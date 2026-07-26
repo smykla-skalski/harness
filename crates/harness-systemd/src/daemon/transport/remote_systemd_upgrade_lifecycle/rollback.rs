@@ -63,6 +63,7 @@ where
         RecoveryOperation::Rollback,
         &displaced.sha256,
         &restored.sha256,
+        None,
         run_systemctl,
     )?;
     stop_and_inhibit(plan, run_systemctl)?;

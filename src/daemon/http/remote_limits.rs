@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use axum::Json;
 use axum::body::Body;
-use axum::extract::State;
 use axum::extract::ws::WebSocketUpgrade;
+use axum::extract::{MatchedPath, State};
 use axum::http::{HeaderValue, Request, StatusCode, header::CONTENT_LENGTH, header::RETRY_AFTER};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -222,7 +222,7 @@ pub(super) async fn admit_remote_http_request(
     request
         .extensions_mut()
         .insert(RemoteHttpAuditMarker::default());
-    let (config, permit) = match remote_http_admission(&state, &request) {
+    let (config, permit, companion_permit) = match remote_http_admission(&state, &request) {
         Ok(admission) => admission,
         Err(rejection) => {
             let response = audited_http_limit_response(
@@ -236,8 +236,7 @@ pub(super) async fn admit_remote_http_request(
         }
     };
     let response = run_remote_http_request_with_timeout(&state, request, next, config).await;
-    drop(permit);
-    response
+    super::companion::bind_response_permits(response, permit, companion_permit)
 }
 
 async fn run_remote_http_request_with_timeout(
@@ -267,7 +266,14 @@ async fn run_remote_http_request_with_timeout(
 fn remote_http_admission(
     state: &DaemonHttpState,
     request: &Request<Body>,
-) -> Result<(RemoteRequestLimitConfig, OwnedSemaphorePermit), RemoteHttpLimitRejection> {
+) -> Result<
+    (
+        RemoteRequestLimitConfig,
+        OwnedSemaphorePermit,
+        Option<OwnedSemaphorePermit>,
+    ),
+    RemoteHttpLimitRejection,
+> {
     let Some(limits) = state.remote_request_limits.as_ref() else {
         return Err(RemoteHttpLimitRejection::new(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -305,7 +311,24 @@ fn remote_http_admission(
             "remote request concurrency limit reached",
         )
     })?;
-    Ok((config, permit))
+    let route_path = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map_or_else(|| request.uri().path(), MatchedPath::as_str);
+    let companion_permit = match state
+        .companion
+        .as_ref()
+        .filter(|companion| companion.owns_route(route_path))
+    {
+        Some(companion) => Some(companion.try_request_permit().ok_or_else(|| {
+            RemoteHttpLimitRejection::with_retry_after(
+                StatusCode::TOO_MANY_REQUESTS,
+                "companion request concurrency limit reached",
+            )
+        })?),
+        None => None,
+    };
+    Ok((config, permit, companion_permit))
 }
 
 #[derive(Debug, Clone, Copy)]

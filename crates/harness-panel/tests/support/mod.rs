@@ -24,6 +24,7 @@ use url::Url;
 /// for a code GitHub has already spent or expired.
 const VALID_CODE: &str = "valid-code";
 const ACCESS_TOKEN: &str = "gho_stub_token";
+const COMPANION_AUTH_TOKEN: &str = "0123456789abcdef0123456789abcdef";
 
 #[derive(Debug, Clone, Serialize)]
 struct StubUser {
@@ -147,11 +148,15 @@ impl PanelUnderTest {
         let directory = tempfile::tempdir().expect("temp dir");
         let secret = directory.path().join("secret");
         fs::write(&secret, "s3cret").expect("writing the secret");
+        let companion_auth_token = directory.path().join("companion-auth-token");
+        fs::write(&companion_auth_token, COMPANION_AUTH_TOKEN).expect("writing the token");
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&secret, fs::Permissions::from_mode(0o600))
                 .expect("restricting the secret");
+            fs::set_permissions(&companion_auth_token, fs::Permissions::from_mode(0o600))
+                .expect("restricting the token");
         }
 
         // The listener is bound first so the public origin can name the port
@@ -164,6 +169,7 @@ impl PanelUnderTest {
             public_origin: format!("http://127.0.0.1:{}", address.port()),
             base_path: "/panel".to_owned(),
             state_dir: directory.path().join("state"),
+            companion_auth_token_file: companion_auth_token,
             github_client_id: "Iv1.stub".to_owned(),
             github_client_secret_file: secret,
             owner_login: owner_login.to_owned(),
@@ -209,6 +215,7 @@ impl PanelUnderTest {
     }
 
     async fn send(&self, request: RequestBuilder, cookie: Option<&str>) -> Response {
+        let request = request.header(AUTHORIZATION, format!("Bearer {COMPANION_AUTH_TOKEN}"));
         let request = match cookie {
             Some(cookie) => request.header(COOKIE, cookie),
             None => request,
@@ -259,19 +266,7 @@ pub fn sign_in_cookie(response: &Response) -> String {
 }
 
 pub fn session_cookie(response: &Response) -> String {
-    cookie_named(response, "harness_panel_session")
-}
-
-fn cookie_named(response: &Response, name: &str) -> String {
-    response
-        .headers()
-        .get_all(SET_COOKIE)
-        .iter()
-        .filter_map(|value| value.to_str().ok())
-        .find(|value| value.starts_with(&format!("{name}=")))
-        .and_then(|value| value.split(';').next())
-        .unwrap_or_else(|| panic!("no {name} cookie was set"))
-        .to_owned()
+    cookie_with_prefix(response, "harness_panel_session_")
 }
 
 fn cookie_with_prefix(response: &Response, prefix: &str) -> String {

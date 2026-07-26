@@ -14,23 +14,31 @@
 use std::error::Error as StdError;
 use std::fmt;
 use std::net::IpAddr;
-use std::sync::Arc;
+use std::path::Path;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Instant;
 
 use axum::Router;
 use axum::body::Body;
 use axum::extract::{ConnectInfo, State};
-use axum::http::{Request, Uri};
+use axum::http::{HeaderValue, Method, Request, Uri};
 use axum::response::Response;
 use axum::routing::any;
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use super::{DaemonConnectInfo, DaemonHttpState};
 
+mod credential;
 mod forward;
+mod rate_limit;
+mod response_body;
 #[cfg(test)]
 mod tests;
+
+pub(crate) use response_body::bind_response_permits;
 
 /// Path segment the daemon's own API owns. A companion prefix may not start
 /// here, or the companion would shadow routes the daemon must keep answering.
@@ -45,6 +53,8 @@ pub const DEFAULT_COMPANION_PATH_PREFIX: &str = "/panel";
 /// describe a different route set.
 const ROUTE_SUFFIX_SLASH: &str = "/";
 const ROUTE_SUFFIX_WILDCARD: &str = "/{*companion_path}";
+const OAUTH_START_SUFFIX: &str = "/auth/github/start";
+const MAX_CONCURRENT_COMPANION_REQUESTS: usize = 8;
 
 /// Why a companion routing configuration was rejected.
 ///
@@ -59,11 +69,17 @@ pub enum CompanionConfigError {
     UpstreamNotLoopback(String),
     UpstreamHasUserinfo(String),
     UpstreamHasPathOrQuery(String),
+    AuthTokenUnreadable(String),
+    AuthTokenNotRegularFile(String),
+    AuthTokenPermissionsTooOpen(String),
+    AuthTokenTooShort,
+    AuthTokenInvalidCharacter,
     PrefixEmpty,
     PrefixNotAbsolute(String),
     PrefixIsRoot,
     PrefixTrailingSlash(String),
     PrefixEmptySegment(String),
+    PrefixDotSegment(String),
     PrefixInvalidCharacter(String),
     PrefixShadowsDaemonApi(String),
 }
@@ -86,13 +102,31 @@ impl fmt::Display for CompanionConfigError {
             ),
             Self::UpstreamHasUserinfo(value) => write!(
                 f,
-                "companion upstream must carry no userinfo, got {value}; the loopback hop \
-                 authenticates nobody and the credentials would ride in every forwarded request"
+                "companion upstream must carry no userinfo, got {value}; use the dedicated \
+                 companion auth token instead"
             ),
             Self::UpstreamHasPathOrQuery(value) => write!(
                 f,
                 "companion upstream must be an origin with no path or query, got {value}; the \
                  request path and query are forwarded unchanged"
+            ),
+            Self::AuthTokenUnreadable(detail) => {
+                write!(f, "cannot read companion auth token file: {detail}")
+            }
+            Self::AuthTokenNotRegularFile(path) => {
+                write!(f, "companion auth token must be a regular file: {path}")
+            }
+            Self::AuthTokenPermissionsTooOpen(path) => write!(
+                f,
+                "companion auth token file must not be accessible by group or others unless it is \
+                 a protected systemd credential: {path}"
+            ),
+            Self::AuthTokenTooShort => {
+                write!(f, "companion auth token must contain at least 32 bytes")
+            }
+            Self::AuthTokenInvalidCharacter => write!(
+                f,
+                "companion auth token must contain only visible ASCII without whitespace or control characters"
             ),
             Self::PrefixEmpty => write!(f, "companion path prefix is required"),
             Self::PrefixNotAbsolute(prefix) => {
@@ -111,6 +145,10 @@ impl fmt::Display for CompanionConfigError {
                     "companion path prefix contains an empty segment: {prefix}"
                 )
             }
+            Self::PrefixDotSegment(prefix) => write!(
+                f,
+                "companion path prefix contains a '.' or '..' URL segment: {prefix}"
+            ),
             Self::PrefixInvalidCharacter(prefix) => write!(
                 f,
                 "companion path prefix must contain no whitespace, control, or URL-structural \
@@ -126,23 +164,72 @@ impl fmt::Display for CompanionConfigError {
 
 impl StdError for CompanionConfigError {}
 
+/// Credential the daemon presents to the loopback companion.
+///
+/// Its `Debug` representation is deliberately opaque because
+/// [`CompanionRouteConfig`] appears in startup diagnostics.
+#[derive(Clone, PartialEq, Eq)]
+pub struct CompanionAuthToken(HeaderValue);
+
+impl fmt::Debug for CompanionAuthToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("CompanionAuthToken([REDACTED])")
+    }
+}
+
+impl CompanionAuthToken {
+    /// Read and validate a token from a private regular file.
+    ///
+    /// # Errors
+    /// Returns [`CompanionConfigError`] when the file is unavailable, has unsafe
+    /// permissions, or does not contain a header-safe token.
+    pub fn read_private_file(path: &Path) -> Result<Self, CompanionConfigError> {
+        let contents = credential::read_private_file(path)?;
+        Self::parse(contents.as_str())
+    }
+
+    pub(crate) fn parse(contents: &str) -> Result<Self, CompanionConfigError> {
+        let token = contents.trim();
+        if token.len() < 32 {
+            return Err(CompanionConfigError::AuthTokenTooShort);
+        }
+        if !token.bytes().all(|byte| (0x21..=0x7e).contains(&byte)) {
+            return Err(CompanionConfigError::AuthTokenInvalidCharacter);
+        }
+        let mut value = HeaderValue::from_str(format!("Bearer {token}").as_str())
+            .map_err(|_| CompanionConfigError::AuthTokenInvalidCharacter)?;
+        value.set_sensitive(true);
+        Ok(Self(value))
+    }
+
+    fn authorization_header(&self) -> HeaderValue {
+        self.0.clone()
+    }
+}
+
 /// A validated companion routing target: where to forward, and which subtree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompanionRouteConfig {
     upstream_origin: String,
     path_prefix: String,
+    auth_token: CompanionAuthToken,
 }
 
 impl CompanionRouteConfig {
-    /// Validate a companion upstream and path prefix.
+    /// Validate a companion upstream and path prefix, and bind its credential.
     ///
     /// # Errors
     /// Returns [`CompanionConfigError`] when the upstream is not a loopback
     /// `http` origin or the prefix would shadow the daemon's own API.
-    pub fn new(upstream: &str, path_prefix: &str) -> Result<Self, CompanionConfigError> {
+    pub fn new(
+        upstream: &str,
+        path_prefix: &str,
+        auth_token: CompanionAuthToken,
+    ) -> Result<Self, CompanionConfigError> {
         Ok(Self {
             upstream_origin: validate_upstream(upstream.trim())?,
             path_prefix: validate_path_prefix(path_prefix.trim())?,
+            auth_token,
         })
     }
 
@@ -156,6 +243,10 @@ impl CompanionRouteConfig {
     #[must_use]
     pub fn path_prefix(&self) -> &str {
         &self.path_prefix
+    }
+
+    fn authorization_header(&self) -> HeaderValue {
+        self.auth_token.authorization_header()
     }
 
     /// Every route pattern the companion owns.
@@ -185,6 +276,10 @@ impl CompanionRouteConfig {
             .strip_prefix(self.path_prefix.as_str())
             .is_some_and(|rest| matches!(rest, "" | ROUTE_SUFFIX_SLASH | ROUTE_SUFFIX_WILDCARD))
     }
+
+    fn is_oauth_start(&self, request_path: &str) -> bool {
+        request_path.strip_prefix(self.path_prefix.as_str()) == Some(OAUTH_START_SUFFIX)
+    }
 }
 
 fn validate_upstream(upstream: &str) -> Result<String, CompanionConfigError> {
@@ -207,8 +302,8 @@ fn validate_upstream(upstream: &str) -> Result<String, CompanionConfigError> {
         .ok_or(CompanionConfigError::UpstreamMissingHost)?;
     // Checking only `authority.host()` would read straight past userinfo and
     // accept `user:pass@127.0.0.1`, which the origin then carries into every
-    // forwarded request. The loopback hop authenticates nobody, so userinfo can
-    // only be an accident or a credential left where it does not belong.
+    // forwarded request. Authentication has one dedicated token, so userinfo
+    // can only be an accident or a credential left where it does not belong.
     if authority.as_str().contains('@') {
         return Err(CompanionConfigError::UpstreamHasUserinfo(
             upstream.to_owned(),
@@ -238,13 +333,11 @@ fn validate_upstream(upstream: &str) -> Result<String, CompanionConfigError> {
 }
 
 /// A companion runs on the same machine by construction, so the upstream host
-/// must be a loopback literal. Resolving an arbitrary name here would let a
-/// configuration typo forward public traffic off the host.
+/// must be a loopback literal. Even `localhost` is refused: the managed socket
+/// proves ownership of one numeric address, while DNS may resolve the request
+/// to another loopback address a different process owns.
 fn is_loopback_host(host: &str) -> bool {
     let host = host.trim_start_matches('[').trim_end_matches(']');
-    if host.eq_ignore_ascii_case("localhost") {
-        return true;
-    }
     host.parse::<IpAddr>()
         .is_ok_and(|address| address.is_loopback())
 }
@@ -275,6 +368,18 @@ fn validate_path_prefix(prefix: &str) -> Result<String, CompanionConfigError> {
     if segments.any(str::is_empty) {
         return Err(CompanionConfigError::PrefixEmptySegment(prefix.to_owned()));
     }
+    if prefix.split('/').skip(1).any(is_url_dot_segment) {
+        return Err(CompanionConfigError::PrefixDotSegment(prefix.to_owned()));
+    }
+    if prefix
+        .split('/')
+        .skip(1)
+        .any(|segment| segment.starts_with(':'))
+    {
+        return Err(CompanionConfigError::PrefixInvalidCharacter(
+            prefix.to_owned(),
+        ));
+    }
     if first.eq_ignore_ascii_case(DAEMON_API_SEGMENT) {
         return Err(CompanionConfigError::PrefixShadowsDaemonApi(
             prefix.to_owned(),
@@ -283,8 +388,16 @@ fn validate_path_prefix(prefix: &str) -> Result<String, CompanionConfigError> {
     Ok(prefix.to_owned())
 }
 
-/// `{`, `}`, and `*` are axum route-pattern syntax; the rest would change how
-/// the prefix parses as a URL.
+fn is_url_dot_segment(segment: &str) -> bool {
+    matches!(segment, "." | "..")
+        || segment.eq_ignore_ascii_case("%2e")
+        || segment.eq_ignore_ascii_case(".%2e")
+        || segment.eq_ignore_ascii_case("%2e.")
+        || segment.eq_ignore_ascii_case("%2e%2e")
+}
+
+/// `{`, `}`, `*`, and a segment-leading `:` are axum route-pattern syntax; the
+/// rest would change how the prefix parses as a URL.
 fn is_rejected_prefix_character(character: char) -> bool {
     character.is_whitespace()
         || character.is_control()
@@ -303,6 +416,8 @@ pub struct CompanionRouter {
 struct CompanionRouterInner {
     config: CompanionRouteConfig,
     client: CompanionClient,
+    oauth_start_limiter: Mutex<rate_limit::OAuthStartRateLimiter>,
+    request_permits: Arc<Semaphore>,
 }
 
 impl fmt::Debug for CompanionRouter {
@@ -316,10 +431,33 @@ impl fmt::Debug for CompanionRouter {
 impl CompanionRouter {
     #[must_use]
     pub fn new(config: CompanionRouteConfig) -> Self {
+        Self::with_request_limit(config, MAX_CONCURRENT_COMPANION_REQUESTS)
+    }
+
+    fn with_request_limit(config: CompanionRouteConfig, max_concurrency: usize) -> Self {
         let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         Self {
-            inner: Arc::new(CompanionRouterInner { config, client }),
+            inner: Arc::new(CompanionRouterInner {
+                config,
+                client,
+                oauth_start_limiter: Mutex::new(rate_limit::OAuthStartRateLimiter::new()),
+                request_permits: Arc::new(Semaphore::new(max_concurrency)),
+            }),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_request_limit_for_tests(
+        config: CompanionRouteConfig,
+        max_concurrency: usize,
+    ) -> Self {
+        Self::with_request_limit(config, max_concurrency)
+    }
+
+    pub(crate) fn try_request_permit(&self) -> Option<OwnedSemaphorePermit> {
+        Arc::clone(&self.inner.request_permits)
+            .try_acquire_owned()
+            .ok()
     }
 
     /// Whether the given matched route path is served by the companion.
@@ -355,10 +493,25 @@ async fn proxy_request(
         // when a companion is configured, but a 502 beats a panic if it ever is.
         return forward::companion_unconfigured_response();
     };
+    let peer_addr = connect_info.remote_addr();
+    if matches!(request.method(), &Method::GET | &Method::HEAD)
+        && companion.inner.config.is_oauth_start(request.uri().path())
+    {
+        let retry_after = companion
+            .inner
+            .oauth_start_limiter
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .admit(peer_addr.ip(), Instant::now())
+            .err();
+        if let Some(retry_after_seconds) = retry_after {
+            return rate_limit::rate_limited_response(retry_after_seconds);
+        }
+    }
     forward::forward_to_companion(
         &companion.inner.config,
         &companion.inner.client,
-        connect_info.remote_addr(),
+        peer_addr,
         request,
     )
     .await

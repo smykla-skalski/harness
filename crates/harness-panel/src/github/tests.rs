@@ -8,8 +8,8 @@ use tokio::net::TcpListener;
 use url::Url;
 
 use super::{
-    GitHubClient, GitHubUser, MAX_FIELD_CHARS, identity_from_user, installation_provider,
-    join_api_path, parse_token_response,
+    GitHubClient, GitHubSignInError, GitHubUser, MAX_FIELD_CHARS, identity_from_user,
+    installation_provider, join_api_path, parse_token_response,
 };
 use crate::config::{ClientSecret, GitHubConfig};
 use crate::error::PanelError;
@@ -101,6 +101,7 @@ fn a_refused_code_is_a_failure_even_though_the_status_was_success() {
     )
     .expect_err("a refused code must fail");
 
+    assert!(matches!(error, GitHubSignInError::Refused(_)));
     assert!(
         error.to_string().contains("The code is incorrect."),
         "{error}"
@@ -110,12 +111,15 @@ fn a_refused_code_is_a_failure_even_though_the_status_was_success() {
 #[test]
 fn a_token_response_without_a_token_is_a_failure() {
     for body in [r"{}", r#"{"access_token":""}"#, r#"{"access_token":"  "}"#] {
-        assert!(
-            parse_token_response(body).is_err(),
-            "{body} should be refused"
-        );
+        assert!(matches!(
+            parse_token_response(body),
+            Err(GitHubSignInError::Internal(_))
+        ));
     }
-    assert!(parse_token_response("not json").is_err());
+    assert!(matches!(
+        parse_token_response("not json"),
+        Err(GitHubSignInError::Internal(_))
+    ));
 }
 
 #[test]

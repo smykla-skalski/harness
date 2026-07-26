@@ -27,6 +27,23 @@ const MAX_FIELD_CHARS: usize = 200;
 
 const SCOPE: &str = "read:user";
 
+/// A token exchange can fail because the authorization code was refused or
+/// because the upstream could not complete the request. Only the former is a
+/// sign-in result the browser may see.
+#[derive(Debug, thiserror::Error)]
+pub enum GitHubSignInError {
+    #[error("github refused the authorization code: {0}")]
+    Refused(String),
+    #[error(transparent)]
+    Internal(PanelError),
+}
+
+impl From<PanelError> for GitHubSignInError {
+    fn from(error: PanelError) -> Self {
+        Self::Internal(error)
+    }
+}
+
 /// Talks to GitHub as the panel's OAuth app.
 #[derive(Debug, Clone)]
 pub struct GitHubClient {
@@ -77,9 +94,10 @@ impl GitHubClient {
     /// Trade the authorization code for an access token.
     ///
     /// # Errors
-    /// Returns [`PanelError::GitHub`] when the request fails or GitHub refuses
-    /// the code.
-    pub async fn exchange_code(&self, code: &str) -> Result<String, PanelError> {
+    /// Returns [`GitHubSignInError::Refused`] when GitHub rejects the code, and
+    /// [`GitHubSignInError::Internal`] when the upstream request or response
+    /// fails.
+    pub async fn exchange_code(&self, code: &str) -> Result<String, GitHubSignInError> {
         let response = self
             .http
             .post(self.config.token_url.clone())
@@ -101,9 +119,9 @@ impl GitHubClient {
             .await
             .map_err(|error| PanelError::github(format!("reading the token response: {error}")))?;
         if !status.is_success() {
-            return Err(PanelError::github(format!(
-                "the token endpoint answered {status}"
-            )));
+            return Err(
+                PanelError::github(format!("the token endpoint answered {status}")).into(),
+            );
         }
         parse_token_response(&body)
     }
@@ -164,21 +182,17 @@ struct TokenResponse {
 /// GitHub answers a refused code with HTTP 200 and an `error` field, so a
 /// caller that only checked the status would go on to call the API with the
 /// literal string "None".
-fn parse_token_response(body: &str) -> Result<String, PanelError> {
+fn parse_token_response(body: &str) -> Result<String, GitHubSignInError> {
     let parsed: TokenResponse = serde_json::from_str(body)
         .map_err(|error| PanelError::github(format!("parsing the token response: {error}")))?;
 
     if let Some(error) = parsed.error {
         let detail = parsed.error_description.unwrap_or_else(|| error.clone());
-        return Err(PanelError::github(format!(
-            "github refused the authorization code: {detail}"
-        )));
+        return Err(GitHubSignInError::Refused(detail));
     }
     match parsed.access_token {
         Some(token) if !token.trim().is_empty() => Ok(token),
-        _ => Err(PanelError::github(
-            "the token response carried no access token",
-        )),
+        _ => Err(PanelError::github("the token response carried no access token").into()),
     }
 }
 

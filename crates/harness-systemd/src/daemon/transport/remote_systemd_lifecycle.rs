@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::errors::{CliError, CliErrorKind};
 
+use super::binary_exclusivity::systemd_manager_version;
 use super::remote_systemd::RemoteSystemdInstallPlan;
 
 const SYSTEMCTL_OUTPUT_ENVIRONMENT: [(&str, &str); 9] = [
@@ -18,11 +19,13 @@ const SYSTEMCTL_OUTPUT_ENVIRONMENT: [(&str, &str); 9] = [
     ("SYSTEMD_LOG_TIME", "0"),
     ("SYSTEMD_URLIFY", "0"),
 ];
+const MIN_CREDENTIAL_SYSTEMD_VERSION: u32 = 247;
 
 mod install_files;
 mod uninstall;
 mod unit_name;
 
+pub(super) use install_files::validate_trusted_read_source;
 use install_files::{
     validate_install_binary, validate_install_environment, write_if_missing, write_unit_if_missing,
 };
@@ -94,7 +97,7 @@ where
     RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
     BeforeEnable: FnMut() -> Result<(), CliError>,
 {
-    validate_install_binary(&plan.binary_path)?;
+    preflight_remote_systemd_install(plan, run_systemctl)?;
     let unit_written =
         write_unit_if_missing(&plan.unit_path, &plan.unit_contents, &plan.unit, 0o644)?;
     let env_written = write_if_missing(&plan.env_path, &plan.env_contents, 0o600)?;
@@ -120,6 +123,45 @@ where
         enabled: true,
         started: true,
     })
+}
+
+pub(crate) fn preflight_remote_systemd_install<RunSystemctl>(
+    plan: &RemoteSystemdInstallPlan,
+    run_systemctl: &RunSystemctl,
+) -> Result<(), CliError>
+where
+    RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
+{
+    if plan.requires_systemd_credentials {
+        validate_systemd_credential_support(run_systemctl)?;
+    }
+    validate_install_binary(&plan.binary_path)
+}
+
+fn validate_systemd_credential_support<RunSystemctl>(
+    run_systemctl: &RunSystemctl,
+) -> Result<(), CliError>
+where
+    RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
+{
+    let manager_version = systemd_manager_version(run_systemctl)?;
+    let version = manager_version
+        .split(|character: char| !character.is_ascii_digit())
+        .next()
+        .and_then(|version| version.parse::<u32>().ok())
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "cannot parse systemd manager version: {manager_version}"
+            )))
+        })?;
+    if version < MIN_CREDENTIAL_SYSTEMD_VERSION {
+        return Err(CliErrorKind::workflow_io(format!(
+            "companion routing requires systemd {MIN_CREDENTIAL_SYSTEMD_VERSION} or newer for \
+             LoadCredential and %d, found {manager_version}"
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 fn validate_effective_install_unit<RunSystemctl>(

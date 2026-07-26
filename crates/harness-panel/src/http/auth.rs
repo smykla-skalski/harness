@@ -9,11 +9,12 @@ use serde::Deserialize;
 
 use super::PanelState;
 use super::session::{
-    has_pending_sign_in, session_token, with_pending_sign_in, with_session_cookie, without_cookie,
-    without_pending_sign_in,
+    has_pending_sign_in, session_token, with_pending_sign_in, with_session_cookie,
+    without_pending_sign_in, without_session_cookie,
 };
 use crate::config::OAUTH_STATE_TTL_MINUTES;
 use crate::error::ApiError;
+use crate::github::GitHubSignInError;
 use crate::store::accounts::AccountIdentity;
 
 /// GitHub's own limit on how much of an error it will describe. Anything past
@@ -40,12 +41,18 @@ pub struct CallbackQuery {
 /// so a second tab starting one does not strand the first.
 ///
 /// # Errors
-/// Returns [`ApiError::Internal`] when the sign-in cannot be recorded.
+/// Returns [`ApiError::RateLimited`] while the outstanding sign-in capacity is
+/// full, and [`ApiError::Internal`] when the sign-in cannot be recorded.
 pub async fn start(State(state): State<PanelState>, jar: CookieJar) -> Result<Response, ApiError> {
-    let issued = state
+    let Some(issued) = state
         .store
         .create_oauth_state(Duration::minutes(OAUTH_STATE_TTL_MINUTES), Utc::now())
-        .await?;
+        .await?
+    else {
+        return Err(ApiError::RateLimited(
+            "too many sign-ins are already waiting to finish",
+        ));
+    };
     let redirect = state.github.authorize_url(issued.expose());
     let jar = with_pending_sign_in(
         jar,
@@ -152,12 +159,22 @@ async fn finish_sign_in(
         .github
         .exchange_code(code)
         .await
-        .map_err(|error| ApiError::SignInFailed(error.to_string()))?;
+        .map_err(token_exchange_error)?;
     state
         .github
         .fetch_identity(&token)
         .await
-        .map_err(|error| ApiError::SignInFailed(error.to_string()))
+        .map_err(ApiError::from)
+}
+
+fn token_exchange_error(error: GitHubSignInError) -> ApiError {
+    match error {
+        GitHubSignInError::Refused(detail) => ApiError::SignInFailed(format!(
+            "github refused the sign-in: {}",
+            reflected_detail(&detail)
+        )),
+        GitHubSignInError::Internal(error) => ApiError::Internal(error),
+    }
 }
 
 async fn validate_callback_state(
@@ -201,14 +218,14 @@ pub async fn signout(
 
     // A request that presented no session has none to end. Doing nothing also
     // avoids sending an expiry for a cookie the request did not carry.
-    let Some(token) = session_token(&headers) else {
+    let Some(token) = session_token(&state, &headers) else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
 
     // Deleting server-side is what makes signing out real; expiring the cookie
     // only asks the browser to cooperate.
     state.store.delete_session(&token).await?;
-    let jar = without_cookie(jar, &state, super::session::SESSION_COOKIE);
+    let jar = without_session_cookie(jar, &state);
     Ok((jar, StatusCode::NO_CONTENT).into_response())
 }
 

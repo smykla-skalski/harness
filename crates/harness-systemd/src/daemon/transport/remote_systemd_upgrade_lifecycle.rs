@@ -42,6 +42,9 @@ pub(in crate::daemon::transport) use release_pair::{
 pub(crate) use rollback::rollback_remote_systemd_with;
 pub(crate) use systemd::verify_remote_systemd_health;
 pub(crate) use workflow::upgrade_remote_systemd_with;
+pub(in crate::daemon::transport) use workflow::{
+    adopt_existing_remote_systemd_unit, upgrade_remote_systemd_claimed_with,
+};
 
 #[cfg(test)]
 pub(crate) use automation::render_recovery_units_for_tests;

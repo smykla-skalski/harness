@@ -89,6 +89,7 @@ impl UpgradeFixture {
         let upgrade_plan = RemoteSystemdUpgradePlan {
             operation: operation.clone(),
             candidate_path: candidate,
+            desired_unit_contents: None,
         };
         establish_release_pair_for_tests(
             &operation.unit,

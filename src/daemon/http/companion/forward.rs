@@ -8,6 +8,7 @@
 //! never carries connection state that belonged to a different connection.
 
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use axum::Json;
 use axum::body::Body;
@@ -22,12 +23,15 @@ use axum::response::{IntoResponse, Response};
 use hyper::body::Incoming;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::{Client, Error as ClientError};
+use tokio::time::{Instant, timeout_at};
 
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::CompanionRouteConfig;
+use super::response_body::stream_upstream_body;
 
 const COMPANION_ERROR_CODE: &str = "COMPANION_UPSTREAM";
+const COMPANION_UPSTREAM_TIMEOUT: Duration = Duration::from_mins(1);
 
 /// Headers that describe one hop and must never be forwarded to the next one.
 const HOP_BY_HOP_HEADERS: &[HeaderName] = &[
@@ -74,11 +78,19 @@ pub(super) async fn forward_to_companion(
         Ok(request) => request,
         Err(response) => return *response,
     };
-    match client.request(upstream_request).await {
-        Ok(response) => upstream_response(response),
-        Err(error) => {
+    let deadline = Instant::now() + COMPANION_UPSTREAM_TIMEOUT;
+    match timeout_at(deadline, client.request(upstream_request)).await {
+        Ok(Ok(response)) => upstream_response(response, deadline, config.upstream_origin()),
+        Ok(Err(error)) => {
             log_upstream_failure(config.upstream_origin(), &error);
             upstream_unreachable_response()
+        }
+        Err(_) => {
+            tracing::warn!(
+                upstream = config.upstream_origin(),
+                "companion upstream request timed out"
+            );
+            upstream_timeout_response()
         }
     }
 }
@@ -94,6 +106,7 @@ fn build_upstream_request(
         .ok_or_else(|| Box::new(upstream_uri_invalid_response()))?;
     strip_hop_by_hop_headers(&mut parts.headers);
     strip_daemon_credentials(&mut parts.headers);
+    apply_companion_authorization(&mut parts.headers, config);
     // hyper derives Host from the upstream authority; leaving the public Host
     // here would make the companion answer for an origin it is not bound to.
     parts.headers.remove(HOST);
@@ -101,14 +114,17 @@ fn build_upstream_request(
     Ok(Request::from_parts(parts, body))
 }
 
-/// The companion authenticates its own users and never speaks the daemon's
-/// remote-auth protocol, so a daemon credential that happens to ride a request
-/// under the prefix - a reused token, a cached browser header - must stop here
-/// rather than reach a separate service that has no business holding it.
+/// A caller credential that happens to ride a request under the prefix - a
+/// reused token, a cached browser header - must stop here rather than override
+/// the daemon's own loopback credential.
 fn strip_daemon_credentials(headers: &mut HeaderMap) {
     headers.remove(AUTHORIZATION);
     headers.remove(REMOTE_CLIENT_ID_HEADER);
     headers.remove(FORWARDED);
+}
+
+fn apply_companion_authorization(headers: &mut HeaderMap, config: &CompanionRouteConfig) {
+    headers.insert(AUTHORIZATION, config.authorization_header());
 }
 
 /// The public host the caller actually addressed.
@@ -157,10 +173,17 @@ fn apply_forwarded_headers(
     }
 }
 
-fn upstream_response(response: HttpResponse<Incoming>) -> Response {
+fn upstream_response(
+    response: HttpResponse<Incoming>,
+    deadline: Instant,
+    upstream: &str,
+) -> Response {
     let (mut parts, body) = response.into_parts();
     strip_hop_by_hop_headers(&mut parts.headers);
-    HttpResponse::from_parts(parts, Body::new(body))
+    let (body, lease) = stream_upstream_body(body, deadline, upstream);
+    let mut response = HttpResponse::from_parts(parts, body);
+    response.extensions_mut().insert(lease);
+    response
 }
 
 /// Remove every hop-by-hop header, including the ones this hop named in
@@ -231,6 +254,13 @@ fn upstream_unreachable_response() -> Response {
     companion_error_response(StatusCode::BAD_GATEWAY, "companion service did not answer")
 }
 
+fn upstream_timeout_response() -> Response {
+    companion_error_response(
+        StatusCode::GATEWAY_TIMEOUT,
+        "companion service did not answer in time",
+    )
+}
+
 fn upstream_uri_invalid_response() -> Response {
     companion_error_response(
         StatusCode::BAD_GATEWAY,
@@ -255,15 +285,19 @@ pub(super) fn companion_unconfigured_response() -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        HOST, HeaderMap, HeaderName, HeaderValue, SocketAddr, X_FORWARDED_FOR, X_FORWARDED_HOST,
-        X_FORWARDED_PROTO, apply_forwarded_headers, connection_listed_headers, original_host,
+        AUTHORIZATION, HOST, HeaderMap, HeaderName, HeaderValue, SocketAddr, X_FORWARDED_FOR,
+        X_FORWARDED_HOST, X_FORWARDED_PROTO, apply_companion_authorization,
+        apply_forwarded_headers, connection_listed_headers, original_host,
         requests_protocol_upgrade, strip_daemon_credentials, strip_hop_by_hop_headers,
         upstream_uri,
     };
-    use crate::daemon::http::companion::CompanionRouteConfig;
+    use crate::daemon::http::companion::{CompanionAuthToken, CompanionRouteConfig};
+
+    const TEST_TOKEN: &str = "daemon-panel-test-token-0123456789";
 
     fn config() -> CompanionRouteConfig {
-        CompanionRouteConfig::new("http://127.0.0.1:8787", "/panel")
+        let token = CompanionAuthToken::parse(TEST_TOKEN).expect("valid companion auth token");
+        CompanionRouteConfig::new("http://127.0.0.1:8787", "/panel", token)
             .expect("valid companion config")
     }
 
@@ -390,6 +424,29 @@ mod tests {
             headers.contains_key("cookie"),
             "the companion's own session cookie must survive"
         );
+    }
+
+    #[test]
+    fn companion_authorization_replaces_every_caller_value() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer attacker-one"),
+        );
+        headers.append(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer attacker-two"),
+        );
+
+        strip_daemon_credentials(&mut headers);
+        apply_companion_authorization(&mut headers, &config());
+
+        let values = headers
+            .get_all(AUTHORIZATION)
+            .iter()
+            .map(|value| value.to_str().expect("ASCII authorization"))
+            .collect::<Vec<_>>();
+        assert_eq!(values, vec![format!("Bearer {TEST_TOKEN}")]);
     }
 
     #[test]

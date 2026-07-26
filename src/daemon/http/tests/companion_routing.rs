@@ -1,23 +1,37 @@
 //! Behaviour of the companion routing seam on a live remote-mode router.
 //!
 //! These drive the real `daemon_http_router`, so they prove the layering that
-//! makes companion traffic unauthenticated while the daemon's own API keeps
-//! demanding credentials on the very same listener.
+//! bypasses public daemon client auth for companion traffic, replaces it with
+//! the private loopback credential, and keeps the daemon API authenticated.
 
+use std::convert::Infallible;
+use std::future::pending;
+use std::sync::Arc;
+
+use axum::body::{Body, Bytes};
 use axum::extract::Request;
-use axum::http::{HeaderMap, StatusCode, Uri};
+use axum::http::{HeaderMap, Response, StatusCode, Uri, header::CONTENT_LENGTH};
 use axum::routing::any;
 use axum::{Json, Router};
+use futures_util::{StreamExt as _, stream};
 use serde_json::Value;
 use tokio::net::TcpListener;
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
+use tokio::time::{Duration, timeout};
 
-use crate::daemon::http::{CompanionRouteConfig, CompanionRouter, DaemonHttpState};
+use crate::daemon::http::companion::CompanionAuthToken;
+use crate::daemon::http::{
+    CompanionRouteConfig, CompanionRouter, DaemonHttpState, RemoteRequestLimitConfig,
+};
 use crate::daemon::protocol::http_paths;
 
-use super::remote_limits_support::{remote_state_with_viewer, serve_remote};
+use super::remote_limits_support::{
+    remote_state_with_viewer, remote_state_with_viewer_config, send_remote_health, serve_remote,
+};
 
 const COMPANION_PREFIX: &str = "/panel";
+const COMPANION_TOKEN: &str = "daemon-panel-test-token-0123456789";
 
 /// What the companion saw: the request line and the headers the assertions care
 /// about, echoed back as JSON so the test reads them from the daemon's answer.
@@ -35,6 +49,7 @@ async fn echo_request(uri: Uri, headers: HeaderMap, request: Request) -> Json<Va
     Json(serde_json::json!({
         "path_and_query": uri.path_and_query().map(ToString::to_string),
         "headers": Value::Object(observed),
+        "authorization_count": headers.get_all("authorization").iter().count(),
     }))
 }
 
@@ -65,10 +80,72 @@ async fn closed_loopback_origin() -> String {
 
 fn state_with_companion(upstream: &str) -> DaemonHttpState {
     let mut state = remote_state_with_viewer();
-    let config =
-        CompanionRouteConfig::new(upstream, COMPANION_PREFIX).expect("valid companion config");
+    let token = CompanionAuthToken::parse(COMPANION_TOKEN).expect("valid companion token");
+    let config = CompanionRouteConfig::new(upstream, COMPANION_PREFIX, token)
+        .expect("valid companion config");
     state.companion = Some(CompanionRouter::new(config));
     state
+}
+
+fn state_with_companion_limits(
+    upstream: &str,
+    global_concurrency: usize,
+    companion_concurrency: usize,
+) -> DaemonHttpState {
+    let mut state = remote_state_with_viewer_config(RemoteRequestLimitConfig {
+        max_http_concurrency: global_concurrency,
+        request_timeout: Duration::from_secs(5),
+        ..RemoteRequestLimitConfig::default()
+    });
+    let token = CompanionAuthToken::parse(COMPANION_TOKEN).expect("valid companion token");
+    let config = CompanionRouteConfig::new(upstream, COMPANION_PREFIX, token)
+        .expect("valid companion config");
+    state.companion = Some(CompanionRouter::with_request_limit_for_tests(
+        config,
+        companion_concurrency,
+    ));
+    state
+}
+
+async fn spawn_stalled_companion_upstream() -> (String, Arc<Notify>, JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind stalled companion");
+    let address = listener.local_addr().expect("stalled companion address");
+    let started = Arc::new(Notify::new());
+    let observed = Arc::clone(&started);
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.expect("accept companion request");
+        observed.notify_one();
+        let _socket = socket;
+        pending::<()>().await;
+    });
+    (format!("http://{address}"), started, server)
+}
+
+async fn stall_after_headers() -> Response<Body> {
+    let body =
+        stream::iter([Ok::<_, Infallible>(Bytes::from_static(b"x"))]).chain(stream::pending());
+    Response::builder()
+        .header(CONTENT_LENGTH, "5")
+        .body(Body::from_stream(body))
+        .expect("stalled response")
+}
+
+async fn spawn_body_stalled_companion_upstream() -> (String, JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind body-stalled companion");
+    let address = listener
+        .local_addr()
+        .expect("body-stalled companion address");
+    let app = Router::new().fallback(any(stall_after_headers));
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .await
+            .expect("serve body-stalled companion");
+    });
+    (format!("http://{address}"), server)
 }
 
 fn header(body: &Value, name: &str) -> Option<String> {
@@ -79,7 +156,7 @@ fn header(body: &Value, name: &str) -> Option<String> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn companion_traffic_is_forwarded_verbatim_without_daemon_credentials() {
+async fn companion_traffic_is_forwarded_with_loopback_credentials() {
     let (upstream, upstream_server) = spawn_companion_upstream().await;
     let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
 
@@ -95,6 +172,10 @@ async fn companion_traffic_is_forwarded_verbatim_without_daemon_credentials() {
         body["path_and_query"].as_str(),
         Some("/panel/api/me?verbose=1"),
         "the prefix and query must reach the companion unchanged"
+    );
+    assert_eq!(
+        header(&body, "authorization"),
+        Some(format!("Bearer {COMPANION_TOKEN}"))
     );
     server.abort();
     upstream_server.abort();
@@ -130,7 +211,7 @@ async fn forwarded_headers_describe_the_public_hop_and_replace_caller_values() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn daemon_credentials_do_not_cross_the_proxy() {
+async fn caller_credentials_are_replaced_by_the_companion_credential() {
     let (upstream, upstream_server) = spawn_companion_upstream().await;
     let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
 
@@ -144,7 +225,11 @@ async fn daemon_credentials_do_not_cross_the_proxy() {
         .expect("companion request");
 
     let body: Value = response.json().await.expect("companion echo body");
-    assert!(header(&body, "authorization").is_none());
+    assert_eq!(
+        header(&body, "authorization"),
+        Some(format!("Bearer {COMPANION_TOKEN}"))
+    );
+    assert_eq!(body["authorization_count"].as_u64(), Some(1));
     assert!(header(&body, "x-harness-remote-client-id").is_none());
     assert!(header(&body, "forwarded").is_none());
     server.abort();
@@ -208,6 +293,66 @@ async fn paths_outside_the_prefix_are_not_forwarded() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn github_sign_in_starts_are_limited_without_blocking_other_companion_routes() {
+    let (upstream, upstream_server) = spawn_companion_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+    let client = reqwest::Client::new();
+    let start_url = format!("{base_url}/panel/auth/github/start");
+
+    for attempt in 1..=4 {
+        let response = client
+            .get(&start_url)
+            .send()
+            .await
+            .expect("GitHub sign-in start");
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "attempt {attempt} should be admitted"
+        );
+    }
+
+    let limited = client
+        .get(&start_url)
+        .send()
+        .await
+        .expect("rate-limited GitHub sign-in start");
+    assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
+    let retry_after = limited
+        .headers()
+        .get("retry-after")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        .expect("numeric Retry-After");
+    assert!((1..=600).contains(&retry_after));
+    let body: Value = limited.json().await.expect("rate-limit error body");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("COMPANION_OAUTH_START_RATE_LIMIT")
+    );
+    assert_eq!(
+        body["error"]["message"].as_str(),
+        Some("GitHub sign-in attempts are rate limited")
+    );
+
+    let non_state_method = client
+        .post(&start_url)
+        .send()
+        .await
+        .expect("non-state method");
+    assert_eq!(non_state_method.status(), StatusCode::OK);
+
+    let unaffected = client
+        .get(format!("{base_url}/panel/api/me"))
+        .send()
+        .await
+        .expect("unrelated companion route");
+    assert_eq!(unaffected.status(), StatusCode::OK);
+    server.abort();
+    upstream_server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_prefix_is_unrouted_when_no_companion_is_configured() {
     let (base_url, server) = serve_remote(remote_state_with_viewer()).await;
 
@@ -236,6 +381,79 @@ async fn an_unreachable_companion_answers_bad_gateway() {
     let body: Value = response.json().await.expect("error body");
     assert_eq!(body["error"]["code"].as_str(), Some("COMPANION_UPSTREAM"));
     server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_stalled_companion_cannot_exhaust_the_core_api_request_lane() {
+    let (upstream, started, upstream_server) = spawn_stalled_companion_upstream().await;
+    let state = state_with_companion_limits(&upstream, 2, 1);
+    let (base_url, server) = serve_remote(state).await;
+    let client = reqwest::Client::new();
+    let first_client = client.clone();
+    let first_url = format!("{base_url}/panel/api/me");
+    let first = tokio::spawn(async move { first_client.get(first_url).send().await });
+    timeout(Duration::from_secs(2), started.notified())
+        .await
+        .expect("first companion request reached upstream");
+
+    let overflow = client
+        .get(format!("{base_url}/panel/api/me"))
+        .send()
+        .await
+        .expect("overflow companion request");
+    let core = send_remote_health(client, base_url, "companion-bulkhead-core-request")
+        .await
+        .expect("authenticated core request");
+
+    assert_eq!(overflow.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(core.status(), StatusCode::OK);
+    first.abort();
+    server.abort();
+    upstream_server.abort();
+}
+
+#[tokio::test]
+async fn a_stalled_response_body_holds_the_bulkhead_until_its_timeout() {
+    let (upstream, upstream_server) = spawn_body_stalled_companion_upstream().await;
+    let state = state_with_companion_limits(&upstream, 1, 2);
+    let (base_url, server) = serve_remote(state).await;
+    let client = reqwest::Client::new();
+    let first = client
+        .get(format!("{base_url}/panel/api/me"))
+        .send()
+        .await
+        .expect("first companion response headers");
+    assert_eq!(first.status(), StatusCode::OK);
+
+    let overflow = client
+        .get(format!("{base_url}/panel/api/me"))
+        .send()
+        .await
+        .expect("overflow companion request");
+    assert_eq!(overflow.status(), StatusCode::TOO_MANY_REQUESTS);
+
+    tokio::time::pause();
+    let first_body = tokio::spawn(async move { first.bytes().await });
+    tokio::task::yield_now().await;
+    tokio::time::advance(Duration::from_secs(61)).await;
+    tokio::time::resume();
+    let _body_error = timeout(Duration::from_secs(1), first_body)
+        .await
+        .expect("body timeout completed")
+        .expect("body task")
+        .expect_err("stalled body must fail");
+
+    tokio::task::yield_now().await;
+    let recovered = timeout(
+        Duration::from_secs(1),
+        client.get(format!("{base_url}/panel/api/me")).send(),
+    )
+    .await
+    .expect("request after body timeout")
+    .expect("recovered companion response");
+    assert_eq!(recovered.status(), StatusCode::OK);
+    server.abort();
+    upstream_server.abort();
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -9,7 +9,8 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::control::print_json;
 use super::remote_systemd::{
-    DaemonRemoteSystemdUnitArgs, ensure_linux_systemd, systemd_daemon_root,
+    DaemonRemoteSystemdUnitArgs, RemoteSystemdInstallPlan, ensure_linux_systemd,
+    systemd_daemon_root,
 };
 use super::remote_systemd_lifecycle::{
     CanonicalRemoteSystemdUnit, run_systemctl, unit_service_name,
@@ -163,6 +164,7 @@ impl DaemonRemoteSystemdUpgradeArgs {
         Ok(RemoteSystemdUpgradePlan {
             operation,
             candidate_path,
+            desired_unit_contents: None,
         })
     }
 }
@@ -178,6 +180,35 @@ impl DaemonRemoteSystemdRollbackArgs {
             Path::new(DEFAULT_TRANSACTION_ROOT),
         )
     }
+}
+
+pub(super) fn reconfigure_upgrade_plan(
+    install: &RemoteSystemdInstallPlan,
+    controller_path: PathBuf,
+) -> Result<RemoteSystemdUpgradePlan, CliError> {
+    let mut operation = operation_plan(
+        &install.unit,
+        &install.binary_path,
+        Some(&install.env_path),
+        DEFAULT_READINESS_TIMEOUT_SECONDS,
+        DEFAULT_STABILIZATION_WINDOW_SECONDS,
+        Path::new(DEFAULT_TRANSACTION_ROOT),
+    )?;
+    if operation.unit_path != install.unit_path {
+        return Err(CliErrorKind::workflow_io(format!(
+            "reconfigure unit path differs from the managed lifecycle path: {} != {}",
+            install.unit_path.display(),
+            operation.unit_path.display()
+        ))
+        .into());
+    }
+    operation.controller_path = controller_path;
+    operation.validate()?;
+    Ok(RemoteSystemdUpgradePlan {
+        operation,
+        candidate_path: install.binary_path.clone(),
+        desired_unit_contents: Some(install.unit_contents.clone()),
+    })
 }
 
 fn operation_plan(

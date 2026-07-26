@@ -45,6 +45,14 @@ pub(super) fn upgrade_unit_to_notify(path: &Path) -> Result<(), CliError> {
     unit_upgrade::upgrade_unit_to_notify(path)
 }
 
+pub(super) fn install_desired_unit(
+    path: &Path,
+    contents: &str,
+    metadata: super::model::FileMetadata,
+) -> Result<(), CliError> {
+    unit_upgrade::install_desired_unit(path, contents, metadata)
+}
+
 #[cfg(test)]
 pub(crate) fn notify_unit_contents_for_tests(contents: &str) -> Result<String, CliError> {
     unit_upgrade::notify_unit_contents_for_tests(contents)

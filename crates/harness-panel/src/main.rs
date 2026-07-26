@@ -1,10 +1,11 @@
 //! The `harness-panel` executable.
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use harness_panel::config::PanelArgs;
+use harness_panel::config::{DEFAULT_LISTEN, PanelArgs};
 use harness_panel::{PanelError, serve, unit};
 use tokio::runtime::Builder;
 use tracing_subscriber::EnvFilter;
@@ -28,8 +29,7 @@ struct Cli {
 enum Command {
     /// Serve the panel.
     Serve(Box<PanelArgs>),
-    /// Print a hardened systemd unit for these flags, for review before it is
-    /// installed.
+    /// Print the hardened systemd service for review before it is installed.
     PrintUnit {
         #[command(flatten)]
         args: Box<PanelArgs>,
@@ -39,6 +39,16 @@ enum Command {
         /// Path the unit starts the panel from.
         #[arg(long, default_value = "/usr/local/bin/harness-panel")]
         binary_path: PathBuf,
+    },
+    /// Print the systemd socket that reserves the panel listener across
+    /// service restarts.
+    PrintSocketUnit {
+        /// Address systemd owns and passes to the panel service.
+        #[arg(long, default_value = DEFAULT_LISTEN)]
+        listen: SocketAddr,
+        /// Unit stem shared by the socket and service.
+        #[arg(long, default_value = DEFAULT_UNIT)]
+        unit: String,
     },
 }
 
@@ -79,6 +89,10 @@ fn run(cli: Cli) -> Result<(), PanelError> {
             // Rendering deliberately does not resolve the configuration: the
             // unit is printed on a host where the secret file may not exist yet.
             print!("{}", unit::render_unit(&unit, &binary_path, &args)?);
+            Ok(())
+        }
+        Command::PrintSocketUnit { listen, unit } => {
+            print!("{}", unit::render_socket_unit(&unit, listen)?);
             Ok(())
         }
     }

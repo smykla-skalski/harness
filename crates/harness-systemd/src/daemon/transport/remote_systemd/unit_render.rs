@@ -11,6 +11,9 @@ use std::path::Path;
 use crate::daemon::remote::RemoteDaemonServeConfig;
 use crate::errors::{CliError, CliErrorKind};
 
+const COMPANION_CREDENTIAL_NAME: &str = "companion-auth-token";
+const COMPANION_CREDENTIAL_RUNTIME_PATH: &str = "%d/companion-auth-token";
+
 pub(super) fn render_unit(
     unit: &str,
     binary_path: &Path,
@@ -18,22 +21,55 @@ pub(super) fn render_unit(
     serve_config: &RemoteDaemonServeConfig,
     needs_bind_capability: bool,
 ) -> String {
-    let exec_start = render_systemd_exec_start(&remote_serve_command(binary_path, serve_config));
+    let exec_start = render_remote_exec_start(binary_path, serve_config);
+    let companion_credential =
+        serve_config
+            .companion
+            .as_ref()
+            .map_or_else(String::new, |companion| {
+                format!(
+                    "LoadCredential={COMPANION_CREDENTIAL_NAME}:{}\n",
+                    companion.auth_token_source.display()
+                )
+            });
+    let companion_dependencies = serve_config.companion.as_ref().map_or_else(
+        || "After=network-online.target\n".to_string(),
+        |companion| {
+            let socket = &companion.panel_socket_unit;
+            format!(
+                "Requires={socket}\n\
+                         BindsTo={socket}\n\
+                         After=network-online.target {socket}\n"
+            )
+        },
+    );
+    let companion_socket = serve_config
+        .companion
+        .as_ref()
+        .map_or_else(String::new, |companion| {
+            format!(
+                "Sockets={}\n\
+                 NonBlocking=true\n",
+                companion.panel_socket_unit
+            )
+        });
     let mut contents = format!(
         "[Unit]\n\
          Description=Harness remote daemon\n\
-         After=network-online.target\n\
+         {companion_dependencies}\
          Wants=network-online.target\n\
          \n\
          [Service]\n\
          Type=notify\n\
          NotifyAccess=main\n\
+         {companion_socket}\
          TimeoutStartSec=20min\n\
          KillMode=control-group\n\
          EnvironmentFile={}\n\
          Environment=HARNESS_DAEMON_DATA_HOME=%S/{unit}\n\
          Environment=XDG_DATA_HOME=%S/{unit}\n\
          Environment=HARNESS_DAEMON_OWNERSHIP=external\n\
+         {companion_credential}\
          ExecStart={exec_start}\n\
          Restart=on-failure\n\
          RestartSec=5s\n\
@@ -80,6 +116,16 @@ pub(super) fn render_unit(
     }
     contents.push_str("\n[Install]\nWantedBy=multi-user.target\n");
     contents
+}
+
+fn render_remote_exec_start(binary_path: &Path, config: &RemoteDaemonServeConfig) -> String {
+    let mut rendered = render_systemd_exec_start(&remote_serve_command(binary_path, config));
+    if config.companion.is_some() {
+        rendered.push_str(" --companion-auth-token-file ");
+        rendered.push_str(COMPANION_CREDENTIAL_RUNTIME_PATH);
+        rendered.push_str(" --companion-systemd-socket-activated");
+    }
+    rendered
 }
 
 fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) -> Vec<String> {

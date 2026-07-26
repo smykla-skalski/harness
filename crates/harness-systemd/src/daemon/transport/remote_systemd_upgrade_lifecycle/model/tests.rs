@@ -17,6 +17,7 @@ fn recovery_arm(phase: RecoveryPhase, target_database_seal: Option<DatabaseSeal>
         original_enabled: true,
         before_sha256: "before".to_string(),
         target_sha256: "target".to_string(),
+        target_unit_sha256: None,
         controller_sha256: Some("a".repeat(64)),
         target_database_seal,
     }

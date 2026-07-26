@@ -20,12 +20,25 @@ fn secret_file(directory: &Path) -> PathBuf {
     path
 }
 
+fn companion_auth_token_file(directory: &Path) -> PathBuf {
+    let path = directory.join("companion-auth-token");
+    fs::write(&path, "0123456789abcdef0123456789abcdef\n").expect("writing the token");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .expect("restricting the token");
+    }
+    path
+}
+
 fn args(directory: &Path) -> PanelArgs {
     PanelArgs {
         listen: "127.0.0.1:0".parse().expect("listen address"),
         public_origin: "https://harness.example.com".to_owned(),
         base_path: "/panel".to_owned(),
         state_dir: directory.join("state"),
+        companion_auth_token_file: companion_auth_token_file(directory),
         github_client_id: "Iv1.abc".to_owned(),
         github_client_secret_file: secret_file(directory),
         owner_login: "Ada".to_owned(),
@@ -48,6 +61,39 @@ fn resolves_a_complete_configuration() {
     assert_eq!(config.base_path, "/panel");
     assert!(config.cookie_is_secure());
     assert_eq!(config.session_ttl.num_hours(), 12);
+    assert!(
+        config
+            .companion_auth
+            .matches(b"0123456789abcdef0123456789abcdef")
+    );
+    assert!(
+        !format!("{config:?}").contains("0123456789abcdef0123456789abcdef"),
+        "resolved configuration must redact the companion token"
+    );
+}
+
+#[test]
+fn only_loopback_listeners_are_accepted() {
+    let directory = tempfile::tempdir().expect("temp dir");
+
+    for listen in ["127.0.0.1:8787", "127.0.0.2:0", "[::1]:8787"] {
+        let mut raw = args(directory.path());
+        raw.listen = listen.parse().expect("listen address");
+        raw.resolve().expect("loopback listener");
+    }
+
+    for listen in [
+        "0.0.0.0:8787",
+        "192.0.2.1:8787",
+        "[::]:8787",
+        "[2001:db8::1]:8787",
+    ] {
+        let mut raw = args(directory.path());
+        raw.listen = listen.parse().expect("listen address");
+        let error = raw.resolve().expect_err("non-loopback listener");
+        assert!(error.to_string().contains("--listen"), "{listen}: {error}");
+        assert!(error.to_string().contains("loopback"), "{listen}: {error}");
+    }
 }
 
 /// GitHub matches the `redirect_uri` against the OAuth app's registration

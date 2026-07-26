@@ -73,6 +73,7 @@ fn daemon_remote_install_systemd_parses_remote_serve_contract() {
         "--acme-email",
         "ops@example.com",
         "--dry-run",
+        "--reconfigure",
         "--json",
     ])
     .expect("parse install-systemd")
@@ -100,6 +101,7 @@ fn assert_install_systemd_identity(args: &DaemonRemoteSystemdInstallArgs) {
 
 fn assert_install_systemd_flags(args: &DaemonRemoteSystemdInstallArgs) {
     assert!(args.dry_run);
+    assert!(args.reconfigure);
     assert!(args.json);
     assert_eq!(args.serve.acme_email, "ops@example.com");
 }
@@ -389,7 +391,11 @@ fn remote_systemd_install_refuses_legacy_readiness_conversion_before_mutation() 
     let error = install_remote_systemd_with(&plan, &runner)
         .expect_err("legacy unit requires transactional upgrade");
 
-    assert!(error.to_string().contains("use harness-systemd upgrade"));
+    assert!(
+        error
+            .to_string()
+            .contains("use harness-systemd install --reconfigure")
+    );
     assert_eq!(fs::read_to_string(&unit_path).expect("legacy unit"), legacy);
     assert_eq!(
         fs::read_to_string(&env_path).expect("environment"),

@@ -94,4 +94,36 @@ fn install_dry_run_renders_standalone_daemon_exec_start() {
         serde_json::from_slice(&output.stdout).expect("decode install response");
     assert_eq!(response["unit"], "harness-remote");
     assert_eq!(response["dry_run"], true);
+    assert_eq!(response["reconfigure"], false);
+}
+
+#[test]
+fn install_reconfigure_dry_run_reports_transactional_mode() {
+    let output = Command::new(cargo_bin("harness-systemd"))
+        .args([
+            "install",
+            "--unit",
+            "harness-remote",
+            "--binary-path",
+            "/usr/local/bin/harness-daemon",
+            "--domain",
+            "daemon.example.com",
+            "--acme-email",
+            "ops@example.com",
+            "--reconfigure",
+            "--dry-run",
+            "--json",
+        ])
+        .output()
+        .expect("run reconfigure dry-run");
+    assert!(
+        output.status.success(),
+        "install reconfigure dry-run failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let response: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("decode reconfigure response");
+    assert_eq!(response["unit"], "harness-remote");
+    assert_eq!(response["dry_run"], true);
+    assert_eq!(response["reconfigure"], true);
 }

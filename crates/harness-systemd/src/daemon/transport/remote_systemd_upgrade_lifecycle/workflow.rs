@@ -12,7 +12,7 @@ use super::binary::{acquire_with_trusted_controller, inspect_binary};
 use super::capacity::{reserve_generation_restore_capacity, validate_restore_filesystems};
 use super::files::{
     combine_errors, copy_file_atomic, create_private_directory, io_error, remove_file_if_exists,
-    remove_tree_if_exists, sha256_file, sync_directory, validate_candidate,
+    remove_tree_if_exists, sha256_bytes, sha256_file, sync_directory, validate_candidate,
 };
 use super::generation::{
     activate_candidate, promote_pending_generation, restart_existing_service, snapshot_generation,
@@ -63,7 +63,46 @@ where
         validate_managed_unit_contract(&plan.operation, run_systemctl)?;
         lifecycle.persist_claim(run_systemctl)?;
     }
-    recover_before_operation(&plan.operation, &lifecycle, run_systemctl, verify_health)?;
+    upgrade_remote_systemd_claimed_with(plan, &lifecycle, run_systemctl, verify_health)
+}
+
+pub(in crate::daemon::transport) fn adopt_existing_remote_systemd_unit<RunSystemctl>(
+    operation: &RemoteSystemdOperationPlan,
+    lifecycle: &mut ClaimedLifecycle,
+    run_systemctl: &RunSystemctl,
+) -> Result<(), CliError>
+where
+    RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
+{
+    validate_managed_unit_contract(operation, run_systemctl)?;
+    lifecycle.persist_claim(run_systemctl)
+}
+
+pub(in crate::daemon::transport) fn upgrade_remote_systemd_claimed_with<
+    RunSystemctl,
+    VerifyHealth,
+>(
+    plan: &RemoteSystemdUpgradePlan,
+    lifecycle: &ClaimedLifecycle,
+    run_systemctl: &RunSystemctl,
+    verify_health: &VerifyHealth,
+) -> Result<RemoteSystemdUpgradeReport, CliError>
+where
+    RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
+    VerifyHealth: Fn(
+        &RemoteSystemdOperationPlan,
+        &str,
+        &RunSystemctl,
+    ) -> Result<RemoteSystemdHealthReport, CliError>,
+{
+    plan.operation.validate()?;
+    if !lifecycle.claim_is_persisted() {
+        return Err(io_error(format!(
+            "systemd lifecycle claim is not durable for unit {}",
+            plan.operation.unit
+        )));
+    }
+    recover_before_operation(&plan.operation, lifecycle, run_systemctl, verify_health)?;
     validate_managed_unit_contract(&plan.operation, run_systemctl)?;
     validate_restore_filesystems(&plan.operation)?;
     let installed_sha256 = sha256_file(&plan.operation.binary_path)?;
@@ -71,8 +110,8 @@ where
     validate_candidate(&plan.candidate_path)?;
 
     let staged = stage_upgrade_candidate(plan)?;
-    let readiness_change = unit_requires_notify_upgrade(&plan.operation.unit_path)?;
-    if staged.candidate_sha256 == staged.previous.sha256 && !readiness_change {
+    let unit_change = unit_change_required(plan)?;
+    if staged.candidate_sha256 == staged.previous.sha256 && !unit_change {
         return health_checked_noop(&plan.operation, staged, run_systemctl, verify_health);
     }
     run_changed_upgrade(
@@ -90,6 +129,8 @@ struct StagedUpgrade {
     candidate_path: PathBuf,
     candidate_sha256: String,
     previous: RemoteSystemdArtifact,
+    desired_unit_contents: Option<String>,
+    target_unit_sha256: Option<String>,
 }
 
 struct UpgradeActivation<'a> {
@@ -130,13 +171,30 @@ fn stage_upgrade_candidate(plan: &RemoteSystemdUpgradePlan) -> Result<StagedUpgr
     )?;
     let candidate_sha256 = sha256_file(&candidate_path)?;
     let previous = inspect_binary(&plan.operation.binary_path, &plan.operation.binary_path)?;
+    let target_unit_sha256 = plan
+        .desired_unit_contents
+        .as_deref()
+        .map(str::as_bytes)
+        .map(sha256_bytes);
     Ok(StagedUpgrade {
         pending_path,
         transaction_id,
         candidate_path,
         candidate_sha256,
         previous,
+        desired_unit_contents: plan.desired_unit_contents.clone(),
+        target_unit_sha256,
     })
+}
+
+fn unit_change_required(plan: &RemoteSystemdUpgradePlan) -> Result<bool, CliError> {
+    plan.desired_unit_contents.as_deref().map_or_else(
+        || unit_requires_notify_upgrade(&plan.operation.unit_path),
+        |desired| {
+            let current_sha256 = sha256_file(&plan.operation.unit_path)?;
+            Ok(current_sha256 != sha256_bytes(desired.as_bytes()))
+        },
+    )
 }
 
 fn health_checked_noop<RunSystemctl, VerifyHealth>(
@@ -203,6 +261,7 @@ where
         RecoveryOperation::Upgrade,
         &staged.previous.sha256,
         &staged.candidate_sha256,
+        staged.target_unit_sha256.as_deref(),
         run_systemctl,
     )?;
     let manifest = match stop_and_snapshot(operation, &staged, run_systemctl) {
@@ -349,6 +408,8 @@ where
         operation,
         &context.staged.candidate_path,
         &context.staged.candidate_sha256,
+        context.staged.desired_unit_contents.as_deref(),
+        context.manifest.unit_metadata,
         lifecycle,
         run_systemctl,
         verify_health,

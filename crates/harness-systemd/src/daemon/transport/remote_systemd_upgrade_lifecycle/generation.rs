@@ -179,6 +179,8 @@ pub(super) fn activate_candidate<RunSystemctl, VerifyHealth>(
     plan: &RemoteSystemdOperationPlan,
     staged_candidate: &Path,
     candidate_sha256: &str,
+    desired_unit_contents: Option<&str>,
+    previous_unit_metadata: Option<FileMetadata>,
     lifecycle: &ClaimedLifecycle,
     run_systemctl: &RunSystemctl,
     verify_health: &VerifyHealth,
@@ -200,7 +202,13 @@ where
             "installed candidate digest mismatch: expected {candidate_sha256}, found {installed_sha}"
         )));
     }
-    upgrade_unit_to_notify(&plan.unit_path)?;
+    if let Some(contents) = desired_unit_contents {
+        let metadata = previous_unit_metadata
+            .ok_or_else(|| io_error("managed systemd unit disappeared before activation"))?;
+        super::systemd::install_desired_unit(&plan.unit_path, contents, metadata)?;
+    } else {
+        upgrade_unit_to_notify(&plan.unit_path)?;
+    }
     systemctl_checked(run_systemctl, &["daemon-reload".to_string()])?;
     validate_inhibited_managed_unit_contract(plan, run_systemctl)?;
     start_and_verify(plan, candidate_sha256, run_systemctl, verify_health)

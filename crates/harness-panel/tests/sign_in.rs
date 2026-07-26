@@ -119,7 +119,7 @@ async fn a_code_github_refuses_never_becomes_a_session() {
             .get_all(SET_COOKIE)
             .iter()
             .filter_map(|value| value.to_str().ok())
-            .all(|value| !value.starts_with("harness_panel_session=")),
+            .all(|value| !value.starts_with("harness_panel_session_")),
         "a refused sign-in must not set a session"
     );
     assert_eq!(github.profile_reads(), 0);

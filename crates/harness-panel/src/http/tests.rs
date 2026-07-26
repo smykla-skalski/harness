@@ -10,11 +10,12 @@ use std::fs;
 use std::path::Path;
 
 use axum::body::{Body, to_bytes};
-use axum::http::{Request, StatusCode, header};
+use axum::http::request::Builder;
+use axum::http::{HeaderValue, Method, Request, StatusCode, header};
 use chrono::Utc;
 use tower::ServiceExt;
 
-use super::session::SESSION_COOKIE;
+use super::session::session_cookie_name;
 use super::{PanelState, router};
 use crate::config::{
     DEFAULT_GITHUB_API_URL, DEFAULT_GITHUB_AUTHORIZE_URL, DEFAULT_GITHUB_TOKEN_URL, PanelArgs,
@@ -25,6 +26,7 @@ use crate::store::accounts::AccountIdentity;
 mod auth;
 
 const BODY_LIMIT: usize = 1024 * 1024;
+const COMPANION_AUTH_TOKEN: &str = "0123456789abcdef0123456789abcdef";
 
 fn args(directory: &Path, owner_login: &str) -> PanelArgs {
     let secret = directory.join("secret");
@@ -35,12 +37,21 @@ fn args(directory: &Path, owner_login: &str) -> PanelArgs {
         fs::set_permissions(&secret, fs::Permissions::from_mode(0o600))
             .expect("restricting the secret");
     }
+    let companion_auth_token = directory.join("companion-auth-token");
+    fs::write(&companion_auth_token, COMPANION_AUTH_TOKEN).expect("writing the token");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&companion_auth_token, fs::Permissions::from_mode(0o600))
+            .expect("restricting the token");
+    }
 
     PanelArgs {
         listen: "127.0.0.1:0".parse().expect("listen address"),
         public_origin: "https://harness.example.com".to_owned(),
         base_path: "/panel".to_owned(),
         state_dir: directory.join("state"),
+        companion_auth_token_file: companion_auth_token,
         github_client_id: "Iv1.abc".to_owned(),
         github_client_secret_file: secret,
         owner_login: owner_login.to_owned(),
@@ -64,6 +75,13 @@ struct StartedSignIn {
 }
 
 impl Harness {
+    fn request() -> Builder {
+        Request::builder().header(
+            header::AUTHORIZATION,
+            format!("Bearer {COMPANION_AUTH_TOKEN}"),
+        )
+    }
+
     async fn new(owner_login: &str) -> Self {
         Self::build(owner_login, None).await
     }
@@ -122,9 +140,12 @@ impl Harness {
     }
 
     async fn get(&self, path: &str, session: Option<&str>) -> (StatusCode, String) {
-        let mut request = Request::builder().uri(path);
+        let mut request = Self::request().uri(path);
         if let Some(token) = session {
-            request = request.header(header::COOKIE, format!("{SESSION_COOKIE}={token}"));
+            request = request.header(
+                header::COOKIE,
+                format!("{}={token}", session_cookie_name(&self.state)),
+            );
         }
         let response = router(self.state.clone())
             .oneshot(request.body(Body::empty()).expect("request"))
@@ -140,7 +161,7 @@ impl Harness {
     /// Open the start route as a browser would, optionally already holding the
     /// sign-in cookie an earlier tab was issued.
     async fn start_sign_in(&self, cookie: Option<&str>) -> StartedSignIn {
-        let mut request = Request::builder().uri("/panel/auth/github/start");
+        let mut request = Self::request().uri("/panel/auth/github/start");
         if let Some(cookie) = cookie {
             request = request.header(header::COOKIE, cookie);
         }
@@ -173,6 +194,84 @@ impl Harness {
 
         StartedSignIn { state, cookie }
     }
+}
+
+#[tokio::test]
+async fn every_panel_route_requires_the_daemon_credential() {
+    let harness = Harness::new("ada").await;
+
+    for (method, path) in [
+        (Method::GET, "/panel/healthz"),
+        (Method::GET, "/panel/"),
+        (Method::GET, "/panel/app.js"),
+        (
+            Method::GET,
+            "/panel/auth/github/callback?code=abc&state=state",
+        ),
+        (Method::POST, "/panel/auth/signout"),
+    ] {
+        let response = router(harness.state.clone())
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(path)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{path}");
+        assert_eq!(
+            response.headers().get(header::WWW_AUTHENTICATE),
+            Some(&HeaderValue::from_static("Bearer")),
+            "{path}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn malformed_wrong_or_duplicate_daemon_credentials_are_refused() {
+    let harness = Harness::new("ada").await;
+
+    for authorization in [
+        "Basic 0123456789abcdef0123456789abcdef",
+        "bearer 0123456789abcdef0123456789abcdef",
+        "Bearer 0123456789abcdef0123456789abcdee",
+        "Bearer ",
+    ] {
+        let response = router(harness.state.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/panel/healthz")
+                    .header(header::AUTHORIZATION, authorization)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "{authorization}"
+        );
+    }
+
+    let mut duplicate = Harness::request()
+        .uri("/panel/healthz")
+        .body(Body::empty())
+        .expect("request");
+    duplicate.headers_mut().append(
+        header::AUTHORIZATION,
+        HeaderValue::from_static("Bearer 0123456789abcdef0123456789abcdef"),
+    );
+    let response = router(harness.state.clone())
+        .oneshot(duplicate)
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 /// The point of the field is that a deploy which skipped the frontend build is
@@ -351,11 +450,12 @@ async fn session_derived_responses_are_never_cached() {
     let owner = harness.sign_in("ada").await;
 
     for path in ["/panel/api/me", "/panel/api/accounts"] {
+        let session_cookie = session_cookie_name(&harness.state);
         let response = router(harness.state.clone())
             .oneshot(
-                Request::builder()
+                Harness::request()
                     .uri(path)
-                    .header(header::COOKIE, format!("{SESSION_COOKIE}={owner}"))
+                    .header(header::COOKIE, format!("{session_cookie}={owner}"))
                     .body(Body::empty())
                     .expect("request"),
             )

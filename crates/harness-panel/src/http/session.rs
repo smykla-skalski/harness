@@ -12,7 +12,7 @@ use crate::store::token::hash_token;
 
 /// Names the panel's own cookies so they cannot collide with anything else the
 /// daemon serves on the same origin.
-pub const SESSION_COOKIE: &str = "harness_panel_session";
+pub const SESSION_COOKIE_PREFIX: &str = "harness_panel_session_";
 pub const SIGN_IN_COOKIE_PREFIX: &str = "harness_panel_signin_";
 
 /// The signed-in person, as the single-page app receives them.
@@ -30,7 +30,7 @@ pub async fn current_viewer(
     state: &PanelState,
     headers: &HeaderMap,
 ) -> Result<Option<Viewer>, ApiError> {
-    let Some(token) = session_token(headers) else {
+    let Some(token) = session_token(state, headers) else {
         return Ok(None);
     };
     let Some(session) = state.store.session_for_token(&token, Utc::now()).await? else {
@@ -71,8 +71,8 @@ pub async fn require_viewer(state: &PanelState, headers: &HeaderMap) -> Result<V
 }
 
 #[must_use]
-pub fn session_token(headers: &HeaderMap) -> Option<String> {
-    cookie_value(headers, SESSION_COOKIE)
+pub fn session_token(state: &PanelState, headers: &HeaderMap) -> Option<String> {
+    cookie_value(headers, &session_cookie_name(state))
 }
 
 #[must_use]
@@ -85,6 +85,16 @@ pub fn has_pending_sign_in(headers: &HeaderMap, state: &str) -> bool {
 #[must_use]
 pub fn sign_in_cookie_name(state: &str) -> String {
     format!("{SIGN_IN_COOKIE_PREFIX}{}", hash_token(state))
+}
+
+#[must_use]
+pub fn session_cookie_name(state: &PanelState) -> String {
+    let scope = format!(
+        "{}\0{}",
+        state.config.public_origin,
+        state.config.cookie_path()
+    );
+    format!("{SESSION_COOKIE_PREFIX}{}", hash_token(&scope))
 }
 
 fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
@@ -118,7 +128,7 @@ fn panel_cookie(
 pub fn with_session_cookie(jar: CookieJar, state: &PanelState, token: String) -> CookieJar {
     let max_age = time::Duration::seconds(state.config.session_ttl.num_seconds());
     jar.add(panel_cookie(
-        SESSION_COOKIE.to_owned(),
+        session_cookie_name(state),
         token,
         state,
         max_age,
@@ -129,9 +139,9 @@ pub fn with_session_cookie(jar: CookieJar, state: &PanelState, token: String) ->
 ///
 /// The attributes have to match the ones it was set with, or the browser keeps
 /// the original cookie alongside the expired one and goes on sending it.
-pub fn without_cookie(jar: CookieJar, state: &PanelState, name: &'static str) -> CookieJar {
+pub fn without_session_cookie(jar: CookieJar, state: &PanelState) -> CookieJar {
     jar.add(panel_cookie(
-        name.to_owned(),
+        session_cookie_name(state),
         String::new(),
         state,
         time::Duration::seconds(0),

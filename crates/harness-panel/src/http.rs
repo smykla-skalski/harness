@@ -12,10 +12,14 @@ pub mod session;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::extract::{Request, State};
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 
 use crate::assets::PanelAssets;
-use crate::config::PanelConfig;
+use crate::config::{CompanionAuthDigest, PanelConfig};
 use crate::error::PanelError;
 use crate::github::GitHubClient;
 use crate::store::Store;
@@ -55,6 +59,7 @@ impl PanelState {
 /// different routes, only one of which is reachable.
 pub fn router(state: PanelState) -> Router {
     let base = state.config.base_path.clone();
+    let companion_auth = state.config.companion_auth.clone();
 
     Router::new()
         .route(&format!("{base}/healthz"), get(api::healthz))
@@ -69,6 +74,33 @@ pub fn router(state: PanelState) -> Router {
         // route the single-page app owns, and only the app can tell which.
         .route(&format!("{base}/{{*asset}}"), get(api::asset_or_index))
         .with_state(state)
+        .layer(middleware::from_fn_with_state(
+            companion_auth,
+            require_companion_auth,
+        ))
+}
+
+async fn require_companion_auth(
+    State(expected): State<CompanionAuthDigest>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let mut values = request.headers().get_all(header::AUTHORIZATION).iter();
+    let presented = values.next().map(HeaderValue::as_bytes);
+    let exactly_one = values.next().is_none();
+    let valid = presented
+        .and_then(|value| value.strip_prefix(b"Bearer "))
+        .is_some_and(|token| exactly_one && expected.matches(token));
+
+    if !valid {
+        return (
+            StatusCode::UNAUTHORIZED,
+            [(header::WWW_AUTHENTICATE, "Bearer")],
+        )
+            .into_response();
+    }
+
+    next.run(request).await
 }
 
 #[cfg(test)]

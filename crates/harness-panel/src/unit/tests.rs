@@ -5,12 +5,16 @@ use crate::config::{
     DEFAULT_GITHUB_API_URL, DEFAULT_GITHUB_AUTHORIZE_URL, DEFAULT_GITHUB_TOKEN_URL, PanelArgs,
 };
 
+mod credential_paths;
+mod socket;
+
 fn args() -> PanelArgs {
     PanelArgs {
         listen: "127.0.0.1:8787".parse().expect("listen address"),
         public_origin: "https://harness.example.com".to_owned(),
         base_path: "/panel/".to_owned(),
         state_dir: PathBuf::from("/var/lib/harness-panel"),
+        companion_auth_token_file: PathBuf::from("/etc/harness-panel/companion-auth-token"),
         github_client_id: "Iv1.abc".to_owned(),
         github_client_secret_file: PathBuf::from("/etc/harness-panel/github-client-secret"),
         owner_login: "ada".to_owned(),
@@ -69,6 +73,26 @@ fn a_relative_client_secret_source_path_is_refused() {
     let message = error.to_string();
 
     assert!(message.contains("client secret source path"), "{message}");
+    assert!(message.contains("must be absolute"), "{message}");
+}
+
+#[test]
+fn a_relative_companion_auth_source_path_is_refused() {
+    let mut args = args();
+    args.companion_auth_token_file = PathBuf::from("companion-auth-token");
+
+    let error = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect_err("the credential source path must be absolute");
+    let message = error.to_string();
+
+    assert!(
+        message.contains("companion auth token source path"),
+        "{message}"
+    );
     assert!(message.contains("must be absolute"), "{message}");
 }
 
@@ -156,6 +180,22 @@ fn the_client_secret_arrives_as_a_credential() {
     );
 }
 
+#[test]
+fn the_companion_auth_token_arrives_as_a_credential() {
+    let unit = rendered();
+
+    assert!(
+        unit.contains(
+            "LoadCredential=companion-auth-token:/etc/harness-panel/companion-auth-token"
+        ),
+        "{unit}"
+    );
+    assert!(
+        unit.contains("--companion-auth-token-file %d/companion-auth-token"),
+        "{unit}"
+    );
+}
+
 /// The panel is reached through the daemon, never from the network, so it never
 /// needs to bind a privileged port.
 #[test]
@@ -225,6 +265,22 @@ fn a_control_character_in_the_secret_path_is_refused() {
     assert!(error.to_string().contains("control characters"), "{error}");
 }
 
+#[test]
+fn a_control_character_in_the_companion_auth_path_is_refused() {
+    let mut args = args();
+    args.companion_auth_token_file =
+        PathBuf::from("/etc/harness-panel/token\nExecStartPost=/bin/sh -c curl");
+
+    let error = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect_err("a newline in the token path must be refused");
+
+    assert!(error.to_string().contains("control characters"), "{error}");
+}
+
 /// `StateDirectory=` is a space-separated list and `%S/{unit}` is emitted as a
 /// bare `ExecStart` word, so a name with a space quietly becomes two of each.
 /// A separator or `..` would point the state directory out of the tree systemd
@@ -240,6 +296,8 @@ fn a_unit_name_that_would_not_survive_systemd_is_refused() {
         "harness\npanel",
         "harness%panel",
         "harness$panel",
+        "harness-panel.service",
+        "harness-panel.socket",
         "",
     ] {
         assert!(
@@ -251,7 +309,7 @@ fn a_unit_name_that_would_not_survive_systemd_is_refused() {
 
 #[test]
 fn an_ordinary_unit_name_is_accepted() {
-    for unit in ["harness-panel", "harness_panel", "panel.service", "p1"] {
+    for unit in ["harness-panel", "harness_panel", "panel.v2", "p1"] {
         assert!(
             render_unit(unit, Path::new("/usr/local/bin/harness-panel"), &args()).is_ok(),
             "{unit:?} should be accepted"
@@ -276,6 +334,24 @@ fn a_percent_in_the_secret_path_is_escaped() {
 
     assert!(
         unit.contains("LoadCredential=github-client-secret:/etc/harness-panel/100%%secret"),
+        "{unit}"
+    );
+}
+
+#[test]
+fn a_percent_in_the_companion_auth_path_is_escaped() {
+    let mut args = args();
+    args.companion_auth_token_file = PathBuf::from("/etc/harness-panel/100%token");
+
+    let unit = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect("a renderable unit");
+
+    assert!(
+        unit.contains("LoadCredential=companion-auth-token:/etc/harness-panel/100%%token"),
         "{unit}"
     );
 }
@@ -320,6 +396,56 @@ fn a_control_character_is_refused_rather_than_quoted() {
     .expect_err("a newline must be refused");
 
     assert!(error.to_string().contains("control characters"), "{error}");
+}
+
+#[test]
+fn every_runtime_flag_is_validated_before_rendering() {
+    type InvalidCase = (&'static str, fn(&mut PanelArgs));
+    let cases: &[InvalidCase] = &[
+        ("--listen", |args| {
+            args.listen = "0.0.0.0:8787".parse().unwrap();
+        }),
+        ("--public-origin", |args| {
+            args.public_origin = "http://example.com".into();
+        }),
+        ("--base-path", |args| args.base_path = "/".into()),
+        ("--github-client-id", |args| {
+            args.github_client_id = " ".into();
+        }),
+        ("--owner-login", |args| args.owner_login = " ".into()),
+        ("--github-authorize-url", |args| {
+            args.github_authorize_url = "ftp://example.com".into();
+        }),
+        ("--github-token-url", |args| {
+            args.github_token_url = "ftp://example.com".into();
+        }),
+        ("--github-api-url", |args| {
+            args.github_api_url = "ftp://example.com".into();
+        }),
+        ("--session-ttl-hours", |args| args.session_ttl_hours = 0),
+        ("--session-ttl-hours", |args| {
+            args.session_ttl_hours = u32::MAX;
+        }),
+    ];
+
+    for &(flag, make_invalid) in cases {
+        let mut args = args();
+        make_invalid(&mut args);
+        let error = render_unit("harness-panel", Path::new("/usr/bin/harness-panel"), &args)
+            .expect_err("invalid runtime configuration must not render");
+        assert!(error.to_string().contains(flag), "{flag}: {error}");
+    }
+}
+
+#[test]
+fn rendering_does_not_read_private_credential_files() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let mut args = args();
+    args.github_client_secret_file = directory.path().join("missing-client-secret");
+    args.companion_auth_token_file = directory.path().join("missing-companion-token");
+
+    render_unit("harness-panel", Path::new("/usr/bin/harness-panel"), &args)
+        .expect("rendering only names credential source files");
 }
 
 /// The hardening is only worth what systemd actually scores it at, and a

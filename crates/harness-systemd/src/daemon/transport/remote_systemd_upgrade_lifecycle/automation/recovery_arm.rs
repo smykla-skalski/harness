@@ -231,6 +231,7 @@ mod tests {
             super::super::super::model::LEGACY_RECOVERY_ARM_VERSION
         );
         assert!(loaded.controller_sha256.is_none());
+        assert!(loaded.target_unit_sha256.is_none());
         write_recovery_arm(&plan, &loaded).expect("rewrite existing legacy arm");
     }
 }

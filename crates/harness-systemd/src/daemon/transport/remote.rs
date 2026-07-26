@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use clap::{Args, ValueEnum};
 
 use crate::daemon::remote::{
-    DEFAULT_COMPANION_PATH_PREFIX, RemoteAcmeChallenge, RemoteCompanionConfig,
-    RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
+    DEFAULT_COMPANION_PANEL_SOCKET_UNIT, DEFAULT_COMPANION_PATH_PREFIX, RemoteAcmeChallenge,
+    RemoteCompanionConfig, RemoteDaemonServeConfig, RemoteDnsProvider,
+    validate_remote_serve_config,
 };
 use crate::errors::{CliError, CliErrorKind};
 
@@ -31,15 +34,57 @@ pub struct DaemonRemoteServeArgs {
     pub acme_dns_provider: Option<DaemonRemoteDnsProvider>,
     /// Loopback origin of a companion web service to forward part of the public
     /// traffic to, for example `http://127.0.0.1:8787`.
-    #[arg(long)]
+    #[arg(long, requires = "companion_auth_token_file")]
     pub companion_upstream: Option<String>,
     /// Path subtree handed to the companion service.
     #[arg(long, default_value = DEFAULT_COMPANION_PATH_PREFIX)]
     pub companion_path_prefix: String,
+    /// Source file systemd loads as the daemon-to-companion authentication
+    /// credential.
+    #[arg(long, requires = "companion_upstream")]
+    pub companion_auth_token_file: Option<PathBuf>,
+    /// Socket unit that reserves the panel listener for the managed companion.
+    #[arg(long, requires = "companion_upstream")]
+    pub companion_panel_socket_unit: Option<String>,
 }
 
 impl DaemonRemoteServeArgs {
     pub fn contract_config(&self) -> Result<RemoteDaemonServeConfig, CliError> {
+        let companion = match (
+            self.companion_upstream.as_deref(),
+            self.companion_auth_token_file.as_ref(),
+        ) {
+            (Some(upstream), Some(auth_token_source)) => Some(RemoteCompanionConfig {
+                upstream: upstream.trim().to_string(),
+                path_prefix: self.companion_path_prefix.trim().to_string(),
+                auth_token_source: auth_token_source.clone(),
+                panel_socket_unit: self
+                    .companion_panel_socket_unit
+                    .as_deref()
+                    .unwrap_or(DEFAULT_COMPANION_PANEL_SOCKET_UNIT)
+                    .trim()
+                    .to_string(),
+            }),
+            (None, None) if self.companion_panel_socket_unit.is_none() => None,
+            (Some(_), None) => {
+                return Err(CliErrorKind::workflow_parse(
+                    "--companion-auth-token-file is required with --companion-upstream",
+                )
+                .into());
+            }
+            (None, Some(_)) => {
+                return Err(CliErrorKind::workflow_parse(
+                    "--companion-auth-token-file requires --companion-upstream",
+                )
+                .into());
+            }
+            (None, None) => {
+                return Err(CliErrorKind::workflow_parse(
+                    "--companion-panel-socket-unit requires --companion-upstream",
+                )
+                .into());
+            }
+        };
         let config = RemoteDaemonServeConfig {
             domain: self.domain.trim().to_string(),
             host: self.host.trim().to_string(),
@@ -48,13 +93,7 @@ impl DaemonRemoteServeArgs {
             acme_email: self.acme_email.trim().to_string(),
             acme_challenge: self.acme_challenge.into(),
             acme_dns_provider: self.acme_dns_provider.map(Into::into),
-            companion: self
-                .companion_upstream
-                .as_deref()
-                .map(|upstream| RemoteCompanionConfig {
-                    upstream: upstream.trim().to_string(),
-                    path_prefix: self.companion_path_prefix.trim().to_string(),
-                }),
+            companion,
         };
         validate_remote_serve_config(&config)
             .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;

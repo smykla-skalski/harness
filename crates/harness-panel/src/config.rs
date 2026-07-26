@@ -14,7 +14,7 @@ use chrono::Duration;
 use url::{Host, Url};
 
 use crate::error::PanelError;
-pub use secret::ClientSecret;
+pub use secret::{ClientSecret, CompanionAuthDigest};
 
 pub const DEFAULT_LISTEN: &str = "127.0.0.1:8787";
 pub const DEFAULT_BASE_PATH: &str = "/panel";
@@ -54,6 +54,11 @@ pub struct PanelArgs {
     /// Directory holding the panel's `SQLite` database.
     #[arg(long, env = "HARNESS_PANEL_STATE_DIR")]
     pub state_dir: PathBuf,
+
+    /// File holding the private token the daemon presents on every forwarded
+    /// request.
+    #[arg(long, env = "HARNESS_PANEL_COMPANION_AUTH_TOKEN_FILE")]
+    pub companion_auth_token_file: PathBuf,
 
     /// GitHub OAuth app client id.
     #[arg(long, env = "HARNESS_PANEL_GITHUB_CLIENT_ID")]
@@ -103,24 +108,61 @@ pub struct PanelConfig {
     pub public_origin: String,
     pub base_path: String,
     pub state_dir: PathBuf,
+    pub companion_auth: CompanionAuthDigest,
     pub owner_login: String,
     pub github: GitHubConfig,
     pub session_ttl: Duration,
 }
 
+pub(crate) struct ValidatedPanelArgs {
+    pub(crate) base_path: String,
+    public_origin: String,
+    client_id: String,
+    owner_login: String,
+    authorize_url: Url,
+    token_url: Url,
+    api_url: Url,
+    session_ttl: Duration,
+}
+
 impl PanelArgs {
-    /// Validate the flags and read the client secret.
+    /// Validate the flags and read the private credentials.
     ///
     /// # Errors
-    /// Returns [`PanelError::Config`] when a flag is malformed or the secret
-    /// file is readable by anyone but its owner, and [`PanelError::Io`] when
-    /// the secret file cannot be read.
+    /// Returns [`PanelError::Config`] when a flag is malformed or a credential
+    /// file is readable by anyone but its owner, and [`PanelError::Io`] when a
+    /// credential file cannot be read.
     pub fn resolve(&self) -> Result<PanelConfig, PanelError> {
+        let validated = self.validate_runtime()?;
+        let client_secret = secret::read_client_secret(&self.github_client_secret_file)?;
+        let companion_auth = secret::read_companion_auth_token(&self.companion_auth_token_file)?;
+
+        Ok(PanelConfig {
+            listen: self.listen,
+            public_origin: validated.public_origin,
+            base_path: validated.base_path,
+            state_dir: self.state_dir.clone(),
+            companion_auth,
+            owner_login: validated.owner_login,
+            github: GitHubConfig {
+                client_id: validated.client_id,
+                client_secret,
+                authorize_url: validated.authorize_url,
+                token_url: validated.token_url,
+                api_url: validated.api_url,
+            },
+            session_ttl: validated.session_ttl,
+        })
+    }
+
+    /// Validate everything the running panel can check without reading private
+    /// credentials or touching its state directory.
+    pub(crate) fn validate_runtime(&self) -> Result<ValidatedPanelArgs, PanelError> {
+        validate_listen(self.listen)?;
         let base_path = normalize_base_path(&self.base_path)?;
         let public_origin = normalize_public_origin(&self.public_origin)?;
-        let client_secret = secret::read_client_secret(&self.github_client_secret_file)?;
-
-        if self.github_client_id.trim().is_empty() {
+        let client_id = self.github_client_id.trim().to_owned();
+        if client_id.is_empty() {
             return Err(PanelError::config("--github-client-id must not be blank"));
         }
         let owner_login = self.owner_login.trim().to_owned();
@@ -135,29 +177,30 @@ impl PanelArgs {
         if self.session_ttl_hours > MAX_SESSION_TTL_HOURS {
             return Err(PanelError::config(format!(
                 "--session-ttl-hours must be at most {MAX_SESSION_TTL_HOURS}; a longer session \
-                 expires past the end of the representable calendar"
+                expires past the end of the representable calendar"
             )));
         }
 
-        Ok(PanelConfig {
-            listen: self.listen,
+        Ok(ValidatedPanelArgs {
             public_origin,
             base_path,
-            state_dir: self.state_dir.clone(),
+            client_id,
             owner_login,
-            github: GitHubConfig {
-                client_id: self.github_client_id.trim().to_owned(),
-                client_secret,
-                authorize_url: parse_endpoint(
-                    "--github-authorize-url",
-                    &self.github_authorize_url,
-                )?,
-                token_url: parse_endpoint("--github-token-url", &self.github_token_url)?,
-                api_url: parse_endpoint("--github-api-url", &self.github_api_url)?,
-            },
+            authorize_url: parse_endpoint("--github-authorize-url", &self.github_authorize_url)?,
+            token_url: parse_endpoint("--github-token-url", &self.github_token_url)?,
+            api_url: parse_endpoint("--github-api-url", &self.github_api_url)?,
             session_ttl: Duration::hours(i64::from(self.session_ttl_hours)),
         })
     }
+}
+
+pub(crate) fn validate_listen(listen: SocketAddr) -> Result<(), PanelError> {
+    if !listen.ip().is_loopback() {
+        return Err(PanelError::config(format!(
+            "--listen must use a loopback address for daemon forwarding, got {listen}"
+        )));
+    }
+    Ok(())
 }
 
 impl PanelConfig {
@@ -284,6 +327,11 @@ fn is_url_dot_segment(segment: &str) -> bool {
 /// Returns [`PanelError::Config`] when the value carries anything but an
 /// origin, or is served over plain HTTP from somewhere other than loopback.
 pub fn normalize_public_origin(raw: &str) -> Result<String, PanelError> {
+    if raw.chars().any(char::is_control) {
+        return Err(PanelError::config(
+            "--public-origin must not contain control characters",
+        ));
+    }
     let parsed = Url::parse(raw.trim())
         .map_err(|error| PanelError::config(format!("--public-origin {raw:?}: {error}")))?;
 

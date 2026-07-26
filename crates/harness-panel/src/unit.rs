@@ -19,18 +19,24 @@
 //! the score. It measures nothing where `systemd-analyze` is absent, which is
 //! macOS and any Linux host without systemd.
 
+use std::net::SocketAddr;
 use std::path::Path;
 
-use crate::config::{PanelArgs, normalize_base_path, parse_endpoint};
+use crate::config::{PanelArgs, ValidatedPanelArgs, validate_listen};
 use crate::error::PanelError;
+use crate::serve::SYSTEMD_SOCKET_NAME;
 
-/// Where the client secret is exposed inside the unit. `LoadCredential` copies
-/// it in as mode 0400 owned by the dynamic user, which is what lets the source
-/// file stay root-only and still satisfy the panel's permission check.
-const CREDENTIAL_NAME: &str = "github-client-secret";
+/// Where private credentials are exposed inside the unit. `LoadCredential`
+/// keeps the copies in a protected directory and grants the dynamic user read
+/// access without exposing the root-only source files.
+const GITHUB_CREDENTIAL_NAME: &str = "github-client-secret";
+const COMPANION_AUTH_CREDENTIAL_NAME: &str = "companion-auth-token";
 
-/// systemd's own ceiling on a unit name.
-const MAX_UNIT_NAME_CHARS: usize = 255;
+const SERVICE_UNIT_SUFFIX: &str = ".service";
+const SOCKET_UNIT_SUFFIX: &str = ".socket";
+
+/// systemd's own ceiling on a unit name, less the longer suffix added here.
+const MAX_UNIT_NAME_CHARS: usize = 255 - SERVICE_UNIT_SUFFIX.len();
 
 /// Render a unit that starts `binary_path` with these flags.
 ///
@@ -40,33 +46,50 @@ const MAX_UNIT_NAME_CHARS: usize = 255;
 /// would not survive systemd's `ExecStart` parsing, or the mount point is not a
 /// usable subtree.
 pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<String, PanelError> {
+    let validated = args.validate_runtime()?;
+    validate_unit_listen(args.listen)?;
     validate_unit_name(unit)?;
     require_absolute_path("the panel binary path", binary_path)?;
     require_absolute_path(
         "the github client secret source path",
         &args.github_client_secret_file,
     )?;
-    let exec_start = render_exec_start(&serve_command(unit, binary_path, args)?);
+    require_absolute_path(
+        "the companion auth token source path",
+        &args.companion_auth_token_file,
+    )?;
+    let exec_start = render_exec_start(&serve_command(unit, binary_path, args, &validated)?);
     // The secret path is the one operator value that never reaches `ExecStart`,
     // because the command points at the credential systemd re-exposes instead.
     // It still lands in a directive, so it needs the same refusal and the same
     // specifier escaping.
-    let secret_source = args.github_client_secret_file.display().to_string();
-    refuse_control_characters("the github client secret path", &secret_source)?;
-    let secret_source = escape_directive_value(&secret_source);
+    let secret_source = render_directive_path(
+        "the github client secret path",
+        &args.github_client_secret_file,
+    )?;
+    let companion_auth_source = render_directive_path(
+        "the companion auth token path",
+        &args.companion_auth_token_file,
+    )?;
+    let socket_unit = format!("{unit}{SOCKET_UNIT_SUFFIX}");
     Ok(format!(
         "[Unit]\n\
          Description=Harness panel\n\
-         After=network-online.target\n\
+         Requires={socket_unit}\n\
+         After=network-online.target {socket_unit}\n\
          Wants=network-online.target\n\
          \n\
          [Service]\n\
          Type=exec\n\
+         NonBlocking=true\n\
+         Sockets={socket_unit}\n\
          ExecStart={exec_start}\n\
          Restart=on-failure\n\
          RestartSec=5s\n\
-         LoadCredential={CREDENTIAL_NAME}:{secret_source}\n\
+         LoadCredential={GITHUB_CREDENTIAL_NAME}:{secret_source}\n\
+         LoadCredential={COMPANION_AUTH_CREDENTIAL_NAME}:{companion_auth_source}\n\
          Environment=RUST_LOG=harness_panel=info\n\
+         Environment=HARNESS_PANEL_REQUIRE_SOCKET_ACTIVATION=1\n\
          NoNewPrivileges=true\n\
          DynamicUser=yes\n\
          PrivateTmp=true\n\
@@ -103,6 +126,41 @@ pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<S
     ))
 }
 
+/// Render the socket unit that owns the panel's loopback listener.
+///
+/// # Errors
+/// Returns [`PanelError::Config`] when the unit name is unusable or `listen`
+/// is not a loopback address.
+pub fn render_socket_unit(unit: &str, listen: SocketAddr) -> Result<String, PanelError> {
+    validate_unit_name(unit)?;
+    validate_unit_listen(listen)?;
+    let service_unit = format!("{unit}{SERVICE_UNIT_SUFFIX}");
+    Ok(format!(
+        "[Unit]\n\
+         Description=Harness panel socket\n\
+         \n\
+         [Socket]\n\
+         ListenStream={listen}\n\
+         Accept=no\n\
+         FileDescriptorName={SYSTEMD_SOCKET_NAME}\n\
+         ReusePort=false\n\
+         Service={service_unit}\n\
+         \n\
+         [Install]\n\
+         WantedBy=sockets.target\n"
+    ))
+}
+
+fn validate_unit_listen(listen: SocketAddr) -> Result<(), PanelError> {
+    validate_listen(listen)?;
+    if listen.port() == 0 {
+        return Err(PanelError::config(
+            "--listen must use a non-zero port in a systemd deployment",
+        ));
+    }
+    Ok(())
+}
+
 fn require_absolute_path(label: &str, path: &Path) -> Result<(), PanelError> {
     if !path.is_absolute() {
         return Err(PanelError::config(format!("{label} must be absolute")));
@@ -124,15 +182,24 @@ fn refuse_control_characters(label: &str, value: &str) -> Result<(), PanelError>
     Ok(())
 }
 
-/// Escape a value the panel writes into a directive rather than `ExecStart`.
-///
-/// systemd expands `%` specifiers in directive values too, not only on the
-/// command line, so a path an operator typed with a `%` in it would be read as
-/// a specifier and resolve to something else entirely. `%%` is how systemd
-/// spells a literal `%`. Quoting is not involved here: unlike `ExecStart`,
-/// a directive value is taken whole, so escaping is the only thing needed.
-fn escape_directive_value(value: &str) -> String {
-    value.replace('%', "%%")
+/// Render a host path inside a systemd directive without changing its parse.
+fn render_directive_path(label: &str, path: &Path) -> Result<String, PanelError> {
+    let value = path
+        .to_str()
+        .ok_or_else(|| PanelError::config(format!("{label} must be valid UTF-8")))?;
+    if value.chars().any(|character| {
+        character.is_whitespace()
+            || character.is_control()
+            || matches!(character, '\\' | '"' | '\'')
+    }) {
+        return Err(PanelError::config(format!(
+            "{label} contains whitespace, control characters, quotes, or backslashes that are \
+             unsafe in a systemd directive"
+        )));
+    }
+    // systemd expands `%` specifiers in directive values. `%%` preserves a
+    // literal percent from the operator's path.
+    Ok(value.replace('%', "%%"))
 }
 
 /// Refuse a unit name that would not survive the two places it is used.
@@ -167,6 +234,11 @@ fn validate_unit_name(unit: &str) -> Result<(), PanelError> {
             "--unit must not start with '.' or contain '..', got {unit:?}"
         )));
     }
+    if unit.ends_with(SERVICE_UNIT_SUFFIX) || unit.ends_with(SOCKET_UNIT_SUFFIX) {
+        return Err(PanelError::config(format!(
+            "--unit is a stem and must not end in {SERVICE_UNIT_SUFFIX} or {SOCKET_UNIT_SUFFIX}"
+        )));
+    }
     Ok(())
 }
 
@@ -187,15 +259,8 @@ fn serve_command(
     unit: &str,
     binary_path: &Path,
     args: &PanelArgs,
+    validated: &ValidatedPanelArgs,
 ) -> Result<Vec<ExecArgument>, PanelError> {
-    let base_path = normalize_base_path(&args.base_path)?;
-    for (flag, value) in [
-        ("--github-authorize-url", &args.github_authorize_url),
-        ("--github-token-url", &args.github_token_url),
-        ("--github-api-url", &args.github_api_url),
-    ] {
-        parse_endpoint(flag, value)?;
-    }
     let command = vec![
         ExecArgument::Value(binary_path.display().to_string()),
         ExecArgument::Value("serve".to_owned()),
@@ -204,12 +269,15 @@ fn serve_command(
         ExecArgument::Value("--public-origin".to_owned()),
         ExecArgument::Value(args.public_origin.clone()),
         ExecArgument::Value("--base-path".to_owned()),
-        ExecArgument::Value(base_path),
+        ExecArgument::Value(validated.base_path.clone()),
         ExecArgument::Value("--state-dir".to_owned()),
         // %S is systemd's state directory root, so the panel writes where
         // StateDirectory= already granted it access rather than somewhere the
         // sandbox would refuse.
         ExecArgument::Specifier(format!("%S/{unit}")),
+        ExecArgument::Value("--companion-auth-token-file".to_owned()),
+        // %d is the credentials directory LoadCredential= populated.
+        ExecArgument::Specifier(format!("%d/{COMPANION_AUTH_CREDENTIAL_NAME}")),
         ExecArgument::Value("--github-client-id".to_owned()),
         ExecArgument::Value(args.github_client_id.clone()),
         ExecArgument::Value("--github-authorize-url".to_owned()),
@@ -220,7 +288,7 @@ fn serve_command(
         ExecArgument::Value(args.github_api_url.clone()),
         ExecArgument::Value("--github-client-secret-file".to_owned()),
         // %d is the credentials directory LoadCredential= populated.
-        ExecArgument::Specifier(format!("%d/{CREDENTIAL_NAME}")),
+        ExecArgument::Specifier(format!("%d/{GITHUB_CREDENTIAL_NAME}")),
         ExecArgument::Value("--owner-login".to_owned()),
         ExecArgument::Value(args.owner_login.clone()),
         ExecArgument::Value("--session-ttl-hours".to_owned()),

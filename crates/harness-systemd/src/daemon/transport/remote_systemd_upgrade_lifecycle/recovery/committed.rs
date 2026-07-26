@@ -5,7 +5,7 @@ use crate::errors::CliError;
 use super::super::super::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use super::super::automation::{finish_recovery_automation, update_recovery_phase};
 use super::super::database::verify_live_database_seal;
-use super::super::files::{combine_errors, io_error};
+use super::super::files::{combine_errors, io_error, sha256_file};
 use super::super::generation::{load_manifest, preflight_generation, restart_existing_service};
 use super::super::generation_restore::restore_generation_retaining_current;
 use super::super::model::{
@@ -89,9 +89,28 @@ where
         ))
     })?;
     verify_installed_sha(plan, &arm.target_sha256)?;
+    verify_target_unit(plan, arm)?;
     verify_live_database_seal(&plan.state_path, seal)?;
     start_and_verify(plan, &arm.target_sha256, run_systemctl, verify_health)?;
+    verify_target_unit(plan, arm)?;
     verify_live_database_seal(&plan.state_path, seal)
+}
+
+fn verify_target_unit(
+    plan: &RemoteSystemdOperationPlan,
+    arm: &RecoveryArm,
+) -> Result<(), CliError> {
+    let Some(expected) = arm.target_unit_sha256.as_deref() else {
+        return Ok(());
+    };
+    let observed = sha256_file(&plan.unit_path)?;
+    if observed == expected {
+        Ok(())
+    } else {
+        Err(io_error(format!(
+            "installed systemd unit digest mismatch during committed recovery: expected {expected}, found {observed}"
+        )))
+    }
 }
 
 struct CommittedFallback<'a> {

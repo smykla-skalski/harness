@@ -28,14 +28,18 @@
   }
 
   async function signOut(): Promise<void> {
+    loading = true;
+    failure = null;
+    viewer = null;
+    accounts = [];
     try {
       await api.signOut();
     } catch (error) {
-      failure = error instanceof Error ? error.message : String(error);
+      const signOutFailure = error instanceof Error ? error.message : String(error);
+      await load();
+      failure = signOutFailure;
       return;
     }
-    viewer = null;
-    accounts = [];
     await load();
   }
 

@@ -3,6 +3,7 @@ mod control;
 mod remote;
 mod remote_acme;
 mod remote_clients;
+mod remote_companion_activation;
 mod remote_doctor;
 mod remote_pair_reviews;
 mod remote_serve;

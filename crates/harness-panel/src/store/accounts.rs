@@ -91,10 +91,14 @@ pub(super) async fn upsert_account_with(
           last_seen_at) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7) \
          ON CONFLICT (provider, subject_id) DO UPDATE SET \
-           login = excluded.login, \
-           display_name = excluded.display_name, \
-           avatar_url = excluded.avatar_url, \
-           last_seen_at = excluded.last_seen_at \
+           login = CASE WHEN excluded.last_seen_at >= accounts.last_seen_at \
+                        THEN excluded.login ELSE accounts.login END, \
+           display_name = CASE WHEN excluded.last_seen_at >= accounts.last_seen_at \
+                               THEN excluded.display_name ELSE accounts.display_name END, \
+           avatar_url = CASE WHEN excluded.last_seen_at >= accounts.last_seen_at \
+                             THEN excluded.avatar_url ELSE accounts.avatar_url END, \
+           first_seen_at = MIN(accounts.first_seen_at, excluded.first_seen_at), \
+           last_seen_at = MAX(accounts.last_seen_at, excluded.last_seen_at) \
          RETURNING id, provider, subject_id, login, display_name, avatar_url, \
                    first_seen_at, last_seen_at",
     )
@@ -198,6 +202,41 @@ mod tests {
         assert_eq!(updated.id, created.id);
         assert_eq!(updated.first_seen_at, at(10));
         assert_eq!(updated.last_seen_at, at(14));
+    }
+
+    #[tokio::test]
+    async fn a_late_older_sign_in_preserves_the_full_seen_range() {
+        let store = Store::open_in_memory().await.expect("store");
+        let newer_identity = AccountIdentity {
+            login: "ada-new".to_owned(),
+            display_name: "Ada New".to_owned(),
+            avatar_url: Some("https://example.com/ada-new.png".to_owned()),
+            ..ada()
+        };
+        let newer = store
+            .upsert_account(&newer_identity, at(14))
+            .await
+            .expect("newer");
+
+        let older = store
+            .upsert_account(&ada(), at(10))
+            .await
+            .expect("older callback commits later");
+
+        assert_eq!(older.id, newer.id);
+        assert_eq!(older.first_seen_at, at(10));
+        assert_eq!(older.last_seen_at, at(14));
+        assert_eq!(older.login, newer_identity.login);
+        assert_eq!(older.display_name, newer_identity.display_name);
+        assert_eq!(older.avatar_url, newer_identity.avatar_url);
+        assert_eq!(
+            store
+                .account_by_id(&newer.id)
+                .await
+                .expect("lookup")
+                .expect("account"),
+            older
+        );
     }
 
     #[tokio::test]

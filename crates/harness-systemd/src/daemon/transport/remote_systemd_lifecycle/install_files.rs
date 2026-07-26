@@ -204,7 +204,7 @@ fn secure_existing_unit(
     })?;
     if existing != expected {
         return Err(CliErrorKind::workflow_parse(format!(
-            "existing unit {unit} differs from the requested installation; keep it active and use harness-systemd upgrade so binary, unit, and database state are rollback-protected"
+            "existing unit {unit} differs from the requested installation; keep it active and use harness-systemd install --reconfigure so binary, unit, and database state are rollback-protected"
         ))
         .into());
     }
@@ -258,6 +258,24 @@ fn apply_trusted_metadata(file: &File, path: &Path, mode: u32) -> Result<(), Cli
 
 fn trusted_owner() -> (u32, u32) {
     (Uid::effective().as_raw(), Gid::effective().as_raw())
+}
+
+pub(in crate::daemon::transport) fn validate_trusted_read_source(
+    path: &Path,
+    label: &str,
+    metadata: &Metadata,
+) -> Result<(), CliError> {
+    validate_trusted_ancestors(path, label)?;
+    let (owner_id, group_id) = trusted_owner();
+    if metadata.uid() != owner_id || metadata.gid() != group_id {
+        return Err(io_error(format!(
+            "{label} {} must have trusted ownership {owner_id}:{group_id}, found {}:{}",
+            path.display(),
+            metadata.uid(),
+            metadata.gid()
+        )));
+    }
+    Ok(())
 }
 
 fn create_parent<'a>(path: &'a Path, label: &str) -> Result<&'a Path, CliError> {
