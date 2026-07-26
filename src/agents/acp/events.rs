@@ -65,7 +65,7 @@ pub fn materialise_batch(
 #[must_use]
 #[expect(
     clippy::cognitive_complexity,
-    reason = "maps one ACP session update to a conversation event; the single tracing::debug! for an unhandled variant costs 7 of its 9 points, leaving structural 2 despite the function's length, because its match scores once and its early returns subtract"
+    reason = "maps one ACP session update to a conversation event; the single tracing::debug! for an unhandled variant costs 7 of its 9 points, leaving structural 2, which is low for a 96-line function because its arms are a wide flat mapping with one nested branch rather than nested control flow"
 )]
 pub fn materialise_one(
     update: &SessionUpdate,
