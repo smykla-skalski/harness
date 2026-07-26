@@ -66,6 +66,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
         remote_pairing_status_limiter: super::super::default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
+        remote_pairing_events: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),

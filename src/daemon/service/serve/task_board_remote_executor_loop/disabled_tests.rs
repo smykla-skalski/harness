@@ -323,6 +323,7 @@ pub(super) fn executor_state(db: &AsyncDaemonDb, daemon_epoch: &str) -> DaemonHt
         remote_pairing_status_limiter: default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
+        remote_pairing_events: broadcast::channel(8).0,
         manifest: test_manifest(),
         daemon_epoch: daemon_epoch.into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),

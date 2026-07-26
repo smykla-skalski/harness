@@ -36,6 +36,7 @@ fn minimal_state() -> DaemonHttpState {
         remote_pairing_status_limiter: crate::daemon::http::default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
+        remote_pairing_events: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),

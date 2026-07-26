@@ -24,8 +24,10 @@ pub use status_rate_limit::{RemotePairingStatusRateLimitDecision, RemotePairingS
 mod subject;
 pub use subject::RemotePairingSubject;
 mod create;
+mod events;
 mod inventory;
 pub(crate) use inventory::RemotePairingObservation;
+pub use events::{RemotePairingChange, RemotePairingEvent};
 pub use inventory::{RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingState};
 mod invitation;
 pub(crate) use create::{RemotePairingCreateParams, create_remote_pairing, pairing_expires_at};
