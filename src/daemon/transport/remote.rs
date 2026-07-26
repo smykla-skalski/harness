@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, str::FromStr};
+use std::{num::NonZeroU64, path::PathBuf, str::FromStr};
 
 use clap::{Args, Subcommand, ValueEnum};
 use serde::Serialize;
@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::DaemonDb;
+use crate::daemon::http::companion::CompanionAuthToken;
 use crate::daemon::http::{
     CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX, DaemonHttpAuthMode,
     RemoteRequestLimitConfig,
@@ -19,9 +20,9 @@ use crate::daemon::remote_pairing::{
 };
 use crate::daemon::service::DaemonServeConfig;
 use crate::daemon::state;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote_doctor::execute_remote_doctor;
@@ -86,14 +87,17 @@ pub struct DaemonRemoteServeArgs {
     /// DNS provider used by DNS-01 challenges.
     #[arg(long, value_enum)]
     pub acme_dns_provider: Option<DaemonRemoteDnsProvider>,
-    /// Loopback origin of a companion web service to forward part of the public
-    /// traffic to, for example `http://127.0.0.1:8787`. Omit to serve only the
-    /// daemon's own API.
-    #[arg(long)]
+    /// Loopback origin of a companion web service.
+    #[arg(long, hide = true)]
     pub companion_upstream: Option<String>,
-    /// Path subtree handed to the companion service. Forwarded verbatim, so the
-    /// companion serves its own routes under this prefix.
-    #[arg(long, default_value = DEFAULT_COMPANION_PATH_PREFIX)]
+    /// Private credential file for the daemon-to-companion loopback hop.
+    #[arg(long, hide = true)]
+    pub companion_auth_token_file: Option<PathBuf>,
+    /// Internal marker emitted by the systemd socket-activated deployment.
+    #[arg(long, hide = true)]
+    pub companion_systemd_socket_activated: bool,
+    /// Path subtree handed to the companion service.
+    #[arg(long, default_value = DEFAULT_COMPANION_PATH_PREFIX, hide = true)]
     pub companion_path_prefix: String,
 }
 
@@ -101,8 +105,9 @@ impl DaemonRemoteServeArgs {
     /// Build the static remote serve config used by later implementation phases.
     ///
     /// # Errors
-    /// Returns [`CliError`] when required remote TLS or ACME settings are absent.
+    /// Returns [`CliError`] when remote TLS, ACME, or companion settings are invalid.
     pub fn contract_config(&self) -> Result<RemoteDaemonServeConfig, CliError> {
+        self.companion_config()?;
         let config = RemoteDaemonServeConfig {
             domain: self.domain.trim().to_string(),
             host: self.host.trim().to_string(),
@@ -119,13 +124,8 @@ impl DaemonRemoteServeArgs {
 
     /// Build the remote-auth scaffold config for the future remote serve path.
     ///
-    /// This selects [`DaemonHttpAuthMode::Remote`] and preserves the public
-    /// remote bind host from the remote contract. It is not passed to the
-    /// current local [`crate::daemon::service::serve`] path, whose validation
-    /// intentionally remains loopback-only.
-    ///
     /// # Errors
-    /// Returns [`CliError`] when the remote TLS or ACME contract is invalid.
+    /// Returns [`CliError`] when the remote TLS, ACME, or companion contract is invalid.
     pub fn remote_auth_scaffold_config(&self) -> Result<DaemonServeConfig, CliError> {
         let remote_config = self.contract_config()?;
         Ok(DaemonServeConfig {
@@ -139,16 +139,37 @@ impl DaemonRemoteServeArgs {
         })
     }
 
-    /// Validate the companion routing target, if one was configured.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the upstream is not a loopback `http` origin or
-    /// the path prefix would shadow the daemon's own API.
     fn companion_config(&self) -> Result<Option<CompanionRouteConfig>, CliError> {
-        let Some(upstream) = self.companion_upstream.as_deref() else {
-            return Ok(None);
+        if self.companion_systemd_socket_activated != self.companion_upstream.is_some() {
+            let message = if self.companion_upstream.is_some() {
+                "companion routing is supported only through the harness-systemd socket-activated deployment"
+            } else {
+                "internal companion socket-activation marker requires --companion-upstream"
+            };
+            return Err(CliErrorKind::workflow_parse(message).into());
+        }
+        let (upstream, token_file) = match (
+            self.companion_upstream.as_deref(),
+            self.companion_auth_token_file.as_deref(),
+        ) {
+            (None, None) => return Ok(None),
+            (Some(_), None) => {
+                return Err(CliErrorKind::workflow_parse(
+                    "--companion-auth-token-file is required with --companion-upstream",
+                )
+                .into());
+            }
+            (None, Some(_)) => {
+                return Err(CliErrorKind::workflow_parse(
+                    "--companion-auth-token-file requires --companion-upstream",
+                )
+                .into());
+            }
+            (Some(upstream), Some(token_file)) => (upstream, token_file),
         };
-        CompanionRouteConfig::new(upstream, self.companion_path_prefix.as_str())
+        let auth_token = CompanionAuthToken::read_private_file(token_file)
+            .map_err(|error| CliErrorKind::workflow_parse(error.to_string()))?;
+        CompanionRouteConfig::new(upstream, self.companion_path_prefix.as_str(), auth_token)
             .map(Some)
             .map_err(|error| CliErrorKind::workflow_parse(error.to_string()).into())
     }

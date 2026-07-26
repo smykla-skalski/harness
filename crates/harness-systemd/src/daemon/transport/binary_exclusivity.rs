@@ -116,7 +116,9 @@ where
     parser::parse_colon_search_path(value, "systemd compiled executable search path")
 }
 
-fn systemd_manager_version<RunSystemctl>(run_systemctl: &RunSystemctl) -> Result<String, CliError>
+pub(super) fn systemd_manager_version<RunSystemctl>(
+    run_systemctl: &RunSystemctl,
+) -> Result<String, CliError>
 where
     RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
 {

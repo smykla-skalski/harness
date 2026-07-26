@@ -7,9 +7,10 @@ use clap::Parser;
 use super::super::remote::DaemonRemoteCommand;
 use super::super::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use super::super::remote_systemd_upgrade_lifecycle::{
-    LockedLifecycle, RemoteSystemdArtifact, RemoteSystemdHealthReport, RemoteSystemdOperationPlan,
-    RemoteSystemdRecoveryOutcome, RemoteSystemdRecoveryReport, RemoteSystemdRollbackReport,
-    RemoteSystemdUpgradeOutcome, RemoteSystemdUpgradeReport, acquire_with_trusted_controller,
+    BindMode, LockedLifecycle, RemoteSystemdArtifact, RemoteSystemdHealthReport,
+    RemoteSystemdOperationPlan, RemoteSystemdRecoveryOutcome, RemoteSystemdRecoveryReport,
+    RemoteSystemdRollbackReport, RemoteSystemdUpgradeOutcome, RemoteSystemdUpgradeReport,
+    acquire_with_trusted_controller, adopt_existing_remote_systemd_unit,
     atomic_copy_temp_prefix_for_tests, notify_unit_contents_for_tests,
     parse_systemd_observation_for_tests, reconcile_restore_debris_for_tests,
     reconcile_rotation_state_for_tests, recover_remote_systemd_with,
@@ -32,6 +33,8 @@ mod hardening;
 mod locking;
 #[path = "remote_systemd_upgrade/ownership.rs"]
 mod ownership;
+#[path = "remote_systemd_upgrade/reconfigure.rs"]
+mod reconfigure;
 #[path = "remote_systemd_upgrade/recovery.rs"]
 mod recovery;
 #[path = "remote_systemd_upgrade/support.rs"]

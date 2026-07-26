@@ -83,7 +83,7 @@ impl RemoteSystemdOperationPlan {
         self.store_path.join(PENDING_DIRECTORY)
     }
 
-    pub(super) fn transaction_root(&self) -> Result<&Path, CliError> {
+    pub(in crate::daemon::transport) fn transaction_root(&self) -> Result<&Path, CliError> {
         self.store_path
             .parent()
             .ok_or_else(|| io_error("systemd transaction store has no parent"))
@@ -149,6 +149,7 @@ impl RemoteSystemdOperationPlan {
 pub(crate) struct RemoteSystemdUpgradePlan {
     pub operation: RemoteSystemdOperationPlan,
     pub candidate_path: PathBuf,
+    pub desired_unit_contents: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,6 +186,8 @@ pub(super) struct RecoveryArm {
     pub(super) before_sha256: String,
     pub(super) target_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) target_unit_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) controller_sha256: Option<String>,
     #[serde(default)]
     pub(super) target_database_seal: Option<DatabaseSeal>,
@@ -193,7 +196,7 @@ pub(super) struct RecoveryArm {
 impl RecoveryArm {
     pub(super) fn validate(&self) -> Result<(), CliError> {
         match (self.arm_version, self.controller_sha256.as_deref()) {
-            (RECOVERY_ARM_VERSION, Some(digest)) => validate_controller_digest(digest)?,
+            (RECOVERY_ARM_VERSION, Some(digest)) => validate_sha256_digest("controller", digest)?,
             (RECOVERY_ARM_VERSION, None) => {
                 return Err(io_error("systemd recovery arm v3 has no controller digest"));
             }
@@ -208,6 +211,9 @@ impl RecoveryArm {
                     "unsupported systemd recovery arm version {version}"
                 )));
             }
+        }
+        if let Some(digest) = self.target_unit_sha256.as_deref() {
+            validate_sha256_digest("target systemd unit", digest)?;
         }
         if let Some(seal) = self.target_database_seal {
             seal.validate()?;
@@ -242,13 +248,13 @@ impl RecoveryArm {
     }
 }
 
-fn validate_controller_digest(digest: &str) -> Result<(), CliError> {
+fn validate_sha256_digest(label: &str, digest: &str) -> Result<(), CliError> {
     if digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         Ok(())
     } else {
-        Err(io_error(
-            "systemd recovery arm controller digest is not SHA-256",
-        ))
+        Err(io_error(format!(
+            "systemd recovery arm {label} digest is not SHA-256"
+        )))
     }
 }
 

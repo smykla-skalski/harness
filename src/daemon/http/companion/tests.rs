@@ -1,7 +1,11 @@
-use super::{CompanionConfigError, CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX};
+use super::{
+    CompanionAuthToken, CompanionConfigError, CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX,
+};
 
 fn config(upstream: &str, prefix: &str) -> Result<CompanionRouteConfig, CompanionConfigError> {
-    CompanionRouteConfig::new(upstream, prefix)
+    let token =
+        CompanionAuthToken::parse("daemon-panel-test-token-0123456789").expect("valid test token");
+    CompanionRouteConfig::new(upstream, prefix, token)
 }
 
 #[test]
@@ -14,12 +18,69 @@ fn accepts_a_loopback_upstream_and_normalizes_nothing() {
 }
 
 #[test]
-fn accepts_localhost_and_ipv6_loopback() {
-    for upstream in ["http://localhost:8787", "http://[::1]:8787"] {
-        config(upstream, "/panel").unwrap_or_else(|error| {
-            panic!("{upstream} should be accepted as loopback: {error}");
-        });
+fn auth_token_debug_output_is_redacted() {
+    let secret = "never-print-this-companion-token-123";
+    let token = CompanionAuthToken::parse(secret).expect("valid token");
+    let route = CompanionRouteConfig::new("http://127.0.0.1:8787", "/panel", token.clone())
+        .expect("valid route");
+
+    for debug in [format!("{token:?}"), format!("{route:?}")] {
+        assert!(debug.contains("REDACTED"));
+        assert!(!debug.contains(secret));
     }
+}
+
+#[test]
+fn auth_token_requires_a_long_visible_ascii_value() {
+    for invalid in [
+        "",
+        "short",
+        "0123456789012345678901234567890",
+        "0123456789012345 7890123456789012",
+        "0123456789012345\t7890123456789012",
+        "012345678901234567890123456789é",
+        "012345678901234567890123456789\u{7f}",
+    ] {
+        assert!(
+            CompanionAuthToken::parse(invalid).is_err(),
+            "{invalid:?} must not become an HTTP credential"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn auth_token_file_must_be_private_and_trims_outer_whitespace() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let temp = tempfile::tempdir().expect("temp dir");
+    let path = temp.path().join("companion-token");
+    let secret = "private-daemon-panel-token-0123456789";
+    std::fs::write(&path, format!("\n{secret}\n")).expect("write token");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640))
+        .expect("make token group-readable");
+
+    let error = CompanionAuthToken::read_private_file(&path)
+        .expect_err("group-readable token file must be rejected");
+    assert!(matches!(
+        error,
+        CompanionConfigError::AuthTokenPermissionsTooOpen(_)
+    ));
+    assert!(
+        !error.to_string().contains(secret),
+        "validation errors must not disclose the credential"
+    );
+
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+        .expect("make token private");
+    let token = CompanionAuthToken::read_private_file(&path).expect("read private token");
+
+    assert_eq!(token.authorization_header(), format!("Bearer {secret}"));
+}
+
+#[test]
+fn accepts_an_ipv6_loopback_literal() {
+    config("http://[::1]:8787", "/panel").expect("IPv6 loopback should be accepted");
 }
 
 #[test]
@@ -49,14 +110,15 @@ fn rejects_a_non_loopback_upstream() {
 }
 
 #[test]
-fn rejects_a_named_upstream_that_is_not_localhost() {
-    let error =
-        config("http://panel.internal:8787", "/panel").expect_err("a named host must be refused");
+fn rejects_every_named_upstream() {
+    for upstream in ["http://localhost:8787", "http://panel.internal:8787"] {
+        let error = config(upstream, "/panel").expect_err("a named host must be refused");
 
-    assert!(matches!(
-        error,
-        CompanionConfigError::UpstreamNotLoopback(_)
-    ));
+        assert!(matches!(
+            error,
+            CompanionConfigError::UpstreamNotLoopback(_)
+        ));
+    }
 }
 
 #[test]
@@ -163,6 +225,26 @@ fn rejects_a_prefix_with_an_empty_segment() {
 }
 
 #[test]
+fn rejects_url_dot_segments_that_browsers_normalize_before_routing() {
+    for prefix in [
+        "/panel/./api",
+        "/panel/../api",
+        "/panel/%2e/api",
+        "/panel/.%2E/api",
+        "/panel/%2e./api",
+        "/panel/%2E%2e/api",
+    ] {
+        let error =
+            config("http://127.0.0.1:8787", prefix).expect_err("URL dot segment must be refused");
+
+        assert!(
+            matches!(error, CompanionConfigError::PrefixDotSegment(_)),
+            "{prefix} should report the dot-segment rejection, got {error}"
+        );
+    }
+}
+
+#[test]
 fn rejects_prefix_characters_that_would_change_routing_or_parsing() {
     // Kept in step with the systemd installer's own list, so a prefix accepted
     // at install time cannot be one the daemon refuses at startup.
@@ -174,6 +256,8 @@ fn rejects_prefix_characters_that_would_change_routing_or_parsing() {
         "/panel#top",
         "/{panel}",
         "/panel/*",
+        "/:panel",
+        "/panel/:api",
         "/panel\\x",
     ] {
         let Err(error) = config("http://127.0.0.1:8787", prefix) else {

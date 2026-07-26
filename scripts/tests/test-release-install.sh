@@ -92,6 +92,7 @@ case "$leaf" in
   hook) binary=harness-hook ;;
   codex) binary=harness-codex-acp ;;
   openrouter) binary=harness-openrouter-agent ;;
+  panel) binary=harness-panel ;;
   aff) binary=aff ;;
   *) exit 2 ;;
 esac

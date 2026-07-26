@@ -299,6 +299,10 @@ pub(super) fn sha256_file(path: &Path) -> Result<String, CliError> {
     sha256_reader(open_regular_nofollow(path)?, path)
 }
 
+pub(super) fn sha256_bytes(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+
 fn sha256_reader(mut file: impl Read, path: &Path) -> Result<String, CliError> {
     let digest = sha256_reader_until(&mut file, path, None)?;
     digest.ok_or_else(|| io_error("unbounded file digest reached an unexpected deadline"))

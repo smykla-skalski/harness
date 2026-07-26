@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 mod remote_systemd;
 mod remote_systemd_companion;
+mod remote_systemd_companion_credentials;
 mod remote_systemd_lifecycle;
 mod remote_systemd_plan;
 mod remote_systemd_security;

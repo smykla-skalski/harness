@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::net::IpAddr;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteAcmeChallenge {
@@ -44,6 +45,8 @@ impl RemoteDnsProvider {
 pub struct RemoteCompanionConfig {
     pub upstream: String,
     pub path_prefix: String,
+    pub auth_token_source: PathBuf,
+    pub panel_socket_unit: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +75,8 @@ pub enum RemoteDaemonConfigError {
     UnexpectedDnsProvider,
     CompanionUpstreamNotLoopbackHttp(String),
     CompanionPathPrefixInvalid(String),
+    CompanionPanelSocketUnitInvalid(String),
+    CompanionAuthTokenSourceInvalid(String),
 }
 
 impl fmt::Display for RemoteDaemonConfigError {
@@ -106,8 +111,18 @@ impl fmt::Display for RemoteDaemonConfigError {
             Self::CompanionPathPrefixInvalid(prefix) => write!(
                 formatter,
                 "remote daemon companion path prefix {prefix} must be an absolute path with no \
-                 trailing slash, no empty segment, and no whitespace, control, or URL-structural \
-                 character, and must not start with /{DAEMON_API_SEGMENT}"
+                 trailing slash, no empty, '.', or '..' URL segment, and no whitespace, control, \
+                 or URL-structural character, and must not start with /{DAEMON_API_SEGMENT}"
+            ),
+            Self::CompanionPanelSocketUnitInvalid(unit) => write!(
+                formatter,
+                "remote daemon companion panel socket unit {unit:?} must be a canonical .socket \
+                 unit name containing only ASCII letters, digits, '-', '_', and '.'"
+            ),
+            Self::CompanionAuthTokenSourceInvalid(path) => write!(
+                formatter,
+                "systemd companion credential source path {path:?} must be UTF-8 and cannot \
+                 contain control characters, quotes, or backslashes"
             ),
         }
     }
@@ -161,6 +176,8 @@ const DAEMON_API_SEGMENT: &str = "v1";
 /// prefix. Must match the daemon's own default.
 pub const DEFAULT_COMPANION_PATH_PREFIX: &str = "/panel";
 
+pub const DEFAULT_COMPANION_PANEL_SOCKET_UNIT: &str = "harness-panel.socket";
+
 /// Reject a companion the daemon would refuse at startup, so `install` fails
 /// while the operator is still watching instead of leaving a unit that will not
 /// come up. The daemon re-validates authoritatively; this crate cannot call into
@@ -183,7 +200,40 @@ fn validate_companion(
             prefix.to_owned(),
         ));
     }
+    if !is_valid_panel_socket_unit(&companion.panel_socket_unit) {
+        return Err(RemoteDaemonConfigError::CompanionPanelSocketUnitInvalid(
+            companion.panel_socket_unit.clone(),
+        ));
+    }
+    let source = companion.auth_token_source.to_str().ok_or_else(|| {
+        RemoteDaemonConfigError::CompanionAuthTokenSourceInvalid(
+            companion.auth_token_source.to_string_lossy().into_owned(),
+        )
+    })?;
+    if source
+        .chars()
+        .any(|character| character.is_control() || matches!(character, '\\' | '\'' | '"'))
+    {
+        return Err(RemoteDaemonConfigError::CompanionAuthTokenSourceInvalid(
+            source.to_owned(),
+        ));
+    }
     Ok(())
+}
+
+fn is_valid_panel_socket_unit(unit: &str) -> bool {
+    let Some(stem) = unit.strip_suffix(".socket") else {
+        return false;
+    };
+    !stem.is_empty()
+        && !stem.starts_with('-')
+        && !stem.starts_with('.')
+        && !stem.ends_with('.')
+        && !stem.contains("..")
+        && unit.len() <= 255
+        && stem.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
 }
 
 fn is_loopback_http_origin(upstream: &str) -> bool {
@@ -204,7 +254,7 @@ fn is_loopback_http_origin(upstream: &str) -> bool {
     {
         return false;
     }
-    companion_host(authority).is_some_and(is_loopback_host)
+    companion_address(authority).is_some_and(|(host, _)| is_loopback_host(host))
 }
 
 /// The daemon parses the URL and compares the scheme case-insensitively, so
@@ -215,24 +265,28 @@ fn strip_http_scheme(upstream: &str) -> Option<&str> {
     scheme.eq_ignore_ascii_case("http").then_some(authority)
 }
 
-/// Split `host:port`, keeping a bracketed IPv6 literal in one piece.
-fn companion_host(authority: &str) -> Option<&str> {
+/// Parse `host:port`, keeping a bracketed IPv6 literal in one piece.
+fn companion_address(authority: &str) -> Option<(&str, u16)> {
     let Some(rest) = authority.strip_prefix('[') else {
-        return Some(
-            authority
-                .split_once(':')
-                .map_or(authority, |(host, _)| host),
-        );
+        return match authority.split_once(':') {
+            Some((host, port)) => Some((host, parse_explicit_port(port)?)),
+            None => Some((authority, 80)),
+        };
     };
     let (host, tail) = rest.split_once(']')?;
-    (tail.is_empty() || tail.starts_with(':')).then_some(host)
+    if tail.is_empty() {
+        return Some((host, 80));
+    }
+    Some((host, parse_explicit_port(tail.strip_prefix(':')?)?))
+}
+
+fn parse_explicit_port(port: &str) -> Option<u16> {
+    port.parse::<u16>().ok().filter(|port| *port != 0)
 }
 
 fn is_loopback_host(host: &str) -> bool {
-    host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<IpAddr>()
-            .is_ok_and(|address| address.is_loopback())
+    host.parse::<IpAddr>()
+        .is_ok_and(|address| address.is_loopback())
 }
 
 fn is_valid_companion_prefix(prefix: &str) -> bool {
@@ -252,5 +306,18 @@ fn is_valid_companion_prefix(prefix: &str) -> bool {
     let Some(first) = segments.next().filter(|segment| !segment.is_empty()) else {
         return false;
     };
-    !first.eq_ignore_ascii_case(DAEMON_API_SEGMENT) && !segments.any(str::is_empty)
+    !first.eq_ignore_ascii_case(DAEMON_API_SEGMENT)
+        && !is_url_dot_segment(first)
+        && !first.starts_with(':')
+        && !segments.any(|segment| {
+            segment.is_empty() || is_url_dot_segment(segment) || segment.starts_with(':')
+        })
+}
+
+fn is_url_dot_segment(segment: &str) -> bool {
+    matches!(segment, "." | "..")
+        || segment.eq_ignore_ascii_case("%2e")
+        || segment.eq_ignore_ascii_case(".%2e")
+        || segment.eq_ignore_ascii_case("%2e.")
+        || segment.eq_ignore_ascii_case("%2e%2e")
 }

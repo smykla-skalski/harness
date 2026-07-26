@@ -37,6 +37,7 @@ HARNESS_RELEASE_BINARIES+=(
   harness-hook
   harness-codex-acp
   harness-openrouter-agent
+  harness-panel
 )
 HARNESS_RELEASE_BUILD_LEAVES+=(
   bridge
@@ -44,6 +45,7 @@ HARNESS_RELEASE_BUILD_LEAVES+=(
   hook
   codex
   openrouter
+  panel
 )
 unset harness_release_host_os
 

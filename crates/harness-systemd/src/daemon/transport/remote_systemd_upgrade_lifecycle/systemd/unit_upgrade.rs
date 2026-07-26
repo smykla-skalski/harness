@@ -7,6 +7,14 @@ use crate::errors::CliError;
 use super::super::files::{io_error, write_bytes_atomic};
 use super::super::model::{FileMetadata, SYSTEMD_START_TIMEOUT};
 
+pub(crate) fn install_desired_unit(
+    path: &Path,
+    contents: &str,
+    metadata: FileMetadata,
+) -> Result<(), CliError> {
+    write_bytes_atomic(path, contents.as_bytes(), metadata)
+}
+
 pub(crate) fn upgrade_unit_to_notify(path: &Path) -> Result<(), CliError> {
     let metadata = FileMetadata::read(path)?;
     let contents = fs::read_to_string(path)

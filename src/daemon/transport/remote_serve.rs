@@ -8,8 +8,8 @@ use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtim
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
 use crate::daemon::service::{self, DaemonServeConfig, ShutdownSignalGuard};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::watch as tokio_watch;
 
@@ -17,6 +17,7 @@ use super::control::adopt_daemon_root_for_transport_command;
 #[cfg(test)]
 use super::remote::DaemonRemoteAcmeCommand;
 use super::remote::{DaemonRemoteServeArgs, open_remote_daemon_db};
+use super::remote_companion_activation::validate_companion_socket_activation;
 use super::remote_serve_startup::{
     RemoteInitialAcmeControl, ensure_initial_remote_acme, record_initial_acme_shutdown,
     run_initial_acme_until_shutdown,
@@ -29,9 +30,13 @@ pub(crate) struct RemoteDaemonServeExecutionPlan {
 }
 
 pub(super) fn execute_remote_serve(args: &DaemonRemoteServeArgs) -> Result<i32, CliError> {
+    let remote_config = args.contract_config()?;
+    validate_companion_socket_activation(
+        args.companion_upstream.as_deref(),
+        args.companion_systemd_socket_activated,
+    )?;
     adopt_daemon_root_for_transport_command("daemon-remote-serve");
     let db = open_remote_daemon_db()?;
-    let remote_config = args.contract_config()?;
     let certificate_domain_matches = certificate_domain_matches(&db, &remote_config)?;
     let now = utc_now();
     db.record_remote_acme_serve_config(&remote_config, now.as_str())?;
@@ -78,8 +83,8 @@ where
     Issuer: RemoteAcmeRenewalIssuer,
 {
     adopt_daemon_root_for_transport_command("daemon-remote-serve");
-    let db = open_db()?;
     let remote_config = args.contract_config()?;
+    let db = open_db()?;
     let certificate_domain_matches = certificate_domain_matches(&db, &remote_config)?;
     db.record_remote_acme_serve_config(&remote_config, now)?;
     ensure_remote_acme_for_serve(&db, issuer, now, certificate_domain_matches)?;

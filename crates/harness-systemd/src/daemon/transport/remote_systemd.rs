@@ -10,7 +10,8 @@ use super::control::{print_json, running_controller_path};
 use super::remote::DaemonRemoteServeArgs;
 use super::remote_systemd_lifecycle::{CanonicalRemoteSystemdUnit, RemoteSystemdInstallReport};
 use super::remote_systemd_lifecycle::{
-    install_remote_systemd_with_pre_enable, run_systemctl, uninstall_remote_systemd_with,
+    install_remote_systemd_with_pre_enable, preflight_remote_systemd_install, run_systemctl,
+    uninstall_remote_systemd_with,
 };
 use super::remote_systemd_lifecycle::{
     parse_remote_systemd_unit_arg, preflight_uninstall_managed_binary,
@@ -18,18 +19,26 @@ use super::remote_systemd_lifecycle::{
     validate_systemd_directive_path,
 };
 use super::remote_systemd_upgrade_lifecycle::{
-    BindMode, LockedLifecycle, cleanup_recovery_artifacts, ensure_systemd_lifecycle_unarmed,
-    remove_release_pair, verify_uninstall_controller,
+    BindMode, LockedLifecycle, RemoteSystemdUpgradeOutcome, RemoteSystemdUpgradeReport,
+    adopt_existing_remote_systemd_unit, cleanup_recovery_artifacts,
+    ensure_systemd_lifecycle_unarmed, remove_release_pair, upgrade_remote_systemd_claimed_with,
+    verify_remote_systemd_health, verify_uninstall_controller,
 };
 
+#[path = "remote_systemd/credential_source.rs"]
+mod credential_source;
 #[path = "remote_systemd/unit_render.rs"]
 mod unit_render;
 
+use credential_source::validate_companion_credential_source;
+#[cfg(test)]
+pub(crate) use credential_source::validate_companion_credential_source_for_tests;
 use unit_render::{render_env_file, render_unit, validate_systemd_exec_value};
 
 const DEFAULT_UNIT: &str = "harness-remote-daemon";
 const SYSTEMD_UNIT_DIR: &str = "/etc/systemd/system";
 const SYSTEMD_ENV_DIR: &str = "/etc/harness";
+const SYSTEMD_STATE_DIR: &str = "/var/lib";
 const SYSTEMD_PRIVATE_STATE_DIR: &str = "/var/lib/private";
 const SYSTEMD_TRANSACTION_DIR: &str = "/var/lib/harness/remote-systemd";
 
@@ -68,6 +77,9 @@ pub struct DaemonRemoteSystemdInstallArgs {
     /// Render and report the install plan without writing files or calling systemctl.
     #[arg(long)]
     pub dry_run: bool,
+    /// Transactionally replace a drifted managed unit while preserving rollback state.
+    #[arg(long)]
+    pub reconfigure: bool,
     /// Output as JSON.
     #[arg(long)]
     pub json: bool,
@@ -84,13 +96,28 @@ impl Execute for DaemonRemoteSystemdInstallArgs {
             .unwrap_or_else(|| unit.environment_path(Path::new(SYSTEMD_ENV_DIR)));
         let plan =
             RemoteSystemdInstallPlan::new(self, unit.into_string(), binary, unit_path, env_path)?;
+        if let Some(source) = self.serve.companion_auth_token_file.as_deref() {
+            validate_companion_credential_source(source)?;
+        }
 
         if self.dry_run {
-            print_install_response(&RemoteSystemdInstallResponse::dry_run(plan), self.json)?;
+            print_install_response(
+                &RemoteSystemdInstallResponse::dry_run(plan, self.reconfigure),
+                self.json,
+            )?;
             return Ok(0);
         }
         ensure_linux_systemd()?;
         super::remote_systemd_upgrade::ensure_root()?;
+        if self.reconfigure {
+            return self.execute_reconfigure(plan);
+        }
+        self.execute_install(plan)
+    }
+}
+
+impl DaemonRemoteSystemdInstallArgs {
+    fn execute_install(&self, plan: RemoteSystemdInstallPlan) -> Result<i32, CliError> {
         let transaction_root = Path::new(SYSTEMD_TRANSACTION_DIR);
         let store_path = transaction_root.join(&plan.unit);
         let locked = LockedLifecycle::acquire(transaction_root, &plan.unit, &store_path)?;
@@ -109,6 +136,41 @@ impl Execute for DaemonRemoteSystemdInstallArgs {
             self.json,
         )?;
         Ok(0)
+    }
+
+    fn execute_reconfigure(&self, plan: RemoteSystemdInstallPlan) -> Result<i32, CliError> {
+        preflight_remote_systemd_install(&plan, &run_systemctl)?;
+        let controller_path = running_controller_path()?;
+        let upgrade_plan = super::remote_systemd_upgrade::reconfigure_upgrade_plan(
+            &plan,
+            controller_path.clone(),
+        )?;
+        let operation = &upgrade_plan.operation;
+        let locked = LockedLifecycle::acquire(
+            operation.transaction_root()?,
+            &operation.unit,
+            &operation.store_path,
+        )?;
+        ensure_systemd_lifecycle_unarmed(&operation.store_path)?;
+        let mut lifecycle = locked.bind(
+            &operation.binary_path,
+            BindMode::InstallOrMatch,
+            &run_systemctl,
+        )?;
+        adopt_existing_remote_systemd_unit(operation, &mut lifecycle, &run_systemctl)?;
+        lifecycle.establish_release_pair(&controller_path, &run_systemctl)?;
+        let report = upgrade_remote_systemd_claimed_with(
+            &upgrade_plan,
+            &lifecycle,
+            &run_systemctl,
+            &verify_remote_systemd_health,
+        )?;
+        let exit_code = report.exit_code();
+        print_install_response(
+            &RemoteSystemdInstallResponse::reconfigured(plan, report),
+            self.json,
+        )?;
+        Ok(exit_code)
     }
 }
 
@@ -234,6 +296,7 @@ pub(crate) struct RemoteSystemdInstallPlan {
     pub unit_contents: String,
     pub env_contents: String,
     pub needs_bind_capability: bool,
+    pub requires_systemd_credentials: bool,
 }
 
 impl RemoteSystemdInstallPlan {
@@ -263,8 +326,26 @@ impl RemoteSystemdInstallPlan {
         if let Some(companion) = serve_config.companion.as_ref() {
             validate_systemd_exec_value("companion upstream", &companion.upstream)?;
             validate_systemd_exec_value("companion path prefix", &companion.path_prefix)?;
+            validate_companion_router_path(&companion.path_prefix)?;
+            validate_systemd_directive_path(
+                "companion credential source",
+                &companion.auth_token_source,
+            )?;
+            validate_path_outside_unit_directory(
+                "companion credential source",
+                &companion.auth_token_source,
+                dynamic_user_root,
+                &unit,
+            )?;
+            validate_path_outside_unit_directory(
+                "companion credential source",
+                &companion.auth_token_source,
+                Path::new(SYSTEMD_STATE_DIR),
+                &unit,
+            )?;
         }
         let needs_bind_capability = serve_config.https_port < 1024 || serve_config.http_port < 1024;
+        let requires_systemd_credentials = serve_config.companion.is_some();
         let unit_contents = render_unit(
             &unit,
             &binary_path,
@@ -281,6 +362,7 @@ impl RemoteSystemdInstallPlan {
             unit_contents,
             env_contents,
             needs_bind_capability,
+            requires_systemd_credentials,
         })
     }
 
@@ -296,6 +378,16 @@ impl RemoteSystemdInstallPlan {
     }
 }
 
+fn validate_companion_router_path(path: &str) -> Result<(), CliError> {
+    if path.split('/').any(|segment| segment.starts_with(':')) {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "systemd companion path prefix must not contain a segment starting with ':': {path}"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct RemoteSystemdInstallResponse {
     unit: String,
@@ -303,7 +395,9 @@ struct RemoteSystemdInstallResponse {
     env_path: PathBuf,
     needs_bind_capability: bool,
     dry_run: bool,
+    reconfigure: bool,
     applied: Option<RemoteSystemdInstallReport>,
+    reconfigured: Option<RemoteSystemdUpgradeReport>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -316,18 +410,24 @@ struct RemoteSystemdStatusResponse {
 }
 
 impl RemoteSystemdInstallResponse {
-    fn dry_run(plan: RemoteSystemdInstallPlan) -> Self {
-        Self::from_plan(plan, true, None)
+    fn dry_run(plan: RemoteSystemdInstallPlan, reconfigure: bool) -> Self {
+        Self::from_plan(plan, true, reconfigure, None, None)
     }
 
     fn applied(plan: RemoteSystemdInstallPlan, report: RemoteSystemdInstallReport) -> Self {
-        Self::from_plan(plan, false, Some(report))
+        Self::from_plan(plan, false, false, Some(report), None)
+    }
+
+    fn reconfigured(plan: RemoteSystemdInstallPlan, report: RemoteSystemdUpgradeReport) -> Self {
+        Self::from_plan(plan, false, true, None, Some(report))
     }
 
     fn from_plan(
         plan: RemoteSystemdInstallPlan,
         dry_run: bool,
+        reconfigure: bool,
         applied: Option<RemoteSystemdInstallReport>,
+        reconfigured: Option<RemoteSystemdUpgradeReport>,
     ) -> Self {
         Self {
             unit: plan.unit,
@@ -335,7 +435,9 @@ impl RemoteSystemdInstallResponse {
             env_path: plan.env_path,
             needs_bind_capability: plan.needs_bind_capability,
             dry_run,
+            reconfigure,
             applied,
+            reconfigured,
         }
     }
 }
@@ -347,7 +449,25 @@ fn print_install_response(
     if json {
         print_json(response)?;
     } else if response.dry_run {
-        println!("{}", response.unit_path.display());
+        if response.reconfigure {
+            println!(
+                "reconfigure {} transactionally",
+                response.unit_path.display()
+            );
+        } else {
+            println!("{}", response.unit_path.display());
+        }
+    } else if let Some(report) = response.reconfigured.as_ref() {
+        match report.outcome {
+            RemoteSystemdUpgradeOutcome::Upgraded => println!("reconfigured {}", response.unit),
+            RemoteSystemdUpgradeOutcome::Noop => println!("already configured {}", response.unit),
+            RemoteSystemdUpgradeOutcome::RolledBack => {
+                println!("reconfigure rolled back {}", response.unit);
+            }
+            RemoteSystemdUpgradeOutcome::RollbackFailed => {
+                println!("reconfigure rollback failed {}", response.unit);
+            }
+        }
     } else {
         println!("installed {}", response.unit);
     }

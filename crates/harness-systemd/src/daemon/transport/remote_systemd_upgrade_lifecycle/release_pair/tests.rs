@@ -353,6 +353,7 @@ fn recovery_arm(fixture: &Fixture, before_sha256: String, target_sha256: String)
         original_enabled: true,
         before_sha256,
         target_sha256,
+        target_unit_sha256: None,
         controller_sha256: Some(sha256_file(&fixture.controller).expect("controller digest")),
         target_database_seal: None,
     }

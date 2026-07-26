@@ -36,7 +36,7 @@ done
 
 if ! release_set_resolve_selectors "${selectors[@]}"; then
   printf 'usage: %s [<selector>...] [--print-build-binary|--print-build-codex-acp-binary|--print-build-openrouter-binary]\n' "${0##*/}" >&2
-  printf 'selector: all, harness, aff, or a leaf (harness-cli, daemon, systemd, bridge, mcp, hook, codex, openrouter)\n' >&2
+  printf 'selector: all, harness, aff, or a leaf (harness-cli, daemon, systemd, bridge, mcp, hook, codex, openrouter, panel)\n' >&2
   exit 2
 fi
 

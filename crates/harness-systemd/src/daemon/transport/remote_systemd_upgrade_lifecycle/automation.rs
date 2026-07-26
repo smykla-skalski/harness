@@ -43,6 +43,7 @@ pub(super) fn arm_recovery_automation<RunSystemctl>(
     operation: RecoveryOperation,
     before_sha256: &str,
     target_sha256: &str,
+    target_unit_sha256: Option<&str>,
     run_systemctl: &RunSystemctl,
 ) -> Result<RecoveryArm, CliError>
 where
@@ -65,6 +66,7 @@ where
         original_enabled,
         before_sha256: before_sha256.to_string(),
         target_sha256: target_sha256.to_string(),
+        target_unit_sha256: target_unit_sha256.map(str::to_owned),
         controller_sha256: None,
         target_database_seal: None,
     };

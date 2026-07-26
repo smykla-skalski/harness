@@ -49,7 +49,9 @@ next=1
 while [[ -e "\$calls_dir/call-\$next" ]]; do
   next=\$((next + 1))
 done
-printf '%s\n' "\$@" >"\$calls_dir/call-\$next"
+# Shell-escaped records preserve argument boundaries even when one argument
+# contains a newline that would otherwise look like several arguments.
+printf '%q\n' "\$@" >"\$calls_dir/call-\$next"
 EOF
 chmod +x "$SANDBOX/scripts/cargo-local.sh"
 
@@ -91,7 +93,7 @@ assert_call_matches() {
   shift
   local expected actual
   [[ -f "$calls_dir/call-$call_number" ]] || return 1
-  expected="$(printf '%s\n' "$@")"
+  expected="$(printf '%q\n' "$@")"
   actual="$(<"$calls_dir/call-$call_number")"
   [[ "$actual" == "$expected" ]]
 }
@@ -106,7 +108,7 @@ scenario_no_arguments_preserves_all_three_groups() {
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime \
     && assert_call_matches 2 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-kernel -p harness-panel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd; then
     pass "no-argument invocation still exercises all three package groups unfiltered"
@@ -125,7 +127,7 @@ scenario_forwards_simple_filter_to_every_group() {
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 2 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit -E 'test(=path::to::test)' \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-kernel -p harness-panel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit -E 'test(=path::to::test)' \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)'; then
     pass "a simple nextest filter reaches every package group, including harness-systemd"
@@ -144,6 +146,8 @@ scenario_preserves_multiword_single_token_filter() {
   if assert_call_count 3 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E "$filter" \
+    && assert_call_matches 2 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-kernel -p harness-panel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit -E "$filter" \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter"; then
     pass "a filter containing spaces survives as a single token in every group"
@@ -167,7 +171,11 @@ scenario_rejects_shell_injection_attempt() {
   fi
   if assert_call_count 3 \
     && assert_call_matches 1 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$payload"; then
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$payload" \
+    && assert_call_matches 2 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-kernel -p harness-panel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit "$payload" \
+    && assert_call_matches 3 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$payload"; then
     pass "a shell metacharacter payload is forwarded as an inert literal argument"
   else
     fail "injection-attempt payload was not forwarded as an inert literal argument: $(calls_snapshot)"

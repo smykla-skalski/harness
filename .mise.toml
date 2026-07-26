@@ -3,6 +3,10 @@
 # rustup's toolchain-file resolution agree. Mismatch invalidates the daemon
 # cargo cache on every context switch.
 rust = "nightly-2026-05-19"
+# The panel's build script shells out to the bundled npm to produce the web
+# assets it embeds, so a missing Node here fails `cargo build`, not just the
+# frontend tasks.
+node = "22.23.1"
 ripgrep = "15.2.0"
 shellcheck = "0.11.0"
 tuist = "4.202.6"
@@ -151,6 +155,10 @@ run = "HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 ./scripts/check-scripts.sh
 description = "Run the release build coordinator and atomic installer shell tests"
 run = "./scripts/tests/test-release-install.sh"
 
+[tasks."test:scripts:panel-frontend"]
+description = "Run the panel frontend dependency installer regression tests"
+run = "./scripts/tests/test-panel-frontend-install.sh"
+
 [tasks."test:unit"]
 description = "Run unit tests (pass nextest args after -- to forward them to every package group, e.g. -E 'test(=path::to::test)')"
 run = "./scripts/run-unit-tests.sh"
@@ -252,7 +260,14 @@ run = "./scripts/cargo-local.sh run --quiet -p openapi-codegen --bin openapi-cod
 
 [tasks.test]
 description = "Run all fast tests"
-depends = ["test:unit", "test:integration", "test:workers", "codegen:check", "openapi:check"]
+depends = [
+  "test:unit",
+  "test:integration",
+  "test:workers",
+  "codegen:check",
+  "openapi:check",
+  "panel:frontend:test",
+]
 
 [tasks."setup:bootstrap"]
 description = "Write runtime bootstrap configs and install the repo-aware wrapper (pass harness setup args after --)"
@@ -268,6 +283,33 @@ depends = [
   "harness:check:binary-contracts",
   "harness:check:source-size",
   "harness:check:rust",
+  "panel:frontend:lint",
+]
+
+[tasks."panel:frontend:install"]
+description = "Install the panel frontend's pinned dependencies from its lockfile"
+run = "./scripts/install-panel-frontend.sh"
+
+[tasks."panel:frontend:build"]
+description = "Build the panel's web assets into crates/harness-panel/frontend/dist"
+depends = ["panel:frontend:install"]
+dir = "crates/harness-panel/frontend"
+run = "npm run build"
+
+[tasks."panel:frontend:lint"]
+description = "Lint, format-check, and type-check the panel frontend"
+depends = ["panel:frontend:install"]
+dir = "crates/harness-panel/frontend"
+run = [
+  "npm run lint",
+]
+
+[tasks."panel:frontend:test"]
+description = "Run the panel frontend unit tests"
+depends = ["panel:frontend:install"]
+dir = "crates/harness-panel/frontend"
+run = [
+  "npm test",
 ]
 
 [tasks."harness:check:stale-state"]
@@ -306,7 +348,7 @@ run = "./scripts/cargo-local.sh --with-group-lease ./scripts/check-feature-isola
 hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-kernel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-kernel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p policy-codegen -p openapi-codegen",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 
@@ -372,6 +414,10 @@ run = "./scripts/build-and-install-release-set.sh codex"
 [tasks."install:harness:openrouter"]
 description = "Build and atomically activate only harness-openrouter-agent, copying the rest of the current release set forward unchanged"
 run = "./scripts/build-and-install-release-set.sh openrouter"
+
+[tasks."install:harness:panel"]
+description = "Build and atomically activate only harness-panel, copying the rest of the current release set forward unchanged"
+run = "./scripts/build-and-install-release-set.sh panel"
 
 [tasks."install:aff"]
 description = "Build aff only, then activate it in the signed versioned release set"

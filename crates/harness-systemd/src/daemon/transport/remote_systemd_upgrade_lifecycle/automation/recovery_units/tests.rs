@@ -69,6 +69,7 @@ fn recovery_unit_writes_refuse_unrelated_existing_files_before_mutation() {
         RecoveryOperation::Upgrade,
         "before",
         "target",
+        None,
         &run,
     )
     .expect_err("unrelated recovery service must fail closed");
