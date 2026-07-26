@@ -9,115 +9,19 @@
 
 use std::sync::{Arc, Mutex};
 
-use axum::Json;
-use axum::Router;
 use axum::body::Body;
-use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::http::{StatusCode, header};
 use chrono::{TimeZone, Utc};
 use serde_json::Value;
-use tokio::net::TcpListener;
 use tower::ServiceExt;
 
 use super::{Harness, router, session_cookie_name};
 use crate::daemon_client::DaemonCredential;
 use crate::store::pair_links::PairLinkRecord;
 
-/// What the stub holds and what it saw.
-#[derive(Debug, Default)]
-struct Daemon {
-    /// The inventory the daemon reports, in the order it reports it.
-    pairings: Vec<Value>,
-    /// Every pairing id a revoke was asked about.
-    revoked: Vec<String>,
-    client_id: Option<String>,
-    authorization: Option<String>,
-    /// Refuse the next revoke the way the daemon refuses one the caller may not
-    /// see.
-    refuse_revoke: bool,
-    /// Answer the way a daemon that does not serve this route does: the same
-    /// status as a missing pairing, with nothing in the body.
-    unrouted_revoke: bool,
-}
+mod daemon_stub;
 
-fn pairing(pairing_id: &str, state: &str) -> Value {
-    serde_json::json!({
-        "pairing_id": pairing_id,
-        "state": state,
-        "role": "operator",
-        "created_at": "2026-07-26T10:00:00Z",
-        "expires_at": "2026-07-26T10:10:00Z",
-    })
-}
-
-/// A claimed link, carrying the device it became.
-fn claimed(pairing_id: &str, device: &str) -> Value {
-    let mut entry = pairing(pairing_id, "active");
-    entry["claimed_at"] = Value::String("2026-07-26T10:01:00Z".to_owned());
-    entry["device"] = serde_json::json!({
-        "client_id": format!("{pairing_id}-device"),
-        "display_name": device,
-        "platform": "macos",
-        "last_seen_at": "2026-07-26T10:05:00Z",
-    });
-    entry
-}
-
-async fn stub_daemon(daemon: Arc<Mutex<Daemon>>) -> String {
-    async fn list(State(daemon): State<Arc<Mutex<Daemon>>>, headers: HeaderMap) -> Response {
-        let mut daemon = daemon.lock().expect("stub lock");
-        daemon.client_id = header_value(&headers, "x-harness-remote-client-id");
-        daemon.authorization = header_value(&headers, "authorization");
-        Json(serde_json::json!({ "pairings": daemon.pairings })).into_response()
-    }
-
-    async fn revoke(
-        State(daemon): State<Arc<Mutex<Daemon>>>,
-        Path(pairing_id): Path<String>,
-    ) -> Response {
-        let mut daemon = daemon.lock().expect("stub lock");
-        if daemon.unrouted_revoke {
-            return StatusCode::NOT_FOUND.into_response();
-        }
-        if daemon.refuse_revoke {
-            return (
-                StatusCode::FORBIDDEN,
-                Json(serde_json::json!({"error": {
-                    "code": "REMOTE_PAIRING_NOT_AVAILABLE",
-                    "message": "no pairing with that id is available to this client"
-                }})),
-            )
-                .into_response();
-        }
-        daemon.revoked.push(pairing_id.clone());
-        Json(serde_json::json!({
-            "pairing_id": pairing_id,
-            "outcome": "device_revoked",
-            "revoked_at": "2026-07-26T11:00:00Z",
-        }))
-        .into_response()
-    }
-
-    let app = Router::new()
-        .route("/v1/remote/pairings", get(list))
-        .route("/v1/remote/pairings/{pairing_id}/revoke", post(revoke))
-        .with_state(daemon);
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let address = listener.local_addr().expect("local address");
-    tokio::spawn(async move {
-        axum::serve(listener, app).await.ok();
-    });
-    format!("http://127.0.0.1:{}", address.port())
-}
-
-fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
-    headers
-        .get(name)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned)
-}
+use daemon_stub::{Daemon, claimed, pairing, pairing_minted_by, stub_daemon};
 
 /// A panel with a stored credential and a daemon that answers.
 async fn ready(daemon: Arc<Mutex<Daemon>>) -> Harness {
@@ -165,7 +69,10 @@ async fn attribute(harness: &Harness, pairing_id: &str, login: &str) {
 #[tokio::test]
 async fn a_person_sees_only_the_pairings_they_generated() {
     let daemon = Arc::new(Mutex::new(Daemon {
-        pairings: vec![claimed("pair-1", "Ada's laptop"), pairing("pair-2", "pending")],
+        pairings: vec![
+            claimed("pair-1", "Ada's laptop"),
+            pairing("pair-2", "pending"),
+        ],
         ..Daemon::default()
     }));
     let harness = ready(Arc::clone(&daemon)).await;
@@ -189,7 +96,10 @@ async fn a_person_sees_only_the_pairings_they_generated() {
 #[tokio::test]
 async fn the_owner_sees_every_pairing_and_whose_it_is() {
     let daemon = Arc::new(Mutex::new(Daemon {
-        pairings: vec![claimed("pair-1", "Ada's laptop"), pairing("pair-2", "pending")],
+        pairings: vec![
+            claimed("pair-1", "Ada's laptop"),
+            pairing("pair-2", "pending"),
+        ],
         ..Daemon::default()
     }));
     let harness = ready(Arc::clone(&daemon)).await;
@@ -207,6 +117,48 @@ async fn the_owner_sees_every_pairing_and_whose_it_is() {
     assert_eq!(pairings[0]["pairing_id"], "pair-1");
     assert_eq!(pairings[0]["account_id"], grace_id);
     assert_eq!(pairings[0]["device"]["display_name"], "Ada's laptop");
+}
+
+/// The real daemon scopes both inventory and revocation to the client id that
+/// minted a pairing. Modeling that here makes a changed panel identity lose
+/// visibility just as it would in production.
+#[tokio::test]
+async fn the_daemon_hides_pairings_minted_by_another_broker_identity() {
+    let daemon = Arc::new(Mutex::new(Daemon {
+        pairings: vec![
+            pairing("pair-current", "pending"),
+            pairing_minted_by("pair-old", "active", "panel-replacement"),
+        ],
+        ..Daemon::default()
+    }));
+    let harness = ready(Arc::clone(&daemon)).await;
+    let owner = harness.sign_in("ada").await;
+    attribute(&harness, "pair-current", "ada").await;
+    attribute(&harness, "pair-old", "ada").await;
+
+    let (status, body) = harness.get("/panel/api/pairings", Some(&owner)).await;
+
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains("pair-current"), "{body}");
+    assert!(!body.contains("pair-old"), "{body}");
+}
+
+#[tokio::test]
+async fn the_daemon_refuses_to_revoke_a_pairing_owned_by_another_broker_identity() {
+    let daemon = Arc::new(Mutex::new(Daemon {
+        pairings: vec![pairing_minted_by("pair-old", "active", "panel-replacement")],
+        ..Daemon::default()
+    }));
+    let harness = ready(Arc::clone(&daemon)).await;
+    let grace = harness.sign_in("grace").await;
+    attribute(&harness, "pair-old", "grace").await;
+
+    let (status, body) = harness
+        .post("/panel/api/pairings/pair-old/revoke", Some(&grace))
+        .await;
+
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert!(daemon.lock().expect("stub lock").revoked.is_empty());
 }
 
 /// The panel records a link before it answers and shouts when it cannot, so a
@@ -241,8 +193,8 @@ async fn a_pairing_the_panel_never_recorded_is_the_owners_alone() {
 #[tokio::test]
 async fn a_pairing_revoked_outside_the_panel_reads_as_revoked() {
     let mut revoked = claimed("pair-1", "Ada's laptop");
-    revoked["state"] = Value::String("revoked".to_owned());
-    revoked["revoked_at"] = Value::String("2026-07-26T10:30:00Z".to_owned());
+    revoked.body["state"] = Value::String("revoked".to_owned());
+    revoked.body["revoked_at"] = Value::String("2026-07-26T10:30:00Z".to_owned());
     let daemon = Arc::new(Mutex::new(Daemon {
         pairings: vec![revoked],
         ..Daemon::default()
