@@ -76,7 +76,10 @@ struct HarnessMonitorMCPContractTests {
     )
 
     controller.start()
-    await awaitRuntimeState(controller, equals: .disabled)
+    // The controller is already `.disabled` here, so waiting for that state
+    // would return before `start()` had done anything. Wait for the enable
+    // attempt it records, which is what actually changes.
+    _ = await waitUntil { service.recordedEnabledStates == [false] }
 
     #expect(service.recordedEnabledStates == [false])
     #expect(controller.runtimeState == .disabled)
