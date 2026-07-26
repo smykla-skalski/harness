@@ -175,12 +175,17 @@ pub(super) fn snapshot_generation(
     Ok(manifest)
 }
 
+/// The staged material an activation installs, and the unit it must leave behind.
+pub(super) struct ActivationCandidate<'a> {
+    pub(super) staged_candidate: &'a Path,
+    pub(super) candidate_sha256: &'a str,
+    pub(super) desired_unit_contents: Option<&'a str>,
+    pub(super) previous_unit_metadata: Option<FileMetadata>,
+}
+
 pub(super) fn activate_candidate<RunSystemctl, VerifyHealth>(
     plan: &RemoteSystemdOperationPlan,
-    staged_candidate: &Path,
-    candidate_sha256: &str,
-    desired_unit_contents: Option<&str>,
-    previous_unit_metadata: Option<FileMetadata>,
+    candidate: &ActivationCandidate<'_>,
     lifecycle: &ClaimedLifecycle,
     run_systemctl: &RunSystemctl,
     verify_health: &VerifyHealth,
@@ -195,15 +200,21 @@ where
 {
     lifecycle.recheck(run_systemctl)?;
     let installed_metadata = FileMetadata::read(&plan.binary_path)?;
-    copy_file_atomic(staged_candidate, &plan.binary_path, installed_metadata)?;
+    copy_file_atomic(
+        candidate.staged_candidate,
+        &plan.binary_path,
+        installed_metadata,
+    )?;
     let installed_sha = super::files::sha256_file(&plan.binary_path)?;
+    let candidate_sha256 = candidate.candidate_sha256;
     if installed_sha != candidate_sha256 {
         return Err(io_error(format!(
             "installed candidate digest mismatch: expected {candidate_sha256}, found {installed_sha}"
         )));
     }
-    if let Some(contents) = desired_unit_contents {
-        let metadata = previous_unit_metadata
+    if let Some(contents) = candidate.desired_unit_contents {
+        let metadata = candidate
+            .previous_unit_metadata
             .ok_or_else(|| io_error("managed systemd unit disappeared before activation"))?;
         super::systemd::install_desired_unit(&plan.unit_path, contents, metadata)?;
     } else {

@@ -6,7 +6,8 @@ use crate::errors::CliError;
 
 use super::super::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use super::automation::{
-    arm_recovery_automation, finish_recovery_automation, load_recovery_arm, update_recovery_phase,
+    RecoveryTransaction, arm_recovery_automation, finish_recovery_automation, load_recovery_arm,
+    update_recovery_phase,
 };
 use super::binary::{acquire_with_trusted_controller, inspect_binary};
 use super::capacity::{
@@ -59,11 +60,13 @@ where
     let mut arm = arm_recovery_automation(
         plan,
         &plan.controller_path,
-        &transaction_id,
-        RecoveryOperation::Rollback,
-        &displaced.sha256,
-        &restored.sha256,
-        None,
+        &RecoveryTransaction {
+            transaction_id: &transaction_id,
+            operation: RecoveryOperation::Rollback,
+            before_sha256: &displaced.sha256,
+            target_sha256: &restored.sha256,
+            target_unit_sha256: None,
+        },
         run_systemctl,
     )?;
     stop_and_inhibit(plan, run_systemctl)?;

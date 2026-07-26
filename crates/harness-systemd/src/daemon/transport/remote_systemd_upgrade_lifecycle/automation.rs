@@ -36,14 +36,19 @@ pub(super) fn load_recovery_arm(store_path: &Path) -> Result<Option<RecoveryArm>
     recovery_arm::load_recovery_arm(store_path)
 }
 
+/// What the transaction being armed replaces, and with what.
+pub(super) struct RecoveryTransaction<'a> {
+    pub(super) transaction_id: &'a str,
+    pub(super) operation: RecoveryOperation,
+    pub(super) before_sha256: &'a str,
+    pub(super) target_sha256: &'a str,
+    pub(super) target_unit_sha256: Option<&'a str>,
+}
+
 pub(super) fn arm_recovery_automation<RunSystemctl>(
     plan: &RemoteSystemdOperationPlan,
     controller_source: &Path,
-    transaction_id: &str,
-    operation: RecoveryOperation,
-    before_sha256: &str,
-    target_sha256: &str,
-    target_unit_sha256: Option<&str>,
+    transaction: &RecoveryTransaction<'_>,
     run_systemctl: &RunSystemctl,
 ) -> Result<RecoveryArm, CliError>
 where
@@ -52,8 +57,8 @@ where
     let original_enabled = original_daemon_enablement(plan, run_systemctl)?;
     let mut arm = RecoveryArm {
         arm_version: RECOVERY_ARM_VERSION,
-        transaction_id: transaction_id.to_string(),
-        operation,
+        transaction_id: transaction.transaction_id.to_string(),
+        operation: transaction.operation,
         phase: RecoveryPhase::Armed,
         unit: plan.unit.clone(),
         binary_path: plan.binary_path.clone(),
@@ -64,9 +69,9 @@ where
         readiness_timeout_seconds: plan.readiness_timeout.as_secs(),
         stabilization_window_seconds: plan.stabilization_window.as_secs(),
         original_enabled,
-        before_sha256: before_sha256.to_string(),
-        target_sha256: target_sha256.to_string(),
-        target_unit_sha256: target_unit_sha256.map(str::to_owned),
+        before_sha256: transaction.before_sha256.to_string(),
+        target_sha256: transaction.target_sha256.to_string(),
+        target_unit_sha256: transaction.target_unit_sha256.map(str::to_owned),
         controller_sha256: None,
         target_database_seal: None,
     };

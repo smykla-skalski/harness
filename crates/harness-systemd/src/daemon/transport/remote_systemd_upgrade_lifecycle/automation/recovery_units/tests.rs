@@ -65,11 +65,13 @@ fn recovery_unit_writes_refuse_unrelated_existing_files_before_mutation() {
     let error = super::super::arm_recovery_automation(
         &plan,
         &plan.binary_path,
-        "transaction",
-        RecoveryOperation::Upgrade,
-        "before",
-        "target",
-        None,
+        &super::super::RecoveryTransaction {
+            transaction_id: "transaction",
+            operation: RecoveryOperation::Upgrade,
+            before_sha256: "before",
+            target_sha256: "target",
+            target_unit_sha256: None,
+        },
         &run,
     )
     .expect_err("unrelated recovery service must fail closed");
