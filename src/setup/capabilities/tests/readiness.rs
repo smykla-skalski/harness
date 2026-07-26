@@ -1,43 +1,52 @@
+use std::collections::BTreeSet;
+
+use super::super::readiness::{BOOTSTRAP_REQUIREMENTS, PROJECT_REQUIREMENTS};
 use super::*;
 
-#[test]
-fn readiness_auto_detects_repo_root() {
-    let tmp = tempfile::tempdir().unwrap();
-    let (home_dir, repo_root, project_dir) = prepare_nested_kuma_project(tmp.path());
+/// Checks that gate nothing and describe nothing are how this report goes stale:
+/// #670 retired four capability summaries and left the five checks that fed them
+/// behind, so the report went on telling readers to repair an environment for
+/// capabilities the product had dropped. A check reaches the report only if some
+/// capability's readiness depends on it, or if it is named here as a fact worth
+/// reporting on its own.
+const INFORMATIONAL_CHECKS: &[&str] = &["data_root_writable"];
 
-    let report = with_data_root(tmp.path(), || {
+fn accounted_check_codes() -> BTreeSet<&'static str> {
+    PROJECT_REQUIREMENTS
+        .iter()
+        .chain(BOOTSTRAP_REQUIREMENTS)
+        .chain(INFORMATIONAL_CHECKS)
+        .copied()
+        .collect()
+}
+
+fn ready_report(tmp: &Path) -> CapabilitiesReport {
+    let (home_dir, project_dir) = prepare_project_root(tmp);
+    with_data_root(tmp, || {
         build_report(
             Some(project_dir.to_str().unwrap()),
-            None,
             &FakeProbe::ready(&home_dir),
         )
-    });
+    })
+}
+
+#[test]
+fn readiness_reports_the_project_scope_it_resolved() {
+    let tmp = tempfile::tempdir().unwrap();
+    let report = ready_report(tmp.path());
 
     assert_eq!(
-        report.readiness.scope.repo_root.as_deref(),
-        Some(repo_root.to_str().unwrap())
+        report.readiness.scope.project_dir,
+        tmp.path().join("project").to_str().unwrap()
     );
+    assert!(report.readiness.scope.explicit_project_dir);
     assert!(report.readiness.features[&Feature::Bootstrap].ready);
 }
 
 #[test]
 fn readiness_stays_ready_when_project_plugin_is_missing() {
     let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("home");
-    let repo_root = tmp.path().join("repo-root");
-    let project_dir = tmp.path().join("project");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(home.join("bin")).unwrap();
-    fs::create_dir_all(&project_dir).unwrap();
-    write_current_kuma_contract(&repo_root);
-
-    let report = with_data_root(tmp.path(), || {
-        build_report(
-            Some(project_dir.to_str().unwrap()),
-            Some(repo_root.to_str().unwrap()),
-            &FakeProbe::ready(&home),
-        )
-    });
+    let report = ready_report(tmp.path());
 
     assert!(report.readiness.features[&Feature::Bootstrap].ready);
     assert!(
@@ -50,51 +59,54 @@ fn readiness_stays_ready_when_project_plugin_is_missing() {
 }
 
 #[test]
-fn readiness_marks_repo_contract_unready_when_targets_are_missing() {
+fn readiness_blocks_the_project_capabilities_when_the_project_dir_is_missing() {
     let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("home");
-    let repo_root = tmp.path().join("repo-root");
-    let project_dir = tmp.path().join("project");
-    fs::create_dir_all(&home).unwrap();
-    fs::create_dir_all(home.join("bin")).unwrap();
-    fs::create_dir_all(&project_dir).unwrap();
-    fs::create_dir_all(repo_root.join("mk")).unwrap();
-    fs::write(
-        repo_root.join("go.mod"),
-        "module github.com/kumahq/kuma\n\ngo 1.24\n",
-    )
-    .unwrap();
-    fs::write(repo_root.join("mk/k3d.mk"), "k3d/start:\n\t@echo old\n").unwrap();
-    fs::write(repo_root.join("mk/k8s.mk"), "KIND_CLUSTER_NAME ?= kuma-1\n").unwrap();
-    fs::write(
-        repo_root.join("mk/docker.mk"),
-        "docker/push:\n\t@echo old\n",
-    )
-    .unwrap();
+    let home_dir = create_home_dir(tmp.path());
+    let missing = tmp.path().join("absent");
 
     let report = with_data_root(tmp.path(), || {
         build_report(
-            Some(project_dir.to_str().unwrap()),
-            Some(repo_root.to_str().unwrap()),
-            &FakeProbe::ready(&home),
+            Some(missing.to_str().unwrap()),
+            &FakeProbe::ready(&home_dir),
         )
     });
 
-    let status = |code: &str| {
-        report
-            .readiness
-            .checks
-            .iter()
-            .find(|check| check.code == code)
-            .map(|check| check.status)
-    };
-
+    let project_dir_status = report
+        .readiness
+        .checks
+        .iter()
+        .find(|check| check.code == "project_dir_exists")
+        .map(|check| check.status);
+    assert_eq!(project_dir_status, Some(ReadinessStatus::Fail));
     assert_eq!(
-        status("repo_make_contract_present"),
-        Some(ReadinessStatus::Fail)
+        report.readiness.features[&Feature::Bootstrap].blocking_checks,
+        vec!["project_dir_exists".to_string()]
     );
-    assert_eq!(
-        status("repo_remote_publish_contract_present"),
-        Some(ReadinessStatus::Fail)
+}
+
+#[test]
+fn every_emitted_check_gates_a_capability_or_is_declared_informational() {
+    let tmp = tempfile::tempdir().unwrap();
+    let report = ready_report(tmp.path());
+
+    let emitted: BTreeSet<&str> = report
+        .readiness
+        .checks
+        .iter()
+        .map(|check| check.code.as_str())
+        .collect();
+    assert!(!emitted.is_empty(), "the report emitted no checks at all");
+
+    let accounted = accounted_check_codes();
+    let orphaned: Vec<&&str> = emitted.difference(&accounted).collect();
+    assert!(
+        orphaned.is_empty(),
+        "these checks gate no capability and are not declared informational: {orphaned:?}"
+    );
+
+    let stale: Vec<&&str> = accounted.difference(&emitted).collect();
+    assert!(
+        stale.is_empty(),
+        "these codes are required or declared but no longer emitted: {stale:?}"
     );
 }

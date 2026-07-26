@@ -55,7 +55,6 @@ impl FeatureInfo {
 pub enum ReadinessCheckScope {
     Machine,
     Project,
-    Repo,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,16 +62,13 @@ pub enum ReadinessCheckScope {
 pub enum ReadinessStatus {
     Pass,
     Fail,
-    Skipped,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReadinessScope {
     pub cwd: String,
     pub project_dir: String,
-    pub repo_root: Option<String>,
     pub explicit_project_dir: bool,
-    pub explicit_repo_root: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

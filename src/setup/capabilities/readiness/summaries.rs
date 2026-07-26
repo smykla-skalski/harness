@@ -7,8 +7,16 @@ pub(super) struct CapabilitySummaries {
     pub(super) bootstrap: ReadinessSummary,
 }
 
-const PROJECT_REQUIREMENTS: &[&str] = &["project_dir_exists", "wrapper_install_target_available"];
-const BOOTSTRAP_REQUIREMENTS: &[&str] = &["project_dir_exists", "wrapper_install_target_available"];
+// Every check the report emits has to appear in one of these lists, or be
+// declared informational where the readiness contract is asserted. #670 retired
+// four capability summaries and left the five checks that fed them behind, so
+// the report kept telling readers to repair an environment for capabilities the
+// product had dropped. A check that gates nothing and says nothing is that
+// defect waiting to happen again.
+pub(crate) const PROJECT_REQUIREMENTS: &[&str] =
+    &["project_dir_exists", "wrapper_install_target_available"];
+pub(crate) const BOOTSTRAP_REQUIREMENTS: &[&str] =
+    &["project_dir_exists", "wrapper_install_target_available"];
 
 pub(super) fn build_summaries(statuses: &BTreeMap<&str, ReadinessStatus>) -> CapabilitySummaries {
     CapabilitySummaries {

@@ -5,7 +5,7 @@
 | Command | Purpose | Key surface |
 | --- | --- | --- |
 | `setup bootstrap` | Install or refresh the repo-aware harness wrapper and write agent bootstrap config | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...`, `--skip-runtime-hooks <AGENTS>...` |
-| `setup capabilities` | Emit a structured capabilities/readiness report for planning | `--project-dir`, `--repo-root` |
+| `setup capabilities` | Emit a structured capabilities/readiness report for planning | `--project-dir` |
 
 Sources: `cargo run --quiet -- setup --help`; `src/app/cli.rs`; `src/setup/bootstrap.rs`; `src/setup/capabilities.rs`.
 
@@ -14,7 +14,7 @@ Sources: `cargo run --quiet -- setup --help`; `src/app/cli.rs`; `src/setup/boots
 | Command | Flags / arguments | Notes |
 | --- | --- | --- |
 | `harness setup bootstrap` | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...`, `--skip-runtime-hooks <AGENTS>...` | `--agents` defaults to all supported agents; `--skip-runtime-hooks` leaves the rest of bootstrap intact while suppressing runtime hook configs for the listed runtimes |
-| `harness setup capabilities` | `--project-dir`, `--repo-root` | Prints JSON |
+| `harness setup capabilities` | `--project-dir` | Prints JSON |
 
 Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- setup capabilities --help`; `src/setup/bootstrap.rs`; `src/setup/capabilities.rs`.
 
