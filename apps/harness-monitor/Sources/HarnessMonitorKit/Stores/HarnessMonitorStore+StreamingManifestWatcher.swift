@@ -154,6 +154,11 @@ extension HarnessMonitorStore {
             kind: .reconnecting,
             detail: "Discovered live daemon manifest, re-bootstrapping"
           )
+          // Reconnecting stops the manifest watcher, and that cancels this very
+          // task. Give up the handle first: a cancellation landing here makes
+          // the bootstrap below abandon its connection attempt, so the daemon we
+          // just found would be adopted and then never connected to.
+          self.externalManifestDiscoveryTask = nil
           await self.reconnect()
           return
         }
