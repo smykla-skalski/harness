@@ -13,10 +13,10 @@ use crate::daemon::protocol::{
     CodexRunSnapshot, CodexRunStatus, CodexTranscriptResponse, StreamEvent,
 };
 use crate::daemon::state;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 use crate::session::types::ManagedAgentRef;
 use crate::workspace::utc_now;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::active_runs::{ActiveRunRegistration, ActiveRuns};
 use super::effort::validate_codex_effort;
@@ -355,7 +355,7 @@ fn ensure_run_belongs_to_session(
 
 #[expect(
     clippy::cognitive_complexity,
-    reason = "this function is one tracing::info! call, whose 7-point expansion is its entire score above the base"
+    reason = "reports a queued codex run by logging it and appending a best-effort event; the one tracing::info! expansion costs 7 of its 8 points, leaving structural 1, so this covers surcharge only"
 )]
 fn log_queued_run(session_id: &str, snapshot: &CodexRunSnapshot) {
     tracing::info!(

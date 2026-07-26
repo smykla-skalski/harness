@@ -27,7 +27,7 @@ impl CodexControllerHandle {
 
     #[expect(
         clippy::cognitive_complexity,
-        reason = "one tracing::warn! for an unsupported worker type costs 7 of this function's 11 points, leaving 4 of real structure"
+        reason = "routes one recovered admission worker to its existing-run or missing-run path, skipping non-codex and already-active workers; the tracing::warn! for an unsupported type costs 7 of its 11 points, leaving structural 4"
     )]
     async fn reconcile_one_admission_worker(
         &self,
@@ -64,7 +64,7 @@ impl CodexControllerHandle {
 
     #[expect(
         clippy::cognitive_complexity,
-        reason = "one tracing::warn! recording the reconciled admission costs 7 of this function's 13 points, leaving 6 of real structure"
+        reason = "reconciles a committed admission that has no durable run, then publishes the recovery and re-evaluates the board; the closing tracing::warn! costs 7 of its 13 points, leaving structural 6"
     )]
     async fn reconcile_missing_admission_run(
         &self,

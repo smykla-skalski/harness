@@ -2,13 +2,13 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::CodexRunRequest;
 use crate::daemon::service as daemon_service;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::session::types::{
     AgentRegistration, CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, SessionRole, SessionState,
     TaskStatus, WorkItem,
 };
 use crate::workspace::utc_now;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::{CodexControllerHandle, lock_db};
 use super::orchestration::rollback_codex_registration;
@@ -185,7 +185,7 @@ fn persist_sync_registration(
 
 #[expect(
     clippy::cognitive_complexity,
-    reason = "both restore failure paths log, so two tracing::warn! expansions cost 14 of this function's 17 points, leaving 3 of real structure"
+    reason = "restores the pre-registration session state and republishes it, logging on either failure; the two tracing::warn! expansions cost 14 of its 17 points, leaving structural 3"
 )]
 fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &SessionState) {
     let restore_result = db
@@ -216,7 +216,7 @@ fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &
 
 #[expect(
     clippy::cognitive_complexity,
-    reason = "one tracing::warn! for a failed registration rollback costs 7 of this function's 10 points, leaving 3 of real structure"
+    reason = "persists registration side effects and rolls them back on failure while still returning the original error; the tracing::warn! for a failed rollback costs 7 of its 10 points, leaving structural 3"
 )]
 pub(super) async fn finalize_async_registration(
     async_db: &AsyncDaemonDb,
