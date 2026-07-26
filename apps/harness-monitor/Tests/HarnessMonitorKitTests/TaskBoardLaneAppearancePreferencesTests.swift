@@ -324,7 +324,9 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(source.contains("Saturation("))
     #expect(source.contains("HueSlider("))
     #expect(!source.contains("ColorPicker("))
-    #expect(!source.contains("NSColorPanel"))
+    // Matches the call, not the prose: the file comment explains why the panel
+    // is being avoided and has every right to name it.
+    #expect(!source.contains("NSColorPanel."))
     // A nested popover would be another window, which is what #532 removed.
     #expect(!source.contains(".popover("))
   }
