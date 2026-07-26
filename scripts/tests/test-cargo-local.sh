@@ -22,6 +22,49 @@ TEST_USER="${SOCKET_TMPDIR##*/}"
 PASS_COUNT=0
 FAIL_COUNT=0
 
+# Every socket under a root that still answers a connect. Used both to assert
+# this suite leaves nothing running and to clean up if it ever does.
+write_reachable_socket_probe() {
+  local path="$1"
+  cat >"$path" <<'PY'
+import os, socket, sys
+
+for root in sys.argv[1:]:
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in filenames:
+            if not name.endswith(".sock"):
+                continue
+            candidate = os.path.join(dirpath, name)
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                probe.settimeout(2)
+                try:
+                    probe.connect(candidate)
+                except OSError:
+                    continue
+            print(candidate)
+PY
+}
+
+# Every root is resolved before anything is written, because cleanup calls this
+# from the EXIT trap, which also fires on a run that died before it had a
+# sandbox to write into.
+reachable_sccache_sockets() {
+  local probe root
+  local -a roots=()
+
+  for root in "${SANDBOX:-}" "${SOCKET_TMPDIR:-}" \
+    "/tmp/harness-sccache-${TEST_USER:-}" "${PRESTART_TMPDIR:-}"; do
+    [[ -n "$root" ]] && [[ -d "$root" ]] && roots+=("$root")
+  done
+  (( ${#roots[@]} > 0 )) || return 0
+  [[ -d "${SANDBOX:-}" ]] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+
+  probe="$SANDBOX/reachable-sockets.py"
+  write_reachable_socket_probe "$probe" 2>/dev/null || return 0
+  python3 "$probe" "${roots[@]}" 2>/dev/null || true
+}
+
 # Defined above the trap that calls it, since cleanup runs on any exit path,
 # including one taken before the scenarios start.
 stop_leaked_sccache_servers() {
@@ -33,7 +76,7 @@ stop_leaked_sccache_servers() {
   while read -r socket; do
     [[ -n "$socket" ]] || continue
     SCCACHE_SERVER_UDS="$socket" "$sccache_bin" --stop-server >/dev/null 2>&1 || true
-  done < <(reachable_sockets_in_test_roots)
+  done < <(reachable_sccache_sockets)
 }
 
 cleanup() {
@@ -1676,39 +1719,9 @@ scenario_empty_sccache_bin_disables_the_cache() {
   fi
 }
 
-# Every socket under a root that still answers a connect. Used both to assert
-# this suite leaves nothing running and to clean up if it ever does.
-write_reachable_socket_probe() {
-  local path="$1"
-  cat >"$path" <<'PY'
-import os, socket, sys
-
-for root in sys.argv[1:]:
-    for dirpath, _dirnames, filenames in os.walk(root):
-        for name in filenames:
-            if not name.endswith(".sock"):
-                continue
-            candidate = os.path.join(dirpath, name)
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
-                probe.settimeout(2)
-                try:
-                    probe.connect(candidate)
-                except OSError:
-                    continue
-            print(candidate)
-PY
-}
-
-reachable_sockets_in_test_roots() {
-  local probe="$SANDBOX/reachable-sockets.py"
-  write_reachable_socket_probe "$probe"
-  python3 "$probe" "$SANDBOX" "$SOCKET_TMPDIR" \
-    "/tmp/harness-sccache-$TEST_USER" "${PRESTART_TMPDIR:-$SANDBOX}" 2>/dev/null || true
-}
-
 scenario_suite_leaves_no_sccache_server_behind() {
   local leaked
-  leaked="$(reachable_sockets_in_test_roots)"
+  leaked="$(reachable_sccache_sockets)"
 
   # A leaked server outlives its sandbox by its whole idle timeout, and every one
   # of them enforces its own copy of SCCACHE_CACHE_SIZE over the one on-disk
