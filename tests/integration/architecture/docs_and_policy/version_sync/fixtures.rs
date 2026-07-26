@@ -215,9 +215,16 @@ pub(super) const MIXED_MONITOR_PBXPROJ_VERSION_FIXTURE: &str = "\
 /// weekly. Deriving it means the fixture cannot drift from the manifest at all.
 fn workspace_member_manifests(root: &Path) -> Vec<String> {
     let manifest = fs::read_to_string(root.join("Cargo.toml")).expect("workspace manifest");
+    // Split on the key and the bracket separately so `members=[` and any amount
+    // of whitespace between them parse the same. A manifest this cannot read
+    // fails loudly here, which is the outcome we want: silently copying no
+    // members would leave the script under test passing for the wrong reason.
     let members = manifest
-        .split_once("members = [")
-        .expect("workspace members list")
+        .split_once("members")
+        .expect("workspace members key")
+        .1
+        .split_once('[')
+        .expect("workspace members opener")
         .1
         .split_once(']')
         .expect("workspace members terminator")
@@ -259,11 +266,17 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
         "apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
     ];
 
-    for relative_path in fixed_paths
+    // Deduplicated because the `.` member and `fixed_paths` both name the root
+    // manifest, and copying a file twice hides which list is responsible.
+    let mut relative_paths: Vec<String> = fixed_paths
         .into_iter()
         .map(str::to_owned)
         .chain(workspace_member_manifests(root))
-    {
+        .collect();
+    relative_paths.sort_unstable();
+    relative_paths.dedup();
+
+    for relative_path in relative_paths {
         let source = root.join(&relative_path);
         let destination = fixture_root.path().join(&relative_path);
         if let Some(parent) = destination.parent() {
