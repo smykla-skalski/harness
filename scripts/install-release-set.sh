@@ -49,7 +49,10 @@ harness_signing_team_id="${HARNESS_INSTALL_SIGNING_TEAM_ID:-Q498EB36N4}"
 aff_signing_identity="${AFF_INSTALL_SIGNING_IDENTITY:-$harness_signing_identity}"
 harness_skip_codesign="${HARNESS_INSTALL_SKIP_CODESIGN:-0}"
 aff_skip_codesign="${AFF_INSTALL_SKIP_CODESIGN:-$harness_skip_codesign}"
-[[ "$(uname -s)" != "Darwin" ]] && harness_skip_codesign=1 aff_skip_codesign=1
+# Signing is a macOS-only step. Resolve the host the same way the release
+# inventory does, so a caller simulating Darwin exercises this path too.
+[[ "${HARNESS_RELEASE_HOST_OS:-$(command uname -s)}" != "Darwin" ]] \
+  && harness_skip_codesign=1 aff_skip_codesign=1
 lock_dir="$install_root/.install.lock"
 current_link="$install_root/current"
 lock_token="$$-$(date +%s)-${RANDOM:-0}"
