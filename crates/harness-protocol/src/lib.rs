@@ -19,6 +19,8 @@ pub mod agent {
 
 /// Daemon websocket contracts shared by standalone Harness clients.
 pub mod daemon;
+/// Session observation timeline contracts.
+pub mod timeline;
 /// Managed-agent request and response contracts shared by daemon clients.
 pub mod managed_agents;
 

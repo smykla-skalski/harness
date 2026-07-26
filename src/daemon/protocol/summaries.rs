@@ -388,18 +388,7 @@ pub struct SessionDetail {
     pub agent_activity: Vec<AgentToolActivitySummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct TimelineEntry {
-    pub entry_id: String,
-    pub recorded_at: String,
-    pub kind: String,
-    pub session_id: String,
-    pub agent_id: Option<String>,
-    pub task_id: Option<String>,
-    pub summary: String,
-    pub payload: Value,
-}
+pub use harness_protocol::timeline::TimelineEntry;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[derive(utoipa::ToSchema)]
