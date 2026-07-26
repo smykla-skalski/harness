@@ -22,7 +22,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use tokio::sync::Mutex;
 
-use crate::assets::PanelAssets;
+use crate::assets::{PanelAssets, PanelPage};
 use crate::config::daemon::DaemonConfig;
 use crate::config::{CompanionAuthDigest, PanelConfig};
 use crate::daemon_client::DaemonClient;
@@ -74,7 +74,11 @@ impl PanelState {
     /// Returns [`PanelError`] when the embedded bundle or the GitHub client
     /// cannot be prepared.
     pub fn new(config: PanelConfig, store: Store) -> Result<Self, PanelError> {
-        let assets = PanelAssets::new(&config.base_path)?;
+        let assets = PanelAssets::new(&PanelPage {
+            base_path: &config.base_path,
+            version: env!("CARGO_PKG_VERSION"),
+            daemon_host: &config.daemon.domain,
+        })?;
         let github = GitHubClient::new(config.github.clone(), config.callback_url())?;
         let daemon = DaemonRuntime {
             client: DaemonClient::new(&config.daemon)?,
@@ -101,11 +105,20 @@ impl PanelState {
 /// forwards the prefix verbatim and the panel answers on exactly the paths a
 /// browser asked for. Nesting would also leave `{base}` and `{base}/` as two
 /// different routes, only one of which is reachable.
+///
+/// At the origin root the base is empty, so `{base}` and `{base}/` are both `/`
+/// and only the second is registered. Registering `""` is not an option either
+/// way: axum rejects a route path that does not start with a slash.
 pub fn router(state: PanelState) -> Router {
     let base = state.config.base_path.clone();
     let companion_auth = state.config.companion_auth.clone();
+    let router = if base.is_empty() {
+        Router::new()
+    } else {
+        Router::new().route(&base, get(api::index))
+    };
 
-    Router::new()
+    router
         .route(&format!("{base}/healthz"), get(api::healthz))
         .route(&format!("{base}/api/me"), get(api::me))
         .route(&format!("{base}/api/accounts"), get(api::accounts))
@@ -126,7 +139,6 @@ pub fn router(state: PanelState) -> Router {
             &format!("{base}/api/pairings/{{pairing_id}}/revoke"),
             post(pairings::revoke),
         )
-        .route(&base, get(api::index))
         .route(&format!("{base}/"), get(api::index))
         // Anything else under the mount point is either a bundled file or a
         // route the single-page app owns, and only the app can tell which.

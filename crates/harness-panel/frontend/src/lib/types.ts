@@ -54,6 +54,16 @@ export interface PanelPairing {
   account_id?: string;
 }
 
+/** The pairing list, and what the daemon said about itself while answering. */
+export interface PanelPairings {
+  pairings: PanelPairing[];
+  /**
+   * Absent from a daemon older than the field, and from any answer the panel
+   * could not get, so the footer omits the mark rather than inventing one.
+   */
+  daemon_version?: string;
+}
+
 /** What an unpair did, as the daemon reports it. */
 export interface PairingRevoke {
   pairing_id: string;

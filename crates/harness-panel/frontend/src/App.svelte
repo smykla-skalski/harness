@@ -1,19 +1,27 @@
 <script lang="ts">
   import AccountsRoster from './components/AccountsRoster.svelte';
   import IdentityBar from './components/IdentityBar.svelte';
+  import PageFooter from './components/PageFooter.svelte';
   import PairingsTable from './components/PairingsTable.svelte';
   import PairLinkPanel from './components/PairLinkPanel.svelte';
   import Plate from './components/Plate.svelte';
   import SignedOut from './components/SignedOut.svelte';
   import type { PanelApi } from './lib/api';
+  import type { PanelBuild } from './lib/base';
   import type { PairLink, PanelAccount, PanelPairing, PanelViewer } from './lib/types';
 
-  const { api, iconUrl }: { api: PanelApi; iconUrl: string } = $props();
+  const { api, iconUrl, build }: { api: PanelApi; iconUrl: string; build: PanelBuild } = $props();
 
   let loading = $state(true);
   let viewer = $state<PanelViewer | null>(null);
   let accounts = $state<PanelAccount[]>([]);
   let pairings = $state<PanelPairing[]>([]);
+  /**
+   * Kept from the last successful read rather than cleared alongside the
+   * pairings: a daemon that stops answering has not changed version, and
+   * blanking the footer mark would read as one.
+   */
+  let daemonVersion = $state<string | null>(null);
   let failure = $state<string | null>(null);
   /**
    * Kept apart from `failure`, because this one comes from the daemon rather
@@ -61,7 +69,8 @@
     try {
       const listed = await api.fetchPairings();
       if (read === pairingsRead) {
-        pairings = listed;
+        pairings = listed.pairings;
+        daemonVersion = listed.daemon_version ?? null;
       }
     } catch (error) {
       if (read === pairingsRead) {
@@ -92,6 +101,17 @@
     return link;
   }
 
+  /**
+   * Withdraw a link the card is still showing. The same route an unpair uses,
+   * because a link nobody claimed and a device nobody wants are the same thing
+   * to the daemon. The failure is deliberately rethrown: the card is where the
+   * control was pressed and where the reason belongs.
+   */
+  async function cancelLink(pairingId: string): Promise<void> {
+    await api.revokePairing(pairingId);
+    void loadPairings();
+  }
+
   async function setCanPair(accountId: string, granted: boolean): Promise<void> {
     try {
       await api.setCanPair(accountId, granted);
@@ -111,6 +131,7 @@
     viewer = null;
     accounts = [];
     pairings = [];
+    daemonVersion = null;
     // Discards any read already in flight, which would otherwise resolve during
     // the sign-out below and put this session's devices back on the page.
     pairingsRead += 1;
@@ -124,6 +145,28 @@
     }
     await load();
   }
+
+  /**
+   * The viewer's own devices. An administrator receives everyone's, but their
+   * own card should hold theirs alone; the rest belong to the account rows,
+   * where each one is a fact about the person who paired it.
+   */
+  const mine = $derived.by(() => {
+    const signedIn = viewer;
+    if (signedIn === null) {
+      return [];
+    }
+    return pairings.filter((pairing) => pairing.account_id === signedIn.account.id);
+  });
+
+  /** Everyone else's, which the roster folds into the account each belongs to. */
+  const theirs = $derived.by(() => {
+    const signedIn = viewer;
+    if (signedIn === null) {
+      return [];
+    }
+    return pairings.filter((pairing) => pairing.account_id !== signedIn.account.id);
+  });
 
   void load();
 </script>
@@ -143,22 +186,22 @@
       <p class="dim">Reading the panel…</p>
     </Plate>
   {:else if viewer !== null}
-    <PairLinkPanel canPair={viewer.account.can_pair} onGenerate={generate} />
+    <PairLinkPanel canPair={viewer.account.can_pair} onGenerate={generate} onCancel={cancelLink} />
     <!-- Skipped only for someone who has nothing paired and cannot pair
-         anything: for them the card above already says what to do, and an empty
-         table underneath repeats it. A failure still shows the plate, because
-         the alternative is swallowing it where nobody can see it. -->
-    {#if pairings.length > 0 || viewer.account.can_pair || viewer.is_owner || pairingsFailure !== null}
-      <PairingsTable
-        {pairings}
-        {accounts}
-        showAccount={viewer.is_owner}
-        failure={pairingsFailure}
-        onUnpair={unpair}
-      />
+         anything: for them the control above already says what to do, and an
+         empty table underneath repeats it. A failure still shows the plate,
+         because the alternative is swallowing it where nobody can see it. -->
+    {#if mine.length > 0 || viewer.account.can_pair || pairingsFailure !== null}
+      <PairingsTable pairings={mine} failure={pairingsFailure} onUnpair={unpair} />
     {/if}
     {#if viewer.is_owner}
-      <AccountsRoster {accounts} viewerAccountId={viewer.account.id} onSetCanPair={setCanPair} />
+      <AccountsRoster
+        {accounts}
+        pairings={theirs}
+        viewerAccountId={viewer.account.id}
+        onSetCanPair={setCanPair}
+        onUnpair={unpair}
+      />
     {/if}
     <!-- A failed load proves nothing about whether anyone is signed in, so the
        gate stays away: offering sign-in as the way out of a daemon outage sends
@@ -166,4 +209,6 @@
   {:else if failure === null}
     <SignedOut href={api.signInUrl()} />
   {/if}
+
+  <PageFooter {build} {daemonVersion} />
 </main>

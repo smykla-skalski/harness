@@ -15,10 +15,25 @@ static PANEL_ASSETS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/frontend/dist")
 /// `frontend/vite.config.ts` and the `harness-panel-base` meta tag.
 pub const BASE_PATH_SENTINEL: &str = "/__harness_panel_base__";
 
+/// Stand-ins for the two facts the page states about itself. Unlike the mount
+/// point these never appear in an asset URL, so they carry no leading slash.
+const VERSION_SENTINEL: &str = "__harness_panel_version__";
+const DAEMON_SENTINEL: &str = "__harness_panel_daemon__";
+
 /// Written by the build script when the web assets were skipped.
 const PLACEHOLDER_MARKER: &str = ".harness-panel-placeholder";
 
 const INDEX_HTML: &str = "index.html";
+
+/// What the entry page says about the panel serving it.
+#[derive(Debug, Clone, Copy)]
+pub struct PanelPage<'a> {
+    /// Path subtree the panel answers on, empty at the origin root.
+    pub base_path: &'a str,
+    pub version: &'a str,
+    /// Host of the daemon this panel mints credentials from.
+    pub daemon_host: &'a str,
+}
 
 /// The embedded bundle, with `index.html` already pointed at the configured
 /// mount point.
@@ -29,12 +44,12 @@ pub struct PanelAssets {
 }
 
 impl PanelAssets {
-    /// Prepare the bundle for a panel mounted at `base_path`.
+    /// Prepare the bundle for one running panel.
     ///
     /// # Errors
     /// Returns [`PanelError::Config`] when the embedded bundle has no entry
     /// point, which means the binary was built against an empty `dist`.
-    pub fn new(base_path: &str) -> Result<Self, PanelError> {
+    pub fn new(page: &PanelPage<'_>) -> Result<Self, PanelError> {
         let index = PANEL_ASSETS
             .get_file(INDEX_HTML)
             .and_then(|file| file.contents_utf8())
@@ -45,8 +60,17 @@ impl PanelAssets {
                 )
             })?;
 
+        // The mount point is substituted first and without escaping: it also
+        // appears inside asset URLs, where an escape would break the link, and
+        // `normalize_base_path` has already refused everything an escape would
+        // be for. The other two land in an attribute value and nowhere else.
+        let index_html = index
+            .replace(BASE_PATH_SENTINEL, page.base_path)
+            .replace(VERSION_SENTINEL, &escape_attribute(page.version))
+            .replace(DAEMON_SENTINEL, &escape_attribute(page.daemon_host));
+
         Ok(Self {
-            index_html: index.replace(BASE_PATH_SENTINEL, base_path),
+            index_html,
             placeholder: PANEL_ASSETS.get_file(PLACEHOLDER_MARKER).is_some(),
         })
     }
@@ -88,6 +112,28 @@ pub struct BundledFile {
     pub immutable: bool,
 }
 
+/// Make a value safe to sit inside a double-quoted HTML attribute.
+///
+/// Both values are validated configuration today, so nothing here has anything
+/// to escape. It is written anyway because the substitution is textual: the day
+/// one of them starts carrying something an operator typed, the page would grow
+/// markup rather than a wrong-looking string, and nothing at the call site would
+/// look different.
+fn escape_attribute(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            other => escaped.push(other),
+        }
+    }
+    escaped
+}
+
 /// Reduce a request path to a bundle lookup, or refuse it.
 ///
 /// `include_dir` resolves by exact key, so a traversal attempt would simply
@@ -127,11 +173,22 @@ fn content_type_for(path: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{BASE_PATH_SENTINEL, PanelAssets, content_type_for, normalize_asset_path};
+    use super::{
+        BASE_PATH_SENTINEL, PanelAssets, PanelPage, content_type_for, escape_attribute,
+        normalize_asset_path,
+    };
+
+    fn page(base_path: &str) -> PanelPage<'_> {
+        PanelPage {
+            base_path,
+            version: "0.3.0",
+            daemon_host: "harness.example.com",
+        }
+    }
 
     #[test]
     fn the_entry_page_is_rewritten_for_the_mount_point() {
-        let assets = PanelAssets::new("/panel").expect("bundle");
+        let assets = PanelAssets::new(&page("/panel")).expect("bundle");
 
         assert!(assets.index_html().contains("/panel"));
         assert!(
@@ -144,13 +201,44 @@ mod tests {
     /// URL, so the rewrite has to reach it and not just the asset links.
     #[test]
     fn the_rewritten_page_tells_the_app_where_it_is_mounted() {
-        let assets = PanelAssets::new("/harness/panel").expect("bundle");
+        let assets = PanelAssets::new(&page("/harness/panel")).expect("bundle");
 
         assert!(
             assets.index_html().contains(r#"content="/harness/panel""#),
             "{}",
             assets.index_html()
         );
+    }
+
+    /// The footer names the build and the daemon, and reads both out of the page
+    /// rather than from a route, so neither sentinel may survive the rewrite.
+    #[test]
+    fn the_rewritten_page_names_the_build_and_the_daemon() {
+        let assets = PanelAssets::new(&page("/panel")).expect("bundle");
+
+        assert!(
+            assets.index_html().contains(r#"content="0.3.0""#),
+            "{}",
+            assets.index_html()
+        );
+        assert!(
+            assets
+                .index_html()
+                .contains(r#"content="harness.example.com""#),
+            "{}",
+            assets.index_html()
+        );
+        assert!(!assets.index_html().contains(super::VERSION_SENTINEL));
+        assert!(!assets.index_html().contains(super::DAEMON_SENTINEL));
+    }
+
+    #[test]
+    fn a_substituted_value_cannot_close_its_attribute() {
+        assert_eq!(
+            escape_attribute(r#""><script>alert(1)</script>"#),
+            "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
+        );
+        assert_eq!(escape_attribute("harness.example.com"), "harness.example.com");
     }
 
     #[test]
@@ -165,7 +253,7 @@ mod tests {
         ] {
             assert!(
                 normalize_asset_path(path).is_none()
-                    || PanelAssets::new("/panel")
+                    || PanelAssets::new(&page("/panel"))
                         .expect("bundle")
                         .file(path)
                         .is_none(),
@@ -178,7 +266,7 @@ mod tests {
     /// bundled copy as a file would hand out the unrewritten sentinel.
     #[test]
     fn the_entry_page_is_never_served_as_a_bundled_file() {
-        let assets = PanelAssets::new("/panel").expect("bundle");
+        let assets = PanelAssets::new(&page("/panel")).expect("bundle");
 
         assert!(assets.file("index.html").is_none());
         assert!(assets.file("/index.html").is_none());
@@ -201,7 +289,7 @@ mod tests {
     /// replaced in place by a later build.
     #[test]
     fn only_hashed_assets_are_marked_immutable() {
-        let assets = PanelAssets::new("/panel").expect("bundle");
+        let assets = PanelAssets::new(&page("/panel")).expect("bundle");
         let hashed = super::PANEL_ASSETS
             .get_dir("assets")
             .and_then(|dir| dir.files().next())

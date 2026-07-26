@@ -10,6 +10,12 @@
 //! The prefix is *not* stripped before forwarding. The companion serves its own
 //! routes under the same prefix the public origin exposes, which keeps every
 //! link it renders correct without teaching it about a rewrite.
+//!
+//! A prefix of `/` is the whole origin, spelled as an empty prefix internally.
+//! That does not hand the daemon's own API away: the companion is registered as
+//! ordinary routes on the same router, and a static path always outranks a
+//! catch-all, so `/v1/...` keeps matching the daemon's own handlers and only
+//! what the daemon does not answer reaches the companion.
 
 use std::error::Error as StdError;
 use std::fmt;
@@ -74,7 +80,6 @@ pub enum CompanionConfigError {
     AuthTokenInvalidCharacter,
     PrefixEmpty,
     PrefixNotAbsolute(String),
-    PrefixIsRoot,
     PrefixTrailingSlash(String),
     PrefixEmptySegment(String),
     PrefixDotSegment(String),
@@ -130,10 +135,6 @@ impl fmt::Display for CompanionConfigError {
             Self::PrefixNotAbsolute(prefix) => {
                 write!(f, "companion path prefix must start with /, got {prefix}")
             }
-            Self::PrefixIsRoot => write!(
-                f,
-                "companion path prefix / would forward every request, including the daemon's own API"
-            ),
             Self::PrefixTrailingSlash(prefix) => {
                 write!(f, "companion path prefix must not end with /, got {prefix}")
             }
@@ -238,6 +239,7 @@ impl CompanionRouteConfig {
     }
 
     /// Absolute path prefix owned by the companion, with no trailing slash.
+    /// Empty when the companion owns the origin root.
     #[must_use]
     pub fn path_prefix(&self) -> &str {
         &self.path_prefix
@@ -249,17 +251,23 @@ impl CompanionRouteConfig {
 
     /// Every route pattern the companion owns.
     ///
-    /// Three are needed, not two: axum's `{*rest}` capture requires a non-empty
-    /// remainder, so `/panel/{*companion_path}` does not match `/panel/` - the
-    /// very URL a browser lands on. Without the bare trailing-slash pattern the
-    /// companion's own root would fall through to the daemon's 404.
+    /// Three are needed under a prefix, not two: axum's `{*rest}` capture
+    /// requires a non-empty remainder, so `/panel/{*companion_path}` does not
+    /// match `/panel/` - the very URL a browser lands on. Without the bare
+    /// trailing-slash pattern the companion's own root would fall through to the
+    /// daemon's 404.
+    ///
+    /// At the origin root there are two, because the bare prefix and the
+    /// trailing-slash one are both `/`, and registering it twice would panic
+    /// during the merge rather than at start-up validation.
     #[must_use]
-    pub(crate) fn routes(&self) -> [String; 3] {
-        [
-            self.path_prefix.clone(),
-            format!("{}{ROUTE_SUFFIX_SLASH}", self.path_prefix),
-            format!("{}{ROUTE_SUFFIX_WILDCARD}", self.path_prefix),
-        ]
+    pub(crate) fn routes(&self) -> Vec<String> {
+        let with_slash = format!("{}{ROUTE_SUFFIX_SLASH}", self.path_prefix);
+        let wildcard = format!("{}{ROUTE_SUFFIX_WILDCARD}", self.path_prefix);
+        if self.path_prefix.is_empty() {
+            return vec![with_slash, wildcard];
+        }
+        vec![self.path_prefix.clone(), with_slash, wildcard]
     }
 
     /// Whether a matched route path belongs to the companion rather than the
@@ -268,6 +276,10 @@ impl CompanionRouteConfig {
     /// The limit middleware asks this of every remote request, the daemon's own
     /// included, so it answers by comparing suffixes rather than rebuilding
     /// [`Self::routes`] and allocating three strings to say "no".
+    ///
+    /// At the origin root the prefix is empty and every path strips to itself,
+    /// so this comes down to the suffix set: `/` and the catch-all are the
+    /// companion's, and `/v1/health` is not.
     #[must_use]
     pub(crate) fn owns_route(&self, route_path: &str) -> bool {
         route_path
@@ -347,8 +359,10 @@ fn validate_path_prefix(prefix: &str) -> Result<String, CompanionConfigError> {
     if !prefix.starts_with('/') {
         return Err(CompanionConfigError::PrefixNotAbsolute(prefix.to_owned()));
     }
+    // The origin root, held as an empty prefix so that joining it to a suffix
+    // gives the suffix itself rather than a path with a doubled slash.
     if prefix == "/" {
-        return Err(CompanionConfigError::PrefixIsRoot);
+        return Ok(String::new());
     }
     if prefix.ends_with('/') {
         return Err(CompanionConfigError::PrefixTrailingSlash(prefix.to_owned()));

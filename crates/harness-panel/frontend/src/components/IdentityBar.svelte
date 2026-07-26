@@ -24,19 +24,20 @@
   <h1 class="mark">
     <img class="mark-icon" src={iconUrl} alt="" width="26" height="26" decoding="async" />
     <span class="mark-name">Harness</span>
-    <span class="mark-part">panel</span>
+    <span class="mark-part">Panel</span>
+    <!-- Beside the product rather than beside the name, because it says which
+         panel this is - the one that can decide for everybody - before it says
+         anything about who is reading it. -->
+    {#if viewer?.is_owner === true}
+      <Chip tone="signal" small>Admin</Chip>
+    {/if}
   </h1>
 
   {#if viewer !== null && handle !== null}
     <div class="who">
       <Avatar account={viewer.account} size={30} />
       <div class="who-text">
-        <p class="who-name">
-          {viewer.account.display_name}
-          {#if viewer.is_owner}
-            <Chip tone="signal" small>Admin</Chip>
-          {/if}
-        </p>
+        <p class="who-name">{viewer.account.display_name}</p>
         <span class="who-handle mono">{handleLabel(handle)}</span>
       </div>
       <button class="btn btn-quiet" onclick={onSignOut}>Sign out</button>
@@ -44,9 +45,7 @@
   {/if}
 </header>
 
-<!-- The fan behind the tower in the app icon. The one ornament on the page, and
-     the only thing tying it to the app it hands credentials to. -->
-<div class="beam" aria-hidden="true"></div>
+<div class="beam bar-rule" aria-hidden="true"></div>
 
 <style>
   .bar {
@@ -71,10 +70,13 @@
     flex: none;
   }
 
+  /* Trimmed to the cap band so the badge beside it centres on the letters
+     rather than on a line box these capitals do not fill. */
   .mark-name,
   .mark-part {
     font: 600 0.8125rem/1 var(--mono);
     letter-spacing: 0.22em;
+    text-box: trim-both cap alphabetic;
     text-transform: uppercase;
   }
 
@@ -83,10 +85,13 @@
     font-weight: 500;
   }
 
-  .beam {
-    background: var(--beam);
-    border-radius: 1px;
-    height: 2px;
+  /* Held off the wordmark by more than its own letter spacing, so the two words
+     stay one name and the badge reads as something said about it. */
+  .mark :global(.chip) {
+    margin-left: 0.25rem;
+  }
+
+  .bar-rule {
     margin-bottom: 1.25rem;
   }
 
@@ -104,11 +109,8 @@
   }
 
   .who-name {
-    align-items: center;
-    display: flex;
     font-size: 0.875rem;
     font-weight: 600;
-    gap: 0.375rem;
     line-height: 1.2;
     margin: 0;
   }

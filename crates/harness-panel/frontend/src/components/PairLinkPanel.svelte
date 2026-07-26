@@ -1,22 +1,31 @@
 <script lang="ts">
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { slide } from 'svelte/transition';
+
   import type { ClipboardWriter } from '../lib/clipboard';
   import { copyText } from '../lib/clipboard';
-  import { formatCountdown, formatTimestamp, remainingFraction, remainingMs } from '../lib/format';
+  import { remainingFraction, remainingMs } from '../lib/format';
   import { pairingHref } from '../lib/pairing';
   import type { PairLink } from '../lib/types';
   import Chip from './Chip.svelte';
+  import PairLinkGauge from './PairLinkGauge.svelte';
   import Plate from './Plate.svelte';
 
   const {
     canPair,
     onGenerate,
+    onCancel,
   }: {
     canPair: boolean;
     onGenerate: () => Promise<PairLink>;
+    /**
+     * Withdraw a link nobody has claimed. Dropping it from the page alone would
+     * leave it claimable by whoever already has it for the rest of its life,
+     * which is the opposite of what the control appears to do.
+     */
+    onCancel: (pairingId: string) => Promise<void>;
   } = $props();
 
-  /** Close enough to lapsing that the countdown should say so in colour too. */
-  const URGENT_MS = 5 * 60 * 1_000;
   const COPIED_SETTLE_MS = 2_500;
   const TICK_MS = 1_000;
   /**
@@ -25,6 +34,8 @@
    * enough that somebody stuck is not left watching a page that says nothing.
    */
   const HANDOFF_GRACE_MS = 1_600;
+  /** How long the card takes to roll down. Zero for anyone who asked for still. */
+  const SLIDE_MS = $derived(prefersReducedMotion.current ? 0 : 180);
 
   let link = $state<PairLink | null>(null);
   /**
@@ -34,6 +45,7 @@
   let issuedMs = $state(0);
   let nowMs = $state(0);
   let working = $state(false);
+  let cancelling = $state(false);
   let failure = $state<string | null>(null);
   let copyState = $state<'idle' | 'copied' | 'manual'>('idle');
   let handoff = $state<'idle' | 'waiting' | 'stalled'>('idle');
@@ -42,7 +54,6 @@
 
   const leftMs = $derived(link === null ? null : remainingMs(link.expires_at, nowMs));
   const expired = $derived(leftMs === 0);
-  const urgent = $derived(leftMs !== null && leftMs > 0 && leftMs <= URGENT_MS);
   const href = $derived(link === null ? null : pairingHref(link.pairing_url));
   const left = $derived.by(() => {
     if (link === null || leftMs === null) {
@@ -144,6 +155,37 @@
     }
   }
 
+  /**
+   * Withdraw the link and put the card away.
+   *
+   * The card closes only once the daemon has agreed. Closing first would leave
+   * whoever holds the link able to claim it, behind a page that says the pairing
+   * was cancelled.
+   */
+  async function cancel(): Promise<void> {
+    const current = link;
+    if (current === null) {
+      return;
+    }
+    cancelling = true;
+    failure = null;
+    try {
+      await onCancel(current.pairing_id);
+      // Only if this is still the link that was withdrawn. A mint that landed
+      // while the revoke was in flight owns the card now, and clearing it would
+      // drop a live link off a page that can never show it again.
+      if (link === current) {
+        link = null;
+        copyState = 'idle';
+        handoff = 'idle';
+      }
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    } finally {
+      cancelling = false;
+    }
+  }
+
   // The handoff is the next thing to do, and putting focus on it lets the whole
   // flow finish from the keyboard without hunting for the control. Keyed on the
   // link alone: reading the countdown here would pull focus back every second.
@@ -170,132 +212,135 @@
   }
 </script>
 
-<Plate label="Pair a device" tone="lead">
-  {#snippet status()}
-    {#if !canPair}
+{#if !canPair}
+  <Plate label="Pair a device" tone="lead">
+    {#snippet status()}
       <Chip>Awaiting approval</Chip>
-    {:else if link === null}
-      <Chip tone="clear" dot>Approved</Chip>
-    {:else if expired}
-      <Chip tone="stop">Expired</Chip>
-    {:else}
-      <Chip tone="signal" dot>Link live</Chip>
-    {/if}
-  {/snippet}
-
-  {#if !canPair}
+    {/snippet}
     <p class="dim">
       Ask an administrator to approve this account. Once they have, you can generate a link here
     </p>
-  {:else if link === null}
-    <p>A link is shown once and cannot be shown again. Open it on the device you want to pair</p>
+  </Plate>
+{:else if link === null}
+  <!-- One control until there is something to show. The card it opens exists to
+       hold a live credential, and standing it up empty put a paragraph and a
+       button inside a frame that said nothing the button did not. -->
+  <div class="start">
     <button class="btn btn-signal" onclick={generate} disabled={working}>
-      {working ? 'Generating…' : 'Generate a pairing link'}
+      {working ? 'Generating…' : 'Pair a device'}
     </button>
-  {:else}
-    {#if !expired}
-      <p>This link is shown once and cannot be shown again</p>
+    {#if failure !== null}
+      <p class="failure">{failure}</p>
     {/if}
-    <div class="ticket" class:ticket-spent={expired}>
-      <!-- Selected on focus so it can be copied in one gesture even where the
+  </div>
+{:else}
+  <div class="open" transition:slide={{ duration: SLIDE_MS }}>
+    <Plate label="Pair a device" tone="lead">
+      <!-- In the header rather than over the link: it is a caveat about the
+           thing below, and as a full-width paragraph it read as the first
+           instruction instead. -->
+      {#snippet status()}
+        {#if !expired}
+          <span class="caveat">This link is shown once and cannot be shown again</span>
+        {/if}
+      {/snippet}
+
+      <div class="ticket" class:ticket-spent={expired}>
+        <!-- Selected on focus so it can be copied in one gesture even where the
            clipboard is refused, and readonly so an accidental edit cannot produce
            a link that looks right and is not. The value is a one-time code, so the
            browser is told to keep it out of form history and away from the spell
            checker, which in some browsers means a remote service. -->
-      <div class="well">
-        <input
-          bind:this={field}
-          class="value mono"
-          type="text"
-          readonly
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
-          value={link.pairing_url}
-          aria-label="Pairing link"
-          onfocus={(event) => event.currentTarget.select()}
-        />
-        <button class="btn copy" onclick={copy} disabled={expired}>
-          {copyState === 'copied' ? 'Copied' : 'Copy'}
-        </button>
+        <div class="well">
+          <input
+            bind:this={field}
+            class="value mono"
+            type="text"
+            readonly
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            value={link.pairing_url}
+            aria-label="Pairing link"
+            onfocus={(event) => event.currentTarget.select()}
+          />
+          <button class="btn copy" onclick={copy} disabled={expired}>
+            {copyState === 'copied' ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+
+        <PairLinkGauge {leftMs} fractionLeft={left} expiresAt={link.expires_at} />
       </div>
 
-      {#if leftMs !== null}
-        <div class="track" aria-hidden="true">
-          <div class="fill" class:fill-urgent={urgent} style="width: {left * 100}%"></div>
-        </div>
+      <p class="note" class:note-quiet={copyState !== 'manual'} role="status">{copyNote}</p>
+
+      {#if expired}
+        <p>This link lapsed before anything claimed it. Generate another to pair the device</p>
       {/if}
 
-      <p class="meta mono">
-        <span class="role">{link.role}</span>
-        <span aria-hidden="true">·</span>
-        <!-- Ticking text in a live region would be read out every second, so the
-             number is shown and the deadline itself is announced instead. -->
-        {#if leftMs === null}
-          <span>expiry unknown</span>
-        {:else if expired}
-          <span class="gone">expired</span>
-        {:else}
-          <span class="count" class:count-urgent={urgent} aria-hidden="true">
-            expires in {formatCountdown(leftMs)}
-          </span>
-        {/if}
-        <!-- Only when the deadline parsed. Otherwise this would put an invalid
-             value in `datetime` and announce an expiry the visible label has just
-             said is unknown. -->
-        {#if leftMs !== null}
-          <span class="visually-hidden">
-            expires <time datetime={link.expires_at}>{formatTimestamp(link.expires_at)}</time>
-          </span>
-        {/if}
-      </p>
-    </div>
-
-    <p class="note" class:note-quiet={copyState !== 'manual'} role="status">{copyNote}</p>
-
-    {#if expired}
-      <p>This link lapsed before anything claimed it. Generate another to pair the device</p>
-    {/if}
-
-    <div class="actions">
-      {#if href !== null && !expired}
-        <!-- `harness://` is registered by the Harness apps, so on the device being
-             paired this finishes the job in one press. An anchor rather than a
-             scripted navigation: it works from the keyboard, carries the browser's
-             own copy-link menu, and is not mistaken for a popup. -->
-        <a
-          bind:this={handoffControl}
-          class="btn btn-signal"
-          {href}
-          onclick={() => (handoff = 'waiting')}
+      <!-- Leftmost is the way out, rightmost is the way on. The handoff sat on
+           the left before, where a control in the corner of a card that has just
+           rolled down reads as the thing that rolls it back up. -->
+      <div class="actions">
+        <button class="btn btn-quiet" onclick={cancel} disabled={working || cancelling}>
+          {cancelling ? 'Cancelling…' : 'Cancel'}
+        </button>
+        <!-- Also while a cancel is in flight: minting into a card that is being
+             withdrawn races the two, and the loser is a live link nobody sees. -->
+        <button
+          class="btn onward"
+          class:btn-signal={expired}
+          onclick={generate}
+          disabled={working || cancelling}
         >
-          Open in Harness Monitor
-        </a>
-      {/if}
-      <button class="btn" class:btn-signal={expired} onclick={generate} disabled={working}>
-        {working ? 'Generating…' : 'Generate another'}
-      </button>
-    </div>
+          {working ? 'Generating…' : 'Generate another'}
+        </button>
+        {#if href !== null && !expired}
+          <!-- `harness://` is registered by the Harness apps, so on the device
+               being paired this finishes the job in one press. An anchor rather
+               than a scripted navigation: it works from the keyboard, carries the
+               browser's own copy-link menu, and is not mistaken for a popup. -->
+          <a
+            bind:this={handoffControl}
+            class="btn btn-signal"
+            {href}
+            onclick={() => (handoff = 'waiting')}
+          >
+            Open in Harness Monitor
+          </a>
+        {/if}
+      </div>
 
-    {#if !expired}
-      <p class="aside dim" role="status">
-        {#if handoff === 'stalled'}
+      <!-- Only when the handoff went nowhere. Saying the same thing up front made
+           every reader answer a question they had not asked yet. -->
+      {#if !expired && handoff === 'stalled'}
+        <p class="aside dim" role="status">
           Harness Monitor did not come forward. If it is not installed on this device, copy the link
           and open it on the one you want to pair
-        {:else}
-          Pairing a different device? Copy the link and open it there instead
-        {/if}
-      </p>
-    {/if}
-  {/if}
+        </p>
+      {/if}
 
-  {#if failure !== null}
-    <p class="failure">{failure}</p>
-  {/if}
-</Plate>
+      {#if failure !== null}
+        <p class="failure">{failure}</p>
+      {/if}
+    </Plate>
+  </div>
+{/if}
 
 <style>
+  /* Carries the plate's own bottom margin, which the card inside it would
+     otherwise be the only thing on the page not to have. */
+  .start {
+    margin-bottom: 1rem;
+  }
+
+  .caveat {
+    color: var(--dim);
+    font-size: 0.8125rem;
+    text-align: right;
+  }
+
   .ticket {
     margin-bottom: 1rem;
   }
@@ -333,60 +378,6 @@
     padding: 0 0.75rem;
   }
 
-  /* Draining as the lifetime burns down, because the only thing worth knowing
-     about a one-time link is how much of it is left. */
-  .track {
-    background: var(--rule);
-    border-radius: 999px;
-    height: 3px;
-    margin: 0.75rem 0 0.5rem;
-    overflow: hidden;
-  }
-
-  .fill {
-    background: var(--signal);
-    height: 100%;
-    transition: width 1s linear;
-  }
-
-  .fill-urgent {
-    background: var(--stop);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .fill {
-      transition: none;
-    }
-  }
-
-  .meta {
-    align-items: center;
-    color: var(--dim);
-    display: flex;
-    flex-wrap: wrap;
-    font-size: 0.6875rem;
-    gap: 0.4rem;
-    letter-spacing: 0.04em;
-    margin: 0;
-    text-transform: uppercase;
-  }
-
-  .role {
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  /* The one number on the page that changes while it is being read. */
-  .count {
-    font-size: 0.75rem;
-  }
-
-  .count-urgent,
-  .gone {
-    color: var(--stop);
-    font-weight: 600;
-  }
-
   .ticket-spent .well {
     border-left-color: var(--rule);
   }
@@ -396,9 +387,15 @@
   }
 
   .actions {
+    align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  /* Everything from here rightward is the way on, pushed away from the way out. */
+  .onward {
+    margin-left: auto;
   }
 
   /* Kept in the accessibility tree for the confirmation the button already shows

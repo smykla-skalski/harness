@@ -123,7 +123,9 @@ fn write_placeholder(dist: &Path) {
         dist.join("index.html"),
         "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"harness-panel-base\" content=\"/__harness_panel_base__\">\
-         <title>Harness panel</title></head><body>\
+         <meta name=\"harness-panel-version\" content=\"__harness_panel_version__\">\
+         <meta name=\"harness-panel-daemon\" content=\"__harness_panel_daemon__\">\
+         <title>Harness Panel</title></head><body>\
          <div id=\"app\"><p>This binary was built without the panel's web assets.</p></div>\
          </body></html>\n",
     )

@@ -269,7 +269,15 @@ fn serve_command(
         ExecArgument::Value("--public-origin".to_owned()),
         ExecArgument::Value(args.public_origin.clone()),
         ExecArgument::Value("--base-path".to_owned()),
-        ExecArgument::Value(validated.base_path.clone()),
+        // Rendered back as a path rather than as the normalized value: the
+        // origin root normalizes to nothing, and `--base-path ""` is a flag the
+        // panel would refuse on the next start. `/` round-trips to the same
+        // configuration.
+        ExecArgument::Value(if validated.base_path.is_empty() {
+            "/".to_owned()
+        } else {
+            validated.base_path.clone()
+        }),
         ExecArgument::Value("--state-dir".to_owned()),
         // %S is systemd's state directory root, so the panel writes where
         // StateDirectory= already granted it access rather than somewhere the

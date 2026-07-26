@@ -192,11 +192,46 @@ fn rejects_a_prefix_that_shadows_the_daemon_api() {
     }
 }
 
+/// The origin root is held as an empty prefix, which is what makes every joined
+/// path come out with one slash rather than two.
 #[test]
-fn rejects_a_root_prefix() {
-    let error = config("http://127.0.0.1:8787", "/").expect_err("root prefix must be refused");
+fn accepts_the_origin_root_as_an_empty_prefix() {
+    let route = config("http://127.0.0.1:8787", "/").expect("the origin root is a valid prefix");
 
-    assert!(matches!(error, CompanionConfigError::PrefixIsRoot));
+    assert_eq!(route.path_prefix(), "");
+    assert_eq!(
+        route.routes(),
+        ["/".to_owned(), "/{*companion_path}".to_owned()],
+        "the bare prefix and the trailing-slash pattern are both / at the root, and axum panics on \
+         a route registered twice"
+    );
+}
+
+/// The daemon keeps its own API at the root as much as under a prefix: these
+/// are ordinary routes on one router, and a static path outranks a catch-all.
+#[test]
+fn the_root_prefix_does_not_claim_the_daemon_api() {
+    let route = config("http://127.0.0.1:8787", "/").expect("the origin root is a valid prefix");
+
+    for owned in route.routes() {
+        assert!(route.owns_route(&owned), "{owned} must be recognised");
+    }
+    for foreign in ["/v1/ready", "/v1/ws", "/v1/sessions/{session_id}"] {
+        assert!(
+            !route.owns_route(foreign),
+            "{foreign} belongs to the daemon, not the companion"
+        );
+    }
+}
+
+/// The panel's OAuth start is rate limited by path, and at the root that path
+/// has no prefix in front of it.
+#[test]
+fn the_root_prefix_still_recognises_the_oauth_start() {
+    let route = config("http://127.0.0.1:8787", "/").expect("the origin root is a valid prefix");
+
+    assert!(route.is_oauth_start("/auth/github/start"));
+    assert!(!route.is_oauth_start("/auth/github/callback"));
 }
 
 #[test]

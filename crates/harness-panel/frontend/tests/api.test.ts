@@ -258,20 +258,33 @@ describe('createPairLink', () => {
 });
 
 describe('fetchPairings', () => {
-  it('unwraps the pairing list', async () => {
-    const pairing = {
-      pairing_id: 'pair-1',
-      state: 'active',
-      role: 'operator',
-      created_at: '2026-07-26T10:00:00Z',
-      expires_at: '2026-07-26T10:10:00Z',
-      account_id: 'acc_1',
-    };
+  const pairing = {
+    pairing_id: 'pair-1',
+    state: 'active',
+    role: 'operator',
+    created_at: '2026-07-26T10:00:00Z',
+    expires_at: '2026-07-26T10:10:00Z',
+    account_id: 'acc_1',
+  };
+
+  it('returns the pairing list and the daemon that answered', async () => {
+    const stub = stubFetch([jsonResponse(200, { daemon_version: '52.0.0', pairings: [pairing] })]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.fetchPairings()).resolves.toEqual({
+      daemon_version: '52.0.0',
+      pairings: [pairing],
+    });
+    expect(stub.calls[0]?.url).toBe('/panel/api/pairings');
+  });
+
+  // A daemon older than the field answers the route without it, and the
+  // pairings are the point of the call.
+  it('reads a list from a daemon that reports no version', async () => {
     const stub = stubFetch([jsonResponse(200, { pairings: [pairing] })]);
     const api = createPanelApi('/panel', stub.fetch);
 
-    await expect(api.fetchPairings()).resolves.toEqual([pairing]);
-    expect(stub.calls[0]?.url).toBe('/panel/api/pairings');
+    await expect(api.fetchPairings()).resolves.toEqual({ pairings: [pairing] });
   });
 
   it('surfaces a daemon the panel cannot reach', async () => {

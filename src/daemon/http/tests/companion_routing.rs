@@ -13,7 +13,7 @@ use crate::daemon::protocol::http_paths;
 use super::companion_routing_support::{
     COMPANION_TOKEN, closed_loopback_origin, header, spawn_body_stalled_companion_upstream,
     spawn_companion_upstream, spawn_stalled_companion_upstream, state_with_companion,
-    state_with_companion_limits,
+    state_with_companion_limits, state_with_root_companion,
 };
 use super::remote_limits_support::{remote_state_with_viewer, send_remote_health, serve_remote};
 
@@ -360,6 +360,49 @@ async fn a_stalled_response_body_holds_the_bulkhead_until_its_timeout() {
     .expect("request after body timeout")
     .expect("recovered companion response");
     assert_eq!(recovered.status(), StatusCode::OK);
+    server.abort();
+    upstream_server.abort();
+}
+
+/// The reason `--companion-path-prefix /` is safe: the companion is registered
+/// as ordinary routes, and a static path outranks a catch-all, so the daemon's
+/// own API keeps answering while everything else is forwarded.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_root_companion_forwards_everything_except_the_daemon_api() {
+    let (upstream, upstream_server) = spawn_companion_upstream().await;
+    let (base_url, server) = serve_remote(state_with_root_companion(&upstream)).await;
+    let client = reqwest::Client::new();
+
+    for path in ["/", "/api/me", "/auth/github/start"] {
+        let response = client
+            .get(format!("{base_url}{path}"))
+            .send()
+            .await
+            .expect("companion request");
+
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        let body: Value = response.json().await.expect("companion echo body");
+        assert_eq!(
+            body["path_and_query"].as_str(),
+            Some(path),
+            "{path} must reach the companion"
+        );
+    }
+
+    // Answered by the daemon, and still behind its own bearer auth rather than
+    // exempted along with the companion's subtree.
+    let unauthenticated = client
+        .get(format!("{base_url}{}", http_paths::HEALTH))
+        .send()
+        .await
+        .expect("daemon API request");
+    assert_eq!(unauthenticated.status(), StatusCode::UNAUTHORIZED);
+
+    let authenticated = send_remote_health(client, base_url, "root-companion")
+        .await
+        .expect("daemon health request");
+    assert_eq!(authenticated.status(), StatusCode::OK);
+
     server.abort();
     upstream_server.abort();
 }

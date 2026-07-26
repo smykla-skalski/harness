@@ -9,6 +9,10 @@ use axum::routing::{get, post};
 use serde_json::Value;
 use tokio::net::TcpListener;
 
+/// The version the stub reports, distinct from the panel's own so a test cannot
+/// pass by reading the wrong one back.
+pub(super) const DAEMON_VERSION: &str = "52.0.0";
+
 /// What the stub holds and what it saw.
 #[derive(Debug, Default)]
 pub(super) struct Daemon {
@@ -24,6 +28,9 @@ pub(super) struct Daemon {
     /// Answer the way a daemon that does not serve this route does: the same
     /// status as a missing pairing, with nothing in the body.
     pub(super) unrouted_revoke: bool,
+    /// Answer the way a daemon older than the field does, leaving the version
+    /// out of an otherwise ordinary reply.
+    pub(super) omit_version: bool,
 }
 
 #[derive(Debug)]
@@ -85,7 +92,11 @@ async fn list(State(daemon): State<Arc<Mutex<Daemon>>>, headers: HeaderMap) -> R
         .filter(|pairing| Some(pairing.minted_by.as_str()) == daemon.client_id.as_deref())
         .map(|pairing| pairing.body.clone())
         .collect::<Vec<_>>();
-    Json(serde_json::json!({ "pairings": pairings })).into_response()
+    let mut body = serde_json::json!({ "pairings": pairings });
+    if !daemon.omit_version {
+        body["daemon_version"] = Value::String(DAEMON_VERSION.to_owned());
+    }
+    Json(body).into_response()
 }
 
 async fn revoke(

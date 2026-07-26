@@ -290,7 +290,15 @@ fn is_loopback_host(host: &str) -> bool {
 }
 
 fn is_valid_companion_prefix(prefix: &str) -> bool {
-    if !prefix.starts_with('/') || prefix == "/" || prefix.ends_with('/') {
+    if !prefix.starts_with('/') {
+        return false;
+    }
+    // The origin root, where the companion answers everything the daemon's own
+    // routes do not. It has no segments to check below.
+    if prefix == "/" {
+        return true;
+    }
+    if prefix.ends_with('/') {
         return false;
     }
     // Must stay identical to the daemon's own rejected set, or `install` writes

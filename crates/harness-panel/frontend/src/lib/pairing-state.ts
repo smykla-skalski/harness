@@ -82,8 +82,9 @@ export function pairingChange(pairing: PanelPairing): PairingChange {
       return at('revoked', pairing.revoked_at ?? pairing.device?.revoked_at, created);
     case 'expired':
       return at('expired', pairing.expires_at, created);
+    // When it was paired, not when its device was last awake. The account rows
+    // already carry that, and saying it twice invites the two to disagree.
     case 'active':
-      return at('last seen', pairing.device?.last_seen_at ?? pairing.claimed_at, created);
     case 'claimed':
       return at('claimed', pairing.claimed_at, created);
     default:
@@ -115,6 +116,43 @@ export function pairingSubject(pairing: PanelPairing): string {
     default:
       return 'Unclaimed link';
   }
+}
+
+/** How much of a minted link is left, as the gauge reports it. */
+export type LinkPhase = 'ample' | 'low' | 'warn' | 'critical' | 'spent';
+
+/** The last seconds, where the gauge stops shading and starts flashing. */
+export const CRITICAL_MS = 10_000;
+/**
+ * Shares of the link's own lifetime the gauge changes colour at. Fractions
+ * rather than durations, because the lifetime is an operator flag and a fixed
+ * threshold would be most of a short link and none of a long one.
+ */
+const LOW_FRACTION = 0.5;
+const WARN_FRACTION = 0.15;
+
+/**
+ * Which band a link is in, from what is left of it.
+ *
+ * Red arrives well before the flash: at the ten-minute default it lands with a
+ * minute and a half to go, which is time to do something about it. The flash is
+ * the last ten seconds, by which point there is nothing to do but mint another.
+ *
+ * `leftMs` is `null` when the deadline could not be read; that is not a link
+ * running out, it is one whose remaining time is unknown, so it reads as spent
+ * rather than as ample.
+ */
+export function linkPhase(leftMs: number | null, fractionLeft: number): LinkPhase {
+  if (leftMs === null || leftMs <= 0) {
+    return 'spent';
+  }
+  if (leftMs <= CRITICAL_MS) {
+    return 'critical';
+  }
+  if (fractionLeft <= WARN_FRACTION) {
+    return 'warn';
+  }
+  return fractionLeft <= LOW_FRACTION ? 'low' : 'ample';
 }
 
 /** How many of these are doing something right now, for the plate's header. */
