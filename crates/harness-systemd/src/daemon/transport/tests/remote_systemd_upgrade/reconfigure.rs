@@ -3,6 +3,7 @@ use std::os::unix::fs::MetadataExt as _;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use super::*;
+use crate::errors::CliError;
 use crate::errors::CliErrorKind;
 
 #[test]
@@ -22,6 +23,10 @@ fn same_binary_and_desired_unit_is_a_health_checked_noop() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "assert macros expand to one branch each, so a test that verifies a whole scenario cannot score under the threshold without being split into fragments that prove less"
+)]
 fn unit_only_reconfigure_commits_without_changing_environment_or_state() {
     let mut fixture = UpgradeFixture::new();
     use_installed_binary(&fixture);
@@ -86,6 +91,10 @@ fn failed_unit_activation_restores_exact_unit_environment_and_state() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "assert macros expand to one branch each, so a test that verifies a whole scenario cannot score under the threshold without being split into fragments that prove less"
+)]
 fn committed_recovery_rejects_target_unit_digest_mismatch() {
     let mut fixture = UpgradeFixture::new();
     use_installed_binary(&fixture);
@@ -207,7 +216,7 @@ fn use_installed_binary(fixture: &UpgradeFixture) {
 fn run_upgrade(
     fixture: &UpgradeFixture,
     runner: &ScriptedSystemd<'_>,
-) -> Result<RemoteSystemdUpgradeReport, crate::errors::CliError> {
+) -> Result<RemoteSystemdUpgradeReport, CliError> {
     upgrade_remote_systemd_with(
         &fixture.upgrade_plan,
         &|args| runner.run(args),
