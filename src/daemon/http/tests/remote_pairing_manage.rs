@@ -186,6 +186,39 @@ async fn revoking_a_claimed_link_cuts_off_its_device() {
     server.abort();
 }
 
+/// Walking the id space produces nothing but refusals, so a refusal that wrote
+/// nothing down would leave the one case the indistinguishable answer exists
+/// for as the one case with no trace of it.
+#[tokio::test]
+async fn a_refused_revoke_is_recorded_as_a_denial() {
+    let state = manage_state();
+    let db = state.db.get().expect("db slot").clone();
+    let (base_url, server) = serve_http(state).await;
+
+    let theirs = mint_as(&base_url, OTHER_BROKER, "9999").await;
+    revoke_as(&base_url, BROKER, &theirs).await;
+
+    let (count, decision, outcome, client_id, metadata): (i64, String, String, String, String) = db
+        .lock()
+        .expect("db lock")
+        .connection()
+        .query_row(
+            "SELECT COUNT(*), COALESCE(MAX(scope_decision), ''), COALESCE(MAX(outcome), ''),
+                    COALESCE(MAX(client_id), ''), COALESCE(MAX(metadata_json), '')
+             FROM remote_audit_events WHERE route_or_method = 'remote.pairing.revoke'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        )
+        .expect("audit row");
+
+    assert_eq!(count, 1);
+    assert_eq!(decision, "denied");
+    assert_eq!(outcome, "failure");
+    assert_eq!(client_id, BROKER, "the caller, not the owner");
+    assert!(metadata.contains(theirs.as_str()), "{metadata}");
+    server.abort();
+}
+
 #[tokio::test]
 async fn a_broker_cannot_revoke_a_link_it_did_not_mint() {
     let state = manage_state();

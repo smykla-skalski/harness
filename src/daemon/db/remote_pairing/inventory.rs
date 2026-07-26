@@ -152,11 +152,11 @@ fn entry_from_columns(
     // withdrawn link as pending until it happened to expire.
     let revoked_at = metadata
         .revoked_at
-        .as_deref()
-        .or(columns.revoked_at.as_deref());
+        .clone()
+        .or_else(|| columns.revoked_at.clone());
     let state = RemotePairingState::derive(&RemotePairingObservation {
         claimed_at: columns.claimed_at.as_deref(),
-        revoked_at,
+        revoked_at: revoked_at.as_deref(),
         last_seen_at: columns.last_seen_at.as_deref(),
         expired,
     });
@@ -179,6 +179,7 @@ fn entry_from_columns(
         created_at: columns.created_at,
         expires_at: columns.expires_at,
         claimed_at: columns.claimed_at,
+        revoked_at,
         minted_for: metadata.minted_for,
         minted_by: metadata.minted_by,
         device,

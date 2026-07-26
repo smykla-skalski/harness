@@ -104,6 +104,11 @@ pub struct RemotePairingInventoryEntry {
     pub expires_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claimed_at: Option<String>,
+    /// When it was revoked, from whichever end carries it. A link withdrawn
+    /// before any claim has no device to read it from, so without this a
+    /// reader could see `revoked` and not when.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revoked_at: Option<String>,
     /// The identity the link was minted for. Absent for a link created on the
     /// host, which belongs to whoever ran the command rather than to anyone the
     /// daemon authenticated.

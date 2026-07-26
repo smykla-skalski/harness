@@ -4173,6 +4173,16 @@
               }
             }
           },
+          "503": {
+            "description": "Pairing store unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/RemoteAuthRequired"
           },
@@ -4184,9 +4194,6 @@
           },
           "429": {
             "$ref": "#/components/responses/RemoteRequestThrottled"
-          },
-          "503": {
-            "$ref": "#/components/responses/RemoteServiceUnavailable"
           },
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
@@ -23228,6 +23235,13 @@
           },
           "pairing_id": {
             "type": "string"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was revoked, from whichever end carries it. A link withdrawn\nbefore any claim has no device to read it from, so without this a\nreader could see `revoked` and not when."
           },
           "role": {
             "type": "string"

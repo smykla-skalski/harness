@@ -134,6 +134,7 @@ fn list_pairings(
         (status = 200, description = "Pairing revoked", body = RemotePairingRevokeResponse),
         (status = 403, description = "The pairing is not available to this caller: minted by another client, or no such id. The two are deliberately indistinguishable so the route cannot be used to discover which ids exist", body = DaemonErrorBody),
         (status = 404, description = "No such pairing, answered only to a caller entitled to see every pairing", body = DaemonErrorBody),
+        (status = 503, description = "Pairing store unavailable", body = DaemonErrorBody),
     ),
 )]
 async fn post_remote_pairing_revoke(
@@ -164,7 +165,7 @@ async fn revoke_pairing(
 ) -> Result<RemotePairingRevokeResponse, RemotePairingManageError> {
     let client = authenticated_remote_client(headers, state)
         .map_err(RemotePairingManageError::Authentication)?;
-    require_may_revoke(state, client.as_ref(), pairing_id)?;
+    require_may_revoke(state, client.as_ref(), pairing_id, request_id)?;
 
     let revoked_at = utc_now();
     let audit = revoke_audit(client.as_ref(), pairing_id, request_id, revoked_at.as_str())
@@ -201,6 +202,7 @@ fn require_may_revoke(
     state: &DaemonHttpState,
     client: Option<&RemoteStoredClient>,
     pairing_id: &str,
+    request_id: &str,
 ) -> Result<(), RemotePairingManageError> {
     if sees_every_pairing(client) {
         return Ok(());
@@ -221,9 +223,37 @@ fn require_may_revoke(
     drop(db);
     let owns = matches!(owner, RemotePairingOwner::Client(ref owner) if owner == client_id);
     if owns {
-        Ok(())
-    } else {
-        Err(RemotePairingManageError::NotYours)
+        return Ok(());
+    }
+    // Recorded here rather than left to the store, which this refusal never
+    // reaches. Walking the id space produces nothing but these refusals, so
+    // without this the one case the indistinguishability exists for is the one
+    // case that leaves no trace.
+    record_refused_revoke(state, client, pairing_id, request_id);
+    Err(RemotePairingManageError::NotYours)
+}
+
+/// Note a revoke that was refused before it reached the store.
+///
+/// Best effort: the caller is being refused either way, and failing the request
+/// because the note could not be written would turn a denial into a fault.
+fn record_refused_revoke(
+    state: &DaemonHttpState,
+    client: Option<&RemoteStoredClient>,
+    pairing_id: &str,
+    request_id: &str,
+) {
+    let recorded_at = utc_now();
+    let Ok(audit) = revoke_audit(client, pairing_id, request_id, recorded_at.as_str()) else {
+        return;
+    };
+    let audit = audit
+        .with_outcome(RemoteAuditOutcome::Failure)
+        .with_scope_decision(RemoteAuditScopeDecision::Denied);
+    let Some(db) = state.db.get() else { return };
+    let Ok(db) = db.lock() else { return };
+    if let Err(error) = db.record_remote_audit_event(&audit) {
+        tracing::warn!(%error, "could not record a refused pairing revoke");
     }
 }
 

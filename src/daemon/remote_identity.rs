@@ -347,6 +347,13 @@ impl RemoteAuditEvent {
         self
     }
 
+    /// Set the scope decision once it is known.
+    #[must_use]
+    pub fn with_scope_decision(mut self, decision: RemoteAuditScopeDecision) -> Self {
+        self.scope_decision = decision;
+        self
+    }
+
     /// Set the outcome once it is known.
     ///
     /// For a route whose result is only decided inside the transaction that
