@@ -199,15 +199,6 @@ fn hook_misc_roots_stay_prod_only() {
             "src/hooks/session/tests.rs",
         ),
         (
-            "src/hooks/audit.rs",
-            &[
-                "fn is_silent_suite_runner()",
-                "fn writes_audit_entry_for_suite_run_hook()",
-                "mod tests {",
-            ][..],
-            "src/hooks/audit/tests.rs",
-        ),
-        (
             "src/hooks/verify_write.rs",
             &[
                 "fn verify_suite_create_empty_amendments_denies()",

@@ -112,20 +112,6 @@ pub fn session_context_dir_for_project(project_dir: &Path) -> PathBuf {
         .join(project_scope_key_for(project_dir))
 }
 
-/// Path to the current run context JSON file.
-///
-/// # Errors
-/// Returns `CliError` if the current directory cannot be determined.
-pub fn current_run_context_path() -> Result<PathBuf, CliError> {
-    Ok(session_context_dir()?.join("current-run.json"))
-}
-
-/// Path to the current run context JSON file for an explicit project path.
-#[must_use]
-pub fn current_run_context_path_for_project(project_dir: &Path) -> PathBuf {
-    session_context_dir_for_project(project_dir).join("current-run.json")
-}
-
 /// Project context directory (hashed from project path).
 ///
 /// If the input path is already under `harness_data_root()/projects/project-{hex16}`,

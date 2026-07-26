@@ -53,10 +53,8 @@ fn run_context_root_stays_a_facade() {
         "pub struct RunMetadata",
         "pub struct CommandEnv",
         "pub struct PreflightArtifact",
-        "pub struct CurrentRunPointer",
         "impl RunLayout",
         "impl CommandEnv",
-        "impl CurrentRunPointer",
         "mod tests {",
     ] {
         assert!(
@@ -70,38 +68,11 @@ fn run_context_root_stays_a_facade() {
         "src/run/context/metadata.rs",
         "src/run/context/command_env.rs",
         "src/run/context/preflight.rs",
-        "src/run/context/current.rs",
         "src/run/context/tests.rs",
     ] {
         assert!(
             repo_path_exists(root, path),
             "run/context split module should exist: {path}"
-        );
-    }
-}
-
-#[test]
-fn run_application_root_stays_a_facade() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let application_mod = read_repo_file(root, "src/run/application/mod.rs");
-
-    for needle in [
-        "pub fn current_run_dir()",
-        "pub fn from_current()",
-        "pub fn cluster_spec(&self)",
-        "pub fn list_managed_service_containers()",
-        "pub fn remove_managed_service_container(",
-    ] {
-        assert!(
-            !application_mod.contains(needle),
-            "src/run/application/mod.rs should stay a thin facade instead of owning `{needle}`"
-        );
-    }
-
-    for path in ["src/run/application/current.rs"] {
-        assert!(
-            repo_path_exists(root, path),
-            "run/application split module should exist: {path}"
         );
     }
 }

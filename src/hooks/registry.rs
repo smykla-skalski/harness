@@ -1,5 +1,5 @@
 use crate::hooks::application::GuardContext;
-use crate::hooks::effects::{HookOutcome, apply_effects};
+use crate::hooks::effects::HookOutcome;
 use crate::hooks::protocol::context::NormalizedHookContext;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use harness_kernel::errors::CliError;
@@ -35,15 +35,13 @@ impl HookEngine {
     /// Execute one registered hook against a normalized input.
     ///
     /// # Errors
-    /// Returns `CliError` when hook execution or effect application fails.
+    /// Returns `CliError` when hook execution fails.
     pub fn execute(
         hook: &dyn Hook,
         normalized: NormalizedHookContext,
     ) -> Result<NormalizedHookResult, CliError> {
         let guard_context = GuardContext::from_normalized(normalized);
         let outcome = hook.execute(&guard_context)?;
-        let mut result = outcome.normalized_result();
-        apply_effects(&mut result, outcome.effects());
-        Ok(result)
+        Ok(outcome.normalized_result())
     }
 }

@@ -176,7 +176,7 @@ Harness Monitor xcodebuild lane internals and fsmonitor cleanup details live in 
 
 ## Gotchas
 
-- `tool-guard` currently denies nothing. Every generated registration claims `--skill suite:run` (`src/setup/wrapper/registrations.rs`), and `guard_bash::execute` returns `allow` unless `ctx.skill_active`, which for that skill needs a run pointer or runner state the retired suite-run flow created. The cluster-binary list in `src/hooks/guard_bash/predicates.rs` is therefore unreachable in an ordinary session. Do not rely on it as an enforcement boundary.
+- `tool-guard` currently denies nothing. Every generated registration claims `--skill suite:run` (`src/setup/wrapper/registrations.rs`), and `guard_bash::execute` returns `allow` unless `ctx.skill_active`, which never confirms for that skill because `session_confirms_skill` rejects `SkillKind::Runner` outright. The cluster-binary list in `src/hooks/guard_bash/predicates.rs` is therefore unreachable in an ordinary session. Do not rely on it as an enforcement boundary.
 - `VersionedJsonRepository` saves atomically with tmp-file rename. Use the repository `load()` path instead of reading state files during saves.
 - Use the installed XcodeBuildMCP skill before XcodeBuildMCP tools. Monitor app work needs a full worktree plus explicit `HARNESS_MONITOR_BUILD_LANE` and `HARNESS_MONITOR_RUNTIME_LANE`.
 - Harness Monitor enables MCP accessibility tracking on normal app paths. In tracked-element hot paths, do not call `accessibilityFrame()` or republish on every `NSWindow.didUpdateNotification`; dense windows such as Settings can become visibly sluggish. Prefer clip-aware AppKit geometry conversion plus a throttled `didUpdate` refresh path.

@@ -7,7 +7,7 @@ use harness_kernel::errors::{CliError, HookMessage};
 
 use super::effects::HookOutcome;
 
-use super::{control_file_hint, is_command_owned_run_file, normalize_path};
+use super::normalize_path;
 
 /// Execute the verify-write hook.
 ///
@@ -20,7 +20,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     }
     super::dispatch_outcome_by_skill(
         ctx,
-        |ctx| Ok(verify_suite_runner(ctx, &paths)),
+        |_ctx| Ok(verify_suite_runner(&paths)),
         |_ctx| Ok(HookOutcome::from_hook_result(verify_suite_create(&paths))),
     )
 }
@@ -43,29 +43,9 @@ fn verify_suite_create(paths: &[&Path]) -> HookResult {
     HookResult::allow()
 }
 
-/// Check a single path for control-file or empty-amendments violations.
+/// Check a single path for an empty-amendments violation.
 /// Returns `Some(outcome)` when the path triggers an early deny.
-fn check_runner_path_violation(
-    raw_path: &Path,
-    path: &Path,
-    run_dir: Option<&Path>,
-) -> Option<HookOutcome> {
-    if let Some(rd) = run_dir
-        && is_command_owned_run_file(path, rd)
-    {
-        let hint = control_file_hint(path);
-        return Some(HookOutcome::from_hook_result(
-            HookMessage::runner_flow_required(
-                "edit run control files",
-                format!(
-                    "{} is harness-managed; {hint}",
-                    path.file_name()
-                        .map_or("file", |n| n.to_str().unwrap_or("file"))
-                ),
-            )
-            .into_result(),
-        ));
-    }
+fn check_runner_path_violation(raw_path: &Path, path: &Path) -> Option<HookOutcome> {
     let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
     if name == "amendments.md"
         && path.exists()
@@ -82,11 +62,10 @@ fn check_runner_path_violation(
     None
 }
 
-fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
-    let run_dir = ctx.effective_run_dir();
+fn verify_suite_runner(paths: &[&Path]) -> HookOutcome {
     for raw_path in paths {
         let path = normalize_path(raw_path);
-        if let Some(violation) = check_runner_path_violation(raw_path, &path, run_dir.as_deref()) {
+        if let Some(violation) = check_runner_path_violation(raw_path, &path) {
             return violation;
         }
     }

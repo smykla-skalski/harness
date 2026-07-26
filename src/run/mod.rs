@@ -1,14 +1,10 @@
-//! Tracked run domain: run models, state, workflow, and audit.
+//! Tracked run domain: run models, state, and workflow.
 
-pub(crate) mod application;
-pub(crate) mod audit;
 pub mod context;
 pub mod prepared_suite;
 pub mod report;
 pub mod specs;
 pub mod status;
-#[cfg(test)]
-pub(crate) mod test_support;
 pub mod workflow;
 
 pub use context::{

@@ -1,14 +1,11 @@
 use std::path::Path;
 
-use crate::agents::policy::{DeniedBinaries, WriteDecision, WriteSurfaceContext, evaluate_write};
 use crate::create::{can_write, suite_create_path_allowed};
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::HookResult;
-use crate::hooks::runner_policy::managed_cluster_binaries;
 use harness_kernel::errors::{CliError, HookMessage};
-use harness_kernel::kernel::run_surface::{RunDir, RunFile};
 
-use super::{control_file_hint, is_command_owned_run_file, normalize_path};
+use super::normalize_path;
 
 /// Execute the guard-write hook.
 ///
@@ -21,7 +18,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     }
     super::dispatch_by_skill(
         ctx,
-        |ctx| Ok(guard_suite_runner(ctx, &paths)),
+        |_ctx| Ok(HookResult::allow()),
         |ctx| Ok(guard_suite_create(ctx, &paths)),
     )
 }
@@ -57,119 +54,3 @@ fn guard_suite_create(ctx: &HookContext, paths: &[&Path]) -> HookResult {
     }
     HookResult::allow()
 }
-
-fn guard_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookResult {
-    let run_dir = ctx.effective_run_dir();
-
-    // Check each path against the centralised write-surface policy first
-    if let Some(rd) = run_dir.as_deref() {
-        let denied = DeniedBinaries::from(managed_cluster_binaries());
-        let policy_ctx = WriteSurfaceContext::new(rd);
-        for raw_path in paths {
-            if let Some(result) = check_policy_decision(raw_path, &policy_ctx, &denied) {
-                return result;
-            }
-        }
-    }
-
-    for raw_path in paths {
-        if let Some(result) = evaluate_runner_path(raw_path, run_dir.as_deref()) {
-            return result;
-        }
-    }
-
-    HookResult::allow()
-}
-
-fn check_policy_decision(
-    path: &Path,
-    ctx: &WriteSurfaceContext<'_>,
-    denied: &DeniedBinaries,
-) -> Option<HookResult> {
-    match evaluate_write(path, ctx, denied) {
-        WriteDecision::Allow => None,
-        WriteDecision::DenyControlFile { hint } => {
-            let label = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
-            Some(
-                HookMessage::runner_flow_required(
-                    "edit run control files",
-                    format!("{label} is harness-managed; {hint}"),
-                )
-                .into_result(),
-            )
-        }
-        WriteDecision::DenyOutsideSurface | WriteDecision::DenyTraversal => {
-            Some(HookMessage::write_outside_run(path.display().to_string()).into_result())
-        }
-        WriteDecision::DenyBinary { name } => Some(
-            HookMessage::runner_flow_required(
-                "write binary files",
-                format!("{name} is a denied cluster binary"),
-            )
-            .into_result(),
-        ),
-        WriteDecision::DenySymlinkEscape { resolved } => Some(
-            HookMessage::runner_flow_required(
-                "write symlinks",
-                format!(
-                    "symlink resolves outside run surface: {}",
-                    resolved.display()
-                ),
-            )
-            .into_result(),
-        ),
-        WriteDecision::DenyCheckFailed { reason } => Some(
-            HookMessage::runner_flow_required(
-                "write files",
-                format!("policy check failed: {reason}"),
-            )
-            .into_result(),
-        ),
-    }
-}
-
-fn file_label(path: &Path) -> &str {
-    path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
-}
-
-fn deny_control_file(path: &Path) -> HookResult {
-    let hint = control_file_hint(path);
-    HookMessage::runner_flow_required(
-        "edit run control files",
-        format!("{} is harness-managed; {hint}", file_label(path)),
-    )
-    .into_result()
-}
-
-fn evaluate_runner_path(raw_path: &Path, run_dir: Option<&Path>) -> Option<HookResult> {
-    let path = normalize_path(raw_path);
-    let rd = run_dir?;
-
-    if is_command_owned_run_file(&path, rd) {
-        return Some(deny_control_file(&path));
-    }
-    if allowed_suite_runner_path(&path, rd) {
-        return None;
-    }
-
-    Some(HookMessage::write_outside_run(raw_path.display().to_string()).into_result())
-}
-
-fn allowed_suite_runner_path(path: &Path, run_dir: &Path) -> bool {
-    let norm = normalize_path(path);
-    let rd_norm = normalize_path(run_dir);
-    if RunFile::ALL
-        .iter()
-        .filter(|f| f.is_allowed())
-        .any(|f| norm == normalize_path(&rd_norm.join(f.to_string())))
-    {
-        return true;
-    }
-    RunDir::ALL
-        .iter()
-        .any(|d| norm.starts_with(normalize_path(&rd_norm.join(d.to_string()))))
-}
-
-#[cfg(test)]
-#[path = "guard_write/tests.rs"]
-mod tests;

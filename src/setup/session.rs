@@ -1,9 +1,9 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
-use harness_kernel::errors::CliError;
 use crate::hooks::SessionStartHookOutput;
 use crate::setup::services::session as session_service;
+use harness_kernel::errors::CliError;
 
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -52,14 +52,11 @@ pub fn session_start(project_dir: Option<&str>) -> Result<i32, CliError> {
     Ok(0)
 }
 
-/// Handle session stop cleanup.
-///
-/// Reads the current run pointer and removes the pointer file.
-/// A missing or stale pointer is not an error.
+/// Handle session stop.
 ///
 /// # Errors
-/// Returns `CliError` on failure.
+/// Returns `CliError` only to keep the shared session-command signature; this
+/// path has no fallible step left now that no run pointer is persisted.
 pub fn session_stop(_project_dir: Option<&str>) -> Result<i32, CliError> {
-    session_service::cleanup_current_run_context()?;
     Ok(0)
 }

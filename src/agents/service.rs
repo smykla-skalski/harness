@@ -95,7 +95,6 @@ pub async fn session_stop(
             .unwrap_or_else(|| default_session_id(agent));
         storage::append_session_marker(&project_dir, agent, &session_id, "session_stop")?;
         storage::clear_current_session_id(&project_dir, agent)?;
-        session_service::cleanup_current_run_context()?;
         Ok(())
     })
     .await

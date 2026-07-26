@@ -30,14 +30,4 @@ impl RunAggregate {
         let repo = RunRepository;
         repo.load(run_dir)
     }
-
-    /// Load from the current session context.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the pointer is corrupt or the referenced
-    /// run cannot be loaded.
-    pub fn from_current() -> Result<Option<Self>, CliError> {
-        let repo = RunRepository;
-        repo.load_current()
-    }
 }
