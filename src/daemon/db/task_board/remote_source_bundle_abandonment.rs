@@ -8,11 +8,14 @@ use super::remote_assignment_model::{
     canonical_time, concurrent, load_offer_collision_in_tx, nonblank,
 };
 use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
-use super::remote_source_bundles::load_source_bundle_collisions_in_tx;
+use super::remote_source_bundles::{
+    TaskBoardRemoteSourceBundle, load_source_bundle_collisions_in_tx,
+};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAttemptBinding, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse, RemoteSourceBundleUploadRequest,
+    RemoteSourceBundleUploadResponse,
 };
 
 #[path = "remote_source_bundle_abandonment/storage.rs"]
@@ -138,17 +141,7 @@ impl AsyncDaemonDb {
         }
         let collisions =
             load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        let receipt = match collisions.as_slice() {
-            [] => None,
-            [stored] if stored.is_exact_replay(request, authenticated_principal) => {
-                Some(stored.response.clone())
-            }
-            _ => {
-                return Err(concurrent(
-                    "source receipt verification found conflicting generation evidence",
-                ));
-            }
-        };
+        let receipt = exact_verified_receipt(&collisions, request, authenticated_principal)?;
         let response = RemoteSourceBundleReceiptVerificationResponse::seal(
             request,
             observed_host_instance_id.into(),
@@ -206,45 +199,70 @@ impl AsyncDaemonDb {
             })?;
             return Ok(existing);
         }
-        // Past the exact-abandonment replay, the offer identity must not collide
-        // with an archived legacy assignment before sealing new evidence.
-        require_no_archival_collision_in_tx(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-            &request.offer.binding.idempotency_key,
-            Some(&request.offer.request_sha256),
-            &request.offer.binding.execution_id,
-            request.offer.binding.fencing_epoch,
-        )
-        .await?;
-        require_abandonable_generation_in_tx(&mut transaction, request).await?;
-        let response = RemoteSourceBundleAbandonResponse::seal(
-            request,
-            observed_host_instance_id.into(),
-            abandoned_at.into(),
-        )
-        .map_err(|error| db_error(format!("seal source abandonment response: {error}")))?;
-        insert_abandonment_in_tx(
+        let stored = seal_and_store_abandonment_in_tx(
             &mut transaction,
             request,
             authenticated_principal,
-            &response,
+            observed_host_instance_id,
+            abandoned_at,
         )
         .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let stored = load_abandonment_in_tx(
-            &mut transaction,
-            &request.offer.binding.assignment_id,
-            request.offer.binding.fencing_epoch,
-        )
-        .await?
-        .ok_or_else(|| db_error("persisted source abandonment disappeared"))?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit source abandonment: {error}")))?;
         Ok(stored)
     }
+}
+
+fn exact_verified_receipt(
+    collisions: &[TaskBoardRemoteSourceBundle],
+    request: &RemoteSourceBundleUploadRequest,
+    principal: &str,
+) -> Result<Option<RemoteSourceBundleUploadResponse>, CliError> {
+    match collisions {
+        [] => Ok(None),
+        [stored] if stored.is_exact_replay(request, principal) => Ok(Some(stored.response.clone())),
+        _ => Err(concurrent(
+            "source receipt verification found conflicting generation evidence",
+        )),
+    }
+}
+
+async fn seal_and_store_abandonment_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSourceBundleAbandonRequest,
+    authenticated_principal: &str,
+    observed_host_instance_id: &str,
+    abandoned_at: &str,
+) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
+    // Past the exact-abandonment replay, the offer identity must not collide
+    // with an archived legacy assignment before sealing new evidence.
+    require_no_archival_collision_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        &request.offer.binding.idempotency_key,
+        Some(&request.offer.request_sha256),
+        &request.offer.binding.execution_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?;
+    require_abandonable_generation_in_tx(transaction, request).await?;
+    let response = RemoteSourceBundleAbandonResponse::seal(
+        request,
+        observed_host_instance_id.into(),
+        abandoned_at.into(),
+    )
+    .map_err(|error| db_error(format!("seal source abandonment response: {error}")))?;
+    insert_abandonment_in_tx(transaction, request, authenticated_principal, &response).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    load_abandonment_in_tx(
+        transaction,
+        &request.offer.binding.assignment_id,
+        request.offer.binding.fencing_epoch,
+    )
+    .await?
+    .ok_or_else(|| db_error("persisted source abandonment disappeared"))
 }
 
 fn exact_upload_abandonment(

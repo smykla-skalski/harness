@@ -75,75 +75,122 @@ pub(super) async fn require_reassignment_evidence_in_tx(
 ) -> Result<(), CliError> {
     match evidence {
         SourceReassignmentEvidence::Abandonment { request, response } => {
-            let abandonment = load_abandonment_in_tx(
+            require_abandonment_evidence_in_tx(
                 transaction,
-                &predecessor.assignment_id,
-                predecessor.fencing_epoch,
+                predecessor,
+                request,
+                response,
+                principal,
             )
-            .await?
-            .ok_or_else(|| concurrent("source reassignment abandonment evidence disappeared"))?;
-            if !abandonment.is_exact_replay(request, principal) || abandonment.response != *response
-            {
-                return Err(concurrent(
-                    "source reassignment abandonment evidence changed",
-                ));
-            }
-            if !load_source_bundle_collisions_in_tx(transaction, &request.offer)
-                .await?
-                .is_empty()
-            {
-                return Err(concurrent(
-                    "source abandonment conflicts with an immutable upload receipt",
-                ));
-            }
-            if predecessor.controller_operation.is_some()
-                || !load_offer_receipt_collisions_in_tx(transaction, &request.offer)
-                    .await?
-                    .is_empty()
-            {
-                return Err(concurrent(
-                    "source abandonment conflicts with pending or durable offer authority",
-                ));
-            }
+            .await
         }
         SourceReassignmentEvidence::OfferRejection {
             request,
             response,
             observed_at,
         } => {
-            let code = response.rejection_code.as_deref().ok_or_else(|| {
-                concurrent("predecessor offer rejection has no durable rejection code")
-            })?;
-            let receipt = ensure_rejected_offer_receipt_in_tx(
-                transaction,
+            let rejection = OfferRejectionEvidence {
                 request,
-                principal,
-                code,
+                response,
                 observed_at,
+            };
+            require_offer_rejection_evidence_in_tx(
+                transaction,
+                predecessor,
+                rejection,
+                principal,
+                trust,
             )
-            .await?;
-            if receipt.response()? != *response {
-                return Err(concurrent(
-                    "predecessor offer rejection changed from executor evidence",
-                ));
-            }
-            if predecessor.controller_operation.is_some() {
-                consume_successor_recovery_operation_trust_in_tx(
-                    transaction,
-                    predecessor,
-                    TaskBoardRemoteOperationKind::Offer,
-                    &request.request_sha256,
-                    trust,
-                )
-                .await?;
-            } else if predecessor.state != TaskBoardRemoteAssignmentState::Offered
-                && predecessor.state != TaskBoardRemoteAssignmentState::Superseded
-            {
-                return Err(concurrent(
-                    "predecessor offer rejection lost its pre-claim generation",
-                ));
-            }
+            .await
         }
     }
+}
+
+async fn require_abandonment_evidence_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    predecessor: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteSourceBundleAbandonRequest,
+    response: &RemoteSourceBundleAbandonResponse,
+    principal: &str,
+) -> Result<(), CliError> {
+    let abandonment = load_abandonment_in_tx(
+        transaction,
+        &predecessor.assignment_id,
+        predecessor.fencing_epoch,
+    )
+    .await?
+    .ok_or_else(|| concurrent("source reassignment abandonment evidence disappeared"))?;
+    if !abandonment.is_exact_replay(request, principal) || abandonment.response != *response {
+        return Err(concurrent(
+            "source reassignment abandonment evidence changed",
+        ));
+    }
+    if !load_source_bundle_collisions_in_tx(transaction, &request.offer)
+        .await?
+        .is_empty()
+    {
+        return Err(concurrent(
+            "source abandonment conflicts with an immutable upload receipt",
+        ));
+    }
+    if predecessor.controller_operation.is_some()
+        || !load_offer_receipt_collisions_in_tx(transaction, &request.offer)
+            .await?
+            .is_empty()
+    {
+        return Err(concurrent(
+            "source abandonment conflicts with pending or durable offer authority",
+        ));
+    }
     Ok(())
+}
+
+struct OfferRejectionEvidence<'a> {
+    request: &'a RemoteOfferRequest,
+    response: &'a RemoteOfferResponse,
+    observed_at: &'a str,
+}
+
+async fn require_offer_rejection_evidence_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    predecessor: &TaskBoardRemoteAssignmentRecord,
+    rejection: OfferRejectionEvidence<'_>,
+    principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<(), CliError> {
+    let OfferRejectionEvidence {
+        request,
+        response,
+        observed_at,
+    } = rejection;
+    let code = response
+        .rejection_code
+        .as_deref()
+        .ok_or_else(|| concurrent("predecessor offer rejection has no durable rejection code"))?;
+    let receipt =
+        ensure_rejected_offer_receipt_in_tx(transaction, request, principal, code, observed_at)
+            .await?;
+    if receipt.response()? != *response {
+        return Err(concurrent(
+            "predecessor offer rejection changed from executor evidence",
+        ));
+    }
+    if predecessor.controller_operation.is_some() {
+        consume_successor_recovery_operation_trust_in_tx(
+            transaction,
+            predecessor,
+            TaskBoardRemoteOperationKind::Offer,
+            &request.request_sha256,
+            trust,
+        )
+        .await
+    } else if predecessor.state != TaskBoardRemoteAssignmentState::Offered
+        && predecessor.state != TaskBoardRemoteAssignmentState::Superseded
+    {
+        Err(concurrent(
+            "predecessor offer rejection lost its pre-claim generation",
+        ))
+    } else {
+        Ok(())
+    }
 }
