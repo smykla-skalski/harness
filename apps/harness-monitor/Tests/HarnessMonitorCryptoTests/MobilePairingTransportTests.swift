@@ -34,7 +34,7 @@ final class MobilePairingTransportTests: XCTestCase {
   func testEveryRejectionStatusReadsAsARejectionRatherThanABadLink() {
     let unrecognized = localizedDescription(for: .unsupportedURL("harness://pair?payload=abc"))
 
-    for statusCode in [403, 409, 410, 429, 500, 503] {
+    for statusCode in [400, 403, 409, 410, 429, 500, 503] {
       let description = localizedDescription(for: .serverStatus(statusCode))
 
       XCTAssertNotEqual(description, unrecognized)
