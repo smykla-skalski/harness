@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 use serde_json::json;
 
@@ -53,8 +55,8 @@ pub(crate) async fn default_branch_async(
                 "task_board.github.repository_default_branch",
                 GitHubPriority::Background,
                 GitHubCachePolicy::read_through(
-                    std::time::Duration::from_secs(6 * 60 * 60),
-                    std::time::Duration::from_secs(7 * 24 * 60 * 60),
+                    Duration::from_hours(6),
+                    Duration::from_hours(7 * 24),
                 ),
             ),
             json!({
