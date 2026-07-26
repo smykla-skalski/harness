@@ -181,7 +181,6 @@ pub fn setup_cmd(command: SetupCommand) -> Command {
 pub fn capabilities_cmd() -> Command {
     setup_cmd(SetupCommand::Capabilities(CapabilitiesArgs {
         project_dir: None,
-        repo_root: None,
     }))
 }
 

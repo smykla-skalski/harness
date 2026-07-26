@@ -85,20 +85,13 @@ fn parse_setup_capabilities_with_scope_overrides() {
         "capabilities",
         "--project-dir",
         "/tmp/project",
-        "--repo-root",
-        "/tmp/repo",
     ])
     .unwrap();
     match cli.command {
         Command::Setup {
-            command:
-                SetupCommand::Capabilities(CapabilitiesArgs {
-                    project_dir,
-                    repo_root,
-                }),
+            command: SetupCommand::Capabilities(CapabilitiesArgs { project_dir }),
         } => {
             assert_eq!(project_dir.as_deref(), Some("/tmp/project"));
-            assert_eq!(repo_root.as_deref(), Some("/tmp/repo"));
         }
         _ => panic!("expected Capabilities command"),
     }
