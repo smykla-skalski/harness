@@ -254,12 +254,34 @@ async fn poisoned_permission_bridge_lock_does_not_block_snapshot_or_stop_cleanup
         };
         let process = active.process();
 
+        let Ok(before) = manager.get(&snapshot.acp_id) else {
+            unreachable!("refresh before poisoning permissions");
+        };
+
         active.poison_permission_bridge_pending_lock_for_test();
 
         let Ok(refreshed) = manager.get(&snapshot.acp_id) else {
             unreachable!("refresh with poisoned permissions");
         };
-        assert_eq!(refreshed.status, AgentStatus::Active);
+        // The live status follows the watchdog, and the watchdog only leaves
+        // `paused` once the spawned protocol task issues `session/initialize`,
+        // which the start call does not wait for. Pinning either live status
+        // here races that handshake; the guarantee is that recovering the
+        // poisoned lock neither disconnects the agent nor drops its counters.
+        assert!(
+            matches!(refreshed.status, AgentStatus::Active | AgentStatus::Idle),
+            "poisoned permission lock left status {:?}",
+            refreshed.status
+        );
+        assert_eq!(refreshed.pending_permissions, before.pending_permissions);
+        assert_eq!(
+            refreshed.permission_queue_depth,
+            before.permission_queue_depth
+        );
+        assert_eq!(
+            refreshed.pending_permission_batches,
+            before.pending_permission_batches
+        );
 
         let Ok(stopped) = manager.stop(&snapshot.acp_id) else {
             unreachable!("stop after poison");
