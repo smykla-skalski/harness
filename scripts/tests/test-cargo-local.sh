@@ -7,11 +7,23 @@ source "$ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 
 SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/cargo-local-test.XXXXXX")"
+# The sandbox sits under the real TMPDIR, which on macOS is already long enough
+# on its own that configure_sccache_socket discards it for the shared /tmp root.
+# A scenario that asserts on the socket directory therefore has to hand the
+# script a short root, or it ends up asserting on a directory the sweep never
+# visits - and, worse, aiming the sweep at the shared one.
+SOCKET_TMPDIR="$(mktemp -d /tmp/cl-socket.XXXXXX)"
+# That shared root is named after the user, and the sweep unlinks every socket
+# in it that lsof does not report as live. These scenarios feed the sweep a fake
+# lsof, so under the real name a run deletes the developer's own live server
+# socket - the exact failure the sweep exists to stop causing. Borrowing the
+# mktemp suffix keeps the name unique per run, where a pid would be reused.
+TEST_USER="${SOCKET_TMPDIR##*/}"
 PASS_COUNT=0
 FAIL_COUNT=0
 
 cleanup() {
-  rm -rf "$SANDBOX"
+  rm -rf "$SANDBOX" "$SOCKET_TMPDIR" "/tmp/harness-sccache-$TEST_USER"
   # Guarded rather than passed as a second argument: this runs from an EXIT trap
   # that fires before the assignment too, and rm on an empty path fails.
   if [[ -n "${PRESTART_TMPDIR:-}" ]]; then
@@ -38,6 +50,16 @@ assert_contains() {
 assert_line() {
   local line="$1" haystack="$2"
   grep -Fxq -- "$line" <<<"$haystack"
+}
+
+# Did the script settle on the directory the scenario seeded. It does not always
+# take the root it was offered - one too long for a Unix socket path is replaced
+# by a short one under /tmp - and a sweep assertion against a directory the
+# script never visited passes or fails on nothing at all.
+assert_swept() {
+  local socket_dir="$1" output="$2" socket
+  socket="$(awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$output")"
+  [[ -n "$socket" ]] && [[ "${socket%/*}" == "$socket_dir" ]]
 }
 
 # GNU and BSD stat disagree on the format flag, and GNU's -f means something
@@ -77,6 +99,7 @@ print_cargo_env() {
       SCCACHE_BIN="$sccache_bin" \
       RUSTC_WRAPPER='' \
       TMPDIR="$tmpdir/" \
+      USER="$TEST_USER" \
       CODEX_SESSION_ID="cargo-local-test-$$" \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
@@ -986,19 +1009,16 @@ scenario_noncanonical_nextest_override_is_rejected() {
 
 scenario_supported_sccache_is_resolved_once() {
   local fake_bin="$SANDBOX/supported-bin"
-  local tmpdir="$SANDBOX/supported-tmp"
+  local tmpdir="$SOCKET_TMPDIR/supported"
   local output
   mkdir -p "$fake_bin" "$tmpdir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
 
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
-  # A sandbox under the macOS per-user TMPDIR already exceeds the socket-root
-  # length limit, so the short /tmp root is a correct answer here too.
   if assert_line "SCCACHE_BIN=$fake_bin/sccache" "$output" \
     && assert_line "SCCACHE_VERSION=0.16.0" "$output" \
     && assert_line "SCCACHE_BASEDIRS=$COMMON_REPO_ROOT" "$output" \
-    && { assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
-      || assert_contains "SCCACHE_SERVER_UDS=/tmp/harness-sccache-" "$output"; } \
+    && assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
     && assert_line "CACHE_MODE=sccache" "$output"; then
     pass "supported sccache is resolved once"
   else
@@ -1026,9 +1046,10 @@ scenario_old_explicit_sccache_is_disabled() {
 
 scenario_failed_lsof_preserves_unknown_sockets() {
   local fake_bin="$SANDBOX/lsof-bin"
-  local tmpdir="$SANDBOX/lsof-tmp"
+  local tmpdir="$SOCKET_TMPDIR/lsof-fail"
   local socket_dir="$tmpdir/harness-sccache"
   local unknown_socket="$socket_dir/unknown.sock"
+  local output
   mkdir -p "$fake_bin" "$socket_dir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
   cat >"$fake_bin/lsof" <<'EOF'
@@ -1038,7 +1059,11 @@ EOF
   chmod +x "$fake_bin/lsof"
   : >"$unknown_socket"
 
-  print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir" >/dev/null
+  output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
+  if ! assert_swept "$socket_dir" "$output"; then
+    fail "failed-lsof scenario never reached the sweep"
+    return
+  fi
   if [[ -e "$unknown_socket" ]]; then
     pass "failed lsof preserves sockets with unknown ownership"
   else
@@ -1048,10 +1073,11 @@ EOF
 
 scenario_live_socket_survives_the_sweep() {
   local fake_bin="$SANDBOX/livesock-bin"
-  local tmpdir="$SANDBOX/livesock-tmp"
+  local tmpdir="$SOCKET_TMPDIR/livesock"
   local socket_dir="$tmpdir/harness-sccache"
   local live_socket="$socket_dir/live.sock"
   local stale_socket="$socket_dir/stale.sock"
+  local output
   mkdir -p "$fake_bin" "$socket_dir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
   # lsof 4.95 prints the name field as "<path> type=STREAM"; 4.91 printed the
@@ -1067,7 +1093,11 @@ EOF
   : >"$live_socket"
   : >"$stale_socket"
 
-  print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir" >/dev/null
+  output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
+  if ! assert_swept "$socket_dir" "$output"; then
+    fail "live-socket scenario never reached the sweep"
+    return
+  fi
   if [[ -e "$live_socket" ]] && [[ ! -e "$stale_socket" ]]; then
     pass "the sweep keeps a live socket and unlinks a stale one"
   else
