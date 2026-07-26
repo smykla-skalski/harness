@@ -171,9 +171,14 @@
     failure = null;
     try {
       await onCancel(current.pairing_id);
-      link = null;
-      copyState = 'idle';
-      handoff = 'idle';
+      // Only if this is still the link that was withdrawn. A mint that landed
+      // while the revoke was in flight owns the card now, and clearing it would
+      // drop a live link off a page that can never show it again.
+      if (link === current) {
+        link = null;
+        copyState = 'idle';
+        handoff = 'idle';
+      }
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
     } finally {
@@ -281,7 +286,14 @@
         <button class="btn btn-quiet" onclick={cancel} disabled={working || cancelling}>
           {cancelling ? 'Cancelling…' : 'Cancel'}
         </button>
-        <button class="btn onward" class:btn-signal={expired} onclick={generate} disabled={working}>
+        <!-- Also while a cancel is in flight: minting into a card that is being
+             withdrawn races the two, and the loser is a live link nobody sees. -->
+        <button
+          class="btn onward"
+          class:btn-signal={expired}
+          onclick={generate}
+          disabled={working || cancelling}
+        >
           {working ? 'Generating…' : 'Generate another'}
         </button>
         {#if href !== null && !expired}
