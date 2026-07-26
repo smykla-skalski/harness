@@ -29,6 +29,7 @@ use super::{DaemonConnectInfo, DaemonHttpState};
 
 use super::openapi::DaemonErrorBody;
 
+pub(super) mod manage;
 pub(super) mod mint;
 pub(super) mod status;
 
@@ -37,6 +38,7 @@ pub(super) fn remote_pairing_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(post_remote_pair_claim))
         .merge(status::remote_pairing_status_routes())
         .merge(mint::remote_pairing_mint_routes())
+        .merge(manage::remote_pairing_manage_routes())
 }
 
 #[derive(Debug, Deserialize)]
@@ -359,7 +361,10 @@ impl IntoResponse for RemotePairClaimHttpError {
 fn pairing_error_status(error: &RemotePairingError) -> StatusCode {
     match error {
         RemotePairingError::AlreadyClaimed => StatusCode::CONFLICT,
-        RemotePairingError::Expired => StatusCode::GONE,
+        // Gone rather than forbidden for both: the link existed and no longer
+        // does, and the device asking holds no credential for anything to
+        // forbid. Which of the two it was is in the message.
+        RemotePairingError::Expired | RemotePairingError::Revoked => StatusCode::GONE,
         RemotePairingError::WrongDomain { .. } => StatusCode::FORBIDDEN,
         RemotePairingError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
         RemotePairingError::EmptyPairingId
@@ -381,6 +386,7 @@ fn pairing_error_message(error: &RemotePairingError) -> &'static str {
     match error {
         RemotePairingError::AlreadyClaimed => "remote pairing code already claimed",
         RemotePairingError::Expired => "remote pairing code expired",
+        RemotePairingError::Revoked => "remote pairing code revoked",
         RemotePairingError::WrongDomain { .. } => "remote pairing domain is not allowed",
         RemotePairingError::RateLimited => "remote pairing attempts are rate limited",
         RemotePairingError::EmptyPairingId => "remote pairing id is required",

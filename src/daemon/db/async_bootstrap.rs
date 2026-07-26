@@ -177,6 +177,9 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         // task_board_projects rebuild that drops 'todoist' from its source
         // check.
         52..=53 => 54,
+        // v55 is one replayable statement pair: the scope backfill for roles
+        // that gained `pair_manage`.
+        54 => 55,
         _ => u64::MAX,
     }
 }

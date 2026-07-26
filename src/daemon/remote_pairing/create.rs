@@ -46,6 +46,10 @@ pub(crate) struct RemotePairingCreateParams<'a> {
     pub requested_scopes: &'a [RemoteAccessScope],
     pub reviews_query: Option<&'a ReviewsQueryRequest>,
     pub minted_for: Option<&'a RemotePairingSubject>,
+    /// The client doing the minting, so a later caller can be shown the links
+    /// it is responsible for and no others. `None` for a link created on the
+    /// host, which belongs to whoever has access to the host.
+    pub minted_by: Option<&'a str>,
     /// Written in the same transaction as the pairing row, so a caller never
     /// ends up with a committed link whose audit trail failed to record.
     pub extra_audit: Option<&'a RemoteAuditEvent>,
@@ -92,7 +96,8 @@ pub(crate) fn create_remote_pairing(
         params.reviews_query,
     )
     .map_err(|error| CliErrorKind::workflow_parse(error.to_string()))?
-    .minted_for(params.minted_for.cloned());
+    .minted_for(params.minted_for.cloned())
+    .minted_by(params.minted_by.map(str::to_owned));
     let role = record.role.as_str().to_owned();
     let scopes = record
         .scopes

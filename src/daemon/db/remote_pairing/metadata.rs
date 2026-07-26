@@ -10,6 +10,13 @@ struct RemotePairingMetadata {
     reviews_query: Option<ReviewsQueryRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     minted_for: Option<RemotePairingSubject>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    minted_by: Option<String>,
+    /// Set when a link is revoked before anyone claimed it. A claimed link is
+    /// revoked by cutting off the client it became, which the clients table
+    /// records; this covers the case where there is no client yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    revoked_at: Option<String>,
 }
 
 /// What the metadata column carries beyond the columns of its own.
@@ -17,15 +24,21 @@ struct RemotePairingMetadata {
 pub(super) struct RemotePairingMetadataFields {
     pub reviews_query: Option<ReviewsQueryRequest>,
     pub minted_for: Option<RemotePairingSubject>,
+    pub minted_by: Option<String>,
+    pub revoked_at: Option<String>,
 }
 
 pub(super) fn encode_remote_pairing_metadata(
     reviews_query: Option<&ReviewsQueryRequest>,
     minted_for: Option<&RemotePairingSubject>,
+    minted_by: Option<&str>,
+    revoked_at: Option<&str>,
 ) -> Result<String, CliError> {
     serde_json::to_string(&RemotePairingMetadata {
         reviews_query: reviews_query.cloned(),
         minted_for: minted_for.cloned(),
+        minted_by: minted_by.map(str::to_owned),
+        revoked_at: revoked_at.map(str::to_owned),
     })
     .map_err(|error| db_error(format!("serialize remote pairing metadata: {error}")))
 }
@@ -50,6 +63,8 @@ pub(super) fn decode_remote_pairing_metadata(
     Ok(RemotePairingMetadataFields {
         reviews_query,
         minted_for: metadata.minted_for,
+        minted_by: metadata.minted_by,
+        revoked_at: metadata.revoked_at,
     })
 }
 
@@ -72,7 +87,9 @@ mod tests {
         let subject =
             RemotePairingSubject::new("github", "4242", "Ada Lovelace").expect("valid subject");
 
-        let encoded = encode_remote_pairing_metadata(None, Some(&subject)).expect("encode");
+        let encoded =
+            encode_remote_pairing_metadata(None, Some(&subject), Some("panel-1"), None)
+                .expect("encode");
         let decoded = decode_remote_pairing_metadata(&encoded).expect("decode");
 
         assert_eq!(decoded.minted_for, Some(subject));

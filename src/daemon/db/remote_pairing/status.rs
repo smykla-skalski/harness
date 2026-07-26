@@ -5,9 +5,12 @@ use crate::daemon::remote_pairing::RemotePairingStatus;
 use harness_kernel::errors::CliError;
 
 const SELECT_REMOTE_PAIRING_STATUS_SQL: &str = "
-SELECT expires_at, claimed_at
-FROM remote_pairing_codes
-WHERE pairing_id = ?1";
+SELECT p.expires_at,
+       p.claimed_at,
+       COALESCE(json_extract(p.metadata_json, '$.revoked_at'), c.revoked_at)
+FROM remote_pairing_codes p
+LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
+WHERE p.pairing_id = ?1";
 
 impl DaemonDb {
     /// Load the public lifecycle state for an opaque remote pairing id.
@@ -29,13 +32,20 @@ impl DaemonDb {
         let row = self
             .conn
             .query_row(SELECT_REMOTE_PAIRING_STATUS_SQL, [pairing_id], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
             })
             .optional()
             .map_err(|error| db_error(format!("load remote pairing status: {error}")))?;
-        let Some((expires_at, claimed_at)) = row else {
+        let Some((expires_at, claimed_at, revoked_at)) = row else {
             return Ok(RemotePairingStatus::Unavailable);
         };
+        if revoked_at.is_some() {
+            return Ok(RemotePairingStatus::Revoked);
+        }
         if claimed_at.is_some() {
             return Ok(RemotePairingStatus::Claimed);
         }

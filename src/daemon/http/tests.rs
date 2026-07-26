@@ -55,6 +55,7 @@ mod remote_limits;
 mod remote_limits_support;
 mod remote_pairing;
 mod remote_pairing_audit;
+mod remote_pairing_manage;
 mod remote_pairing_mint;
 mod remote_pairing_status;
 mod remote_viewer_diagnostics;

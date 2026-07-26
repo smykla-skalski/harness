@@ -60,6 +60,9 @@ mod remote_acme;
 mod remote_acme_cas;
 mod remote_identity;
 mod remote_identity_async;
+mod remote_pairing_revoke;
+pub(crate) use remote_pairing_revoke::RemotePairingRevokeOutcome;
+pub(crate) use remote_pairing::inventory::RemotePairingOwner;
 mod remote_pairing;
 mod remote_pairing_expiry;
 mod review_writes;
@@ -122,6 +125,7 @@ mod schema_v51;
 mod schema_v52;
 mod schema_v53;
 mod schema_v54;
+mod schema_v55;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -386,7 +390,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "54";
+pub(crate) const SCHEMA_VERSION: &str = "55";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

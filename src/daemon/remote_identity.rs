@@ -347,6 +347,23 @@ impl RemoteAuditEvent {
         self
     }
 
+    /// Set the scope decision once it is known.
+    #[must_use]
+    pub fn with_scope_decision(mut self, decision: RemoteAuditScopeDecision) -> Self {
+        self.scope_decision = decision;
+        self
+    }
+
+    /// Set the outcome once it is known.
+    ///
+    /// For a route whose result is only decided inside the transaction that
+    /// writes the event, the caller cannot know it when building the event.
+    #[must_use]
+    pub fn with_outcome(mut self, outcome: RemoteAuditOutcome) -> Self {
+        self.outcome = outcome;
+        self
+    }
+
     #[must_use]
     pub fn error_detail(&self) -> Option<&str> {
         self.error_detail.as_deref()
@@ -426,6 +443,7 @@ pub fn parse_remote_scope(value: &str) -> Option<RemoteAccessScope> {
         "admin" => Some(RemoteAccessScope::Admin),
         "execute" => Some(RemoteAccessScope::Execute),
         "pair_mint" => Some(RemoteAccessScope::PairMint),
+        "pair_manage" => Some(RemoteAccessScope::PairManage),
         _ => None,
     }
 }

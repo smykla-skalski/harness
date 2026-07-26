@@ -252,6 +252,68 @@ fn remote_pairing_claim_rejects_lost_claim_race() {
 }
 
 #[test]
+fn remote_pairing_claim_rejects_revocation_after_initial_read() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let code = RemotePairingCode::from_value_for_tests("revoked-race-pairing-secret");
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-revoked-race",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read],
+        code.expose(),
+        "2026-06-21T13:40:00Z",
+        "2026-06-21T13:50:00Z",
+    )
+    .expect("pairing record");
+    db.create_remote_pairing_code(&record, "audit-create-revoked-race")
+        .expect("create pairing");
+    db.conn
+        .execute_batch(
+            "
+            CREATE TRIGGER simulate_remote_pairing_revoke_after_read
+            BEFORE INSERT ON remote_clients
+            WHEN NEW.client_id = 'client-revoked-race'
+            BEGIN
+                UPDATE remote_pairing_codes
+                   SET metadata_json = json_set(
+                       metadata_json,
+                       '$.revoked_at',
+                       '2026-06-21T13:40:30Z'
+                   )
+                 WHERE pairing_id = 'pairing-revoked-race';
+            END;",
+        )
+        .expect("install revoke race trigger");
+
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-revoked-race",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.31"),
+        "audit-claim-revoked-race",
+    )
+    .expect("claim request");
+    let error = db
+        .claim_remote_pairing_code(code.expose(), &claim, "2026-06-21T13:41:00Z")
+        .expect_err("revocation after the initial read must win");
+
+    assert!(
+        error.to_string().contains("revoked"),
+        "unexpected race error: {error}"
+    );
+    let client_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_clients WHERE client_id = 'client-revoked-race'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("client count");
+    assert_eq!(client_count, 0);
+}
+
+#[test]
 fn remote_pairing_create_rejects_blank_audit_event_id_before_writes() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let code = RemotePairingCode::from_value_for_tests("blank-create-audit-secret");

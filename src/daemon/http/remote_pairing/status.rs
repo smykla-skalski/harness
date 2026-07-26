@@ -1,9 +1,9 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -33,16 +33,14 @@ pub(super) fn remote_pairing_status_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new().routes(routes!(post_remote_pair_status))
 }
 
-#[derive(Debug, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 struct RemotePairStatusHttpRequest {
     pairing_id: String,
 }
 
-#[derive(Debug, Serialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 struct RemotePairStatusHttpResponse {
-    status: &'static str,
+    status: RemotePairingStatus,
 }
 
 #[utoipa::path(
@@ -76,9 +74,7 @@ async fn post_remote_pair_status(
             http_paths::REMOTE_PAIR_STATUS,
             request_id.as_str(),
             start,
-            Ok(RemotePairStatusHttpResponse {
-                status: status.as_str(),
-            }),
+            Ok(RemotePairStatusHttpResponse { status }),
         ),
         Err(error) => timed_response(
             "POST",
