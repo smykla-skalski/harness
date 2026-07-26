@@ -147,6 +147,38 @@ struct TaskBoardAutomationPresentationTests {
     #expect(earlier != later)
   }
 
+  @Test("Status content stays mounted while a refreshed presentation rebuilds")
+  func statusContentStaysMountedDuringRefresh() async {
+    let presentation = await TaskBoardAutomationInspectorPresentationWorker().compute(
+      input: input(snapshot: snapshot())
+    )
+
+    #expect(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
+        presentation: presentation,
+        isPresentationCurrent: false
+      ) == .presentation
+    )
+    #expect(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
+        presentation: presentation,
+        isPresentationCurrent: true
+      ) == .presentation
+    )
+    #expect(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
+        presentation: .empty,
+        isPresentationCurrent: false
+      ) == .loading
+    )
+    #expect(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
+        presentation: .empty,
+        isPresentationCurrent: true
+      ) == .waiting
+    )
+  }
+
   @Test("Presentation freshness ignores harmless clock updates and closes on stale heartbeat")
   func presentationFreshnessHandlesClockUpdatesSafely() {
     let worker = TaskBoardAutomationInspectorPresentationWorker.self
