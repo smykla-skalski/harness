@@ -42,6 +42,11 @@
   /* The fan behind the tower in the app icon, quoted once. */
   --beam: linear-gradient(90deg, #d1892a, #1f8f62, #2f7fc4, #6f4bc4, #bd3a80);
 
+  /* Laid over whatever a pressed control's own background is. A brightness
+     filter would have nothing to act on for the transparent variant, and each
+     variant would have to name its own pressed colour. */
+  --press: rgb(0 0 0 / 12%);
+
   --mono: ui-monospace, sfmono-regular, 'SF Mono', menlo, consolas, 'Liberation Mono', monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', roboto, sans-serif;
 
@@ -71,6 +76,10 @@
     --stop-tint: #392e3f;
 
     --beam: linear-gradient(90deg, #f0a63c, #4fc08d, #3d8fd4, #8b62d9, #d9539b);
+
+    /* Deeper than in light, because the same veil over an already dark control
+       moves it by almost nothing. */
+    --press: rgb(0 0 0 / 26%);
   }
 }
 
@@ -82,7 +91,7 @@
 
 body {
   margin: 0;
-  padding: 1.5rem 1rem 4rem;
+  padding: 1.5rem 1rem 2.5rem;
   background: var(--ink);
   color: var(--text);
   font: 0.9375rem/1.55 var(--sans);
@@ -94,6 +103,23 @@ body {
 :focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 2px;
+}
+
+/* The pressed state still changes colour, so a control asked to hold still is
+   still visibly taking the press; only the travel and the easing go. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 .shell {
@@ -126,6 +152,22 @@ body {
   position: absolute;
   white-space: nowrap;
   width: 1px;
+}
+
+/* The fan behind the tower in the app icon. The one ornament on the page, and
+   the only thing tying it to the app it hands credentials to. Global because the
+   masthead opens with it and the footer closes on it. */
+.beam {
+  background: var(--beam);
+  border-radius: 1px;
+  height: 2px;
+}
+
+/* The same fan mirrored and thinned: an echo of the opening rule rather than a
+   second statement of it. */
+.beam-close {
+  height: 1px;
+  transform: scaleX(-1);
 }
 
 /* A flight strip: one flat slab per subject, told apart from the ground by fill
@@ -190,11 +232,28 @@ button {
   min-height: 2.25rem;
   padding: 0 0.875rem;
   text-decoration: none;
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
   white-space: nowrap;
+  /* The grey flash a tap paints on top of the press state below, which on a
+     touch screen is the only one of the two anybody sees. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn:hover:not(:disabled) {
   filter: brightness(1.12);
+}
+
+/* The control takes the press: it sinks a pixel and darkens. Anchors get it too,
+   because the one that hands the link to the app is a link, and it should not be
+   the only control on the page that feels dead under the finger. */
+.btn:active:not(:disabled) {
+  box-shadow: inset 0 0 0 100vmax var(--press);
+  /* The pointer is still hovering, and the hover brightening would cancel most
+     of the veil out, leaving the press to read as a one-pixel twitch. */
+  filter: none;
+  transform: translateY(1px);
 }
 
 .btn:disabled {
@@ -226,6 +285,18 @@ button {
   filter: none;
 }
 
+/* Row-sized. A control that repeats down a list sets that list's row height, and
+   at the full size it made every device twice as tall as the line it labels. */
+.btn-row {
+  font-size: 0.8125rem;
+  min-height: 1.75rem;
+  padding: 0 0.625rem;
+}
+
+/* Trimmed to the cap band before the padding is applied, so the tint sits
+   evenly around the letters instead of around a line box that carries descender
+   space this all-caps label never uses. Without it every chip reads a fraction
+   low against whatever it sits beside. */
 .chip {
   align-items: center;
   border-radius: var(--r-chip);
@@ -234,6 +305,7 @@ button {
   gap: 0.35rem;
   letter-spacing: 0.08em;
   padding: 0.3rem 0.45rem;
+  text-box: trim-both cap alphabetic;
   text-transform: uppercase;
   white-space: nowrap;
 }

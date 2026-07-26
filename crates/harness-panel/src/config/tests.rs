@@ -193,14 +193,35 @@ fn normalizes_the_mount_point() {
     );
 }
 
-/// Mounting at the origin root would scope the session cookie to the daemon's
-/// own API, which is served from the same origin.
+/// The origin root is held as the empty string, so `{base}/api/me` comes out
+/// with one slash instead of two and nothing that joins a path needs a branch.
 #[test]
-fn refuses_the_origin_root_as_a_mount_point() {
-    for raw in ["/", "//"] {
-        let error = normalize_base_path(raw).expect_err("the root must be refused");
-        assert!(error.to_string().contains("subtree"), "{error}");
+fn the_origin_root_normalizes_to_an_empty_mount_point() {
+    for raw in ["/", "//", " / "] {
+        assert_eq!(
+            normalize_base_path(raw).expect("the origin root is a valid mount"),
+            ""
+        );
     }
+}
+
+/// The cookie is the one place the empty mount point cannot be used verbatim:
+/// a browser drops `Path=` outright, and the session would never come back.
+#[test]
+fn a_root_panel_scopes_its_cookie_to_the_whole_origin() {
+    let directory = tempfile::tempdir().expect("temp dir");
+    let mut raw = args(directory.path());
+    raw.base_path = "/".to_owned();
+
+    let config = raw.resolve().expect("valid configuration");
+
+    assert_eq!(config.base_path, "");
+    assert_eq!(config.cookie_path(), "/");
+    assert_eq!(config.landing_path(), "/");
+    assert_eq!(
+        config.callback_url(),
+        "https://harness.example.com/auth/github/callback"
+    );
 }
 
 #[test]

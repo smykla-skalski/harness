@@ -53,6 +53,26 @@ sudo /usr/local/bin/harness-systemd install \
 
 The prefix is forwarded verbatim, so the panel serves its own routes under `/panel/...` and `--base-path` has to match `--companion-path-prefix`. The daemon exempts that subtree from remote bearer auth: the proxy token authenticates the daemon-to-panel hop, while the panel's GitHub session authenticates the person. The daemon's body, URI, and header limits still apply, and GitHub OAuth starts are rate-limited by the real public source address before forwarding.
 
+### Serving the panel at the origin root
+
+Pass `/` to both flags to reach the panel at `https://harness.example.com/` with no path segment. The daemon's own API is unaffected: the companion is registered as ordinary routes on the same router, and a static path always outranks a catch-all, so `/v1/...` keeps reaching the daemon and only what the daemon does not answer is forwarded. A route the daemon grows later therefore wins over the panel's, which is the precedence to want but worth knowing before mounting anything else on that origin.
+
+The one thing that changes is the session cookie, which is scoped to `/` instead of `/panel` and so is offered to the daemon's own API as well. That daemon is the same process that already reads the cookie on every request it forwards to the panel, and it authenticates by bearer token rather than by cookie, so the cookie grants nothing there. Do not put a third service on this origin.
+
+```bash
+sudo harness-systemd daemon remote-systemd install \
+  --reconfigure \
+  --binary-path /usr/local/bin/harness-daemon \
+  --domain harness.example.com \
+  --acme-email ops@example.com \
+  --companion-upstream http://127.0.0.1:8787 \
+  --companion-path-prefix / \
+  --companion-panel-socket-unit harness-panel.socket \
+  --companion-auth-token-file /etc/harness-panel/companion-auth-token
+```
+
+The panel's own unit then takes `--base-path /`, and the OAuth app's callback URL loses the segment too: `https://harness.example.com/auth/github/callback`. Changing the mount point of a running panel means re-registering that callback, because GitHub matches it exactly.
+
 Everything absolute the panel produces, including the OAuth `redirect_uri`, is built from `--public-origin` and `--base-path`. It never derives its origin from forwarded headers, so whoever can reach the loopback listener cannot choose where GitHub sends an authorization code.
 
 ## GitHub OAuth app
@@ -452,3 +472,7 @@ mise run panel:frontend:test
 ```
 
 Vite bakes the mount point into its asset URLs at build time, but `--base-path` is chosen at start, so the bundle is built against the sentinel `/__harness_panel_base__` and the serving binary substitutes the configured prefix into `index.html`. Only `index.html` mentions the sentinel. If you change `base` in `vite.config.ts`, change `BASE_PATH_SENTINEL` in `src/assets.rs` and the `harness-panel-base` meta tag with it.
+
+Never `import` an asset in the frontend. Vite would inline `/__harness_panel_base__/assets/…` into the JS bundle, which nothing rewrites, and the asset would 404 under every mount point but the sentinel. Put the file in `public/` and reference it from `index.html`, or build its URL from the base the app already read. `grep -rl __harness_panel_base__ frontend/dist/assets/` must print nothing.
+
+The panel also substitutes `__harness_panel_version__` and `__harness_panel_daemon__`, which the footer reads back. Those two *do* appear in the bundle, as the values `readPanelBuild` compares against so a page nobody substituted reports nothing instead of printing a stand-in. They never appear in a URL, so the rule above is about the mount point alone.

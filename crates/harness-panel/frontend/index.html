@@ -8,8 +8,12 @@
          on the mount point without a rebuild. Vite rewrites the icon hrefs to the
          same sentinel at build time, which is what makes them mount-independent. -->
     <meta name="harness-panel-base" content="/__harness_panel_base__" />
+    <!-- Substituted the same way, so the footer can name the build and the daemon
+         it fronts without a route to ask and without waiting for a session. -->
+    <meta name="harness-panel-version" content="__harness_panel_version__" />
+    <meta name="harness-panel-daemon" content="__harness_panel_daemon__" />
 
-    <title>Harness panel</title>
+    <title>Harness Panel</title>
     <meta name="description" content="Sign in to get a pairing link for a Harness device." />
 
     <!-- The panel is one person's access control, published on the daemon's public

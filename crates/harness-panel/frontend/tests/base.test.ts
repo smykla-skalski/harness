@@ -1,18 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
-import { BASE_PATH_SENTINEL, normalizeBasePath, panelUrl, readBasePath } from '../src/lib/base';
+import {
+  BASE_PATH_SENTINEL,
+  normalizeBasePath,
+  panelUrl,
+  readBasePath,
+  readPanelBuild,
+} from '../src/lib/base';
 
-function documentWithBase(content: string | null): Document {
+function documentWithMeta(tags: Record<string, string | null>): Document {
   return {
     querySelector(selector: string) {
-      if (selector !== 'meta[name="harness-panel-base"]') {
+      const name = /^meta\[name="(?<name>[^"]+)"\]$/u.exec(selector)?.groups?.name;
+      if (name === undefined || !(name in tags)) {
         return null;
       }
-      return {
-        getAttribute: () => content,
-      };
+      return { getAttribute: () => tags[name] };
     },
   } as unknown as Document;
+}
+
+function documentWithBase(content: string | null): Document {
+  return documentWithMeta({ 'harness-panel-base': content });
 }
 
 describe('normalizeBasePath', () => {
@@ -51,8 +60,45 @@ describe('readBasePath', () => {
     expect(readBasePath(documentWithBase(BASE_PATH_SENTINEL))).toBe(BASE_PATH_SENTINEL);
   });
 
+  // A panel at the origin root has the sentinel replaced with nothing, so an
+  // empty value is a real answer rather than a page served wrong.
+  it('reads an empty prefix as the origin root', () => {
+    expect(readBasePath(documentWithBase(''))).toBe('');
+  });
+
   it('fails loudly when the page was not served by the panel', () => {
     expect(() => readBasePath(documentWithBase(null))).toThrow(/harness-panel-base/);
-    expect(() => readBasePath(documentWithBase(''))).toThrow(/harness-panel-base/);
+    expect(() => readBasePath(documentWithMeta({}))).toThrow(/harness-panel-base/);
+  });
+});
+
+describe('readPanelBuild', () => {
+  it('reads what the serving binary said about itself', () => {
+    expect(
+      readPanelBuild(
+        documentWithMeta({
+          'harness-panel-version': '0.3.0',
+          'harness-panel-daemon': 'harness.example.com',
+        }),
+      ),
+    ).toEqual({ version: '0.3.0', daemonHost: 'harness.example.com' });
+  });
+
+  // Under `vite dev` nothing substitutes these, and a footer reading
+  // `__harness_panel_version__` is worse than one that omits the line.
+  it('reports nothing for a page no panel has filled in', () => {
+    expect(
+      readPanelBuild(
+        documentWithMeta({
+          'harness-panel-version': '__harness_panel_version__',
+          'harness-panel-daemon': '__harness_panel_daemon__',
+        }),
+      ),
+    ).toEqual({ version: null, daemonHost: null });
+    expect(readPanelBuild(documentWithMeta({}))).toEqual({ version: null, daemonHost: null });
+    expect(readPanelBuild(documentWithMeta({ 'harness-panel-version': '  ' }))).toEqual({
+      version: null,
+      daemonHost: null,
+    });
   });
 });

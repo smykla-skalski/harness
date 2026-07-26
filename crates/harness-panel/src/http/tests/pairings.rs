@@ -21,7 +21,7 @@ use crate::store::pair_links::PairLinkRecord;
 
 mod daemon_stub;
 
-use daemon_stub::{Daemon, claimed, pairing, pairing_minted_by, stub_daemon};
+use daemon_stub::{DAEMON_VERSION, Daemon, claimed, pairing, pairing_minted_by, stub_daemon};
 
 /// A panel with a stored credential and a daemon that answers.
 async fn ready(daemon: Arc<Mutex<Daemon>>) -> Harness {
@@ -62,6 +62,50 @@ async fn attribute(harness: &Harness, pairing_id: &str, login: &str) {
         })
         .await
         .expect("record");
+}
+
+/// The footer names the daemon this panel mints against, and this route is the
+/// only answer that can carry it: the broker credential may mint and manage
+/// pairings and holds nothing else, so `/v1/health` is out of reach.
+#[tokio::test]
+async fn the_pairing_list_carries_the_version_of_the_daemon_that_answered() {
+    let daemon = Arc::new(Mutex::new(Daemon {
+        pairings: vec![claimed("pair-1", "Ada's laptop")],
+        ..Daemon::default()
+    }));
+    let harness = ready(Arc::clone(&daemon)).await;
+    let owner = harness.sign_in("ada").await;
+    attribute(&harness, "pair-1", "ada").await;
+
+    let (status, body) = harness.get("/panel/api/pairings", Some(&owner)).await;
+
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let listed: Value = serde_json::from_str(&body).expect("a pairings body");
+    assert_eq!(listed["daemon_version"], DAEMON_VERSION, "{body}");
+}
+
+/// A daemon predating the field still answers this route, and the pairings are
+/// what the caller asked for. Omitting the mark beats failing the read.
+#[tokio::test]
+async fn a_daemon_that_reports_no_version_still_lists_its_pairings() {
+    let daemon = Arc::new(Mutex::new(Daemon {
+        pairings: vec![claimed("pair-1", "Ada's laptop")],
+        omit_version: true,
+        ..Daemon::default()
+    }));
+    let harness = ready(Arc::clone(&daemon)).await;
+    let owner = harness.sign_in("ada").await;
+    attribute(&harness, "pair-1", "ada").await;
+
+    let (status, body) = harness.get("/panel/api/pairings", Some(&owner)).await;
+
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let listed: Value = serde_json::from_str(&body).expect("a pairings body");
+    assert_eq!(listed["pairings"].as_array().expect("an array").len(), 1);
+    assert!(
+        listed.get("daemon_version").is_none(),
+        "an absent version must not reach the page as a value: {body}"
+    );
 }
 
 /// The whole point of the view for anyone but the owner: their own links, and

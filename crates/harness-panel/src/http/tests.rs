@@ -28,6 +28,7 @@ mod auth;
 mod companion;
 mod locks;
 mod minting;
+mod mount;
 mod pair_links;
 mod pairings;
 
@@ -119,14 +120,22 @@ impl Harness {
         token_url: Option<&str>,
         daemon_endpoint: Option<&str>,
     ) -> Self {
+        Self::with_args(owner_login, |raw| {
+            if let Some(url) = token_url {
+                raw.github_token_url = url.to_owned();
+            }
+            if let Some(endpoint) = daemon_endpoint {
+                raw.daemon_endpoint = endpoint.to_owned();
+            }
+        })
+        .await
+    }
+
+    /// A panel built from the default flags with `adjust` applied to them.
+    async fn with_args(owner_login: &str, adjust: impl FnOnce(&mut PanelArgs)) -> Self {
         let directory = tempfile::tempdir().expect("temp dir");
         let mut raw = args(directory.path(), owner_login);
-        if let Some(url) = token_url {
-            raw.github_token_url = url.to_owned();
-        }
-        if let Some(endpoint) = daemon_endpoint {
-            raw.daemon_endpoint = endpoint.to_owned();
-        }
+        adjust(&mut raw);
         let config = raw.resolve().expect("valid configuration");
         let store = Store::open_in_memory().await.expect("store");
         let state = PanelState::new(config, store).expect("panel state");
@@ -433,43 +442,6 @@ async fn an_unknown_session_token_is_not_a_session() {
 
 /// Both spellings of the mount point are what people type and what links
 /// produce, and only one of them can come from a browser's address bar.
-#[tokio::test]
-async fn the_entry_page_is_served_at_the_mount_point_with_or_without_a_slash() {
-    let harness = Harness::new("ada").await;
-
-    for path in ["/panel", "/panel/"] {
-        let (status, body) = harness.get(path, None).await;
-
-        assert_eq!(status, StatusCode::OK, "{path}");
-        assert!(body.contains("harness-panel-base"), "{path}: {body}");
-        assert!(body.contains(r#"content="/panel""#), "{path}: {body}");
-    }
-}
-
-/// A reload or a bookmark of an app route has to reach the app, which only the
-/// entry page can dispatch.
-#[tokio::test]
-async fn an_unknown_path_under_the_mount_point_falls_back_to_the_app() {
-    let harness = Harness::new("ada").await;
-
-    let (status, body) = harness.get("/panel/accounts", None).await;
-
-    assert_eq!(status, StatusCode::OK);
-    assert!(body.contains("<div id=\"app\">"), "{body}");
-}
-
-/// The daemon forwards only its companion prefix, but the panel must not serve
-/// anything outside it even when reached directly over loopback.
-#[tokio::test]
-async fn nothing_is_served_outside_the_mount_point() {
-    let harness = Harness::new("ada").await;
-
-    for path in ["/", "/healthz", "/api/me", "/panelx/healthz"] {
-        let (status, _) = harness.get(path, None).await;
-        assert_eq!(status, StatusCode::NOT_FOUND, "{path} should not be served");
-    }
-}
-
 /// These bodies belong to one session, and a 200 is heuristically cacheable, so
 /// a proxy between the daemon and the browser would otherwise be free to hand
 /// one person's answer to the next request.

@@ -37,6 +37,11 @@ struct PanelPairing {
 
 #[derive(Debug, Serialize)]
 struct PairingsBody {
+    /// Passed through from the daemon rather than read from a route of its own:
+    /// the panel's credential mints and manages pairings and holds nothing
+    /// else, so this is the only answer it gets that can carry the version.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    daemon_version: Option<String>,
     pairings: Vec<PanelPairing>,
 }
 
@@ -58,7 +63,7 @@ pub async fn list(
     // who signs in, so it answers with every link the panel ever minted however
     // little of it this person may see. Asking it to narrow further is not on
     // offer: it has never been told which account any of them belongs to.
-    let pairings = state.daemon.client.pairings(&credential).await?;
+    let listed = state.daemon.client.pairings(&credential).await?;
     // The owner is entitled to every row, so their map covers everyone. Anyone
     // else can only ever match their own, and a pairing missing from a narrowed
     // map fails `visible_to` exactly as another account's id would, so the
@@ -70,7 +75,8 @@ pub async fn list(
     };
     let accounts = state.store.pair_link_accounts(attribution).await?;
 
-    let pairings = pairings
+    let pairings = listed
+        .pairings
         .into_iter()
         .map(|pairing| {
             let account_id = accounts.get(&pairing.pairing_id).cloned();
@@ -82,7 +88,10 @@ pub async fn list(
         .filter(|entry| visible_to(&viewer, entry))
         .collect();
 
-    Ok(private_json(&PairingsBody { pairings }))
+    Ok(private_json(&PairingsBody {
+        daemon_version: listed.daemon_version,
+        pairings,
+    }))
 }
 
 /// Whether this person may see this row.

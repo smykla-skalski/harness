@@ -61,9 +61,17 @@ pub struct DaemonRevoke {
     pub revoked_at: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct PairingListResponse {
-    pairings: Vec<DaemonPairing>,
+/// The daemon's answer to a pairing list: what it holds, and what it is.
+///
+/// `daemon_version` is defaulted rather than required. A daemon older than the
+/// field still answers this route, and the panel would rather show the pairings
+/// with nothing said about the version than fail the whole read over a footer
+/// line.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DaemonPairings {
+    #[serde(default)]
+    pub daemon_version: Option<String>,
+    pub pairings: Vec<DaemonPairing>,
 }
 
 /// Why a revoke did not happen.
@@ -81,7 +89,8 @@ pub enum RevokeError {
 }
 
 impl DaemonClient {
-    /// Every pairing this credential is responsible for.
+    /// Every pairing this credential is responsible for, and the version of the
+    /// daemon that answered.
     ///
     /// # Errors
     /// Returns [`PanelError::Daemon`] when the daemon refuses or cannot be
@@ -89,14 +98,13 @@ impl DaemonClient {
     pub async fn pairings(
         &self,
         credential: &DaemonCredential,
-    ) -> Result<Vec<DaemonPairing>, PanelError> {
+    ) -> Result<DaemonPairings, PanelError> {
         let response = authenticated(self.http.get(self.route("/v1/remote/pairings")), credential)
             .send()
             .await
             .map_err(|error| PanelError::daemon(format!("listing pairings: {error}")))?;
 
-        let listed: PairingListResponse = super::read_json(response, "list pairings").await?;
-        Ok(listed.pairings)
+        super::read_json(response, "list pairings").await
     }
 
     /// Cut off one pairing: the device it became, or the link if unclaimed.

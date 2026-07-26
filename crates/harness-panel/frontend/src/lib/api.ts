@@ -4,7 +4,7 @@ import type {
   PairingRevoke,
   PanelAccount,
   PanelErrorBody,
-  PanelPairing,
+  PanelPairings,
   PanelViewer,
 } from './types';
 
@@ -32,7 +32,7 @@ export interface PanelApi {
   /** Mint a link for the signed-in account. The reply is shown once. */
   createPairLink(): Promise<PairLink>;
   /** The viewer's own pairings, or everyone's for the owner. */
-  fetchPairings(): Promise<PanelPairing[]>;
+  fetchPairings(): Promise<PanelPairings>;
   /** Cut off a device, or withdraw a link nobody claimed. */
   revokePairing(pairingId: string): Promise<PairingRevoke>;
 }
@@ -97,10 +97,9 @@ export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
       return (await response.json()) as PairLink;
     },
 
-    async fetchPairings(): Promise<PanelPairing[]> {
+    async fetchPairings(): Promise<PanelPairings> {
       const response = await request('/api/pairings');
-      const body = (await response.json()) as { pairings: PanelPairing[] };
-      return body.pairings;
+      return (await response.json()) as PanelPairings;
     },
 
     async revokePairing(pairingId: string): Promise<PairingRevoke> {

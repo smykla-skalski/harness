@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CRITICAL_MS,
+  linkPhase,
   liveCount,
   pairingCanUnpair,
   pairingChange,
@@ -93,9 +95,10 @@ describe('pairingChange', () => {
     });
   });
 
-  // Where the device is what moved, that is the fact the reader wants; the
-  // claim is only when it started.
-  it('prefers when an active device was last seen over when it claimed', () => {
+  // When it was paired, not when its device was last awake. The account rows
+  // already carry the second, and a device saying one thing while the account
+  // above it says another reads as a fault rather than as two facts.
+  it('reports when an active pairing was claimed, not when its device last checked in', () => {
     const seen = pairingChange(
       pairing({
         state: 'active',
@@ -109,7 +112,7 @@ describe('pairingChange', () => {
       }),
     );
 
-    expect(seen).toEqual({ label: 'last seen', at: '2026-07-26T10:05:00Z' });
+    expect(seen).toEqual({ label: 'claimed', at: '2026-07-26T10:01:00Z' });
   });
 
   // A link withdrawn before any claim has no device to read the stamp from, so
@@ -181,5 +184,37 @@ describe('liveCount', () => {
       ]),
     ).toBe(2);
     expect(liveCount([])).toBe(0);
+  });
+});
+
+describe('linkPhase', () => {
+  const MINUTE = 60_000;
+
+  it('shades by how much of the link is left, not by a fixed clock', () => {
+    expect(linkPhase(9 * MINUTE, 0.9)).toBe('ample');
+    expect(linkPhase(4 * MINUTE, 0.4)).toBe('low');
+    expect(linkPhase(MINUTE, 0.1)).toBe('warn');
+  });
+
+  // The lifetime is an operator flag, so the same fraction has to mean the same
+  // thing whether the link lives ten minutes or one.
+  it('reads a short link the same way as a long one', () => {
+    expect(linkPhase(54_000, 0.9)).toBe('ample');
+    expect(linkPhase(24_000, 0.4)).toBe('low');
+    expect(linkPhase(12_000, 0.12)).toBe('warn');
+  });
+
+  // The flash is the only band that is absolute: ten seconds is ten seconds
+  // however long the link was meant to last.
+  it('flashes for the last seconds whatever the fraction says', () => {
+    expect(linkPhase(CRITICAL_MS, 0.9)).toBe('critical');
+    expect(linkPhase(CRITICAL_MS - 1, 0.9)).toBe('critical');
+    expect(linkPhase(CRITICAL_MS + 1, 0.9)).toBe('ample');
+  });
+
+  // An unreadable deadline is not a link with plenty of time on it.
+  it('treats a lapsed or unreadable link as spent', () => {
+    expect(linkPhase(0, 0)).toBe('spent');
+    expect(linkPhase(null, 1)).toBe('spent');
   });
 });

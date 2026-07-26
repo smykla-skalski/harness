@@ -334,7 +334,7 @@ fn every_runtime_flag_is_validated_before_rendering() {
         ("--public-origin", |args| {
             args.public_origin = "http://example.com".into();
         }),
-        ("--base-path", |args| args.base_path = "/".into()),
+        ("--base-path", |args| args.base_path = "panel".into()),
         ("--github-client-id", |args| {
             args.github_client_id = " ".into();
         }),
@@ -419,7 +419,7 @@ fn systemd_scores_the_unit_in_its_safest_reachable_band() {
 #[test]
 fn an_unusable_mount_point_is_refused() {
     let mut args = args();
-    args.base_path = "/".to_owned();
+    args.base_path = "/panel?x=1".to_owned();
 
     assert!(
         render_unit(
@@ -429,4 +429,22 @@ fn an_unusable_mount_point_is_refused() {
         )
         .is_err()
     );
+}
+
+/// The origin root normalizes to nothing, and a unit carrying `--base-path ""`
+/// is one the panel refuses on its next start. The rendered flag has to be the
+/// spelling that round-trips back to the same configuration.
+#[test]
+fn a_root_mount_point_renders_as_a_path_the_panel_accepts_again() {
+    let mut args = args();
+    args.base_path = "/".to_owned();
+
+    let unit = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect("the origin root is a valid mount point");
+
+    assert!(unit.contains("--base-path / --state-dir"), "{unit}");
 }

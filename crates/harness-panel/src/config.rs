@@ -48,7 +48,7 @@ pub struct PanelArgs {
     pub public_origin: String,
 
     /// Path subtree the panel is mounted under, matching the daemon's
-    /// `--companion-path-prefix`.
+    /// `--companion-path-prefix`. Use `/` to serve the origin root.
     #[arg(long, default_value = DEFAULT_BASE_PATH, env = "HARNESS_PANEL_BASE_PATH")]
     pub base_path: String,
 
@@ -248,9 +248,16 @@ impl PanelConfig {
 
     /// The `Path` attribute of the session cookie, which keeps the browser from
     /// offering it to anything else the daemon serves on the same origin.
+    ///
+    /// A panel at the origin root has no subtree to narrow to, and `Path=` with
+    /// an empty value is not a cookie a browser keeps, so it says `/` outright.
     #[must_use]
     pub fn cookie_path(&self) -> &str {
-        &self.base_path
+        if self.base_path.is_empty() {
+            "/"
+        } else {
+            &self.base_path
+        }
     }
 
     /// Whether the panel is reached over TLS, and so whether the session cookie
@@ -283,7 +290,12 @@ impl PanelConfig {
     }
 }
 
-/// Reduce a mount point to a leading slash with no trailing one.
+/// Reduce a mount point to a leading slash with no trailing one, or to nothing
+/// at all when the panel owns the origin root.
+///
+/// The empty result is what makes `{base}/api/me` come out as `/api/me` rather
+/// than `//api/me`, so the root case needs no special handling anywhere a path
+/// is built.
 ///
 /// # Errors
 /// Returns [`PanelError::Config`] when the value is not a usable subtree.
@@ -308,11 +320,13 @@ pub fn normalize_base_path(raw: &str) -> Result<String, PanelError> {
     }
     let normalized = trimmed.trim_end_matches('/');
     if normalized.is_empty() {
-        // Serving from the origin root would scope the session cookie to
-        // everything else on that origin, including the daemon's own API.
-        return Err(PanelError::config(
-            "--base-path must name a subtree such as /panel, not the origin root",
-        ));
+        // The origin root. The session cookie then has to be scoped to `/`, so
+        // the daemon sharing this origin sees it on its own API requests too.
+        // That is the same process reading a header it already reads on every
+        // request it forwards here, and it authenticates by bearer token rather
+        // than by cookie, so the cookie buys nothing there. Anything else on the
+        // origin would be a different matter, and the daemon does not share it.
+        return Ok(String::new());
     }
     if normalized.contains("//") {
         return Err(PanelError::config(format!(
