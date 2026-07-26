@@ -2512,7 +2512,7 @@ const CODEX_SOURCE: &str = include_str!("../crates/harness-protocol/src/managed_
 // session_requests: clean serde request/response structs. Seven types are
 // SKIP_TYPES (no Swift mirror); the rest reference session::types enums that
 // already exist hand-written in Swift, so they stay unsuffixed references.
-const SESSION_REQUESTS_SOURCE: &str = include_str!("../src/daemon/protocol/session_requests.rs");
+const SESSION_REQUESTS_SOURCE: &str = include_str!("../src/session/wire/session_requests.rs");
 // reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named,
 // replacing the hand HarnessMonitorReviewsEnums file) rather than wire/model
 // split, since a string enum's generated form is a drop-in for the hand one.
@@ -2578,7 +2578,7 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 // so the structs reference the existing bare Swift hand enums. ReviewPoint is also
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
-const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
+const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/task_board/wire/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
 const TASK_BOARD_ITEM_FIELDS_SOURCE: &str = include_str!("../src/task_board/item_fields.rs");
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../src/task_board/lane.rs");
@@ -2648,7 +2648,7 @@ const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
 const TASK_BOARD_TRIAGE_ESCALATION_SOURCE: &str =
     include_str!("../src/task_board/triage_escalation.rs");
 const TASK_BOARD_TRIAGE_PROTOCOL_SOURCE: &str =
-    include_str!("../src/daemon/protocol/task_board_triage.rs");
+    include_str!("../src/task_board/wire/task_board_triage.rs");
 const TASK_BOARD_TRIAGE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageWireTypes.generated.swift";
 // The BuiltInV1 triage decision record and its verdict/reason/cause enums,
 // the durable override and effective-outcome choke point, plus the
@@ -2678,7 +2678,7 @@ const TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE: &str =
 const TASK_BOARD_TRIAGE_RULES_STORE_SOURCE: &str =
     include_str!("../src/task_board/triage_rules/store.rs");
 const TASK_BOARD_TRIAGE_RULES_PROTOCOL_SOURCE: &str =
-    include_str!("../src/daemon/protocol/task_board_triage_rules.rs");
+    include_str!("../src/task_board/wire/task_board_triage_rules.rs");
 const TASK_BOARD_TRIAGE_RULES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageRulesWireTypes.generated.swift";
 // The runtime-authored TriageRuleSetV1 domain (rule, condition, outcome,
 // priority action, validation report/issue), its store-layer draft/revision/
@@ -2732,7 +2732,7 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
     "EvaluationSignalFailure",
 ];
 const TASK_BOARD_DISPATCH_SOURCE: &str = include_str!("../src/task_board/dispatch.rs");
-const TASK_BOARD_STEPS_SOURCE: &str = include_str!("../src/daemon/protocol/task_board_steps.rs");
+const TASK_BOARD_STEPS_SOURCE: &str = include_str!("../src/task_board/wire/task_board_steps.rs");
 const TASK_BOARD_DISPATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardDispatchWireTypes.generated.swift";
 // The dispatch-endpoint execution summary and its plan/intent graph (dispatch.rs).
 // The internally-tagged enums emit as Swift enums with associated values; references
@@ -2868,7 +2868,7 @@ const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &[
     "AcpMcpEnvVariable",
     "AcpMcpHttpHeader",
 ];
-const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/daemon/protocol/managed_agents.rs");
+const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/session/wire/managed_agents.rs");
 const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ManagedAgentSnapshotWireTypes.generated.swift";
 // The managed-agent snapshot umbrella + its list response. ManagedAgentSnapshot is adjacently
 // tagged (kind + snapshot) over the three transport snapshots - Terminal/Codex resolve to the
@@ -2993,7 +2993,7 @@ const TASK_BOARD_AUTOMATION_STATUS_SOURCE: &str =
 const TASK_BOARD_AUTOMATION_SETTINGS_SOURCE: &str =
     include_str!("../src/task_board/automation/settings.rs");
 const TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE: &str =
-    include_str!("../src/daemon/protocol/task_board_automation.rs");
+    include_str!("../src/task_board/wire/task_board_automation.rs");
 const TASK_BOARD_AUTOMATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardAutomationWireTypes.generated.swift";
 // Independent compact status, paged history/detail/metrics reads, local automation
 // settings, and the exact-target force-cancel request/response contract.

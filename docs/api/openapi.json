@@ -33171,6 +33171,7 @@
       },
       "TimelineEntry": {
         "type": "object",
+        "description": "One entry on a session's observation timeline.\n\nLives here rather than beside the daemon summaries it is served with,\nbecause the managed-agent run contracts in this crate carry it and a leaf\ncrate cannot reach back into the daemon for a type.",
         "required": [
           "entry_id",
           "recorded_at",

@@ -39,6 +39,7 @@ mod triage_escalation_prompt;
 pub mod triage_override;
 pub mod triage_rules;
 pub mod types;
+pub mod wire;
 mod worker_prompt;
 pub mod working_copy;
 
