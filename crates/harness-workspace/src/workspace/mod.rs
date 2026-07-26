@@ -22,8 +22,8 @@ pub use paths::{
 };
 pub use paths::{account_home_dir, host_home_dir, normalized_env_value};
 pub use remote_kubernetes::{
-    RemoteKubernetesInstallState, load_remote_install_state_for_spec,
-    remote_install_state_path_for_spec,
+    RemoteKubernetesInstallMemberState, RemoteKubernetesInstallState,
+    load_remote_install_state_for_spec, remote_install_state_path_for_spec,
 };
 pub use session::{
     current_run_context_path, current_run_context_path_for_project, data_root, project_context_dir,

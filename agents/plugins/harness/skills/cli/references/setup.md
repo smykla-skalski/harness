@@ -5,23 +5,18 @@
 | Command | Purpose | Key surface |
 | --- | --- | --- |
 | `setup bootstrap` | Install or refresh the repo-aware harness wrapper and write agent bootstrap config | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...`, `--skip-runtime-hooks <AGENTS>...` |
-| `setup kuma` | Kuma-specific setup entrypoint | Subcommand: `cluster` |
-| `setup gateway` | Check, install, or uninstall Gateway API CRDs | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` |
 | `setup capabilities` | Emit a structured capabilities/readiness report for planning | `--project-dir`, `--repo-root` |
 
-Sources: `cargo run --quiet -- setup --help`; `src/app/cli.rs:82-90`; `src/setup/bootstrap.rs:16-24`; `src/setup/kuma.rs:8-27`; `src/setup/gateway.rs:35-50`; `src/setup/capabilities.rs:22-42`.
+Sources: `cargo run --quiet -- setup --help`; `src/app/cli.rs`; `src/setup/bootstrap.rs`; `src/setup/capabilities.rs`.
 
 ## `setup` key help surface
 
 | Command | Flags / arguments | Notes |
 | --- | --- | --- |
 | `harness setup bootstrap` | `--project-dir <PROJECT_DIR>`, `--agents <AGENTS>...`, `--skip-runtime-hooks <AGENTS>...` | `--agents` defaults to all supported agents; `--skip-runtime-hooks` leaves the rest of bootstrap intact while suppressing runtime hook configs for the listed runtimes |
-| `harness setup kuma` | Subcommand `cluster` | Use `harness setup kuma cluster --help` for lifecycle flags |
-| `harness setup kuma cluster` | `<MODE> <CLUSTER_NAME> [EXTRA_CLUSTER_NAMES]...`, `--platform`, `--provider`, `--repo-root`, `--run-dir`, `--helm-setting`, `--remote`, `--push-prefix`, `--push-tag`, `--namespace`, `--release-name`, `--restart-namespace`, `--store`, `--image`, `--no-build`, `--no-load` | Modes in help: `single-up`, `single-down`, `global-zone-up`, `global-zone-down`, `global-two-zones-up`, `global-two-zones-down` |
-| `harness setup gateway` | `--kubeconfig`, `--repo-root`, `--check-only`, `--uninstall` | `--check-only` and `--uninstall` are mutually exclusive in source |
 | `harness setup capabilities` | `--project-dir`, `--repo-root` | Prints JSON |
 
-Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- setup kuma --help`; `cargo run --quiet -- setup kuma cluster --help`; `cargo run --quiet -- setup gateway --help`; `cargo run --quiet -- setup capabilities --help`; `src/setup/bootstrap.rs:32-49`; `src/setup/gateway.rs:76-142`; `src/setup/capabilities.rs:33-42`.
+Sources: `cargo run --quiet -- setup bootstrap --help`; `cargo run --quiet -- setup capabilities --help`; `src/setup/bootstrap.rs`; `src/setup/capabilities.rs`.
 
 ## Canonical `setup` shortcuts
 
