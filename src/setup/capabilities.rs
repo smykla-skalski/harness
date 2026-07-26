@@ -10,7 +10,7 @@ mod model;
 #[path = "capabilities/readiness/mod.rs"]
 mod readiness;
 
-use data::{create, features};
+use data::features;
 use model::CapabilitiesReport;
 
 impl Execute for CapabilitiesArgs {
@@ -54,7 +54,6 @@ fn build_report_with_probe(
     let feature_map = features();
     let readiness = readiness::evaluate(project_dir, repo_root, &feature_map, probe);
     CapabilitiesReport {
-        create: create(),
         features: feature_map,
         readiness,
     }

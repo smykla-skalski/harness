@@ -76,7 +76,6 @@ pub(super) fn evaluate(
     ReadinessReport {
         scope,
         checks,
-        create: summaries.create.clone(),
         features,
     }
 }

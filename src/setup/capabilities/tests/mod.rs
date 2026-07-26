@@ -9,6 +9,7 @@ use super::data::features;
 use super::model::{CapabilitiesReport, Feature, ReadinessStatus};
 use super::readiness::CapabilityProbe;
 
+mod commands;
 mod readiness;
 
 #[derive(Debug, Clone)]
@@ -98,12 +99,10 @@ fn with_data_root<T>(root: &Path, run: impl FnOnce() -> T) -> T {
 }
 
 fn assert_report_has_static_sections(caps: &CapabilitiesReport) {
-    assert!(caps.create.available);
     assert!(!caps.features.is_empty());
 }
 
 fn assert_report_has_readiness_sections(caps: &CapabilitiesReport) {
-    assert!(caps.readiness.create.ready);
     assert!(!caps.readiness.checks.is_empty());
     assert!(!caps.readiness.features.is_empty());
 }
@@ -151,7 +150,6 @@ fn readiness_succeeds_without_suite_plugin() {
         )
     });
 
-    assert!(caps.readiness.create.ready);
     assert!(caps.readiness.features[&Feature::Bootstrap].ready);
     assert!(
         !caps
@@ -205,14 +203,19 @@ fn json_round_trip() {
     assert_eq!(caps, deserialized);
 }
 
+// The sibling command test rejects any entry naming a command the binaries no
+// longer accept, which covers every retired feature that carried one. This list
+// holds the rest: capabilities described without a command, where nothing else
+// would notice them coming back.
 #[test]
-fn features_exclude_retired_cluster_capability() {
+fn features_exclude_retired_capabilities() {
     let feature_map = features();
     assert!(feature_map.contains_key(&Feature::Bootstrap));
     let keys = serde_json::to_value(&feature_map).unwrap();
     let keys = keys.as_object().unwrap();
     for retired in [
         "api_access",
+        "bug_found_gate",
         "cluster_check",
         "cluster_management",
         "container_logs",
@@ -239,7 +242,7 @@ fn feature_count_is_current() {
     let feature_map = features();
     assert_eq!(
         feature_map.len(),
-        13,
+        7,
         "feature count changed - update this test"
     );
 }

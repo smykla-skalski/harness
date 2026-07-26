@@ -11,18 +11,12 @@ use serde::{Deserialize, Serialize};
 #[non_exhaustive]
 pub enum Feature {
     Bootstrap,
-    BugFoundGate,
     GlobalDelay,
     HookSystem,
-    IdempotentGroupReporting,
-    JsonDiff,
     Observation,
     PreCompactHandoff,
     ProgressHeartbeat,
-    RunLifecycle,
     SessionLifecycle,
-    TaskManagement,
-    TrackedRecording,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,13 +48,6 @@ impl FeatureInfo {
         self.commands = Some(values.iter().map(|&s| s.into()).collect());
         self
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CreateInfo {
-    pub available: bool,
-    pub commands: Vec<String>,
-    pub description: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,13 +95,11 @@ pub struct ReadinessSummary {
 pub struct ReadinessReport {
     pub scope: ReadinessScope,
     pub checks: Vec<ReadinessCheck>,
-    pub create: ReadinessSummary,
     pub features: BTreeMap<Feature, ReadinessSummary>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilitiesReport {
-    pub create: CreateInfo,
     pub features: BTreeMap<Feature, FeatureInfo>,
     pub readiness: ReadinessReport,
 }
