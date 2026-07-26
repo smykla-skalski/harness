@@ -66,6 +66,13 @@ mod tests {
     use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
     use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
 
+    /// A backstop against a loop that never sweeps, not a claim about how fast
+    /// this machine is. The waits below finish on their condition in
+    /// milliseconds; this only decides how long a genuine regression hangs
+    /// before it reports, so it is far above any scheduling delay a loaded
+    /// machine can impose rather than tuned close to the expected duration.
+    const EXPIRY_LOOP_BACKSTOP: Duration = Duration::from_secs(30);
+
     #[tokio::test]
     async fn remote_pairing_expiry_loop_records_unused_expiration_once() {
         let temp = tempdir().expect("create pairing expiry tempdir");
@@ -78,10 +85,10 @@ mod tests {
         );
 
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let handle = spawn_remote_pairing_expiry_loop(async_db, shutdown_rx);
-        wait_for_expiration(&db_path).await;
+        let handle = spawn_remote_pairing_expiry_loop(Arc::clone(&async_db), shutdown_rx);
+        wait_for_expiration(&async_db).await;
         shutdown_tx.send(true).expect("signal expiry loop shutdown");
-        tokio::time::timeout(Duration::from_secs(1), handle)
+        tokio::time::timeout(EXPIRY_LOOP_BACKSTOP, handle)
             .await
             .expect("expiry loop shutdown timeout")
             .expect("join expiry loop");
@@ -138,29 +145,35 @@ mod tests {
 
         let handle = spawn_remote_pairing_expiry_loop(async_db, shutdown_rx);
 
-        tokio::time::timeout(Duration::from_millis(100), handle)
+        tokio::time::timeout(EXPIRY_LOOP_BACKSTOP, handle)
             .await
             .expect("presignaled expiry loop shutdown timeout")
             .expect("join presignaled expiry loop");
     }
 
-    async fn wait_for_expiration(db_path: &std::path::Path) {
-        tokio::time::timeout(Duration::from_secs(1), async {
-            loop {
-                let recorded = DaemonDb::open(db_path)
-                    .expect("open pairing expiry poll database")
-                    .load_remote_audit_events(20)
-                    .expect("load pairing expiry poll audits")
-                    .iter()
-                    .any(|event| event.route_or_method == "remote.pair.expire");
-                if recorded {
-                    break;
-                }
+    /// Polled through the pool the loop itself writes to, rather than by
+    /// reopening the blocking handle. That handle opens and migrates a database
+    /// on the runtime thread, so a poll every five milliseconds spent most of
+    /// the wait starving the very task it was waiting for - which is why a busy
+    /// machine could burn the deadline without the sweep ever being scheduled.
+    async fn wait_for_expiration(db: &AsyncDaemonDb) {
+        tokio::time::timeout(EXPIRY_LOOP_BACKSTOP, async {
+            while recorded_expirations(db).await == 0 {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
         })
         .await
-        .expect("pairing expiration audit timeout");
+        .expect("pairing expiration audit backstop");
+    }
+
+    async fn recorded_expirations(db: &AsyncDaemonDb) -> i64 {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM remote_audit_events WHERE route_or_method = ?1",
+        )
+        .bind("remote.pair.expire")
+        .fetch_one(db.pool())
+        .await
+        .expect("count pairing expiry audits")
     }
 
     fn seed_expired_pairing(db_path: &std::path::Path) {
