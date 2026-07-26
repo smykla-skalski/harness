@@ -31,10 +31,17 @@ use super::forward::{
 
 /// Whether this request is the one upgrade the daemon relays.
 ///
-/// All three conditions, not any: a `GET` carrying `Upgrade: websocket` without
-/// the `Connection` token is not a handshake any client will complete, and
-/// forwarding it would hand the companion a request it has to refuse on the
-/// daemon's behalf.
+/// Protocol selection and nothing else: websocket is carried, `CONNECT` and
+/// every other upgrade is not. Whether a websocket handshake is well formed is
+/// the companion's to judge — it answers a missing `Sec-WebSocket-Key` by naming
+/// it, and that refusal reaches the caller intact — so checking it here would
+/// only let the daemon refuse on behalf of an endpoint that was never asked, in
+/// words less precise than the ones it would have used.
+///
+/// Both header spellings are required because a request carrying one without the
+/// other is not asking for the upgrade this relays: `Upgrade` alone names a
+/// protocol nobody agreed to switch to, and the `Connection` token alone names
+/// no protocol at all.
 pub(super) fn requests_websocket_upgrade(method: &Method, headers: &HeaderMap) -> bool {
     method == Method::GET
         && headers

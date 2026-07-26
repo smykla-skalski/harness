@@ -129,3 +129,37 @@ async fn a_handshake_the_companion_declines_comes_back_whole() {
     server.abort();
     upstream_server.abort();
 }
+
+/// Whether a handshake is well formed is the companion's to judge, not the
+/// daemon's. One missing `Sec-WebSocket-Key` reaches it and comes back carrying
+/// its own refusal, which names the missing header; a gate here would have to
+/// reimplement part of RFC 6455 to say something less precise, and would refuse
+/// on behalf of an endpoint that had not been asked.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_malformed_handshake_is_refused_by_the_companion_rather_than_the_daemon() {
+    let (upstream, upstream_server) = spawn_companion_websocket_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}/panel/socket"))
+        .header("connection", "Upgrade")
+        .header("upgrade", "websocket")
+        .header("sec-websocket-version", "13")
+        .send()
+        .await
+        .expect("upgrade request");
+
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "the companion's own verdict, not the daemon's 501"
+    );
+    let detail = response.text().await.expect("refusal body");
+    assert!(
+        detail.to_ascii_lowercase().contains("sec-websocket-key"),
+        "the refusal must name what was missing, got {detail:?}"
+    );
+
+    server.abort();
+    upstream_server.abort();
+}
