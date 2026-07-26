@@ -13,6 +13,7 @@ public enum MobilePairingError: Error, LocalizedError, Equatable, Sendable {
   case stationFingerprintMismatch(expected: String, actual: String)
   case invalidDeviceAgreementKey
   case invalidStationAgreementKey
+  case serverStatus(Int)
 
   public var errorDescription: String? {
     switch self {
@@ -42,6 +43,25 @@ public enum MobilePairingError: Error, LocalizedError, Equatable, Sendable {
       "This device's pairing key is invalid. Restart the app, then try again."
     case .invalidStationAgreementKey:
       "The station's pairing key is invalid. Create a new pairing link and try again."
+    case .serverStatus(let statusCode):
+      Self.serverStatusDescription(statusCode)
+    }
+  }
+
+  private static func serverStatusDescription(_ statusCode: Int) -> String {
+    switch statusCode {
+    // The station's own pairing server answers 400 to everything it turns down,
+    // including an invitation it has already consumed or never issued. Anything
+    // else came from whatever else is listening on that address.
+    case 400:
+      "The station rejected this pairing request (HTTP 400). The pairing link may "
+        + "already have been used. Create a new pairing link and try again."
+    case 500...599:
+      "The server at this address could not complete pairing (HTTP \(statusCode)). "
+        + "Check that Harness Monitor is still running on the station, then try again."
+    default:
+      "The server at this address refused pairing (HTTP \(statusCode)). Check that "
+        + "the link points at the station, then create a new pairing link and try again."
     }
   }
 }
