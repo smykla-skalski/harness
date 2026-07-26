@@ -24,7 +24,10 @@ struct TaskBoardRouteContentSourceTests {
     )
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let selectionModelSource = try taskBoardSourceFile(named: "TaskBoardCardSelectionModel.swift")
-    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    let actionsSource = try previewableTypeSource(
+      domain: "TaskBoard",
+      type: "TaskBoardOverviewActions"
+    )
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
     #expect(overviewSource.contains(".sheet(item: taskBoardManagementSheet)"))
@@ -382,20 +385,4 @@ struct TaskBoardRouteContentSourceTests {
     ].joined(separator: "\n")
   }
 
-  private func previewableSourceFile(domain: String, named relativePath: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let fileURL =
-      repoRoot
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
-      .appendingPathComponent("Views")
-      .appendingPathComponent(domain)
-      .appendingPathComponent(relativePath)
-    return try String(contentsOf: fileURL, encoding: .utf8)
-  }
 }

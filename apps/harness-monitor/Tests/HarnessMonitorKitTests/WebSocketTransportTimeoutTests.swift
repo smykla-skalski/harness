@@ -58,6 +58,7 @@ struct WebSocketTransportTimeoutTests {
           "pid": .number(42),
           "endpoint": .string("http://127.0.0.1:9999"),
           "started_at": .string("2026-05-22T00:00:00Z"),
+          "log_level": .string("info"),
           "project_count": .number(0),
           "worktree_count": .number(0),
           "session_count": .number(0),

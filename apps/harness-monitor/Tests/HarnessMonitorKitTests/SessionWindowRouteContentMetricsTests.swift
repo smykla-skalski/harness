@@ -127,7 +127,10 @@ struct SessionWindowRouteContentMetricsTests {
         "evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary"
       )
     )
-    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    let actionsSource = try previewableTypeSource(
+      domain: "TaskBoard",
+      type: "TaskBoardOverviewActions"
+    )
     #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
     #expect(actionsSource.contains("store.supervisorSelectedDecisionID = decision.id"))
     #expect(actionsSource.contains("store.requestSessionRoute("))
@@ -179,7 +182,10 @@ struct SessionWindowRouteContentMetricsTests {
       named: "DashboardRouteContent.swift"
     )
     let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
-    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    let actionsSource = try previewableTypeSource(
+      domain: "TaskBoard",
+      type: "TaskBoardOverviewActions"
+    )
 
     #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
     #expect(
@@ -335,20 +341,4 @@ struct SessionWindowRouteContentMetricsTests {
     ].joined(separator: "\n")
   }
 
-  private func previewableSourceFile(domain: String, named relativePath: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let fileURL =
-      repoRoot
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
-      .appendingPathComponent("Views")
-      .appendingPathComponent(domain)
-      .appendingPathComponent(relativePath)
-    return try String(contentsOf: fileURL, encoding: .utf8)
-  }
 }

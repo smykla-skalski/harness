@@ -65,7 +65,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(store.navigationBackStack.allSatisfy { $0 != PreviewFixtures.summary.sessionId })
     #expect(store.navigationForwardStack.allSatisfy { $0 != PreviewFixtures.summary.sessionId })
     #expect(
-      client.recordedCalls()
+      client.recordedCallsIgnoringProjectCatalogReads()
         == [
           .removeSession(
             sessionID: PreviewFixtures.summary.sessionId,
@@ -160,7 +160,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(store.sessions.isEmpty)
     #expect(store.selectedSessionID == nil)
     #expect(
-      client.recordedCalls()
+      client.recordedCallsIgnoringProjectCatalogReads()
         == [
           .removeSession(
             sessionID: PreviewFixtures.summary.sessionId,
@@ -195,7 +195,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(store.contentUI.sessionDetail.presentedSessionDetail == nil)
     #expect(store.currentSuccessFeedbackMessage == "Remove session")
     #expect(
-      client.recordedCalls()
+      client.recordedCallsIgnoringProjectCatalogReads()
         == [
           .removeSession(
             sessionID: PreviewFixtures.summary.sessionId,
@@ -259,7 +259,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
       }
     )
     #expect(
-      client.recordedCalls()
+      client.recordedCallsIgnoringProjectCatalogReads()
         == [
           .removeSession(
             sessionID: PreviewFixtures.summary.sessionId,

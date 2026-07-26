@@ -133,9 +133,9 @@ struct OpenRouterManagedAgentTests {
       }
       """.utf8
     )
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let entry = try decoder.decode(OpenRouterModelEntry.self, from: payload)
+    // The generated type spells its snake_case keys itself, so converting them
+    // first renames every one out from under it and the fields decode empty.
+    let entry = try PolicyWireCoding.decoder.decode(OpenRouterModelEntry.self, from: payload)
     #expect(entry.id == "anthropic/claude-3.7-sonnet")
     #expect(entry.contextLength == 200000)
     #expect(entry.supportedParameters == ["temperature", "max_tokens"])

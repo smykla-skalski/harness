@@ -50,7 +50,6 @@ struct HarnessMonitorAppBundleMetadataTests {
       .appendingPathComponent("Resources/HarnessMonitorWatch-Info.plist", isDirectory: false)
     let infoPlist = try loadDictionaryPlist(at: infoPlistURL)
 
-    #expect(infoPlist["WKCompanionAppBundleIdentifier"] as? String == "io.harnessmonitor.app.ios")
     #expect(infoPlist["WKWatchOnly"] == nil)
 
     let projectURL = root.appendingPathComponent("Project.swift", isDirectory: false)
@@ -60,6 +59,19 @@ struct HarnessMonitorAppBundleMetadataTests {
       try #require(projectSource.range(of: "private let mobileWidgetsTarget"))
     let mobileTargetSource =
       projectSource[mobileTargetStart.lowerBound..<mobileWidgetsStart.lowerBound]
+
+    // WatchKit pairs the watch app to its companion by that companion's own
+    // bundle id, and the iPhone app's has moved once already (it now shares the
+    // Mac app's identity). Read it back from the target so the pairing is what
+    // gets checked, not a copy of the id that only says what it used to be.
+    let mobileBundleIDMatch = try #require(
+      mobileTargetSource.range(of: #"bundleId: "[^"]+""#, options: .regularExpression)
+    )
+    let mobileBundleID = String(mobileTargetSource[mobileBundleIDMatch])
+      .replacingOccurrences(of: "bundleId: ", with: "")
+      .replacingOccurrences(of: "\"", with: "")
+    #expect(infoPlist["WKCompanionAppBundleIdentifier"] as? String == mobileBundleID)
+
     #expect(mobileTargetSource.contains(".target(name: \"HarnessMonitorWatch\"),"))
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch\""))
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch.widgets\""))

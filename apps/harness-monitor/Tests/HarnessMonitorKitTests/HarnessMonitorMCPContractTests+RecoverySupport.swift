@@ -13,15 +13,28 @@ extension HarnessMonitorMCPContractTests {
     return (defaults, suiteName)
   }
 
+  /// A yield count is not a bound on progress. Under a loaded run the work
+  /// being waited for can stay unscheduled through every one of them, so the
+  /// wait gives up early and the test reports a failure the code never had.
+  /// Bound the wait in time instead, and sleep between checks so the executor
+  /// is free to run that work rather than the spin.
   func waitForCondition(
-    attempts: Int = 200,
+    timeout: Duration = .seconds(10),
+    poll: Duration = .milliseconds(10),
     condition: @escaping @MainActor () -> Bool
   ) async {
-    for _ in 0..<attempts {
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while ContinuousClock.now < deadline {
       if condition() {
         return
       }
-      await Task.yield()
+      do {
+        try await Task.sleep(for: poll)
+      } catch {
+        // Cancellation makes every later sleep throw at once, so swallowing it
+        // would turn this back into the spin it replaced.
+        break
+      }
     }
     #expect(condition())
   }

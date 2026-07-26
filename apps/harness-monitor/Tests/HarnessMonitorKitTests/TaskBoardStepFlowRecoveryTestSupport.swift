@@ -58,14 +58,23 @@ extension TaskBoardStepFlowRecoveryTests {
   }
 
   func waitForDelivery(itemID: String, client: RecordingHarnessClient) async -> Bool {
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
     while ContinuousClock.now < deadline {
       if client.recordedCalls().contains(
         .deliverTaskBoardDispatch(itemID: itemID, dryRun: false)
       ) {
         return true
       }
-      await Task.yield()
+      // Sleeping rather than yielding: the delivery this waits for has to hop
+      // back onto the main actor, and a yield loop here re-enqueues itself
+      // ahead of that hop for as long as the wait lasts.
+      do {
+        try await Task.sleep(for: .milliseconds(10))
+      } catch {
+        // Cancellation makes every later sleep throw at once, so swallowing it
+        // would spin here until the deadline.
+        return false
+      }
     }
     return false
   }

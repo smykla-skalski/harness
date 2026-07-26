@@ -6,6 +6,8 @@ struct AppOpenAnythingPerformanceSourceContractTests {
   @Test("Open Anything corpus rebuild stays outside SwiftUI body")
   func openAnythingCorpusRebuildStaysOutsideSwiftUIBody() throws {
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
+    // The driver is stored on the app itself and reached through an accessor.
+    let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
     let corpusTaskSource = try harnessSourceFile(named: "App/OpenAnythingCorpusTask.swift")
     let corpusDriverSource = try harnessSourceFile(
       named: "App/OpenAnythingCorpusUpdateDriver.swift"
@@ -17,8 +19,12 @@ struct AppOpenAnythingPerformanceSourceContractTests {
     // The SwiftUI corpus host must not walk source collections from body.
     // Observation-driven rebuilds keep body evaluation cheap while still
     // tracking every source field read by the input builder.
-    #expect(hostSource.contains("@State private var corpusDriver"))
-    #expect(hostSource.contains("corpusDriver.start(coordinator: coordinator)"))
+    #expect(appSource.contains("@State private var openAnythingCorpusDriver"))
+    #expect(
+      hostSource.contains(
+        "appOpenAnythingCorpusDriver.start(coordinator: appOpenAnythingCoordinator)"
+      )
+    )
     #expect(!hostSource.contains("OpenAnythingCorpusSourceSignature.compute(input)"))
     #expect(!hostSource.contains(".task(id: sourceSignature)"))
     #expect(corpusDriverSource.contains("withObservationTracking"))
