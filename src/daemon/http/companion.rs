@@ -24,13 +24,11 @@ use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderValue, Method, Request, Uri};
 use axum::response::Response;
 use axum::routing::any;
-use hyper_util::client::legacy::Client;
-use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::rt::TokioExecutor;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use super::{DaemonConnectInfo, DaemonHttpState};
 
+mod client;
 mod credential;
 mod forward;
 mod rate_limit;
@@ -404,10 +402,8 @@ fn is_rejected_prefix_character(character: char) -> bool {
         || matches!(character, '?' | '#' | '{' | '}' | '*' | '\\')
 }
 
-type CompanionClient = Client<HttpConnector, Body>;
-
 /// Live companion routing: the validated target plus the pooled client used to
-/// reach it. Cloning shares one connection pool.
+/// reach it. Cloning shares the HTTP/1 and HTTP/2 connection pools.
 #[derive(Clone)]
 pub struct CompanionRouter {
     inner: Arc<CompanionRouterInner>,
@@ -415,7 +411,7 @@ pub struct CompanionRouter {
 
 struct CompanionRouterInner {
     config: CompanionRouteConfig,
-    client: CompanionClient,
+    clients: client::CompanionClients,
     oauth_start_limiter: Mutex<rate_limit::OAuthStartRateLimiter>,
     request_permits: Arc<Semaphore>,
 }
@@ -435,11 +431,10 @@ impl CompanionRouter {
     }
 
     fn with_request_limit(config: CompanionRouteConfig, max_concurrency: usize) -> Self {
-        let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         Self {
             inner: Arc::new(CompanionRouterInner {
                 config,
-                client,
+                clients: client::CompanionClients::new(),
                 oauth_start_limiter: Mutex::new(rate_limit::OAuthStartRateLimiter::new()),
                 request_permits: Arc::new(Semaphore::new(max_concurrency)),
             }),
@@ -508,9 +503,10 @@ async fn proxy_request(
             return rate_limit::rate_limited_response(retry_after_seconds);
         }
     }
+    let client = companion.inner.clients.for_version(request.version());
     forward::forward_to_companion(
         &companion.inner.config,
-        &companion.inner.client,
+        client,
         peer_addr,
         request,
     )
