@@ -122,7 +122,6 @@ async fn default_publication_rejects_same_tree_parent_drift_before_noop() {
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
         policy: None,
         config: &fixture.config,
-        project_dir: None,
         dry_run: false,
         item: &prepared,
         session_worktrees: &BTreeMap::new(),
@@ -160,7 +159,6 @@ async fn default_publication_uses_canonical_repository_and_frozen_worktree() {
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
         policy: None,
         config: &fixture.config,
-        project_dir: Some(path(&decoy).as_str()),
         dry_run: false,
         item: &prepared,
         session_worktrees: &session_worktrees,
@@ -200,7 +198,6 @@ async fn post_create_metadata_failure_keeps_authoritative_identity() {
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
         policy: None,
         config: &fixture.config,
-        project_dir: None,
         dry_run: false,
         item: &prepared,
         session_worktrees: &BTreeMap::new(),

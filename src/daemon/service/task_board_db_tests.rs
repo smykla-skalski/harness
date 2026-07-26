@@ -5,19 +5,45 @@ use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardProjectUpdateRequest, TaskBoardUpdateIdentityClears,
     TaskBoardUpdateItemRequest,
 };
-use crate::task_board::TaskBoardStatus;
 use crate::task_board::project::TaskBoardProjectSource;
 use crate::task_board::project_color::TaskBoardProjectColor;
+use crate::task_board::{TaskBoardOrchestratorSettings, TaskBoardStatus};
 
 use super::{
-    create_task_board_item_db, read_task_board_items_db, update_task_board_item_db,
-    update_task_board_project_db,
+    active_external_sync_config_db, create_task_board_item_db, read_task_board_items_db,
+    update_task_board_item_db, update_task_board_project_db,
 };
 
 async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
     AsyncDaemonDb::connect(&directory.path().join("harness.db"))
         .await
         .expect("database")
+}
+
+#[tokio::test]
+async fn external_sync_ignores_the_hidden_legacy_project_repository() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let mut settings = TaskBoardOrchestratorSettings::default();
+    settings.github_project.owner = "legacy-owner".into();
+    settings.github_project.repo = "hidden-repository-735".into();
+    settings.github_inbox.repositories = vec!["visible-owner/monitored-repository".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save settings");
+
+    let config = active_external_sync_config_db(&db)
+        .await
+        .expect("external sync config");
+
+    assert_ne!(
+        config.github_repository(),
+        Some("legacy-owner/hidden-repository-735")
+    );
+    assert_eq!(
+        config.github_inbox_repositories(),
+        ["visible-owner/monitored-repository"]
+    );
 }
 
 /// A create that names its starting lane lands there in one call. The board

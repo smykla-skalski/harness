@@ -242,16 +242,7 @@ pub(super) fn dispatch_input(
         project_dir: request
             .project_dir
             .clone()
-            .or_else(|| settings.project_dir.clone())
-            .or_else(|| {
-                (!settings.github_project.checkout_path.as_os_str().is_empty()).then(|| {
-                    settings
-                        .github_project
-                        .checkout_path
-                        .to_string_lossy()
-                        .into_owned()
-                })
-            }),
+            .or_else(|| settings.project_dir.clone()),
         actor: request.actor.clone(),
     }
 }

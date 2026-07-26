@@ -2,34 +2,35 @@ use std::path::Path;
 use std::slice;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::state::overlay_task_board_git_runtime_secrets;
-use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::task_board::github::{
-    GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
-};
+use crate::task_board::github::{GitHubAutomationClient, GitHubProjectConfig};
 use crate::task_board::{
     PolicyAction, PolicyGraph, TaskBoardItem, TaskBoardLifecycleOutcome,
     TaskBoardOrchestratorSettings, TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, normalize_repository_slug,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DatabaseAutomationRequest;
 use super::support::{
-    AutomationPolicy, action_policy, automation_config, github_token_for_repository,
-    load_session_worktrees_async, managed_branch_name,
+    AutomationPolicy, action_policy, load_session_worktrees_async, managed_branch_name,
 };
 use super::workflow::automate_item_with_database_policy;
 
+#[path = "write_publication/client.rs"]
+mod client;
 #[path = "write_publication/evidence.rs"]
 mod evidence;
 #[path = "write_publication/preparation.rs"]
 mod preparation;
 
+use client::{
+    PublicationClient, publication_client_for_repository, repository_publication_client,
+    resolve_base_branch,
+};
 use evidence::{
     LocalHeadEvidence, freeze_pull_request, implementation_base, known_publication_number,
-    local_head_evidence, required_branch_state, required_frozen_head,
-    validate_publication_repository, validate_published_evidence, validate_published_pull_request,
-    validate_pull_request_target, worktree_path,
+    local_head_evidence, required_branch_state, required_frozen_head, validate_published_evidence,
+    validate_published_pull_request, validate_pull_request_target, worktree_path,
 };
 #[cfg(test)]
 pub(super) use evidence::{parse_publication_url, reconcile_publication_number};
@@ -39,12 +40,6 @@ pub(super) use preparation::{
 
 const WRITE_PUBLICATION_HOST: &str = "task-board-write-workflow";
 
-struct PublicationClient {
-    config: GitHubProjectConfig,
-    client: GitHubApiAutomationClient,
-    repository: String,
-}
-
 pub(crate) async fn validate_write_workflow_launch_publication(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
@@ -53,7 +48,8 @@ pub(crate) async fn validate_write_workflow_launch_publication(
     pull_request: Option<&TaskBoardPullRequestIdentity>,
 ) -> Result<Option<TaskBoardPullRequestIdentity>, CliError> {
     let publication =
-        configured_publication_client(db, settings, workflow_kind, execution_repository).await?;
+        publication_client_for_repository(db, settings, workflow_kind, execution_repository)
+            .await?;
     let Some(expected) = pull_request else {
         return Ok(None);
     };
@@ -247,13 +243,9 @@ async fn publish_default_task(
             .active_live_canvas()
             .map(|(canvas, document)| (canvas.id.as_str(), document))
     });
-    let project_dir = worktree_path(execution)?
-        .to_str()
-        .ok_or_else(|| invalid_transition("write publication worktree is not valid UTF-8"))?;
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
         policy,
         config: &publication.config,
-        project_dir: Some(project_dir),
         dry_run: false,
         item: &item,
         session_worktrees: &session_worktrees,
@@ -395,66 +387,15 @@ async fn write_publication_client(
         .into());
     }
     validate_write_publication(execution)?;
-    configured_publication_client(
+    let mut publication = publication_client_for_repository(
         db,
         &settings.settings,
         execution.snapshot.workflow_kind,
         execution.snapshot.execution_repository.as_deref(),
     )
-    .await
-}
-
-async fn configured_publication_client(
-    db: &AsyncDaemonDb,
-    settings: &TaskBoardOrchestratorSettings,
-    workflow_kind: TaskBoardWorkflowKind,
-    execution_repository: Option<&str>,
-) -> Result<PublicationClient, CliError> {
-    let Some((config, token)) = automation_config(settings) else {
-        return Err(CliErrorKind::workflow_io(
-            "write workflow publication requires configured GitHub automation",
-        )
-        .into());
-    };
-    validate_publication_automations(&config, workflow_kind)?;
-    let repository = config.repository_slug();
-    validate_publication_repository(execution_repository, &repository)?;
-    let mut runtime_config = db.task_board_runtime_config().await?;
-    overlay_task_board_git_runtime_secrets(&mut runtime_config);
-    let client = GitHubApiAutomationClient::new_with_runtime_config(token, runtime_config)?;
-    Ok(PublicationClient {
-        config,
-        client,
-        repository,
-    })
-}
-
-async fn repository_publication_client(
-    db: &AsyncDaemonDb,
-    base: &GitHubProjectConfig,
-    repository: &str,
-) -> Result<PublicationClient, CliError> {
-    let repository = normalize_repository_slug(Some(repository))
-        .ok_or_else(|| invalid_transition("publication head repository is invalid"))?;
-    let token = github_token_for_repository(Some(&repository)).ok_or_else(|| {
-        CliErrorKind::workflow_io(format!(
-            "write workflow publication has no GitHub token for '{repository}'"
-        ))
-    })?;
-    let (owner, repo) = repository
-        .split_once('/')
-        .ok_or_else(|| invalid_transition("publication head repository is invalid"))?;
-    let mut config = base.clone();
-    config.owner = owner.into();
-    config.repo = repo.into();
-    let mut runtime_config = db.task_board_runtime_config().await?;
-    overlay_task_board_git_runtime_secrets(&mut runtime_config);
-    let client = GitHubApiAutomationClient::new_with_runtime_config(token, runtime_config)?;
-    Ok(PublicationClient {
-        config,
-        client,
-        repository,
-    })
+    .await?;
+    resolve_base_branch(&mut publication).await?;
+    Ok(publication)
 }
 
 fn validate_write_publication(

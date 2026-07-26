@@ -376,12 +376,9 @@ pub(crate) async fn active_external_sync_config_db(
     db: &AsyncDaemonDb,
 ) -> Result<ExternalSyncConfig, CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
-    let project = &settings.github_project;
-    let repository = (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-        .then(|| project.repository_slug());
     Ok(
         super::task_board_runtime::external_sync_config_for_repository(
-            repository.as_deref(),
+            None,
             &settings.github_inbox.repositories,
         )
         .with_github_import_labels_override(&settings.github_inbox.label_filter),

@@ -12,7 +12,10 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
 
     let saveButton = element(in: app, identifier: Accessibility.settingsTaskBoardSaveButton)
     let reloadButton = element(in: app, identifier: Accessibility.settingsTaskBoardReloadButton)
-    let ownerField = element(in: app, identifier: Accessibility.settingsTaskBoardOwnerField)
+    let projectDirField = element(
+      in: app,
+      identifier: Accessibility.settingsTaskBoardProjectDirField
+    )
     let repositoriesButton = element(
       in: app,
       identifier: Accessibility.settingsTaskBoardRepositoriesButton
@@ -22,8 +25,12 @@ final class HarnessMonitorSettingsTaskBoardUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(saveButton.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(reloadButton.exists)
     XCTAssertTrue(
-      ownerField.waitForExistence(timeout: Self.actionTimeout),
+      projectDirField.waitForExistence(timeout: Self.actionTimeout),
       "Task Board settings should load editable fields"
+    )
+    XCTAssertFalse(
+      element(in: app, identifier: "harness.settings.task-board.owner").exists,
+      "Task Board settings should not name one publication repository anymore"
     )
     XCTAssertTrue(
       repositoriesButton.exists,

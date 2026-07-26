@@ -78,6 +78,21 @@ impl GitHubApiAutomationClient {
             runtime_config,
         })
     }
+
+    /// Read a repository's default branch, to be used as a publication base.
+    ///
+    /// Deliberately not on [`GitHubAutomationClient`]: every method there takes
+    /// a `GitHubProjectConfig`, and this call has to happen while building one.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the GitHub client.
+    pub async fn repository_default_branch(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Option<String>, CliError> {
+        super::repository::default_branch_async(&self.client, owner, repo).await
+    }
 }
 
 #[async_trait]

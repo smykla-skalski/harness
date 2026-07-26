@@ -264,7 +264,10 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let launched = launchForPerf(app: app, scenario: "task-board-settings")
     let settingsRoot = element(in: launched, identifier: Accessibility.settingsRoot)
     let saveButton = element(in: launched, identifier: Accessibility.settingsTaskBoardSaveButton)
-    let ownerField = element(in: launched, identifier: Accessibility.settingsTaskBoardOwnerField)
+    let projectDirField = element(
+      in: launched,
+      identifier: Accessibility.settingsTaskBoardProjectDirField
+    )
     let status = element(in: launched, identifier: Accessibility.settingsTaskBoardStatus)
 
     waitForScenarioCompletion(app: launched, scenario: "task-board-settings")
@@ -272,7 +275,7 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     XCTAssertTrue(waitForElement(settingsRoot, timeout: Self.uiTimeout))
     XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
     XCTAssertTrue(
-      waitForElement(ownerField, timeout: Self.actionTimeout),
+      waitForElement(projectDirField, timeout: Self.actionTimeout),
       "Task Board settings perf scenario should load editable Task Board fields"
     )
     XCTAssertFalse(status.exists, "Task Board settings perf scenario should not settle on an error")

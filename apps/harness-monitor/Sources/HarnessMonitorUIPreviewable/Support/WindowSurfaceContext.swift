@@ -47,7 +47,7 @@ public struct OpenTaskBoardSettingsAction: Sendable {
   }
 
   @MainActor
-  public func callAsFunction(_ anchor: SettingsTaskBoardAnchor = .githubProject) {
+  public func callAsFunction(_ anchor: SettingsTaskBoardAnchor = .githubInbox) {
     action(anchor)
   }
 }

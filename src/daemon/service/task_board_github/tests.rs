@@ -7,7 +7,7 @@ use crate::task_board::github::{
     GitHubBranchProtectionEvidence, GitHubCheckEvidence, GitHubMergeEvidence, GitHubProjectConfig,
     GitHubPullRequestEvidence, GitHubPullRequestHandle, GitHubReviewEvidence,
 };
-use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardStatus};
+use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 use tempfile::tempdir;
 
 use super::support::{STEP_MERGED, STEP_WAITING_FOR_REVIEW, managed_branch_name};
@@ -49,13 +49,6 @@ async fn automation_opens_reviews_and_merges_prs() {
         .enabled
         .push(crate::task_board::github::GitHubAutomation::AutoMerge);
     config.requested_reviewers.reviewers = vec!["alice".to_string(), "bob".to_string()];
-    let input = TaskBoardOrchestratorDispatchInput {
-        item_id: None,
-        status: Some(TaskBoardStatus::Done),
-        dry_run: false,
-        project_dir: Some(repo.to_string_lossy().into_owned()),
-        actor: None,
-    };
     let mut item = TaskBoardItem::new(
         "task-1".to_string(),
         "Task".to_string(),
@@ -108,7 +101,6 @@ async fn automation_opens_reviews_and_merges_prs() {
     let workflow = automate_item(AutomationRequest {
         board_root: temp.path(),
         config: &config,
-        project_dir: input.project_dir.as_deref(),
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
@@ -216,7 +208,6 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
     let workflow = automate_item(AutomationRequest {
         board_root: temp.path(),
         config: &config,
-        project_dir: None,
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
@@ -309,7 +300,6 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
     let workflow = automate_item(AutomationRequest {
         board_root: temp.path(),
         config: &config,
-        project_dir: Some(repo.to_string_lossy().as_ref()),
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),

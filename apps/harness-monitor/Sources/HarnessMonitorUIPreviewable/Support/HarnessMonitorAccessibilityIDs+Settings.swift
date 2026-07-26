@@ -214,8 +214,8 @@ extension HarnessMonitorAccessibility {
   public static let settingsSecretsReloadButton = "harness.settings.secrets.reload"
   public static let settingsSecretsSaveButton = "harness.settings.secrets.save"
   public static let settingsTaskBoardProjectDirField = "harness.settings.task-board.project-dir"
-  public static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
-  public static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
+  public static let settingsTaskBoardBranchPrefixField =
+    "harness.settings.task-board.branch-prefix"
   public static let settingsTaskBoardRepositoriesSummary =
     "harness.settings.task-board.repositories.summary"
   public static let settingsTaskBoardRepositoriesButton =
@@ -243,7 +243,6 @@ extension HarnessMonitorAccessibility {
     "harness.settings.task-board.host.reload"
   public static let settingsTaskBoardHostSaveButton =
     "harness.settings.task-board.host.save"
-  public static let settingsTaskBoardCheckoutPathField = "harness.settings.task-board.checkout-path"
   public static let settingsTaskBoardProtectedPathsField =
     "harness.settings.task-board.protected-paths"
   public static let settingsTaskBoardRequestedReviewersField =

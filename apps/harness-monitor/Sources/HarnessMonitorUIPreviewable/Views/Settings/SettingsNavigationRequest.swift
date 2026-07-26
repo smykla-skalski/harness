@@ -28,7 +28,6 @@ public enum SettingsNavigationTarget: Equatable, Hashable, Sendable {
 }
 
 public enum SettingsTaskBoardAnchor: String, Equatable, Hashable, Sendable {
-  case githubProject
   case githubInbox
 }
 

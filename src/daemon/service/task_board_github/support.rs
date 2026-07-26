@@ -14,9 +14,6 @@ use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::service::session_detail_core;
 use crate::daemon::service::session_detail_core_async;
-use harness_kernel::errors::CliError;
-#[cfg(test)]
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
@@ -25,10 +22,14 @@ use crate::task_board::github::{
 use crate::task_board::policy_graph::resolve_gate_policy;
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
 use crate::task_board::{
-    BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, PolicyAction, PolicyDecision,
-    PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
-    TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
+    BuiltInPolicyGate, ExternalProvider, ExternalRef, ExternalRefProvider, PolicyAction,
+    PolicyDecision, PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject,
+    TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
+use crate::task_board::{normalize_repository_slug, task_board_read_only_execution_repository};
+use harness_kernel::errors::CliError;
+#[cfg(test)]
+use harness_kernel::errors::CliErrorKind;
 
 #[derive(Clone, Copy)]
 pub(super) enum AutomationPolicy<'a> {
@@ -92,8 +93,6 @@ pub(super) fn resolve_worktree(
     item: &TaskBoardItem,
     workflow: &TaskBoardWorkflowState,
     session_worktrees: &BTreeMap<String, String>,
-    project_dir: Option<&str>,
-    config: &GitHubProjectConfig,
 ) -> Option<String> {
     workflow
         .worktree
@@ -106,20 +105,10 @@ pub(super) fn resolve_worktree(
                 .and_then(|session_id| session_worktrees.get(session_id))
                 .cloned()
         })
-        .or_else(|| {
-            project_dir
-                .filter(|path| !path.trim().is_empty())
-                .map(ToString::to_string)
-        })
-        .or_else(|| {
-            (!config.checkout_path.as_os_str().is_empty())
-                .then(|| config.checkout_path.to_string_lossy().into_owned())
-        })
-}
-
-pub(super) fn is_repo_scoped(item: &TaskBoardItem, config: &GitHubProjectConfig) -> bool {
-    let repository = config.repository_slug();
-    item.project_id.as_deref() == Some(repository.as_str())
+    // There used to be a `config.checkout_path` fallback here. It held one
+    // path for the whole board, so once items publish to their own
+    // repositories it would hand an item another repository's checkout.
+    // Reporting a missing worktree beats working in the wrong one.
 }
 
 pub(super) fn managed_branch_name(
@@ -184,28 +173,13 @@ pub(super) async fn load_session_worktrees_async(
     Ok(worktrees)
 }
 
+/// The conventions every publication shares. The repository and its token are
+/// resolved per item, so this deliberately says nothing about which repository
+/// is being published to.
 pub(super) fn automation_config(
     settings: &TaskBoardOrchestratorSettings,
-) -> Option<(GitHubProjectConfig, String)> {
-    let settings_repository = {
-        let project = &settings.github_project;
-        (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-            .then(|| project.repository_slug())
-    };
-    let external_sync_config =
-        external_sync_config_for_repository(settings_repository.as_deref(), &[]);
-    let token = github_token_for_repository(settings_repository.as_deref())?;
-    let mut config = settings.github_project.clone();
-    if (config.owner.trim().is_empty() || config.repo.trim().is_empty())
-        && let Some(repository) = external_sync_config.github_repository()
-        && let Some((owner, repo)) = repository.split_once('/')
-    {
-        config.owner = owner.to_string();
-        config.repo = repo.to_string();
-    }
-    if config.owner.trim().is_empty() || config.repo.trim().is_empty() {
-        return None;
-    }
+) -> Option<GitHubProjectConfig> {
+    let config = settings.github_project.clone();
     let enabled = config
         .enabled_automations
         .enables(GitHubAutomation::CreateBranch)
@@ -221,7 +195,7 @@ pub(super) fn automation_config(
         || config
             .enabled_automations
             .enables(GitHubAutomation::AutoMerge);
-    enabled.then_some((config, token))
+    enabled.then_some(config)
 }
 
 pub(super) fn github_token_for_repository(repository: Option<&str>) -> Option<String> {
@@ -341,14 +315,44 @@ fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> Stri
         lines.push(String::new());
         lines.push(summary.to_string());
     }
-    if let Some(issue_number) = item.external_refs.iter().find_map(|reference| {
-        let repository = config.repository_slug();
-        (reference.provider == ExternalRefProvider::GitHub
-            && item.project_id.as_deref() == Some(repository.as_str()))
-        .then(|| reference.external_id.clone())
-    }) {
+    // Resolve the item's repository the same way dispatch does rather than
+    // reading `project_id`: a GitHub import leaves that field null and puts the
+    // slug in `execution_repository`, so keying off it alone drops the `Closes`
+    // line for nearly every imported item. Casing differs between the two
+    // fields as well, hence normalizing both sides.
+    let publication = normalize_repository_slug(Some(&config.repository_slug()));
+    let item_repository = task_board_read_only_execution_repository(item)
+        .ok()
+        .flatten()
+        .and_then(|repository| normalize_repository_slug(Some(&repository)));
+    if let Some(repository) = publication
+        .as_deref()
+        .filter(|_| item_repository == publication)
+        && let Some(issue_number) = item
+            .external_refs
+            .iter()
+            .find_map(|reference| github_issue_number(reference, repository))
+    {
         lines.push(String::new());
         lines.push(format!("Closes #{issue_number}"));
     }
     lines.join("\n")
 }
+
+fn github_issue_number(reference: &ExternalRef, repository: &str) -> Option<u64> {
+    if reference.provider != ExternalRefProvider::GitHub {
+        return None;
+    }
+    let external_id = reference.external_id.trim();
+    let number = if let Some((source_repository, number)) = external_id.rsplit_once('#') {
+        (normalize_repository_slug(Some(source_repository)).as_deref() == Some(repository))
+            .then_some(number)?
+    } else {
+        external_id
+    };
+    number.parse::<u64>().ok().filter(|number| *number > 0)
+}
+
+#[cfg(test)]
+#[path = "support_tests.rs"]
+mod support_tests;

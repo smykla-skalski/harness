@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubMergeEvidence, GitHubProjectConfig,
     GitHubPullRequestHandle, build_auto_merge_policy_input,
@@ -9,6 +8,7 @@ use crate::task_board::{
     PolicyAction, PolicyDecision, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
     TaskBoardWorkflowState,
 };
+use harness_kernel::errors::CliErrorKind;
 
 #[cfg(test)]
 use super::AutomationRequest;
@@ -17,9 +17,8 @@ use super::support::{
     STEP_BRANCH_PUSHED, STEP_EVIDENCE_FAILED, STEP_MERGED, STEP_MISSING_WORKTREE, STEP_PR_FAILED,
     STEP_PUSH_FAILED, STEP_READY, STEP_WAITING_FOR_CHECKS, STEP_WAITING_FOR_COMMITS,
     STEP_WAITING_FOR_CONSENSUS, STEP_WAITING_FOR_HUMAN, STEP_WAITING_FOR_REVIEW, action_policy,
-    branch_publication_async, clear_error, failure, is_repo_scoped, managed_branch_name,
-    new_policy_trace_id, policy_blocked, push_branch_async, resolve_worktree, step, sync_labels,
-    waiting,
+    branch_publication_async, clear_error, failure, managed_branch_name, new_policy_trace_id,
+    policy_blocked, push_branch_async, resolve_worktree, step, sync_labels, waiting,
 };
 
 mod pull_request;
@@ -36,12 +35,7 @@ pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWo
         host_id: request.host_id,
         expected_parent: None,
     };
-    let mut prepared = match prepare_item(
-        &context,
-        request.project_dir,
-        request.dry_run,
-        request.session_worktrees,
-    ) {
+    let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
         AutomationFlow::Continue(prepared) => prepared,
         AutomationFlow::Done(workflow) => return workflow,
     };
@@ -59,12 +53,7 @@ pub(super) async fn automate_item_with_database_policy(
         host_id: request.host_id,
         expected_parent: request.expected_parent,
     };
-    let mut prepared = match prepare_item(
-        &context,
-        request.project_dir,
-        request.dry_run,
-        request.session_worktrees,
-    ) {
+    let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
         AutomationFlow::Continue(prepared) => prepared,
         AutomationFlow::Done(workflow) => return workflow,
     };
@@ -151,26 +140,21 @@ enum AutomationFlow<T> {
 
 fn prepare_item(
     context: &AutomationContext<'_>,
-    project_dir: Option<&str>,
     dry_run: bool,
     session_worktrees: &BTreeMap<String, String>,
 ) -> AutomationFlow<PreparedItem> {
     let mut workflow = context.item.workflow.clone();
-    if !is_repo_scoped(context.item, context.config)
-        || !matches!(
-            context.item.status,
-            TaskBoardStatus::InReview | TaskBoardStatus::Done
-        )
-    {
+    // Callers group items by repository before they get here, so scope is
+    // already settled. The old check compared `project_id` to the configured
+    // slug verbatim and skipped every item whose repository merely differed in
+    // case from the one repository settings named.
+    if !matches!(
+        context.item.status,
+        TaskBoardStatus::InReview | TaskBoardStatus::Done
+    ) {
         return AutomationFlow::Done(workflow);
     }
-    let Some(worktree) = resolve_worktree(
-        context.item,
-        &workflow,
-        session_worktrees,
-        project_dir,
-        context.config,
-    ) else {
+    let Some(worktree) = resolve_worktree(context.item, &workflow, session_worktrees) else {
         let error = CliErrorKind::workflow_io("task-board github worktree missing").into();
         return AutomationFlow::Done(failure(&mut workflow, STEP_MISSING_WORKTREE, &error));
     };

@@ -11,6 +11,7 @@ mod config;
 mod evidence;
 mod evidence_api;
 mod publication;
+mod repository;
 mod risk;
 
 pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullRequestHandle};

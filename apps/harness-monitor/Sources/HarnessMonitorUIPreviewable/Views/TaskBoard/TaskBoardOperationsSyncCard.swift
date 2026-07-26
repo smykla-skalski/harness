@@ -82,7 +82,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
           message: warning,
           showsSeparator: dashboard.taskBoardSyncSummary != nil
         ) {
-          openTaskBoardSettings(.githubProject)
+          openTaskBoardSettings(.githubInbox)
         }
       } else {
         actionRow(
@@ -200,7 +200,7 @@ struct TaskBoardGitHubSyncAvailability: Equatable {
       warning = nil
       return
     }
-    warning = "Configure a GitHub repository or inbox repository before running sync"
+    warning = "Add a monitored repository before running sync"
   }
 
   var canRun: Bool {
@@ -257,16 +257,10 @@ private struct TaskBoardOperationsSyncWarning: View {
 }
 
 extension TaskBoardOrchestratorSettings {
+  /// The monitored repository list is the only thing sync needs. There used to
+  /// be a second source here - one owner/repo pair in settings - but the board
+  /// spans many repositories and that pair no longer names any of them.
   fileprivate var hasConfiguredGitHubSyncRepository: Bool {
-    hasConfiguredGitHubProjectRepository || hasConfiguredGitHubInboxRepository
-  }
-
-  fileprivate var hasConfiguredGitHubProjectRepository: Bool {
-    !githubProject.owner.trimmedForTaskBoardSync.isEmpty
-      && !githubProject.repo.trimmedForTaskBoardSync.isEmpty
-  }
-
-  fileprivate var hasConfiguredGitHubInboxRepository: Bool {
     githubInbox.repositories.contains { !$0.trimmedForTaskBoardSync.isEmpty }
   }
 }
