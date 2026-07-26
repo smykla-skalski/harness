@@ -69,13 +69,13 @@ fn guard_bash_ignores_retired_runner_skill() {
     }
 }
 
-/// A payload carrying no command at all reaches the guard and allows, rather
-/// than short-circuiting earlier on session isolation.
+/// An active create session whose payload carries no command clears the skill
+/// gate and then allows where the command is parsed, before any guard runs, so
+/// a payload the hook cannot inspect is never denied.
 #[test]
 fn guard_bash_allows_payload_without_a_command() {
     let mut ctx = make_hook_context("suite:create", make_empty_payload());
     ctx.skill_active = true;
-    assert!(ctx.skill_active, "case must reach the guard body");
     let r = guard_bash::execute(&ctx).unwrap();
     assert_allow(&r);
 }
