@@ -164,13 +164,20 @@ fn entry_from_columns(
     // The device is built from the joined columns only when the join matched.
     // Reading them individually would invent a device out of a row where every
     // column is null.
-    let device = columns.client_id.map(|client_id| RemotePairingDevice {
-        client_id,
-        display_name: columns.display_name.unwrap_or_default(),
-        platform: columns.platform.unwrap_or_default(),
-        last_seen_at: columns.last_seen_at,
-        revoked_at: columns.revoked_at,
-    });
+    let device = match columns.client_id {
+        Some(client_id) => Some(RemotePairingDevice {
+            client_id,
+            display_name: columns.display_name.ok_or_else(|| {
+                db_error("matched remote pairing device has no display_name".to_owned())
+            })?,
+            platform: columns.platform.ok_or_else(|| {
+                db_error("matched remote pairing device has no platform".to_owned())
+            })?,
+            last_seen_at: columns.last_seen_at,
+            revoked_at: columns.revoked_at,
+        }),
+        None => None,
+    };
 
     Ok(RemotePairingInventoryEntry {
         pairing_id: columns.pairing_id,
@@ -184,4 +191,36 @@ fn entry_from_columns(
         minted_by: metadata.minted_by,
         device,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{InventoryColumns, entry_from_columns};
+
+    #[test]
+    fn matched_device_requires_its_non_null_identity_columns() {
+        for (display_name, platform, missing) in [
+            (None, Some("macos".to_owned()), "display_name"),
+            (Some("MacBook Pro".to_owned()), None, "platform"),
+        ] {
+            let columns = InventoryColumns {
+                pairing_id: "pairing-corrupt-device".to_owned(),
+                role: "operator".to_owned(),
+                created_at: "2026-07-26T14:00:00Z".to_owned(),
+                expires_at: "2026-07-26T14:10:00Z".to_owned(),
+                claimed_at: Some("2026-07-26T14:01:00Z".to_owned()),
+                metadata_json: "{}".to_owned(),
+                client_id: Some("client-corrupt-device".to_owned()),
+                display_name,
+                platform,
+                last_seen_at: None,
+                revoked_at: None,
+            };
+
+            let error = entry_from_columns(columns, "2026-07-26T14:02:00Z")
+                .expect_err("matched client identity columns are required");
+
+            assert!(error.to_string().contains(missing), "{error}");
+        }
+    }
 }
