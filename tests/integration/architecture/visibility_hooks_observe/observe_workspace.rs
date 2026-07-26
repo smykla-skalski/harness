@@ -149,7 +149,6 @@ fn infra_exec_root_stays_a_facade() {
         "pub(crate) fn run_command(",
         "pub(crate) fn run_command_streaming(",
         "pub(crate) fn run_command_inherited(",
-        "pub fn kumactl_run(",
         "mod tests {",
     ] {
         assert!(
@@ -158,11 +157,7 @@ fn infra_exec_root_stays_a_facade() {
         );
     }
 
-    for path in [
-        "src/infra/exec/runner.rs",
-        "src/infra/exec/tools.rs",
-        "src/infra/exec/tests.rs",
-    ] {
+    for path in ["src/infra/exec/runner.rs", "src/infra/exec/tests.rs"] {
         assert!(
             root.join(path).exists(),
             "infra exec split module should exist: {path}"

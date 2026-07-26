@@ -261,17 +261,6 @@ fn wait_for_http_succeeds_on_mock_server() {
     );
 }
 
-#[test]
-fn kumactl_run_injects_cp_addr() {
-    let result = kumactl_run(
-        Path::new("/418cf829-6691-5fc0-92b1-8e5013efa2cb/kumactl"),
-        "http://localhost:5681",
-        &["version"],
-        &[0],
-    );
-    assert!(result.is_err());
-}
-
 fn mock_http_server(response_body: &str, content_type: &str) -> (u16, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();

@@ -1,55 +1,50 @@
 use super::*;
-use std::env;
-use std::fs;
 use std::iter;
 
 #[test]
-fn merge_env_prepends_build_artifacts_to_path() {
-    let tmp = tempfile::tempdir().unwrap();
-    let os_name = if cfg!(target_os = "macos") {
-        "darwin"
-    } else {
-        "linux"
-    };
-    let arch = if cfg!(target_arch = "aarch64") {
-        "arm64"
-    } else {
-        "amd64"
-    };
-    let artifacts_dir = tmp
-        .path()
-        .join("build")
-        .join(format!("artifacts-{os_name}-{arch}"))
-        .join("kumactl");
-    fs::create_dir_all(&artifacts_dir).unwrap();
-
-    let mut extra = HashMap::new();
-    extra.insert(
-        "REPO_ROOT".into(),
-        tmp.path().to_string_lossy().into_owned(),
+fn merge_env_inherits_path_without_rewriting_it() {
+    // REPO_ROOT is what used to switch on the PATH rewrite, so it stays set here
+    // to keep this a regression test rather than a vacuous one.
+    temp_env::with_vars(
+        [
+            ("PATH", Some("/sentinel/bin")),
+            ("REPO_ROOT", Some("/nonexistent-repo-root")),
+        ],
+        || {
+            let merged = merge_env(iter::empty());
+            assert_eq!(
+                merged.get("PATH").map(String::as_str),
+                Some("/sentinel/bin")
+            );
+        },
     );
-    let merged = merge_env(extra.iter());
-    let path_val = merged.get("PATH").unwrap();
-    let expected_prefix = artifacts_dir.to_string_lossy();
-    assert!(path_val.starts_with(expected_prefix.as_ref()));
 }
 
 #[test]
-fn merge_env_skips_artifacts_when_dir_missing() {
-    let tmp = tempfile::tempdir().unwrap();
-    let mut extra = HashMap::new();
-    extra.insert(
-        "REPO_ROOT".into(),
-        tmp.path().to_string_lossy().into_owned(),
+fn merge_env_omits_path_when_the_process_has_none() {
+    temp_env::with_vars(
+        [
+            ("PATH", None),
+            ("REPO_ROOT", Some("/nonexistent-repo-root")),
+        ],
+        || {
+            let merged = merge_env(iter::empty());
+            assert_eq!(merged.get("PATH"), None);
+        },
     );
-    let original_path = env::var("PATH").unwrap_or_default();
-    let merged = merge_env(extra.iter());
-    assert_eq!(merged.get("PATH").unwrap(), &original_path);
 }
 
 #[test]
-fn merge_env_no_repo_root_leaves_path_unchanged() {
-    let original_path = env::var("PATH").unwrap_or_default();
-    let merged = merge_env(iter::empty());
-    assert_eq!(merged.get("PATH").unwrap(), &original_path);
+fn merge_env_lets_extras_override_inherited_values() {
+    temp_env::with_var("PATH", Some("/sentinel/bin"), || {
+        let mut extra = HashMap::new();
+        extra.insert("HARNESS_MERGE_ENV_PROBE".into(), "probe".into());
+        extra.insert("PATH".into(), "/only-this".into());
+        let merged = merge_env(extra.iter());
+        assert_eq!(
+            merged.get("HARNESS_MERGE_ENV_PROBE").map(String::as_str),
+            Some("probe")
+        );
+        assert_eq!(merged.get("PATH").map(String::as_str), Some("/only-this"));
+    });
 }
