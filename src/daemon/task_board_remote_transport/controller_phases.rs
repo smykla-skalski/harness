@@ -1,9 +1,11 @@
 //! Shared phases of a fenced controller operation.
 //!
-//! Every mutating controller call runs the same sequence: replay a durable
-//! receipt, prove the assignment is still live, claim the fenced I/O authority,
-//! then talk to the executor. These helpers hold the phases that more than one
-//! operation needs, or that would otherwise bury the sequence in its caller.
+//! A mutating controller call walks the same phases in the same order: replay a
+//! durable receipt if one exists, prove the assignment is still live, claim the
+//! fenced I/O authority, call the executor, then record the response. Not every
+//! operation has every phase. These helpers hold the ones more than one
+//! operation needs, plus the ones that would otherwise bury the order in a
+//! caller.
 
 use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,

@@ -2,7 +2,9 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use super::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
+use crate::daemon::db::{
+    AsyncDaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome,
+};
 
 impl RemoteExecutionControllerClient {
     pub(crate) async fn reconcile_pending_renewal(
@@ -15,10 +17,9 @@ impl RemoteExecutionControllerClient {
     > {
         self.preflight_active_lease(db, request, "pending remote renewal is no longer active")
             .await?;
-        self.authorize_pending_renewal_replay(db, request).await?;
+        let trust = self.authorize_pending_renewal_replay(db, request).await?;
         let response = self.renew_lease_tolerating_lost_response(request).await?;
         let settled_at = self.clock.now();
-        let trust = self.current_stable_host_trust_for_replay(db).await?;
         let outcome = Box::pin(
             db.record_pending_task_board_remote_assignment_lease_renewal_replay(
                 request,
@@ -32,11 +33,15 @@ impl RemoteExecutionControllerClient {
         Ok((response, outcome))
     }
 
+    /// Returns the fence the authority check passed against, so the recorded
+    /// replay is fenced on that exact value. Reading the trust again after the
+    /// executor round-trip would let an operator repin the host in between and
+    /// record under a fence this check never saw.
     async fn authorize_pending_renewal_replay(
         &self,
         db: &AsyncDaemonDb,
         request: &RemoteLeaseRenewRequest,
-    ) -> Result<(), RemoteExecutionControllerError> {
+    ) -> Result<TaskBoardRemoteHostTrustFence, RemoteExecutionControllerError> {
         let trust = self.current_stable_host_trust_for_replay(db).await?;
         if db
             .require_pending_task_board_remote_renew_replay_authority_fenced(
@@ -46,7 +51,7 @@ impl RemoteExecutionControllerClient {
             )
             .await?
         {
-            Ok(())
+            Ok(trust)
         } else {
             Err(binding_error("pending remote renewal authority disappeared").into())
         }
