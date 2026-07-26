@@ -41,14 +41,41 @@ static PROBE_CACHE: LazyLock<Mutex<ProbeCacheState>> =
 // therefore belongs to the daemon and reaches this module as `spawn_refresh`;
 // nothing here may look at the daemon to decide for itself.
 
-/// Return cached ACP probe results, refreshing in the background through
-/// `spawn_refresh` when the cache is stale or empty.
+/// The right to publish one in-flight refresh, held by whoever is performing it.
 ///
-/// # Panics
-/// Panics if the process-wide probe cache mutex is poisoned.
-#[must_use]
-pub fn probe_acp_agents_cached_with(spawn_refresh: fn()) -> AcpRuntimeProbeResponse {
-    cached_probe_snapshot_with(spawn_refresh).unwrap_or_else(pending_probe_response)
+/// Dropping this without storing a response releases the cache instead of
+/// publishing, so a panicking refresh thread, a thread that never started, or an
+/// early return all leave the cache open to the next caller. Nothing else may
+/// clear the in-flight flag, which is what keeps a wedged cache impossible
+/// rather than merely unlikely.
+pub(crate) struct ProbeCacheRefresh {
+    published: bool,
+}
+
+impl ProbeCacheRefresh {
+    /// Publish `response` as the current snapshot and end the refresh.
+    ///
+    /// # Panics
+    /// Panics if the process-wide probe cache mutex is poisoned.
+    pub(crate) fn publish(mut self, response: AcpRuntimeProbeResponse) {
+        let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+        cache.entry = Some(ProbeCacheEntry {
+            cached_at: Instant::now(),
+            response,
+        });
+        cache.refreshing = false;
+        self.published = true;
+    }
+}
+
+impl Drop for ProbeCacheRefresh {
+    fn drop(&mut self) {
+        if self.published {
+            return;
+        }
+        let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
+        cache.refreshing = false;
+    }
 }
 
 /// Return the latest process-local probe snapshot, scheduling a background
@@ -67,7 +94,9 @@ pub(crate) fn local_cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
 /// # Panics
 /// Panics if the process-wide probe cache mutex is poisoned.
 #[must_use]
-pub fn cached_probe_snapshot_with(spawn_refresh: fn()) -> Option<AcpRuntimeProbeResponse> {
+pub(crate) fn cached_probe_snapshot_with(
+    spawn_refresh: fn(ProbeCacheRefresh),
+) -> Option<AcpRuntimeProbeResponse> {
     let mut should_refresh = false;
     let snapshot = {
         let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
@@ -95,44 +124,10 @@ pub fn cached_probe_snapshot_with(spawn_refresh: fn()) -> Option<AcpRuntimeProbe
     };
 
     if should_refresh {
-        spawn_refresh();
+        spawn_refresh(ProbeCacheRefresh { published: false });
     }
 
     snapshot
-}
-
-/// Best-effort cache warm-up for the ACP runtime probe, refreshing through
-/// `spawn_refresh`.
-///
-/// # Panics
-/// Panics if the process-wide probe cache mutex is poisoned.
-pub fn schedule_probe_cache_refresh_with(spawn_refresh: fn()) {
-    let should_refresh = {
-        let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
-        let entry_is_fresh = cache.entry.as_ref().is_some_and(probe_cache_entry_is_fresh);
-        if entry_is_fresh || cache.refreshing {
-            false
-        } else {
-            cache.refreshing = true;
-            true
-        }
-    };
-
-    if should_refresh {
-        spawn_refresh();
-    }
-}
-
-/// Settle the refresh this module marked as in flight.
-///
-/// `Some` publishes a new snapshot; `None` abandons the attempt so a later
-/// caller can start another one. A refresh that never calls this leaves the
-/// cache permanently marked as refreshing.
-pub fn finish_probe_cache_refresh(response: Option<AcpRuntimeProbeResponse>) {
-    match response {
-        Some(response) => store_probe_cache(response),
-        None => clear_probe_cache_refresh_flag(),
-    }
 }
 
 #[must_use]
@@ -224,13 +219,6 @@ fn default_probe_home() -> PathBuf {
     agent_package_home()
 }
 
-fn pending_probe_response() -> AcpRuntimeProbeResponse {
-    AcpRuntimeProbeResponse {
-        probes: Vec::new(),
-        checked_at: utc_now(),
-    }
-}
-
 fn probe_cache_entry_is_fresh(entry: &ProbeCacheEntry) -> bool {
     entry.cached_at.elapsed() < PROBE_CACHE_TTL
 }
@@ -239,35 +227,17 @@ fn probe_cache_entry_is_fresh(entry: &ProbeCacheEntry) -> bool {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-pub(crate) fn spawn_local_probe_cache_refresh() {
-    if let Err(error) = spawn_local_probe_cache_refresh_thread() {
-        clear_probe_cache_refresh_flag();
+pub(crate) fn spawn_local_probe_cache_refresh(refresh: ProbeCacheRefresh) {
+    if let Err(error) = spawn_local_probe_cache_refresh_thread(refresh) {
         warn!(%error, "failed to spawn ACP runtime probe refresh");
     }
 }
 
-fn spawn_local_probe_cache_refresh_thread() -> io::Result<()> {
+fn spawn_local_probe_cache_refresh_thread(refresh: ProbeCacheRefresh) -> io::Result<()> {
     thread::Builder::new()
         .name("acp-probe-refresh".to_string())
-        .spawn(|| {
-            let response = probe_acp_agents();
-            store_probe_cache(response);
-        })?;
+        .spawn(move || refresh.publish(probe_acp_agents()))?;
     Ok(())
-}
-
-fn clear_probe_cache_refresh_flag() {
-    let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
-    cache.refreshing = false;
-}
-
-fn store_probe_cache(response: AcpRuntimeProbeResponse) {
-    let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
-    cache.entry = Some(ProbeCacheEntry {
-        cached_at: Instant::now(),
-        response,
-    });
-    cache.refreshing = false;
 }
 
 fn version_from_output(stdout: &[u8], stderr: &[u8]) -> Option<String> {
@@ -303,6 +273,8 @@ pub(crate) fn replace_probe_cache_for_tests(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use crate::agents::acp::catalog::{DoctorProbe, tags};
 
@@ -459,15 +431,28 @@ mod tests {
         replace_probe_cache_for_tests(None, Duration::ZERO, false);
     }
 
+    static ABANDONED_REFRESH_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    fn abandon_refresh(_refresh: ProbeCacheRefresh) {
+        ABANDONED_REFRESH_CALLS.fetch_add(1, Ordering::SeqCst);
+    }
+
     #[test]
-    fn cached_probe_returns_pending_response_while_refresh_is_in_flight() {
+    fn an_abandoned_refresh_releases_the_cache_for_the_next_caller() {
         let _guard = lock_probe_cache_for_tests();
-        replace_probe_cache_for_tests(None, Duration::ZERO, true);
+        replace_probe_cache_for_tests(None, Duration::ZERO, false);
+        ABANDONED_REFRESH_CALLS.store(0, Ordering::SeqCst);
 
-        let response = probe_acp_agents_cached_with(spawn_local_probe_cache_refresh);
+        // Dropping the handle without publishing stands in for a refresh thread
+        // that panics or never starts.
+        assert_eq!(cached_probe_snapshot_with(abandon_refresh), None);
+        assert_eq!(cached_probe_snapshot_with(abandon_refresh), None);
 
-        assert!(response.probes.is_empty());
-        assert!(!response.checked_at.is_empty());
+        assert_eq!(
+            ABANDONED_REFRESH_CALLS.load(Ordering::SeqCst),
+            2,
+            "an abandoned refresh left the cache permanently marked as refreshing"
+        );
 
         replace_probe_cache_for_tests(None, Duration::ZERO, false);
     }
