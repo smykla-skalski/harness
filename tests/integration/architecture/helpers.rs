@@ -105,6 +105,48 @@ where
     hits
 }
 
+/// Like [`collect_hits_in_tree`], but judges one line at a time.
+///
+/// A whole-file substring search cannot express "this token, but only with that
+/// prefix on the same line", which is what separates an attribute from prose
+/// naming one. Reporting the line number matters too: it is the part of a guard
+/// failure a person actually reads.
+pub(super) fn collect_line_hits_in_tree<P, F>(
+    start: &Path,
+    root: &Path,
+    skip_prefix: Option<&Path>,
+    is_hit: P,
+    render: F,
+) -> Vec<String>
+where
+    P: Fn(&str) -> bool,
+    F: Fn(&str, usize, &str) -> String,
+{
+    let mut hits = Vec::new();
+
+    for entry in walkdir::WalkDir::new(start)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        let child = entry.into_path();
+        if skip_prefix.is_some_and(|prefix| child.starts_with(prefix)) || child.is_dir() {
+            continue;
+        }
+        if !matches_extension(&child) {
+            continue;
+        }
+        let contents = fs::read_to_string(&child).unwrap();
+        let relative = child.strip_prefix(root).unwrap().display().to_string();
+        for (offset, line) in contents.lines().enumerate() {
+            if is_hit(line) {
+                hits.push(render(&relative, offset + 1, line));
+            }
+        }
+    }
+
+    hits
+}
+
 pub(super) fn matches_extension(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|ext| ext.to_str()),
