@@ -17,11 +17,11 @@ fn readiness_auto_detects_repo_root() {
         report.readiness.scope.repo_root.as_deref(),
         Some(repo_root.to_str().unwrap())
     );
-    assert!(report.readiness.create.ready);
+    assert!(report.readiness.features[&Feature::Bootstrap].ready);
 }
 
 #[test]
-fn readiness_keeps_create_ready_when_project_plugin_is_missing() {
+fn readiness_stays_ready_when_project_plugin_is_missing() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
     let repo_root = tmp.path().join("repo-root");
@@ -39,7 +39,6 @@ fn readiness_keeps_create_ready_when_project_plugin_is_missing() {
         )
     });
 
-    assert!(report.readiness.create.ready);
     assert!(report.readiness.features[&Feature::Bootstrap].ready);
     assert!(
         !report

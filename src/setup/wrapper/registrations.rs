@@ -1,7 +1,7 @@
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
 
-pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
+pub(crate) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     let mut registrations = Vec::new();
 
     // Lifecycle hooks registered for all runtimes. The session-start hook

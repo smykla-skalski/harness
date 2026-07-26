@@ -3,18 +3,15 @@ use std::collections::BTreeMap;
 use crate::setup::capabilities::model::{Feature, ReadinessStatus, ReadinessSummary};
 
 pub(super) struct CapabilitySummaries {
-    pub(super) create: ReadinessSummary,
     pub(super) project: ReadinessSummary,
     pub(super) bootstrap: ReadinessSummary,
 }
 
-const CREATE_REQUIREMENTS: &[&str] = &["data_root_writable", "project_dir_exists"];
 const PROJECT_REQUIREMENTS: &[&str] = &["project_dir_exists", "wrapper_install_target_available"];
 const BOOTSTRAP_REQUIREMENTS: &[&str] = &["project_dir_exists", "wrapper_install_target_available"];
 
 pub(super) fn build_summaries(statuses: &BTreeMap<&str, ReadinessStatus>) -> CapabilitySummaries {
     CapabilitySummaries {
-        create: summary_from_codes(statuses, CREATE_REQUIREMENTS),
         project: summary_from_codes(statuses, PROJECT_REQUIREMENTS),
         bootstrap: summary_from_codes(statuses, BOOTSTRAP_REQUIREMENTS),
     }
@@ -52,15 +49,8 @@ pub(super) fn feature_summary(
         Feature::HookSystem
         | Feature::Observation
         | Feature::PreCompactHandoff
-        | Feature::RunLifecycle
-        | Feature::SessionLifecycle
-        | Feature::TrackedRecording => inputs.project.clone(),
-        Feature::BugFoundGate
-        | Feature::GlobalDelay
-        | Feature::IdempotentGroupReporting
-        | Feature::JsonDiff
-        | Feature::ProgressHeartbeat
-        | Feature::TaskManagement => ReadinessSummary {
+        | Feature::SessionLifecycle => inputs.project.clone(),
+        Feature::GlobalDelay | Feature::ProgressHeartbeat => ReadinessSummary {
             ready: true,
             blocking_checks: vec![],
         },

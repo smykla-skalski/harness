@@ -16,7 +16,7 @@ mod tests;
 pub use install::{choose_install_dir_with_home, install_wrapper};
 
 use install::path_candidates;
-use registrations::process_agent_registrations;
+pub(crate) use registrations::process_agent_registrations;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
