@@ -18,6 +18,7 @@ use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
+use crate::task_board::normalize_repository_slug;
 #[cfg(test)]
 use crate::task_board::policy_graph::resolve_gate_policy;
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
@@ -117,11 +118,6 @@ pub(super) fn resolve_worktree(
         })
 }
 
-pub(super) fn is_repo_scoped(item: &TaskBoardItem, config: &GitHubProjectConfig) -> bool {
-    let repository = config.repository_slug();
-    item.project_id.as_deref() == Some(repository.as_str())
-}
-
 pub(super) fn managed_branch_name(
     config: &GitHubProjectConfig,
     item_id: &str,
@@ -184,28 +180,13 @@ pub(super) async fn load_session_worktrees_async(
     Ok(worktrees)
 }
 
+/// The conventions every publication shares. The repository and its token are
+/// resolved per item, so this deliberately says nothing about which repository
+/// is being published to.
 pub(super) fn automation_config(
     settings: &TaskBoardOrchestratorSettings,
-) -> Option<(GitHubProjectConfig, String)> {
-    let settings_repository = {
-        let project = &settings.github_project;
-        (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-            .then(|| project.repository_slug())
-    };
-    let external_sync_config =
-        external_sync_config_for_repository(settings_repository.as_deref(), &[]);
-    let token = github_token_for_repository(settings_repository.as_deref())?;
-    let mut config = settings.github_project.clone();
-    if (config.owner.trim().is_empty() || config.repo.trim().is_empty())
-        && let Some(repository) = external_sync_config.github_repository()
-        && let Some((owner, repo)) = repository.split_once('/')
-    {
-        config.owner = owner.to_string();
-        config.repo = repo.to_string();
-    }
-    if config.owner.trim().is_empty() || config.repo.trim().is_empty() {
-        return None;
-    }
+) -> Option<GitHubProjectConfig> {
+    let config = settings.github_project.clone();
     let enabled = config
         .enabled_automations
         .enables(GitHubAutomation::CreateBranch)
@@ -221,7 +202,7 @@ pub(super) fn automation_config(
         || config
             .enabled_automations
             .enables(GitHubAutomation::AutoMerge);
-    enabled.then_some((config, token))
+    enabled.then_some(config)
 }
 
 pub(super) fn github_token_for_repository(repository: Option<&str>) -> Option<String> {
@@ -341,11 +322,16 @@ fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> Stri
         lines.push(String::new());
         lines.push(summary.to_string());
     }
+    // `project_id` keeps GitHub's casing while the publication slug is
+    // normalized, so `Owner/beta` and `owner/beta` are the same
+    // repository and a raw string compare would drop the `Closes` line.
+    let publication = normalize_repository_slug(Some(&config.repository_slug()));
+    let item_repository = normalize_repository_slug(item.project_id.as_deref());
     if let Some(issue_number) = item.external_refs.iter().find_map(|reference| {
-        let repository = config.repository_slug();
         (reference.provider == ExternalRefProvider::GitHub
-            && item.project_id.as_deref() == Some(repository.as_str()))
-        .then(|| reference.external_id.clone())
+            && item_repository.is_some()
+            && item_repository == publication)
+            .then(|| reference.external_id.clone())
     }) {
         lines.push(String::new());
         lines.push(format!("Closes #{issue_number}"));

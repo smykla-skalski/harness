@@ -124,19 +124,6 @@ pub(super) fn validate_published_evidence(
     Ok(())
 }
 
-pub(super) fn validate_publication_repository(
-    execution_repository: Option<&str>,
-    configured_repository: &str,
-) -> Result<(), CliError> {
-    if execution_repository == Some(configured_repository) {
-        Ok(())
-    } else {
-        Err(invalid_transition(
-            "write workflow repository does not match GitHub publication configuration",
-        ))
-    }
-}
-
 pub(super) fn required_frozen_head(
     identity: &TaskBoardPullRequestIdentity,
 ) -> Result<&TaskBoardPullRequestHeadIdentity, CliError> {
@@ -426,14 +413,6 @@ mod tests {
             .expect_err("merged publication must retain its frozen identity");
 
         assert!(error.to_string().contains("frozen publication target"));
-    }
-
-    #[test]
-    fn write_launch_repository_must_match_configured_publication() {
-        validate_publication_repository(Some("example/compass"), "example/compass")
-            .expect("matching repository");
-        assert!(validate_publication_repository(None, "example/compass").is_err());
-        assert!(validate_publication_repository(Some("example/other"), "example/compass").is_err());
     }
 
     fn frozen_identity() -> TaskBoardPullRequestIdentity {

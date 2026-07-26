@@ -19,6 +19,7 @@ use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{MachineRegistry, TaskBoardStore};
 use crate::task_board::{
     PolicyGraph, TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
+    task_board_read_only_execution_repository,
 };
 use harness_kernel::errors::CliError;
 
@@ -36,7 +37,7 @@ pub(crate) use write_publication::{
     verify_task_board_write_execution_publication,
 };
 
-use self::support::{automation_config, load_session_worktrees_async};
+use self::support::{automation_config, github_token_for_repository, load_session_worktrees_async};
 #[cfg(test)]
 use self::support::{load_session_worktrees, run_blocking};
 #[cfg(test)]
@@ -75,7 +76,7 @@ pub(crate) fn run_task_board_github_automation(
     items: &[TaskBoardItem],
     db: Option<&DaemonDb>,
 ) -> Result<(), CliError> {
-    let Some((config, token)) = automation_config(settings) else {
+    let Some(defaults) = automation_config(settings) else {
         return Ok(());
     };
     let host_id = MachineRegistry::new(board_root.to_path_buf())
@@ -84,17 +85,24 @@ pub(crate) fn run_task_board_github_automation(
     let session_worktrees = load_session_worktrees(items, db)?;
     let mut runtime_config = load_task_board_git_runtime_config()?;
     overlay_task_board_git_runtime_secrets(&mut runtime_config);
-    let client =
-        GitHubApiAutomationClient::new_with_runtime_config(token.as_str(), runtime_config)?;
-    run_blocking(run_task_board_github_automation_with_client(
-        board_root,
-        &config,
-        input,
-        items,
-        &session_worktrees,
-        &client,
-        host_id.as_str(),
-    ))
+    for (repository, grouped) in group_items_by_repository(items) {
+        let Some(token) = github_token_for_repository(Some(&repository)) else {
+            continue;
+        };
+        let config = repository_automation_config(&defaults, &repository);
+        let client =
+            GitHubApiAutomationClient::new_with_runtime_config(&token, runtime_config.clone())?;
+        run_blocking(run_task_board_github_automation_with_client(
+            board_root,
+            &config,
+            input,
+            &grouped,
+            &session_worktrees,
+            &client,
+            host_id.as_str(),
+        ))?;
+    }
+    Ok(())
 }
 
 pub(crate) async fn run_task_board_github_automation_async(
@@ -103,7 +111,7 @@ pub(crate) async fn run_task_board_github_automation_async(
     items: &[TaskBoardItem],
     async_db: &AsyncDaemonDb,
 ) -> Result<(), CliError> {
-    let Some((config, token)) = automation_config(settings) else {
+    let Some(defaults) = automation_config(settings) else {
         return Ok(());
     };
     let host_id = super::task_board_db::task_board_host_local_db(async_db)
@@ -118,19 +126,64 @@ pub(crate) async fn run_task_board_github_automation_async(
     });
     let mut runtime_config = async_db.task_board_runtime_config().await?;
     overlay_task_board_git_runtime_secrets(&mut runtime_config);
-    let client =
-        GitHubApiAutomationClient::new_with_runtime_config(token.as_str(), runtime_config)?;
-    run_task_board_github_automation_with_database_client(
-        async_db,
-        policy,
-        &config,
-        input,
-        items,
-        &session_worktrees,
-        &client,
-        host_id.as_str(),
-    )
-    .await
+    for (repository, grouped) in group_items_by_repository(items) {
+        let Some(token) = github_token_for_repository(Some(&repository)) else {
+            tracing::warn!(
+                %repository,
+                "skipping task-board GitHub automation: no token for this repository"
+            );
+            continue;
+        };
+        let config = repository_automation_config(&defaults, &repository);
+        let client =
+            GitHubApiAutomationClient::new_with_runtime_config(&token, runtime_config.clone())?;
+        run_task_board_github_automation_with_database_client(
+            async_db,
+            policy,
+            &config,
+            input,
+            &grouped,
+            &session_worktrees,
+            &client,
+            host_id.as_str(),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// Items reach this loop from every repository the board watches, so each group
+/// gets its own token and client. An item with no GitHub repository is not ours
+/// to publish and drops out silently; one whose repository is unusable is worth
+/// saying out loud, because silence here is what let a blank publication target
+/// go unnoticed.
+fn group_items_by_repository(items: &[TaskBoardItem]) -> BTreeMap<String, Vec<&TaskBoardItem>> {
+    let mut grouped: BTreeMap<String, Vec<&TaskBoardItem>> = BTreeMap::new();
+    for item in items {
+        match task_board_read_only_execution_repository(item) {
+            Ok(Some(repository)) => grouped.entry(repository).or_default().push(item),
+            Ok(None) => {}
+            Err(error) => tracing::warn!(
+                item = %item.id,
+                %error,
+                "skipping task-board GitHub automation for an item with an unusable repository"
+            ),
+        }
+    }
+    grouped
+}
+
+/// Stamp one repository onto the conventions shared by all of them.
+fn repository_automation_config(
+    defaults: &GitHubProjectConfig,
+    repository: &str,
+) -> GitHubProjectConfig {
+    let mut config = defaults.clone();
+    if let Some((owner, repo)) = repository.split_once('/') {
+        config.owner = owner.into();
+        config.repo = repo.into();
+    }
+    config
 }
 
 #[cfg(test)]
@@ -138,7 +191,7 @@ async fn run_task_board_github_automation_with_client(
     board_root: &Path,
     config: &GitHubProjectConfig,
     input: &TaskBoardOrchestratorDispatchInput,
-    items: &[TaskBoardItem],
+    items: &[&TaskBoardItem],
     session_worktrees: &BTreeMap<String, String>,
     client: &dyn GitHubAutomationClient,
     host_id: &str,
@@ -182,7 +235,7 @@ async fn run_task_board_github_automation_with_database_client(
     policy: Option<(&str, &PolicyGraph)>,
     config: &GitHubProjectConfig,
     input: &TaskBoardOrchestratorDispatchInput,
-    items: &[TaskBoardItem],
+    items: &[&TaskBoardItem],
     session_worktrees: &BTreeMap<String, String>,
     client: &dyn GitHubAutomationClient,
     host_id: &str,
