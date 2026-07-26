@@ -10,7 +10,22 @@ struct PreviewHostApp: App {
     // window or dock presence appears, so verification never steals focus.
     if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_DIFF_LAB_DUMP"] {
       NSApplication.shared.setActivationPolicy(.prohibited)
-      DashboardReviewFileDiffLabRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      do {
+        try DashboardReviewFileDiffLabRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      } catch {
+        FileHandle.standardError.write(Data("diff lab render failed: \(error)\n".utf8))
+        exit(1)
+      }
+      exit(0)
+    }
+    if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_LANE_COLOR_PICKER_DUMP"] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      do {
+        try SettingsTaskBoardLaneColorPickerRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      } catch {
+        FileHandle.standardError.write(Data("lane color picker render failed: \(error)\n".utf8))
+        exit(1)
+      }
       exit(0)
     }
     for _ in Self.forceLoadedSymbolReferences {}
