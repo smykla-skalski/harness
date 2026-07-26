@@ -295,8 +295,33 @@ resolve_sccache_candidate() {
   command -v "$candidate"
 }
 
+# Every sccache PATH offers, in PATH order, then the two fixed locations a plain
+# Cargo or Xcode build might have instead.
+sccache_candidates() {
+  local entry
+  local -a entries=()
+
+  IFS=: read -ra entries <<<"$PATH"
+  for entry in "${entries[@]}"; do
+    # An empty PATH element means the working directory, which is how PATH has
+    # always been written; skipping it would search a different PATH than the
+    # shell does.
+    printf '%s/sccache\n' "${entry:-.}"
+  done
+  printf '%s\n' /opt/homebrew/bin/sccache /usr/local/bin/sccache
+}
+
+# Naming the reason, because the alternative is a repository that quietly builds
+# without a compiler cache. Every other outcome here is visible in --print-env;
+# this one looks identical to having no sccache installed at all.
+report_unsupported_sccache() {
+  printf 'cargo-local: %s is sccache %s, below the 0.14 this repository needs, and no newer one is on PATH - building without a compiler cache\n' \
+    "$1" "$2" >&2
+}
+
 resolve_sccache_bin() {
   local requested="${SCCACHE_BIN:-}" candidate resolved output version
+  local rejected_path="" rejected_version=""
 
   if [[ -n "$requested" ]]; then
     candidate="$requested"
@@ -309,24 +334,39 @@ resolve_sccache_bin() {
         export SCCACHE_VERSION="$version"
         return 0
       fi
+      report_unsupported_sccache "$resolved" "$version"
     fi
     export SCCACHE_BIN=""
     unset SCCACHE_VERSION
     return 1
   fi
 
-  for candidate in sccache /opt/homebrew/bin/sccache /usr/local/bin/sccache; do
-    resolved="$(resolve_sccache_candidate "$candidate" 2>/dev/null || true)"
-    [[ -n "$resolved" ]] || continue
-    sccache_bin_usable "$resolved" || continue
-    output="$("$resolved" --version 2>/dev/null)"
+  # Every candidate rather than `command -v sccache`, which answers with the
+  # first sccache on PATH and nothing about whether it is usable. A distro
+  # package in /usr/bin ahead of the pinned newer build - the ordinary shape
+  # inside a `mise run`, where tool directories land after the system ones -
+  # otherwise decided that the whole repository built without a cache, and
+  # looked exactly like having no sccache at all.
+  while IFS= read -r candidate; do
+    [[ -x "$candidate" ]] || continue
+    sccache_bin_usable "$candidate" || continue
+    output="$("$candidate" --version 2>/dev/null)"
     version="${output##* }"
-    sccache_version_supported "$version" || continue
-    export SCCACHE_BIN="$resolved"
+    if ! sccache_version_supported "$version"; then
+      if [[ -z "$rejected_path" ]]; then
+        rejected_path="$candidate"
+        rejected_version="$version"
+      fi
+      continue
+    fi
+    export SCCACHE_BIN="$candidate"
     export SCCACHE_VERSION="$version"
     return 0
-  done
+  done < <(sccache_candidates)
 
+  if [[ -n "$rejected_path" ]]; then
+    report_unsupported_sccache "$rejected_path" "$rejected_version"
+  fi
   export SCCACHE_BIN=""
   unset SCCACHE_VERSION
   return 1

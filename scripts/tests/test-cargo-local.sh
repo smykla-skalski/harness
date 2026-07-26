@@ -1007,6 +1007,113 @@ scenario_noncanonical_nextest_override_is_rejected() {
   fi
 }
 
+# A PATH carrying only the tools cargo-local reaches for, so a scenario about
+# which sccache is chosen is not decided by whichever one this host installed.
+# Dropping the sccache-bearing directories from the real PATH instead does not
+# work: the distro package lives in /usr/bin, and dropping that takes bash,
+# git and the rest of the script's tools with it.
+minimal_tool_path() {
+  local shim="$SANDBOX/tool-shim" tool resolved
+  mkdir -p "$shim"
+  for tool in awk basename bash cat chmod cksum cut dirname env find getconf \
+    git grep head id ln mkdir nproc python3 readlink rm sed shasum sleep sort \
+    stat touch tr uname wc; do
+    resolved="$(command -v "$tool" 2>/dev/null || true)"
+    [[ -n "$resolved" ]] || continue
+    ln -sf "$resolved" "$shim/$tool"
+  done
+  # Without this the scenario using it fails as a missing interpreter rather
+  # than as the thing it means to assert.
+  if [[ ! -x "$shim/bash" ]]; then
+    printf 'minimal_tool_path could not resolve bash\n' >&2
+    return 1
+  fi
+  printf '%s\n' "$shim"
+}
+
+print_cargo_env_with_path() {
+  local search_path="$1" tmpdir="$2"
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    PATH="$search_path" \
+      SCCACHE_BIN='' \
+      RUSTC_WRAPPER='' \
+      HARNESS_JOBSERVER=0 \
+      TMPDIR="$tmpdir/" \
+      CODEX_SESSION_ID="cargo-local-pathscan-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$ROOT/scripts/cargo-local.sh" --print-env 2>&1
+  )
+}
+
+scenario_unsupported_sccache_earlier_on_path_is_skipped() {
+  local old_bin="$SANDBOX/pathscan-old"
+  local new_bin="$SANDBOX/pathscan-new"
+  local tmpdir="$SANDBOX/pathscan-tmp"
+  local output
+  mkdir -p "$old_bin" "$new_bin" "$tmpdir"
+  write_fake_sccache "$old_bin/sccache" "0.7.7"
+  write_fake_sccache "$new_bin/sccache" "0.16.0"
+
+  # The shape a `mise run` produces on a host with a distro sccache: the pinned
+  # build is on PATH, but an older one is ahead of it. Answering with the first
+  # sccache and giving up on the version turned that into a whole repository
+  # building with no compiler cache, indistinguishable from having none.
+  #
+  # Both fakes precede the runner's own PATH, so whatever sccache this host has
+  # sits behind them and cannot decide the outcome.
+  output="$(print_cargo_env_with_path "$old_bin:$new_bin:$PATH" "$tmpdir")"
+
+  if assert_line "SCCACHE_BIN=$new_bin/sccache" "$output" \
+    && assert_line "SCCACHE_VERSION=0.16.0" "$output" \
+    && assert_line "CACHE_MODE=sccache" "$output"; then
+    pass "an unsupported sccache earlier on PATH does not disable the cache"
+  else
+    fail "PATH scan stopped at the unsupported sccache: $(grep -E '^(SCCACHE_BIN|CACHE_MODE)=' <<<"$output")"
+  fi
+}
+
+scenario_only_unsupported_sccache_names_the_reason() {
+  local old_bin="$SANDBOX/pathscan-only-old"
+  local tmpdir="$SANDBOX/pathscan-only-tmp"
+  local output shim status=0
+  mkdir -p "$old_bin" "$tmpdir"
+  write_fake_sccache "$old_bin/sccache" "0.7.7"
+
+  # The resolver also probes two fixed locations regardless of PATH, so a host
+  # carrying a usable sccache in one of them has no "nothing supported" state
+  # for this scenario to observe.
+  if [[ -x /usr/local/bin/sccache ]] || [[ -x /opt/homebrew/bin/sccache ]]; then
+    pass "skipped: a fixed-location sccache on this host answers the scan"
+    return
+  fi
+
+  shim="$(minimal_tool_path)" || {
+    fail "could not build a minimal tool PATH"
+    return
+  }
+  output="$(print_cargo_env_with_path "$old_bin:$shim" "$tmpdir")" || status=$?
+  if (( status != 0 )); then
+    fail "cargo-local failed under the minimal tool PATH (exit $status): $output"
+    return
+  fi
+
+  # Every other outcome is visible in --print-env; a cache switched off for a
+  # version nobody mentioned looks exactly like a host with no sccache at all.
+  if assert_line "SCCACHE_BIN=" "$output" \
+    && assert_line "CACHE_MODE=none" "$output" \
+    && assert_contains "$old_bin/sccache is sccache 0.7.7" "$output" \
+    && assert_contains "building without a compiler cache" "$output"; then
+    pass "an unsupported sccache with no alternative names why the cache is off"
+  else
+    fail "disabled cache went unexplained: $output"
+  fi
+}
+
 scenario_supported_sccache_is_resolved_once() {
   local fake_bin="$SANDBOX/supported-bin"
   local tmpdir="$SOCKET_TMPDIR/supported"
@@ -1615,6 +1722,8 @@ scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
 scenario_old_explicit_sccache_is_disabled
+scenario_unsupported_sccache_earlier_on_path_is_skipped
+scenario_only_unsupported_sccache_names_the_reason
 scenario_failed_lsof_preserves_unknown_sockets
 scenario_live_socket_survives_the_sweep
 scenario_sccache_server_is_started_before_cargo
