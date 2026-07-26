@@ -141,27 +141,30 @@ fn write_session_fixture(tmp: &tempfile::TempDir, session_id: &str, lines: &[&st
     }
 }
 
+// Drift is detected against the runtime config bootstrap actually writes, so a
+// stale lifecycle command has to be planted there rather than in the retired
+// plugin layout the doctor used to inspect.
 fn write_doctor_project(project_dir: &Path, legacy_lifecycle: bool) {
-    let suite_dir = project_dir.join(".claude").join("plugins").join("suite");
-    let hooks_dir = suite_dir.join("hooks");
-    fs::create_dir_all(&hooks_dir).unwrap();
-    fs::write(suite_dir.join("harness"), "").unwrap();
-    let hooks_json = if legacy_lifecycle {
-        let session_start = [
-            "harness",
-            " setup",
-            " session-start",
-            " --project-dir \\\"$CLAUDE_PROJECT_DIR\\\"",
-        ]
-        .concat();
+    let claude_dir = project_dir.join(".claude");
+    fs::create_dir_all(&claude_dir).unwrap();
+    if !legacy_lifecycle {
+        return;
+    }
+
+    let session_start = [
+        "harness",
+        " setup",
+        " session-start",
+        " --project-dir \\\"$CLAUDE_PROJECT_DIR\\\"",
+    ]
+    .concat();
+    fs::write(
+        claude_dir.join("settings.json"),
         format!(
             r#"{{"hooks":{{"SessionStart":[{{"hooks":[{{"type":"command","command":"{session_start}"}}]}}]}}}}"#
-        )
-    } else {
-        r#"{"hooks":{"PreCompact":[{"hooks":[{"type":"command","command":"harness-hook pre-compact --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"SessionStart":[{"hooks":[{"type":"command","command":"harness-hook session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"Stop":[{"hooks":[{"type":"command","command":"harness-hook session-stop --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}]}}"#
-            .to_string()
-    };
-    fs::write(hooks_dir.join("hooks.json"), hooks_json).unwrap();
+        ),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -240,7 +243,7 @@ fn observe_doctor_accepts_current_project_wiring() {
 }
 
 #[test]
-fn observe_doctor_reports_legacy_lifecycle() {
+fn observe_doctor_reports_a_drifted_runtime_config() {
     let tmp = tempfile::tempdir().unwrap();
     let project_dir = tmp.path().join("project");
     write_doctor_project(&project_dir, true);

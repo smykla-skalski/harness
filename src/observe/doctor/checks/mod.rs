@@ -1,24 +1,12 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::DoctorCheck;
 
 mod project;
 mod runtime;
 
-pub(super) fn auto_detect_kuma_repo_root(start: &Path) -> Option<PathBuf> {
-    project::auto_detect_kuma_repo_root(start)
-}
-
 pub(super) fn check_global_install(project_dir: &Path) -> Vec<DoctorCheck> {
     project::check_global_install(project_dir)
-}
-
-pub(super) fn check_lifecycle_contract(project_dir: &Path) -> Vec<DoctorCheck> {
-    project::check_lifecycle_contract(project_dir)
-}
-
-pub(super) fn check_repo_provider_contract(repo_root: Option<&Path>) -> Vec<DoctorCheck> {
-    project::check_repo_provider_contract(repo_root)
 }
 
 pub(super) fn check_compact_handoff(project_dir: &Path, compact_path: &Path) -> DoctorCheck {

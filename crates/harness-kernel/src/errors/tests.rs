@@ -15,12 +15,12 @@ fn cli_err_basic_fields() {
 
 #[test]
 fn cli_err_with_hint() {
-    let err: CliError = CliErrorKind::MissingRunPointer.into();
-    assert_eq!(err.code(), "KSRCLI005");
-    assert_eq!(err.message(), "missing current run pointer");
+    let err: CliError = CliErrorKind::MissingRunStatus.into();
+    assert_eq!(err.code(), "KSRCLI060");
+    assert_eq!(err.message(), "run has no recorded status");
     assert_eq!(
         err.hint().as_deref(),
-        Some("Run `harness run start` first.")
+        Some("The run status file could not be loaded. Check the run directory.")
     );
 }
 
@@ -148,10 +148,10 @@ fn cli_err_hint_formats_correctly() {
 }
 
 #[test]
-fn service_readiness_timeout_has_hint() {
+fn service_readiness_timeout_has_no_command_hint() {
     let err: CliError = CliErrorKind::service_readiness_timeout("demo-svc").into();
-    let hint = err.hint().expect("should have a hint");
-    assert!(hint.contains("harness run kuma service down demo-svc"));
+    assert!(err.message().contains("demo-svc"));
+    assert_eq!(err.hint(), None);
 }
 
 #[test]
@@ -189,10 +189,10 @@ fn cli_err_display_trait() {
 
 #[test]
 fn render_error_includes_hint_and_details() {
-    let err = CliErrorKind::MissingRunPointer.with_details("stack");
+    let err = CliErrorKind::MissingRunStatus.with_details("stack");
     let rendered = render_error(&err);
-    assert!(rendered.contains("ERROR [KSRCLI005] missing current run pointer"));
-    assert!(rendered.contains("Hint: Run `harness run start` first."));
+    assert!(rendered.contains("ERROR [KSRCLI060] run has no recorded status"));
+    assert!(rendered.contains("Hint: The run status file could not be loaded."));
     assert!(rendered.contains("stack"));
 }
 
@@ -254,7 +254,8 @@ fn hook_msg_bug_found_gate_required() {
 
 #[test]
 fn snapshot_render_error_with_hint_and_details() {
-    let err = CliErrorKind::MissingRunPointer.with_details("checked /tmp/ctx/current-run.json");
+    let err =
+        CliErrorKind::MissingRunStatus.with_details("checked /tmp/runs/run-1/run-status.json");
     let rendered = render_error(&err);
     insta::assert_snapshot!(rendered);
 }
