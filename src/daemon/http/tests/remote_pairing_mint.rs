@@ -247,7 +247,7 @@ async fn a_minted_link_is_claimable_by_its_recipient() {
     server.abort();
 }
 
-fn code_from_pairing_url(pairing_url: &str) -> String {
+pub(super) fn code_from_pairing_url(pairing_url: &str) -> String {
     use base64::Engine as _;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
@@ -311,7 +311,7 @@ fn mint_state() -> DaemonHttpState {
 /// The invitation is built from persisted ACME state, and its SPKI pin is
 /// computed by parsing the stored leaf, so the fixture needs a real
 /// certificate rather than placeholder PEM text.
-fn seed_remote_tls_identity(db: &DaemonDb) {
+pub(super) fn seed_remote_tls_identity(db: &DaemonDb) {
     let key = KeyPair::generate().expect("generate fixture key");
     let mut params = CertificateParams::new(vec!["daemon.example.com".to_owned()])
         .expect("fixture certificate params");
