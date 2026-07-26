@@ -1,5 +1,6 @@
 pub mod adopter;
 pub mod observe;
+pub mod ordering;
 pub mod persona;
 pub mod roles;
 pub mod service;

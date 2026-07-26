@@ -274,3 +274,64 @@ fn conversation_entry_emits_user_prompt_rows() {
     assert_eq!(entry.summary, "Ship the transcript fix");
     assert_eq!(entry.payload["event"]["type"], "user_prompt");
 }
+
+/// `SupervisorEventSink` counts synthetic events in a sequence space disjoint
+/// from the receive loop's transcript sequence, so the two can collide on
+/// `sequence` alone. The `entry_kind` segment is what keeps `entry_id` unique.
+#[test]
+fn conversation_entry_keeps_watchdog_and_transcript_ids_disjoint() {
+    let watchdog = ConversationEvent {
+        timestamp: Some("2026-05-04T23:00:00Z".into()),
+        sequence: 0,
+        kind: ConversationEventKind::WatchdogState {
+            from: "paused".into(),
+            to: "fired".into(),
+            reason: Some("watchdog timeout".into()),
+        },
+        agent: "agent-test".into(),
+        session_id: "session-test".into(),
+    };
+    let transcript = ConversationEvent {
+        timestamp: Some("2026-05-04T23:00:00Z".into()),
+        sequence: watchdog.sequence,
+        kind: ConversationEventKind::AssistantText {
+            content: "hello".into(),
+            message_id: None,
+        },
+        agent: "agent-test".into(),
+        session_id: "session-test".into(),
+    };
+
+    let watchdog_entry = conversation_entry(
+        "session-test",
+        "agent-test",
+        "acp",
+        &watchdog,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("watchdog state emitted");
+    let transcript_entry = conversation_entry(
+        "session-test",
+        "agent-test",
+        "acp",
+        &transcript,
+        TimelinePayloadScope::Full,
+    )
+    .expect("conversation entry converts")
+    .expect("assistant text emitted");
+
+    assert_eq!(watchdog_entry.kind, "agent_watchdog_state");
+    assert_eq!(
+        watchdog_entry.entry_id, "acp-agent-test-agent_watchdog_state-0",
+        "watchdog entry_id encodes (runtime, agent, kind, sequence)",
+    );
+    assert_eq!(
+        watchdog_entry.summary,
+        "agent-test watchdog paused -> fired (watchdog timeout)"
+    );
+    assert_ne!(
+        watchdog_entry.entry_id, transcript_entry.entry_id,
+        "disjoint entry_kind keeps the (kind, sequence) space collision-free even when sequences match",
+    );
+}
