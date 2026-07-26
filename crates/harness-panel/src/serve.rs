@@ -1,6 +1,6 @@
 //! Running the panel.
 
-use std::time::Duration;
+use std::{future::pending, io, time::Duration};
 
 use chrono::Utc;
 use tokio::net::TcpListener;
@@ -89,27 +89,70 @@ async fn prune_loop(store: Store) {
 )]
 async fn shutdown_signal() {
     let interrupt = async {
-        signal::ctrl_c().await.ok();
+        wait_for_interrupt(signal::ctrl_c().await).await;
     };
 
     #[cfg(unix)]
-    let terminate = async {
-        let mut stream = match signal::unix::signal(signal::unix::SignalKind::terminate()) {
-            Ok(stream) => stream,
-            Err(error) => {
-                tracing::warn!(%error, "cannot listen for SIGTERM");
-                return;
-            }
-        };
-        stream.recv().await;
-    };
+    let terminate = wait_for_terminate(signal::unix::signal(signal::unix::SignalKind::terminate()));
 
     #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
+    let terminate = pending::<()>();
 
     tokio::select! {
         () = interrupt => {}
         () = terminate => {}
     }
     tracing::info!("panel shutting down");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn wait_for_interrupt(result: io::Result<()>) {
+    if let Err(error) = result {
+        tracing::warn!(%error, "cannot listen for Ctrl-C");
+        pending::<()>().await;
+    }
+}
+
+#[cfg(unix)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn wait_for_terminate(result: io::Result<signal::unix::Signal>) {
+    let mut stream = match result {
+        Ok(stream) => stream,
+        Err(error) => {
+            tracing::warn!(%error, "cannot listen for SIGTERM");
+            pending::<signal::unix::Signal>().await
+        }
+    };
+    stream.recv().await;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use super::wait_for_interrupt;
+    #[cfg(unix)]
+    use super::wait_for_terminate;
+    use tokio::time::{Duration, timeout};
+
+    #[tokio::test]
+    async fn failed_interrupt_registration_does_not_request_shutdown() {
+        let waiting = wait_for_interrupt(Err(io::Error::other("cannot register")));
+
+        assert!(timeout(Duration::from_millis(10), waiting).await.is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn failed_terminate_registration_does_not_request_shutdown() {
+        let waiting = wait_for_terminate(Err(io::Error::other("cannot register")));
+
+        assert!(timeout(Duration::from_millis(10), waiting).await.is_err());
+    }
 }
