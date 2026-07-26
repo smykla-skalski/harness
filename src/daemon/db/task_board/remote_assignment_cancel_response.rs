@@ -41,54 +41,15 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         recorded_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote cancel request: {error}")))?;
-        response
-            .validate(request)
-            .map_err(|error| db_error(format!("validate remote cancel response: {error}")))?;
-        nonblank(
-            authenticated_principal,
-            "remote assignment authenticated principal",
-        )?;
-        canonical_time(recorded_at, "remote cancel response receipt time")?;
-        if response.state != RemoteAssignmentWireState::Cancelled {
-            return Err(db_error(
-                "remote cancel response did not confirm cancellation",
-            ));
-        }
+        validate_cancel_exchange(request, response, authenticated_principal, recorded_at)?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote cancel response")
             .await?;
         let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
         if cancel_response_replayed(&record, request, response, authenticated_principal) {
-            let parent = load_execution_in_tx(&mut transaction, &record.execution_id).await?;
-            let handoff_matches = if let Some(parent) = parent.as_ref() {
-                controller_handoff_matches_in_tx(
-                    &mut transaction,
-                    &record,
-                    TaskBoardRemoteControllerHandoffKind::TerminalProjection,
-                    parent,
-                )
-                .await?
-            } else {
-                false
-            };
-            commit_noop(transaction, "replayed remote cancel response").await?;
-            return Ok(if handoff_matches {
-                TaskBoardRemoteMutationOutcome::Replayed(record)
-            } else {
-                TaskBoardRemoteMutationOutcome::Stale(record)
-            });
+            return settle_replayed_cancel_in_tx(transaction, record).await;
         }
-        let cancellable = matches!(
-            record.state,
-            TaskBoardRemoteAssignmentState::Offered
-                | TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        );
-        if !cancellable
+        if !cancellable(&record)
             || !mutation_binding_matches(
                 &record,
                 &request.binding,
@@ -100,33 +61,106 @@ impl AsyncDaemonDb {
             commit_noop(transaction, "stale remote cancel response").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
-        let adopted = reconstruct_adopted_claim(&record, response)?;
-        consume_controller_operation_trust_in_tx(
-            &mut transaction,
-            &record,
-            TaskBoardRemoteOperationKind::Cancel,
-            &request.request_sha256,
-        )
-        .await?;
-        persist_cancel_response(
-            &mut transaction,
-            &record,
-            request,
-            response,
-            adopted.as_ref(),
-            recorded_at,
-        )
-        .await?;
-        settle_cancel_io_authority_in_tx(
-            &mut transaction,
-            &record,
-            request,
-            TaskBoardRemoteAssignmentState::Cancelled,
-            recorded_at,
-        )
-        .await?;
-        finish_mutation(transaction, &record.assignment_id, "cancel response").await
+        settle_cancel_response_in_tx(transaction, &record, request, response, recorded_at).await
     }
+}
+
+fn validate_cancel_exchange(
+    request: &RemoteCancelRequest,
+    response: &RemoteCancelResponse,
+    principal: &str,
+    recorded_at: &str,
+) -> Result<(), CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote cancel request: {error}")))?;
+    response
+        .validate(request)
+        .map_err(|error| db_error(format!("validate remote cancel response: {error}")))?;
+    nonblank(principal, "remote assignment authenticated principal")?;
+    canonical_time(recorded_at, "remote cancel response receipt time")?;
+    if response.state != RemoteAssignmentWireState::Cancelled {
+        return Err(db_error(
+            "remote cancel response did not confirm cancellation",
+        ));
+    }
+    Ok(())
+}
+
+/// Only an assignment still in flight can be cancelled; anything already
+/// terminal keeps whatever outcome it settled on.
+const fn cancellable(record: &super::TaskBoardRemoteAssignmentRecord) -> bool {
+    matches!(
+        record.state,
+        TaskBoardRemoteAssignmentState::Offered
+            | TaskBoardRemoteAssignmentState::Claimed
+            | TaskBoardRemoteAssignmentState::Started
+            | TaskBoardRemoteAssignmentState::Running
+    )
+}
+
+/// A replayed cancel still has to prove the terminal projection actually
+/// reached the parent execution before it can report a replay rather than
+/// stale evidence -- an assignment with no parent left never projected.
+async fn settle_replayed_cancel_in_tx(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: super::TaskBoardRemoteAssignmentRecord,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    let parent = load_execution_in_tx(&mut transaction, &record.execution_id).await?;
+    let handoff_matches = if let Some(parent) = parent.as_ref() {
+        controller_handoff_matches_in_tx(
+            &mut transaction,
+            &record,
+            TaskBoardRemoteControllerHandoffKind::TerminalProjection,
+            parent,
+        )
+        .await?
+    } else {
+        false
+    };
+    commit_noop(transaction, "replayed remote cancel response").await?;
+    Ok(if handoff_matches {
+        TaskBoardRemoteMutationOutcome::Replayed(record)
+    } else {
+        TaskBoardRemoteMutationOutcome::Stale(record)
+    })
+}
+
+/// Persist the cancellation, adopting whatever claim receipt the response
+/// carries, and settle the assignment's I/O authority as `Cancelled`.
+async fn settle_cancel_response_in_tx(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteCancelRequest,
+    response: &RemoteCancelResponse,
+    recorded_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    let adopted = reconstruct_adopted_claim(record, response)?;
+    consume_controller_operation_trust_in_tx(
+        &mut transaction,
+        record,
+        TaskBoardRemoteOperationKind::Cancel,
+        &request.request_sha256,
+    )
+    .await?;
+    persist_cancel_response(
+        &mut transaction,
+        record,
+        request,
+        response,
+        adopted.as_ref(),
+        recorded_at,
+    )
+    .await?;
+    settle_cancel_io_authority_in_tx(
+        &mut transaction,
+        record,
+        request,
+        TaskBoardRemoteAssignmentState::Cancelled,
+        recorded_at,
+    )
+    .await?;
+    finish_mutation(transaction, &record.assignment_id, "cancel response").await
 }
 
 fn cancel_response_replayed(

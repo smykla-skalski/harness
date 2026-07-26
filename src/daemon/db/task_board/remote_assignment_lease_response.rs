@@ -49,43 +49,23 @@ impl AsyncDaemonDb {
             commit_noop(transaction, "replayed remote renewal response").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
         }
-        let active = matches!(
-            record.state,
-            TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        );
-        let settlement_only = record.state == TaskBoardRemoteAssignmentState::Unknown;
-        if settlement_only && renew_request_for_record(&record)? != *request {
-            return Err(concurrent(
-                "late remote renewal request differs from deterministic durable evidence",
-            ));
-        }
-        let current_expiry = record
-            .lease_expires_at
-            .as_deref()
-            .map(|value| canonical_time(value, "current lease expiry"))
-            .transpose()?;
-        let deadline = record
-            .deadline_at
-            .as_deref()
-            .map(|value| canonical_time(value, "remote assignment deadline"))
-            .transpose()?;
-        let valid_rotation = response.lease.lease_id != request.lease_id
-            && current_expiry.is_some_and(|current| renewed_expiry > current)
-            && deadline.is_some_and(|deadline| renewed_expiry <= deadline);
-        if (!active && !settlement_only)
-            || !valid_rotation
-            || !mutation_binding_matches(
-                &record,
-                &request.binding,
-                authenticated_principal,
-                &request.lease_id,
-            )
-        {
+        let window = renewal_window(
+            &record,
+            request,
+            response,
+            renewed_expiry,
+            authenticated_principal,
+        )?;
+        if !window.acceptable {
             commit_noop(transaction, "stale remote renewal response").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
+        let RenewalWindow {
+            current_expiry,
+            deadline,
+            settlement_only,
+            ..
+        } = window;
         consume_controller_operation_trust_in_tx(
             &mut transaction,
             &record,
@@ -93,32 +73,152 @@ impl AsyncDaemonDb {
             &request.request_sha256,
         )
         .await?;
-        persist_renewal_response(&mut transaction, &record, request, response, recorded_at).await?;
-        if settlement_only {
-            return finish_mutation(transaction, &record.assignment_id, "late renewal response")
-                .await;
-        }
-        let observed_after_fence = current_expiry.is_some_and(|expiry| recorded >= expiry)
-            || recorded >= renewed_expiry
-            || deadline.is_some_and(|deadline| recorded >= deadline);
-        if observed_after_fence {
-            Box::pin(recover_controller_remote_assignment_in_tx(
-                &mut transaction,
-                &record,
-                recorded_at,
-            ))
-            .await?;
-        } else {
-            clear_renew_io_authority_in_tx(
-                &mut transaction,
-                &record,
-                &request.request_sha256,
-                recorded_at,
-            )
-            .await?;
-        }
-        finish_mutation(transaction, &record.assignment_id, "renewal response").await
+        settle_renewal_response_in_tx(
+            transaction,
+            &record,
+            request,
+            response,
+            recorded_at,
+            &RenewalFence {
+                recorded,
+                renewed_expiry,
+                current_expiry,
+                deadline,
+                settlement_only,
+            },
+            &RenewalLabels {
+                late: "late renewal response",
+                settled: "renewal response",
+            },
+        )
+        .await
     }
+}
+
+/// The live renewal path's counterpart to the replay path's `ReplayWindow`:
+/// the record's own fence values, whether it is only being settled after the
+/// fact, and whether the rotation is acceptable at all. The two paths differ
+/// in that a live record need not carry an expiry or a deadline, and reports
+/// an unacceptable rotation as a stale no-op rather than an error.
+struct RenewalWindow {
+    current_expiry: Option<chrono::DateTime<chrono::Utc>>,
+    deadline: Option<chrono::DateTime<chrono::Utc>>,
+    settlement_only: bool,
+    acceptable: bool,
+}
+
+fn renewal_window(
+    record: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteLeaseRenewRequest,
+    response: &RemoteLeaseRenewResponse,
+    renewed_expiry: chrono::DateTime<chrono::Utc>,
+    principal: &str,
+) -> Result<RenewalWindow, CliError> {
+    let active = matches!(
+        record.state,
+        TaskBoardRemoteAssignmentState::Claimed
+            | TaskBoardRemoteAssignmentState::Started
+            | TaskBoardRemoteAssignmentState::Running
+    );
+    let settlement_only = record.state == TaskBoardRemoteAssignmentState::Unknown;
+    if settlement_only && renew_request_for_record(record)? != *request {
+        return Err(concurrent(
+            "late remote renewal request differs from deterministic durable evidence",
+        ));
+    }
+    let current_expiry = record
+        .lease_expires_at
+        .as_deref()
+        .map(|value| canonical_time(value, "current lease expiry"))
+        .transpose()?;
+    let deadline = record
+        .deadline_at
+        .as_deref()
+        .map(|value| canonical_time(value, "remote assignment deadline"))
+        .transpose()?;
+    let valid_rotation = response.lease.lease_id != request.lease_id
+        && current_expiry.is_some_and(|current| renewed_expiry > current)
+        && deadline.is_some_and(|deadline| renewed_expiry <= deadline);
+    let acceptable = (active || settlement_only)
+        && valid_rotation
+        && mutation_binding_matches(record, &request.binding, principal, &request.lease_id);
+    Ok(RenewalWindow {
+        current_expiry,
+        deadline,
+        settlement_only,
+        acceptable,
+    })
+}
+
+/// The three deadlines a renewal is measured against, plus whether the record
+/// is only being settled after the fact. `current_expiry` and `deadline` are
+/// optional because the live path reads them straight off a record that need
+/// not carry either, while the replay path has already proved both present.
+pub(super) struct RenewalFence {
+    pub(super) recorded: chrono::DateTime<chrono::Utc>,
+    pub(super) renewed_expiry: chrono::DateTime<chrono::Utc>,
+    pub(super) current_expiry: Option<chrono::DateTime<chrono::Utc>>,
+    pub(super) deadline: Option<chrono::DateTime<chrono::Utc>>,
+    pub(super) settlement_only: bool,
+}
+
+impl RenewalFence {
+    /// A renewal observed at or past any one of the three fences means the
+    /// controller has to re-derive the assignment rather than simply release
+    /// its renew authority.
+    fn observed_after_fence(&self) -> bool {
+        self.current_expiry
+            .is_some_and(|expiry| self.recorded >= expiry)
+            || self.recorded >= self.renewed_expiry
+            || self
+                .deadline
+                .is_some_and(|deadline| self.recorded >= deadline)
+    }
+}
+
+/// The commit labels that distinguish a live renewal from its pending replay;
+/// everything else about settling the two is identical.
+pub(super) struct RenewalLabels {
+    pub(super) late: &'static str,
+    pub(super) settled: &'static str,
+}
+
+/// Persist a renewal response and settle its transaction: a settlement-only
+/// record finishes immediately, anything observed past the fence hands the
+/// assignment back to controller recovery, and everything else just releases
+/// the renew I/O authority. The live renewal path and its pending-replay twin
+/// share this verbatim -- they differ only in these labels and in whether
+/// their fence values were optional at the point they were read.
+pub(super) async fn settle_renewal_response_in_tx(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteLeaseRenewRequest,
+    response: &RemoteLeaseRenewResponse,
+    recorded_at: &str,
+    fence: &RenewalFence,
+    labels: &RenewalLabels,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    persist_renewal_response(&mut transaction, record, request, response, recorded_at).await?;
+    if fence.settlement_only {
+        return finish_mutation(transaction, &record.assignment_id, labels.late).await;
+    }
+    if fence.observed_after_fence() {
+        Box::pin(recover_controller_remote_assignment_in_tx(
+            &mut transaction,
+            record,
+            recorded_at,
+        ))
+        .await?;
+    } else {
+        clear_renew_io_authority_in_tx(
+            &mut transaction,
+            record,
+            &request.request_sha256,
+            recorded_at,
+        )
+        .await?;
+    }
+    finish_mutation(transaction, &record.assignment_id, labels.settled).await
 }
 
 pub(super) fn renewal_response_replayed(

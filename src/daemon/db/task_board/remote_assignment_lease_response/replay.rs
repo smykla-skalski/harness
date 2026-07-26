@@ -1,10 +1,9 @@
-use super::{persist_renewal_response, renewal_response_replayed};
+use super::{
+    RenewalFence, RenewalLabels, renewal_response_replayed, settle_renewal_response_in_tx,
+};
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
-use crate::daemon::db::task_board::remote_assignment_authority_settlement::clear_renew_io_authority_in_tx;
-use crate::daemon::db::task_board::remote_assignment_controller_recovery::recover_controller_remote_assignment_in_tx;
 use crate::daemon::db::task_board::remote_assignment_lease::{
-    commit_noop, finish_mutation, mutation_binding_matches, renew_request_for_record,
-    require_assignment,
+    commit_noop, mutation_binding_matches, renew_request_for_record, require_assignment,
 };
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, nonblank,
@@ -49,31 +48,25 @@ impl AsyncDaemonDb {
             trust,
         )
         .await?;
-        persist_renewal_response(&mut transaction, &record, request, response, recorded_at).await?;
-        if window.settlement_only {
-            return finish_mutation(transaction, &record.assignment_id, "late renewal replay")
-                .await;
-        }
-        if recorded >= window.current_expiry
-            || recorded >= renewed_expiry
-            || recorded >= window.deadline
-        {
-            Box::pin(recover_controller_remote_assignment_in_tx(
-                &mut transaction,
-                &record,
-                recorded_at,
-            ))
-            .await?;
-        } else {
-            clear_renew_io_authority_in_tx(
-                &mut transaction,
-                &record,
-                &request.request_sha256,
-                recorded_at,
-            )
-            .await?;
-        }
-        finish_mutation(transaction, &record.assignment_id, "pending renewal replay").await
+        settle_renewal_response_in_tx(
+            transaction,
+            &record,
+            request,
+            response,
+            recorded_at,
+            &RenewalFence {
+                recorded,
+                renewed_expiry,
+                current_expiry: Some(window.current_expiry),
+                deadline: Some(window.deadline),
+                settlement_only: window.settlement_only,
+            },
+            &RenewalLabels {
+                late: "late renewal replay",
+                settled: "pending renewal replay",
+            },
+        )
+        .await
     }
 }
 
