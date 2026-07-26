@@ -68,9 +68,18 @@ Write the client secret to a file the service can read and nobody else can:
 
 ```bash
 sudo install -d -m 0700 /etc/harness-panel
-printf '%s' "$GITHUB_CLIENT_SECRET" | sudo tee /etc/harness-panel/github-client-secret >/dev/null
-sudo chmod 0400 /etc/harness-panel/github-client-secret
+client_secret_tmp="$(mktemp)" || exit 1
+if ! printf '%s' "$GITHUB_CLIENT_SECRET" >"$client_secret_tmp" ||
+    ! sudo install -m 0400 "$client_secret_tmp" /etc/harness-panel/github-client-secret; then
+  rm -f "$client_secret_tmp"
+  unset client_secret_tmp
+  exit 1
+fi
+rm -f "$client_secret_tmp"
+unset client_secret_tmp
 ```
+
+`mktemp` creates the staging file readable only by its owner, and `install` puts it in place already at 0400. Writing straight to the destination and tightening it afterwards would leave the secret world-readable for as long as the two commands take, which is a window any local process can wait for.
 
 The panel refuses to start if that file is readable by group or other. It is never taken as a flag value or an environment string, both of which any local process can read out of `/proc`.
 
@@ -180,8 +189,15 @@ Write the code to a file only root can read, then claim it once as root. The pan
 
 ```bash
 sudo install -d -m 0700 /etc/harness-panel
-printf '%s' "$PAIR_CODE" | sudo tee /etc/harness-panel/daemon-pair-code >/dev/null
-sudo chmod 0400 /etc/harness-panel/daemon-pair-code
+pair_code_tmp="$(mktemp)" || exit 1
+if ! printf '%s' "$PAIR_CODE" >"$pair_code_tmp" ||
+    ! sudo install -m 0400 "$pair_code_tmp" /etc/harness-panel/daemon-pair-code; then
+  rm -f "$pair_code_tmp"
+  unset pair_code_tmp
+  exit 1
+fi
+rm -f "$pair_code_tmp"
+unset pair_code_tmp
 
 sudo harness-panel pair \
   --public-origin https://harness.example.com \
