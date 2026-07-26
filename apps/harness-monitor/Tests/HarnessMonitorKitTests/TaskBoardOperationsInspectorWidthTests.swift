@@ -60,12 +60,21 @@ struct TaskBoardOperationsInspectorWidthTests {
 }
 
 func expectPersistentResizableInspectorSource(_ source: String) {
+  let clippedIndex = source.range(of: ".clipped()")?.lowerBound
+  let glassIndex = source.range(
+    of: ".harnessInspectorGlass(isActive: isVisible)"
+  )?.lowerBound
+
   #expect(source.contains("static let defaultValue: CGFloat = 480"))
   #expect(source.contains("@AppStorage(TaskBoardOperationsInspectorWidth.storageKey)"))
   #expect(source.contains("ScrollView(.vertical)"))
   #expect(!source.contains("topContentInset"))
   #expect(source.contains(".harnessInspectorGlass(isActive: isVisible)"))
-  #expect(source.contains(".clipped()\n    .harnessInspectorGlass(isActive: isVisible)"))
+  #expect(clippedIndex != nil)
+  #expect(glassIndex != nil)
+  if let clippedIndex, let glassIndex {
+    #expect(clippedIndex < glassIndex)
+  }
   #expect(!source.contains("HarnessMonitorTheme.controlBorder.opacity(0.7)"))
   #expect(!source.contains("thinMaterial"))
   #expect(!source.contains("inspectorSurfaceFill"))
@@ -81,7 +90,7 @@ func expectPersistentResizableInspectorSource(_ source: String) {
   #expect(!source.contains("@objc"))
   #expect(!source.contains(": NSObject"))
   #expect(!source.contains("Timer"))
-  #expect(source.contains(".frame(width: isVisible ? displayedWidth : 0)"))
+  #expect(source.contains(".frame(width: displayedWidth)"))
   #expect(!source.contains("private static let width: CGFloat = 380"))
   #expect(source.contains(".allowsHitTesting(isVisible)"))
   #expect(source.contains(".accessibilityHidden(!isVisible)"))

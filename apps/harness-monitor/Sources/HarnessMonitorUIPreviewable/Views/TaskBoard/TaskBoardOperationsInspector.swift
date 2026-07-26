@@ -80,7 +80,7 @@ struct TaskBoardOperationsInspector: View {
       taskBoardItems: isVisible ? taskBoardItems : [],
       isActive: isVisible
     )
-    .frame(width: isVisible ? displayedWidth : 0)
+    .frame(width: displayedWidth)
     .clipped()
     .harnessInspectorGlass(isActive: isVisible)
     .overlay(alignment: .leading) {
