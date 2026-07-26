@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use axum::body::{Body, Bytes};
 use axum::extract::Request;
-use axum::http::{HeaderMap, Response, StatusCode, Uri, header::CONTENT_LENGTH};
+use axum::http::{HeaderMap, Response, StatusCode, Uri, Version, header::CONTENT_LENGTH};
 use axum::routing::any;
 use axum::{Json, Router};
 use futures_util::{StreamExt as _, stream};
@@ -36,7 +36,6 @@ const COMPANION_TOKEN: &str = "daemon-panel-test-token-0123456789";
 /// What the companion saw: the request line and the headers the assertions care
 /// about, echoed back as JSON so the test reads them from the daemon's answer.
 async fn echo_request(uri: Uri, headers: HeaderMap, request: Request) -> Json<Value> {
-    let _ = request;
     let observed: serde_json::Map<String, Value> = headers
         .iter()
         .filter_map(|(name, value)| {
@@ -47,6 +46,8 @@ async fn echo_request(uri: Uri, headers: HeaderMap, request: Request) -> Json<Va
         })
         .collect();
     Json(serde_json::json!({
+        "is_http1": request.version() == Version::HTTP_11,
+        "is_http2": request.version() == Version::HTTP_2,
         "path_and_query": uri.path_and_query().map(ToString::to_string),
         "headers": Value::Object(observed),
         "authorization_count": headers.get_all("authorization").iter().count(),
@@ -153,6 +154,52 @@ fn header(body: &Value, name: &str) -> Option<String> {
         .get(name)?
         .as_str()
         .map(ToOwned::to_owned)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn http2_companion_traffic_stays_http2_on_the_loopback_hop() {
+    let (upstream, upstream_server) = spawn_companion_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+    let client = reqwest::Client::builder()
+        .http2_prior_knowledge()
+        .build()
+        .expect("HTTP/2 client");
+
+    let response = client
+        .get(format!("{base_url}/panel/healthz"))
+        .send()
+        .await
+        .expect("HTTP/2 companion request");
+
+    assert_eq!(response.version(), reqwest::Version::HTTP_2);
+    let body: Value = response.json().await.expect("companion echo body");
+    assert_eq!(body["is_http2"], true);
+    assert_eq!(body["is_http1"], false);
+    server.abort();
+    upstream_server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn http1_companion_traffic_stays_http1_on_the_loopback_hop() {
+    let (upstream, upstream_server) = spawn_companion_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+    let client = reqwest::Client::builder()
+        .http1_only()
+        .build()
+        .expect("HTTP/1 client");
+
+    let response = client
+        .get(format!("{base_url}/panel/healthz"))
+        .send()
+        .await
+        .expect("HTTP/1 companion request");
+
+    assert_eq!(response.version(), reqwest::Version::HTTP_11);
+    let body: Value = response.json().await.expect("companion echo body");
+    assert_eq!(body["is_http1"], true);
+    assert_eq!(body["is_http2"], false);
+    server.abort();
+    upstream_server.abort();
 }
 
 #[tokio::test(flavor = "multi_thread")]

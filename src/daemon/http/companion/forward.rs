@@ -17,7 +17,7 @@ use axum::http::header::{
     TRANSFER_ENCODING, UPGRADE,
 };
 use axum::http::{
-    HeaderMap, HeaderName, HeaderValue, Request, Response as HttpResponse, StatusCode, Uri,
+    HeaderMap, HeaderName, HeaderValue, Method, Request, Response as HttpResponse, StatusCode, Uri,
 };
 use axum::response::{IntoResponse, Response};
 use hyper::body::Incoming;
@@ -71,7 +71,7 @@ pub(super) async fn forward_to_companion(
     peer_addr: SocketAddr,
     request: Request<Body>,
 ) -> Response {
-    if requests_protocol_upgrade(request.headers()) {
+    if requests_protocol_upgrade(request.method(), request.headers()) {
         return upgrade_unsupported_response();
     }
     let upstream_request = match build_upstream_request(config, peer_addr, request) {
@@ -210,10 +210,13 @@ fn connection_listed_headers(headers: &HeaderMap) -> Vec<HeaderName> {
         .collect()
 }
 
-/// A `Connection: upgrade` request wants a protocol the daemon does not relay.
+/// An upgrade request wants a protocol the daemon does not relay.
 /// Answering `501` is honest; silently stripping the upgrade would leave the
 /// caller waiting on a handshake that can never complete.
-fn requests_protocol_upgrade(headers: &HeaderMap) -> bool {
+fn requests_protocol_upgrade(method: &Method, headers: &HeaderMap) -> bool {
+    if method == Method::CONNECT {
+        return true;
+    }
     if headers.contains_key(UPGRADE) {
         return true;
     }
@@ -285,7 +288,7 @@ pub(super) fn companion_unconfigured_response() -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        AUTHORIZATION, HOST, HeaderMap, HeaderName, HeaderValue, SocketAddr, X_FORWARDED_FOR,
+        AUTHORIZATION, HOST, HeaderMap, HeaderName, HeaderValue, Method, SocketAddr, X_FORWARDED_FOR,
         X_FORWARDED_HOST, X_FORWARDED_PROTO, apply_companion_authorization,
         apply_forwarded_headers, connection_listed_headers, original_host,
         requests_protocol_upgrade, strip_daemon_credentials, strip_hop_by_hop_headers,
@@ -450,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn protocol_upgrade_is_detected_from_either_header() {
+    fn protocol_upgrade_is_detected_from_method_or_either_header() {
         let mut upgrade_header = HeaderMap::new();
         upgrade_header.insert("upgrade", HeaderValue::from_static("websocket"));
         let mut connection_token = HeaderMap::new();
@@ -459,8 +462,15 @@ mod tests {
             HeaderValue::from_static("keep-alive, Upgrade"),
         );
 
-        assert!(requests_protocol_upgrade(&upgrade_header));
-        assert!(requests_protocol_upgrade(&connection_token));
-        assert!(!requests_protocol_upgrade(&HeaderMap::new()));
+        assert!(requests_protocol_upgrade(&Method::GET, &upgrade_header));
+        assert!(requests_protocol_upgrade(&Method::GET, &connection_token));
+        assert!(requests_protocol_upgrade(
+            &Method::CONNECT,
+            &HeaderMap::new()
+        ));
+        assert!(!requests_protocol_upgrade(
+            &Method::GET,
+            &HeaderMap::new()
+        ));
     }
 }

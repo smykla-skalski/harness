@@ -12,6 +12,17 @@ use reqwest::header::SET_COOKIE;
 use support::{GitHubStub, PanelUnderTest, state_from_authorize_url};
 
 #[tokio::test]
+async fn the_panel_serves_http2() {
+    let github = GitHubStub::start("ada", 4242).await;
+    let panel = PanelUnderTest::start(&github, "ada").await;
+
+    let response = panel.get_over_http2("/panel/healthz").await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.version(), reqwest::Version::HTTP_2);
+}
+
+#[tokio::test]
 async fn a_person_signs_in_and_the_panel_records_the_account() {
     let github = GitHubStub::start("ada", 4242).await;
     let panel = PanelUnderTest::start(&github, "someone-else").await;

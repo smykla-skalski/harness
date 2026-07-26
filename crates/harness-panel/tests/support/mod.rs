@@ -213,6 +213,16 @@ impl PanelUnderTest {
             .await
     }
 
+    pub async fn get_over_http2(&self, path: &str) -> Response {
+        let client = Client::builder()
+            .http2_prior_knowledge()
+            .redirect(Policy::none())
+            .build()
+            .expect("HTTP/2 client");
+        self.send(client.get(format!("{}{path}", self.base_url)), None)
+            .await
+    }
+
     pub async fn post(&self, path: &str, cookie: Option<&str>) -> Response {
         self.send(
             self.client

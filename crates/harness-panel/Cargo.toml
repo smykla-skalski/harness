@@ -1,6 +1,6 @@
 [package]
 name = "harness-panel"
-version = "51.1.0"
+version = "51.1.1"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -11,7 +11,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-axum = "0.8.9"
+axum = { version = "0.8.9", features = ["http2"] }
 axum-extra = { version = "0.12.6", features = ["cookie"] }
 base64 = "0.23.0"
 chrono = { version = "0.4.44", features = ["serde"] }
