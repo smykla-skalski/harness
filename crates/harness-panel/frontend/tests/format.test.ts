@@ -91,10 +91,20 @@ describe('formatRelative', () => {
     expect(formatRelative('2026-07-26T09:00:00Z', now)).toBe('5 hours ago');
   });
 
+  // Derived from the same API the panel renders with rather than asserting a
+  // literal: a runner under a non-Gregorian calendar or Arabic-Indic digits
+  // renders this date without the substring "2026" in it anywhere.
   it('drops to a date beyond a day', () => {
-    const rendered = formatRelative('2026-07-01T09:00:00Z', now);
+    const stamp = '2026-07-01T09:00:00Z';
+    const rendered = formatRelative(stamp, now);
     expect(rendered).not.toMatch(/ago$/);
-    expect(rendered).toMatch(/2026/);
+    expect(rendered).toBe(
+      new Date(Date.parse(stamp)).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }),
+    );
   });
 });
 
