@@ -276,12 +276,14 @@ struct WebSocketStreamTests {
     rawCount: Int,
     events: [AcpConversationEvent]
   ) -> JSONValue {
+    // Keys the daemon actually sends. A camel-cased fixture decodes as nothing,
+    // every push is dropped before it reaches a stream, and the test that waits
+    // for one waits for the life of the process.
     .object([
-      "acpId": .string(acpID),
-      "managedAgentId": .string(acpID),
-      "managedAgentFamily": .string("acp"),
-      "sessionId": .string(sessionID),
-      "rawCount": .number(Double(rawCount)),
+      "managed_agent_id": .string(acpID),
+      "managed_agent_family": .string("acp"),
+      "session_id": .string(sessionID),
+      "raw_count": .number(Double(rawCount)),
       "events": .array(
         events.map { event in
           .object([
@@ -289,7 +291,7 @@ struct WebSocketStreamTests {
             "sequence": .number(Double(event.sequence)),
             "kind": event.kind,
             "agent": .string(event.agent),
-            "sessionId": .string(event.sessionId),
+            "session_id": .string(event.sessionId),
           ])
         }
       ),
