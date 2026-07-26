@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::daemon::client::DaemonClient;
-use crate::daemon::protocol;
+use crate::session::wire;
 use harness_kernel::errors::CliError;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, ManagedAgentRef, RuntimeSessionId};
 
@@ -29,7 +29,7 @@ pub fn register_agent_runtime_session(
     if let Some(client) = DaemonClient::try_connect() {
         return client.register_agent_runtime_session(
             session_id.as_str(),
-            &protocol::AgentRuntimeSessionRegistrationRequest {
+            &wire::AgentRuntimeSessionRegistrationRequest {
                 managed_agent_id: managed_agent_id.to_string(),
                 runtime: runtime_name.to_string(),
                 runtime_session_id: runtime_session_id.to_string(),

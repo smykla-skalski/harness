@@ -171,6 +171,6 @@ fn parse_session_agents_start_codex() {
     };
     assert_eq!(args.session_id, "sess-codex");
     assert_eq!(args.prompt, "Patch the bridge flow");
-    assert_eq!(args.mode, crate::daemon::protocol::CodexRunMode::Approval);
+    assert_eq!(args.mode, harness_protocol::managed_agents::codex::CodexRunMode::Approval);
     assert_eq!(args.resume_thread_id.as_deref(), Some("thread-123"));
 }

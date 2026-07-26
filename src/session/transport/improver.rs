@@ -4,7 +4,7 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::DaemonClient;
-use crate::daemon::protocol::ImproverApplyRequest;
+use crate::session::wire::ImproverApplyRequest;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_text;
 use crate::session::service::{self, ImproverApplyOutcome, ImproverTarget};

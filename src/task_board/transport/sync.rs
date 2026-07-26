@@ -1,5 +1,5 @@
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::TaskBoardSyncRequest;
+use crate::task_board::wire::TaskBoardSyncRequest;
 use harness_kernel::errors::CliError;
 use crate::task_board::summary::TaskBoardSyncSummary;
 

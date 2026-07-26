@@ -42,7 +42,7 @@ fn drop_task_to_same_agent_after_assign_starts_instead_of_self_queueing() {
         drop_task(
             session_id,
             &task.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
             },
             TaskQueuePolicy::Locked,

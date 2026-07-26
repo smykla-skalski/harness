@@ -2,9 +2,12 @@ use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::DaemonClient;
-use crate::daemon::protocol::{
-    SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
-    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+// SessionDetail aggregates daemon-owned state and still lives in the daemon's
+// summaries module, so it cannot follow the task requests down to the domain yet.
+use crate::daemon::protocol::SessionDetail;
+use crate::session::wire::{
+    TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
+    TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service;

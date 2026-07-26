@@ -1,5 +1,5 @@
 use crate::app::command_context::AppContext;
-use crate::daemon::protocol::TaskBoardCatalogRequest;
+use crate::task_board::wire::TaskBoardCatalogRequest;
 use harness_kernel::errors::CliError;
 
 use super::{TaskBoardCatalogArgs, daemon_client, print_json};

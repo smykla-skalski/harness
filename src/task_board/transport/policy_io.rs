@@ -7,7 +7,7 @@ use clap::Args;
 use serde_json::Value;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::{
+use crate::task_board::wire::{
     POLICY_TRANSFER_FORMAT, POLICY_TRANSFER_VERSION, PolicyTransferBundle,
     PolicyTransferDumpRequest, PolicyTransferImportRequest, PolicyTransferWorkspaceMetadata,
 };

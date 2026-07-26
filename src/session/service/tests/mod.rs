@@ -86,7 +86,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
         drop_task(
             session_id,
             &task.task_id,
-            &protocol::TaskDropTarget::Agent {
+            &wire::TaskDropTarget::Agent {
                 agent_id: worker_id.clone(),
             },
             TaskQueuePolicy::Locked,
