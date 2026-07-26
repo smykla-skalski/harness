@@ -79,9 +79,15 @@
     working = pairingId;
     try {
       await onUnpair(pairingId);
-      confirming = null;
     } finally {
       working = null;
+    }
+    // Only this row's own confirmation, never whichever one happens to be open.
+    // Nothing can move it while the request runs, because every control that
+    // could is disabled until it finishes, and clearing somebody else's is not
+    // a thing to leave resting on that.
+    if (confirming === pairingId) {
+      confirming = null;
     }
   }
 </script>
@@ -146,7 +152,16 @@
               </button>
             </div>
           {:else if pairingCanUnpair(pairing.state)}
-            <button class="btn unpair" onclick={() => (confirming = pairing.pairing_id)}>
+            <!-- Disabled while any row is being unpaired, not just this one.
+                 Opening a second confirmation would close the running row's,
+                 and the request that finishes first would then hand every
+                 control back while the other was still in flight. One at a
+                 time also matches the re-read each one triggers. -->
+            <button
+              class="btn unpair"
+              disabled={working !== null}
+              onclick={() => (confirming = pairing.pairing_id)}
+            >
               Unpair
             </button>
           {/if}
