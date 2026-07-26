@@ -32,6 +32,7 @@ struct ActivityLedger {
     runs: Vec<TaskBoardAutomationRunInfo>,
     provider_backoff: Option<ProviderBackoff>,
     open_conflict: bool,
+    queue: crate::task_board::TaskBoardAutomationQueueSummary,
     wake: super::wake::WakeObservation,
 }
 
@@ -52,6 +53,7 @@ pub(super) async fn load(
         runs: activity.runs,
         provider_backoff: activity.provider_backoff,
         open_conflict: activity.open_conflict,
+        queue: activity.queue,
         wake: activity.wake,
         cancelable_targets: targets.targets,
         cancelable_targets_truncated: targets.truncated,
@@ -76,6 +78,7 @@ async fn load_activity_ledger(
         runs: super::super::history::load_snapshot_run_infos(connection).await?,
         provider_backoff: load_provider_backoff(connection).await?,
         open_conflict: load_open_conflict(connection).await?,
+        queue: super::queue::load(connection).await?,
         wake: super::wake::load(connection).await?,
     })
 }

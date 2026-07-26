@@ -45,10 +45,17 @@ extension TaskBoardAutomationTone {
 
 struct TaskBoardAutomationSubsectionHeader: View {
   let title: String
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     Text(title)
-      .font(.caption.weight(.semibold))
+      .font(
+        HarnessMonitorTextSize.scaledFont(
+          .body.weight(.semibold),
+          by: fontScale
+        )
+      )
       .foregroundStyle(.primary)
       .padding(.top, HarnessMonitorTheme.spacingMD)
       .padding(.bottom, HarnessMonitorTheme.spacingXS)
@@ -79,12 +86,17 @@ struct TaskBoardAutomationPillFlow: View {
 
 struct TaskBoardAutomationValueRows: View {
   let rows: [TaskBoardAutomationValueRow]
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     ForEach(rows) { row in
-      TaskBoardOperationsFormRow(row.label) {
+      TaskBoardOperationsFormRow(
+        row.label,
+        showsSeparator: row.id != rows.last?.id
+      ) {
         Text(row.value)
-          .font(.caption)
+          .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
           .foregroundStyle(row.tone.color)
           .lineLimit(2)
           .truncationMode(.middle)
@@ -102,6 +114,8 @@ struct TaskBoardAutomationPlaceholder: View {
   let title: String
   let systemImage: String
   var showsProgress = false
+  @Environment(\.fontScale)
+  private var fontScale
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
@@ -115,7 +129,7 @@ struct TaskBoardAutomationPlaceholder: View {
           .accessibilityHidden(true)
       }
       Text(title)
-        .font(.caption)
+        .font(HarnessMonitorTextSize.scaledFont(.body, by: fontScale))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .padding(.vertical, HarnessMonitorTheme.spacingMD)

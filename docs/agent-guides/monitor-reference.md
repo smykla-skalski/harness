@@ -252,15 +252,9 @@ Payloads pass through `SupervisorAuditRedactor.redactSupervisorPayloadJSON(_:)` 
 
 UI surfaces read events through `HarnessMonitorStore.supervisorAuditRepository` rather than touching the SwiftData container directly.
 
-## Preview authoring detail
+## Preview authoring
 
-All `#Preview` blocks live in `HarnessMonitorUIPreviewable`. Previews render through the dedicated `HarnessMonitorPreviewHost` app target via the `HarnessMonitorUIPreviews` scheme. The host links only `HarnessMonitorKit` and `HarnessMonitorUIPreviewable`; it has no daemon signaling or main-app dependencies.
-
-Previewable views must not take closure properties such as `let onTap: () -> Void`. Use `HarnessAsyncActionButton.StoreAction` or `@Environment(\.openWindow)` for actions.
-
-Every `#Preview` that exercises `@Query` or other SwiftData-backed views must inject `.modelContainer(PreviewFixtures.previewContainer())` or an equivalent fixture container. Do not allocate `DateFormatter`, `JSONEncoder`, or `NumberFormatter` in view bodies; use static `@MainActor` lets.
-
-Never wrap `#Preview` in `#if DEBUG`. Add canonical screens to `Previews.json` when adding a new top-level surface. If a `#Preview` crashes with `TableViewListCore_Mac2.swift:5170`, mark it with a TODO referencing the macOS 26 SwiftUI bug and comment out the offending preview.
+Use `monitor-previews.md` for the canonical preview structure, headless shell-rendering workflow, snapshot handoff, and Canvas restrictions.
 
 ## Swift 6 deinit trap
 

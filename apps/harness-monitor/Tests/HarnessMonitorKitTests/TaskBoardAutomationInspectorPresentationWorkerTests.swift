@@ -10,7 +10,20 @@ struct TaskBoardAutomationPresentationTests {
   func presentationUsesCurrentMetrics() async throws {
     let presentation = await TaskBoardAutomationInspectorPresentationWorker().compute(
       input: input(
-        snapshot: snapshot(cleanupRequired: 3),
+        snapshot: snapshot(
+          cleanupRequired: 3,
+          queue: TaskBoardAutomationQueueSummary(
+            ready: 12,
+            awaitingApproval: 2,
+            policyBlocked: 1,
+            preparing: 3,
+            retrying: 1,
+            starting: 2,
+            active: 4,
+            draining: 1,
+            cleanupRequired: 3
+          )
+        ),
         metrics: TaskBoardAutomationMetrics(
           runsTotal: 12,
           runsRunning: 1,
@@ -42,6 +55,21 @@ struct TaskBoardAutomationPresentationTests {
     #expect(
       presentation.issueRows.first(where: { $0.id == "cleanup-required" })?.value == "3"
     )
+    #expect(presentation.queueLanes.map(\.id) == [.waiting, .execution, .recovery])
+    #expect(
+      presentation.queueLanes.flatMap(\.stages).map(\.id) == [
+        "ready",
+        "approval",
+        "policy",
+        "preparing",
+        "starting",
+        "active",
+        "retrying",
+        "draining",
+        "cleanup",
+      ]
+    )
+    #expect(presentation.queueLanes.flatMap(\.stages).map(\.value) == [12, 2, 1, 3, 2, 4, 1, 1, 3])
     #expect(presentation.controlAvailability.controlBlockedReason == nil)
   }
 

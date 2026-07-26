@@ -197,7 +197,7 @@ XCODE_ONLY_TESTING=HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensS
 
 The generated project intentionally keeps SwiftLint out of the Xcode build graph so SwiftUI previews and routine local builds stay responsive. The fast lint lane owns `swift format` + `swiftlint`; the slower `monitor:quality-gate` task owns build-based validation and daemon checks.
 
-For SwiftUI canvas previews, open `HarnessMonitor.xcodeproj` and select the shared `HarnessMonitorUIPreviews` scheme. It uses the `Preview` configuration, builds only the UI framework graph, and avoids launching the full `Harness Monitor.app` as the preview host.
+For preview authoring and headless PNG capture, follow `../../docs/agent-guides/monitor-previews.md`. Xcode Canvas is optional for interactive exploration; automated visual verification uses the shell-rendered Preview Host workflow.
 
 Regenerate the project after target or configuration changes:
 

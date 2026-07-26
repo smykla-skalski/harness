@@ -19,6 +19,8 @@ struct TaskBoardAutomationStatusView: View {
   let presentation: TaskBoardAutomationPresentation
   let metrics: TaskBoardOverviewMetrics
   let isPresentationCurrent: Bool
+  @Environment(\.fontScale)
+  private var fontScale
 
   private var contentMode: ContentMode {
     .resolve(
@@ -57,7 +59,11 @@ struct TaskBoardAutomationStatusView: View {
     TaskBoardAutomationPillFlow(pills: presentation.statePills)
 
     TaskBoardAutomationSubsectionHeader(title: "Queue")
-    TaskBoardAutomationPillFlow(pills: presentation.queuePills)
+    TaskBoardAutomationQueueMap(
+      lanes: presentation.queueLanes,
+      fontScale: fontScale
+    )
+    .equatable()
 
     TaskBoardAutomationSubsectionHeader(title: "Active run")
     if presentation.activeRunRows.isEmpty {

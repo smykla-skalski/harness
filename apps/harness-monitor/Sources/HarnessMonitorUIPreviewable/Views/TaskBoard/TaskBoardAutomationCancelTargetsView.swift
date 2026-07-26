@@ -13,7 +13,7 @@ struct TaskBoardAutomationCancelTargetsView: View {
 
     if let blockedReason, !targets.isEmpty {
       Label(blockedReason, systemImage: "lock.trianglebadge.exclamationmark")
-        .font(.caption)
+        .scaledFont(.body)
         .foregroundStyle(HarnessMonitorTheme.caution)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("harness.task-board.automation.forceCancel-blocked")
@@ -37,7 +37,7 @@ struct TaskBoardAutomationCancelTargetsView: View {
         "Showing the first 100 eligible targets. Refresh after a cancellation to inspect later targets.",
         systemImage: "ellipsis.circle"
       )
-      .font(.caption)
+      .scaledFont(.body)
       .foregroundStyle(HarnessMonitorTheme.caution)
       .fixedSize(horizontal: false, vertical: true)
       .accessibilityIdentifier("harness.task-board.automation.forceCancel-truncated")
@@ -50,13 +50,13 @@ struct TaskBoardAutomationCancelTargetsView: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         Text(presentation.title)
-          .font(.caption.weight(.semibold))
+          .scaledFont(.body.weight(.semibold))
           .foregroundStyle(.primary)
           .lineLimit(1)
           .truncationMode(.middle)
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
         Text(presentation.state)
-          .font(.caption2.weight(.medium))
+          .scaledFont(.callout.weight(.medium))
           .foregroundStyle(
             presentation.target.cancelPending
               ? HarnessMonitorTheme.caution
@@ -100,7 +100,7 @@ struct TaskBoardAutomationCancelTargetsView: View {
 
   private func targetDetail(_ value: String) -> some View {
     Text(value)
-      .font(.caption2)
+      .scaledFont(.callout)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .lineLimit(1)
       .truncationMode(.middle)

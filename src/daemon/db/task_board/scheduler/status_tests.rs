@@ -6,8 +6,8 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
-    TaskBoardAutomationEffectiveState, TaskBoardAutomationSchedulingSettings, TaskBoardItem,
-    TaskBoardOrchestratorSettings,
+    TaskBoardAutomationEffectiveState, TaskBoardAutomationQueueSummary,
+    TaskBoardAutomationSchedulingSettings, TaskBoardItem, TaskBoardOrchestratorSettings,
 };
 
 #[tokio::test]
@@ -93,6 +93,67 @@ async fn snapshot_is_consistent_bounded_and_read_only() {
         Some("run-active")
     );
     assert_eq!(fingerprint(&db).await, before);
+}
+
+#[tokio::test]
+async fn snapshot_counts_live_workflow_queue_without_double_counting_cleanup() {
+    let db = database().await;
+    seed_control(
+        &db,
+        "continuous",
+        "accepting",
+        &timestamp(Utc::now() - Duration::minutes(1)),
+    )
+    .await;
+    for (id, phase, state) in [
+        ("ready", "planning", "pending"),
+        ("approval", "awaiting_approval", "awaiting_approval"),
+        ("policy", "planning", "blocked"),
+        ("preparing", "implementation", "preparing"),
+        ("retrying", "review", "retry_wait"),
+        ("starting", "evaluate", "starting"),
+        ("active", "publish", "running"),
+        ("draining", "planning", "draining"),
+        ("cleanup-pending", "cleanup", "pending"),
+        ("cleanup-human", "cleanup", "human_required"),
+        ("terminal-human-live", "terminal", "human_required"),
+        ("terminal", "cleanup", "completed"),
+    ] {
+        seed_queue_execution(&db, id, phase, state).await;
+    }
+    seed_queue_execution(&db, "terminal-human", "cleanup", "human_required").await;
+    query(
+        "UPDATE task_board_workflow_executions
+         SET completed_at = '2026-07-15T09:01:00+00:00'
+         WHERE execution_id = 'queue-execution-terminal-human'",
+    )
+    .execute(db.pool())
+    .await
+    .expect("complete human-required queue execution");
+    seed_queue_execution(&db, "unknown-kind", "planning", "pending").await;
+    query(
+        "UPDATE task_board_workflow_executions
+         SET workflow_kind = 'unknown'
+         WHERE execution_id = 'queue-execution-unknown-kind'",
+    )
+    .execute(db.pool())
+    .await
+    .expect("mark unsupported workflow kind");
+
+    assert_eq!(
+        snapshot(&db).await.queue,
+        TaskBoardAutomationQueueSummary {
+            ready: 1,
+            awaiting_approval: 1,
+            policy_blocked: 1,
+            preparing: 1,
+            retrying: 1,
+            starting: 1,
+            active: 1,
+            draining: 1,
+            cleanup_required: 3,
+        }
+    );
 }
 
 #[tokio::test]
@@ -384,6 +445,39 @@ async fn seed_open_conflict(db: &AsyncDaemonDb) {
     .execute(db.pool())
     .await
     .expect("seed open conflict");
+}
+
+async fn seed_queue_execution(
+    db: &AsyncDaemonDb,
+    id: &str,
+    phase: &str,
+    state: &str,
+) {
+    let item_id = format!("queue-item-{id}");
+    db.create_task_board_item(TaskBoardItem::new(
+        item_id.clone(),
+        format!("Queue item {id}"),
+        String::new(),
+        "2026-07-15T09:00:00+00:00".into(),
+    ))
+    .await
+    .expect("create queue item");
+    query(
+        "INSERT INTO task_board_workflow_executions (
+            execution_id, item_id, workflow_kind, phase, state, item_revision,
+            configuration_revision, snapshot_json, resolved_reviewer_json,
+            fencing_epoch, diagnostics_json, resource_ownership_json, created_at,
+            updated_at
+         ) VALUES (?1, ?2, 'review', ?3, ?4, 1, 1, '{}', '{}', 0, '{}', '{}',
+                   '2026-07-15T09:00:00+00:00', '2026-07-15T09:00:00+00:00')",
+    )
+    .bind(format!("queue-execution-{id}"))
+    .bind(item_id)
+    .bind(phase)
+    .bind(state)
+    .execute(db.pool())
+    .await
+    .expect("seed queue execution");
 }
 
 async fn fingerprint(db: &AsyncDaemonDb) -> (i64, i64, i64, i64, i64, i64, String) {
