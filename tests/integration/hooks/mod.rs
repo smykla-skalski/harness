@@ -1,6 +1,6 @@
 // Hook guard/verify integration tests.
-// Split by hook type: guard_bash, guard_write, guard_question,
-// verify (bash/write/question combined).
+// Split by hook type: guard_bash, guard_write, guard_question, and verify,
+// which now covers verify-question only.
 
 mod guard_bash;
 mod guard_question;

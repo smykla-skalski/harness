@@ -20,7 +20,7 @@ pub fn execute(ctx: &HookContext) -> Result<HookOutcome, CliError> {
     }
     super::dispatch_outcome_by_skill(
         ctx,
-        |_ctx| Ok(verify_suite_runner(&paths)),
+        |_ctx| Ok(verify_non_create_paths(&paths)),
         |_ctx| Ok(HookOutcome::from_hook_result(verify_suite_create(&paths))),
     )
 }
@@ -45,7 +45,7 @@ fn verify_suite_create(paths: &[&Path]) -> HookResult {
 
 /// Check a single path for an empty-amendments violation.
 /// Returns `Some(outcome)` when the path triggers an early deny.
-fn check_runner_path_violation(raw_path: &Path, path: &Path) -> Option<HookOutcome> {
+fn check_amendments_violation(raw_path: &Path, path: &Path) -> Option<HookOutcome> {
     let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
     if name == "amendments.md"
         && path.exists()
@@ -62,10 +62,13 @@ fn check_runner_path_violation(raw_path: &Path, path: &Path) -> Option<HookOutco
     None
 }
 
-fn verify_suite_runner(paths: &[&Path]) -> HookOutcome {
+/// Verify writes for the branch that is not `suite:create`. Every confirmed
+/// non-create skill lands here, `observe` included, so this is not specific to
+/// the retired suite runner.
+fn verify_non_create_paths(paths: &[&Path]) -> HookOutcome {
     for raw_path in paths {
         let path = normalize_path(raw_path);
-        if let Some(violation) = check_runner_path_violation(raw_path, &path) {
+        if let Some(violation) = check_amendments_violation(raw_path, &path) {
             return violation;
         }
     }
