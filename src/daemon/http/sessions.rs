@@ -30,6 +30,13 @@ pub(super) use super::sessions_mutations::{
 
 pub(super) fn session_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
+        .merge(session_collection_routes())
+        .merge(session_membership_routes())
+        .merge(session_lifecycle_routes())
+}
+
+fn session_collection_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(
             get_sessions,
             super::sessions_mutations::post_session_start
@@ -44,13 +51,21 @@ pub(super) fn session_routes() -> OpenApiRouter<DaemonHttpState> {
             http_paths::SESSION_STREAM,
             get(super::stream::stream_session),
         )
+}
+
+fn session_membership_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(super::sessions_mutations::post_session_join))
+        .routes(routes!(super::sessions_mutations::post_leave_session))
+        .routes(routes!(super::sessions_mutations::post_observe_session))
+}
+
+fn session_lifecycle_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(super::runtime_session::post_runtime_session))
         .routes(routes!(super::sessions_mutations::post_session_title))
         .routes(routes!(super::sessions_mutations::post_end_session))
         .routes(routes!(super::sessions_mutations::post_session_archive))
-        .routes(routes!(super::sessions_mutations::post_leave_session))
-        .routes(routes!(super::sessions_mutations::post_observe_session))
 }
 
 #[derive(utoipa::IntoParams)]

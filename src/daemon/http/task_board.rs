@@ -46,8 +46,8 @@ fn task_board_host_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(operations::put_task_board_host_set_project_types))
 }
 
-pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
-    let router = OpenApiRouter::new()
+fn task_board_item_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(items::get_task_board_capabilities))
         .routes(routes!(
             items::post_task_board_item,
@@ -58,11 +58,19 @@ pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
             items::put_task_board_item,
             items::delete_task_board_item
         ))
+}
+
+fn task_board_position_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(
             positions::get_task_board_item_position_snapshot,
             positions::put_task_board_item_position
         ))
         .routes(routes!(positions::post_task_board_item_position_reset))
+}
+
+fn task_board_triage_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(triage::get_task_board_item_triage))
         .routes(routes!(triage::get_task_board_item_triage_history))
         .routes(routes!(triage::put_task_board_item_triage_override))
@@ -71,20 +79,42 @@ pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
             triage_escalation::post_task_board_triage_escalation_verdict
         ))
         .merge(task_board_triage_rules_routes())
+}
+
+fn task_board_plan_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(items::post_task_board_plan_begin))
         .routes(routes!(items::post_task_board_plan_submit))
         .routes(routes!(items::post_task_board_plan_approve))
         .routes(routes!(items::post_task_board_plan_revoke))
+}
+
+fn task_board_dispatch_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(operations::post_task_board_sync))
         .routes(routes!(operations::post_task_board_dispatch))
         .routes(routes!(operations::post_task_board_dispatch_deliver))
         .routes(routes!(operations::post_task_board_dispatch_pick))
         .routes(routes!(operations::post_task_board_evaluate))
+}
+
+fn task_board_inventory_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(operations::get_task_board_audit))
         .routes(routes!(operations::get_task_board_projects))
         .routes(routes!(operations::post_task_board_projects_update))
         .routes(routes!(operations::get_task_board_machines))
-        .merge(task_board_host_routes());
+        .merge(task_board_host_routes())
+}
+
+pub(super) fn task_board_routes() -> OpenApiRouter<DaemonHttpState> {
+    let router = OpenApiRouter::new()
+        .merge(task_board_item_routes())
+        .merge(task_board_position_routes())
+        .merge(task_board_triage_routes())
+        .merge(task_board_plan_routes())
+        .merge(task_board_dispatch_routes())
+        .merge(task_board_inventory_routes());
     merge_policy_pipeline_routes(merge_policy_spawn_gate_routes(merge_policy_io_routes(
         merge_policy_routes(merge_git_routes(merge_orchestrator_routes(
             working_copies::merge_working_copy_routes(router),

@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, VecDeque};
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
 use axum::Json;
@@ -105,7 +105,7 @@ fn source_budget_key(source: IpAddr) -> IpAddr {
     match source {
         IpAddr::V4(address) => {
             if address.is_loopback() {
-                IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)
+                IpAddr::V4(Ipv4Addr::LOCALHOST)
             } else {
                 IpAddr::V4(address)
             }
@@ -113,7 +113,7 @@ fn source_budget_key(source: IpAddr) -> IpAddr {
         IpAddr::V6(address) => {
             if let Some(address) = address.to_ipv4_mapped() {
                 return if address.is_loopback() {
-                    IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)
+                    IpAddr::V4(Ipv4Addr::LOCALHOST)
                 } else {
                     IpAddr::V4(address)
                 };
