@@ -130,6 +130,15 @@ async fn snapshot_counts_live_workflow_queue_without_double_counting_cleanup() {
     .execute(db.pool())
     .await
     .expect("complete human-required queue execution");
+    seed_queue_execution(&db, "unknown-kind", "planning", "pending").await;
+    query(
+        "UPDATE task_board_workflow_executions
+         SET workflow_kind = 'unknown'
+         WHERE execution_id = 'queue-execution-unknown-kind'",
+    )
+    .execute(db.pool())
+    .await
+    .expect("mark unsupported workflow kind");
 
     assert_eq!(
         snapshot(&db).await.queue,

@@ -172,7 +172,7 @@ public enum TaskBoardInspectorPreviewRenderer {
       return false
     }
     view.cacheDisplay(in: view.bounds, to: bitmap)
-    guard let data = bitmap.representation(using: .png, properties: [:]) else {
+    guard let data = bitmap.representation(using: .png, properties: [:]), !data.isEmpty else {
       return false
     }
 
