@@ -166,17 +166,14 @@ async fn finalize_existing_link(
     provider_baseline: &ExternalRef,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
     let identity_changed = apply_provider_identity(&mut item, &stored, provider_target)?;
-    let attached_item_revision = if identity_changed {
-        ensure_workflow_item_mutation_allowed_in_tx(&mut transaction, &stored.item_id).await?;
-        if item.updated_at.as_str() < attached_at {
-            attached_at.clone_into(&mut item.updated_at);
-        }
-        let revision = item_revision + 1;
-        replace_item_in_tx(&mut transaction, &item, revision).await?;
-        revision
-    } else {
-        item_revision
-    };
+    let attached_item_revision = rewrite_linked_item_in_tx(
+        &mut transaction,
+        &mut item,
+        &stored.item_id,
+        (item_revision, attached_at),
+        identity_changed,
+    )
+    .await?;
     update_attached_receipt(
         &mut transaction,
         &stored,
@@ -192,18 +189,7 @@ async fn finalize_existing_link(
         provider_baseline,
     )
     .await?;
-    bump_change_in_tx(
-        &mut transaction,
-        if identity_changed {
-            ITEMS_CHANGE_SCOPE
-        } else {
-            ORCHESTRATOR_CHANGE_SCOPE
-        },
-    )
-    .await?;
-    if identity_changed && conflicts_changed {
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    }
+    publish_linked_receipt_in_tx(&mut transaction, identity_changed, conflicts_changed).await?;
     commit(transaction, "task-board external create linked receipt").await?;
     let attached = attached_intent(stored, attached_at, attached_item_revision)?;
     Ok(finalize_result(
@@ -212,6 +198,49 @@ async fn finalize_existing_link(
         Some(attached_item_revision),
         TaskBoardExternalCreateFinalizeDisposition::AlreadyLinked,
     ))
+}
+
+/// Move the item to a fresh revision only when the provider identity actually
+/// changed; an already-correct link keeps the revision the caller read, so a
+/// repeated finalize does not make every board client refetch.
+async fn rewrite_linked_item_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &mut TaskBoardItem,
+    item_id: &str,
+    at: (i64, &str),
+    identity_changed: bool,
+) -> Result<i64, CliError> {
+    let (item_revision, attached_at) = at;
+    if !identity_changed {
+        return Ok(item_revision);
+    }
+    ensure_workflow_item_mutation_allowed_in_tx(transaction, item_id).await?;
+    if item.updated_at.as_str() < attached_at {
+        attached_at.clone_into(&mut item.updated_at);
+    }
+    let revision = item_revision + 1;
+    replace_item_in_tx(transaction, item, revision).await?;
+    Ok(revision)
+}
+
+/// Publish the scopes this receipt actually moved: the items scope when the
+/// identity changed and the orchestrator scope otherwise, plus a second
+/// orchestrator bump when superseded conflicts rode along with an item change.
+async fn publish_linked_receipt_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    identity_changed: bool,
+    conflicts_changed: bool,
+) -> Result<(), CliError> {
+    let scope = if identity_changed {
+        ITEMS_CHANGE_SCOPE
+    } else {
+        ORCHESTRATOR_CHANGE_SCOPE
+    };
+    bump_change_in_tx(transaction, scope).await?;
+    if identity_changed && conflicts_changed {
+        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    Ok(())
 }
 
 async fn supersede_create_conflicts(

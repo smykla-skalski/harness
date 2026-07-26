@@ -3,11 +3,8 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_io_authority::has_remote_io_authority;
-use super::remote_assignment_stop_fence::{
-    RemoteTargetStopPlan, remote_stop_requires_cancellation, remote_target_stop_plan_in_tx,
-};
+use super::remote_assignment_stop_fence::remote_stop_requires_cancellation;
 use super::workflow_execution_attempts::load_execution_attempts_in_tx;
-use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_execution_rows::{WorkflowExecutionRow, execution_json, label, phase_label};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
@@ -15,9 +12,13 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionCreateOutcome,
     TaskBoardWorkflowExecutionRecord, advance_task_board_workflow,
-    restart_task_board_workflow_revision, validate_task_board_execution_update,
-    validate_task_board_read_only_run_context, validate_task_board_workflow_execution,
+    restart_task_board_workflow_revision, validate_task_board_read_only_run_context,
+    validate_task_board_workflow_execution,
 };
+
+#[path = "workflow_executions/cas_screen.rs"]
+mod cas_screen;
+use cas_screen::{WorkflowExecutionCasScreen, screen_workflow_execution_cas_in_tx};
 
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
     WHERE execution_id = ?1";
@@ -114,65 +115,37 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board workflow execution CAS")
             .await?;
-        let Some(current) = load_execution_in_tx(&mut transaction, &expected.execution_id).await?
-        else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit missing workflow execution CAS: {error}"))
-            })?;
-            return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
-                mismatch: TaskBoardWorkflowCasMismatch::ExecutionId,
-                current: None,
-            });
-        };
-        ensure_terminal_transition_has_no_active_side_effect(&current, updated)?;
-        if let Some(mismatch) = cas_mismatch(expected, &current) {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit stale workflow execution CAS: {error}"))
-            })?;
-            return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
-                mismatch,
-                current: Some(current),
-            });
-        }
-        if current.transition.phase != updated.transition.phase
-            && let Some(mismatch) =
-                live_execution_revision_mismatch_in_tx(&mut transaction, &current).await?
+        // The screen only reads, so its refusals and the write below leave the
+        // transaction in states an empty commit and a rollback cannot tell
+        // apart. One commit covers both and keeps the per-refusal commit
+        // messages from outliving the branches that produced them.
+        // Both halves must stay boxed. Awaited inline they fold their frames
+        // into this future, which the read-only coordinator, the remote
+        // controller and the transport controller all await transitively; that
+        // pushes more than twenty of those awaits past the 16384-byte threshold
+        // of `clippy::large_futures`, which is denied here. `cargo check` will
+        // not tell you, because the limit is a lint rather than a compile error.
+        let outcome = match Box::pin(screen_workflow_execution_cas_in_tx(
+            &mut transaction,
+            expected,
+            updated,
+        ))
+        .await?
         {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit stale workflow phase CAS: {error}")))?;
-            return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
-                mismatch,
-                current: Some(current),
-            });
-        }
-        validate_task_board_execution_update(&current, updated)
-            .map_err(|error| db_error(format!("validate workflow execution CAS: {error}")))?;
-        validate_phase_change(&current, updated)?;
-        if current == *updated {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit unchanged workflow execution CAS: {error}"))
-            })?;
-            return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(current));
-        }
-        let persisted =
-            match remote_target_stop_plan_in_tx(&mut transaction, &current, updated).await? {
-                RemoteTargetStopPlan::ApplyRequested => updated.clone(),
-                RemoteTargetStopPlan::PersistCancelIntent(parent) => parent,
-                RemoteTargetStopPlan::ReplayedCancelIntent(parent) => {
-                    transaction.commit().await.map_err(|error| {
-                        db_error(format!("commit replayed remote cancellation CAS: {error}"))
-                    })?;
-                    return Ok(TaskBoardWorkflowExecutionCasOutcome::Unchanged(parent));
-                }
-            };
-        update_execution_in_tx(&mut transaction, expected, &persisted).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+            WorkflowExecutionCasScreen::Settled(outcome) => outcome,
+            WorkflowExecutionCasScreen::Persist(persisted) => {
+                Box::pin(persist_workflow_execution_cas_in_tx(
+                    &mut transaction,
+                    expected,
+                    persisted,
+                ))
+                .await?
+            }
+        };
         transaction.commit().await.map_err(|error| {
             db_error(format!("commit task board workflow execution CAS: {error}"))
         })?;
-        Ok(TaskBoardWorkflowExecutionCasOutcome::Updated(persisted))
+        Ok(outcome)
     }
 
     pub(crate) async fn task_board_configuration_revision(&self) -> Result<u64, CliError> {
@@ -186,6 +159,16 @@ impl AsyncDaemonDb {
         u64::try_from(revision)
             .map_err(|_| db_error("task board configuration revision is out of range"))
     }
+}
+
+async fn persist_workflow_execution_cas_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected: &TaskBoardWorkflowExecutionCas,
+    persisted: TaskBoardWorkflowExecutionRecord,
+) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
+    update_execution_in_tx(transaction, expected, &persisted).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    Ok(TaskBoardWorkflowExecutionCasOutcome::Updated(persisted))
 }
 
 pub(super) async fn load_execution_in_tx(

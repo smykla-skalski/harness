@@ -106,97 +106,212 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board held dispatch delivery")
             .await?;
-        let (intent_id, payload_json) =
-            load_held_delivery(transaction.as_mut(), board_item_id).await?;
-        let mut applied = decode_applied(&payload_json)?;
-        let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
-        let before = item.clone();
-        ensure_held_linkage(&applied, &item)?;
-        validate_held_workflow_claim_revision(&applied, revision)?;
-        ensure_dispatch_item_startable(
-            &item,
-            &applied.session_id,
-            &applied.work_item_id,
-            applied.item.workflow.execution_id.as_deref(),
-        )?;
-        if let TaskBoardAdmissionCheck::Blocked(admission) =
-            revalidate_dispatch_admission_in_tx(&mut transaction, &intent_id, &item, revision)
-                .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit refused held task board admission: {error}"))
-            })?;
-            return Err(CliErrorKind::invalid_transition(admission.refusal_message()).into());
-        }
-        let now = utc_now();
-        let authorization =
-            authorize_held_delivery(&mut transaction, board_item_id, &item, &now).await?;
-        let (decision_id, consumed_approval_grant_id) = match authorization {
-            HeldDeliveryAuthorization::Allowed {
-                decision_id,
-                consumed_approval_grant_id,
-            } => (decision_id, consumed_approval_grant_id),
-            HeldDeliveryAuthorization::Refused(decision) => {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit denied held task board delivery: {error}"))
-                })?;
-                return Err(CliErrorKind::invalid_transition(format!(
-                    "current spawn policy refused held delivery: {decision:?}"
-                ))
-                .into());
+        // Both arms must stay boxed. Awaited inline they fold their frames into
+        // this future, which the websocket dispatcher, the HTTP task-board
+        // operations and the route executor all await; that pushes those three
+        // and this function past the 16384-byte threshold of
+        // `clippy::large_futures`, which is denied here. `cargo check` will not
+        // tell you, because the limit is a lint rather than a compile error.
+        match Box::pin(prepare_held_claim_in_tx(&mut transaction, board_item_id)).await? {
+            HeldClaimPreparation::Refused { context, message } => {
+                Err(commit_held_refusal(transaction, context, message).await)
             }
-        };
-        item.workflow.current_step_id = Some("dispatch".to_string());
-        item.workflow.last_error = None;
-        if let Some(decision_id) = decision_id {
-            item.workflow.push_policy_trace_id(decision_id);
+            HeldClaimPreparation::Ready(prepared) => {
+                Box::pin(deliver_held_claim(transaction, prepared)).await
+            }
         }
-        item.updated_at.clone_from(&now);
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Generic,
-        )
-        .await?;
-        let delivered_item_revision = write.item_revision;
-        let item = write.item.clone();
-        advance_held_workflow_launch(&mut applied, &item, delivered_item_revision)?;
-        applied.item = item;
-        // Rendering is pure, so it belongs here rather than around the call:
-        // this is the first point where `applied` is the state the commit will
-        // publish and the worker will start from. Returning before the commit
-        // drops the transaction, which rolls back the lane write, the consumed
-        // approval grant and the intent update together.
-        let rendered_prompt = rendered_worker_prompt(&applied, &intent_id)?;
-        let claim_token = start_held_intent_in_tx(
-            &mut transaction,
-            &intent_id,
-            &applied,
-            &now,
-            consumed_approval_grant_id.as_deref(),
-        )
-        .await?;
-        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit held task board delivery: {error}")))?;
-        Ok(ClaimedHeldTaskBoardDispatch {
-            claim: ClaimedTaskBoardDispatch {
-                intent_id,
-                claim_token,
-                applied,
-                consumed_approval_grant_id,
-                action: TaskBoardDispatchClaimAction::Start,
-            },
-            rendered_prompt,
-        })
     }
+}
+
+/// Whether a held claim may proceed, or which refusal it settled on.
+enum HeldClaimPreparation {
+    /// `context` names the commit for the error message the original refusal
+    /// used, without the leading `commit `.
+    Refused {
+        context: &'static str,
+        message: String,
+    },
+    /// Boxed because the preparation carries the item twice, before and after;
+    /// unboxed it is stored twice again in the caller's future, once here and
+    /// once as the binding the match moves out.
+    Ready(Box<PreparedHeldClaim>),
+}
+
+/// The item and payload a held claim proved it may deliver, already advanced to
+/// the dispatch step the commit will publish.
+struct PreparedHeldClaim {
+    intent_id: String,
+    applied: DispatchAppliedTask,
+    item: TaskBoardItem,
+    before: TaskBoardItem,
+    revision: i64,
+    consumed_approval_grant_id: Option<String>,
+    now: String,
+}
+
+/// Re-evaluate admission and current spawn policy against the held payload, and
+/// shape the item the delivery will write.
+async fn prepare_held_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    board_item_id: &str,
+) -> Result<HeldClaimPreparation, CliError> {
+    let state = load_held_claim_state_in_tx(transaction, board_item_id).await?;
+    if let TaskBoardAdmissionCheck::Blocked(admission) = revalidate_dispatch_admission_in_tx(
+        transaction,
+        &state.intent_id,
+        &state.item,
+        state.revision,
+    )
+    .await?
+    {
+        return Ok(HeldClaimPreparation::Refused {
+            context: "refused held task board admission",
+            message: admission.refusal_message(),
+        });
+    }
+    let now = utc_now();
+    match authorize_held_delivery(transaction, board_item_id, &state.item, &now).await? {
+        HeldDeliveryAuthorization::Refused(decision) => Ok(HeldClaimPreparation::Refused {
+            context: "denied held task board delivery",
+            message: format!("current spawn policy refused held delivery: {decision:?}"),
+        }),
+        HeldDeliveryAuthorization::Allowed {
+            decision_id,
+            consumed_approval_grant_id,
+        } => {
+            let HeldClaimState {
+                intent_id,
+                applied,
+                mut item,
+                before,
+                revision,
+            } = state;
+            advance_held_item(&mut item, decision_id, &now);
+            Ok(HeldClaimPreparation::Ready(Box::new(PreparedHeldClaim {
+                intent_id,
+                applied,
+                item,
+                before,
+                revision,
+                consumed_approval_grant_id,
+                now,
+            })))
+        }
+    }
+}
+
+/// The held delivery and the item it names, proven to still match the board
+/// linkage, the workflow start fence and the startability a claim requires.
+struct HeldClaimState {
+    intent_id: String,
+    applied: DispatchAppliedTask,
+    item: TaskBoardItem,
+    before: TaskBoardItem,
+    revision: i64,
+}
+
+async fn load_held_claim_state_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    board_item_id: &str,
+) -> Result<HeldClaimState, CliError> {
+    let (intent_id, payload_json) = load_held_delivery(transaction.as_mut(), board_item_id).await?;
+    let applied = decode_applied(&payload_json)?;
+    let (item, revision) = load_item_in_tx(transaction, board_item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
+    ensure_held_linkage(&applied, &item)?;
+    validate_held_workflow_claim_revision(&applied, revision)?;
+    ensure_dispatch_item_startable(
+        &item,
+        &applied.session_id,
+        &applied.work_item_id,
+        applied.item.workflow.execution_id.as_deref(),
+    )?;
+    Ok(HeldClaimState {
+        intent_id,
+        before: item.clone(),
+        applied,
+        item,
+        revision,
+    })
+}
+
+/// Point the item at the dispatch step the delivery is about to start, carrying
+/// the policy decision that allowed it.
+fn advance_held_item(item: &mut TaskBoardItem, decision_id: Option<String>, now: &str) {
+    item.workflow.current_step_id = Some("dispatch".to_string());
+    item.workflow.last_error = None;
+    if let Some(decision_id) = decision_id {
+        item.workflow.push_policy_trace_id(decision_id);
+    }
+    now.clone_into(&mut item.updated_at);
+}
+
+/// Commit the refusal's reads and hand back the transition error it decided on.
+///
+/// A refusal writes nothing, so committing rather than dropping keeps it out of
+/// the rollback path, and a failed commit outranks the refusal because the
+/// caller has to hear about the durability problem first.
+async fn commit_held_refusal(
+    transaction: Transaction<'_, Sqlite>,
+    context: &str,
+    message: String,
+) -> CliError {
+    if let Err(error) = transaction.commit().await {
+        return db_error(format!("commit {context}: {error}"));
+    }
+    CliErrorKind::invalid_transition(message).into()
+}
+
+/// Write the lane transition, claim the intent and publish the change, then
+/// settle the transaction that made all three one delivery.
+async fn deliver_held_claim(
+    mut transaction: Transaction<'_, Sqlite>,
+    prepared: Box<PreparedHeldClaim>,
+) -> Result<ClaimedHeldTaskBoardDispatch, CliError> {
+    let prepared = *prepared;
+    let mut applied = prepared.applied;
+    let write = replace_with_lane_transition_in_tx(
+        &mut transaction,
+        prepared.before,
+        prepared.revision,
+        prepared.item,
+        LaneTransitionKind::Generic,
+    )
+    .await?;
+    let item = write.item.clone();
+    advance_held_workflow_launch(&mut applied, &item, write.item_revision)?;
+    applied.item = item;
+    // Rendering is pure, so it belongs here rather than around the call: this is
+    // the first point where `applied` is the state the commit will publish and
+    // the worker will start from. Returning before the commit drops the
+    // transaction, which rolls back the lane write, the consumed approval grant
+    // and the intent update together.
+    let rendered_prompt = rendered_worker_prompt(&applied, &prepared.intent_id)?;
+    let claim_token = start_held_intent_in_tx(
+        &mut transaction,
+        &prepared.intent_id,
+        &applied,
+        &prepared.now,
+        prepared.consumed_approval_grant_id.as_deref(),
+    )
+    .await?;
+    let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit held task board delivery: {error}")))?;
+    Ok(ClaimedHeldTaskBoardDispatch {
+        claim: ClaimedTaskBoardDispatch {
+            intent_id: prepared.intent_id,
+            claim_token,
+            applied,
+            consumed_approval_grant_id: prepared.consumed_approval_grant_id,
+            action: TaskBoardDispatchClaimAction::Start,
+        },
+        rendered_prompt,
+    })
 }
 
 /// Move the held intent to `starting` under a fresh claim token, carrying the

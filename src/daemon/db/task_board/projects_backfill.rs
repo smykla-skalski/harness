@@ -65,18 +65,19 @@ async fn attribute_item_in_tx(
     .bind(&project_id)
     .execute(transaction.as_mut())
     .await
-    .map_err(|error| {
-        db_error(format!(
-            "attribute task board item '{}': {error}",
-            item.id
-        ))
-    })?;
+    .map_err(|error| db_error(format!("attribute task board item '{}': {error}", item.id)))?;
     Ok(true)
 }
 
 /// Whole items rather than the three columns attribution reads today, so a rule
 /// that starts reading a fourth repairs the same rows it now names, instead of
 /// silently missing them against a projection nobody remembered to widen.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "two queries, a group-by and a decode loop score 6 structurally; the \
+              one tracing::warn! naming an item this build cannot read expands to \
+              7 more points on its own, so no split reaches the threshold of 7"
+)]
 async fn load_unattributed_items_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
