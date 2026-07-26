@@ -65,6 +65,9 @@ fn resolves_in(command: &clap::Command, path: &[&str]) -> bool {
     }
 }
 
+/// `harness daemon` and `harness bridge` only hand their arguments to a worker
+/// binary, so resolving one of those here would prove the front CLI accepts it
+/// and nothing about the worker. Advertising one needs a worker-side check too.
 fn resolves(command: &str, cli: &clap::Command, hook_subcommands: &BTreeSet<String>) -> bool {
     let mut tokens = command.split_whitespace();
     let Some(binary) = tokens.next() else {
@@ -95,6 +98,7 @@ fn every_advertised_command_resolves_against_a_shipped_binary() {
 
     assert!(
         unresolved.is_empty(),
-        "the report advertises commands no shipped binary accepts: {unresolved:?}"
+        "the report advertises commands that do not resolve against the harness or \
+         harness-hook command surface: {unresolved:?}"
     );
 }
