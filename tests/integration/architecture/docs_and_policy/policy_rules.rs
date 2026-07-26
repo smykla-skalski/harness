@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::super::helpers::collect_hits_in_tree;
+use super::super::helpers::collect_code_hits_in_tree;
 
 #[test]
 fn repo_contains_no_clippy_allow_attributes() {
@@ -9,7 +9,7 @@ fn repo_contains_no_clippy_allow_attributes() {
     let mut hits = Vec::new();
 
     for start in [root.join("src"), root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_hits_in_tree(
+        hits.extend(collect_code_hits_in_tree(
             &start,
             root,
             None,
@@ -32,7 +32,7 @@ fn repo_contains_no_custom_macro_rules() {
     let needle = ["macro", "_rules!"].concat();
 
     for start in [root.join("src"), root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_hits_in_tree(
+        hits.extend(collect_code_hits_in_tree(
             &start,
             root,
             None,
@@ -66,7 +66,7 @@ fn tests_do_not_quit_or_kill_apps_by_name() {
     let mut hits = Vec::new();
 
     for start in [root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_hits_in_tree(
+        hits.extend(collect_code_hits_in_tree(
             &start,
             root,
             None,

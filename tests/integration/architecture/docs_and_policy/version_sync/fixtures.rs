@@ -207,26 +207,49 @@ pub(super) const MIXED_MONITOR_PBXPROJ_VERSION_FIXTURE: &str = "\
 \trootObject = DDDDDDDDDDDDDDDDDDDDDDDD /* Project object */;\n\
 }\n";
 
+/// Every workspace member's manifest, read from the real workspace manifest.
+///
+/// `version.sh` walks the members declared in the copied root `Cargo.toml` and
+/// aborts on the first one whose manifest is missing, so a hard-coded fixture
+/// list breaks the moment a crate joins the workspace - which here is roughly
+/// weekly. Deriving it means the fixture cannot drift from the manifest at all.
+fn workspace_member_manifests(root: &Path) -> Vec<String> {
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).expect("workspace manifest");
+    let members = manifest
+        .split_once("members = [")
+        .expect("workspace members list")
+        .1
+        .split_once(']')
+        .expect("workspace members terminator")
+        .0;
+
+    members
+        .lines()
+        .filter_map(|line| {
+            let member = line.trim().trim_end_matches(',').trim_matches('"');
+            if member.is_empty() || member.starts_with('#') {
+                return None;
+            }
+            Some(if member == "." {
+                "Cargo.toml".to_owned()
+            } else {
+                format!("{member}/Cargo.toml")
+            })
+        })
+        .collect()
+}
+
 pub(super) fn setup_version_script_fixture_with_pbxproj(
     root: &Path,
     pbxproj_fixture: &str,
 ) -> TempDir {
     let fixture_root = tempdir().expect("temporary repo");
-    for relative_path in [
+    // Every repo-relative path `version.sh` rewrites, which is not derivable
+    // without parsing the script; the member manifests below are derived.
+    let fixed_paths = [
         "Cargo.toml",
         "Cargo.lock",
-        "aff/Cargo.toml",
-        "crates/harness-bridge/Cargo.toml",
-        "crates/harness-command/Cargo.toml",
-        "crates/harness-daemon-client/Cargo.toml",
-        "crates/harness-daemon/Cargo.toml",
-        "crates/harness-hook/Cargo.toml",
-        "crates/harness-mcp/Cargo.toml",
-        "crates/harness-protocol/Cargo.toml",
-        "crates/harness-systemd/Cargo.toml",
-        "crates/harness-systemd-protocol/Cargo.toml",
-        "crates/harness-telemetry/Cargo.toml",
-        "testkit/Cargo.toml",
+        "docs/api/openapi.json",
         "src/observe/output.rs",
         "scripts/version.sh",
         "apps/harness-monitor/Scripts/lib/swift-tool-env.sh",
@@ -234,9 +257,15 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
         "apps/harness-monitor/Scripts/patch-tuist-pbxproj.py",
         "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
         "apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
-    ] {
-        let source = root.join(relative_path);
-        let destination = fixture_root.path().join(relative_path);
+    ];
+
+    for relative_path in fixed_paths
+        .into_iter()
+        .map(str::to_owned)
+        .chain(workspace_member_manifests(root))
+    {
+        let source = root.join(&relative_path);
+        let destination = fixture_root.path().join(&relative_path);
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent).expect("fixture parent");
         }
