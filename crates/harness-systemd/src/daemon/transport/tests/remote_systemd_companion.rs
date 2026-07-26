@@ -19,6 +19,10 @@ const COMPANION_RUNTIME_TOKEN_ARGUMENT: &str =
     "--companion-auth-token-file %d/companion-auth-token";
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "assert macros expand to one branch each, so a test that verifies a whole scenario cannot score under the threshold without being split into fragments that prove less"
+)]
 fn remote_systemd_plan_renders_companion_routing_and_credential() {
     let args = install_args([
         "test",
