@@ -63,11 +63,11 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote result import prepare")
             .await?;
-        // Same chain hazard as `mark_manual_required` below: the callers that
-        // reach this prepare are already about twenty async frames deep, and a
-        // nested helper here fails the crate's recursion limit with `E0275:
-        // overflow evaluating the requirement sqlx::SqliteStatement: Send`.
-        // Erasing both halves proves `Send` once and truncates the chain.
+        // Same chain hazard as `mark_manual_required` below, and measured the
+        // same way: with these two erasures removed, the crate fails to build
+        // with `E0275: overflow evaluating the requirement
+        // &sqlx::SqliteStatement: Send`, reported against the websocket
+        // dispatch task that owns every controller reaching this prepare.
         let target: ImportTargetFuture<'_> = Box::pin(load_result_import_target_in_tx(
             &mut transaction,
             expected,
@@ -118,11 +118,9 @@ impl AsyncDaemonDb {
         }
         require_git_evidence(&record, git)?;
         // `require_import_authority` reloads the assignment, its execution and
-        // the import materials, which makes it the deepest `Send` obligation
-        // chain reaching this recorder. E0275 reports it from the websocket
-        // dispatch task that owns the whole controller closure, so erasing it
-        // here proves `Send` once and keeps that closure inside the crate's
-        // recursion limit.
+        // the import materials, so it carries the deepest `Send` obligation
+        // chain in this recorder. Erasing it is load-bearing for the same
+        // measured reason as the prepare above.
         let authority: ImportAuthorityFuture<'_> =
             Box::pin(require_import_authority(&mut transaction, &record));
         authority.await?;

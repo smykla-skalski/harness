@@ -74,10 +74,11 @@ impl AsyncDaemonDb {
             }
             TerminalAdoptionScreen::Proceed(proceed) => {
                 // The adoption write reaches the result-import evidence loaders
-                // through six nested frames, and every controller that calls
-                // this entry point is already about twenty frames deep, so
-                // E0275 reports the whole closure over the crate's recursion
-                // limit. Erasing here proves `Send` once for the write half.
+                // through six nested frames, on top of the twenty the calling
+                // controller already spends, which puts the closure over the
+                // crate's recursion limit and fails the build with `E0275:
+                // overflow evaluating the requirement &sqlx::SqliteStatement:
+                // Send`. Erasing proves `Send` once for the write half.
                 let settled: SettledAdoptionFuture<'_> =
                     Box::pin(settle_screened_adoption(transaction, proceed));
                 settled.await
