@@ -115,45 +115,123 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote settlement response")
             .await?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        require_settlement_handoff(&mut transaction, &assignment, request).await?;
-        if exact_receipt_or_conflict(
+        // The screen and the settle path must stay boxed. Awaited inline they
+        // fold their frames into this future, which the remote controller's
+        // terminal settlement and the transport controller await transitively;
+        // that pushes both of those past the 16384-byte threshold of
+        // `clippy::large_futures`, which is denied here. `cargo check` will not
+        // tell you, because the limit is a lint rather than a compile error.
+        match Box::pin(screen_settlement_response_in_tx(
             &mut transaction,
             request,
+            response,
             authenticated_principal,
-            Some(response),
-        )
+        ))
         .await?
-        .is_some()
         {
-            let receipt = require_receipt(&mut transaction, request).await?;
-            commit_replay(transaction, "settlement response").await?;
-            return Ok(receipt);
+            SettlementResponseScreen::Replayed(receipt) => {
+                commit_replay(transaction, "settlement response").await?;
+                Ok(receipt)
+            }
+            SettlementResponseScreen::Settle(assignment) => {
+                Box::pin(commit_settled_response(
+                    transaction,
+                    &assignment,
+                    request,
+                    response,
+                    authenticated_principal,
+                ))
+                .await
+            }
         }
-        require_exact_terminal_assignment(&assignment, request, authenticated_principal)?;
-        if !exact_pending_authority(&assignment, request) {
-            return Err(concurrent(
-                "remote settlement response lost its durable I/O authority",
-            ));
-        }
-        consume_controller_operation_trust_in_tx(
-            &mut transaction,
-            &assignment,
-            TaskBoardRemoteOperationKind::Settle,
-            &request.request_sha256,
-        )
-        .await?;
-        insert_settlement_in_tx(&mut transaction, request, authenticated_principal, response)
-            .await?;
-        clear_authority_in_tx(&mut transaction, &assignment, request, response).await?;
-        let receipt = require_receipt(&mut transaction, request).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote settlement response: {error}")))?;
-        Ok(receipt)
     }
+}
+
+/// Whether a settlement response is a replay of one already recorded, or the
+/// generation that still owns the write.
+///
+/// The assignment stays boxed: unboxed it is stored twice in the caller's
+/// future, once as this enum and once as the binding the match moves out, which
+/// on its own puts that future past the 16384-byte `clippy::large_futures`
+/// threshold at the two controllers that await it.
+enum SettlementResponseScreen {
+    Replayed(TaskBoardRemoteSettlementReceipt),
+    Settle(Box<TaskBoardRemoteAssignmentRecord>),
+}
+
+async fn screen_settlement_response_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSettledRequest,
+    response: &RemoteSettledResponse,
+    authenticated_principal: &str,
+) -> Result<SettlementResponseScreen, CliError> {
+    let assignment = require_assignment(transaction, &request.binding.assignment_id).await?;
+    require_settlement_handoff(transaction, &assignment, request).await?;
+    if exact_receipt_or_conflict(
+        transaction,
+        request,
+        authenticated_principal,
+        Some(response),
+    )
+    .await?
+    .is_some()
+    {
+        let receipt = require_receipt(transaction, request).await?;
+        return Ok(SettlementResponseScreen::Replayed(receipt));
+    }
+    Ok(SettlementResponseScreen::Settle(Box::new(assignment)))
+}
+
+/// Record the settlement this generation owns and settle the transaction.
+///
+/// The terminal and authority guards stay ahead of the first write, so a lost
+/// authority still refuses before anything is persisted.
+async fn commit_settled_response(
+    mut transaction: Transaction<'_, Sqlite>,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteSettledRequest,
+    response: &RemoteSettledResponse,
+    authenticated_principal: &str,
+) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
+    require_exact_terminal_assignment(assignment, request, authenticated_principal)?;
+    if !exact_pending_authority(assignment, request) {
+        return Err(concurrent(
+            "remote settlement response lost its durable I/O authority",
+        ));
+    }
+    persist_settled_response_in_tx(
+        &mut transaction,
+        assignment,
+        request,
+        response,
+        authenticated_principal,
+    )
+    .await?;
+    let receipt = require_receipt(&mut transaction, request).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote settlement response: {error}")))?;
+    Ok(receipt)
+}
+
+async fn persist_settled_response_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteSettledRequest,
+    response: &RemoteSettledResponse,
+    authenticated_principal: &str,
+) -> Result<(), CliError> {
+    consume_controller_operation_trust_in_tx(
+        transaction,
+        assignment,
+        TaskBoardRemoteOperationKind::Settle,
+        &request.request_sha256,
+    )
+    .await?;
+    insert_settlement_in_tx(transaction, request, authenticated_principal, response).await?;
+    clear_authority_in_tx(transaction, assignment, request, response).await?;
+    Ok(())
 }
 
 async fn require_settlement_handoff(

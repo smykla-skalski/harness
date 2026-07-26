@@ -2,19 +2,15 @@ use sqlx::{Sqlite, Transaction};
 
 use super::items::bump_change_in_tx;
 use super::remote_assignment_active_fence::{
-    TaskBoardRemoteControllerHandoffKind, controller_handoff_matches_in_tx,
-    record_controller_handoff_in_tx,
+    TaskBoardRemoteControllerHandoffKind, record_controller_handoff_in_tx,
 };
 use super::remote_assignment_io_authority::{
     active_target_matches, has_remote_io_authority, monotonic_time,
 };
-use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, concurrent, load_assignment_in_tx,
-};
+use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
 use super::remote_assignment_status_failure::settle_failed_remote_attempt_in_tx;
-use super::remote_result_import::require_adopted_remote_implementation_import_in_tx;
 use super::workflow_execution_attempts::update_attempt_in_tx;
-use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
+use super::workflow_executions::update_execution_in_tx;
 use super::workflow_terminal::{project_terminal_execution_in_tx, settle_prepared_dispatch_in_tx};
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -36,6 +32,10 @@ use crate::workspace::utc_now;
 mod evidence;
 use evidence::{load_completed_artifact, require_failed_artifact_set};
 
+#[path = "remote_assignment_result_adoption/screen.rs"]
+mod screen;
+use screen::{ProceedingAdoption, TerminalAdoptionScreen, screen_terminal_adoption_in_tx};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteResultAdoptionOutcome {
     Updated(TaskBoardWorkflowExecutionRecord),
@@ -53,50 +53,45 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote result adoption")
             .await?;
-        let assignment = load_assignment_in_tx(&mut transaction, assignment_id)
-            .await?
-            .ok_or_else(|| concurrent("remote result assignment disappeared"))?;
-        let parent = load_execution_in_tx(&mut transaction, &assignment.execution_id)
-            .await?
-            .ok_or_else(|| concurrent("remote result execution disappeared"))?;
-        if assignment.fencing_epoch == fencing_epoch
-            && terminal_adoption_replay_matches(&assignment, &parent)
-            && controller_handoff_matches_in_tx(
-                &mut transaction,
-                &assignment,
-                TaskBoardRemoteControllerHandoffKind::ResultAdopted,
-                &parent,
-            )
-            .await?
-        {
-            if completed_implementation(&assignment) {
-                require_adopted_remote_implementation_import_in_tx(&mut transaction, &assignment)
-                    .await?;
-            }
-            commit_adoption(transaction, "replayed").await?;
-            return Ok(TaskBoardRemoteResultAdoptionOutcome::Replayed(parent));
-        }
-        if assignment.fencing_epoch != fencing_epoch || cas_mismatch(expected, &parent).is_some() {
-            commit_adoption(transaction, "stale").await?;
-            return Ok(TaskBoardRemoteResultAdoptionOutcome::Stale(parent));
-        }
-        let (attempt_index, current_attempt) =
-            require_active_adoption_target(&assignment, &parent)?;
-        let combined = apply_terminal_adoption_in_tx(
+        match screen_terminal_adoption_in_tx(
             &mut transaction,
-            &assignment,
-            &parent,
-            &current_attempt,
-            attempt_index,
-            &utc_now(),
+            expected,
+            assignment_id,
+            fencing_epoch,
         )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote result adoption: {error}")))?;
-        Ok(TaskBoardRemoteResultAdoptionOutcome::Updated(combined))
+        .await?
+        {
+            TerminalAdoptionScreen::Settled { context, outcome } => {
+                commit_adoption(transaction, context).await?;
+                Ok(outcome)
+            }
+            TerminalAdoptionScreen::Proceed(proceed) => {
+                settle_screened_adoption(transaction, proceed).await
+            }
+        }
     }
+}
+
+/// Write the adoption the screen cleared and settle the transaction that made
+/// the handoff, the attempt and the item projection one adoption.
+async fn settle_screened_adoption(
+    mut transaction: Transaction<'_, Sqlite>,
+    proceed: Box<ProceedingAdoption>,
+) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
+    let combined = apply_terminal_adoption_in_tx(
+        &mut transaction,
+        &proceed.assignment,
+        &proceed.parent,
+        &proceed.current_attempt,
+        proceed.attempt_index,
+        &utc_now(),
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote result adoption: {error}")))?;
+    Ok(TaskBoardRemoteResultAdoptionOutcome::Updated(combined))
 }
 
 async fn apply_terminal_adoption_in_tx(

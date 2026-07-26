@@ -1,3 +1,6 @@
+use std::iter::Peekable;
+use std::str::Chars;
+
 use rusqlite::Connection;
 
 use super::{CliError, db_error};
@@ -251,53 +254,86 @@ fn normalize_sql(sql: &str) -> String {
     while characters.peek().is_some() {
         let character = characters.next().expect("peeked SQL character");
         if let Some(quote) = quoted {
-            normalized.push(character);
-            if character == quote {
-                if characters.peek() == Some(&quote) {
-                    normalized.push(characters.next().expect("quoted SQL escape"));
-                } else {
-                    quoted = None;
-                }
-            }
-            continue;
-        }
-        if character == '-' && characters.peek() == Some(&'-') {
-            characters.next();
-            while characters.next().is_some_and(|character| character != '\n') {}
-            whitespace = !normalized.is_empty();
-            continue;
-        }
-        if character == '/' && characters.peek() == Some(&'*') {
-            characters.next();
-            let mut previous = None;
-            while characters.peek().is_some() {
-                let comment_character = characters.next().expect("peeked SQL comment character");
-                if previous == Some('*') && comment_character == '/' {
-                    break;
-                }
-                previous = Some(comment_character);
-            }
-            whitespace = !normalized.is_empty();
-            continue;
-        }
-        if character == '\'' || character == '"' {
-            if whitespace && !normalized.is_empty() {
-                normalized.push(' ');
-            }
-            whitespace = false;
-            normalized.push(character);
-            quoted = Some(character);
-        } else if character.is_whitespace() {
+            quoted = continue_quoted_sql(&mut normalized, &mut characters, character, quote);
+        } else if skip_sql_comment(&mut characters, character) {
             whitespace = !normalized.is_empty();
         } else {
-            if whitespace {
-                normalized.push(' ');
-                whitespace = false;
-            }
-            normalized.extend(character.to_lowercase());
+            quoted = push_sql_character(&mut normalized, &mut whitespace, character);
         }
     }
     normalized
+}
+
+/// Copy one character of a quoted literal through untouched, and report the
+/// quote still in force: a doubled quote escapes itself rather than closing.
+fn continue_quoted_sql(
+    normalized: &mut String,
+    characters: &mut Peekable<Chars<'_>>,
+    character: char,
+    quote: char,
+) -> Option<char> {
+    normalized.push(character);
+    if character != quote {
+        return Some(quote);
+    }
+    if characters.peek() == Some(&quote) {
+        normalized.push(characters.next().expect("quoted SQL escape"));
+        return Some(quote);
+    }
+    None
+}
+
+/// Consume a line or block comment when `character` opens one, reporting
+/// whether anything was skipped so the caller can mark pending whitespace.
+fn skip_sql_comment(characters: &mut Peekable<Chars<'_>>, character: char) -> bool {
+    if character == '-' && characters.peek() == Some(&'-') {
+        characters.next();
+        while characters.next().is_some_and(|character| character != '\n') {}
+        return true;
+    }
+    if character == '/' && characters.peek() == Some(&'*') {
+        characters.next();
+        skip_sql_block_comment(characters);
+        return true;
+    }
+    false
+}
+
+fn skip_sql_block_comment(characters: &mut Peekable<Chars<'_>>) {
+    let mut previous = None;
+    for character in characters.by_ref() {
+        if previous == Some('*') && character == '/' {
+            break;
+        }
+        previous = Some(character);
+    }
+}
+
+/// Append one character found outside quotes and comments, collapsing pending
+/// whitespace, and report the quote a literal opened here.
+fn push_sql_character(
+    normalized: &mut String,
+    whitespace: &mut bool,
+    character: char,
+) -> Option<char> {
+    if character == '\'' || character == '"' {
+        if *whitespace && !normalized.is_empty() {
+            normalized.push(' ');
+        }
+        *whitespace = false;
+        normalized.push(character);
+        return Some(character);
+    }
+    if character.is_whitespace() {
+        *whitespace = !normalized.is_empty();
+        return None;
+    }
+    if *whitespace {
+        normalized.push(' ');
+        *whitespace = false;
+    }
+    normalized.extend(character.to_lowercase());
+    None
 }
 
 fn migration_trigger_sql(trigger: &str) -> Option<String> {

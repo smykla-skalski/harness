@@ -33,46 +33,21 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board workflow dispatch preparation")
             .await?;
-        let (item_id, session_id, work_item_id, execution_id) =
-            claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
-        let applied = load_claimed_applied(&mut transaction, intent_id, claim_token).await?;
-        ensure_workflow_launch(&applied)?;
-        let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        validate_claimed_identity(&item, &session_id, &work_item_id, &execution_id, &applied)?;
-        let (prepared_revision, configuration_revision) = workflow_start_fence(&applied)?
-            .ok_or_else(|| db_error("workflow dispatch has no immutable start fence"))?;
-        validate_worker_start_fence_in_tx(
+        let prepared =
+            screen_workflow_dispatch_in_tx(&mut transaction, intent_id, claim_token).await?;
+        persist_prepared_workflow_dispatch_in_tx(
             &mut transaction,
-            Some((prepared_revision, configuration_revision)),
-            revision,
-        )
-        .await?;
-        ensure_dispatch_item_startable(&item, &session_id, &work_item_id, Some(&execution_id))?;
-        item.workflow.current_step_id = Some("workflow_prepared".into());
-        item.updated_at = utc_now();
-        let started_revision = revision
-            .checked_add(1)
-            .ok_or_else(|| db_error("workflow item revision is out of range"))?;
-        replace_item_in_tx(&mut transaction, &item, started_revision).await?;
-        insert_started_workflow_in_tx(
-            &mut transaction,
-            &item,
-            started_revision,
             intent_id,
-            &applied,
+            claim_token,
+            &prepared,
         )
         .await?;
-        mark_workflow_prepared(&mut transaction, intent_id, claim_token).await?;
-        renew_dispatch_admission_in_tx(&mut transaction, intent_id).await?;
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!(
                 "commit task board workflow dispatch preparation: {error}"
             ))
         })?;
-        Ok(item)
+        Ok(prepared.item)
     }
 
     /// Commit admission only after the exact local or remote worker durably started.
@@ -269,6 +244,73 @@ fn target_resource<'a>(
                 "workflow execution target resource '{key}' is missing"
             ))
         })
+}
+
+/// The item a prepared dispatch is about to write, the revision it writes it
+/// at, and the claimed payload the started workflow row is built from.
+struct PreparedWorkflowDispatch {
+    item: TaskBoardItem,
+    started_revision: i64,
+    applied: DispatchAppliedTask,
+}
+
+/// Prove the claim still owns its item and its immutable start fence, then
+/// shape the item the preparation will persist.
+async fn screen_workflow_dispatch_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    claim_token: &str,
+) -> Result<PreparedWorkflowDispatch, CliError> {
+    let (item_id, session_id, work_item_id, execution_id) =
+        claimed_intent_identity(transaction, intent_id, claim_token).await?;
+    let applied = load_claimed_applied(transaction, intent_id, claim_token).await?;
+    ensure_workflow_launch(&applied)?;
+    let (mut item, revision) = load_item_in_tx(transaction, &item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+    validate_claimed_identity(&item, &session_id, &work_item_id, &execution_id, &applied)?;
+    let (prepared_revision, configuration_revision) = workflow_start_fence(&applied)?
+        .ok_or_else(|| db_error("workflow dispatch has no immutable start fence"))?;
+    validate_worker_start_fence_in_tx(
+        transaction,
+        Some((prepared_revision, configuration_revision)),
+        revision,
+    )
+    .await?;
+    ensure_dispatch_item_startable(&item, &session_id, &work_item_id, Some(&execution_id))?;
+    item.workflow.current_step_id = Some("workflow_prepared".into());
+    item.updated_at = utc_now();
+    Ok(PreparedWorkflowDispatch {
+        started_revision: revision
+            .checked_add(1)
+            .ok_or_else(|| db_error("workflow item revision is out of range"))?,
+        item,
+        applied,
+    })
+}
+
+/// Write the prepared item, its started workflow row and the intent's prepared
+/// marker. Admission is renewed rather than charged; the start completion path
+/// commits it once the worker durably started.
+async fn persist_prepared_workflow_dispatch_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    claim_token: &str,
+    prepared: &PreparedWorkflowDispatch,
+) -> Result<(), CliError> {
+    replace_item_in_tx(transaction, &prepared.item, prepared.started_revision).await?;
+    insert_started_workflow_in_tx(
+        transaction,
+        &prepared.item,
+        prepared.started_revision,
+        intent_id,
+        &prepared.applied,
+    )
+    .await?;
+    mark_workflow_prepared(transaction, intent_id, claim_token).await?;
+    renew_dispatch_admission_in_tx(transaction, intent_id).await?;
+    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    Ok(())
 }
 
 fn ensure_workflow_launch(applied: &DispatchAppliedTask) -> Result<(), CliError> {

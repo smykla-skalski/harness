@@ -329,6 +329,12 @@ async fn apply_restore_conflicts_in_tx(
     ))
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "accepting or rejecting a restored parent link scores 3 structurally; \
+              the one tracing::warn! reporting the rejected link expands to 7 more \
+              points on its own, so no split reaches the threshold of 7"
+)]
 async fn resolve_restore_parent_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
@@ -466,8 +472,7 @@ async fn reconcile_restore_triage_in_tx(
 ) -> Result<(Option<TriageOutcome>, LaneTransitionKind), CliError> {
     let pre_triage_item = item.clone();
     let outcome =
-        apply_active_triage_in_tx(transaction, item, decided_at, false, existing_override)
-            .await?;
+        apply_active_triage_in_tx(transaction, item, decided_at, false, existing_override).await?;
     let override_reapply_transition =
         reapply_active_override_outcome_in_tx(transaction, item, existing_override, decided_at)
             .await?;
