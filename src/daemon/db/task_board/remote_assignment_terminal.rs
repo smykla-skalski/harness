@@ -7,10 +7,8 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
     nonblank, to_i64,
 };
-use super::remote_assignment_rejection::{apply_rejected_offer, apply_unclaimable_offer};
-use super::remote_offer_receipts::{
-    ensure_accepted_offer_receipt_in_tx, load_offer_receipt_collisions_in_tx,
-};
+use super::remote_assignment_rejection::apply_unclaimable_offer;
+use super::remote_offer_receipts::ensure_accepted_offer_receipt_in_tx;
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     consume_controller_operation_trust_in_tx, consume_successor_recovery_operation_trust_in_tx,
@@ -21,6 +19,31 @@ use crate::daemon::task_board_remote_transport::wire::{
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use sqlx::{Sqlite, Transaction, query};
+
+mod offer_screen;
+use offer_screen::{
+    OfferScreen, OfferScreenLabels, apply_offer_disposition, screen_offer_response_in_tx,
+    validate_offer_request,
+};
+
+const OFFER_RESPONSE_LABELS: OfferScreenLabels = OfferScreenLabels {
+    principal: "remote assignment authenticated principal",
+    observed: "remote offer response time",
+    validate: "validate remote offer response",
+    abandoned: "stale abandoned offer response",
+    replayed: "replayed immutable remote offer response",
+    conflict: "remote offer response conflicts with immutable receipt evidence",
+};
+
+const PREDECESSOR_ACCEPTANCE_LABELS: OfferScreenLabels = OfferScreenLabels {
+    principal: "recovered remote offer authenticated principal",
+    observed: "recovered remote offer response time",
+    validate: "validate recovered offer response",
+    abandoned: "stale recovered abandoned offer",
+    replayed: "replayed recovered offer acceptance",
+    conflict: "recovered offer acceptance conflicts with immutable receipt evidence",
+};
+
 impl AsyncDaemonDb {
     pub(crate) async fn record_task_board_remote_offer_response(
         &self,
@@ -28,41 +51,23 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         observed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        nonblank(
-            authenticated_principal,
-            "remote assignment authenticated principal",
-        )?;
-        canonical_time(observed_at, "remote offer response time")?;
+        validate_offer_request(authenticated_principal, observed_at, &OFFER_RESPONSE_LABELS)?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote offer response")
             .await?;
         let record = require_assignment(&mut transaction, &response.binding.assignment_id).await?;
-        response
-            .validate(record.require_offer()?)
-            .map_err(|error| db_error(format!("validate remote offer response: {error}")))?;
-        if super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx(
-            &mut transaction,
-            record.require_offer()?,
+        let (mut transaction, record) = match screen_offer_response_in_tx(
+            transaction,
+            record,
+            response,
+            authenticated_principal,
+            &OFFER_RESPONSE_LABELS,
         )
         .await?
         {
-            commit_noop(transaction, "stale abandoned offer response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let receipts =
-            load_offer_receipt_collisions_in_tx(&mut transaction, record.require_offer()?).await?;
-        if !receipts.is_empty() {
-            if receipts.len() == 1
-                && receipts[0].is_exact_replay(record.require_offer()?, authenticated_principal)
-                && receipts[0].response()? == *response
-            {
-                commit_noop(transaction, "replayed immutable remote offer response").await?;
-                return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-            }
-            return Err(concurrent(
-                "remote offer response conflicts with immutable receipt evidence",
-            ));
-        }
+            OfferScreen::Settled(outcome) => return Ok(outcome),
+            OfferScreen::Proceed(transaction, record) => (transaction, record),
+        };
         if !response_binding_matches(&record, &response.binding, authenticated_principal) {
             commit_noop(transaction, "stale offer response").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
@@ -74,26 +79,7 @@ impl AsyncDaemonDb {
             &response.offer_request_sha256,
         )
         .await?;
-        match response.disposition {
-            RemoteOfferDisposition::Accepted => {
-                Box::pin(apply_accepted_offer(
-                    transaction,
-                    record,
-                    response,
-                    observed_at,
-                ))
-                .await
-            }
-            RemoteOfferDisposition::Rejected => {
-                Box::pin(apply_rejected_offer(
-                    transaction,
-                    record,
-                    response,
-                    observed_at,
-                ))
-                .await
-            }
-        }
+        apply_offer_disposition(transaction, record, response, observed_at).await
     }
     pub(crate) async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
@@ -102,11 +88,11 @@ impl AsyncDaemonDb {
         trust: &TaskBoardRemoteOperationTrustFence,
         observed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        nonblank(
+        validate_offer_request(
             authenticated_principal,
-            "recovered remote offer authenticated principal",
+            observed_at,
+            &PREDECESSOR_ACCEPTANCE_LABELS,
         )?;
-        canonical_time(observed_at, "recovered remote offer response time")?;
         if response.disposition != RemoteOfferDisposition::Accepted {
             return Err(db_error(
                 "predecessor offer acceptance recovery requires an accepted response",
@@ -116,32 +102,18 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board predecessor offer acceptance")
             .await?;
         let record = require_assignment(&mut transaction, &response.binding.assignment_id).await?;
-        response
-            .validate(record.require_offer()?)
-            .map_err(|error| db_error(format!("validate recovered offer response: {error}")))?;
-        if super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx(
-            &mut transaction,
-            record.require_offer()?,
+        let (mut transaction, record) = match screen_offer_response_in_tx(
+            transaction,
+            record,
+            response,
+            authenticated_principal,
+            &PREDECESSOR_ACCEPTANCE_LABELS,
         )
         .await?
         {
-            commit_noop(transaction, "stale recovered abandoned offer").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let receipts =
-            load_offer_receipt_collisions_in_tx(&mut transaction, record.require_offer()?).await?;
-        if !receipts.is_empty() {
-            if receipts.len() == 1
-                && receipts[0].is_exact_replay(record.require_offer()?, authenticated_principal)
-                && receipts[0].response()? == *response
-            {
-                commit_noop(transaction, "replayed recovered offer acceptance").await?;
-                return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-            }
-            return Err(concurrent(
-                "recovered offer acceptance conflicts with immutable receipt evidence",
-            ));
-        }
+            OfferScreen::Settled(outcome) => return Ok(outcome),
+            OfferScreen::Proceed(transaction, record) => (transaction, record),
+        };
         if !response_binding_matches(&record, &response.binding, authenticated_principal)
             || record.target_host_instance_id.as_deref()
                 == Some(trust.observed_host_instance_id.as_str())
@@ -189,16 +161,7 @@ impl AsyncDaemonDb {
             commit_noop(transaction, "replayed cancellation").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
         }
-        let cancellable = matches!(
-            record.state,
-            TaskBoardRemoteAssignmentState::Offered
-                | TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        );
-        if record.executor_start_authority_sha256.is_some()
-            || record.executor_stop_pending.is_some()
-            || !cancellable
+        if !remote_assignment_is_mutable(&record)
             || !mutation_binding_matches(
                 &record,
                 &request.binding,
@@ -255,18 +218,7 @@ impl AsyncDaemonDb {
             commit_noop(transaction, "replayed unknown outcome").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
         }
-        let active = matches!(
-            record.state,
-            TaskBoardRemoteAssignmentState::Offered
-                | TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        );
-        if record.executor_start_authority_sha256.is_some()
-            || record.executor_stop_pending.is_some()
-            || !active
-            || !record_binding_matches(&record, binding)
-        {
+        if !remote_assignment_is_mutable(&record) || !record_binding_matches(&record, binding) {
             commit_noop(transaction, "stale unknown outcome").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
@@ -458,6 +410,22 @@ async fn retain_late_accepted_offer(
         return Err(concurrent("late accepted remote offer lost its fence"));
     }
     finish_mutation(transaction, &record.assignment_id, "late accepted offer").await
+}
+
+/// An assignment is still mutable only while it is in flight and neither the
+/// executor start authority nor a pending stop has taken hold of it. The same
+/// three conditions are spelled out in the `WHERE` clause of every fenced
+/// update that relies on them.
+fn remote_assignment_is_mutable(record: &TaskBoardRemoteAssignmentRecord) -> bool {
+    record.executor_start_authority_sha256.is_none()
+        && record.executor_stop_pending.is_none()
+        && matches!(
+            record.state,
+            TaskBoardRemoteAssignmentState::Offered
+                | TaskBoardRemoteAssignmentState::Claimed
+                | TaskBoardRemoteAssignmentState::Started
+                | TaskBoardRemoteAssignmentState::Running
+        )
 }
 
 fn response_binding_matches(
