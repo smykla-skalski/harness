@@ -18,16 +18,10 @@ pub fn execute(ctx: &HookContext) -> Result<HookResult, CliError> {
     if !ctx.skill_active || !ctx.is_suite_create() {
         return Ok(HookResult::allow());
     }
-    let command = match ctx.parsed_command() {
-        Ok(Some(command)) => command,
-        Ok(None) => return Ok(HookResult::allow()),
-        Err(e) => {
-            return Ok(HookMessage::runner_flow_required(
-                "parse command",
-                format!("shell tokenization failed: {e}"),
-            )
-            .into_result());
-        }
+    // Propagate tokenization failures rather than dressing them up as a
+    // workflow verdict; the runtime renders them as a hook-internal error.
+    let Some(command) = ctx.parsed_command()? else {
+        return Ok(HookResult::allow());
     };
     let words = command.words();
     if words.is_empty() {
