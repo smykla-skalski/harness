@@ -84,13 +84,17 @@ impl Store {
     /// Replace a reservation with what the daemon actually issued.
     ///
     /// # Errors
-    /// Returns [`sqlx::Error`] when the write fails.
+    /// Returns [`sqlx::Error`] when the write fails, and
+    /// [`sqlx::Error::RowNotFound`] when the reservation is gone. Answering
+    /// `Ok` to that would report a link as recorded while the row that should
+    /// carry it does not exist, and the record is the only thing an operator
+    /// has to find a live link by.
     pub async fn finalize_pair_link(
         &self,
         reservation_id: &str,
         record: &PairLinkRecord,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
+        let updated = sqlx::query(
             "UPDATE pair_links SET id = ?1, role = ?2, created_at = ?3, expires_at = ?4 \
              WHERE id = ?5",
         )
@@ -100,7 +104,12 @@ impl Store {
         .bind(to_unix_seconds(record.expires_at))
         .bind(reservation_id)
         .execute(self.pool())
-        .await?;
+        .await?
+        .rows_affected();
+
+        if updated == 0 {
+            return Err(sqlx::Error::RowNotFound);
+        }
         Ok(())
     }
 
@@ -312,6 +321,31 @@ mod tests {
             store.pair_links_for_account(&ada.id).await.expect("list"),
             vec![minted],
             "one row, carrying what the daemon issued"
+        );
+    }
+
+    /// Finalizing writes over a row that must already be there. If it is not —
+    /// the account was removed and took its rows with it, or another process
+    /// holds the same database — then answering `Ok` would log the link as
+    /// recorded while nothing holds it, and the record is the only way an
+    /// operator finds a live link to revoke.
+    #[tokio::test]
+    async fn finalizing_a_reservation_that_is_gone_is_an_error() {
+        let store = Store::open_in_memory().await.expect("store");
+        let ada = account(&store, "ada", "4242").await;
+
+        let error = store
+            .finalize_pair_link("reservation:vanished", &record("pair-1", &ada.id, 12))
+            .await
+            .expect_err("a missing reservation must not read as recorded");
+
+        assert!(matches!(error, sqlx::Error::RowNotFound), "{error}");
+        assert!(
+            store
+                .pair_links_for_account(&ada.id)
+                .await
+                .expect("list")
+                .is_empty()
         );
     }
 
