@@ -1430,7 +1430,8 @@ scenario_concurrent_builds_start_one_sccache_server() {
   local fake_bin="$SANDBOX/concurrent-prestart-bin"
   local log="$SANDBOX/concurrent-prestart-log"
   local pid_file="$SANDBOX/concurrent-prestart-pids"
-  local tmpdir starts builds
+  local tmpdir starts builds pid failures=0
+  local -a build_pids=()
   tmpdir="$(prestart_tmpdir)"
   mkdir -p "$fake_bin" "$tmpdir"
   : >"$log"
@@ -1444,18 +1445,24 @@ scenario_concurrent_builds_start_one_sccache_server() {
   # server, starts one, and all but the last are orphaned on the same path.
   for _ in {1..8}; do
     run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib &
+    build_pids+=("$!")
   done
-  wait
+  # Per pid, because a bare `wait` reports success however the jobs ended, and a
+  # build that died would otherwise reach the verdict below as a low count this
+  # scenario would blame on the prestart.
+  for pid in "${build_pids[@]}"; do
+    wait "$pid" || failures=$((failures + 1))
+  done
   stop_prestart_servers "$pid_file"
 
   starts="$(grep -c '^start-server$' "$log" || true)"
   builds="$(grep -c '^cargo$' "$log" || true)"
   rm -rf "$tmpdir"
 
-  if [[ "$starts" == "1" ]] && [[ "$builds" == "8" ]]; then
+  if [[ "$starts" == "1" ]] && [[ "$builds" == "8" ]] && (( failures == 0 )); then
     pass "a burst of concurrent builds starts exactly one sccache server"
   else
-    fail "concurrent prestart wrong: $starts server start(s) for $builds builds"
+    fail "concurrent prestart wrong: $starts server start(s) for $builds builds, $failures failed"
   fi
 }
 
