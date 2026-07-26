@@ -50,9 +50,17 @@ impl AsyncDaemonDb {
         revoked_at: &str,
         audit: &RemoteAuditEvent,
     ) -> Result<RemotePairingRevoked, CliError> {
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!("begin remote pairing revoke transaction: {error}"))
-        })?;
+        // Immediate rather than deferred: every branch below decides what to
+        // write from what the SELECT saw, and a deferred transaction takes no
+        // write lock until the first write, leaving room for the device to be
+        // revoked or the link to be claimed in between.
+        let mut transaction = self
+            .pool()
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(|error| {
+                db_error(format!("begin remote pairing revoke transaction: {error}"))
+            })?;
 
         let row = query(
             "SELECT p.claimed_client_id,
@@ -68,8 +76,12 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("load pairing {pairing_id} to revoke: {error}")))?;
 
         let Some(row) = row else {
-            transaction.rollback().await.map_err(|error| {
-                db_error(format!("rollback missing remote pairing revoke: {error}"))
+            // Recorded rather than rolled back: an attempt to revoke an id that
+            // does not exist is exactly what probing looks like, and the trail
+            // is the only place it would show.
+            record_revoke_audit(&mut transaction, audit).await?;
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit missing remote pairing revoke: {error}"))
             })?;
             return Ok(RemotePairingRevoked {
                 outcome: RemotePairingRevokeOutcome::NotFound,
@@ -109,17 +121,19 @@ impl AsyncDaemonDb {
                         revoked_at.to_owned(),
                     )
                 } else {
-                    // The device revoked itself between the read and here, or
-                    // an operator did it on the host. Either way it is off, and
-                    // this request is not what cut it off.
+                    // The write lock makes this mean the device was revoked
+                    // before the SELECT, which the guard above should have
+                    // caught. Report the moment on the row rather than this
+                    // one, so a retry never claims the revocation as its own.
+                    let existing = stored_device_revocation(&mut transaction, &client_id).await?;
                     (
                         RemotePairingRevokeOutcome::AlreadyRevoked,
-                        revoked_at.to_owned(),
+                        existing.unwrap_or_else(|| revoked_at.to_owned()),
                     )
                 }
             }
             (None, None) => {
-                query(
+                let withdrawn = query(
                     "UPDATE remote_pairing_codes
                      SET metadata_json = json_set(metadata_json, '$.revoked_at', ?2)
                      WHERE pairing_id = ?1 AND claimed_at IS NULL",
@@ -128,7 +142,17 @@ impl AsyncDaemonDb {
                 .bind(revoked_at)
                 .execute(transaction.as_mut())
                 .await
-                .map_err(|error| db_error(format!("withdraw link {pairing_id}: {error}")))?;
+                .map_err(|error| db_error(format!("withdraw link {pairing_id}: {error}")))?
+                .rows_affected();
+                if withdrawn != 1 {
+                    // The guard is `claimed_at IS NULL`, so changing nothing
+                    // means the link was claimed after all. Answering
+                    // `LinkWithdrawn` would report that nobody can use the code
+                    // at the moment somebody just did.
+                    return Err(db_error(format!(
+                        "pairing {pairing_id} was claimed while it was being withdrawn"
+                    )));
+                }
                 (
                     RemotePairingRevokeOutcome::LinkWithdrawn,
                     revoked_at.to_owned(),
@@ -177,4 +201,22 @@ async fn record_revoke_audit(
             ))
         })?;
     Ok(())
+}
+
+/// When a device was cut off, for reporting a revocation this request did not
+/// perform.
+async fn stored_device_revocation(
+    transaction: &mut Transaction<'_, Sqlite>,
+    client_id: &str,
+) -> Result<Option<String>, CliError> {
+    let row = query("SELECT revoked_at FROM remote_clients WHERE client_id = ?1")
+        .bind(client_id)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("read revocation for device {client_id}: {error}")))?;
+    row.map_or(Ok(None), |row| {
+        row.try_get("revoked_at").map_err(|error| {
+            db_error(format!("read revocation for device {client_id}: {error}"))
+        })
+    })
 }

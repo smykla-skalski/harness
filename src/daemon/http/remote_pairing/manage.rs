@@ -61,6 +61,12 @@ fn sees_every_pairing(client: Option<&RemoteStoredClient>) -> bool {
     client.is_none_or(|client| client.scopes.contains(&RemoteAccessScope::Admin))
 }
 
+/// A pairing minted before this field was recorded has no owner stored, so it
+/// reads as the host's and only an `admin` caller sees it. That is the safe
+/// direction and the only honest one: the daemon never wrote down which broker
+/// minted those, and attributing them to whichever broker happens to ask would
+/// hand one broker another's links. Such a link expires within a day; a device
+/// already claimed from one stays revocable from the host.
 fn owned_by(entry: &RemotePairingInventoryEntry, client_id: &str) -> bool {
     entry.minted_by.as_deref() == Some(client_id)
 }

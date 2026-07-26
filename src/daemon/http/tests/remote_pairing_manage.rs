@@ -199,6 +199,33 @@ async fn a_broker_cannot_revoke_a_link_it_did_not_mint() {
     server.abort();
 }
 
+/// Revoking an id that does not exist still reaches the trail. It is what
+/// probing looks like, and rolling the attempt back would leave no record of
+/// somebody walking the id space.
+#[tokio::test]
+async fn an_attempt_on_a_missing_pairing_is_still_recorded() {
+    let state = manage_state();
+    let db = state.db.get().expect("db slot").clone();
+    let (base_url, server) = serve_http(state).await;
+
+    revoke_as(&base_url, ADMIN, "pairing-does-not-exist").await;
+
+    let recorded: i64 = db
+        .lock()
+        .expect("db lock")
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM remote_audit_events
+             WHERE route_or_method = 'remote.pairing.revoke'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("audit count");
+
+    assert_eq!(recorded, 1);
+    server.abort();
+}
+
 /// A pairing the caller may not see answers the same way whether or not it
 /// exists, so the route cannot be used to find out which ids are real.
 #[tokio::test]
