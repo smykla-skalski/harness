@@ -1,26 +1,26 @@
 import SwiftUI
 
-enum TaskBoardAutomationStatusContentMode: Equatable {
-  case loading
-  case waiting
-  case presentation
-
-  static func resolve(
-    presentation: TaskBoardAutomationPresentation,
-    isPresentationCurrent: Bool
-  ) -> Self {
-    // Keep cached rows mounted during push rebuilds so inspector scroll geometry cannot collapse.
-    guard presentation.statePills.isEmpty else { return .presentation }
-    return isPresentationCurrent ? .waiting : .loading
-  }
-}
-
 struct TaskBoardAutomationStatusView: View {
+  enum ContentMode: Equatable {
+    case loading
+    case waiting
+    case presentation
+
+    static func resolve(
+      presentation: TaskBoardAutomationPresentation,
+      isPresentationCurrent: Bool
+    ) -> Self {
+      // Keep cached rows mounted during push rebuilds so inspector scroll geometry cannot collapse.
+      guard presentation.statePills.isEmpty else { return .presentation }
+      return isPresentationCurrent ? .waiting : .loading
+    }
+  }
+
   let presentation: TaskBoardAutomationPresentation
   let metrics: TaskBoardOverviewMetrics
   let isPresentationCurrent: Bool
 
-  private var contentMode: TaskBoardAutomationStatusContentMode {
+  private var contentMode: ContentMode {
     .resolve(
       presentation: presentation,
       isPresentationCurrent: isPresentationCurrent

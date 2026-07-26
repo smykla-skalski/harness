@@ -154,25 +154,25 @@ struct TaskBoardAutomationPresentationTests {
     )
 
     #expect(
-      TaskBoardAutomationStatusContentMode.resolve(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
         presentation: presentation,
         isPresentationCurrent: false
       ) == .presentation
     )
     #expect(
-      TaskBoardAutomationStatusContentMode.resolve(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
         presentation: presentation,
         isPresentationCurrent: true
       ) == .presentation
     )
     #expect(
-      TaskBoardAutomationStatusContentMode.resolve(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
         presentation: .empty,
         isPresentationCurrent: false
       ) == .loading
     )
     #expect(
-      TaskBoardAutomationStatusContentMode.resolve(
+      TaskBoardAutomationStatusView.ContentMode.resolve(
         presentation: .empty,
         isPresentationCurrent: true
       ) == .waiting
