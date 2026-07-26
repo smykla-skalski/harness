@@ -153,21 +153,53 @@ async fn read_revoke(response: Response) -> Result<DaemonRevoke, RevokeError> {
         });
     }
 
+    let detail = response.text().await.unwrap_or_default();
+
     // 403 and 404 are the daemon's two ways of saying the same thing to
     // different callers: it answers 403 to a credential that may not see the
     // pairing and 404 to one that may see everything. A broker credential
     // normally draws the 403, but the pairing it was cleared to revoke can also
     // go before the write lands, so both are treated alike rather than resting
     // on which one arrives.
-    if status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND {
+    //
+    // Only when the body says so, though. Both statuses are also answered by
+    // things that have nothing to do with this pairing, and reporting one of
+    // those as the pairing being unavailable is worse than saying nothing: it
+    // sends somebody hunting for a permission problem while a stale credential
+    // or an unserved route goes unnamed.
+    let refusal = matches!(status, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND);
+    if refusal && names_a_pairing_refusal(&detail) {
         return Err(RevokeError::NotAvailable);
     }
 
-    let detail = response.text().await.unwrap_or_default();
     Err(RevokeError::Failed(PanelError::daemon(format!(
         "could not revoke the pairing: the daemon answered {status}: {}",
         detail.trim()
     ))))
+}
+
+/// The prefix on every error code the daemon's pairing-management routes
+/// answer with.
+///
+/// Its authentication layer answers `REMOTE_AUTH` and a route the daemon does
+/// not serve answers with no body at all, so a code carrying this prefix is
+/// what distinguishes the pairing routes' own verdict from everything else
+/// that arrives with the same status.
+const PAIRING_ERROR_PREFIX: &str = "REMOTE_PAIRING_";
+
+fn names_a_pairing_refusal(body: &str) -> bool {
+    serde_json::from_str::<DaemonErrorEnvelope>(body)
+        .is_ok_and(|envelope| envelope.error.code.starts_with(PAIRING_ERROR_PREFIX))
+}
+
+#[derive(Debug, Deserialize)]
+struct DaemonErrorEnvelope {
+    error: DaemonErrorBody,
+}
+
+#[derive(Debug, Deserialize)]
+struct DaemonErrorBody {
+    code: String,
 }
 
 /// Encode one path segment.
@@ -193,7 +225,34 @@ fn utf8_percent_encode(segment: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{DaemonPairing, utf8_percent_encode};
+    use super::{DaemonPairing, names_a_pairing_refusal, utf8_percent_encode};
+
+    /// The pairing routes' own refusal is the only thing that may read as one.
+    /// A stale credential and a route the daemon does not serve arrive with the
+    /// same statuses, and calling either of those "no such pairing" hides a
+    /// fault an operator has to fix.
+    #[test]
+    fn only_the_pairing_routes_own_refusal_reads_as_one() {
+        assert!(names_a_pairing_refusal(
+            r#"{"error":{"code":"REMOTE_PAIRING_NOT_AVAILABLE","message":"no"}}"#
+        ));
+        assert!(names_a_pairing_refusal(
+            r#"{"error":{"code":"REMOTE_PAIRING_NOT_FOUND","message":"no"}}"#
+        ));
+
+        assert!(
+            !names_a_pairing_refusal(r#"{"error":{"code":"REMOTE_AUTH","message":"scope"}}"#),
+            "a credential the daemon will not accept is not a missing pairing"
+        );
+        assert!(
+            !names_a_pairing_refusal(""),
+            "a route the daemon does not serve answers with no body at all"
+        );
+        assert!(
+            !names_a_pairing_refusal("<html>404</html>"),
+            "a proxy between the two answers with whatever it likes"
+        );
+    }
 
     /// The daemon grows fields the panel does not read, and a strict decode
     /// would turn each addition into an outage on a panel that had no need of

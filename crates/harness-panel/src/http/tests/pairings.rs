@@ -37,6 +37,9 @@ struct Daemon {
     /// Refuse the next revoke the way the daemon refuses one the caller may not
     /// see.
     refuse_revoke: bool,
+    /// Answer the way a daemon that does not serve this route does: the same
+    /// status as a missing pairing, with nothing in the body.
+    unrouted_revoke: bool,
 }
 
 fn pairing(pairing_id: &str, state: &str) -> Value {
@@ -75,6 +78,9 @@ async fn stub_daemon(daemon: Arc<Mutex<Daemon>>) -> String {
         Path(pairing_id): Path<String>,
     ) -> Response {
         let mut daemon = daemon.lock().expect("stub lock");
+        if daemon.unrouted_revoke {
+            return StatusCode::NOT_FOUND.into_response();
+        }
         if daemon.refuse_revoke {
             return (
                 StatusCode::FORBIDDEN,
@@ -393,6 +399,29 @@ async fn a_daemon_refusal_reads_like_the_panels_own() {
     assert_eq!(refused, StatusCode::FORBIDDEN, "{refused_body}");
     assert_eq!(refused, not_theirs);
     assert_eq!(refused_body, not_theirs_body);
+}
+
+/// A daemon built before these routes, or a proxy that does not forward one,
+/// answers with the same status a missing pairing does and nothing in the body.
+/// Reporting that as the pairing being unavailable would send somebody hunting
+/// for a permission problem while the real fault went unnamed, so it has to
+/// read as the daemon failure it is.
+#[tokio::test]
+async fn a_daemon_that_does_not_serve_the_route_is_not_a_missing_pairing() {
+    let daemon = Arc::new(Mutex::new(Daemon {
+        unrouted_revoke: true,
+        ..Daemon::default()
+    }));
+    let harness = ready(Arc::clone(&daemon)).await;
+    let grace = harness.sign_in("grace").await;
+    attribute(&harness, "pair-1", "grace").await;
+
+    let (status, body) = harness
+        .post("/panel/api/pairings/pair-1/revoke", Some(&grace))
+        .await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert!(body.contains("\"code\":\"internal\""), "{body}");
 }
 
 /// `SameSite` cookies cross between sibling origins, so a state-changing
