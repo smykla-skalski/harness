@@ -185,6 +185,10 @@ async fn forward_frame(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "marks the upstream body timed out and reports it; the one tracing::warn! costs 7 of this 7-line function's 8 points, leaving structural 1, so this covers surcharge only"
+)]
 fn record_timeout(timed_out: &AtomicBool, upstream_origin: &str) {
     timed_out.store(true, Ordering::Release);
     tracing::warn!(
