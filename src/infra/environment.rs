@@ -3,9 +3,11 @@ use std::env;
 
 /// Merge current env with extra key-value pairs.
 ///
-/// `PATH` is inherited verbatim. This used to gain a locally built `kumactl`
-/// directory in front, so every spawned command saw a repo-local binary that
-/// the product no longer builds or ships.
+/// `PATH` gets no special treatment: it is inherited from the current process,
+/// stays absent when the process has none, and is overridable through `extra`
+/// like any other key. A previous version prepended a repo-local build-artifacts
+/// directory to it, which silently changed binary resolution for every command
+/// harness spawns.
 #[must_use]
 pub fn merge_env<'a, I>(extra: I) -> HashMap<String, String>
 where
