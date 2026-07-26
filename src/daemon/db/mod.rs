@@ -60,6 +60,8 @@ mod remote_acme;
 mod remote_acme_cas;
 mod remote_identity;
 mod remote_identity_async;
+mod remote_pairing_revoke;
+pub(crate) use remote_pairing_revoke::RemotePairingRevokeOutcome;
 mod remote_pairing;
 mod remote_pairing_expiry;
 mod review_writes;

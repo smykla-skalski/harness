@@ -123,15 +123,22 @@ impl MatrixClients {
             RemoteAccessScope::PairMint => {
                 panic!("no websocket method should require the pair_mint scope")
             }
+            // Listing and revoking pairings are HTTP routes for the same
+            // reason minting is: the broker holding these scopes has nothing
+            // to say on the RPC channel.
+            RemoteAccessScope::PairManage => {
+                panic!("no websocket method should require the pair_manage scope")
+            }
         }
     }
 
     fn denied(&self, scope: RemoteAccessScope) -> &Arc<Mutex<ConnectionState>> {
         match scope {
             RemoteAccessScope::Read | RemoteAccessScope::Admin => &self.write_only,
-            RemoteAccessScope::Write | RemoteAccessScope::Execute | RemoteAccessScope::PairMint => {
-                &self.viewer
-            }
+            RemoteAccessScope::Write
+            | RemoteAccessScope::Execute
+            | RemoteAccessScope::PairMint
+            | RemoteAccessScope::PairManage => &self.viewer,
         }
     }
 }

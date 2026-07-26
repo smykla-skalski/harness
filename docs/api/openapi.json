@@ -4078,6 +4078,122 @@
         }
       }
     },
+    "/v1/remote/pairings": {
+      "get": {
+        "tags": [
+          "pairing"
+        ],
+        "description": "List pairing links and the devices they became. Requires the pair_manage scope, which shows the caller the links it minted; a caller that also holds admin sees every pairing. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+        "operationId": "get_remote_pairings",
+        "responses": {
+          "200": {
+            "description": "Pairings the caller may see",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemotePairingListResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Pairing store unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
+    "/v1/remote/pairings/{pairing_id}/revoke": {
+      "post": {
+        "tags": [
+          "pairing"
+        ],
+        "description": "Revoke a pairing that is not the caller's own. A claimed link cuts off the device it became; an unclaimed one can no longer be claimed. Requires the pair_manage scope, and the caller must have minted the pairing unless it also holds admin. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+        "operationId": "post_remote_pairing_revoke",
+        "parameters": [
+          {
+            "name": "pairing_id",
+            "in": "path",
+            "description": "Pairing to revoke",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pairing revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemotePairingRevokeResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pairing belongs to another caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such pairing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
     "/v1/reviews/action-preview": {
       "post": {
         "tags": [
@@ -23022,6 +23138,135 @@
         ],
         "properties": {
           "status": {
+            "type": "string"
+          }
+        }
+      },
+      "RemotePairingDevice": {
+        "type": "object",
+        "description": "The device a claimed link became.",
+        "required": [
+          "client_id",
+          "display_name",
+          "platform"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "last_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent until the device makes its first authenticated request."
+          },
+          "platform": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RemotePairingInventoryEntry": {
+        "type": "object",
+        "description": "One link and what became of it.",
+        "required": [
+          "pairing_id",
+          "state",
+          "role",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "claimed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "device": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemotePairingDevice"
+              }
+            ]
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "minted_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client that minted it, absent for the same reason."
+          },
+          "minted_for": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemotePairingSubject",
+                "description": "The identity the link was minted for. Absent for a link created on the\nhost, which belongs to whoever ran the command rather than to anyone the\ndaemon authenticated."
+              }
+            ]
+          },
+          "pairing_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "RemotePairingListResponse": {
+        "type": "object",
+        "required": [
+          "pairings"
+        ],
+        "properties": {
+          "pairings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemotePairingInventoryEntry"
+            }
+          }
+        }
+      },
+      "RemotePairingRevokeResponse": {
+        "type": "object",
+        "required": [
+          "pairing_id",
+          "outcome",
+          "revoked_at"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "description": "What the revoke did: `device_revoked`, `link_withdrawn`, or\n`already_revoked`."
+          },
+          "pairing_id": {
+            "type": "string"
+          },
+          "revoked_at": {
             "type": "string"
           }
         }

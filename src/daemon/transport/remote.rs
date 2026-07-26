@@ -260,6 +260,8 @@ impl DaemonRemotePairCreateArgs {
                 requested_scopes: &requested_scopes,
                 reviews_query: reviews_query.as_ref(),
                 minted_for: None,
+            // Created on the host, so no remote client owns it.
+            minted_by: None,
                 extra_audit: None,
             },
         )?;
@@ -445,6 +447,8 @@ pub enum DaemonRemoteScope {
     Execute,
     #[value(name = "pair-mint")]
     PairMint,
+    #[value(name = "pair-manage")]
+    PairManage,
 }
 
 impl DaemonRemoteScope {
@@ -456,6 +460,7 @@ impl DaemonRemoteScope {
             Self::Admin => "admin",
             Self::Execute => "execute",
             Self::PairMint => "pair-mint",
+            Self::PairManage => "pair-manage",
         }
     }
 }
@@ -468,6 +473,7 @@ impl From<DaemonRemoteScope> for RemoteAccessScope {
             DaemonRemoteScope::Admin => Self::Admin,
             DaemonRemoteScope::Execute => Self::Execute,
             DaemonRemoteScope::PairMint => Self::PairMint,
+            DaemonRemoteScope::PairManage => Self::PairManage,
         }
     }
 }

@@ -426,6 +426,7 @@ pub fn parse_remote_scope(value: &str) -> Option<RemoteAccessScope> {
         "admin" => Some(RemoteAccessScope::Admin),
         "execute" => Some(RemoteAccessScope::Execute),
         "pair_mint" => Some(RemoteAccessScope::PairMint),
+        "pair_manage" => Some(RemoteAccessScope::PairManage),
         _ => None,
     }
 }

@@ -170,6 +170,7 @@ fn mint_remote_pairing(
             requested_scopes: &plan.scopes,
             reviews_query: None,
             minted_for: Some(&request.subject),
+            minted_by: client.map(|client| client.client_id.as_str()),
             extra_audit: Some(&mint_audit),
         },
     )

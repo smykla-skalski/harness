@@ -29,6 +29,7 @@ use crate::daemon::remote_pairing::{
 
 mod metadata;
 use metadata::{decode_remote_pairing_metadata, encode_remote_pairing_metadata};
+mod inventory;
 mod status;
 
 const INSERT_REMOTE_PAIRING_SQL: &str = "
@@ -50,6 +51,7 @@ const ROUTE_REMOTE_PAIR_EXPIRE: &str = "remote.pair.expire";
 const ROUTE_REMOTE_PAIR_INVALID: &str = "remote.pair.invalid";
 const ROUTE_REMOTE_PAIR_REPLAY: &str = "remote.pair.replay";
 const ROUTE_REMOTE_PAIR_UNKNOWN: &str = "remote.pair.unknown";
+const ROUTE_REMOTE_PAIR_REVOKED: &str = "remote.pair.revoked";
 
 #[derive(Debug)]
 pub(crate) enum RemotePairingClaimCodeError {
@@ -120,6 +122,8 @@ impl DaemonDb {
         let metadata_json = encode_remote_pairing_metadata(
             record.reviews_query.as_ref(),
             record.minted_for.as_ref(),
+            record.minted_by.as_deref(),
+            None,
         )?;
         let transaction = self
             .conn
@@ -225,6 +229,21 @@ impl DaemonDb {
             .map_err(RemotePairingClaimCodeError::store)?;
             return Err(RemotePairingClaimCodeError::pairing(error));
         };
+        if pairing.revoked_at.is_some() {
+            // Checked before expiry so a link withdrawn inside its window says
+            // it was revoked rather than blaming the clock, and before the
+            // claim check for the same reason: revocation is the live fact.
+            let error = RemotePairingError::Revoked;
+            let error_detail = error.to_string();
+            self.record_pairing_claim_failure(
+                claim,
+                now,
+                ROUTE_REMOTE_PAIR_REVOKED,
+                error_detail.as_str(),
+            )
+            .map_err(RemotePairingClaimCodeError::store)?;
+            return Err(RemotePairingClaimCodeError::pairing(error));
+        }
         if pairing.claimed_at.is_some() {
             let error = RemotePairingError::AlreadyClaimed;
             let error_detail = error.to_string();
@@ -429,6 +448,8 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
         claim_remote_addr: row.get(8)?,
         reviews_query: metadata.reviews_query,
         minted_for: metadata.minted_for,
+        minted_by: metadata.minted_by,
+        revoked_at: metadata.revoked_at,
     })
 }
 

@@ -38,6 +38,11 @@ pub enum RemoteAccessScope {
     /// by `Admin`: an operator credential that leaks should not be able to
     /// hand out further credentials without being granted that power.
     PairMint,
+    /// See and revoke pairings. Separate from `PairMint` in the other
+    /// direction: an administrator needs to inspect and cut off what exists
+    /// without gaining the power to issue more, and the broker needs to manage
+    /// what it issued without gaining anything else.
+    PairManage,
 }
 
 impl RemoteAccessScope {
@@ -49,6 +54,7 @@ impl RemoteAccessScope {
             Self::Admin => "admin",
             Self::Execute => "execute",
             Self::PairMint => "pair_mint",
+            Self::PairManage => "pair_manage",
         }
     }
 }
@@ -58,11 +64,16 @@ const WRITE_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Write];
 const ADMIN_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Admin];
 const EXECUTION_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::Execute];
 const PAIR_MINT_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::PairMint];
+const PAIR_MANAGE_SCOPES: &[RemoteAccessScope] = &[RemoteAccessScope::PairManage];
 const ADMIN_ROLE_SCOPES: &[RemoteAccessScope] = &[
     RemoteAccessScope::Read,
     RemoteAccessScope::Write,
     RemoteAccessScope::Admin,
+    RemoteAccessScope::PairManage,
 ];
+/// The broker mints and manages what it minted, and holds nothing else.
+const BROKER_ROLE_SCOPES: &[RemoteAccessScope] =
+    &[RemoteAccessScope::PairMint, RemoteAccessScope::PairManage];
 const OPERATOR_ROLE_SCOPES: &[RemoteAccessScope] =
     &[RemoteAccessScope::Read, RemoteAccessScope::Write];
 
@@ -73,7 +84,7 @@ pub const fn scopes_for_role(role: RemoteRole) -> &'static [RemoteAccessScope] {
         RemoteRole::Operator => OPERATOR_ROLE_SCOPES,
         RemoteRole::Viewer => READ_SCOPES,
         RemoteRole::ExecutionCoordinator => EXECUTION_SCOPES,
-        RemoteRole::PairingBroker => PAIR_MINT_SCOPES,
+        RemoteRole::PairingBroker => BROKER_ROLE_SCOPES,
     }
 }
 
@@ -91,6 +102,7 @@ pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [Remo
         | http_paths::MANAGED_AGENT_ATTACH
         | http_paths::POLICIES_IMPORT => Some(WRITE_SCOPES),
         http_paths::REMOTE_PAIR_MINT => Some(PAIR_MINT_SCOPES),
+        http_paths::REMOTE_PAIRINGS | http_paths::REMOTE_PAIRING_REVOKE => Some(PAIR_MANAGE_SCOPES),
         // The ACP logout and agent-session routes now carry websocket methods,
         // so their HTTP scope derives from the mirrored method like any RPC route.
         _ => route.parity.ws_method().and_then(remote_ws_scopes),

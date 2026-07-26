@@ -20,7 +20,7 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 13, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 15, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
@@ -30,6 +30,8 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             http_paths::REMOTE_PAIR_STATUS,
             http_paths::REMOTE_PAIR_MINT,
             http_paths::REMOTE_CLIENT_SELF_REVOKE,
+            http_paths::REMOTE_PAIRINGS,
+            http_paths::REMOTE_PAIRING_REVOKE,
             http_paths::POLICIES_DUMP,
             http_paths::POLICIES_IMPORT,
             http_paths::WS,

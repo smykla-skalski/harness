@@ -23,6 +23,10 @@ pub use status_rate_limit::{RemotePairingStatusRateLimitDecision, RemotePairingS
 mod subject;
 pub use subject::RemotePairingSubject;
 mod create;
+mod inventory;
+pub use inventory::{
+    RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation, RemotePairingState,
+};
 mod invitation;
 pub(crate) use create::{RemotePairingCreateParams, create_remote_pairing, pairing_expires_at};
 
@@ -45,6 +49,7 @@ pub enum RemotePairingError {
     WrongDomain { expected: String, actual: String },
     RateLimited,
     Expired,
+    Revoked,
     AlreadyClaimed,
     UnknownCode,
     InvalidReviewsQuery(String),
@@ -69,6 +74,7 @@ impl fmt::Display for RemotePairingError {
             ),
             Self::RateLimited => write!(f, "remote pairing attempts are rate limited"),
             Self::Expired => write!(f, "remote pairing code expired"),
+            Self::Revoked => write!(f, "remote pairing code revoked"),
             Self::AlreadyClaimed => write!(f, "remote pairing code already claimed"),
             Self::UnknownCode => write!(f, "remote pairing code is unknown"),
             Self::InvalidReviewsQuery(detail) => {
@@ -95,6 +101,7 @@ impl Error for RemotePairingError {
             | Self::WrongDomain { .. }
             | Self::RateLimited
             | Self::Expired
+            | Self::Revoked
             | Self::AlreadyClaimed
             | Self::UnknownCode
             | Self::InvalidReviewsQuery(_)
@@ -204,6 +211,10 @@ pub struct RemotePairingRecord {
     /// Set only for links minted on someone else's behalf. A link created on
     /// the host has no external identity behind it.
     pub minted_for: Option<RemotePairingSubject>,
+    /// The client that minted this link, absent for one created on the host.
+    /// Ownership is decided from this: a caller without the authority to see
+    /// everyone's pairings sees the ones it minted and no others.
+    pub minted_by: Option<String>,
 }
 
 impl RemotePairingRecord {
@@ -211,6 +222,13 @@ impl RemotePairingRecord {
     #[must_use]
     pub fn minted_for(mut self, subject: Option<RemotePairingSubject>) -> Self {
         self.minted_for = subject;
+        self
+    }
+
+    /// Attach the client that minted this link.
+    #[must_use]
+    pub fn minted_by(mut self, client_id: Option<String>) -> Self {
+        self.minted_by = client_id;
         self
     }
 
@@ -271,6 +289,10 @@ pub struct RemoteStoredPairing {
     pub claim_remote_addr: Option<String>,
     pub reviews_query: Option<ReviewsQueryRequest>,
     pub minted_for: Option<RemotePairingSubject>,
+    /// The client that minted this link, absent for one created on the host.
+    pub minted_by: Option<String>,
+    /// Set when the link was revoked before anyone claimed it.
+    pub revoked_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
