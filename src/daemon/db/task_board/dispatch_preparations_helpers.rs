@@ -1,10 +1,13 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
-use super::super::admission_lifecycle::release_dispatch_admission_in_tx;
+use super::super::admission_lifecycle::{
+    TaskBoardAdmissionCheck, release_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
+};
+use super::super::items::load_item_in_tx;
 use super::{
     ClaimedTaskBoardDispatchPreparation, PREPARATION_LEASE_SECONDS, ReservedTaskBoardDispatch,
-    TaskBoardDispatchPreparation,
+    TaskBoardDispatchPreparation, preparation_revision_error,
 };
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::session::types::TaskSeverity;
@@ -208,6 +211,125 @@ const fn dispatch_severity(priority: TaskBoardPriority) -> TaskSeverity {
         TaskBoardPriority::High => TaskSeverity::High,
         TaskBoardPriority::Critical => TaskSeverity::Critical,
     }
+}
+
+/// What the preparation-claim screen decided. `Settled` names the commit's
+/// error context, and carries a refusal message when the claim was rejected
+/// rather than merely absent.
+pub(super) enum PreparationClaim {
+    Ready(Box<TaskBoardDispatchPreparation>),
+    Settled {
+        context: &'static str,
+        refusal: Option<String>,
+    },
+}
+
+/// Releases expired preparations, then decides whether `intent_id` is
+/// claimable. A rejected claim records its own failure here, so the caller
+/// commits that record before reporting the refusal.
+pub(super) async fn screen_preparation_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+) -> Result<PreparationClaim, CliError> {
+    release_expired_preparations(transaction).await?;
+    let Some(payload) = load_preparing_payload_in_tx(transaction, intent_id).await? else {
+        return Ok(PreparationClaim::Settled {
+            context: "empty task board preparation claim",
+            refusal: None,
+        });
+    };
+    let preparation = decode_preparation(&payload)?;
+    let (item, item_revision) = load_item_in_tx(transaction, &preparation.board_item_id)
+        .await?
+        .ok_or_else(|| {
+            db_error(format!(
+                "task-board item '{}' not found",
+                preparation.board_item_id
+            ))
+        })?;
+    if let Some(reason) = preparation_revision_error(&preparation, &item, item_revision) {
+        return refuse_preparation_in_tx(
+            transaction,
+            intent_id,
+            "stale task board preparation",
+            reason.to_string(),
+        )
+        .await;
+    }
+    validate_reservable_item(&item, &preparation.plan)?;
+    if let TaskBoardAdmissionCheck::Blocked(admission) =
+        revalidate_dispatch_admission_in_tx(transaction, intent_id, &item, item_revision).await?
+    {
+        return refuse_preparation_in_tx(
+            transaction,
+            intent_id,
+            "refused task board preparation",
+            admission.refusal_message(),
+        )
+        .await;
+    }
+    Ok(PreparationClaim::Ready(Box::new(preparation)))
+}
+
+async fn load_preparing_payload_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+) -> Result<Option<String>, CliError> {
+    query_as::<_, (String,)>(
+        "SELECT payload_json FROM task_board_dispatch_intents
+         WHERE intent_id = ?1 AND status = 'preparing'
+           AND datetime(available_at) <= datetime('now')",
+    )
+    .bind(intent_id)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load task board preparation: {error}")))
+    .map(|row| row.map(|row| row.0))
+}
+
+async fn refuse_preparation_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    context: &'static str,
+    reason: String,
+) -> Result<PreparationClaim, CliError> {
+    fail_preparation_admission_in_tx(transaction, intent_id, &reason).await?;
+    Ok(PreparationClaim::Settled {
+        context,
+        refusal: Some(reason),
+    })
+}
+
+/// Takes the lease on a screened preparation and reports the claim token. The
+/// `UPDATE` re-checks `preparing`, so a competing claimer changes no row.
+pub(super) async fn claim_preparation_intent_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+) -> Result<String, CliError> {
+    let claim_token = format!("dispatch-prepare-{}", Uuid::new_v4().simple());
+    query(
+        "UPDATE task_board_dispatch_intents
+         SET status = 'preparing_claimed', attempts = attempts + 1,
+             claim_token = ?2, claimed_at = ?3, updated_at = ?3
+         WHERE intent_id = ?1 AND status = 'preparing'",
+    )
+    .bind(intent_id)
+    .bind(&claim_token)
+    .bind(utc_now())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("claim task board preparation: {error}")))?;
+    Ok(claim_token)
+}
+
+pub(super) async fn commit_preparation(
+    transaction: Transaction<'_, Sqlite>,
+    context: &str,
+) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 pub(super) fn decode_preparation(payload: &str) -> Result<TaskBoardDispatchPreparation, CliError> {
