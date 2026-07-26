@@ -1,4 +1,6 @@
 #[cfg(target_os = "macos")]
+use std::fs;
+#[cfg(target_os = "macos")]
 use std::path::Path;
 
 #[cfg(target_os = "macos")]
@@ -38,7 +40,7 @@ fn resolves_bookmark_from_shared_sandbox_store_and_bootstraps_helper_store() {
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
             let project_dir = tmp.path().join("repo");
-            std::fs::create_dir_all(&project_dir).expect("create project dir");
+            fs::create_dir_all(&project_dir).expect("create project dir");
             let bookmark_id = "B-project-input";
             let store_path = tmp.path().join("sandbox/bookmarks.json");
             bookmarks::save(
@@ -86,7 +88,7 @@ fn resolves_bookmark_when_input_matches_shared_bookmark_path() {
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
             let project_dir = tmp.path().join("repo");
-            std::fs::create_dir_all(&project_dir).expect("create project dir");
+            fs::create_dir_all(&project_dir).expect("create project dir");
             let bookmark_id = "B-project-input-path";
             let store_path = tmp.path().join("sandbox/bookmarks.json");
             bookmarks::save(
@@ -131,7 +133,7 @@ fn resolves_bookmark_from_legacy_harness_store_path() {
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
             let project_dir = tmp.path().join("repo");
-            std::fs::create_dir_all(&project_dir).expect("create project dir");
+            fs::create_dir_all(&project_dir).expect("create project dir");
             let bookmark_id = "B-project-input-legacy";
             let store_path = tmp.path().join("harness/bookmarks.json");
             bookmarks::save(
@@ -165,6 +167,8 @@ fn resolves_bookmark_from_legacy_harness_store_path() {
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 fn synthesize_bookmark(path: &Path, with_security_scope: bool) -> Vec<u8> {
+    use std::ptr;
+
     use core_foundation::base::TCFType;
     use core_foundation::data::CFData;
     use core_foundation::url::{
@@ -172,19 +176,19 @@ fn synthesize_bookmark(path: &Path, with_security_scope: bool) -> Vec<u8> {
     };
 
     let cf_url = CFURL::from_path(path, true).expect("CFURL from path");
-    let mut err = std::ptr::null_mut();
+    let mut err = ptr::null_mut();
     // SAFETY: cf_url is a valid CFURL; null allocator/relative_to/keys are valid sentinels.
     let data_ref = unsafe {
         CFURLCreateBookmarkData(
-            std::ptr::null(),
+            ptr::null(),
             cf_url.as_concrete_TypeRef(),
             if with_security_scope {
                 kCFURLBookmarkCreationWithSecurityScope
             } else {
                 0
             },
-            std::ptr::null(),
-            std::ptr::null(),
+            ptr::null(),
+            ptr::null(),
             &raw mut err,
         )
     };
