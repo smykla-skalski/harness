@@ -42,7 +42,7 @@ public struct URLSessionMobilePairingTransport: MobilePairingTransport {
     if let httpResponse = response as? HTTPURLResponse,
       !(200..<300).contains(httpResponse.statusCode)
     {
-      throw MobilePairingError.unsupportedURL(endpoint.absoluteString)
+      throw MobilePairingError.serverStatus(httpResponse.statusCode)
     }
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .iso8601
