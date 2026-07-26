@@ -3809,7 +3809,7 @@ dependencies = [
 
 [[package]]
 name = "harness-panel"
-version = "51.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "axum-extra",

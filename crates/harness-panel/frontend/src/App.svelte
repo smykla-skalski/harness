@@ -1,12 +1,13 @@
 <script lang="ts">
-  import AccountsTable from './components/AccountsTable.svelte';
+  import AccountsRoster from './components/AccountsRoster.svelte';
+  import IdentityBar from './components/IdentityBar.svelte';
   import PairLinkPanel from './components/PairLinkPanel.svelte';
+  import Plate from './components/Plate.svelte';
   import SignedOut from './components/SignedOut.svelte';
-  import ViewerCard from './components/ViewerCard.svelte';
   import type { PanelApi } from './lib/api';
   import type { PanelAccount, PanelViewer } from './lib/types';
 
-  const { api }: { api: PanelApi } = $props();
+  const { api, iconUrl }: { api: PanelApi; iconUrl: string } = $props();
 
   let loading = $state(true);
   let viewer = $state<PanelViewer | null>(null);
@@ -62,25 +63,29 @@
   void load();
 </script>
 
-<main>
-  <h1>Harness panel</h1>
+<main class="shell">
+  <IdentityBar {viewer} {iconUrl} onSignOut={signOut} />
 
   {#if failure !== null}
-    <section class="failure">
+    <Plate label="Problem" tone="alarm">
       <p>{failure}</p>
-      <button class="secondary" onclick={load}>Try again</button>
-    </section>
+      <button class="btn" onclick={load}>Try again</button>
+    </Plate>
   {/if}
 
   {#if loading}
-    <section><p class="muted">Loading…</p></section>
-  {:else if viewer === null}
-    <SignedOut href={api.signInUrl()} />
-  {:else}
-    <ViewerCard {viewer} onSignOut={signOut} />
+    <Plate label="Panel">
+      <p class="dim">Reading the panel…</p>
+    </Plate>
+  {:else if viewer !== null}
     <PairLinkPanel canPair={viewer.account.can_pair} onGenerate={api.createPairLink} />
     {#if viewer.is_owner}
-      <AccountsTable {accounts} onSetCanPair={setCanPair} />
+      <AccountsRoster {accounts} viewerAccountId={viewer.account.id} onSetCanPair={setCanPair} />
     {/if}
+    <!-- A failed load proves nothing about whether anyone is signed in, so the
+       gate stays away: offering sign-in as the way out of a daemon outage sends
+       someone to repeat what they have already done. -->
+  {:else if failure === null}
+    <SignedOut href={api.signInUrl()} />
   {/if}
 </main>
