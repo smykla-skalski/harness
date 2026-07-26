@@ -111,13 +111,15 @@ fn list_pairings(
     let now = utc_now();
     // The narrowing is the query's, not a filter applied after reading every
     // link the daemon has ever issued.
-    let owner = if sees_every_pairing(client.as_ref()) {
-        None
-    } else {
-        Some(client.map(|client| client.client_id).unwrap_or_default())
+    // A caller that is not entitled to everything is authenticated by
+    // definition, so the id is there. Defaulting a missing one to an empty
+    // string would answer an authentication bug with an empty list instead.
+    let owner = match client.as_ref() {
+        Some(client) if !sees_every_pairing(Some(client)) => Some(client.client_id.as_str()),
+        _ => None,
     };
     let pairings = db
-        .list_remote_pairing_inventory(now.as_str(), owner.as_deref())
+        .list_remote_pairing_inventory(now.as_str(), owner)
         .map_err(RemotePairingManageError::Store)?;
     drop(db);
 
