@@ -11,7 +11,7 @@ use uuid::Uuid;
 use super::PanelState;
 use super::session::require_viewer;
 use crate::daemon_client::{DaemonCredential, MintedLink};
-use crate::error::ApiError;
+use crate::error::{ApiError, PanelError};
 use crate::store::accounts::Account;
 use crate::store::pair_links::PairLinkRecord;
 
@@ -82,7 +82,10 @@ pub async fn create(
     }
 
     let minted = mint_against(&state, &credential, &viewer.account, &reservation.id).await?;
+    // Recorded before it is judged, so a link that is refused below is still
+    // one an operator can find and revoke on the daemon.
     finalize(&state, &viewer.account, &reservation.id, &minted).await;
+    refuse_unexpected_role(&state, &minted)?;
 
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
@@ -123,6 +126,30 @@ async fn mint_against(
             Err(error.into())
         }
     }
+}
+
+/// Refuse a link the daemon issued under a role the panel did not ask for.
+///
+/// The panel picks the role from its own allow-list, but the daemon is what
+/// decides what the code actually grants, and only the daemon knows. If the two
+/// disagree — an endpoint pointed at the wrong daemon, or one that stopped
+/// honouring the request — showing the code would hand somebody authority the
+/// owner never approved, which is the whole thing the allow-list exists to
+/// prevent.
+///
+/// The link is already minted and the panel holds a credential that cannot
+/// revoke anything, so refusing to show the code is the most it can do: the
+/// code lapses unclaimed, and the row recorded a moment ago is what an
+/// operator reconciles against the daemon.
+fn refuse_unexpected_role(state: &PanelState, minted: &MintedLink) -> Result<(), ApiError> {
+    if minted.role == state.daemon.config.link_role {
+        return Ok(());
+    }
+    Err(ApiError::Internal(PanelError::daemon(format!(
+        "the daemon minted a {} link where {} was asked for; pairing {} was not shown to \
+         anyone and lapses unclaimed, revoke it on the daemon",
+        minted.role, state.daemon.config.link_role, minted.pairing_id
+    ))))
 }
 
 /// Write what the daemon issued over the reservation that stood for it.

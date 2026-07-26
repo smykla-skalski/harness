@@ -46,11 +46,18 @@
       {formatTimestamp(link.expires_at)}.
     </p>
     <!-- Selected on focus so it can be copied in one gesture, and readonly so
-         an accidental edit cannot produce a link that looks right and is not. -->
+         an accidental edit cannot produce a link that looks right and is not.
+         The value is a one-time code, so the browser is told to keep it out of
+         form history and away from the spell checker, which in some browsers
+         means a remote service. -->
     <input
       class="pair-link"
       type="text"
       readonly
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
       value={link.pairing_url}
       aria-label="Pairing link"
       onfocus={(event) => event.currentTarget.select()}

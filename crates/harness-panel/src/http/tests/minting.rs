@@ -38,6 +38,8 @@ struct Seen {
     skewed_expiry: Option<String>,
     /// A lifetime the daemon grants instead of the one it was asked for.
     granted_ttl: Option<u64>,
+    /// A role the daemon issues instead of the one it was asked for.
+    granted_role: Option<String>,
 }
 
 async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
@@ -52,7 +54,7 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
                 .and_then(|value| value.to_str().ok())
                 .map(str::to_owned)
         };
-        let (pairing_id, skew, granted_ttl) = {
+        let (pairing_id, skew, granted_ttl, granted_role) = {
             let mut seen = seen.lock().expect("stub lock");
             seen.body = Some(body);
             seen.client_id = header("x-harness-remote-client-id");
@@ -62,6 +64,7 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
                 format!("pair-{}", seen.minted),
                 seen.skewed_expiry.clone(),
                 seen.granted_ttl,
+                seen.granted_role.clone(),
             )
         };
         // Relative to now, not a fixed date: an expiry in the past would make
@@ -74,7 +77,7 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
         };
         Json(serde_json::json!({
             "pairing_id": pairing_id,
-            "role": "operator",
+            "role": granted_role.unwrap_or_else(|| "operator".to_owned()),
             "scopes": ["read", "write"],
             "created_at": created_at.to_rfc3339(),
             "expires_at": expires_at,
@@ -260,6 +263,35 @@ async fn a_daemon_clock_that_disagrees_does_not_reach_the_stored_row() {
     );
     // The person who asked is still shown the daemon's own deadline.
     assert!(body.contains("2000-01-01"), "{body}");
+}
+
+/// The allow-list decides what the panel may ask for, but the daemon decides
+/// what the code grants. If a misconfigured endpoint answers with more than
+/// was asked for, showing it would hand out authority the owner never
+/// approved, and the panel cannot revoke what it has already caused.
+#[tokio::test]
+async fn a_link_of_the_wrong_role_is_never_shown_to_anyone() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (harness, owner) = ready(Arc::clone(&seen)).await;
+    seen.lock().expect("stub lock").granted_role = Some("admin".to_owned());
+
+    let (status, body) = harness.post("/panel/api/pair-links", Some(&owner)).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert!(
+        !body.contains("harness://pair"),
+        "the code must not reach the caller: {body}"
+    );
+    // Still written down, because the daemon minted it and an operator needs
+    // to find it to revoke it.
+    let recorded = harness
+        .state
+        .store
+        .pair_links_for_account(&harness.account_id("ada").await)
+        .await
+        .expect("records");
+    assert_eq!(recorded.len(), 1, "{recorded:?}");
+    assert_eq!(recorded[0].role, "admin");
 }
 
 /// The daemon may shorten the lifetime the panel asked for, and the shorter
