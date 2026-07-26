@@ -9,7 +9,7 @@ use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 
-use super::{Attempt, DaemonEventStream, DaemonPairingEvent, header_value};
+use super::{Attempt, DaemonEventStream, DaemonPairingEvent, dial_authority, header_value};
 use crate::config::daemon::resolve;
 use crate::daemon_client::{CLIENT_ID_HEADER, DaemonClient, DaemonCredential};
 use crate::events::{PanelChange, PanelEvents};
@@ -44,6 +44,27 @@ fn the_event_route_keeps_the_endpoint_prefix_and_changes_only_the_scheme() {
             .expect("a websocket url");
 
         assert_eq!(url.as_str(), expected, "{endpoint}");
+    }
+}
+
+/// A literal IPv6 address has to be dialled bracketed. Unbracketed it would give
+/// `::1:8443`, an authority no resolver can read, leaving the panel unable to
+/// reach a daemon on an IPv6 address at all — and loopback IPv6 is a
+/// configuration the panel explicitly accepts.
+#[test]
+fn an_ipv6_daemon_is_dialled_on_an_authority_that_parses() {
+    for (endpoint, expected) in [
+        ("http://[::1]:8443", "[::1]:8443"),
+        ("http://127.0.0.1:8443", "127.0.0.1:8443"),
+        ("https://harness.example.com", "harness.example.com:443"),
+    ] {
+        let url = client_for(endpoint)
+            .event_socket_url()
+            .expect("a websocket url");
+
+        let authority = dial_authority(&url).expect("an authority");
+
+        assert_eq!(authority, expected, "{endpoint}");
     }
 }
 

@@ -291,16 +291,7 @@ impl DaemonClient {
     }
 
     async fn dial(&self, url: &Url) -> Result<TcpStream, PanelError> {
-        let host = url
-            .host_str()
-            .ok_or_else(|| PanelError::daemon("the daemon endpoint has no host"))?;
-        let port = url
-            .port_or_known_default()
-            .ok_or_else(|| PanelError::daemon("the daemon endpoint has no port"))?;
-        // Through the authority rather than the parsed host, because a literal
-        // IPv6 address arrives bracketed and only the authority form parses back
-        // to an address.
-        TcpStream::connect(format!("{host}:{port}"))
+        TcpStream::connect(dial_authority(url)?)
             .await
             .map_err(|error| PanelError::daemon(format!("reaching the daemon: {error}")))
     }
@@ -328,6 +319,23 @@ impl DaemonClient {
             .map_err(|()| PanelError::daemon("the daemon endpoint cannot address a websocket"))?;
         Ok(url)
     }
+}
+
+/// The `host:port` to open the connection on.
+///
+/// A literal IPv6 address has to be dialled bracketed, and `host_str` already
+/// spells it that way — it slices the host out of the serialized URL, brackets
+/// included. Written as its own function so the test below can hold that, since
+/// an unbracketed host would give `::1:8443` and leave the panel unable to reach
+/// a daemon on an IPv6 address at all.
+fn dial_authority(url: &Url) -> Result<String, PanelError> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| PanelError::daemon("the daemon endpoint has no host"))?;
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| PanelError::daemon("the daemon endpoint has no port"))?;
+    Ok(format!("{host}:{port}"))
 }
 
 /// Refuse a credential that cannot go in a header rather than sending part of
