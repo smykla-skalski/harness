@@ -102,6 +102,27 @@
   }
 
   /**
+   * Re-read on anything the panel pushes, rather than patching the row the event
+   * carries.
+   *
+   * The daemon is the authority on what a pairing became, and a read settles the
+   * whole page at one instant: the event that arrives is a fact about one row,
+   * but a claim also spends a link, and a page that patched only the row named
+   * in the event would leave the rest of what changed with it untouched. It also
+   * keeps one path into `pairings`, so the freshness guard above covers the
+   * pushed case for free.
+   */
+  $effect(() => {
+    if (viewer === null) {
+      return;
+    }
+    return api.openStream({
+      onResync: () => void loadPairings(),
+      onPairing: () => void loadPairings(),
+    });
+  });
+
+  /**
    * Withdraw a link the card is still showing. The same route an unpair uses,
    * because a link nobody claimed and a device nobody wants are the same thing
    * to the daemon. The failure is deliberately rethrown: the card is where the
@@ -186,7 +207,15 @@
       <p class="dim">Reading the panel…</p>
     </Plate>
   {:else if viewer !== null}
-    <PairLinkPanel canPair={viewer.account.can_pair} onGenerate={generate} onCancel={cancelLink} />
+    <!-- The viewer's own pairings, so the card can find the link it is showing
+         and retire it when the daemon reports the claim. -->
+    <PairLinkPanel
+      canPair={viewer.account.can_pair}
+      pairings={mine}
+      onGenerate={generate}
+      onCancel={cancelLink}
+      onLapse={loadPairings}
+    />
     <!-- Skipped only for someone who has nothing paired and cannot pair
          anything: for them the control above already says what to do, and an
          empty table underneath repeats it. A failure still shows the plate,
