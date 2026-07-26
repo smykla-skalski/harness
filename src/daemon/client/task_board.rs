@@ -8,9 +8,10 @@ use crate::daemon::protocol::{
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
-    TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardClearTriageOverrideRequest,
-    TaskBoardCreateItemRequest, TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
+    TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest,
+    TaskBoardAuditResponse, TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest,
+    TaskBoardClearTriageOverrideRequest, TaskBoardCreateItemRequest,
+    TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
     TaskBoardHostListResponse, TaskBoardHostLocalResponse,
@@ -100,6 +101,7 @@ impl DaemonClient {
         request: &TaskBoardListItemsRequest,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
         let mut request = request.clone();
+        request.limit.get_or_insert(TASK_BOARD_LIST_MAX_LIMIT);
         let mut items = Vec::new();
         let mut seen = HashSet::new();
         let mut items_change_seq = None;

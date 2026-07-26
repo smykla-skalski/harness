@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::{TaskBoardItemPages, page_params};
+use super::{TASK_BOARD_LIST_MAX_LIMIT, TaskBoardItemPages, page_params};
 
 fn page(ids: &[&str], next_cursor: Option<&str>) -> serde_json::Value {
     let mut page = json!({
@@ -175,13 +175,25 @@ fn a_page_request_replaces_the_cursor_and_keeps_the_rest_of_the_selection() {
     let selection = json!({ "status": "todo", "tags": ["backend"] });
 
     let first = page_params(&selection, None).expect("first page params");
-    assert_eq!(first, selection);
+    assert_eq!(first["limit"], json!(TASK_BOARD_LIST_MAX_LIMIT));
+    assert_eq!(first["status"], json!("todo"));
+    assert_eq!(first["tags"], json!(["backend"]));
 
     let second = page_params(&selection, Some("cursor-2")).expect("second page params");
     assert_eq!(second["cursor"], json!("cursor-2"));
+    assert_eq!(second["limit"], json!(TASK_BOARD_LIST_MAX_LIMIT));
     assert_eq!(second["status"], json!("todo"));
     assert_eq!(second["tags"], json!(["backend"]));
 
     let third = page_params(&second, Some("cursor-3")).expect("third page params");
     assert_eq!(third["cursor"], json!("cursor-3"));
+}
+
+#[test]
+fn a_page_request_keeps_an_explicit_limit() {
+    let selection = json!({ "limit": 25 });
+
+    let page = page_params(&selection, None).expect("page params");
+
+    assert_eq!(page["limit"], json!(25));
 }

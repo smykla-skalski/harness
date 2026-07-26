@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde_json::{Map, Value};
 
-use crate::daemon::protocol::ws_methods;
+use crate::daemon::protocol::{TASK_BOARD_LIST_MAX_LIMIT, ws_methods};
 use crate::mcp::protocol::ToolResult;
 use crate::mcp::tool::{Tool, ToolError};
 
@@ -96,6 +96,9 @@ fn page_params(params: &Value, cursor: Option<&str>) -> Result<Value, ToolError>
         .as_object()
         .ok_or_else(|| ToolError::invalid("arguments must be an object"))?
         .clone();
+    object
+        .entry("limit".to_string())
+        .or_insert_with(|| Value::from(TASK_BOARD_LIST_MAX_LIMIT));
     match cursor {
         Some(cursor) => object.insert("cursor".to_string(), Value::String(cursor.to_string())),
         None => object.remove("cursor"),

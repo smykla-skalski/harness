@@ -20,7 +20,7 @@ fn task_board_list_serializes_status_as_query() {
     assert_eq!(items.len(), 1);
     assert_eq!(
         *request_line.lock().expect("request line"),
-        "GET /v1/task-board/items?status=backlog HTTP/1.1"
+        "GET /v1/task-board/items?status=backlog&limit=500 HTTP/1.1"
     );
 }
 
@@ -80,8 +80,8 @@ fn task_board_list_walks_every_page_until_the_cursor_runs_out() {
     assert_eq!(
         *request_lines.lock().expect("request lines"),
         [
-            "GET /v1/task-board/items HTTP/1.1",
-            "GET /v1/task-board/items?cursor=cursor-2 HTTP/1.1",
+            "GET /v1/task-board/items?limit=500 HTTP/1.1",
+            "GET /v1/task-board/items?limit=500&cursor=cursor-2 HTTP/1.1",
         ]
     );
 }
