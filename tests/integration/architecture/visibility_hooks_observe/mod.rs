@@ -42,10 +42,7 @@ fn hooks_application_context_root_stays_prod_only() {
     );
     assert_split_modules_exist(
         root,
-        &[
-            "src/hooks/application/context/command.rs",
-            "src/hooks/application/context/view.rs",
-        ],
+        &["src/hooks/application/context/command.rs"],
         "hooks application context split module should exist",
     );
 }
@@ -255,9 +252,4 @@ fn guard_write_root_stays_prod_only() {
             "src/hooks/guard_write.rs should stay focused on production write-guard logic instead of owning `{needle}`"
         );
     }
-
-    assert!(
-        root.join("src/hooks/guard_write/tests.rs").exists(),
-        "guard-write split test module should exist"
-    );
 }

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use harness::hooks::GuardContext;
 use harness::hooks::hook_result::{Decision, HookResult};
@@ -103,18 +103,6 @@ impl HookPayloadBuilder {
     }
 }
 
-fn attach_run_context(
-    mut context: GuardContext,
-    run_dir: &Path,
-    activate_skill: bool,
-) -> GuardContext {
-    context.run_dir = Some(run_dir.to_path_buf());
-    if activate_skill {
-        context.skill_active = true;
-    }
-    context
-}
-
 /// Build a bash hook envelope. Drop-in for `helpers::make_bash_payload`.
 #[must_use]
 pub fn make_bash_payload(command: &str) -> HookEnvelopePayload {
@@ -164,18 +152,6 @@ pub fn make_empty_payload() -> HookEnvelopePayload {
 #[must_use]
 pub fn make_hook_context(skill: &str, payload: HookEnvelopePayload) -> GuardContext {
     GuardContext::from_envelope(skill, payload)
-}
-
-/// Build a `GuardContext` with an associated run directory.
-/// Drop-in for `helpers::make_hook_context_with_run`.
-#[must_use]
-pub fn make_hook_context_with_run(
-    skill: &str,
-    payload: HookEnvelopePayload,
-    run_dir: &Path,
-) -> GuardContext {
-    let context = GuardContext::from_envelope(skill, payload);
-    attach_run_context(context, run_dir, true)
 }
 
 /// Assert the hook result matches a specific decision.
