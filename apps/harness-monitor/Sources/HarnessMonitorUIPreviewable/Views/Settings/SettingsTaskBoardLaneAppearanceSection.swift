@@ -237,7 +237,7 @@ struct SettingsTaskBoardLaneAppearancePopover: View {
             .strokeBorder(appearance.color(for: lane).opacity(0.28), lineWidth: 1)
         }
     }
-    .harnessPlainButtonStyle()
+    .buttonStyle(.borderless)
     .help(symbolName)
     .accessibilityLabel("Use \(symbolName) symbol")
   }

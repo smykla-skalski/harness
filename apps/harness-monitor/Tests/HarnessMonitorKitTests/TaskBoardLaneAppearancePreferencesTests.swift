@@ -333,6 +333,23 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(!source.contains(".popover("))
   }
 
+  @Test("The appearance popover keeps native button feedback")
+  func appearancePopoverKeepsNativeButtonFeedback() throws {
+    // `.plain` strips hover, press feedback, and accessibility affordances.
+    // `harnessPlainButtonStyle()` is just a spelling of it, so ban both, and
+    // check the swatch and symbol grids together: they sit in one popover and
+    // must not disagree about whether a tile reacts to the pointer.
+    for path in [
+      "Views/Settings/SettingsTaskBoardLaneColorPicker.swift",
+      "Views/Settings/SettingsTaskBoardLaneAppearanceSection.swift",
+    ] {
+      let source = try sourceFile(named: path)
+
+      #expect(!source.contains("harnessPlainButtonStyle"), "\(path) uses a plain button style")
+      #expect(!source.contains("buttonStyle(.plain)"), "\(path) uses a plain button style")
+    }
+  }
+
   @Test("Lane color components round-trip a stored color")
   func laneColorComponentsRoundTripAStoredColor() throws {
     let original = Color(.sRGB, red: 0.24, green: 0.58, blue: 0.87, opacity: 1)

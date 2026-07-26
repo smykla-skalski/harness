@@ -137,7 +137,7 @@ struct SettingsTaskBoardLaneColorPicker: View {
             )
         }
     }
-    .harnessPlainButtonStyle()
+    .buttonStyle(.borderless)
     .help(token.title)
     // The checkmark is the only visible "selected", and it rides on the swatch
     // rather than beside a name, so VoiceOver needs the trait set explicitly.
