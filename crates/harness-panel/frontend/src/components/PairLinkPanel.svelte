@@ -106,7 +106,8 @@
   });
 
   // Depends on the link alone. Reading the countdown here instead would tear the
-  // interval down and rebuild it on every tick.
+  // interval down and rebuild it on every tick. What ends it early is decided
+  // inside the tick below, for the same reason.
   $effect(() => {
     const current = link;
     if (current === null) {
@@ -120,17 +121,20 @@
       return;
     }
     const tick = setInterval(() => {
+      // A claimed link has nothing left to count down. Stopping from inside the
+      // tick rather than by keying the effect on the claim keeps the interval
+      // built once per link: the claim arrives on a whole new pairing list, so
+      // as a dependency it would tear this down and rebuild it on every read.
+      if (claimedBy !== null) {
+        clearInterval(tick);
+        return;
+      }
       nowMs = Date.now();
       if (nowMs < deadline) {
         return;
       }
       clearInterval(tick);
-      // Only for a link that ran out unclaimed. One that was claimed has
-      // already settled the page, and asking for another read would say a
-      // deadline mattered when nothing was waiting on it.
-      if (claimedBy === null) {
-        onLapse();
-      }
+      onLapse();
     }, TICK_MS);
     return () => {
       clearInterval(tick);
