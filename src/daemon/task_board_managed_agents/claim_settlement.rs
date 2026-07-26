@@ -35,6 +35,10 @@ pub(crate) async fn settle_claimed_task_board_worker(
         Ok(worker) => worker,
         Err(error) => return handle_start_error(db, claim, error).await,
     };
+    // Boxed, not inlined: async frames nest and add, so splitting this path put
+    // three untouched callers over the 16384-byte `large_futures` cap (worst was
+    // task_board_route_executor.rs at 17304). Boxing here stops the growth
+    // propagating out of this file. The same applies to every box below.
     Box::pin(finish_worker_settlement(
         state, db, claim, &worker_id, worker,
     ))
@@ -54,6 +58,7 @@ async fn finish_worker_settlement(
     match complete_worker_settlement(db, claim).await {
         Ok(()) => Ok(Some(worker)),
         Err(error) => {
+            // Boxed to keep this frame out of the caller's future; see above.
             Box::pin(adopt_committed_settlement(
                 state, db, claim, worker_id, worker, error,
             ))
@@ -96,6 +101,7 @@ async fn settle_workflow_before_start(
         rollback_unstarted_workflow(db, claim, &error).await?;
         return Err(error);
     }
+    // Boxed to keep this frame out of the caller's future; see above.
     Box::pin(settle_or_compensate_workflow(
         state, db, claim, &worker_id, existing,
     ))
@@ -136,6 +142,7 @@ async fn settle_or_compensate_workflow(
         }
         return Err(error);
     }
+    // Boxed to keep this frame out of the caller's future; see above.
     Box::pin(commit_workflow_dispatch(
         state, db, claim, worker_id, existing,
     ))
