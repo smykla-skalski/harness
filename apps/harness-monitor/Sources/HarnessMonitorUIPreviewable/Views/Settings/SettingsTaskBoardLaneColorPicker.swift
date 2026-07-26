@@ -61,16 +61,40 @@ struct SettingsTaskBoardLaneColorPicker: View {
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
 
+      // Both surfaces are drag-only, so without this they are invisible to
+      // VoiceOver and the custom path becomes mouse-only. The presets above
+      // are ordinary buttons and need no help. Saturation and brightness share
+      // one control, and an adjustable action only drives one axis, so
+      // brightness rides along as a pair of named actions.
       Saturation(
         saturation: binding(\.saturation),
         brightness: binding(\.brightness),
         hue: components.hue
       )
       .frame(height: 96)
+      .accessibilityElement()
       .accessibilityLabel("\(lane.title) custom color saturation and brightness")
+      .accessibilityValue(
+        "Saturation \(percentage(components.saturation)),"
+          + " brightness \(percentage(components.brightness))"
+      )
+      .accessibilityAdjustableAction { direction in
+        adjust(\.saturation, by: direction == .increment ? 0.05 : -0.05)
+      }
+      .accessibilityAction(named: "Increase brightness") {
+        adjust(\.brightness, by: 0.05)
+      }
+      .accessibilityAction(named: "Decrease brightness") {
+        adjust(\.brightness, by: -0.05)
+      }
 
       HueSlider(hue: binding(\.hue))
+        .accessibilityElement()
         .accessibilityLabel("\(lane.title) custom color hue")
+        .accessibilityValue("\(Int((components.hue * 360).rounded())) degrees")
+        .accessibilityAdjustableAction { direction in
+          adjust(\.hue, by: direction == .increment ? 1 / 36 : -1 / 36)
+        }
     }
     .environment(\.cornerSize, 8)
     .environment(\.pointSize, CGSize(width: 14, height: 14))
@@ -119,6 +143,18 @@ struct SettingsTaskBoardLaneColorPicker: View {
     // rather than beside a name, so VoiceOver needs the trait set explicitly.
     .accessibilityLabel(token.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+  }
+
+  private func adjust(
+    _ keyPath: WritableKeyPath<TaskBoardLaneColorComponents, CGFloat>,
+    by delta: CGFloat
+  ) {
+    let target = binding(keyPath)
+    target.wrappedValue = min(max(target.wrappedValue + delta, 0), 1)
+  }
+
+  private func percentage(_ value: CGFloat) -> String {
+    "\(Int((value * 100).rounded())) percent"
   }
 
   private func binding(
