@@ -43,6 +43,11 @@ const OPENAPI_EXEMPT: &[(&str, &str, &str)] = &[
         "/v1/managed-agents/{managed_agent_id}/attach",
         "raw terminal attach stream, not a request/response operation",
     ),
+    (
+        "GET",
+        "/v1/remote/ws",
+        "websocket upgrade carrying remote client events, not a request/response operation",
+    ),
 ];
 
 fn documented_operations() -> BTreeSet<(String, String)> {
