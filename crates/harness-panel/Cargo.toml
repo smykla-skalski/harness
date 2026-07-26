@@ -1,13 +1,13 @@
 # The panel ships on its own cadence, so `scripts/version.sh` lists it as an
-# independent package and leaves the version below alone. 51.1.1 was only ever
-# the workspace number it happened to be created under; this is its own line, and
-# sitting far below the workspace version is deliberate rather than stale.
+# independent package and leaves the version below alone. The workspace number
+# was only ever the one it happened to be created under; this is its own line,
+# and sitting far below the workspace version is deliberate rather than stale.
 #
 # Keep `name` and `version` adjacent: the version script reads them with one
 # regex that allows only whitespace between the two.
 [package]
 name = "harness-panel"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
