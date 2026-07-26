@@ -26,7 +26,7 @@ use super::CompanionRouteConfig;
 use super::client::CompanionClient;
 use super::forward::{
     COMPANION_UPSTREAM_TIMEOUT, build_upstream_request, connection_names_upgrade,
-    upstream_response, upstream_unreachable_response,
+    upstream_response, upstream_timeout_response, upstream_unreachable_response,
 };
 
 /// Whether this request is the one upgrade the daemon relays.
@@ -77,7 +77,7 @@ pub(super) async fn relay_websocket(
     let mut response = match timeout_at(deadline, client.request(upstream_request)).await {
         Ok(Ok(response)) => response,
         Ok(Err(error)) => return upstream_unreachable(config, &error),
-        Err(_) => return upgrade_timed_out_response(),
+        Err(_) => return upstream_timeout_response(),
     };
 
     if response.status() != StatusCode::SWITCHING_PROTOCOLS {
@@ -157,12 +157,6 @@ fn report_upstream_failure(upstream_origin: &str, error: &hyper_util::client::le
         %error,
         "companion websocket handshake failed"
     );
-}
-
-fn upgrade_timed_out_response() -> Response {
-    let mut response = Response::new(Body::empty());
-    *response.status_mut() = StatusCode::GATEWAY_TIMEOUT;
-    response
 }
 
 #[cfg(test)]

@@ -266,7 +266,7 @@ pub(super) fn upstream_unreachable_response() -> Response {
     companion_error_response(StatusCode::BAD_GATEWAY, "companion service did not answer")
 }
 
-fn upstream_timeout_response() -> Response {
+pub(super) fn upstream_timeout_response() -> Response {
     companion_error_response(
         StatusCode::GATEWAY_TIMEOUT,
         "companion service did not answer in time",

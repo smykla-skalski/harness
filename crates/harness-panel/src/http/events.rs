@@ -33,8 +33,8 @@ use crate::events::{PairingChanged, PanelChange};
 /// Something in the middle — the daemon that fronts this, or whatever the reader
 /// is behind — will drop a connection that has carried nothing for long enough,
 /// and a page whose socket died quietly is a page that stops updating without
-/// saying so. The browser answers each ping itself, so this costs a frame a
-/// minute and keeps the path warm.
+/// saying so. The browser answers each ping itself, so keeping the path warm
+/// costs one frame each way every thirty seconds and no work on the page.
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Open the socket for the signed-in person.
