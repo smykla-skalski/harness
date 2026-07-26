@@ -43,12 +43,30 @@
     }
   }
 
+  /**
+   * Counts reads of the pairings so only the newest may apply what it found.
+   *
+   * These overlap: a mint refreshes without waiting, an unpair refreshes after
+   * it, and both can be in flight while the page reloads. Two reads answering
+   * out of order would otherwise leave the older one's snapshot on screen,
+   * showing a device as still paired seconds after it was cut off. Signing out
+   * bumps it too, so a read that started under one session cannot land under
+   * the next.
+   */
+  let pairingsRead = 0;
+
   async function loadPairings(): Promise<void> {
+    const read = ++pairingsRead;
     pairingsFailure = null;
     try {
-      pairings = await api.fetchPairings();
+      const listed = await api.fetchPairings();
+      if (read === pairingsRead) {
+        pairings = listed;
+      }
     } catch (error) {
-      pairingsFailure = error instanceof Error ? error.message : String(error);
+      if (read === pairingsRead) {
+        pairingsFailure = error instanceof Error ? error.message : String(error);
+      }
     }
   }
 
@@ -93,6 +111,9 @@
     viewer = null;
     accounts = [];
     pairings = [];
+    // Discards any read already in flight, which would otherwise resolve during
+    // the sign-out below and put this session's devices back on the page.
+    pairingsRead += 1;
     try {
       await api.signOut();
     } catch (error) {
