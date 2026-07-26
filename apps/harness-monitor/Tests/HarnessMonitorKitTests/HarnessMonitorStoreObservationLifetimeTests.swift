@@ -124,7 +124,9 @@ struct HarnessMonitorStoreObservationLifetimeTests {
       repeating: proc_fdinfo(),
       count: Int(sizingResult) / MemoryLayout<proc_fdinfo>.stride
     )
-    let listedBytes = proc_pidinfo(getpid(), PROC_PIDLISTFDS, 0, &entries, sizingResult)
+    let listedBytes = entries.withUnsafeMutableBufferPointer { buffer in
+      proc_pidinfo(getpid(), PROC_PIDLISTFDS, 0, buffer.baseAddress, sizingResult)
+    }
     try #require(listedBytes > 0)
     return Int(listedBytes) / MemoryLayout<proc_fdinfo>.stride
   }
