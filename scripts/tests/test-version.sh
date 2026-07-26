@@ -108,6 +108,13 @@ canonical_version() {
   "$SCRIPT" show
 }
 
+next_patch_version() {
+  perl -e '
+    my ($major, $minor, $patch) = split /\./, $ARGV[0];
+    print join ".", $major, $minor, $patch + 1;
+  ' "$(canonical_version)"
+}
+
 # Parsed here rather than asked of version.sh, so a scenario cannot pass
 # because the reader under test and the assertion share the same blind spot.
 sandbox_member_versions() {
@@ -138,6 +145,35 @@ stale_member_package_version() {
     my $count = s/(\[package\]\s*name = "[^"]+"\s*version = ")[^"]+(")/${1}0.0.1$2/s;
     die "failed to stale the package version in $ARGV\n" unless $count;
   ' "$SANDBOX/$member/Cargo.toml"
+}
+
+set_member_package_version() {
+  local member="$1"
+  NEW_VERSION="$2" perl -0pi -e '
+    my $count = s/(\[package\]\s*name = "[^"]+"\s*version = ")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/se;
+    die "failed to set the package version in $ARGV\n" unless $count;
+  ' "$SANDBOX/$member/Cargo.toml"
+}
+
+set_lock_package_version() {
+  PACKAGE_NAME="$1" NEW_VERSION="$2" perl -0pi -e '
+    my $count = s/(\[\[package\]\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = ")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/se;
+    die "failed to set the lock version for $ENV{PACKAGE_NAME}\n" unless $count;
+  ' "$SANDBOX/Cargo.lock"
+}
+
+# The exemption is read back out of the script rather than repeated here, so a
+# crate joining or leaving the list cannot leave this suite asserting the old
+# set. The scenarios that name `harness-panel` state intended behaviour and are
+# meant to be read literally.
+independent_package_names() {
+  perl -0ne '
+    unless (/^INDEPENDENT_PACKAGE_NAMES=\((.*?)\)/ms) {
+      die "failed to read INDEPENDENT_PACKAGE_NAMES from $ARGV\n";
+    }
+    my $names = $1;
+    print "$1\n" while $names =~ /"([^"]+)"/g;
+  ' "$SCRIPT"
 }
 
 check_rejects() {
@@ -195,18 +231,14 @@ scenario_check_names_an_unreadable_openapi_version() {
 scenario_set_stamps_the_openapi_document() {
   seed_sandbox
   start_test "set stamps the openapi document alongside the other surfaces"
-  local original bumped stamped
+  local bumped stamped
   # `set` reaches PlistBuddy through sync_monitor, so the write path is
   # macOS-only even though `check` runs everywhere.
   if [[ "$(uname -s)" != "Darwin" ]]; then
     skip "version.sh set needs PlistBuddy"
     return 0
   fi
-  original="$("$SCRIPT" show)"
-  bumped="$(perl -e '
-    my ($major, $minor, $patch) = split /\./, $ARGV[0];
-    print join ".", $major, $minor, $patch + 1;
-  ' "$original")"
+  bumped="$(next_patch_version)"
 
   if ! "$SCRIPT" set "$bumped" >/dev/null 2>&1; then
     fail "version.sh set $bumped exited non-zero"
@@ -283,26 +315,24 @@ EOF
   check_rejects "harness-kernel"
 }
 
-scenario_set_moves_every_workspace_member() {
+scenario_set_moves_every_shared_workspace_member() {
   seed_sandbox
-  start_test "set moves every workspace member and its lock entry"
-  local original bumped stragglers
+  start_test "set moves every workspace member that shares the root version"
+  local bumped exempt stragglers
   if [[ "$(uname -s)" != "Darwin" ]]; then
     skip "version.sh set needs PlistBuddy"
     return 0
   fi
-  original="$(canonical_version)"
-  bumped="$(perl -e '
-    my ($major, $minor, $patch) = split /\./, $ARGV[0];
-    print join ".", $major, $minor, $patch + 1;
-  ' "$original")"
+  bumped="$(next_patch_version)"
+  exempt=" $(independent_package_names | tr '\n' ' ')"
 
   if ! "$SCRIPT" set "$bumped" >/dev/null 2>&1; then
     fail "version.sh set $bumped exited non-zero"
     return 1
   fi
 
-  stragglers="$(sandbox_member_versions | awk -v want="$bumped" '
+  stragglers="$(sandbox_member_versions | awk -v want="$bumped" -v exempt="$exempt" '
+    index(exempt, " " $1 " ") { next }
     $2 != want { print $1 " manifest " $2 }
     $3 != want { print $1 " lock " $3 }
   ')"
@@ -310,6 +340,54 @@ scenario_set_moves_every_workspace_member() {
     pass
   else
     fail "members left behind by set $bumped: $(printf '%s' "$stragglers" | tr '\n' ' ')"
+  fi
+}
+
+scenario_check_ignores_an_independent_member_version() {
+  seed_sandbox
+  start_test "check passes when an independent member carries its own version"
+  set_member_package_version "crates/harness-panel" "9.9.9"
+  set_lock_package_version "harness-panel" "9.9.9"
+
+  if "$SCRIPT" check >/dev/null 2>&1; then
+    pass
+  else
+    fail "check flagged an independent member: $("$SCRIPT" check 2>&1)"
+  fi
+}
+
+# Exempt from the root version, not from being consistent with itself: a lock
+# entry that disagrees with the crate's own manifest is still a broken tree.
+scenario_check_rejects_an_independent_member_lock_drift() {
+  seed_sandbox
+  start_test "check fails when an independent member's lock entry lags its manifest"
+  set_member_package_version "crates/harness-panel" "9.9.9"
+
+  check_rejects "harness-panel"
+}
+
+scenario_set_leaves_an_independent_member_alone() {
+  seed_sandbox
+  start_test "set leaves an independent member and its lock entry alone"
+  local bumped after
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    skip "version.sh set needs PlistBuddy"
+    return 0
+  fi
+  set_member_package_version "crates/harness-panel" "9.9.9"
+  set_lock_package_version "harness-panel" "9.9.9"
+  bumped="$(next_patch_version)"
+
+  if ! "$SCRIPT" set "$bumped" >/dev/null 2>&1; then
+    fail "version.sh set $bumped exited non-zero"
+    return 1
+  fi
+
+  after="$(sandbox_member_versions | awk '$1 == "harness-panel" { print $2 " " $3 }')"
+  if [[ "$after" == "9.9.9 9.9.9" ]]; then
+    pass
+  else
+    fail "harness-panel reports $after after setting $bumped"
   fi
 }
 
@@ -321,7 +399,10 @@ scenario_check_rejects_a_stale_member_crate
 scenario_check_rejects_a_member_added_after_the_tooling
 scenario_check_rejects_a_stale_member_requirement
 scenario_check_rejects_an_unreadable_member_requirement
-scenario_set_moves_every_workspace_member
+scenario_set_moves_every_shared_workspace_member
+scenario_check_ignores_an_independent_member_version
+scenario_check_rejects_an_independent_member_lock_drift
+scenario_set_leaves_an_independent_member_alone
 
 log "version tests: $PASS_COUNT passed, $FAIL_COUNT failed"
 if ((FAIL_COUNT > 0)); then

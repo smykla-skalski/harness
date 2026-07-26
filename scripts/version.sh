@@ -16,6 +16,14 @@ MISSING_VERSION="<missing>"
 WORKSPACE_MANIFESTS=()
 WORKSPACE_NAMES=()
 WORKSPACE_VERSIONS=()
+# Members that ship on their own cadence and keep the version in their own
+# manifest. This one names crates to leave alone, so a crate nobody remembered
+# to list moves with the root and says so, rather than going stale in silence.
+# `harness-codex-acp` and `harness-openrouter-agent` need no entry: they declare
+# their own [workspace] and are not members of this one.
+INDEPENDENT_PACKAGE_NAMES=(
+  "harness-panel"
+)
 MONITOR_APP_ROOT="$ROOT/apps/harness-monitor"
 MONITOR_BUILD_SETTINGS="$ROOT/apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift"
 MONITOR_DAEMON_INFO_PLIST="$ROOT/apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
@@ -110,6 +118,31 @@ is_workspace_package_name() {
     [ "$candidate" = "$package_name" ] && return 0
   done
   return 1
+}
+
+# The version every surface naming this package has to carry: the root version,
+# or the package's own when it versions independently. An independent package is
+# still held to one version across its manifest, the lock, and any requirement
+# on it; it just is not the root's.
+package_target_version() {
+  local candidate="$1"
+  local canonical="$2"
+  local package_name index
+  # The list is expected to shrink back to empty one day, and expanding an empty
+  # array is an unbound variable under `set -u` in the bash 3.2 macOS ships.
+  if [ "${#INDEPENDENT_PACKAGE_NAMES[@]}" -gt 0 ]; then
+    for package_name in "${INDEPENDENT_PACKAGE_NAMES[@]}"; do
+      [ "$candidate" = "$package_name" ] || continue
+      for index in "${!WORKSPACE_NAMES[@]}"; do
+        if [ "${WORKSPACE_NAMES[$index]}" = "$candidate" ]; then
+          printf '%s' "${WORKSPACE_VERSIONS[$index]}"
+          return 0
+        fi
+      done
+      die "$candidate is listed as independent but is not a workspace member"
+    done
+  fi
+  printf '%s' "$canonical"
 }
 
 # Reports every dependency a manifest declares, so the caller can tell a stale
@@ -385,7 +418,7 @@ check_sync() {
   local -a generated_marketing_versions=()
   local -a generated_current_versions=()
   local -a errors=()
-  local index manifest package_name package_version lock_version
+  local index manifest package_name package_version target_version lock_version
   local kind dependency_name detail
 
   version="$(canonical_version)"
@@ -405,15 +438,17 @@ check_sync() {
     manifest="${WORKSPACE_MANIFESTS[$index]}"
     package_name="${WORKSPACE_NAMES[$index]}"
     package_version="${WORKSPACE_VERSIONS[$index]}"
+    target_version="$(package_target_version "$package_name" "$version")"
     lock_version="$(lock_package_version "$CARGO_LOCK" "$package_name")"
-    [ "$package_version" = "$version" ] || errors+=("${manifest#"$ROOT/"} $package_name version $package_version != Cargo.toml version $version")
-    [ "$lock_version" = "$version" ] || errors+=("Cargo.lock $package_name version $lock_version != Cargo.toml version $version")
+    [ "$package_version" = "$target_version" ] || errors+=("${manifest#"$ROOT/"} $package_name version $package_version != expected version $target_version")
+    [ "$lock_version" = "$target_version" ] || errors+=("Cargo.lock $package_name version $lock_version != expected version $target_version")
   done
   for manifest in "${WORKSPACE_MANIFESTS[@]}"; do
     while IFS=$'\t' read -r kind dependency_name detail; do
       is_workspace_package_name "$dependency_name" || continue
+      target_version="$(package_target_version "$dependency_name" "$version")"
       if [ "$kind" = "version" ]; then
-        [ "$detail" = "$version" ] || errors+=("${manifest#"$ROOT/"} $dependency_name dependency version $detail != Cargo.toml version $version")
+        [ "$detail" = "$target_version" ] || errors+=("${manifest#"$ROOT/"} $dependency_name dependency version $detail != expected version $target_version")
       else
         errors+=("${manifest#"$ROOT/"} $dependency_name dependency is $detail")
       fi
@@ -466,20 +501,22 @@ check_sync() {
 
 sync_all() {
   local version="$1"
-  local index manifest package_name kind dependency_name detail
+  local index manifest package_name target_version kind dependency_name detail
 
   load_workspace_members
   for index in "${!WORKSPACE_MANIFESTS[@]}"; do
     package_name="${WORKSPACE_NAMES[$index]}"
-    set_manifest_package_version "${WORKSPACE_MANIFESTS[$index]}" "$package_name" "$version"
-    set_lock_package_version "$package_name" "$version"
+    target_version="$(package_target_version "$package_name" "$version")"
+    set_manifest_package_version "${WORKSPACE_MANIFESTS[$index]}" "$package_name" "$target_version"
+    set_lock_package_version "$package_name" "$target_version"
   done
   for manifest in "${WORKSPACE_MANIFESTS[@]}"; do
     while IFS=$'\t' read -r kind dependency_name detail; do
       is_workspace_package_name "$dependency_name" || continue
       [ "$kind" = "version" ] ||
         die "${manifest#"$ROOT/"} $dependency_name dependency is $detail"
-      set_manifest_dependency_version "$manifest" "$dependency_name" "$version"
+      target_version="$(package_target_version "$dependency_name" "$version")"
+      set_manifest_dependency_version "$manifest" "$dependency_name" "$target_version"
     done < <(manifest_dependency_declarations "$manifest")
   done
   sync_monitor "$version"
