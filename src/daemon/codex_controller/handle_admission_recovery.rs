@@ -19,25 +19,35 @@ impl CodexControllerHandle {
             ))
         })?;
         for recovery in db.task_board_admission_worker_recoveries().await? {
-            if !recovery.managed_worker_id.starts_with("codex-") {
-                tracing::warn!(
-                    managed_worker_id = %recovery.managed_worker_id,
-                    "preserving committed admission for an unsupported managed worker type",
-                );
-                continue;
-            }
-            if self.state.active_runs.contains(&recovery.managed_worker_id) {
-                continue;
-            }
-            if let Some(run) = db.codex_run(&recovery.managed_worker_id).await? {
-                self.reconcile_existing_admission_run(db.as_ref(), run)
-                    .await?;
-                continue;
-            }
-            self.reconcile_missing_admission_run(db.as_ref(), &recovery)
+            self.reconcile_one_admission_worker(db.as_ref(), &recovery)
                 .await?;
         }
         Ok(())
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "routes one recovered admission worker to its existing-run or missing-run path, skipping non-codex and already-active workers; the tracing::warn! for an unsupported type costs 7 of its 11 points, leaving structural 4"
+    )]
+    async fn reconcile_one_admission_worker(
+        &self,
+        db: &AsyncDaemonDb,
+        recovery: &TaskBoardAdmissionWorkerRecovery,
+    ) -> Result<(), CliError> {
+        if !recovery.managed_worker_id.starts_with("codex-") {
+            tracing::warn!(
+                managed_worker_id = %recovery.managed_worker_id,
+                "preserving committed admission for an unsupported managed worker type",
+            );
+            return Ok(());
+        }
+        if self.state.active_runs.contains(&recovery.managed_worker_id) {
+            return Ok(());
+        }
+        if let Some(run) = db.codex_run(&recovery.managed_worker_id).await? {
+            return self.reconcile_existing_admission_run(db, run).await;
+        }
+        self.reconcile_missing_admission_run(db, recovery).await
     }
 
     async fn reconcile_existing_admission_run(
@@ -52,6 +62,10 @@ impl CodexControllerHandle {
         self.reconcile_run(run).map(|_| ())
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "reconciles a committed admission that has no durable run, then publishes the recovery and re-evaluates the board; the closing tracing::warn! costs 7 of its 13 points, leaving structural 6"
+    )]
     async fn reconcile_missing_admission_run(
         &self,
         db: &AsyncDaemonDb,

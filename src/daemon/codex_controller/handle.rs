@@ -353,6 +353,10 @@ fn ensure_run_belongs_to_session(
     .into())
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "reports a queued codex run by logging it and appending a best-effort event; the one tracing::info! expansion costs 7 of its 8 points, leaving structural 1, so this covers surcharge only"
+)]
 fn log_queued_run(session_id: &str, snapshot: &CodexRunSnapshot) {
     tracing::info!(
         session_id,

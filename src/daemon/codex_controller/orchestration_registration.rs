@@ -183,6 +183,10 @@ fn persist_sync_registration(
     ))
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "restores the pre-registration session state and republishes it, logging on either failure; the two tracing::warn! expansions cost 14 of its 17 points, leaving structural 3"
+)]
 fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &SessionState) {
     let restore_result = db
         .project_id_for_session(session_id)
@@ -210,6 +214,10 @@ fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "persists registration side effects and rolls them back on failure while still returning the original error; the tracing::warn! for a failed rollback costs 7 of its 10 points, leaving structural 3"
+)]
 pub(super) async fn finalize_async_registration(
     async_db: &AsyncDaemonDb,
     session_id: &str,

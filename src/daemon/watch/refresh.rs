@@ -163,6 +163,10 @@ async fn broadcast_session_fanout_async(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "builds the automation snapshot behind its feature flag before emitting a task-board update; the tracing::warn! for a failed snapshot costs 7 of its 12 points, leaving structural 5"
+)]
 async fn emit_task_board_updated_async(
     sender: &Sender<StreamEvent>,
     changes: &WatchChanges,
