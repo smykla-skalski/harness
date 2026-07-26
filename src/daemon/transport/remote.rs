@@ -263,8 +263,8 @@ impl DaemonRemotePairCreateArgs {
                 requested_scopes: &requested_scopes,
                 reviews_query: reviews_query.as_ref(),
                 minted_for: None,
-            // Created on the host, so no remote client owns it.
-            minted_by: None,
+                // Created on the host, so no remote client owns it.
+                minted_by: None,
                 extra_audit: None,
             },
         )?;
