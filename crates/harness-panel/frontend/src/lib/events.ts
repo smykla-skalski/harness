@@ -209,8 +209,37 @@ function readEvent(data: unknown): PanelStreamEvent | null {
     return null;
   }
   const { change, pairing } = frame as Partial<Extract<PanelStreamEvent, { type: 'pairing' }>>;
-  if (typeof change !== 'string' || typeof pairing?.pairing_id !== 'string') {
+  const entry = readPairing(pairing);
+  if (typeof change !== 'string' || entry === null) {
     return null;
   }
-  return { type: 'pairing', change, pairing };
+  return { type: 'pairing', change, pairing: entry };
+}
+
+/**
+ * Every field `PanelPairing` declares as required.
+ *
+ * Checking only the id would hand a caller a value typed as a whole pairing that
+ * is not one. Nothing reads past the id today — a change means re-reading the
+ * list — but the type says otherwise, and the first caller to believe it would
+ * be the one that crashes.
+ */
+const REQUIRED_PAIRING_FIELDS = ['pairing_id', 'state', 'role', 'created_at', 'expires_at'];
+
+/**
+ * A pairing, or `null` for anything that is not one.
+ *
+ * Only the required fields are checked. An optional one that is absent is a
+ * pairing in a state that has no value for it, and a field the panel grows later
+ * still arrives without this build having to learn about it first.
+ */
+function readPairing(value: unknown): PanelPairing | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+  const fields = value as Record<string, unknown>;
+  if (!REQUIRED_PAIRING_FIELDS.every((name) => typeof fields[name] === 'string')) {
+    return null;
+  }
+  return value as PanelPairing;
 }

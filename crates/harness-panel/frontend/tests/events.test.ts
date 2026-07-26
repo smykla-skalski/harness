@@ -180,6 +180,13 @@ describe('openPanelStream', () => {
     state.socketAt(0).deliver({ type: 'something_later' });
     state.socketAt(0).deliver({ type: 'pairing', change: 'claimed' });
     state.socketAt(0).deliver({ type: 'pairing', pairing: claimed('pair-1') });
+    // Typed as a whole pairing, so a partial one must not reach a handler that
+    // believes the type. Nothing reads past the id today, and the first caller
+    // that does would be the one to crash on it.
+    const withoutState: Record<string, unknown> = { ...claimed('pair-1') };
+    delete withoutState.state;
+    state.socketAt(0).deliver({ type: 'pairing', change: 'claimed', pairing: withoutState });
+    state.socketAt(0).deliver({ type: 'pairing', change: 'claimed', pairing: 'pair-1' });
 
     expect(state.pairings).toHaveLength(0);
     expect(state.resyncs).toBe(1);
