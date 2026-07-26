@@ -1,10 +1,12 @@
 //! The panel's one link to the daemon.
 //!
-//! Two calls, both over the daemon's public HTTPS listener: claiming the
-//! credential the panel runs as, once, and minting a pairing link for a person
-//! the panel has authenticated. The panel never reads the daemon's database or
-//! runs its CLI; this module is the whole of the coupling.
+//! Four calls, all over the daemon's public HTTPS listener: claiming the
+//! credential the panel runs as, once; minting a pairing link for a person the
+//! panel has authenticated; and listing and revoking what it minted. The panel
+//! never reads the daemon's database or runs its CLI; this module is the whole
+//! of the coupling.
 
+pub mod pairings;
 pub mod tls;
 
 use std::time::Duration;
@@ -298,7 +300,11 @@ struct MintSubject<'a> {
 const MAX_PAIRING_ID_CHARS: usize = 200;
 
 /// The prefix the panel gives a slot it has claimed but not yet filled.
-const RESERVATION_PREFIX: &str = "reservation:";
+///
+/// [`checked_pairing_id`] refuses a daemon pairing spelled this way, which is
+/// what lets the store tell its own reservations from real pairings by the id
+/// alone.
+pub const RESERVATION_PREFIX: &str = "reservation:";
 
 /// Check the identifier the panel will log, store, and quote back.
 ///
