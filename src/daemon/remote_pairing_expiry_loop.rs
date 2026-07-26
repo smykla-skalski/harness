@@ -168,7 +168,7 @@ mod tests {
 
     async fn recorded_expirations(db: &AsyncDaemonDb) -> i64 {
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM remote_audit_events WHERE route_or_method = ?",
+            "SELECT COUNT(*) FROM remote_audit_events WHERE route_or_method = ?1",
         )
         .bind("remote.pair.expire")
         .fetch_one(db.pool())
