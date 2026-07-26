@@ -250,6 +250,38 @@ extension View {
   }
 }
 
+// MARK: - Inspector overlay glass
+
+private struct HarnessMonitorInspectorGlassModifier: ViewModifier {
+  let isActive: Bool
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+
+  func body(content: Content) -> some View {
+    content
+      .background {
+        if isActive {
+          if reduceTransparency {
+            Rectangle()
+              .fill(.background)
+              .ignoresSafeArea(.container, edges: .top)
+          } else {
+            Rectangle()
+              .fill(.clear)
+              .glassEffect(.regular, in: .rect)
+              .ignoresSafeArea(.container, edges: .top)
+          }
+        }
+      }
+  }
+}
+
+extension View {
+  func harnessInspectorGlass(isActive: Bool) -> some View {
+    modifier(HarnessMonitorInspectorGlassModifier(isActive: isActive))
+  }
+}
+
 // MARK: - Toast dismiss circle glass
 
 private struct HarnessMonitorToastDismissGlassModifier: ViewModifier {

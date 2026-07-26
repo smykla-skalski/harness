@@ -6,6 +6,22 @@ enum TaskBoardOperationsInspectorVisibility {
   static let defaultValue = false
 }
 
+enum TaskBoardOperationsInspectorWidth {
+  static let storageKey = "taskBoard.operationsInspectorWidth"
+  static let defaultValue: CGFloat = 480
+  static let minimum: CGFloat = 320
+  static let maximum: CGFloat = 720
+
+  static func resolved(_ width: CGFloat) -> CGFloat {
+    guard width.isFinite else { return defaultValue }
+    return min(max(width, minimum), maximum)
+  }
+
+  static func resized(from width: CGFloat, translation: CGFloat) -> CGFloat {
+    resolved(width - translation)
+  }
+}
+
 @MainActor
 public final class TaskBoardOperationsInspectorFocusDispatcher {
   public var toggleInspector: (() -> Void)?
@@ -40,45 +56,110 @@ public struct TaskBoardOperationsInspectorFocus: Equatable {
 }
 
 struct TaskBoardOperationsInspector: View {
-  private static let width: CGFloat = 380
-
   let store: HarnessMonitorStore
   let taskBoardItems: [TaskBoardItem]
   let isVisible: Bool
+  @AppStorage(TaskBoardOperationsInspectorWidth.storageKey)
+  private var storedWidth = Double(TaskBoardOperationsInspectorWidth.defaultValue)
+  @GestureState private var resizeTranslation: CGFloat = 0
+
+  private var resolvedWidth: CGFloat {
+    TaskBoardOperationsInspectorWidth.resolved(CGFloat(storedWidth))
+  }
+
+  private var displayedWidth: CGFloat {
+    TaskBoardOperationsInspectorWidth.resized(
+      from: resolvedWidth,
+      translation: resizeTranslation
+    )
+  }
 
   var body: some View {
-    HStack(spacing: 0) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.7))
-        .frame(width: 1)
-        .frame(maxHeight: .infinity)
-
-      ScrollView(.vertical) {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
-          TaskBoardAutomationInspector(store: store, isActive: isVisible)
-          TaskBoardTriageRulesEditor(store: store, isActive: isVisible)
-          TaskBoardOperationsPanel(
-            store: store,
-            taskBoardItems: isVisible ? taskBoardItems : [],
-            isActive: isVisible
-          )
-        }
-        .padding(HarnessMonitorTheme.spacingLG)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-      }
-      .scrollBounceBehavior(.basedOnSize)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .background(.background)
-    }
-    // Preserve the inspector subtree's 380-point layout while the outer frame
-    // collapses only its clipped container, keeping form state and geometry stable.
-    .frame(width: Self.width)
-    .frame(width: isVisible ? Self.width : 0, alignment: .leading)
+    TaskBoardOperationsInspectorContent(
+      store: store,
+      taskBoardItems: isVisible ? taskBoardItems : [],
+      isActive: isVisible
+    )
+    .frame(width: isVisible ? displayedWidth : 0)
     .clipped()
+    .harnessInspectorGlass(isActive: isVisible)
+    .overlay(alignment: .leading) {
+      if isVisible {
+        resizeHandle
+      }
+    }
     .opacity(isVisible ? 1 : 0)
     .allowsHitTesting(isVisible)
     .accessibilityHidden(!isVisible)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.taskBoardOperationsInspector)
+  }
+
+  private var resizeHandle: some View {
+    Color.clear
+      .frame(width: 12)
+      .contentShape(.rect)
+      .gesture(resizeGesture)
+      .accessibilityElement()
+      .accessibilityLabel("Task Board Operations inspector width")
+      .accessibilityValue("\(Int(displayedWidth)) points")
+      .accessibilityAdjustableAction { direction in
+        adjustWidth(for: direction)
+      }
+      .help("Drag to resize the inspector")
+  }
+
+  private var resizeGesture: some Gesture {
+    DragGesture(minimumDistance: 0)
+      .updating($resizeTranslation) { value, translation, _ in
+        translation = value.translation.width
+      }
+      .onEnded { value in
+        storeWidth(
+          TaskBoardOperationsInspectorWidth.resized(
+            from: resolvedWidth,
+            translation: value.translation.width
+          )
+        )
+      }
+  }
+
+  private func adjustWidth(for direction: AccessibilityAdjustmentDirection) {
+    switch direction {
+    case .increment:
+      storeWidth(resolvedWidth + 40)
+    case .decrement:
+      storeWidth(resolvedWidth - 40)
+    @unknown default:
+      break
+    }
+  }
+
+  private func storeWidth(_ width: CGFloat) {
+    storedWidth = Double(TaskBoardOperationsInspectorWidth.resolved(width))
+  }
+}
+
+private struct TaskBoardOperationsInspectorContent: View {
+  let store: HarnessMonitorStore
+  let taskBoardItems: [TaskBoardItem]
+  let isActive: Bool
+
+  var body: some View {
+    ScrollView(.vertical) {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+        TaskBoardAutomationInspector(store: store, isActive: isActive)
+        TaskBoardTriageRulesEditor(store: store, isActive: isActive)
+        TaskBoardOperationsPanel(
+          store: store,
+          taskBoardItems: taskBoardItems,
+          isActive: isActive
+        )
+      }
+      .padding(HarnessMonitorTheme.spacingLG)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+    .scrollBounceBehavior(.basedOnSize)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
