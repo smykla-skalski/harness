@@ -67,36 +67,12 @@ impl RemoteExecutionControllerClient {
         request: &RemoteOfferRequest,
     ) -> Result<(RemoteOfferResponse, TaskBoardRemoteMutationOutcome), RemoteExecutionControllerError>
     {
-        if let Some(receipt) = db
-            .exact_task_board_remote_offer_receipt(request, &self.host_id)
-            .await?
-        {
-            let record = self.preflight(db, &request.binding.assignment_id).await?;
-            return Ok((
-                receipt.response()?,
-                TaskBoardRemoteMutationOutcome::Replayed(record),
-            ));
+        if let Some(replayed) = self.replay_existing_offer(db, request).await? {
+            return Ok(replayed);
         }
         let record = self.preflight(db, &request.binding.assignment_id).await?;
         verify_offer_preflight(&record, request, &self.host_id)?;
-        let trust = self
-            .current_operation_trust_for(
-                db,
-                TaskBoardRemoteOperationKind::Offer,
-                &request.binding.assignment_id,
-            )
-            .await?;
-        let authority_at = self.clock.now();
-        require_io_authority(
-            db.claim_task_board_remote_offer_io_authority_fenced(
-                request,
-                &self.host_id,
-                &authority_at,
-                &trust,
-            )
-            .await?,
-            "remote offer lost workflow I/O authority",
-        )?;
+        self.authorize_offer(db, request).await?;
         let response = self.client.offer(request).await?;
         let settled_at = self.clock.now();
         let outcome = Box::pin(db.record_task_board_remote_offer_response(
@@ -170,48 +146,10 @@ impl RemoteExecutionControllerClient {
         (RemoteLeaseRenewResponse, TaskBoardRemoteMutationOutcome),
         RemoteExecutionControllerError,
     > {
-        let record = self
-            .preflight_lifecycle(
-                db,
-                request.binding.assignment_id.as_str(),
-                request.lease_id.as_str(),
-                request.offer_request_sha256.as_str(),
-                &request.binding,
-            )
+        self.preflight_active_lease(db, request, "remote lease renewal is no longer active")
             .await?;
-        if !matches!(
-            record.state,
-            TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        ) {
-            return Err(binding_error("remote lease renewal is no longer active").into());
-        }
-        let trust = self
-            .current_operation_trust_for(
-                db,
-                TaskBoardRemoteOperationKind::Renew,
-                &request.binding.assignment_id,
-            )
-            .await?;
-        let authority_at = self.clock.now();
-        require_io_authority(
-            db.claim_task_board_remote_renew_io_authority_fenced(
-                request,
-                &self.host_id,
-                &authority_at,
-                &trust,
-            )
-            .await?,
-            "remote lease renewal lost workflow I/O authority",
-        )?;
-        let response = match self.client.renew_lease(request).await {
-            Ok(response) => response,
-            Err(error) if renewal_response_may_be_lost(&error) => {
-                self.client.renew_lease(request).await?
-            }
-            Err(error) => return Err(error.into()),
-        };
+        self.authorize_renew(db, request).await?;
+        let response = self.renew_lease_tolerating_lost_response(request).await?;
         let settled_at = self.clock.now();
         let outcome = Box::pin(db.record_task_board_remote_assignment_lease_renewal(
             request,
@@ -285,31 +223,8 @@ impl RemoteExecutionControllerClient {
         if let Some(response) = durable_cancel_response(&record, request)? {
             return Ok((response, TaskBoardRemoteMutationOutcome::Replayed(record)));
         }
-        let trust = self
-            .current_operation_trust_for(
-                db,
-                TaskBoardRemoteOperationKind::Cancel,
-                &request.binding.assignment_id,
-            )
-            .await?;
-        let authority_at = self.clock.now();
-        require_io_authority(
-            db.claim_task_board_remote_cancel_io_authority_fenced(
-                request,
-                &self.host_id,
-                &authority_at,
-                &trust,
-            )
-            .await?,
-            "remote cancellation lost workflow I/O authority",
-        )?;
-        let response = match self.client.cancel(request).await {
-            Ok(response) => response,
-            Err(error) if lifecycle_response_may_be_lost(&error) => {
-                self.client.cancel(request).await?
-            }
-            Err(error) => return Err(error.into()),
-        };
+        self.authorize_cancel(db, request).await?;
+        let response = self.cancel_tolerating_lost_response(request).await?;
         let settled_at = self.clock.now();
         let outcome = Box::pin(db.record_task_board_remote_assignment_cancel(
             request,
@@ -440,7 +355,7 @@ impl RemoteExecutionControllerClient {
     }
 }
 
-fn require_io_authority(
+pub(super) fn require_io_authority(
     authority: Option<TaskBoardRemoteIoAuthority>,
     message: &'static str,
 ) -> Result<(), RemoteExecutionControllerError> {

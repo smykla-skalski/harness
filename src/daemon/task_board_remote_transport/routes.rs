@@ -62,9 +62,8 @@ const fn max_body_limit(left: usize, right: usize) -> usize {
     if left > right { left } else { right }
 }
 
-pub(crate) fn execution_routes() -> OpenApiRouter<DaemonHttpState> {
+fn execution_offer_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
-        .routes(routes!(advertise))
         .routes(routes!(offer).layer(DefaultBodyLimit::max(OFFER_HTTP_BODY_LIMIT_BYTES)))
         .routes(
             routes!(upload_source_bundle)
@@ -79,13 +78,19 @@ pub(crate) fn execution_routes() -> OpenApiRouter<DaemonHttpState> {
                 DefaultBodyLimit::max(SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES),
             ),
         )
+}
+
+fn execution_attempt_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(claim).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
-        .routes(
-            routes!(renew_lease).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
-        )
+        .routes(routes!(renew_lease).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
         .routes(routes!(status).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
         .routes(routes!(cancel).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
         .routes(routes!(settled).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)))
+}
+
+fn execution_result_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(
             routes!(fetch_artifact).layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
@@ -93,6 +98,14 @@ pub(crate) fn execution_routes() -> OpenApiRouter<DaemonHttpState> {
             routes!(super::routes_cleanup::observe_cleanup)
                 .layer(DefaultBodyLimit::max(MAX_REMOTE_LIFECYCLE_JSON_BYTES)),
         )
+}
+
+pub(crate) fn execution_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(advertise))
+        .merge(execution_offer_routes())
+        .merge(execution_attempt_routes())
+        .merge(execution_result_routes())
 }
 
 pub(crate) fn execution_http_body_limit(method: &Method, path: &str) -> Option<usize> {
@@ -127,8 +140,16 @@ pub const EXECUTION_OPERATIONS: &[(Method, &str, &str)] = &[
     (Method::GET, ADVERTISE_PATH, "advertise"),
     (Method::POST, OFFER_PATH, "offer"),
     (Method::POST, SOURCE_BUNDLE_PATH, "upload_source_bundle"),
-    (Method::POST, SOURCE_BUNDLE_RECEIPT_PATH, "verify_source_bundle_receipt"),
-    (Method::POST, SOURCE_BUNDLE_ABANDON_PATH, "abandon_source_bundle"),
+    (
+        Method::POST,
+        SOURCE_BUNDLE_RECEIPT_PATH,
+        "verify_source_bundle_receipt",
+    ),
+    (
+        Method::POST,
+        SOURCE_BUNDLE_ABANDON_PATH,
+        "abandon_source_bundle",
+    ),
     (Method::POST, CLAIM_PATH, "claim"),
     (Method::POST, LEASE_RENEW_PATH, "renew_lease"),
     (Method::POST, STATUS_PATH, "status"),
@@ -208,9 +229,7 @@ async fn advertise(headers: HeaderMap, State(state): State<DaemonHttpState>) -> 
             let host = local_host(db).await?;
             let client =
                 require_execution_remote_client(&headers, &state, "advertise").map_err(|_| {
-                    CliErrorKind::session_permission_denied(
-                        "remote executor authorization denied",
-                    )
+                    CliErrorKind::session_permission_denied("remote executor authorization denied")
                 })?;
             verify_route_identity(&host, &state.daemon_epoch, &client.client_id, None)?;
             let active = active_assignments(db, &host).await?;
