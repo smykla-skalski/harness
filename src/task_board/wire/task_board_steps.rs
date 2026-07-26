@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::{DispatchAppliedTask, DispatchPlan, TaskBoardItem};
 
-use super::ManagedAgentSnapshot;
-use super::ManagedAgentSnapshotSchema;
+use crate::session::wire::{ManagedAgentSnapshot, ManagedAgentSnapshotSchema};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]

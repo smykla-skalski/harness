@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::daemon::agent_acp::AcpAgentSnapshot;
-use crate::daemon::agent_acp::AcpAgentSnapshotSchema;
-use crate::daemon::agent_tui::AgentTuiSnapshot;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, SessionAgentId};
-
-use super::CodexRunSnapshot;
+use harness_protocol::managed_agents::acp::{AcpAgentSnapshot, AcpAgentSnapshotSchema};
+use harness_protocol::managed_agents::codex::CodexRunSnapshot;
+use harness_protocol::managed_agents::tui::AgentTuiSnapshot;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", content = "snapshot")]
@@ -93,12 +91,12 @@ pub struct ManagedAgentListResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::daemon::agent_acp::AcpAgentSnapshot;
-    use crate::daemon::agent_tui::{
+    use crate::session::types::{AgentStatus, HarnessSessionId, ManagedAgentId, SessionAgentId};
+    use harness_protocol::managed_agents::acp::AcpAgentSnapshot;
+    use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
+    use harness_protocol::managed_agents::tui::{
         AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
     };
-    use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
-    use crate::session::types::{AgentStatus, HarnessSessionId, ManagedAgentId, SessionAgentId};
 
     use super::ManagedAgentSnapshot;
 

@@ -42,7 +42,7 @@ pub struct TaskBoardAutomationForceCancelResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::daemon::protocol::TaskBoardUpdatedPayload;
+    use crate::task_board::wire::TaskBoardUpdatedPayload;
 
     #[test]
     fn legacy_task_board_push_payload_defaults_snapshot_to_none() {

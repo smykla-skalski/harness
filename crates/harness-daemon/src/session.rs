@@ -13,3 +13,5 @@ pub mod storage;
 pub mod types {
     pub use harness_protocol::session::*;
 }
+#[path = "../../../src/session/wire/mod.rs"]
+pub mod wire;

@@ -8,3 +8,4 @@ pub mod transport;
 pub mod types {
     pub use harness_protocol::session::*;
 }
+pub mod wire;

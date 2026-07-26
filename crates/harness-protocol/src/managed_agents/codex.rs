@@ -2,9 +2,9 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::session::types::SessionRole;
+use crate::session::SessionRole;
 
-use super::summaries::TimelineEntry;
+use crate::timeline::TimelineEntry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "snake_case")]
@@ -231,7 +231,7 @@ pub struct CodexApprovalRequestedPayload {
 
 #[cfg(test)]
 mod tests {
-    use crate::session::types::SessionRole;
+    use crate::session::SessionRole;
 
     use super::{CodexRunMode, CodexRunRequest};
 
