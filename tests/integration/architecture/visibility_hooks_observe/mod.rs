@@ -84,66 +84,6 @@ fn create_workflow_root_stays_focused_on_runtime_state() {
 }
 
 #[test]
-fn question_and_stop_hooks_root_stay_prod_only() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-
-    for (path, needles) in [
-        (
-            "src/hooks/guard_question.rs",
-            &[
-                "fn triage_with_failure_allows_manifest_fix()",
-                "fn execution_phase_denies_manifest_fix()",
-                "mod tests {",
-            ][..],
-        ),
-        (
-            "src/hooks/verify_question.rs",
-            &["fn inactive_skill_allows()", "mod tests {"][..],
-        ),
-    ] {
-        let contents = fs::read_to_string(root.join(path)).unwrap();
-        for needle in needles {
-            assert!(
-                !contents.contains(needle),
-                "{path} should stay focused on production hook logic instead of owning `{needle}`"
-            );
-        }
-    }
-
-    for path in [
-        "src/hooks/guard_question/tests.rs",
-        "src/hooks/verify_question/tests.rs",
-    ] {
-        assert!(
-            root.join(path).exists(),
-            "question/stop hook split test module should exist: {path}"
-        );
-    }
-}
-
-#[test]
-fn hooks_debug_root_stays_prod_only() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let debug = fs::read_to_string(root.join("src/hooks/debug.rs")).unwrap();
-
-    for needle in [
-        "fn allow_returns_zero_exit_code()",
-        "fn log_and_exit_writes_jsonl_debug_file()",
-        "mod tests {",
-    ] {
-        assert!(
-            !debug.contains(needle),
-            "src/hooks/debug.rs should stay focused on production debug logging instead of owning `{needle}`"
-        );
-    }
-
-    assert!(
-        root.join("src/hooks/debug/tests.rs").exists(),
-        "hooks debug split test module should exist"
-    );
-}
-
-#[test]
 fn hook_protocol_roots_stay_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
@@ -196,15 +136,6 @@ fn hook_misc_roots_stay_prod_only() {
             "src/hooks/session/tests.rs",
         ),
         (
-            "src/hooks/verify_write.rs",
-            &[
-                "fn verify_suite_create_empty_amendments_denies()",
-                "fn verify_suite_runner_accumulates_suite_and_amendments_writes()",
-                "mod tests {",
-            ][..],
-            "src/hooks/verify_write/tests.rs",
-        ),
-        (
             "crates/harness-kernel/src/redact.rs",
             &[
                 "fn scrubs_pem_certificate()",
@@ -233,23 +164,6 @@ fn hook_misc_roots_stay_prod_only() {
         assert!(
             root.join(split_path).exists(),
             "hook misc split test module should exist: {split_path}"
-        );
-    }
-}
-
-#[test]
-fn guard_write_root_stays_prod_only() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let guard_write = fs::read_to_string(root.join("src/hooks/guard_write.rs")).unwrap();
-
-    for needle in [
-        "fn allowed_path_for_run_metadata(",
-        "fn file_label_with_filename(",
-        "mod tests {",
-    ] {
-        assert!(
-            !guard_write.contains(needle),
-            "src/hooks/guard_write.rs should stay focused on production write-guard logic instead of owning `{needle}`"
         );
     }
 }

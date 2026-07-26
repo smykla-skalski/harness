@@ -1,34 +1,10 @@
 use std::env;
 use std::path::PathBuf;
 
-use crate::create::{CreateWorkflowState, read_create_state};
 use crate::hooks::protocol::context::{
     NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
 };
 use crate::workspace::canonical_checkout_root;
-
-#[derive(Debug, Clone, Default)]
-pub(super) struct HydratedHookState {
-    pub(super) create_state: Option<CreateWorkflowState>,
-}
-
-impl HydratedHookState {
-    pub(super) fn from_skill(skill: &SkillContext) -> Self {
-        let mut state = Self::default();
-        state.load_create_state(skill);
-        state
-    }
-
-    fn load_create_state(&mut self, skill: &SkillContext) {
-        if skill.is_create() {
-            self.read_create_state();
-        }
-    }
-
-    fn read_create_state(&mut self) {
-        self.create_state = read_create_state().ok().flatten();
-    }
-}
 
 pub(crate) fn prepare_normalized_context(
     mut normalized: NormalizedHookContext,

@@ -16,7 +16,3 @@ pub mod protocol {
         pub use super::super::payload_types::*;
     }
 }
-
-pub mod runner_policy {
-    pub use harness_hook::hook_runner_policy::*;
-}

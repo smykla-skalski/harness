@@ -1,1 +1,1 @@
-pub use harness_hook::infra::{io, persistence};
+pub use harness_hook::infra::{blocks, io, persistence};

@@ -27,7 +27,6 @@ mod integration {
     mod commands;
     mod compact;
     pub mod helpers;
-    mod hooks;
     mod install_workflow;
     mod mcp;
     mod preflight;

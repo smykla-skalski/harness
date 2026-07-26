@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,22 @@ impl BlockRequirement {
         Self::Kuma,
         Self::Build,
     ];
+
+    /// The union of `denied_binaries` across every variant: the CLI names that
+    /// drive the tools these requirements stand for, such as `docker`,
+    /// `kubectl` and `kumactl`.
+    ///
+    /// The ACP protocol takes this as the set of binaries an agent may not
+    /// create, and is its only consumer now that the hook guards that also read
+    /// it are retired.
+    #[must_use]
+    pub fn all_denied_binaries() -> BTreeSet<String> {
+        Self::ALL
+            .iter()
+            .flat_map(|requirement| requirement.denied_binaries().iter().copied())
+            .map(ToString::to_string)
+            .collect()
+    }
 
     #[must_use]
     pub const fn as_str(self) -> &'static str {

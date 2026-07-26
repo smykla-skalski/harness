@@ -1,12 +1,12 @@
 //! Write-surface policy evaluation.
 //!
-//! Single free function consumed by both TUI hook write guards and the ACP
-//! `Client::write_text_file` handler. No trait, no abstraction layer: if a
-//! third caller needs different semantics, factor then. — tef + antirez.
+//! Single free function consumed by the ACP `Client::write_text_file` handler.
+//! No trait, no abstraction layer: if a second caller needs different
+//! semantics, factor then. — tef + antirez.
 //!
 //! Drift integration test (`tests/integration/policy_drift.rs`) catches
-//! divergence by feeding the same nasty-input fixtures through both call
-//! paths.
+//! divergence by feeding the same nasty-input fixtures through the policy and
+//! the ACP handler.
 
 use std::collections::BTreeSet;
 use std::io;
@@ -60,9 +60,9 @@ impl WriteDecision {
 
 /// Wrapper for the set of denied binary names.
 ///
-/// The set is produced by `managed_cluster_binaries()` in
-/// `hooks/runner_policy/cluster.rs`. ACP callers build the same set from
-/// `BlockRequirement::denied_binaries()`.
+/// The set is produced by `BlockRequirement::all_denied_binaries()` in
+/// `infra/blocks/registry.rs`, which is the single source the ACP protocol
+/// reads.
 #[derive(Debug, Clone)]
 pub struct DeniedBinaries(BTreeSet<String>);
 
@@ -268,8 +268,9 @@ fn check_run_dir_surface(path: &Path, run_dir: &Path, denied: &DeniedBinaries) -
 
 /// Evaluate whether a write to `path` is allowed.
 ///
-/// This is the single source of truth for write-surface policy. TUI hook
-/// `guard-write` and ACP `Client::write_text_file` both call this function.
+/// This is the single source of truth for write-surface policy, and ACP
+/// `Client::write_text_file` is its only caller. The hook-side write guard that
+/// also called it is retired; it could not deny under either of its gates.
 ///
 /// # Arguments
 ///

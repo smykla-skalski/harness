@@ -9,12 +9,11 @@ use tracing::callsite::Identifier as CallsiteIdentifier;
 use tracing::field::Empty;
 
 use super::adapters::{HookAgent, adapter_for};
-use super::application::GuardContext;
 use super::protocol::context::NormalizedEvent;
 use super::protocol::hook_result::HookResult;
 use super::protocol::result::NormalizedHookResult;
 use super::registry::Hook;
-use super::{HookCommand, HookOutcome, HookType};
+use super::{HookCommand, HookType};
 use observation::{
     HookRunMetadata, acknowledged_signal_lines, find_pending_signals_with_trace,
     finish_hook_observation, prepare_hook_execution, project_dir_for_signal_context,
@@ -30,42 +29,6 @@ pub(crate) fn hook_runtime_result(hook: &dyn Hook, code: &str, message: &str) ->
     } else {
         HookResult::warn(code, message)
     }
-}
-
-pub(crate) fn dispatch_by_skill<RunnerFn, CreateFn>(
-    ctx: &GuardContext,
-    runner: RunnerFn,
-    create: CreateFn,
-) -> Result<HookResult, CliError>
-where
-    RunnerFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
-    CreateFn: FnOnce(&GuardContext) -> Result<HookResult, CliError>,
-{
-    if !ctx.skill_active {
-        return Ok(HookResult::allow());
-    }
-    if ctx.is_suite_create() {
-        return create(ctx);
-    }
-    runner(ctx)
-}
-
-pub(crate) fn dispatch_outcome_by_skill<RunnerFn, CreateFn>(
-    ctx: &GuardContext,
-    runner: RunnerFn,
-    create: CreateFn,
-) -> Result<HookOutcome, CliError>
-where
-    RunnerFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
-    CreateFn: FnOnce(&GuardContext) -> Result<HookOutcome, CliError>,
-{
-    if !ctx.skill_active {
-        return Ok(HookOutcome::allow());
-    }
-    if ctx.is_suite_create() {
-        return create(ctx);
-    }
-    runner(ctx)
 }
 
 fn format_hook_error_detail(hook: &dyn Hook, error: &CliError) -> String {

@@ -36,16 +36,26 @@ impl Hook for StaticHook {
     }
 }
 
-pub(crate) static TOOL_GUARD_HOOK: &dyn Hook = &StaticHook::effect(
-    "tool-guard",
-    HookType::PreToolUse,
-    super::tool_guard::execute,
-);
-pub(crate) static TOOL_RESULT_HOOK: &dyn Hook = &StaticHook::effect(
-    "tool-result",
-    HookType::PostToolUse,
-    super::tool_result::execute,
-);
+/// Shared body for both tool-lifecycle hooks: neither holds any policy.
+///
+/// The statics below are the dispatch targets, and they carry the only thing
+/// the runtime needs from them — `name` and `hook_type`, which it routes and
+/// reports on. Recording the call and injecting pending session signals happen
+/// around this call in `runtime::run_hook_command`, and write-surface
+/// enforcement lives in `agents::policy::evaluate_write` behind the ACP client.
+/// So there is nothing left for a handler body to decide.
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the signature must match the HookFn pointer type"
+)]
+fn allow(_ctx: &GuardContext) -> Result<HookOutcome, CliError> {
+    Ok(HookOutcome::allow())
+}
+
+pub(crate) static TOOL_GUARD_HOOK: &dyn Hook =
+    &StaticHook::effect("tool-guard", HookType::PreToolUse, allow);
+pub(crate) static TOOL_RESULT_HOOK: &dyn Hook =
+    &StaticHook::effect("tool-result", HookType::PostToolUse, allow);
 
 #[cfg(test)]
 pub(crate) fn all_hooks() -> [&'static dyn Hook; 2] {

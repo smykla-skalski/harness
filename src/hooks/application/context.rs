@@ -2,9 +2,8 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::create::CreateWorkflowState;
 use crate::hooks::protocol::context::{
-    AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext, SkillKind,
+    AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext,
 };
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
 use harness_kernel::kernel::tooling::ToolContext;
@@ -12,8 +11,8 @@ use harness_kernel::kernel::tooling::ToolContext;
 mod hydration;
 mod interaction;
 
+use self::hydration::hydrate_normalized_context;
 pub(crate) use self::hydration::prepare_normalized_context;
-use self::hydration::{HydratedHookState, hydrate_normalized_context};
 use self::interaction::{
     HookInteraction, deserialize_value_list, normalized_from_envelope, render_tool_response_text,
 };
@@ -31,8 +30,6 @@ pub struct GuardContext {
     pub tool: Option<ToolContext>,
     pub agent: Option<AgentContext>,
     pub skill: SkillContext,
-    pub skill_active: bool,
-    pub create_state: Option<CreateWorkflowState>,
     interaction: HookInteraction,
 }
 
@@ -41,17 +38,12 @@ impl GuardContext {
     pub fn from_normalized(normalized: NormalizedHookContext) -> Self {
         let normalized = hydrate_normalized_context(normalized);
         let interaction = HookInteraction::from_normalized(&normalized);
-        let hydrated = HydratedHookState::from_skill(&normalized.skill);
-        let skill_active =
-            normalized.skill.active && session_confirms_skill(&normalized.skill, &hydrated);
         Self {
             event: normalized.event,
             session: normalized.session,
             tool: normalized.tool,
             agent: normalized.agent,
             skill: normalized.skill,
-            skill_active,
-            create_state: hydrated.create_state,
             interaction,
         }
     }
@@ -62,22 +54,6 @@ impl GuardContext {
         Self::from_normalized(normalized)
     }
 
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn from_test_envelope(skill: &str, payload: HookEnvelopePayload) -> Self {
-        let normalized = hydrate_normalized_context(normalized_from_envelope(skill, payload));
-        let interaction = HookInteraction::from_normalized(&normalized);
-        Self {
-            event: normalized.event.clone(),
-            session: normalized.session.clone(),
-            tool: normalized.tool.clone(),
-            agent: normalized.agent.clone(),
-            skill: normalized.skill.clone(),
-            skill_active: normalized.skill.active,
-            create_state: None,
-            interaction,
-        }
-    }
     #[must_use]
     pub fn tool_name(&self) -> &str {
         &self.interaction.tool_name
@@ -142,41 +118,6 @@ impl GuardContext {
     #[must_use]
     pub fn response_text(&self) -> String {
         render_tool_response_text(self.tool_name(), self.tool_response())
-    }
-
-    #[must_use]
-    pub fn is_suite_runner(&self) -> bool {
-        self.skill.is_runner()
-    }
-
-    #[must_use]
-    pub fn is_suite_create(&self) -> bool {
-        self.skill.is_create()
-    }
-
-    #[must_use]
-    pub fn is_observe(&self) -> bool {
-        self.skill.is_observe()
-    }
-}
-
-/// Check whether the session has evidence that the claimed skill is actually
-/// running. Hooks are registered at the project level with a hardcoded skill
-/// name, so they fire in every session. Without this gate, sessions that have
-/// nothing to do with the named skill would still enforce its guards.
-///
-/// The Runner skill is retired, but `harness-hook` registrations still pass
-/// `--skill suite:run`, so it never confirms: letting it through here would
-/// switch every skill-gated hook on for ordinary sessions. For Create, a
-/// create-workflow state must exist. Other skill kinds pass through
-/// unconditionally.
-fn session_confirms_skill(skill: &SkillContext, hydrated: &HydratedHookState) -> bool {
-    match skill.kind {
-        SkillKind::Runner => false,
-        SkillKind::Create => hydrated.create_state.is_some(),
-        // Observe and None pass through - observe checks are gated separately,
-        // and None means no skill was claimed.
-        SkillKind::Observe | SkillKind::None => true,
     }
 }
 

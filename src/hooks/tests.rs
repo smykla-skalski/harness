@@ -1,29 +1,10 @@
 use clap::Parser;
-use std::path::{Path, PathBuf};
 
 use crate::hooks::protocol::hook_result::Decision;
 
 use super::adapters::HookAgent;
 use super::catalog::{TOOL_GUARD_HOOK, TOOL_RESULT_HOOK, all_hooks};
 use super::*;
-
-#[test]
-fn normalize_path_resolves_dot_dot() {
-    let path = Path::new("/a/b/../c");
-    assert_eq!(normalize_path(path), PathBuf::from("/a/c"));
-}
-
-#[test]
-fn normalize_path_resolves_dot() {
-    let path = Path::new("/a/./b/./c");
-    assert_eq!(normalize_path(path), PathBuf::from("/a/b/c"));
-}
-
-#[test]
-fn normalize_path_preserves_absolute() {
-    let path = Path::new("/a/b/c");
-    assert_eq!(normalize_path(path), PathBuf::from("/a/b/c"));
-}
 
 #[test]
 fn hook_names_are_unique() {

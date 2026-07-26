@@ -18,7 +18,7 @@ use super::*;
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::permission::standard_permission_options;
 use crate::daemon::agent_acp::permission_bridge::PermissionBridgeHandle;
-use crate::hooks::runner_policy::managed_cluster_binaries;
+use crate::infra::blocks::BlockRequirement;
 
 const ACP_SESSION: &str = "acp-session-1";
 
@@ -55,7 +55,7 @@ fn handler_harness() -> HandlerHarness {
         project.path().to_path_buf(),
         project.path().to_path_buf(),
         None,
-        managed_cluster_binaries(),
+        BlockRequirement::all_denied_binaries(),
         bridge.mode(Duration::from_secs(30)),
     ));
     let session_guard = Arc::new(SessionRouteGuard::default());
