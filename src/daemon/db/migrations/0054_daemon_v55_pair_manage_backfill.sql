@@ -21,6 +21,6 @@ WHERE role = 'pairing_broker'
   AND (SELECT COUNT(*) FROM json_each(remote_clients.scopes_json)) = 1
   AND EXISTS (SELECT 1 FROM json_each(remote_clients.scopes_json) WHERE value = 'pair_mint');
 
--- The async bootstrap trusts this value rather than re-deriving it, and the
--- sync path stamps the same version after running the statements above.
+-- Both paths take the version from here: the async bootstrap trusts this value
+-- rather than re-deriving it, and the sync step is this file and nothing else.
 UPDATE schema_meta SET value = '55' WHERE key = 'version';

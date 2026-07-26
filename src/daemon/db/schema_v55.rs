@@ -8,15 +8,11 @@ const PAIR_MANAGE_BACKFILL_SQL: &str =
 pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
     // Safe to repeat: both statements skip a client that already holds the
     // scope, because a set carrying it no longer matches the old default the
-    // guards require.
+    // guards require. The file carries the version stamp in the same batch, as
+    // the backfill migrations before it do, so a stamp here would report a
+    // failure over work that had already landed.
     conn.execute_batch(PAIR_MANAGE_BACKFILL_SQL)
-        .map_err(|error| super::db_error(format!("backfill schema v55 pair_manage: {error}")))?;
-    conn.execute(
-        "UPDATE schema_meta SET value = '55' WHERE key = 'version'",
-        [],
-    )
-    .map(|_| ())
-    .map_err(|error| super::db_error(format!("stamp schema v55: {error}")))
+        .map_err(|error| super::db_error(format!("backfill schema v55 pair_manage: {error}")))
 }
 
 #[cfg(test)]

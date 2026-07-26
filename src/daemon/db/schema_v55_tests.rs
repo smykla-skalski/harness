@@ -11,6 +11,15 @@ fn client_scopes(conn: &Connection, client_id: &str) -> String {
     .expect("stored scopes")
 }
 
+fn schema_version(conn: &Connection) -> String {
+    conn.query_row(
+        "SELECT value FROM schema_meta WHERE key = 'version'",
+        [],
+        |row| row.get(0),
+    )
+    .expect("stored version")
+}
+
 fn seeded() -> Connection {
     let conn = Connection::open_in_memory().expect("open memory db");
     conn.execute_batch(
@@ -60,6 +69,17 @@ fn a_narrowed_registration_is_left_alone() {
 
     assert_eq!(client_scopes(&conn, "admin-narrowed"), "[\"read\"]");
     assert_eq!(client_scopes(&conn, "operator"), "[\"read\",\"write\"]");
+}
+
+/// The stamp is the migration file's alone, so dropping it from the SQL would
+/// otherwise leave the version behind with every scope assertion still green.
+#[test]
+fn the_step_stamps_the_new_version() {
+    let conn = seeded();
+
+    run(&conn).expect("run v55");
+
+    assert_eq!(schema_version(&conn), "55");
 }
 
 /// The repair chain replays every step, so running twice must not append the
