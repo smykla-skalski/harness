@@ -20,6 +20,10 @@ use uuid::Uuid;
 
 /// Claim a broker credential and store it, replacing any earlier one.
 ///
+/// Re-pairing keeps the existing daemon client id. The daemon uses that id as
+/// the owner of every pairing the broker minted, so changing it would hide
+/// still-active devices from the replacement credential.
+///
 /// # Errors
 /// Returns [`PanelError::Io`] or [`PanelError::Config`] when the code file
 /// cannot be read or is too widely readable, [`PanelError::Daemon`] when the
@@ -30,11 +34,18 @@ pub async fn claim(config: &PanelConfig, code_file: &Path) -> Result<(), PanelEr
     let store = Store::open(&config.state_dir).await?;
     let client = DaemonClient::new(&config.daemon)?;
 
-    let client_id = Uuid::new_v4().to_string();
+    let client_id = client_id_for_claim(&store).await?;
     let credential = client.claim(&code, &client_id).await?;
 
     refuse_wrong_role(&credential)?;
     keep(&store, &credential).await
+}
+
+async fn client_id_for_claim(store: &Store) -> Result<String, PanelError> {
+    Ok(store.daemon_credential().await?.map_or_else(
+        || Uuid::new_v4().to_string(),
+        |credential| credential.client_id,
+    ))
 }
 
 /// A credential of the wrong role stores happily and then fails for whoever
@@ -128,7 +139,11 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{BROKER_ROLE, DaemonCredential, read_pair_code, refuse_wrong_role};
+    use super::{
+        BROKER_ROLE, DaemonCredential, client_id_for_claim, read_pair_code, refuse_wrong_role,
+    };
+    use crate::store::Store;
+    use uuid::Uuid;
 
     #[cfg(unix)]
     fn set_mode(path: &Path, mode: u32) {
@@ -200,6 +215,35 @@ mod tests {
             role: BROKER_ROLE.to_owned(),
         })
         .expect("the role the panel needs");
+    }
+
+    #[tokio::test]
+    async fn re_pairing_reuses_the_stored_daemon_client_id() {
+        let store = Store::open_in_memory().await.expect("store");
+        store
+            .store_daemon_credential(
+                &DaemonCredential {
+                    client_id: "panel-stable".to_owned(),
+                    token: "revoked-token".to_owned(),
+                    role: BROKER_ROLE.to_owned(),
+                },
+                chrono::Utc::now(),
+            )
+            .await
+            .expect("old credential");
+
+        assert_eq!(
+            client_id_for_claim(&store).await.expect("client id"),
+            "panel-stable"
+        );
+    }
+
+    #[tokio::test]
+    async fn first_pairing_generates_a_daemon_client_id() {
+        let store = Store::open_in_memory().await.expect("store");
+        let client_id = client_id_for_claim(&store).await.expect("client id");
+
+        Uuid::parse_str(&client_id).expect("generated UUID");
     }
 
     #[test]

@@ -6,7 +6,7 @@ use crate::daemon::remote_pairing::{
 };
 
 #[test]
-fn remote_pairing_claim_replaces_existing_stable_client() {
+fn remote_pairing_claim_recovers_revoked_stable_client() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let old_token = "existing-stable-client-token";
     let registration = RemoteClientRegistration::new_for_tests(
@@ -21,6 +21,8 @@ fn remote_pairing_claim_replaces_existing_stable_client() {
     .expect("existing client registration");
     db.register_remote_client(&registration)
         .expect("register existing client");
+    db.revoke_remote_client("stable-iphone", "2026-07-14T00:00:30Z")
+        .expect("revoke existing client");
 
     let code = RemotePairingCode::from_value_for_tests("stable-client-repair-secret");
     let record = RemotePairingRecord::new_for_tests(

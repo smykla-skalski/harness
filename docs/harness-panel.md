@@ -215,7 +215,7 @@ sudo rm /etc/harness-panel/daemon-pair-code
 
 The code is a credential in transit, which is why it goes in a file rather than a flag value: any local process can read a command line out of `/proc`. `pair` refuses a code file that group or other can read, and refuses a credential the daemon issues with any role but `pairing_broker`, rather than storing one that fails later for whoever first tries to generate a link.
 
-Re-pair the same way after revoking the panel's client on the daemon.
+Re-pair the same way after revoking the panel's client on the daemon. The panel reuses the client id stored in its state database while the daemon rotates the revoked credential, preserving the panel's ownership of existing pairing links and devices. Keep or restore that database when recovering the panel; starting with empty state creates a new daemon identity that cannot manage pairings minted by the old one.
 
 ## Checking it
 
