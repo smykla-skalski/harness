@@ -6,6 +6,8 @@
 
 mod managed_agents;
 mod session_requests;
+mod summaries;
 
 pub use managed_agents::*;
 pub use session_requests::*;
+pub use summaries::*;
