@@ -52,11 +52,11 @@ pub async fn session_start(
     .map_err(join_error("session-start"))?
 }
 
-/// Stop tracking an agent runtime session and clear its current-run state.
+/// Stop tracking an agent runtime session.
 ///
 /// # Errors
-/// Returns [`CliError`] when the blocking task cannot be joined or session
-/// markers and current-run state cannot be updated.
+/// Returns [`CliError`] when the blocking task cannot be joined or the session
+/// markers cannot be updated.
 pub async fn session_stop(
     agent: HookAgent,
     project_dir: PathBuf,
