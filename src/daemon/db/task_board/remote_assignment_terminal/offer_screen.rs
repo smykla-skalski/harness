@@ -46,6 +46,13 @@ pub(super) fn validate_offer_request(
 
 /// Hand the transaction to whichever terminal path the response's disposition
 /// names. Both arms consume the transaction and settle it themselves.
+///
+/// Both arms must stay boxed. Awaiting either one inline makes this future
+/// 17664 bytes and the caller's 23392, past the 16384-byte threshold of
+/// `clippy::large_futures`, which is denied here -- and `cargo check` will not
+/// tell you, because the limit is a lint rather than a compile error. The
+/// boxing arrived with #436, whose whole point was to retire the blanket
+/// `allow(clippy::large_futures)` the daemon wrapper used to carry.
 pub(super) async fn apply_offer_disposition(
     transaction: Transaction<'_, Sqlite>,
     record: TaskBoardRemoteAssignmentRecord,
