@@ -1,5 +1,12 @@
 import { panelUrl } from './base';
-import type { PairLink, PanelAccount, PanelErrorBody, PanelViewer } from './types';
+import type {
+  PairLink,
+  PairingRevoke,
+  PanelAccount,
+  PanelErrorBody,
+  PanelPairing,
+  PanelViewer,
+} from './types';
 
 /** A panel response the caller cannot treat as data. */
 export class PanelApiError extends Error {
@@ -24,6 +31,10 @@ export interface PanelApi {
   setCanPair(accountId: string, granted: boolean): Promise<PanelAccount>;
   /** Mint a link for the signed-in account. The reply is shown once. */
   createPairLink(): Promise<PairLink>;
+  /** The viewer's own pairings, or everyone's for the owner. */
+  fetchPairings(): Promise<PanelPairing[]>;
+  /** Cut off a device, or withdraw a link nobody claimed. */
+  revokePairing(pairingId: string): Promise<PairingRevoke>;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -84,6 +95,22 @@ export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
     async createPairLink(): Promise<PairLink> {
       const response = await request('/api/pair-links', { method: 'POST' });
       return (await response.json()) as PairLink;
+    },
+
+    async fetchPairings(): Promise<PanelPairing[]> {
+      const response = await request('/api/pairings');
+      const body = (await response.json()) as { pairings: PanelPairing[] };
+      return body.pairings;
+    },
+
+    async revokePairing(pairingId: string): Promise<PairingRevoke> {
+      // Encoded because the id lands in a path segment. The daemon mints these
+      // and the page only ever quotes one back, but a value that reached an
+      // unescaped `/` would address a different route altogether.
+      const response = await request(`/api/pairings/${encodeURIComponent(pairingId)}/revoke`, {
+        method: 'POST',
+      });
+      return (await response.json()) as PairingRevoke;
     },
   };
 }

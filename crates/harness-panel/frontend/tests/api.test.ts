@@ -245,3 +245,81 @@ describe('createPairLink', () => {
     });
   });
 });
+
+describe('fetchPairings', () => {
+  it('unwraps the pairing list', async () => {
+    const pairing = {
+      pairing_id: 'pair-1',
+      state: 'active',
+      role: 'operator',
+      created_at: '2026-07-26T10:00:00Z',
+      expires_at: '2026-07-26T10:10:00Z',
+      account_id: 'acc_1',
+    };
+    const stub = stubFetch([jsonResponse(200, { pairings: [pairing] })]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.fetchPairings()).resolves.toEqual([pairing]);
+    expect(stub.calls[0]?.url).toBe('/panel/api/pairings');
+  });
+
+  it('surfaces a daemon the panel cannot reach', async () => {
+    const stub = stubFetch([
+      jsonResponse(503, {
+        error: { code: 'unavailable', message: 'the panel has not paired with the daemon yet' },
+      }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.fetchPairings()).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('revokePairing', () => {
+  it('posts to the revoke route and returns what it did', async () => {
+    const revoked = {
+      pairing_id: 'pair-1',
+      outcome: 'device_revoked',
+      revoked_at: '2026-07-26T11:00:00Z',
+    };
+    const stub = stubFetch([jsonResponse(200, revoked)]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.revokePairing('pair-1')).resolves.toEqual(revoked);
+    expect(stub.calls[0]?.url).toBe('/panel/api/pairings/pair-1/revoke');
+    expect(stub.calls[0]?.init?.method).toBe('POST');
+  });
+
+  // The id is the daemon's, but building a path by concatenation is how one
+  // containing a slash would silently address another route.
+  it('escapes the pairing id into the path', async () => {
+    const stub = stubFetch([
+      jsonResponse(200, { pairing_id: 'a/b', outcome: 'link_withdrawn', revoked_at: 'now' }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await api.revokePairing('a/b');
+
+    expect(stub.calls[0]?.url).toBe('/panel/api/pairings/a%2Fb/revoke');
+  });
+
+  // The panel answers this for a pairing that belongs to somebody else and for
+  // one that does not exist, deliberately alike, and the page shows its
+  // sentence rather than guessing which it was.
+  it('surfaces a pairing that is not the viewer to withdraw', async () => {
+    const stub = stubFetch([
+      jsonResponse(403, {
+        error: {
+          code: 'forbidden',
+          message: 'no pairing with that id is available to this account',
+        },
+      }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.revokePairing('pair-1')).rejects.toMatchObject({
+      status: 403,
+      message: 'no pairing with that id is available to this account',
+    });
+  });
+});
