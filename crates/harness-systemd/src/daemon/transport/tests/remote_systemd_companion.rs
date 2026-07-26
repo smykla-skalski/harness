@@ -18,6 +18,39 @@ const COMPANION_TOKEN_SOURCE: &str = "/etc/harness/companion-auth-token";
 const COMPANION_RUNTIME_TOKEN_ARGUMENT: &str =
     "--companion-auth-token-file %d/companion-auth-token";
 
+/// A companion at the origin root has to survive the installer as well as the
+/// daemon, or `install` writes a unit whose daemon then refuses to start.
+#[test]
+fn remote_systemd_plan_accepts_the_origin_root_as_a_companion_prefix() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--companion-upstream",
+        "http://127.0.0.1:8787",
+        "--companion-auth-token-file",
+        COMPANION_TOKEN_SOURCE,
+        "--companion-path-prefix",
+        "/",
+    ]);
+
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("the origin root is a valid companion prefix");
+
+    assert!(
+        plan.unit_contents.contains("--companion-path-prefix /"),
+        "{}",
+        plan.unit_contents
+    );
+}
+
 #[test]
 #[expect(
     clippy::cognitive_complexity,
@@ -303,7 +336,6 @@ fn remote_systemd_plan_refuses_a_companion_the_daemon_would_reject() {
         ("http://127.0.0.1 :8787", "/panel"),
         ("http://127.0.0.1:8787", "/v1"),
         ("http://127.0.0.1:8787", "/v1/remote"),
-        ("http://127.0.0.1:8787", "/"),
         ("http://127.0.0.1:8787", "panel"),
         ("http://127.0.0.1:8787", "/panel/"),
         ("http://127.0.0.1:8787", "/panel//api"),

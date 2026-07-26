@@ -84,6 +84,16 @@ pub(super) fn state_with_companion(upstream: &str) -> DaemonHttpState {
     state
 }
 
+/// A companion that owns the whole origin, which is what `--companion-path-prefix /`
+/// configures.
+pub(super) fn state_with_root_companion(upstream: &str) -> DaemonHttpState {
+    let mut state = remote_state_with_viewer();
+    let token = CompanionAuthToken::parse(COMPANION_TOKEN).expect("valid companion token");
+    let config = CompanionRouteConfig::new(upstream, "/", token).expect("valid companion config");
+    state.companion = Some(CompanionRouter::new(config));
+    state
+}
+
 pub(super) fn state_with_companion_limits(
     upstream: &str,
     global_concurrency: usize,
