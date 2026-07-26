@@ -3,11 +3,11 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 #[cfg(test)]
 use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::TaskBoardStatus;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::types::TaskBoardOrchestratorSettings;
 #[cfg(test)]
@@ -242,16 +242,7 @@ pub(super) fn dispatch_input(
         project_dir: request
             .project_dir
             .clone()
-            .or_else(|| settings.project_dir.clone())
-            .or_else(|| {
-                (!settings.github_project.checkout_path.as_os_str().is_empty()).then(|| {
-                    settings
-                        .github_project
-                        .checkout_path
-                        .to_string_lossy()
-                        .into_owned()
-                })
-            }),
+            .or_else(|| settings.project_dir.clone()),
         actor: request.actor.clone(),
     }
 }

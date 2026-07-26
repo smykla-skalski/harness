@@ -165,13 +165,8 @@ fn prepare_item(
     ) {
         return AutomationFlow::Done(workflow);
     }
-    let Some(worktree) = resolve_worktree(
-        context.item,
-        &workflow,
-        session_worktrees,
-        project_dir,
-        context.config,
-    ) else {
+    let Some(worktree) = resolve_worktree(context.item, &workflow, session_worktrees, project_dir)
+    else {
         let error = CliErrorKind::workflow_io("task-board github worktree missing").into();
         return AutomationFlow::Done(failure(&mut workflow, STEP_MISSING_WORKTREE, &error));
     };

@@ -94,7 +94,6 @@ pub(super) fn resolve_worktree(
     workflow: &TaskBoardWorkflowState,
     session_worktrees: &BTreeMap<String, String>,
     project_dir: Option<&str>,
-    config: &GitHubProjectConfig,
 ) -> Option<String> {
     workflow
         .worktree
@@ -112,10 +111,10 @@ pub(super) fn resolve_worktree(
                 .filter(|path| !path.trim().is_empty())
                 .map(ToString::to_string)
         })
-        .or_else(|| {
-            (!config.checkout_path.as_os_str().is_empty())
-                .then(|| config.checkout_path.to_string_lossy().into_owned())
-        })
+    // There used to be a `config.checkout_path` fallback here. It held one
+    // path for the whole board, so once items publish to their own
+    // repositories it would hand an item another repository's checkout. Reporting a
+    // missing worktree beats working in the wrong one.
 }
 
 pub(super) fn managed_branch_name(
