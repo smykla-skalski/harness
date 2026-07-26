@@ -87,7 +87,7 @@ while IFS= read -r -d '' snapshot; do
   cp -f -- "$snapshot" "$destination_path"
   printf '%s\n' "$destination_path"
   rendered_count=$((rendered_count + 1))
-done < <(find "$staging_directory" -type f -name '*.png' -size +0 -print0)
+done < <(find "$staging_directory" -type f -name '*.png' -size +0c -print0)
 
 if (( rendered_count == 0 )); then
   printf 'error: preview suite produced no non-empty PNG snapshots: %s\n' "$suite" >&2

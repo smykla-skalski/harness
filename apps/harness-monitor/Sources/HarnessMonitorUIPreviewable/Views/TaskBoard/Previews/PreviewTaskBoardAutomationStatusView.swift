@@ -43,7 +43,7 @@ private enum TaskBoardAutomationStatusPreviewFixture {
         .waiting,
         stage("ready", "Ready", 12, .accent),
         stage("approval", "Approval", 2, .warning),
-        stage("policy-blocked", "Policy blocked", 1, .danger)
+        stage("policy", "Policy blocked", 1, .danger)
       ),
       queueLane(
         .execution,
