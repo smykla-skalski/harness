@@ -69,18 +69,32 @@ sccache_socket_state() {
 
   if [[ -n "$socket" ]] && command -v python3 >/dev/null 2>&1; then
     verdict="$(python3 - "$socket" 2>/dev/null <<'PY' || true
-import socket, sys
+import errno, socket, sys
+
+# Errors that prove nothing is serving this path: no listener, no file, or a
+# file that cannot be one, since a live server's path is a socket by definition.
+# Linux answers ECONNREFUSED for every non-socket, but the BSDs distinguish, and
+# reading their answer as "could not ask" would leave the junk there forever.
+# Anything else - a permission error, a timeout under load - stays unknown,
+# because the only action taken on a definite answer is starting a second server.
+NOT_SERVING = {
+    errno.ECONNREFUSED,
+    errno.ENOENT,
+    errno.ENOTSOCK,
+    errno.EISDIR,
+    errno.ENOTDIR,
+}
 
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 sock.settimeout(2)
 try:
     sock.connect(sys.argv[1])
-except (ConnectionRefusedError, FileNotFoundError):
-    print("absent")
-except OSError:
-    print("unknown")
+except OSError as error:
+    print("absent" if error.errno in NOT_SERVING else "unknown")
 else:
     print("reachable")
+finally:
+    sock.close()
 PY
     )"
   fi
