@@ -243,13 +243,9 @@ async fn publish_default_task(
             .active_live_canvas()
             .map(|(canvas, document)| (canvas.id.as_str(), document))
     });
-    let project_dir = worktree_path(execution)?
-        .to_str()
-        .ok_or_else(|| invalid_transition("write publication worktree is not valid UTF-8"))?;
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
         policy,
         config: &publication.config,
-        project_dir: Some(project_dir),
         dry_run: false,
         item: &item,
         session_worktrees: &session_worktrees,

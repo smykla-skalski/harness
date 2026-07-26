@@ -22,9 +22,9 @@ use crate::task_board::github::{
 use crate::task_board::policy_graph::resolve_gate_policy;
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
 use crate::task_board::{
-    BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, PolicyAction, PolicyDecision,
-    PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
-    TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
+    BuiltInPolicyGate, ExternalProvider, ExternalRef, ExternalRefProvider, PolicyAction,
+    PolicyDecision, PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject,
+    TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
 use crate::task_board::{normalize_repository_slug, task_board_read_only_execution_repository};
 use harness_kernel::errors::CliError;
@@ -93,7 +93,6 @@ pub(super) fn resolve_worktree(
     item: &TaskBoardItem,
     workflow: &TaskBoardWorkflowState,
     session_worktrees: &BTreeMap<String, String>,
-    project_dir: Option<&str>,
 ) -> Option<String> {
     workflow
         .worktree
@@ -105,11 +104,6 @@ pub(super) fn resolve_worktree(
                 .as_deref()
                 .and_then(|session_id| session_worktrees.get(session_id))
                 .cloned()
-        })
-        .or_else(|| {
-            project_dir
-                .filter(|path| !path.trim().is_empty())
-                .map(ToString::to_string)
         })
     // There used to be a `config.checkout_path` fallback here. It held one
     // path for the whole board, so once items publish to their own
@@ -331,16 +325,32 @@ fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> Stri
         .ok()
         .flatten()
         .and_then(|repository| normalize_repository_slug(Some(&repository)));
-    if let Some(issue_number) = item.external_refs.iter().find_map(|reference| {
-        (reference.provider == ExternalRefProvider::GitHub
-            && item_repository.is_some()
-            && item_repository == publication)
-            .then(|| reference.external_id.clone())
-    }) {
+    if let Some(repository) = publication
+        .as_deref()
+        .filter(|_| item_repository == publication)
+        && let Some(issue_number) = item
+            .external_refs
+            .iter()
+            .find_map(|reference| github_issue_number(reference, repository))
+    {
         lines.push(String::new());
         lines.push(format!("Closes #{issue_number}"));
     }
     lines.join("\n")
+}
+
+fn github_issue_number(reference: &ExternalRef, repository: &str) -> Option<u64> {
+    if reference.provider != ExternalRefProvider::GitHub {
+        return None;
+    }
+    let external_id = reference.external_id.trim();
+    let number = if let Some((source_repository, number)) = external_id.rsplit_once('#') {
+        (normalize_repository_slug(Some(source_repository)).as_deref() == Some(repository))
+            .then_some(number)?
+    } else {
+        external_id
+    };
+    number.parse::<u64>().ok().filter(|number| *number > 0)
 }
 
 #[cfg(test)]

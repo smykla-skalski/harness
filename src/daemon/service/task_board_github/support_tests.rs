@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::*;
 use crate::task_board::ExternalRef;
 
@@ -12,7 +14,7 @@ fn github_item(project_id: Option<&str>, execution_repository: Option<&str>) -> 
     item.execution_repository = execution_repository.map(Into::into);
     item.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
-        external_id: "42".into(),
+        external_id: "example/compass#42".into(),
         url: Some("https://github.com/example/compass/issues/42".into()),
         sync_state: None,
     }];
@@ -34,6 +36,16 @@ fn imported_items_still_close_their_issue() {
         &github_item(None, Some("example/compass")),
         &config_for("example", "compass"),
     );
+
+    assert!(body.contains("Closes #42"), "unexpected body: {body}");
+}
+
+#[test]
+fn legacy_bare_issue_numbers_still_close_their_issue() {
+    let mut item = github_item(None, Some("example/compass"));
+    item.external_refs[0].external_id = "42".into();
+
+    let body = pull_request_body(&item, &config_for("example", "compass"));
 
     assert!(body.contains("Closes #42"), "unexpected body: {body}");
 }
@@ -63,4 +75,14 @@ fn an_item_with_no_repository_does_not_close_an_issue() {
     let body = pull_request_body(&github_item(None, None), &config_for("example", "compass"));
 
     assert!(!body.contains("Closes"), "unexpected body: {body}");
+}
+
+#[test]
+fn publication_requires_an_item_specific_worktree() {
+    let item = github_item(None, Some("example/compass"));
+
+    assert_eq!(
+        resolve_worktree(&item, &item.workflow, &BTreeMap::new()),
+        None
+    );
 }

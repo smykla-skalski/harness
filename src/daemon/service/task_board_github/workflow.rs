@@ -35,12 +35,7 @@ pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWo
         host_id: request.host_id,
         expected_parent: None,
     };
-    let mut prepared = match prepare_item(
-        &context,
-        request.project_dir,
-        request.dry_run,
-        request.session_worktrees,
-    ) {
+    let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
         AutomationFlow::Continue(prepared) => prepared,
         AutomationFlow::Done(workflow) => return workflow,
     };
@@ -58,12 +53,7 @@ pub(super) async fn automate_item_with_database_policy(
         host_id: request.host_id,
         expected_parent: request.expected_parent,
     };
-    let mut prepared = match prepare_item(
-        &context,
-        request.project_dir,
-        request.dry_run,
-        request.session_worktrees,
-    ) {
+    let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
         AutomationFlow::Continue(prepared) => prepared,
         AutomationFlow::Done(workflow) => return workflow,
     };
@@ -150,7 +140,6 @@ enum AutomationFlow<T> {
 
 fn prepare_item(
     context: &AutomationContext<'_>,
-    project_dir: Option<&str>,
     dry_run: bool,
     session_worktrees: &BTreeMap<String, String>,
 ) -> AutomationFlow<PreparedItem> {
@@ -165,8 +154,7 @@ fn prepare_item(
     ) {
         return AutomationFlow::Done(workflow);
     }
-    let Some(worktree) = resolve_worktree(context.item, &workflow, session_worktrees, project_dir)
-    else {
+    let Some(worktree) = resolve_worktree(context.item, &workflow, session_worktrees) else {
         let error = CliErrorKind::workflow_io("task-board github worktree missing").into();
         return AutomationFlow::Done(failure(&mut workflow, STEP_MISSING_WORKTREE, &error));
     };

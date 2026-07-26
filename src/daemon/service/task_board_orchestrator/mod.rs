@@ -10,8 +10,8 @@ use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
-    TaskBoardOrchestratorTickPhase, TaskBoardStatus, build_audit_summary, default_board_root,
+    TaskBoardOrchestrator, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorTickPhase,
+    TaskBoardStatus, build_audit_summary, default_board_root,
 };
 
 use super::task_board::{dispatch_task_board, run_task_board_sync_blocking_with_config};
@@ -173,10 +173,7 @@ fn github_sync_config(
     {
         return Ok(None);
     }
-    let mut config = external_sync_config_for_repository(
-        github_repository(&settings).as_deref(),
-        &settings.github_inbox.repositories,
-    );
+    let mut config = external_sync_config_for_repository(None, &settings.github_inbox.repositories);
     config = config.with_github_import_labels_override(&settings.github_inbox.label_filter);
     if config.token_for(ExternalProvider::GitHub).is_none()
         || (config.github_repository().is_none() && config.github_inbox_repositories().is_empty())
@@ -184,12 +181,6 @@ fn github_sync_config(
         return Ok(None);
     }
     Ok(Some(config))
-}
-
-fn github_repository(settings: &TaskBoardOrchestratorSettings) -> Option<String> {
-    let project = &settings.github_project;
-    (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-        .then(|| project.repository_slug())
 }
 
 fn sync_request(input: &TaskBoardOrchestratorDispatchInput) -> TaskBoardSyncRequest {

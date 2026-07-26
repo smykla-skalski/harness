@@ -48,7 +48,6 @@ use self::workflow::automate_item_with_database_policy;
 pub(super) struct AutomationRequest<'a> {
     pub board_root: &'a Path,
     pub config: &'a GitHubProjectConfig,
-    pub project_dir: Option<&'a str>,
     pub dry_run: bool,
     pub item: &'a TaskBoardItem,
     pub session_worktrees: &'a BTreeMap<String, String>,
@@ -59,7 +58,6 @@ pub(super) struct AutomationRequest<'a> {
 pub(super) struct DatabaseAutomationRequest<'a> {
     pub policy: Option<(&'a str, &'a PolicyGraph)>,
     pub config: &'a GitHubProjectConfig,
-    pub project_dir: Option<&'a str>,
     pub dry_run: bool,
     pub item: &'a TaskBoardItem,
     pub session_worktrees: &'a BTreeMap<String, String>,
@@ -232,7 +230,6 @@ async fn run_task_board_github_automation_with_client(
             config,
             item,
             session_worktrees,
-            project_dir: input.project_dir.as_deref(),
             dry_run: input.dry_run,
             client,
             host_id,
@@ -274,7 +271,6 @@ async fn run_task_board_github_automation_with_database_client(
             config,
             item,
             session_worktrees,
-            project_dir: input.project_dir.as_deref(),
             dry_run: input.dry_run,
             client,
             host_id,

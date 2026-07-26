@@ -431,20 +431,16 @@ fn active_external_sync_config() -> ExternalSyncConfig {
     let settings = TaskBoardOrchestrator::new(default_board_root())
         .settings()
         .ok();
-    let (repository, inbox_repositories, github_labels) = settings.map_or_else(
-        || (None, Vec::new(), Vec::new()),
+    let (inbox_repositories, github_labels) = settings.map_or_else(
+        || (Vec::new(), Vec::new()),
         |settings| {
-            let project = &settings.github_project;
-            let repository = (!project.owner.trim().is_empty() && !project.repo.trim().is_empty())
-                .then(|| project.repository_slug());
             (
-                repository,
                 settings.github_inbox.repositories.clone(),
                 settings.github_inbox.label_filter.clone(),
             )
         },
     );
-    external_sync_config_for_repository(repository.as_deref(), &inbox_repositories)
+    external_sync_config_for_repository(None, &inbox_repositories)
         .with_github_import_labels_override(&github_labels)
 }
 
