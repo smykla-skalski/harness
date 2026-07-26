@@ -185,6 +185,17 @@ describe('setCanPair', () => {
     expect(stub.calls[0]?.url).toBe('/panel/api/accounts/a%2Fb/approve');
   });
 
+  // `encodeURIComponent` leaves the dot alone, so this is the one that would
+  // survive as a segment and get resolved away into the route above.
+  it('escapes a dotted account id so it cannot climb a level', async () => {
+    const stub = stubFetch([jsonResponse(200, VIEWER.account)]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await api.setCanPair('..', true);
+
+    expect(stub.calls[0]?.url).toBe('/panel/api/accounts/%2E%2E/approve');
+  });
+
   it('surfaces a refusal', async () => {
     const stub = stubFetch([
       jsonResponse(403, { error: { code: 'forbidden', message: 'owner only' } }),
@@ -301,6 +312,20 @@ describe('revokePairing', () => {
     await api.revokePairing('a/b');
 
     expect(stub.calls[0]?.url).toBe('/panel/api/pairings/a%2Fb/revoke');
+  });
+
+  // The dot is the one `encodeURIComponent` passes through, so `..` would reach
+  // the request as a real segment and be resolved away, sending a revoke to
+  // whatever sits one level up. The Rust client escapes it for the same reason.
+  it('escapes a dotted pairing id so it cannot climb a level', async () => {
+    const stub = stubFetch([
+      jsonResponse(200, { pairing_id: '..', outcome: 'link_withdrawn', revoked_at: 'now' }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await api.revokePairing('..');
+
+    expect(stub.calls[0]?.url).toBe('/panel/api/pairings/%2E%2E/revoke');
   });
 
   // The panel answers this for a pairing that belongs to somebody else and for

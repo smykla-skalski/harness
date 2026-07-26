@@ -86,7 +86,7 @@ export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
 
     async setCanPair(accountId: string, granted: boolean): Promise<PanelAccount> {
       const action = granted ? 'approve' : 'revoke';
-      const response = await request(`/api/accounts/${encodeURIComponent(accountId)}/${action}`, {
+      const response = await request(`/api/accounts/${pathSegment(accountId)}/${action}`, {
         method: 'POST',
       });
       return (await response.json()) as PanelAccount;
@@ -104,15 +104,32 @@ export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
     },
 
     async revokePairing(pairingId: string): Promise<PairingRevoke> {
-      // Encoded because the id lands in a path segment. The daemon mints these
-      // and the page only ever quotes one back, but a value that reached an
-      // unescaped `/` would address a different route altogether.
-      const response = await request(`/api/pairings/${encodeURIComponent(pairingId)}/revoke`, {
+      const response = await request(`/api/pairings/${pathSegment(pairingId)}/revoke`, {
         method: 'POST',
       });
       return (await response.json()) as PairingRevoke;
     },
   };
+}
+
+/**
+ * Encode one id into one path segment.
+ *
+ * `encodeURIComponent` alone is not enough: it leaves `.` untouched, so an id
+ * of `..` survives as a segment that URL resolution then removes, addressing
+ * the route above the intended one. Ids are server-generated and none looks
+ * like this today, but building a path by concatenation is exactly how that
+ * stops being true without anybody noticing.
+ *
+ * The panel's Rust client escapes the dot for the same reason. The two do not
+ * produce byte-identical output — this one leaves sub-delimiters that resolve
+ * to themselves — but they agree on everything that must not survive as a
+ * segment of its own.
+ */
+function pathSegment(value: string): string {
+  // Safe after encoding rather than before: a percent escape is `%` and two
+  // hex digits, so it can never contain the dot this puts back.
+  return encodeURIComponent(value).replace(/\./g, '%2E');
 }
 
 async function readError(response: Response): Promise<PanelApiError> {
