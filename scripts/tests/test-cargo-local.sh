@@ -12,6 +12,11 @@ FAIL_COUNT=0
 
 cleanup() {
   rm -rf "$SANDBOX"
+  # Guarded rather than passed as a second argument: this runs from an EXIT trap
+  # that fires before the assignment too, and rm on an empty path fails.
+  if [[ -n "${PRESTART_TMPDIR:-}" ]]; then
+    rm -rf "$PRESTART_TMPDIR"
+  fi
 }
 trap cleanup EXIT
 
@@ -1336,8 +1341,14 @@ EOF
 # that configure_sccache_socket would fall back to the shared /tmp root, and the
 # socket id is a hash of this repository - so these scenarios would bind, and
 # then kill, the developer's own sccache socket.
+#
+# mktemp rather than the pid: a pid is reused, so a run that died before its
+# cleanup would hand its leftover sockets to a later run, which would then also
+# delete a directory it never created.
+PRESTART_TMPDIR="$(mktemp -d /tmp/cl-prestart.XXXXXX)"
+
 prestart_tmpdir() {
-  printf '/tmp/cl-prestart-%s\n' "$$"
+  printf '%s\n' "$PRESTART_TMPDIR"
 }
 
 run_cargo_local_prestart() {
