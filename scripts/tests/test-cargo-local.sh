@@ -23,6 +23,10 @@ PASS_COUNT=0
 FAIL_COUNT=0
 
 cleanup() {
+  # Before the directories go, because a server is found through the socket it
+  # listens on. A leak this suite cannot see is one the developer inherits for
+  # the whole idle timeout, so stop rather than only assert.
+  stop_leaked_sccache_servers
   rm -rf "$SANDBOX" "$SOCKET_TMPDIR" "/tmp/harness-sccache-$TEST_USER"
   # Guarded rather than passed as a second argument: this runs from an EXIT trap
   # that fires before the assignment too, and rm on an empty path fails.
@@ -31,6 +35,20 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+# Defined above the trap that calls it, since cleanup runs on any exit path,
+# including one taken before the scenarios start.
+stop_leaked_sccache_servers() {
+  local sccache_bin socket
+  sccache_bin="$(command -v sccache 2>/dev/null || true)"
+  [[ -n "$sccache_bin" ]] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+
+  while read -r socket; do
+    [[ -n "$socket" ]] || continue
+    SCCACHE_SERVER_UDS="$socket" "$sccache_bin" --stop-server >/dev/null 2>&1 || true
+  done < <(reachable_sockets_in_test_roots)
+}
 
 fail() {
   FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -1044,30 +1062,34 @@ scenario_old_explicit_sccache_is_disabled() {
   fi
 }
 
-scenario_failed_lsof_preserves_unknown_sockets() {
-  local fake_bin="$SANDBOX/lsof-bin"
-  local tmpdir="$SOCKET_TMPDIR/lsof-fail"
+scenario_unprobeable_socket_is_preserved() {
+  local fake_bin="$SANDBOX/nopython-sweep-bin"
+  local tmpdir="$SOCKET_TMPDIR/nopython-sweep"
   local socket_dir="$tmpdir/harness-sccache"
   local unknown_socket="$socket_dir/unknown.sock"
   local output
   mkdir -p "$fake_bin" "$socket_dir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
-  cat >"$fake_bin/lsof" <<'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-  chmod +x "$fake_bin/lsof"
+  # macOS ships a /usr/bin/python3 that behaves like this until the command line
+  # tools are installed: on PATH, exit 1, no output. A sweep that cannot ask
+  # whether anything is listening must keep what it found; deleting on a
+  # question it could not put reintroduces the failure it exists to prevent.
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$fake_bin/python3"
+  chmod +x "$fake_bin/python3"
   : >"$unknown_socket"
+  # Aged past the sweep's window, so what preserves it here is the unanswerable
+  # probe rather than the age every fresh socket gets for free.
+  touch -t 202001010000 "$unknown_socket"
 
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
   if ! assert_swept "$socket_dir" "$output"; then
-    fail "failed-lsof scenario never reached the sweep"
+    fail "unprobeable-socket scenario never reached the sweep"
     return
   fi
   if [[ -e "$unknown_socket" ]]; then
-    pass "failed lsof preserves sockets with unknown ownership"
+    pass "a socket the sweep cannot probe is preserved"
   else
-    fail "socket was deleted after lsof failed"
+    fail "socket was deleted although nothing could probe it"
   fi
 }
 
@@ -1078,22 +1100,28 @@ scenario_live_socket_survives_the_sweep() {
   local live_socket="$socket_dir/live.sock"
   local stale_socket="$socket_dir/stale.sock"
   local output
+  local pid_file="$SANDBOX/livesock-pids"
   mkdir -p "$fake_bin" "$socket_dir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
-  # lsof 4.95 prints the name field as "<path> type=STREAM"; 4.91 printed the
-  # path alone. Reading only the older shape matched nothing on a modern lsof,
-  # so every live socket was unlinked and the next client then found no server
-  # and started a second one.
-  cat >"$fake_bin/lsof" <<EOF
-#!/usr/bin/env bash
-printf 'p1\n'
-printf 'n%s type=STREAM\n' "$live_socket"
-EOF
-  chmod +x "$fake_bin/lsof"
-  : >"$live_socket"
+  : >"$pid_file"
+  # A real listener, because that is the thing the sweep has to recognise. The
+  # previous version of this scenario fed a fake lsof instead, which meant it
+  # asserted on one parsing of one tool's output rather than on whether a live
+  # server survives - and a socket with nothing behind it is what "stale" means.
+  write_fake_socket_holder "$SANDBOX/livesock-holder.py"
+  python3 "$SANDBOX/livesock-holder.py" "$live_socket" "$pid_file" >/dev/null 2>&1 &
+  local waited=0
+  while [[ ! -S "$live_socket" ]] && (( waited < 200 )); do
+    sleep 0.05
+    waited=$((waited + 1))
+  done
   : >"$stale_socket"
+  # Older than the sweep's window, or it would survive on its age alone and this
+  # scenario would pass without ever asking whether anything was listening.
+  touch -t 202001010000 "$stale_socket"
 
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
+  stop_prestart_servers "$pid_file"
   if ! assert_swept "$socket_dir" "$output"; then
     fail "live-socket scenario never reached the sweep"
     return
@@ -1105,40 +1133,34 @@ EOF
   fi
 }
 
-scenario_socket_bound_after_the_snapshot_survives() {
+scenario_young_socket_survives_the_sweep() {
   local fake_bin="$SANDBOX/latesock-bin"
   local tmpdir="$SOCKET_TMPDIR/latesock"
   local socket_dir="$tmpdir/harness-sccache"
-  local late_socket="$socket_dir/late.sock"
-  local stale_socket="$socket_dir/stale.sock"
+  local young_socket="$socket_dir/young.sock"
+  local old_socket="$socket_dir/old.sock"
   local output
   mkdir -p "$fake_bin" "$socket_dir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
-  # A server binding while lsof is being asked. Its socket cannot appear in a
-  # snapshot taken before it existed, so a sweep that lists the directory
-  # afterwards reads it as an orphan and unlinks a live server's socket. On a
-  # loaded machine lsof is slow enough that concurrent builds hit this for real,
-  # and the build that lost its socket then started a second server.
-  #
-  # The stale socket is not decoration: the sweep skips lsof entirely when it has
-  # nothing to judge, so without a candidate this fake would never run.
-  cat >"$fake_bin/lsof" <<EOF
-#!/usr/bin/env bash
-: >"$late_socket"
-printf 'p1\n'
-EOF
-  chmod +x "$fake_bin/lsof"
-  : >"$stale_socket"
+
+  # Neither of these answers a connect, so the only thing keeping the young one
+  # is its age. That is the point: a build binding this path a moment after the
+  # sweep decided about it produces exactly this state, and unlinking on the
+  # older answer takes the live socket that build just created - which is how the
+  # build came to find nothing on the path and start a second server.
+  : >"$young_socket"
+  : >"$old_socket"
+  touch -t 202001010000 "$old_socket"
 
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
   if ! assert_swept "$socket_dir" "$output"; then
-    fail "late-socket scenario never reached the sweep"
+    fail "young-socket scenario never reached the sweep"
     return
   fi
-  if [[ -e "$late_socket" ]] && [[ ! -e "$stale_socket" ]]; then
-    pass "a socket bound after the lsof snapshot survives the sweep"
+  if [[ -e "$young_socket" ]] && [[ ! -e "$old_socket" ]]; then
+    pass "a socket younger than the sweep's window survives it"
   else
-    fail "late-socket sweep wrong: late=$([[ -e "$late_socket" ]] && echo kept || echo unlinked) stale=$([[ -e "$stale_socket" ]] && echo kept || echo unlinked)"
+    fail "young-socket sweep wrong: young=$([[ -e "$young_socket" ]] && echo kept || echo unlinked) old=$([[ -e "$old_socket" ]] && echo kept || echo unlinked)"
   fi
 }
 
@@ -1625,6 +1647,72 @@ scenario_query_commands_start_no_sccache_server() {
   fi
 }
 
+scenario_empty_sccache_bin_disables_the_cache() {
+  local tmpdir="$SOCKET_TMPDIR/empty-bin"
+  local output
+  mkdir -p "$tmpdir"
+
+  # An empty value is how every scenario here asks for no caching, and how
+  # rustc-cache-wrapper.sh has always read it. Reading it as "go find one"
+  # instead started a real server for scenarios about jobserver sizing, inside a
+  # sandbox this suite then deleted, leaving it to run out its idle timeout
+  # against the developer's own cache.
+  output="$(print_cargo_env "$SANDBOX/nonexistent-bin" "" "$tmpdir")"
+
+  if assert_line "SCCACHE_BIN=" "$output" \
+    && assert_line "SCCACHE_VERSION=" "$output" \
+    && assert_line "SCCACHE_SERVER_UDS=" "$output" \
+    && assert_line "CACHE_MODE=none" "$output"; then
+    pass "an empty SCCACHE_BIN disables the cache instead of searching"
+  else
+    fail "empty SCCACHE_BIN did not disable sccache: $output"
+  fi
+}
+
+# Every socket under a root that still answers a connect. Used both to assert
+# this suite leaves nothing running and to clean up if it ever does.
+write_reachable_socket_probe() {
+  local path="$1"
+  cat >"$path" <<'PY'
+import os, socket, sys
+
+for root in sys.argv[1:]:
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in filenames:
+            if not name.endswith(".sock"):
+                continue
+            candidate = os.path.join(dirpath, name)
+            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            probe.settimeout(2)
+            try:
+                probe.connect(candidate)
+            except OSError:
+                continue
+            print(candidate)
+PY
+}
+
+reachable_sockets_in_test_roots() {
+  local probe="$SANDBOX/reachable-sockets.py"
+  write_reachable_socket_probe "$probe"
+  python3 "$probe" "$SANDBOX" "$SOCKET_TMPDIR" \
+    "/tmp/harness-sccache-$TEST_USER" "${PRESTART_TMPDIR:-$SANDBOX}" 2>/dev/null || true
+}
+
+scenario_suite_leaves_no_sccache_server_behind() {
+  local leaked
+  leaked="$(reachable_sockets_in_test_roots)"
+
+  # A leaked server outlives its sandbox by its whole idle timeout, and every one
+  # of them enforces its own copy of SCCACHE_CACHE_SIZE over the one on-disk
+  # cache - the eviction fight this repository already paid for once.
+  if [[ -z "$leaked" ]]; then
+    pass "the suite leaves no sccache server listening"
+  else
+    fail "sccache servers still listening under the test roots: $(tr '\n' ' ' <<<"$leaked")"
+  fi
+}
+
 scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_reserve_drops_an_inherited_jobserver
@@ -1652,14 +1740,16 @@ scenario_single_thread_nextest_override_is_rejected
 scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
 scenario_old_explicit_sccache_is_disabled
-scenario_failed_lsof_preserves_unknown_sockets
+scenario_empty_sccache_bin_disables_the_cache
+scenario_unprobeable_socket_is_preserved
 scenario_live_socket_survives_the_sweep
-scenario_socket_bound_after_the_snapshot_survives
+scenario_young_socket_survives_the_sweep
 scenario_sccache_server_is_started_before_cargo
 scenario_concurrent_builds_start_one_sccache_server
 scenario_unusable_python_falls_back_to_the_socket_file
 scenario_query_commands_start_no_sccache_server
 scenario_cache_wrapper_shortens_long_tmpdir
+scenario_suite_leaves_no_sccache_server_behind
 
 printf 'cargo-local tests: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
 (( FAIL_COUNT == 0 ))

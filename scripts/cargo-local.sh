@@ -55,40 +55,87 @@ short_hash() {
   printf '%s\n' "${digest:0:16}"
 }
 
-sweep_dead_sccache_sockets() {
-  local dir="$1"
-  local live_sockets sock
-  local -a candidates=()
-  [[ -d "$dir" ]] || return 0
-  command -v lsof >/dev/null 2>&1 || return 0
+# One question, answered by connecting: is a server listening on this path right
+# now. The file cannot answer it - every orphaned server still holds a listening
+# socket on the path it was started with, and a path left behind by a dead one
+# looks identical from the filesystem.
+#
+# The answer is a word rather than an exit status because macOS ships a
+# /usr/bin/python3 that stays a stub until the command line tools are installed
+# and fails with the same status a refused connection would, and an exit code
+# alone cannot separate "nothing is listening" from "could not ask".
+sccache_socket_state() {
+  local socket="${1:-}" verdict=""
 
-  # Name the candidates before asking lsof about them, never after. A socket
-  # bound after this listing is not a candidate at all, and one already listed
-  # was bound before lsof started looking, so lsof reports it. The other order
-  # asks lsof about a socket that did not exist when it looked, and on a loaded
-  # machine that window is wide enough for a build to unlink the live server
-  # another build has just started - then find nothing there and start a second.
-  for sock in "$dir"/*.sock; do
-    [[ -e "$sock" ]] || continue
-    candidates+=("$sock")
-  done
-  (( ${#candidates[@]} > 0 )) || return 0
+  if [[ -n "$socket" ]] && command -v python3 >/dev/null 2>&1; then
+    verdict="$(python3 - "$socket" 2>/dev/null <<'PY' || true
+import socket, sys
 
-  # lsof 4.95 appends " type=STREAM" to the name field, where 4.91 printed the
-  # path alone. Matching the whole line against a socket path therefore matched
-  # nothing on a modern lsof, and this sweep unlinked the live server's socket on
-  # every run - which is precisely how the next client came to find no server and
-  # start one of its own.
-  if ! live_sockets="$(lsof -U -F n 2>/dev/null \
-    | awk '/^n\// {sub(/ type=[A-Z]+$/, ""); print substr($0,2)}' \
-    | sort -u)"; then
-    return 0
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.settimeout(2)
+try:
+    sock.connect(sys.argv[1])
+except (ConnectionRefusedError, FileNotFoundError):
+    print("absent")
+except OSError:
+    print("unknown")
+else:
+    print("reachable")
+PY
+    )"
   fi
 
-  for sock in "${candidates[@]}"; do
-    if [[ -n "$live_sockets" ]] && grep -qxF "$sock" <<<"$live_sockets"; then
-      continue
-    fi
+  case "$verdict" in
+    reachable | absent | unknown) printf '%s\n' "$verdict" ;;
+    *) printf 'unprobed\n' ;;
+  esac
+}
+
+# How long a dead socket has to have been sitting there before the sweep will
+# remove it. Nothing depends on the removal being prompt - a starting sccache
+# server unlinks the path itself - so the only job of this number is to be longer
+# than the gap between a concurrent build binding a socket and this sweep
+# deciding about it.
+SCCACHE_SOCKET_MIN_AGE_SECONDS=60
+
+# GNU and BSD stat disagree on the format flag, and GNU's -f means something else
+# entirely while still exiting 0, so the shape has to be validated before it is
+# trusted.
+socket_mtime_epoch() {
+  local path="$1" mtime
+  mtime="$(stat -c '%Y' "$path" 2>/dev/null || true)"
+  if [[ ! "$mtime" =~ ^[0-9]+$ ]]; then
+    mtime="$(stat -f '%m' "$path" 2>/dev/null || true)"
+  fi
+  [[ "$mtime" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$mtime"
+}
+
+# Unlink a socket only once a connect proves it dead and it has been there long
+# enough to belong to a build that is over. Asking lsof which sockets were live
+# and deleting the rest was wrong three ways: it needed lsof installed, it had to
+# parse lsof's name field - whose format changed between 4.91 and 4.95, so on a
+# modern lsof it unlinked the live server's socket on every run - and it judged a
+# directory listing against a snapshot that could predate a socket bound while
+# lsof was being asked.
+#
+# A connect answers about one candidate at the moment of the decision, so no
+# snapshot is left to go stale, and the age check covers what remains: any socket
+# a concurrent build has just bound is young, whatever this sweep decided about
+# the path a moment earlier. Comparing the file instead does not work - /tmp is
+# tmpfs on Linux and hands the rebound socket the inode the unlinked one had.
+sweep_dead_sccache_sockets() {
+  local dir="$1" sock mtime now
+  [[ -d "$dir" ]] || return 0
+  now="$(date +%s 2>/dev/null || true)"
+  [[ "$now" =~ ^[0-9]+$ ]] || return 0
+
+  for sock in "$dir"/*.sock; do
+    [[ -e "$sock" ]] || continue
+    mtime="$(socket_mtime_epoch "$sock" || true)"
+    [[ "$mtime" =~ ^[0-9]+$ ]] || continue
+    (( now - mtime >= SCCACHE_SOCKET_MIN_AGE_SECONDS )) || continue
+    [[ "$(sccache_socket_state "$sock")" == "absent" ]] || continue
     rm -f "$sock"
   done
 }
@@ -134,53 +181,23 @@ configure_sccache_socket() {
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
 }
 
-# Is anything answering on the socket right now. Existence of the file cannot
-# say: every orphaned server still holds a listening socket on that path, and a
-# path left behind by a dead one looks identical. Connecting is the only answer.
-#
-# The answer is a word rather than an exit status, because macOS ships a
-# /usr/bin/python3 that is a stub until the command line tools are installed and
-# fails with the same status a refused connection would, and an exit code alone
-# cannot separate "no server" from "could not ask". An unknown - a timeout under
-# load, a permission error - reads as reachable on purpose: the only action taken
-# on "no server" is starting one, and starting a second server next to a live one
-# is the failure this path exists to prevent.
+# An unknown - a timeout under load, a permission error - reads as reachable on
+# purpose: the only action taken on "no server" is starting one, and starting a
+# second server next to a live one is the failure this path exists to prevent.
 #
 # A probe that could not run at all falls back to the socket file, which is not
 # the same as starting nothing. A path with no socket file behind it is one no
 # client could reach either, so a prestart there can only help; what the fallback
 # gives up is telling a live server from an orphan's leftover path.
 sccache_server_reachable() {
-  local socket="${SCCACHE_SERVER_UDS:-}" verdict=""
+  local socket="${SCCACHE_SERVER_UDS:-}"
 
   [[ -n "$socket" ]] || return 1
-  if command -v python3 >/dev/null 2>&1; then
-    verdict="$(python3 - "$socket" 2>/dev/null <<'PY' || true
-import socket, sys
-
-sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-sock.settimeout(2)
-try:
-    sock.connect(sys.argv[1])
-except (ConnectionRefusedError, FileNotFoundError):
-    print("absent")
-except OSError:
-    print("unknown")
-else:
-    print("reachable")
-PY
-    )"
-  fi
-
-  case "$verdict" in
+  case "$(sccache_socket_state "$socket")" in
     reachable | unknown) return 0 ;;
     absent) return 1 ;;
   esac
 
-  # No usable probe. sweep_dead_sccache_sockets has already unlinked every
-  # socket lsof does not report as live, so a socket file that survived it is
-  # the closest thing to an answer left. Without lsof either, this reads every
-  # socket as live and leaves clients doing exactly what they do today.
   [[ -S "$socket" ]]
 }
 
@@ -309,6 +326,18 @@ resolve_sccache_candidate() {
 
 resolve_sccache_bin() {
   local requested="${SCCACHE_BIN:-}" candidate resolved output version
+
+  # Set but empty means no sccache, which is how rustc-cache-wrapper.sh has
+  # always read it. Reading it as "not specified" and going looking anyway turned
+  # a caller's opt-out into a running server: the shell tests pass an empty value
+  # for scenarios that have nothing to do with caching, and each one left a
+  # server behind, bound inside a sandbox directory the suite then deleted, still
+  # enforcing its own copy of the size limit over the shared cache.
+  if [[ -n "${SCCACHE_BIN+set}" ]] && [[ -z "$requested" ]]; then
+    export SCCACHE_BIN=""
+    unset SCCACHE_VERSION
+    return 1
+  fi
 
   if [[ -n "$requested" ]]; then
     candidate="$requested"
