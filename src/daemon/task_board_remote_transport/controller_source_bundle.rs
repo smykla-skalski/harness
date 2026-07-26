@@ -80,6 +80,18 @@ impl RemoteExecutionControllerClient {
                 trust,
             });
         }
+        self.adopt_or_abandon_predecessor_source_bundle(db, request, trust)
+            .await
+    }
+
+    /// Asks the executor whether it still holds the predecessor upload, then
+    /// either adopts that receipt or seals an abandonment for it.
+    async fn adopt_or_abandon_predecessor_source_bundle(
+        &self,
+        db: &AsyncDaemonDb,
+        request: &RemoteSourceBundleUploadRequest,
+        trust: TaskBoardRemoteOperationTrustFence,
+    ) -> Result<RemoteSourceBundleRecoveryOutcome, RemoteExecutionControllerError> {
         let verification = self.client.verify_source_bundle_receipt(request).await?;
         if verification.receipt.is_some() {
             let stored = Box::pin(db.adopt_verified_task_board_remote_source_bundle_receipt(

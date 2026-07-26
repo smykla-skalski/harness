@@ -27,22 +27,8 @@ impl RemoteExecutionControllerClient {
             )
             .into());
         }
-        if let Some(receipt) = db
-            .exact_task_board_remote_offer_receipt(request, &self.host_id)
-            .await?
-        {
-            let response = receipt.response()?;
-            return match response.disposition {
-                RemoteOfferDisposition::Accepted => {
-                    let record = self.preflight(db, &request.binding.assignment_id).await?;
-                    Ok(RemotePredecessorOfferRecoveryOutcome::Accepted {
-                        outcome: Box::new(TaskBoardRemoteMutationOutcome::Replayed(record)),
-                    })
-                }
-                RemoteOfferDisposition::Rejected => Ok(
-                    RemotePredecessorOfferRecoveryOutcome::Rejected(Box::new(response)),
-                ),
-            };
+        if let Some(replayed) = self.replay_recovered_offer_receipt(db, request).await? {
+            return Ok(replayed);
         }
         let current = self.current_source_recovery_trust(db).await?;
         if current != *trust {
@@ -51,6 +37,42 @@ impl RemoteExecutionControllerClient {
             )
             .into());
         }
+        self.place_recovered_offer(db, request, trust).await
+    }
+
+    /// Returns the durable receipt for an already-delivered recovery offer, or
+    /// `None` when the successor instance has never seen this offer.
+    async fn replay_recovered_offer_receipt(
+        &self,
+        db: &AsyncDaemonDb,
+        request: &RemoteOfferRequest,
+    ) -> Result<Option<RemotePredecessorOfferRecoveryOutcome>, RemoteExecutionControllerError> {
+        let Some(receipt) = db
+            .exact_task_board_remote_offer_receipt(request, &self.host_id)
+            .await?
+        else {
+            return Ok(None);
+        };
+        let response = receipt.response()?;
+        match response.disposition {
+            RemoteOfferDisposition::Accepted => {
+                let record = self.preflight(db, &request.binding.assignment_id).await?;
+                Ok(Some(RemotePredecessorOfferRecoveryOutcome::Accepted {
+                    outcome: Box::new(TaskBoardRemoteMutationOutcome::Replayed(record)),
+                }))
+            }
+            RemoteOfferDisposition::Rejected => Ok(Some(
+                RemotePredecessorOfferRecoveryOutcome::Rejected(Box::new(response)),
+            )),
+        }
+    }
+
+    async fn place_recovered_offer(
+        &self,
+        db: &AsyncDaemonDb,
+        request: &RemoteOfferRequest,
+        trust: &TaskBoardRemoteOperationTrustFence,
+    ) -> Result<RemotePredecessorOfferRecoveryOutcome, RemoteExecutionControllerError> {
         let response = self.client.offer(request).await?;
         match response.disposition {
             RemoteOfferDisposition::Accepted => {

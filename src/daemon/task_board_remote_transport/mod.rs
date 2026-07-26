@@ -12,6 +12,7 @@ mod controller_cancel_replay;
 mod controller_cleanup;
 mod controller_clock;
 pub(crate) mod controller_offer_recovery;
+mod controller_phases;
 mod controller_renew_replay;
 pub(crate) mod controller_source_bundle;
 mod controller_trust;
