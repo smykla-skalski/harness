@@ -8,7 +8,7 @@ use crate::app::command_context::{AppContext, Execute};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::ObserveArgs;
 use crate::session::transport::SessionCommand;
-use crate::setup::{BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, SecretsArgs};
+use crate::setup::{BootstrapArgs, CapabilitiesArgs, SecretsArgs};
 use crate::task_board::transport::TaskBoardCommand;
 use crate::telemetry::{current_trace_id, runtime_service_from_current_process};
 
@@ -32,8 +32,6 @@ pub struct Cli {
 #[non_exhaustive]
 pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
-    Kuma(Box<KumaSetupArgs>),
-    Gateway(GatewayArgs),
     Capabilities(CapabilitiesArgs),
     /// Inspect task-board secret state in your macOS Keychain.
     Secrets(SecretsArgs),
@@ -121,8 +119,6 @@ fn worker_error(error: &harness_command::WorkerError) -> CliError {
 fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliError> {
     match command {
         SetupCommand::Bootstrap(args) => args.execute(ctx),
-        SetupCommand::Kuma(args) => args.execute(ctx),
-        SetupCommand::Gateway(args) => args.execute(ctx),
         SetupCommand::Capabilities(args) => args.execute(ctx),
         SetupCommand::Secrets(args) => args.execute(ctx),
     }

@@ -8,8 +8,6 @@ use harness::kernel::topology::{ClusterMode, ClusterProvider, ClusterSpec, HelmS
 
 use super::helpers::init_run;
 
-mod orchestration;
-
 // ============================================================================
 // ClusterSpec payload tests
 // ============================================================================
