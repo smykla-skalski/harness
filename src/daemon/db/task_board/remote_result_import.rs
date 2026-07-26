@@ -1,3 +1,6 @@
+use std::future::Future;
+use std::pin::Pin;
+
 use sqlx::{Sqlite, Transaction, query};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -26,6 +29,10 @@ mod model;
 #[path = "remote_result_import/storage.rs"]
 mod storage;
 use evidence::{ImportMaterials, load_import_materials};
+
+type ManualImportFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<TaskBoardRemoteResultImportRecord, CliError>> + Send + 'a>>;
+
 pub(crate) use model::{
     TaskBoardRemoteImplementationImportEvidence, TaskBoardRemoteResultImportRecord,
     TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
@@ -200,15 +207,24 @@ impl AsyncDaemonDb {
         detail: &str,
         failed_at: &str,
     ) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
-        Box::pin(failure::mark_manual_required(
+        // The box is erased to `dyn Future` on purpose, and the erasure is
+        // load-bearing rather than stylistic. Without it every async body below
+        // this call folds its `Send` obligation into the websocket dispatch
+        // chain that reaches it, which is already about twenty async frames
+        // deep; adding a single nested helper inside `mark_manual_required`
+        // then fails the crate's recursion limit with `E0275: overflow
+        // evaluating the requirement sqlx::Transaction: Send`. Erasing proves
+        // `Send` once here and truncates the chain, so the recorder below can
+        // be split into named steps at all.
+        let recovery: ManualImportFuture<'_> = Box::pin(failure::mark_manual_required(
             self,
             assignment_id,
             fencing_epoch,
             import_sha256,
             detail,
             failed_at,
-        ))
-        .await
+        ));
+        recovery.await
     }
 }
 

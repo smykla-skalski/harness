@@ -1,7 +1,9 @@
 use sqlx::query;
 
 use super::super::remote_assignment_io_authority::{active_target_matches, monotonic_time};
-use super::super::remote_assignment_model::{concurrent, load_assignment_in_tx, nonblank, to_i64};
+use super::super::remote_assignment_model::{
+    canonical_time, concurrent, load_assignment_in_tx, nonblank, to_i64,
+};
 use super::super::workflow_execution_attempts::update_attempt_in_tx;
 use super::super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use super::super::workflow_terminal::project_terminal_execution_in_tx;
@@ -28,10 +30,7 @@ pub(super) async fn mark_manual_required(
     failed_at: &str,
 ) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
     let detail = bounded_detail(detail)?;
-    super::super::remote_assignment_model::canonical_time(
-        failed_at,
-        "remote result import failure time",
-    )?;
+    canonical_time(failed_at, "remote result import failure time")?;
     let mut transaction = db
         .begin_immediate_transaction("task board remote result import manual recovery")
         .await?;
@@ -43,62 +42,140 @@ pub(super) async fn mark_manual_required(
     )
     .await?;
     if record.state == TaskBoardRemoteResultImportState::ManualRequired {
-        require_manual_replay(&mut transaction, &record, &detail).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit replayed manual result import: {error}")))?;
-        return Ok(record);
+        return commit_replayed_manual_state(transaction, record, &detail).await;
     }
-    if !matches!(
+    require_recoverable_import_state(&record)?;
+    let recovery =
+        resolve_manual_recovery_in_tx(&mut transaction, &record, assignment_id, &detail, failed_at)
+            .await?;
+    persist_manual_recovery_in_tx(&mut transaction, &record, &detail, &recovery).await?;
+    commit_manual_recovery(transaction, assignment_id, fencing_epoch, import_sha256).await
+}
+
+/// The import already requires manual recovery. Its durable projection must
+/// match this detail exactly, and then the transaction commits unchanged.
+async fn commit_replayed_manual_state(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: TaskBoardRemoteResultImportRecord,
+    detail: &str,
+) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
+    require_manual_replay(&mut transaction, &record, detail).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit replayed manual result import: {error}")))?;
+    Ok(record)
+}
+
+fn require_recoverable_import_state(
+    record: &TaskBoardRemoteResultImportRecord,
+) -> Result<(), CliError> {
+    if matches!(
         record.state,
         TaskBoardRemoteResultImportState::Prepared | TaskBoardRemoteResultImportState::Applied
     ) {
-        return Err(concurrent(
+        Ok(())
+    } else {
+        Err(concurrent(
             "remote result import cannot require manual recovery after adoption",
-        ));
+        ))
     }
-    let assignment = load_assignment_in_tx(&mut transaction, assignment_id)
+}
+
+/// The exact generation a manual recovery writes against: the parent as it
+/// stands, the stopped parent it becomes, the combined record both the workflow
+/// validation and the terminal projection read, and the attempt pair.
+struct ManualRecovery {
+    parent: TaskBoardWorkflowExecutionRecord,
+    stopped_parent: TaskBoardWorkflowExecutionRecord,
+    combined: TaskBoardWorkflowExecutionRecord,
+    current_attempt: TaskBoardExecutionAttemptRecord,
+    failed_attempt: TaskBoardExecutionAttemptRecord,
+}
+
+async fn resolve_manual_recovery_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &TaskBoardRemoteResultImportRecord,
+    assignment_id: &str,
+    detail: &str,
+    failed_at: &str,
+) -> Result<ManualRecovery, CliError> {
+    let assignment = load_assignment_in_tx(transaction, assignment_id)
         .await?
         .ok_or_else(|| concurrent("manual result import assignment disappeared"))?;
-    let parent = load_execution_in_tx(&mut transaction, &record.execution_id)
+    let parent = load_execution_in_tx(transaction, &record.execution_id)
         .await?
         .ok_or_else(|| concurrent("manual result import execution disappeared"))?;
-    let (attempt_index, current_attempt) = require_active_import(&record, &assignment, &parent)?;
-    let failed_attempt = failed_attempt(&current_attempt, &detail, failed_at)?;
-    let mut stopped_parent = parent.clone();
-    stopped_parent.transition.execution_state = TaskBoardExecutionState::HumanRequired;
-    stopped_parent.available_at = None;
-    stopped_parent.blocked_reason = Some(BLOCKED_REASON.into());
-    stopped_parent.updated_at = monotonic_time(&parent.updated_at, failed_at)?;
-    stopped_parent
-        .ownership
-        .resources
-        .remove(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE);
-    stopped_parent.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
-        kind: TaskBoardTerminalOutcomeKind::HumanRequired,
-        summary: format!("remote result import requires manual recovery: {detail}"),
-        recorded_at: failed_at.into(),
-    });
+    let (attempt_index, current_attempt) = require_active_import(record, &assignment, &parent)?;
+    let failed_attempt = failed_attempt(&current_attempt, detail, failed_at)?;
+    let stopped_parent = manual_required_parent(&parent, detail, failed_at)?;
     let mut combined = stopped_parent.clone();
     combined.attempts[attempt_index] = failed_attempt.clone();
     validate_task_board_workflow_execution(&combined)
         .map_err(|error| db_error(format!("validate manual result import workflow: {error}")))?;
-    persist_manual_state(&mut transaction, &record, &detail).await?;
+    Ok(ManualRecovery {
+        parent,
+        stopped_parent,
+        combined,
+        current_attempt,
+        failed_attempt,
+    })
+}
+
+/// The parent as a manual recovery leaves it: human-required, unschedulable, its
+/// import authority surrendered, and carrying the terminal outcome.
+fn manual_required_parent(
+    parent: &TaskBoardWorkflowExecutionRecord,
+    detail: &str,
+    failed_at: &str,
+) -> Result<TaskBoardWorkflowExecutionRecord, CliError> {
+    let mut stopped = parent.clone();
+    stopped.transition.execution_state = TaskBoardExecutionState::HumanRequired;
+    stopped.available_at = None;
+    stopped.blocked_reason = Some(BLOCKED_REASON.into());
+    stopped.updated_at = monotonic_time(&parent.updated_at, failed_at)?;
+    stopped
+        .ownership
+        .resources
+        .remove(TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE);
+    stopped.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
+        kind: TaskBoardTerminalOutcomeKind::HumanRequired,
+        summary: format!("remote result import requires manual recovery: {detail}"),
+        recorded_at: failed_at.into(),
+    });
+    Ok(stopped)
+}
+
+async fn persist_manual_recovery_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &TaskBoardRemoteResultImportRecord,
+    detail: &str,
+    recovery: &ManualRecovery,
+) -> Result<(), CliError> {
+    persist_manual_state(transaction, record, detail).await?;
     update_execution_in_tx(
-        &mut transaction,
-        &TaskBoardWorkflowExecutionCas::from(&parent),
-        &stopped_parent,
+        transaction,
+        &TaskBoardWorkflowExecutionCas::from(&recovery.parent),
+        &recovery.stopped_parent,
     )
     .await?;
     update_attempt_in_tx(
-        &mut transaction,
-        &TaskBoardExecutionAttemptCas::from(&current_attempt),
-        &failed_attempt,
+        transaction,
+        &TaskBoardExecutionAttemptCas::from(&recovery.current_attempt),
+        &recovery.failed_attempt,
     )
     .await?;
-    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    project_terminal_execution_in_tx(&mut transaction, &combined).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    project_terminal_execution_in_tx(transaction, &recovery.combined).await?;
+    Ok(())
+}
+
+async fn commit_manual_recovery(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    assignment_id: &str,
+    fencing_epoch: u64,
+    import_sha256: &str,
+) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
     let updated = require_import(
         &mut transaction,
         assignment_id,

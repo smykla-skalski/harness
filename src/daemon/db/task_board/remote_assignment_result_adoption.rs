@@ -18,7 +18,9 @@ use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_exec
 use super::workflow_terminal::{project_terminal_execution_in_tx, settle_prepared_dispatch_in_tx};
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteAssignmentWireState;
+use crate::daemon::task_board_remote_transport::wire::{
+    RemoteAssignmentWireState, RemoteStatusResponse,
+};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE,
@@ -109,6 +111,59 @@ async fn apply_terminal_adoption_in_tx(
         .status_response
         .as_ref()
         .ok_or_else(|| concurrent("remote result assignment has no terminal status"))?;
+    let handoff = adopt_terminal_handoff_in_tx(
+        transaction,
+        assignment,
+        parent,
+        (current_attempt, attempt_index),
+        response,
+        adopted_at,
+    )
+    .await?;
+    persist_adopted_handoff_in_tx(
+        transaction,
+        assignment,
+        (parent, current_attempt),
+        &handoff,
+        adopted_at,
+    )
+    .await?;
+    // A terminal parent projects its item, and that projection usually publishes
+    // the items change itself; the settled dispatch only owes its own bump when
+    // nothing else published one.
+    let published = if handoff.terminal_parent {
+        let projection = project_terminal_execution_in_tx(transaction, &handoff.combined).await?;
+        projection.item_changed || projection.admission_released
+    } else {
+        false
+    };
+    if handoff.dispatch_changed && !published {
+        bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    }
+    Ok(handoff.combined)
+}
+
+/// The workflow and attempt records an adoption writes, whether the combined
+/// parent ended up terminal and so needs its item projected, and whether the
+/// dispatch settlement that ran first still owes the items scope a bump.
+struct AdoptedHandoff {
+    combined: TaskBoardWorkflowExecutionRecord,
+    updated_attempt: TaskBoardExecutionAttemptRecord,
+    terminal_parent: bool,
+    dispatch_changed: bool,
+}
+
+/// Settle the prepared dispatch, then build the handoff the reported terminal
+/// state earns. A completed result reads its artifact first; a failed one proves
+/// its artifact set and may leave the parent human-required.
+async fn adopt_terminal_handoff_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+    parent: &TaskBoardWorkflowExecutionRecord,
+    (current_attempt, attempt_index): (&TaskBoardExecutionAttemptRecord, usize),
+    response: &RemoteStatusResponse,
+    adopted_at: &str,
+) -> Result<AdoptedHandoff, CliError> {
     let prepared = settle_prepared_dispatch_in_tx(transaction, parent).await?;
     let (combined, updated_attempt, terminal_parent) = match response.state {
         RemoteAssignmentWireState::Completed => {
@@ -151,16 +206,34 @@ async fn apply_terminal_adoption_in_tx(
             ));
         }
     };
+    Ok(AdoptedHandoff {
+        combined,
+        updated_attempt,
+        terminal_parent,
+        dispatch_changed: prepared.changed,
+    })
+}
+
+async fn persist_adopted_handoff_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+    (parent, current_attempt): (
+        &TaskBoardWorkflowExecutionRecord,
+        &TaskBoardExecutionAttemptRecord,
+    ),
+    handoff: &AdoptedHandoff,
+    adopted_at: &str,
+) -> Result<(), CliError> {
     update_execution_in_tx(
         transaction,
         &TaskBoardWorkflowExecutionCas::from(parent),
-        &combined,
+        &handoff.combined,
     )
     .await?;
     update_attempt_in_tx(
         transaction,
         &TaskBoardExecutionAttemptCas::from(current_attempt),
-        &updated_attempt,
+        &handoff.updated_attempt,
     )
     .await?;
     record_controller_handoff_in_tx(
@@ -168,20 +241,12 @@ async fn apply_terminal_adoption_in_tx(
         assignment,
         assignment.state,
         TaskBoardRemoteControllerHandoffKind::ResultAdopted,
-        &combined,
+        &handoff.combined,
         adopted_at,
     )
     .await?;
     bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    if terminal_parent {
-        let projection = project_terminal_execution_in_tx(transaction, &combined).await?;
-        if prepared.changed && !projection.item_changed && !projection.admission_released {
-            bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-        }
-    } else if prepared.changed {
-        bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-    }
-    Ok(combined)
+    Ok(())
 }
 
 async fn commit_adoption(
