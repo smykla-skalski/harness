@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use super::PanelState;
 use super::session::require_viewer;
+use crate::config::daemon::MAX_PAIR_LINK_TTL_SECONDS;
 use crate::daemon_client::{DaemonCredential, MintedLink};
 use crate::error::ApiError;
 use crate::store::accounts::Account;
@@ -138,6 +139,13 @@ async fn finalize(
     reservation_id: &str,
     minted: &MintedLink,
 ) {
+    // Both timestamps come from this host's clock, dating the link by the
+    // lifetime the daemon granted rather than by the instant it named. Storing
+    // the daemon's own expiry would put two hosts' clocks in one row, where a
+    // panel running ahead would file a link as expiring before it was created
+    // and, worse, stop counting it against the cap while it was still live.
+    // The person who asked still sees the daemon's deadline in the response.
+    let created_at = Utc::now();
     let recorded = state
         .store
         .finalize_pair_link(
@@ -146,8 +154,8 @@ async fn finalize(
                 id: minted.pairing_id.clone(),
                 account_id: account.id.clone(),
                 role: minted.role.clone(),
-                created_at: Utc::now(),
-                expires_at: minted.expires_at,
+                created_at,
+                expires_at: created_at + granted_lifetime(minted),
             },
         )
         .await;
@@ -167,15 +175,31 @@ async fn finalize(
 /// for, which is the same lifetime the finished link would have carried.
 fn reservation_for(account_id: &str, state: &PanelState) -> PairLinkRecord {
     let now = Utc::now();
-    // The configuration refuses a TTL above a day, so this never saturates.
-    let ttl = i64::try_from(state.daemon.config.link_ttl_seconds).unwrap_or(i64::MAX);
     PairLinkRecord {
         id: format!("reservation:{}", Uuid::new_v4()),
         account_id: account_id.to_owned(),
         role: state.daemon.config.link_role.clone(),
         created_at: now,
-        expires_at: now + Duration::seconds(ttl),
+        expires_at: now + lifetime(state.daemon.config.link_ttl_seconds),
     }
+}
+
+/// How long the daemon says this link lives.
+///
+/// A daemon that answered with something absurd would otherwise decide how
+/// long a row occupies a slot, so this falls back to what the panel asked for
+/// rather than trusting the number.
+fn granted_lifetime(minted: &MintedLink) -> Duration {
+    if minted.ttl_seconds == 0 || minted.ttl_seconds > MAX_PAIR_LINK_TTL_SECONDS {
+        return lifetime(MAX_PAIR_LINK_TTL_SECONDS);
+    }
+    lifetime(minted.ttl_seconds)
+}
+
+/// Seconds as a duration. The configured maximum is a day, so the conversion
+/// only saturates on a value this function has already refused.
+fn lifetime(seconds: u64) -> Duration {
+    Duration::seconds(i64::try_from(seconds).unwrap_or(i64::MAX))
 }
 
 /// A slot held for a link that was never issued.

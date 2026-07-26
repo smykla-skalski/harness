@@ -47,7 +47,14 @@ pub struct MintedLink {
     pub pairing_id: String,
     pub role: String,
     pub scopes: Vec<String>,
+    /// When the daemon says the link lapses, for the person who asked. The
+    /// panel does not do arithmetic against its own clock with this: see
+    /// [`MintedLink::ttl_seconds`].
     pub expires_at: DateTime<Utc>,
+    /// The lifetime the daemon granted, which may be shorter than the one
+    /// asked for. A duration rather than an instant, so the panel can date the
+    /// link on its own clock instead of comparing two hosts' clocks.
+    pub ttl_seconds: u64,
     /// The `harness://pair` link. It carries the one-time code, so the panel
     /// shows it once and stores none of it.
     pub pairing_url: String,
@@ -164,6 +171,7 @@ impl DaemonClient {
             role: minted.role,
             scopes: minted.scopes,
             expires_at,
+            ttl_seconds: minted.ttl_seconds,
             pairing_url: minted.pairing_url,
         })
     }
@@ -258,6 +266,7 @@ struct MintResponse {
     role: String,
     scopes: Vec<String>,
     expires_at: String,
+    ttl_seconds: u64,
     pairing_url: String,
 }
 

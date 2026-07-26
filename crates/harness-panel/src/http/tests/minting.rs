@@ -34,6 +34,8 @@ struct Seen {
     /// daemon never repeats a pairing id, and a stub that did would hide a
     /// panel that wrote every link over the same row.
     minted: usize,
+    /// An expiry from a daemon whose clock disagrees with this host's.
+    skewed_expiry: Option<String>,
 }
 
 async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
@@ -48,25 +50,28 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
                 .and_then(|value| value.to_str().ok())
                 .map(str::to_owned)
         };
-        let pairing_id = {
+        let (pairing_id, skew) = {
             let mut seen = seen.lock().expect("stub lock");
             seen.body = Some(body);
             seen.client_id = header("x-harness-remote-client-id");
             seen.authorization = header("authorization");
             seen.minted += 1;
-            format!("pair-{}", seen.minted)
+            (format!("pair-{}", seen.minted), seen.skewed_expiry.clone())
         };
         // Relative to now, not a fixed date: an expiry in the past would make
         // every link the panel records read as already lapsed, and the cap
         // counts only unexpired ones.
         let created_at = Utc::now();
-        let expires_at = created_at + Duration::minutes(10);
+        let expires_at = match skew {
+            Some(skewed) => skewed,
+            None => (created_at + Duration::minutes(10)).to_rfc3339(),
+        };
         Json(serde_json::json!({
             "pairing_id": pairing_id,
             "role": "operator",
             "scopes": ["read", "write"],
             "created_at": created_at.to_rfc3339(),
-            "expires_at": expires_at.to_rfc3339(),
+            "expires_at": expires_at,
             "ttl_seconds": 600,
             "endpoint": "https://harness.example.com",
             "server_spki_sha256": "sha256/AAAA",
@@ -210,6 +215,45 @@ async fn minting_records_the_link_as_metadata_only() {
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].id, "pair-1");
     assert_eq!(recorded[0].role, "operator");
+}
+
+/// The daemon's clock is not this host's, and the panel compares what it
+/// stores against its own `now`. A row that took the daemon's instant could
+/// read as expiring before it was created, and would stop counting against the
+/// cap while the link was still claimable.
+#[tokio::test]
+async fn a_daemon_clock_that_disagrees_does_not_reach_the_stored_row() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (harness, owner) = ready(Arc::clone(&seen)).await;
+    seen.lock().expect("stub lock").skewed_expiry = Some("2000-01-01T00:00:00Z".to_owned());
+
+    let (status, body) = harness.post("/panel/api/pair-links", Some(&owner)).await;
+
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let owner_id = harness.account_id("ada").await;
+    let recorded = harness
+        .state
+        .store
+        .pair_links_for_account(&owner_id)
+        .await
+        .expect("records");
+    assert!(
+        recorded[0].created_at < recorded[0].expires_at,
+        "a link cannot lapse before it was issued: {:?}",
+        recorded[0]
+    );
+    assert_eq!(
+        harness
+            .state
+            .store
+            .live_pair_link_count(&owner_id, Utc::now())
+            .await
+            .expect("count"),
+        1,
+        "a link the daemon dated in the past still occupies its slot"
+    );
+    // The person who asked is still shown the daemon's own deadline.
+    assert!(body.contains("2000-01-01"), "{body}");
 }
 
 /// The cap bounds how many live one-time codes one account can accumulate, so
