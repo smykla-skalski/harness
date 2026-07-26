@@ -94,8 +94,7 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsRepositoriesSaveButton = "harness.settings.repositories.save"
   static let settingsRepositoriesOwnerField = "harness.settings.repositories.owner"
   static let settingsRepositoriesNameField = "harness.settings.repositories.name"
-  static let settingsTaskBoardOwnerField = "harness.settings.task-board.owner"
-  static let settingsTaskBoardRepoField = "harness.settings.task-board.repo"
+  static let settingsTaskBoardProjectDirField = "harness.settings.task-board.project-dir"
   static let settingsTaskBoardRepositoriesSummary =
     "harness.settings.task-board.repositories.summary"
   static let settingsTaskBoardRepositoriesButton =

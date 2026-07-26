@@ -43,8 +43,6 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
           SettingsTaskBoardCardsSection()
           SettingsTaskBoardLaneAppearanceSection()
           SettingsTaskBoardProjectAppearanceSection(store: store)
-          TaskBoardProjectSection(store: store, taskBoardFormState: $taskBoardFormState)
-            .id(SettingsTaskBoardAnchor.githubProject)
           TaskBoardMonitoredReposSection(
             store: store,
             taskBoardFormState: $taskBoardFormState,
@@ -118,6 +116,14 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
 
   var automationSection: some View {
     Section {
+      TextField("Branch Prefix", text: draftBinding.branchPrefix)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardBranchPrefixField)
+      Picker("Merge Method", selection: draftBinding.mergeMethod) {
+        ForEach(TaskBoardGitHubMergeMethod.allCases, id: \.self) { method in
+          Text(method.title).tag(method)
+        }
+      }
+      .pickerStyle(.menu)
       TextField("Managed Label", text: draftBinding.managedLabel)
       TextField("Auto Merge Label", text: draftBinding.autoMergeLabel)
       TextField("Needs Human Label", text: draftBinding.needsHumanLabel)
@@ -132,9 +138,24 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
       ForEach(TaskBoardGitHubAutomation.allCases, id: \.self) { automation in
         Toggle(automation.title, isOn: automationBinding(automation))
       }
+      multilineField(
+        title: "Requested Reviewers",
+        placeholder: "usernames, one per line",
+        text: draftBinding.requestedReviewersText,
+        accessibilityIdentifier: HarnessMonitorAccessibility
+          .settingsTaskBoardRequestedReviewersField
+      )
+      multilineField(
+        title: "Requested Team Reviewers",
+        placeholder: "team slugs, one per line",
+        text: draftBinding.requestedTeamReviewersText,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardTeamReviewersField
+      )
     } header: {
-      Text("Automation")
+      Text("GitHub Automation Defaults")
         .harnessNativeFormSectionHeader()
+    } footer: {
+      Text("Applied to every repository the board publishes to")
     }
   }
 
@@ -206,6 +227,13 @@ struct TaskBoardWorkflowSection: View, SettingsTaskBoardEditingSurface {
 
   var body: some View {
     Section {
+      pathField(
+        .directory(
+          title: "Project Directory",
+          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardProjectDirField
+        ),
+        text: draftBinding.projectDir
+      )
       ForEach(TaskBoardOrchestratorWorkflow.allCases, id: \.self) { workflow in
         Toggle(workflow.title, isOn: workflowBinding(workflow))
       }
@@ -219,61 +247,6 @@ struct TaskBoardWorkflowSection: View, SettingsTaskBoardEditingSurface {
     } header: {
       Text("Orchestrator Defaults")
         .harnessNativeFormSectionHeader()
-    }
-  }
-}
-
-struct TaskBoardProjectSection: View, SettingsTaskBoardEditingSurface {
-  let store: HarnessMonitorStore
-  @Binding var taskBoardFormState: TaskBoardSettingsFormState
-  var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
-
-  var body: some View {
-    Section {
-      pathField(
-        .directory(
-          title: "Project Directory",
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardProjectDirField
-        ),
-        text: draftBinding.projectDir
-      )
-      TextField("Owner", text: draftBinding.owner)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardOwnerField)
-      TextField("Repository", text: draftBinding.repo)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRepoField)
-      pathField(
-        .directory(
-          title: "Checkout Path",
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardCheckoutPathField
-        ),
-        text: draftBinding.checkoutPath
-      )
-      TextField("Default Branch", text: draftBinding.defaultBranch)
-      TextField("Branch Prefix", text: draftBinding.branchPrefix)
-      Picker("Merge Method", selection: draftBinding.mergeMethod) {
-        ForEach(TaskBoardGitHubMergeMethod.allCases, id: \.self) { method in
-          Text(method.title).tag(method)
-        }
-      }
-      .pickerStyle(.menu)
-      multilineField(
-        title: "Requested Reviewers",
-        placeholder: "usernames, one per line",
-        text: draftBinding.requestedReviewersText,
-        accessibilityIdentifier: HarnessMonitorAccessibility
-          .settingsTaskBoardRequestedReviewersField
-      )
-      multilineField(
-        title: "Requested Team Reviewers",
-        placeholder: "team slugs, one per line",
-        text: draftBinding.requestedTeamReviewersText,
-        accessibilityIdentifier: HarnessMonitorAccessibility.settingsTaskBoardTeamReviewersField
-      )
-    } header: {
-      Text("GitHub Project")
-        .harnessNativeFormSectionHeader()
-    } footer: {
-      Text("These settings control the automation repository that the orchestrator targets")
     }
   }
 }
