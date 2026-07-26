@@ -71,9 +71,14 @@
     }
     const deadline = Date.parse(current.expires_at);
     nowMs = Date.now();
+    // A deadline that cannot be read has nothing to count down to. Ticking anyway
+    // would re-render every second behind a label that never changes.
+    if (!Number.isFinite(deadline)) {
+      return;
+    }
     const tick = setInterval(() => {
       nowMs = Date.now();
-      if (Number.isFinite(deadline) && nowMs >= deadline) {
+      if (nowMs >= deadline) {
         clearInterval(tick);
       }
     }, TICK_MS);

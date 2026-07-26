@@ -36,6 +36,20 @@ describe('relativeBucket', () => {
     expect(relativeBucket(0, 59 * MINUTE + 59 * SECOND)).toEqual({ kind: 'minutes', minutes: 59 });
   });
 
+  // The gap between the present bucket and a whole minute would otherwise floor
+  // to zero and read as "0 minutes ago".
+  it('never reports a count of zero', () => {
+    for (let elapsed = 0; elapsed <= DAY; elapsed += SECOND) {
+      const bucket = relativeBucket(0, elapsed);
+      if (bucket.kind === 'minutes') {
+        expect(bucket.minutes).toBeGreaterThan(0);
+      }
+      if (bucket.kind === 'hours') {
+        expect(bucket.hours).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('counts whole hours below a day', () => {
     expect(relativeBucket(0, 3 * HOUR)).toEqual({ kind: 'hours', hours: 3 });
     expect(relativeBucket(0, 23 * HOUR + 59 * MINUTE)).toEqual({ kind: 'hours', hours: 23 });
@@ -66,6 +80,10 @@ describe('formatRelative', () => {
   it('singularises one unit', () => {
     expect(formatRelative('2026-07-26T13:59:00Z', now)).toBe('1 minute ago');
     expect(formatRelative('2026-07-26T13:00:00Z', now)).toBe('1 hour ago');
+  });
+
+  it('rounds the gap below a whole minute up to one', () => {
+    expect(formatRelative('2026-07-26T13:59:10Z', now)).toBe('1 minute ago');
   });
 
   it('pluralises the rest', () => {

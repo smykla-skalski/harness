@@ -49,7 +49,10 @@ export function relativeBucket(fromMs: number, nowMs: number): RelativeBucket {
     return { kind: 'just-now' };
   }
   if (elapsed < HOUR) {
-    return { kind: 'minutes', minutes: Math.floor(elapsed / MINUTE) };
+    // The stretch between the present bucket and a whole minute floors to zero,
+    // and "0 minutes ago" is not something anybody means to write. The hours
+    // bucket needs no such guard: it starts at exactly one hour.
+    return { kind: 'minutes', minutes: Math.max(1, Math.floor(elapsed / MINUTE)) };
   }
   if (elapsed < DAY) {
     return { kind: 'hours', hours: Math.floor(elapsed / HOUR) };
