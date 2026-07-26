@@ -1,24 +1,22 @@
 use sqlx::{Sqlite, Transaction};
 
+use self::write::{
+    HidePreparation, RestoreAudit, apply_exclusion_tombstone_in_tx, prepare_hide_in_tx,
+};
+use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::items::{
     ParentAssignmentValidation, TaskBoardMutation, bump_change_in_tx,
-    check_parent_assignment_in_tx, clear_children_parent_in_tx, load_item_in_tx,
-    load_item_with_triage_override_in_tx, next_child_order_in_tx, validate_item,
+    check_parent_assignment_in_tx, load_item_with_triage_override_in_tx, next_child_order_in_tx,
 };
-use super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
+use super::lane_order::LaneTransitionKind;
 use super::provider_sync_conflicts::replace_open_sync_conflicts_in_connection;
 use super::triage_apply::{TriageOutcome, reapply_active_override_outcome_in_tx};
 use super::triage_apply_rules::apply_active_triage_in_tx;
-use super::triage_audit::{
-    ProviderExclusionConflictAudit, record_provider_exclusion_hidden_audit_in_tx,
-    record_provider_exclusion_restored_audit_in_tx,
-};
-use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
-use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
-use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
+use super::triage_audit::ProviderExclusionConflictAudit;
+use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::infra::io;
-use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
+use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::TaskBoardItemKind;
 use crate::task_board::{
     ExternalProvider, ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome,
@@ -51,80 +49,27 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board provider exclusion hide")
             .await?;
-        let (mut item, revision) = load_item_in_tx(&mut transaction, item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        if revision != expected_revision
-            || !is_exclusion_label(&context.matched_label)
-            || !item_has_stored_provider_ref(&item, context)
-            || !is_hideable_for_provider_exclusion_in_tx(&mut transaction, &item).await?
-        {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit task board hide no-op: {error}")))?;
-            return Ok(None);
-        }
-        let before = item.clone();
-        apply_patch(&mut item, patch);
-        // The context's claim alone isn't proof the patched row carries the
-        // label; tombstoning on a false claim hides under false evidence.
-        if !canonicalize_labels(&item.tags).contains(&context.matched_label) {
-            return Err(CliErrorKind::workflow_io(format!(
-                "task-board item '{item_id}' hide patch does not carry the matched exclusion label '{}'",
-                context.matched_label
-            ))
-            .into());
-        }
-        // Runs before the tombstoning write, while the row's revision still
-        // matches `expected_revision`.
-        let conflict_audit = if let Some(conflicts) = conflicts.as_deref() {
-            let replacement = replace_open_sync_conflicts_in_connection(
-                transaction.as_mut(),
-                item_id,
-                ExternalProvider::from(context.provider),
-                &context.incoming_external_ref,
-                expected_revision,
-                conflicts,
-            )
-            .await?;
-            let orchestrator_change_seq = if replacement.changed() {
-                Some(bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?)
-            } else {
-                None
-            };
-            ProviderExclusionConflictAudit::new(
-                Some(conflicts),
-                replacement.changed_fields(),
-                orchestrator_change_seq,
-            )
-        } else {
-            ProviderExclusionConflictAudit::new(None, &[], None)
-        };
-        item.deleted_at = Some(utc_now());
-        item.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
-        item.updated_at = utc_now();
-        validate_item(&item)?;
-        let unparented_children = clear_children_parent_in_tx(&mut transaction, item_id).await?;
-        let write = replace_with_lane_transition_in_tx(
+        let prepared = match prepare_hide_in_tx(
             &mut transaction,
-            before.clone(),
-            revision,
-            item,
-            LaneTransitionKind::ProviderExclusionHide,
-        )
-        .await?;
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_provider_exclusion_hidden_audit_in_tx(
-            &mut transaction,
+            item_id,
+            expected_revision,
+            patch,
             context,
-            &conflict_audit,
-            &before,
-            &unparented_children,
-            &write,
-            change_revision,
+            conflicts.as_deref(),
         )
-        .await?;
+        .await?
+        {
+            HidePreparation::Ready(prepared) => prepared,
+            HidePreparation::NotApplied => {
+                transaction
+                    .commit()
+                    .await
+                    .map_err(|error| db_error(format!("commit task board hide no-op: {error}")))?;
+                return Ok(None);
+            }
+        };
+        let (write, change_revision) =
+            apply_exclusion_tombstone_in_tx(&mut transaction, *prepared, context).await?;
         transaction
             .commit()
             .await
@@ -167,7 +112,7 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board provider exclusion restore")
             .await?;
-        let (mut item, revision, existing_override, conflict_audit) = match prepare_restore_in_tx(
+        let (item, revision, existing_override, conflict_audit) = match prepare_restore_in_tx(
             &mut transaction,
             expected_item_id,
             expected_revision,
@@ -186,77 +131,64 @@ impl AsyncDaemonDb {
                 return commit_restore_no_op(transaction, outcome, "no-op").await;
             }
         };
-        let before = item.clone();
-        let before_parent_item_id = item.parent_item_id.clone();
-        item.deleted_at = None;
-        item.tombstone_cause = None;
-        item.updated_at = utc_now();
-        apply_patch(&mut item, patch);
-        if canonicalize_labels(&item.tags)
-            .iter()
-            .any(|label| is_exclusion_label(label))
-        {
-            return Err(CliErrorKind::workflow_io(format!(
-                "provider-exclusion restore for '{expected_item_id}' still carries an exclusion label"
-            ))
-            .into());
-        }
-        resolve_restore_parent_in_tx(
-            &mut transaction,
-            expected_item_id,
-            &mut item,
-            before_parent_item_id.as_deref(),
-            before.child_order,
-        )
-        .await?;
-        validate_item(&item)?;
-        let decided_at = item.updated_at.clone();
-        let (outcome, transition_kind) = reconcile_restore_triage_in_tx(
-            &mut transaction,
-            &mut item,
-            existing_override.as_ref(),
-            &decided_at,
-        )
-        .await?;
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before.clone(),
-            revision,
-            item,
-            transition_kind,
-        )
-        .await?;
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        if let Some(TriageOutcome::Decided(decision)) = outcome.as_ref() {
-            maybe_enqueue_triage_escalation_in_tx(
+        let restored = self
+            .write_provider_exclusion_restore_in_tx(
                 &mut transaction,
-                &write.item.id,
-                decision,
-                existing_override.is_some(),
-                &self.triage_escalation_config(),
-                &decided_at,
+                item,
+                revision,
+                patch,
+                &RestoreAudit {
+                    context,
+                    conflict_audit: &conflict_audit,
+                    existing_override: existing_override.as_ref(),
+                },
             )
             .await?;
-        }
-        record_provider_exclusion_restored_audit_in_tx(
-            &mut transaction,
-            context,
-            &conflict_audit,
-            &before,
-            before_parent_item_id.as_deref(),
-            outcome.as_ref(),
-            &write,
-            change_revision,
-        )
-        .await?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit task board restore: {error}")))?;
         Ok(ProviderExclusionRestoreOutcome::Restored(Box::new(
-            write.item,
+            restored,
         )))
     }
+}
+
+#[path = "provider_exclusion_write.rs"]
+mod write;
+
+/// Replaces the item's open sync conflicts for a hide, and reports what the
+/// replacement changed so the hidden audit event can carry it. A hide records
+/// conflicts and proceeds; only a restore is blocked by them.
+async fn record_hide_conflicts_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
+    expected_revision: i64,
+    context: &ProviderExclusionAuditContext,
+    conflicts: Option<&[TaskBoardSyncConflict]>,
+) -> Result<ProviderExclusionConflictAudit, CliError> {
+    let Some(conflicts) = conflicts else {
+        return Ok(ProviderExclusionConflictAudit::new(None, &[], None));
+    };
+    let replacement = replace_open_sync_conflicts_in_connection(
+        transaction.as_mut(),
+        item_id,
+        ExternalProvider::from(context.provider),
+        &context.incoming_external_ref,
+        expected_revision,
+        conflicts,
+    )
+    .await?;
+    let orchestrator_change_seq = if replacement.changed() {
+        Some(bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?)
+    } else {
+        None
+    };
+    Ok(ProviderExclusionConflictAudit::new(
+        Some(conflicts),
+        replacement.changed_fields(),
+        orchestrator_change_seq,
+    ))
 }
 
 enum RestoreConflictAction {
