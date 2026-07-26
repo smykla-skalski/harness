@@ -10,7 +10,6 @@ use super::MeshControlPlane;
 pub enum FakeKumaCall {
     DataplaneTokenPath { mesh: String, name: String },
     ZoneTokenPath { name: String },
-    ExtractAdminToken { container: String },
     RenderDataplane { service_name: String, mesh: String },
 }
 
@@ -131,13 +130,6 @@ impl MeshControlPlane for FakeMeshControlPlane {
 
     fn default_kumactl_path(&self, repo_root: &Path) -> PathBuf {
         repo_root.join("build/artifacts-docker/kumactl")
-    }
-
-    fn extract_admin_token(&self, cp_container: &str) -> Result<String, BlockError> {
-        self.record(FakeKumaCall::ExtractAdminToken {
-            container: cp_container.to_string(),
-        });
-        Ok("fake-admin-token".to_string())
     }
 }
 

@@ -1,8 +1,4 @@
-use crate::infra::blocks::{BlockError, ContainerRuntime};
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
-use std::thread;
-use std::time::{Duration, Instant};
+use crate::infra::blocks::BlockError;
 
 /// Token kinds supported by the Kuma control plane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,84 +165,6 @@ pub fn parse_token_response(raw: &str) -> Result<KumaTokenResponse, BlockError> 
     let response = KumaTokenResponse::new(raw.trim().to_string());
     response.validate()?;
     Ok(response)
-}
-
-/// Extract the admin user token from a running Kuma control-plane container.
-///
-/// The control plane bootstraps the admin token asynchronously, so this helper
-/// retries for a short bounded period before failing.
-///
-/// # Errors
-///
-/// Returns `BlockError` if the token cannot be fetched, parsed, decoded, or is
-/// still unavailable after the retry window expires.
-pub fn extract_admin_token(
-    runtime: &dyn ContainerRuntime,
-    cp_container: &str,
-) -> Result<String, BlockError> {
-    let container = require_non_empty("extract admin token", "cp_container", cp_container)?;
-    let deadline = Instant::now() + Duration::from_secs(15);
-    let mut sleep_for = Duration::from_millis(200);
-    let max_sleep = Duration::from_secs(2);
-
-    loop {
-        match try_extract_admin_token(runtime, container) {
-            Ok(token) => return Ok(token),
-            Err(error) => {
-                let now = Instant::now();
-                if now >= deadline {
-                    return Err(error);
-                }
-                let remaining = deadline.saturating_duration_since(now);
-                thread::sleep(sleep_for.min(remaining));
-                sleep_for = (sleep_for * 2).min(max_sleep);
-            }
-        }
-    }
-}
-
-fn try_extract_admin_token(
-    runtime: &dyn ContainerRuntime,
-    cp_container: &str,
-) -> Result<String, BlockError> {
-    let result = runtime.exec_command(
-        cp_container,
-        &[
-            "/busybox/wget",
-            "-q",
-            "-O",
-            "-",
-            "http://localhost:5681/global-secrets/admin-user-token",
-        ],
-    )?;
-
-    let body: serde_json::Value = serde_json::from_str(result.stdout.trim())
-        .map_err(|error| BlockError::new("kuma", "parse admin token response", error))?;
-
-    let b64_data = body
-        .get("data")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            BlockError::message("kuma", "parse admin token response", "missing data field")
-        })?;
-
-    let bytes = STANDARD
-        .decode(b64_data)
-        .map_err(|error| BlockError::new("kuma", "decode admin token", error))?;
-
-    let token = String::from_utf8(bytes)
-        .map_err(|error| BlockError::new("kuma", "decode admin token utf8", error))?;
-
-    let trimmed = token.trim().to_string();
-    if trimmed.is_empty() {
-        return Err(BlockError::message(
-            "kuma",
-            "extract_admin_token",
-            "empty token",
-        ));
-    }
-
-    Ok(trimmed)
 }
 
 fn require_non_empty<'a>(

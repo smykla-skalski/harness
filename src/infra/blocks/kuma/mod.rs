@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::infra::blocks::BlockError;
 #[cfg(feature = "kuma")]
-use crate::infra::blocks::{ContainerRuntime, HttpClient, ProcessExecutor};
+use crate::infra::blocks::{HttpClient, ProcessExecutor};
 
 #[cfg(test)]
 pub mod fake;
@@ -102,13 +102,6 @@ pub trait MeshControlPlane: Send + Sync {
 
     /// Resolve the default location of a locally built `kumactl` binary.
     fn default_kumactl_path(&self, repo_root: &Path) -> PathBuf;
-
-    /// Extract the admin token from a running Kuma control-plane container.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the token cannot be extracted.
-    fn extract_admin_token(&self, cp_container: &str) -> Result<String, BlockError>;
 }
 
 /// Default Kuma control-plane implementation backed by existing harness blocks.
@@ -121,22 +114,13 @@ pub trait MeshControlPlane: Send + Sync {
 pub struct KumaControlPlane {
     process: Arc<dyn ProcessExecutor>,
     http: Arc<dyn HttpClient>,
-    container_runtime: Arc<dyn ContainerRuntime>,
 }
 
 #[cfg(feature = "kuma")]
 impl KumaControlPlane {
     #[must_use]
-    pub fn new(
-        process: Arc<dyn ProcessExecutor>,
-        http: Arc<dyn HttpClient>,
-        container_runtime: Arc<dyn ContainerRuntime>,
-    ) -> Self {
-        Self {
-            process,
-            http,
-            container_runtime,
-        }
+    pub fn new(process: Arc<dyn ProcessExecutor>, http: Arc<dyn HttpClient>) -> Self {
+        Self { process, http }
     }
 
     #[must_use]
@@ -147,11 +131,6 @@ impl KumaControlPlane {
     #[must_use]
     pub fn http(&self) -> &Arc<dyn HttpClient> {
         &self.http
-    }
-
-    #[must_use]
-    pub fn container_runtime(&self) -> &Arc<dyn ContainerRuntime> {
-        &self.container_runtime
     }
 }
 
@@ -229,10 +208,6 @@ impl MeshControlPlane for KumaControlPlane {
 
     fn default_kumactl_path(&self, repo_root: &Path) -> PathBuf {
         cli::primary_kumactl_dir(repo_root)
-    }
-
-    fn extract_admin_token(&self, cp_container: &str) -> Result<String, BlockError> {
-        token::extract_admin_token(self.container_runtime.as_ref(), cp_container)
     }
 }
 
