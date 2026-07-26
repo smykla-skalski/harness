@@ -1,9 +1,9 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use axum::routing::get;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -38,16 +38,36 @@ use super::{DaemonHttpState, require_async_db};
 
 pub(super) fn core_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
+        .merge(health_routes())
+        .merge(daemon_admin_routes())
+        .merge(daemon_control_routes())
+        .merge(discovery_routes())
+}
+
+fn health_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(get_health))
         .routes(routes!(get_ready))
         .routes(routes!(get_diagnostics))
         .routes(routes!(get_github_status))
+}
+
+fn daemon_admin_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(super::audit::get_audit_events))
         .routes(routes!(post_daemon_telemetry))
         .routes(routes!(get_config))
+}
+
+fn daemon_control_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_stop_daemon))
         .routes(routes!(post_bridge_reconfigure))
         .routes(routes!(get_log_level, put_log_level))
+}
+
+fn discovery_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(get_projects))
         .routes(routes!(get_runtime_session_resolution))
         .routes(routes!(get_runtimes_probe))

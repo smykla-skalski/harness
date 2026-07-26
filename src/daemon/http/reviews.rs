@@ -1,9 +1,9 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
@@ -24,12 +24,7 @@ use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
 pub(super) fn reviews_routes() -> OpenApiRouter<DaemonHttpState> {
-    let router = OpenApiRouter::new()
-        .routes(routes!(post_review_repositories))
-        .routes(routes!(get_review_capabilities))
-        .routes(routes!(post_query_reviews))
-        .routes(routes!(post_resolve_review_pull_requests))
-        .routes(routes!(post_review_action_preview));
+    let router = review_query_routes();
     // Policy preview/start/status/history handlers live in the sibling
     // `reviews_policy` module to keep this file within the line-length cap.
     let router = super::reviews_policy::merge_policy_routes(router);
@@ -37,15 +32,32 @@ pub(super) fn reviews_routes() -> OpenApiRouter<DaemonHttpState> {
     // request-review/comment) live in the sibling `reviews_actions` module for
     // the same reason.
     let router = super::reviews_actions::merge_action_routes(router);
-    let router = router
-        .routes(routes!(delete_reviews_cache))
-        .routes(routes!(post_refresh_reviews))
-        .routes(routes!(post_review_body))
-        .routes(routes!(post_review_body_update));
+    let router = router.merge(review_content_routes());
     // Review-files preview/patch/blob/local-clone handlers live in the sibling
     // `reviews_files` module to keep this file within the line-length cap.
     let router = super::reviews_files::merge_files_routes(router);
-    router
+    router.merge(review_thread_routes())
+}
+
+fn review_query_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(post_review_repositories))
+        .routes(routes!(get_review_capabilities))
+        .routes(routes!(post_query_reviews))
+        .routes(routes!(post_resolve_review_pull_requests))
+        .routes(routes!(post_review_action_preview))
+}
+
+fn review_content_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(delete_reviews_cache))
+        .routes(routes!(post_refresh_reviews))
+        .routes(routes!(post_review_body))
+        .routes(routes!(post_review_body_update))
+}
+
+fn review_thread_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_review_avatar))
         .routes(routes!(post_review_timeline))
         .routes(routes!(post_review_review_threads_resolve))

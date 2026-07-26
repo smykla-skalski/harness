@@ -17,13 +17,28 @@ pub(super) use review::post_task_submit_for_review;
 
 pub(super) fn task_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
+        .merge(task_lifecycle_routes())
+        .merge(task_progress_routes())
+        .merge(task_review_routes())
+}
+
+fn task_lifecycle_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(mutations::post_task_create))
         .routes(routes!(mutations::post_task_delete))
         .routes(routes!(mutations::post_task_assign))
         .routes(routes!(mutations::post_task_drop))
+}
+
+fn task_progress_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(mutations::post_task_queue_policy))
         .routes(routes!(mutations::post_task_update))
         .routes(routes!(mutations::post_task_checkpoint))
+}
+
+fn task_review_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(review::post_task_submit_for_review))
         .routes(routes!(review::post_task_claim_review))
         .routes(routes!(review::post_task_submit_review))

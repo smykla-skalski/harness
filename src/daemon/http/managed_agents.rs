@@ -8,8 +8,8 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
 use crate::daemon::service::session_acp_transcript_async;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::acp_enabled_from_env;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{DaemonHttpState, require_async_db};
 
@@ -34,6 +34,15 @@ pub(crate) use snapshots::{
 
 pub(super) fn managed_agent_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
+        .merge(managed_agent_lifecycle_routes())
+        .merge(terminal_agent_routes())
+        .merge(codex_agent_routes())
+        .merge(acp_agent_routes())
+        .merge(acp_session_routes())
+}
+
+fn managed_agent_lifecycle_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(reads::get_managed_agents))
         .routes(routes!(mutations::post_terminal_agent_start))
         .routes(routes!(mutations::post_codex_agent_start))
@@ -42,6 +51,10 @@ pub(super) fn managed_agent_routes() -> OpenApiRouter<DaemonHttpState> {
             reads::get_managed_agent,
             acp_delete::delete_acp_agent
         ))
+}
+
+fn terminal_agent_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(mutations::post_terminal_agent_input))
         .routes(routes!(mutations::post_terminal_agent_resize))
         .routes(routes!(mutations::post_terminal_agent_stop))
@@ -50,19 +63,31 @@ pub(super) fn managed_agent_routes() -> OpenApiRouter<DaemonHttpState> {
             http_paths::MANAGED_AGENT_ATTACH,
             get(attach::get_terminal_agent_attach),
         )
+}
+
+fn codex_agent_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(mutations::post_codex_agent_steer))
         .routes(routes!(mutations::post_codex_agent_interrupt))
         .routes(routes!(mutations::post_codex_agent_approval))
+        .routes(routes!(codex_inspect::get_codex_inspect))
+        .routes(routes!(codex_transcript::get_codex_transcript))
+}
+
+fn acp_agent_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(mutations_acp::post_acp_permission))
         .routes(routes!(mutations_acp::post_acp_agent_prompt))
         .routes(routes!(mutations_acp::post_acp_agent_logout))
+        .routes(routes!(acp_inspect::get_acp_inspect))
+        .routes(routes!(acp_transcript::get_acp_transcript))
+}
+
+fn acp_session_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(acp_sessions::get_acp_sessions))
         .routes(routes!(acp_sessions::delete_acp_session))
         .routes(routes!(acp_sessions::post_acp_session_close))
-        .routes(routes!(codex_inspect::get_codex_inspect))
-        .routes(routes!(codex_transcript::get_codex_transcript))
-        .routes(routes!(acp_inspect::get_acp_inspect))
-        .routes(routes!(acp_transcript::get_acp_transcript))
 }
 
 // Cross-transport ACP policy lives here. HTTP and websocket wrappers still own
