@@ -39,19 +39,21 @@ pub(super) async fn maybe_enqueue_triage_escalation_in_tx(
     config: &TaskBoardTriageEscalationConfig,
     now: &str,
 ) -> Result<(), CliError> {
-    if !config.enabled
-        || decision.verdict != TriageVerdict::Undecided
-        || decision.evaluator_identity == AGENT_V1_EVALUATOR_IDENTITY
-        || override_active
-    {
+    if !escalation_applies(decision, override_active, config) {
         return Ok(());
     }
-    let active = load_active_escalation_in_tx(transaction, item_id).await?;
-    match active {
+    match load_active_escalation_in_tx(transaction, item_id).await? {
         Some(active) if active.evidence_fingerprint == decision.evidence_fingerprint => Ok(()),
         Some(active) if active.status == "pending" => {
-            supersede_pending_escalation_in_tx(transaction, &active.escalation_id, now).await?;
-            insert_pending_escalation_in_tx(transaction, item_id, decision, config, now).await
+            supersede_and_enqueue_in_tx(
+                transaction,
+                &active.escalation_id,
+                item_id,
+                decision,
+                config,
+                now,
+            )
+            .await
         }
         // A `running` escalation is left alone here -- it is already claimed
         // by the executor and cannot be superseded (see the migration's
@@ -65,6 +67,32 @@ pub(super) async fn maybe_enqueue_triage_escalation_in_tx(
         Some(_) => Ok(()),
         None => insert_pending_escalation_in_tx(transaction, item_id, decision, config, now).await,
     }
+}
+
+/// An agent-reported verdict is already the escalation's own output, so
+/// re-escalating it would loop; an overridden item has an operator decision
+/// that outranks the queue entirely.
+fn escalation_applies(
+    decision: &TaskBoardTriageDecision,
+    override_active: bool,
+    config: &TaskBoardTriageEscalationConfig,
+) -> bool {
+    config.enabled
+        && decision.verdict == TriageVerdict::Undecided
+        && decision.evaluator_identity != AGENT_V1_EVALUATOR_IDENTITY
+        && !override_active
+}
+
+async fn supersede_and_enqueue_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    superseded_escalation_id: &str,
+    item_id: &str,
+    decision: &TaskBoardTriageDecision,
+    config: &TaskBoardTriageEscalationConfig,
+    now: &str,
+) -> Result<(), CliError> {
+    supersede_pending_escalation_in_tx(transaction, superseded_escalation_id, now).await?;
+    insert_pending_escalation_in_tx(transaction, item_id, decision, config, now).await
 }
 
 async fn load_active_escalation_in_tx(
@@ -112,7 +140,11 @@ async fn insert_pending_escalation_in_tx(
     )
     .fetch_one(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("count active task board triage escalations: {error}")))?;
+    .map_err(|error| {
+        db_error(format!(
+            "count active task board triage escalations: {error}"
+        ))
+    })?;
     if active_count >= i64::try_from(config.max_pending).unwrap_or(i64::MAX) {
         return Ok(());
     }
