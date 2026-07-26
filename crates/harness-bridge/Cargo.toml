@@ -2,7 +2,7 @@
 name = "harness-bridge"
 version = "51.0.1"
 edition = "2024"
-rust-version = "1.94"
+rust-version = "1.95"
 
 [lib]
 test = false

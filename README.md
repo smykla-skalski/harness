@@ -12,7 +12,7 @@ For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 mise run install
 ```
 
-Builds and installs the Harness CLI, the `harness-systemd` lifecycle controller, ACP adapters, and `aff` into `~/.local/bin`. Requires Rust 1.94+.
+Builds and installs the Harness CLI, the `harness-systemd` lifecycle controller, ACP adapters, and `aff` into `~/.local/bin`. Requires Rust 1.95+.
 
 The installer reconciles stale Harness binaries on your `PATH`, including old `~/.cargo/bin/harness` shadows. If it cannot rewrite a conflicting path safely, it fails and tells you which path to clean up.
 
