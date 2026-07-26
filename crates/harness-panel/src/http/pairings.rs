@@ -54,6 +54,10 @@ pub async fn list(
     let viewer = require_viewer(&state, &headers).await?;
     let credential = require_credential(&state).await?;
 
+    // The daemon narrows by client, and the panel is one client for everybody
+    // who signs in, so it answers with every link the panel ever minted however
+    // little of it this person may see. Asking it to narrow further is not on
+    // offer: it has never been told which account any of them belongs to.
     let pairings = state.daemon.client.pairings(&credential).await?;
     let accounts = state.store.pair_link_accounts().await?;
 

@@ -155,9 +155,10 @@ async fn read_revoke(response: Response) -> Result<DaemonRevoke, RevokeError> {
 
     // 403 and 404 are the daemon's two ways of saying the same thing to
     // different callers: it answers 403 to a credential that may not see the
-    // pairing and 404 to one that may see everything. The panel holds a broker
-    // credential and so gets the 403, but it treats both alike rather than
-    // resting on which one it happens to receive.
+    // pairing and 404 to one that may see everything. A broker credential
+    // normally draws the 403, but the pairing it was cleared to revoke can also
+    // go before the write lands, so both are treated alike rather than resting
+    // on which one arrives.
     if status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND {
         return Err(RevokeError::NotAvailable);
     }
