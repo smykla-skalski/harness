@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,19 @@ impl BlockRequirement {
         Self::Kuma,
         Self::Build,
     ];
+
+    /// Every binary name the managed cluster blocks refuse to have written.
+    ///
+    /// The ACP protocol uses this as its denied-binary set; it is the live
+    /// consumer now that the hook guards that also read it are retired.
+    #[must_use]
+    pub fn all_denied_binaries() -> BTreeSet<String> {
+        Self::ALL
+            .iter()
+            .flat_map(|requirement| requirement.denied_binaries().iter().copied())
+            .map(ToString::to_string)
+            .collect()
+    }
 
     #[must_use]
     pub const fn as_str(self) -> &'static str {

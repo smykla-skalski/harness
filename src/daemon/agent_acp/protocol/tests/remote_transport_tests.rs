@@ -24,7 +24,7 @@ use super::{ok, protocol_manager};
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisedProcess, SupervisionConfig};
 use crate::daemon::agent_acp::permission_bridge::PermissionBridgeHandle;
-use crate::hooks::runner_policy::managed_cluster_binaries;
+use crate::infra::blocks::BlockRequirement;
 
 /// The agent side served by the HTTP server. Rebuilt per connection, so it
 /// holds no state and captures nothing.
@@ -89,7 +89,7 @@ fn client_side() -> ClientSide {
         project.path().to_path_buf(),
         project.path().to_path_buf(),
         None,
-        managed_cluster_binaries(),
+        BlockRequirement::all_denied_binaries(),
         bridge.mode(Duration::from_secs(30)),
     ));
     let session_guard = Arc::new(SessionRouteGuard::default());

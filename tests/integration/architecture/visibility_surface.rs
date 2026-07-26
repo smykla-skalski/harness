@@ -108,16 +108,6 @@ fn helper_modules_do_not_leak_publicly() {
         ),
         (
             "src/hooks/mod.rs",
-            "pub mod debug;",
-            "pub(crate) mod debug;",
-        ),
-        (
-            "src/hooks/mod.rs",
-            "pub mod runner_policy;",
-            "pub(crate) mod runner_policy;",
-        ),
-        (
-            "src/hooks/mod.rs",
             "pub mod session;",
             "pub(crate) mod session;",
         ),
@@ -319,7 +309,6 @@ fn hooks_root_stays_a_facade() {
         "src/hooks/catalog.rs",
         "src/hooks/transport.rs",
         "src/hooks/runtime.rs",
-        "src/hooks/write_surface.rs",
         "src/hooks/tests.rs",
     ] {
         assert!(

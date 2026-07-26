@@ -15,3 +15,12 @@ pub use harness_kernel::io;
 
 #[path = "../../../src/infra/persistence/mod.rs"]
 pub mod persistence;
+
+#[path = "../../../src/infra/blocks/error.rs"]
+mod error;
+#[path = "../../../src/infra/blocks/registry.rs"]
+mod registry;
+
+pub mod blocks {
+    pub use super::registry::BlockRequirement;
+}

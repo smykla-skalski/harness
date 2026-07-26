@@ -50,7 +50,7 @@ fn envelope_from_json_with_questions() {
         }
     }"#;
     let envelope = HookEnvelopePayload::from_json_text(json).unwrap();
-    let context = GuardContext::from_test_envelope("suite:run", envelope);
+    let context = GuardContext::from_envelope("suite:run", envelope);
     let prompts = context.question_prompts();
     assert_eq!(prompts.len(), 1);
     let prompt = &prompts[0];
@@ -90,9 +90,7 @@ fn envelope_from_json_full_envelope() {
 #[test]
 fn context_from_envelope_sets_skill() {
     let payload = HookEnvelopePayload::from_json_text("{}").unwrap();
-    let context = GuardContext::from_test_envelope("suite:run", payload);
-    assert_eq!(context.skill.name.as_deref(), Some("suite:run"));
-    assert!(context.skill_active);
+    let context = GuardContext::from_envelope("suite:run", payload);
     assert_eq!(context.skill.name.as_deref(), Some("suite:run"));
 }
 
@@ -114,7 +112,7 @@ fn response_text_renders_bash_output() {
         "tool_response": {"stdout": "ok", "stderr": "warn", "exit_code": 3}
     }"#;
     let payload = HookEnvelopePayload::from_json_text(json).unwrap();
-    let context = GuardContext::from_test_envelope("suite:run", payload);
+    let context = GuardContext::from_envelope("suite:run", payload);
     assert_eq!(
         context.response_text(),
         "exit code: 3\n--- STDOUT ---\nok\n--- STDERR ---\nwarn"
@@ -124,7 +122,7 @@ fn response_text_renders_bash_output() {
 #[test]
 fn response_text_returns_empty_when_absent() {
     let payload = HookEnvelopePayload::from_json_text("{}").unwrap();
-    let context = GuardContext::from_test_envelope("suite:run", payload);
+    let context = GuardContext::from_envelope("suite:run", payload);
     assert_eq!(context.response_text(), "");
 }
 
@@ -135,6 +133,6 @@ fn response_text_renders_non_bash_json() {
         "tool_response": {"answers": [{"question": "Q", "answer": "A"}]}
     }"#;
     let payload = HookEnvelopePayload::from_json_text(json).unwrap();
-    let context = GuardContext::from_test_envelope("suite:run", payload);
+    let context = GuardContext::from_envelope("suite:run", payload);
     assert!(context.response_text().contains("\"answer\": \"A\""));
 }

@@ -1,12 +1,12 @@
 //! Write-surface policy evaluation.
 //!
-//! Single free function consumed by both TUI hook write guards and the ACP
-//! `Client::write_text_file` handler. No trait, no abstraction layer: if a
-//! third caller needs different semantics, factor then. — tef + antirez.
+//! Single free function consumed by the ACP `Client::write_text_file` handler.
+//! No trait, no abstraction layer: if a second caller needs different
+//! semantics, factor then. — tef + antirez.
 //!
 //! Drift integration test (`tests/integration/policy_drift.rs`) catches
-//! divergence by feeding the same nasty-input fixtures through both call
-//! paths.
+//! divergence by feeding the same nasty-input fixtures through the policy and
+//! the ACP handler.
 
 use std::collections::BTreeSet;
 use std::io;
@@ -61,7 +61,7 @@ impl WriteDecision {
 /// Wrapper for the set of denied binary names.
 ///
 /// The set is produced by `managed_cluster_binaries()` in
-/// `hooks/runner_policy/cluster.rs`. ACP callers build the same set from
+/// `hooks/cluster_policy.rs`; ACP callers can equally build it from
 /// `BlockRequirement::denied_binaries()`.
 #[derive(Debug, Clone)]
 pub struct DeniedBinaries(BTreeSet<String>);
