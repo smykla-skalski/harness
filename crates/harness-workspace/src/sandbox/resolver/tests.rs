@@ -1,6 +1,9 @@
 #![cfg(target_os = "macos")]
 #![allow(unsafe_code)]
 
+use std::path::Path;
+use std::ptr;
+
 use super::*;
 
 #[test]
@@ -44,7 +47,7 @@ fn is_sandboxed_reads_env() {
 ///
 /// The test binary is unsandboxed so the bookmark lacks real extension rights,
 /// but the CFURL round-trip is sufficient to verify `resolve`.
-fn synthesize_bookmark(path: &std::path::Path, with_security_scope: bool) -> Vec<u8> {
+fn synthesize_bookmark(path: &Path, with_security_scope: bool) -> Vec<u8> {
     use core_foundation::base::TCFType;
     use core_foundation::data::CFData;
     use core_foundation::url::{
@@ -52,19 +55,19 @@ fn synthesize_bookmark(path: &std::path::Path, with_security_scope: bool) -> Vec
     };
 
     let cf_url = CFURL::from_path(path, true).expect("CFURL from path");
-    let mut err = std::ptr::null_mut();
+    let mut err = ptr::null_mut();
     // SAFETY: cf_url is a valid CFURL; null allocator/relative_to/keys are valid sentinels.
     let data_ref = unsafe {
         CFURLCreateBookmarkData(
-            std::ptr::null(),
+            ptr::null(),
             cf_url.as_concrete_TypeRef(),
             if with_security_scope {
                 kCFURLBookmarkCreationWithSecurityScope
             } else {
                 0
             },
-            std::ptr::null(),
-            std::ptr::null(),
+            ptr::null(),
+            ptr::null(),
             &raw mut err,
         )
     };
