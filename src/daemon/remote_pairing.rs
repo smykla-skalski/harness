@@ -24,9 +24,8 @@ mod subject;
 pub use subject::RemotePairingSubject;
 mod create;
 mod inventory;
-pub use inventory::{
-    RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation, RemotePairingState,
-};
+pub use inventory::{RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingState};
+pub(crate) use inventory::RemotePairingObservation;
 mod invitation;
 pub(crate) use create::{RemotePairingCreateParams, create_remote_pairing, pairing_expires_at};
 

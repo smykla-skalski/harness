@@ -30,17 +30,6 @@ pub enum RemotePairingState {
 }
 
 impl RemotePairingState {
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Pending => "pending",
-            Self::Claimed => "claimed",
-            Self::Active => "active",
-            Self::Expired => "expired",
-            Self::Revoked => "revoked",
-        }
-    }
-
     /// Decide the state from the columns that record it.
     ///
     /// `revoked_at` wins over everything: a cut-off device must never read as
@@ -48,7 +37,7 @@ impl RemotePairingState {
     /// before it was claimed must not read as pending and invite someone to
     /// wait for a claim that can no longer happen.
     #[must_use]
-    pub fn derive(observed: &RemotePairingObservation<'_>) -> Self {
+    pub(crate) fn derive(observed: &RemotePairingObservation<'_>) -> Self {
         if observed.revoked_at.is_some() {
             return Self::Revoked;
         }
@@ -71,12 +60,15 @@ impl RemotePairingState {
 
 /// The stored facts a state is derived from, named so the derivation reads as
 /// the rule it is rather than as four positional booleans.
+///
+/// Crate-private: it is the argument to a derivation the daemon runs on its own
+/// rows, not something a caller of this module ever builds.
 #[derive(Debug, Clone, Copy)]
-pub struct RemotePairingObservation<'a> {
-    pub claimed_at: Option<&'a str>,
-    pub revoked_at: Option<&'a str>,
-    pub last_seen_at: Option<&'a str>,
-    pub expired: bool,
+pub(crate) struct RemotePairingObservation<'a> {
+    pub(crate) claimed_at: Option<&'a str>,
+    pub(crate) revoked_at: Option<&'a str>,
+    pub(crate) last_seen_at: Option<&'a str>,
+    pub(crate) expired: bool,
 }
 
 /// The device a claimed link became.
@@ -186,8 +178,13 @@ mod tests {
         }
     }
 
+    /// These labels are the wire format and the enum the OpenAPI schema
+    /// documents, so they are pinned against what `serde` actually emits. The
+    /// previous spelling asserted them against an inherent accessor instead,
+    /// which would have stayed green through a change to the `rename_all` that
+    /// decides what callers really receive.
     #[test]
-    fn every_state_has_a_stable_label() {
+    fn every_state_serializes_to_its_documented_label() {
         for (state, label) in [
             (RemotePairingState::Pending, "pending"),
             (RemotePairingState::Claimed, "claimed"),
@@ -195,7 +192,10 @@ mod tests {
             (RemotePairingState::Expired, "expired"),
             (RemotePairingState::Revoked, "revoked"),
         ] {
-            assert_eq!(state.as_str(), label);
+            assert_eq!(
+                serde_json::to_value(state).expect("serialize state"),
+                serde_json::Value::String(label.to_owned())
+            );
         }
     }
 }
