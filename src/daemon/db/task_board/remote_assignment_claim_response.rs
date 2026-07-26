@@ -24,58 +24,17 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         observed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote claim request: {error}")))?;
-        response
-            .validate(request)
-            .map_err(|error| db_error(format!("validate remote claim response: {error}")))?;
-        nonblank(
-            authenticated_principal,
-            "remote assignment authenticated principal",
-        )?;
+        validate_claim_exchange(request, response, authenticated_principal)?;
         let claimed = canonical_time(&response.claimed_at, "remote claim response time")?;
         let observed = canonical_time(observed_at, "remote claim observation time")?;
         let mut transaction = self
             .begin_immediate_transaction("task board remote claim response")
             .await?;
         let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if exact_claim_response(&record, request, authenticated_principal).as_ref()
-            == Some(response)
-        {
-            commit_noop(transaction, "replayed remote claim response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        if record.claim_receipt.is_some() {
-            commit_noop(transaction, "conflicting remote claim receipt").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let lease_expiry = record
-            .lease_expires_at
-            .as_deref()
-            .map(|value| canonical_time(value, "remote assignment lease expiry"))
-            .transpose()?;
-        let deadline = record
-            .deadline_at
-            .as_deref()
-            .map(|value| canonical_time(value, "remote assignment deadline"))
-            .transpose()?;
-        let exact_lease = record.lease_id.as_deref() == Some(response.lease.lease_id.as_str())
-            && record.lease_expires_at.as_deref() == Some(response.lease.expires_at.as_str());
-        let within_fence = lease_expiry.is_some_and(|expiry| claimed <= expiry)
-            && deadline.is_some_and(|deadline| claimed <= deadline);
-        if record.state != TaskBoardRemoteAssignmentState::Offered
-            || !exact_lease
-            || !within_fence
-            || !mutation_binding_matches(
-                &record,
-                &request.binding,
-                authenticated_principal,
-                &request.lease_id,
-            )
-        {
-            commit_noop(transaction, "stale remote claim response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+        let window = claim_window(&record, request, response, claimed, authenticated_principal)?;
+        if let Some(refusal) = window.refusal {
+            commit_noop(transaction, refusal.reason()).await?;
+            return Ok(refusal.outcome(record));
         }
         consume_controller_operation_trust_in_tx(
             &mut transaction,
@@ -84,26 +43,172 @@ impl AsyncDaemonDb {
             &request.request_sha256,
         )
         .await?;
-        let observed_after_fence = lease_expiry.is_some_and(|expiry| observed >= expiry)
-            || deadline.is_some_and(|deadline| observed >= deadline);
-        if observed_after_fence {
-            persist_claim_response(&mut transaction, &record, request, response).await?;
-            let claimed_record =
-                require_assignment(&mut transaction, &record.assignment_id).await?;
-            Box::pin(recover_controller_remote_assignment_in_tx(
-                &mut transaction,
-                &claimed_record,
-                observed_at,
-            ))
-            .await?;
-            return finish_mutation(transaction, &record.assignment_id, "late claim response")
-                .await;
-        }
-        settle_claim_io_authority_in_tx(&mut transaction, &record, request, &response.claimed_at)
-            .await?;
-        persist_claim_response(&mut transaction, &record, request, response).await?;
-        finish_mutation(transaction, &record.assignment_id, "claim response").await
+        let observed_after_fence = window.lease_expiry.is_some_and(|expiry| observed >= expiry)
+            || window.deadline.is_some_and(|deadline| observed >= deadline);
+        settle_claim_response_in_tx(
+            transaction,
+            &record,
+            request,
+            response,
+            observed_at,
+            observed_after_fence,
+        )
+        .await
     }
+}
+
+fn validate_claim_exchange(
+    request: &RemoteClaimRequest,
+    response: &RemoteClaimResponse,
+    principal: &str,
+) -> Result<(), CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote claim request: {error}")))?;
+    response
+        .validate(request)
+        .map_err(|error| db_error(format!("validate remote claim response: {error}")))?;
+    nonblank(principal, "remote assignment authenticated principal")
+}
+
+/// Why a claim response never reaches the write path. Collapsing the three
+/// refusals into one value lets the caller settle every one of them at a
+/// single `commit_noop`.
+#[derive(Clone, Copy)]
+enum ClaimRefusal {
+    Replayed,
+    Conflicting,
+    Stale,
+}
+
+impl ClaimRefusal {
+    const fn reason(self) -> &'static str {
+        match self {
+            Self::Replayed => "replayed remote claim response",
+            Self::Conflicting => "conflicting remote claim receipt",
+            Self::Stale => "stale remote claim response",
+        }
+    }
+
+    const fn outcome(
+        self,
+        record: super::TaskBoardRemoteAssignmentRecord,
+    ) -> TaskBoardRemoteMutationOutcome {
+        match self {
+            Self::Replayed => TaskBoardRemoteMutationOutcome::Replayed(record),
+            Self::Conflicting | Self::Stale => TaskBoardRemoteMutationOutcome::Stale(record),
+        }
+    }
+}
+
+/// The record's own lease fences, plus the refusal this claim earns if it
+/// earns one: the assignment must still be merely `Offered`, the response must
+/// echo the exact lease the record holds, and the claim must fall inside both
+/// the lease expiry and the deadline.
+struct ClaimWindow {
+    lease_expiry: Option<chrono::DateTime<chrono::Utc>>,
+    deadline: Option<chrono::DateTime<chrono::Utc>>,
+    refusal: Option<ClaimRefusal>,
+}
+
+impl ClaimWindow {
+    /// A refused claim never reads its fences, so they stay unresolved --
+    /// which also keeps a replay or a conflict decidable on a record whose
+    /// stored timestamps would not parse.
+    const fn refused(refusal: ClaimRefusal) -> Self {
+        Self {
+            lease_expiry: None,
+            deadline: None,
+            refusal: Some(refusal),
+        }
+    }
+}
+
+fn claim_window(
+    record: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteClaimRequest,
+    response: &RemoteClaimResponse,
+    claimed: chrono::DateTime<chrono::Utc>,
+    principal: &str,
+) -> Result<ClaimWindow, CliError> {
+    if exact_claim_response(record, request, principal).as_ref() == Some(response) {
+        return Ok(ClaimWindow::refused(ClaimRefusal::Replayed));
+    }
+    if record.claim_receipt.is_some() {
+        return Ok(ClaimWindow::refused(ClaimRefusal::Conflicting));
+    }
+    let lease_expiry = record
+        .lease_expires_at
+        .as_deref()
+        .map(|value| canonical_time(value, "remote assignment lease expiry"))
+        .transpose()?;
+    let deadline = record
+        .deadline_at
+        .as_deref()
+        .map(|value| canonical_time(value, "remote assignment deadline"))
+        .transpose()?;
+    let exact_lease = record.lease_id.as_deref() == Some(response.lease.lease_id.as_str())
+        && record.lease_expires_at.as_deref() == Some(response.lease.expires_at.as_str());
+    let within_fence = lease_expiry.is_some_and(|expiry| claimed <= expiry)
+        && deadline.is_some_and(|deadline| claimed <= deadline);
+    let acceptable = record.state == TaskBoardRemoteAssignmentState::Offered
+        && exact_lease
+        && within_fence
+        && mutation_binding_matches(record, &request.binding, principal, &request.lease_id);
+    Ok(ClaimWindow {
+        lease_expiry,
+        deadline,
+        refusal: (!acceptable).then_some(ClaimRefusal::Stale),
+    })
+}
+
+/// Persist the claim receipt and settle its transaction. A claim only
+/// *observed* at or past one of the record's fences is still recorded, but is
+/// then handed back to controller recovery instead of taking the claim I/O
+/// authority, because the window it was granted under has already closed.
+async fn settle_claim_response_in_tx(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteClaimRequest,
+    response: &RemoteClaimResponse,
+    observed_at: &str,
+    observed_after_fence: bool,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    if observed_after_fence {
+        return settle_late_claim_response_in_tx(
+            transaction,
+            record,
+            request,
+            response,
+            observed_at,
+        )
+        .await;
+    }
+    settle_claim_io_authority_in_tx(&mut transaction, record, request, &response.claimed_at)
+        .await?;
+    persist_claim_response(&mut transaction, record, request, response).await?;
+    finish_mutation(transaction, &record.assignment_id, "claim response").await
+}
+
+/// Record a claim whose granted window had already closed by the time it was
+/// observed, then hand the assignment straight back to controller recovery
+/// rather than letting it take the claim I/O authority.
+async fn settle_late_claim_response_in_tx(
+    mut transaction: sqlx::Transaction<'_, sqlx::Sqlite>,
+    record: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteClaimRequest,
+    response: &RemoteClaimResponse,
+    observed_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    persist_claim_response(&mut transaction, record, request, response).await?;
+    let claimed_record = require_assignment(&mut transaction, &record.assignment_id).await?;
+    Box::pin(recover_controller_remote_assignment_in_tx(
+        &mut transaction,
+        &claimed_record,
+        observed_at,
+    ))
+    .await?;
+    finish_mutation(transaction, &record.assignment_id, "late claim response").await
 }
 
 async fn persist_claim_response(
