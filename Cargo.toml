@@ -54,7 +54,6 @@ bollard = "0.21.0"
 bytes = "1.10.1"
 caseless = "0.2.2"
 clap = { version = "4.6.0", features = ["derive", "env"] }
-compose_spec = { version = "0.3.0", optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yml = "0.0.13"
@@ -152,7 +151,7 @@ tracing-subscriber = { version = "=0.3.23", features = ["chrono", "env-filter", 
 
 [features]
 default = ["all-adapters"]
-all-adapters = ["compose", "helm", "k3d", "kubernetes", "kuma"]
+all-adapters = ["helm", "k3d", "kubernetes", "kuma"]
 bridge-runtime = [
   "dep:agent-client-protocol",
   "dep:nix",
@@ -186,7 +185,6 @@ standalone-daemon = []
 standalone-worker = ["harness-kernel/standalone-worker"]
 full-runtime = ["daemon-runtime", "mcp-runtime"]
 mcp-runtime = ["dep:harness-mcp"]
-compose = ["dep:compose_spec"]
 helm = []
 k3d = []
 kubernetes = ["dep:k8s-openapi", "dep:kube"]

@@ -2,10 +2,7 @@ use std::env;
 use std::sync::Arc;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-#[cfg(feature = "compose")]
-use crate::infra::blocks::compose::BollardComposeOrchestrator;
-use crate::infra::blocks::compose::DockerComposeOrchestrator;
-use crate::infra::blocks::{ComposeOrchestrator, ProcessExecutor};
+use crate::infra::blocks::ProcessExecutor;
 
 use super::{BollardContainerRuntime, ContainerRuntime, DockerContainerRuntime};
 
@@ -31,13 +28,6 @@ impl ContainerRuntimeBackend {
     }
 }
 
-#[derive(Clone)]
-pub struct SelectedContainerBackends {
-    pub backend: ContainerRuntimeBackend,
-    pub container_runtime: Arc<dyn ContainerRuntime>,
-    pub compose_orchestrator: Arc<dyn ComposeOrchestrator>,
-}
-
 /// Resolve the selected container backend from `HARNESS_CONTAINER_RUNTIME`.
 ///
 /// # Errors
@@ -57,47 +47,8 @@ pub fn container_backend_from_env() -> Result<ContainerRuntimeBackend, CliError>
 pub fn container_runtime_from_env(
     process: Arc<dyn ProcessExecutor>,
 ) -> Result<Arc<dyn ContainerRuntime>, CliError> {
-    Ok(container_backends_from_env(process)?.container_runtime)
-}
-
-/// Build the matched regular-Docker and compose backends from one selector.
-///
-/// # Errors
-///
-/// Returns `CliError` when backend selection fails or the chosen backend cannot initialize.
-pub fn container_backends_from_env(
-    process: Arc<dyn ProcessExecutor>,
-) -> Result<SelectedContainerBackends, CliError> {
-    let backend = container_backend_from_env()?;
-    match backend {
-        ContainerRuntimeBackend::DockerCli => {
-            let container_runtime: Arc<dyn ContainerRuntime> =
-                Arc::new(DockerContainerRuntime::new(process.clone()));
-            let compose_orchestrator: Arc<dyn ComposeOrchestrator> =
-                Arc::new(DockerComposeOrchestrator::new(process));
-            Ok(SelectedContainerBackends {
-                backend,
-                container_runtime,
-                compose_orchestrator,
-            })
-        }
-        ContainerRuntimeBackend::Bollard => {
-            let container_runtime: Arc<dyn ContainerRuntime> =
-                Arc::new(BollardContainerRuntime::new()?);
-            // Only the engine-native orchestrator needs `compose_spec`. Without
-            // the `compose` feature the docker CLI drives compose instead, so
-            // callers still get a working orchestrator here.
-            #[cfg(feature = "compose")]
-            let compose_orchestrator: Arc<dyn ComposeOrchestrator> =
-                Arc::new(BollardComposeOrchestrator::new(container_runtime.clone()));
-            #[cfg(not(feature = "compose"))]
-            let compose_orchestrator: Arc<dyn ComposeOrchestrator> =
-                Arc::new(DockerComposeOrchestrator::new(process));
-            Ok(SelectedContainerBackends {
-                backend,
-                container_runtime,
-                compose_orchestrator,
-            })
-        }
+    match container_backend_from_env()? {
+        ContainerRuntimeBackend::DockerCli => Ok(Arc::new(DockerContainerRuntime::new(process))),
+        ContainerRuntimeBackend::Bollard => Ok(Arc::new(BollardContainerRuntime::new()?)),
     }
 }
