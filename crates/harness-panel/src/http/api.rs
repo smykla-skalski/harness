@@ -160,7 +160,7 @@ async fn require_owner(state: &PanelState, headers: &HeaderMap) -> Result<Viewer
 /// A 200 is heuristically cacheable, so without this a proxy between the daemon
 /// and the browser is free to keep one person's account list and hand it to the
 /// next request that looks the same.
-fn private_json<T: Serialize>(body: &T) -> Response {
+pub(super) fn private_json<T: Serialize>(body: &T) -> Response {
     ([(header::CACHE_CONTROL, NO_STORE)], Json(body)).into_response()
 }
 
