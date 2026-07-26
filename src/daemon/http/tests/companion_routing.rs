@@ -424,7 +424,13 @@ async fn a_websocket_under_the_prefix_reaches_the_companion() {
         .expect("the daemon must relay the handshake");
 
     assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
-    let Some(Ok(Message::Text(presented))) = socket.next().await else {
+    // Bounded, because a relay that establishes the socket and then carries
+    // nothing is exactly the regression this covers, and an unbounded read would
+    // meet it by hanging the suite rather than by failing.
+    let frame = timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("the relayed socket must carry a frame rather than go silent");
+    let Some(Ok(Message::Text(presented))) = frame else {
         panic!("the relayed socket must carry the companion's own frames");
     };
     assert_eq!(
