@@ -61,7 +61,6 @@ fn transport_command_modules_stay_internal_to_domains() {
         "src/app/cli.rs",
         "tests/integration/helpers.rs",
         "tests/integration/cluster/mod.rs",
-        "tests/integration/cluster/orchestration.rs",
         "tests/integration/preflight.rs",
         "tests/integration/universal.rs",
     ] {
