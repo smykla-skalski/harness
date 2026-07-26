@@ -24,6 +24,12 @@ BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-te
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
 TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
 FOCUSED_UI_TEST_TIMEOUT_SECONDS="${HARNESS_MONITOR_FOCUSED_UI_TEST_TIMEOUT_SECONDS:-45}"
+# A test that awaits something that never arrives otherwise blocks the whole run
+# for as long as anyone leaves it, and reports nothing at all: no failing name,
+# no output, just a process that never exits. Bound every test so the run ends
+# and names the offender instead. Generous enough that a slow UI test is never
+# the one it catches.
+TEST_EXECUTION_TIME_ALLOWANCE="${HARNESS_MONITOR_TEST_TIME_ALLOWANCE_SECONDS:-300}"
 CODE_SIGNING_ALLOWED_SETTING=""
 TEST_SCHEME="${HARNESS_MONITOR_TEST_SCHEME:-HarnessMonitor}"
 export XCODEBUILD_DERIVED_DATA_PATH="$DERIVED_DATA_PATH"
@@ -443,6 +449,8 @@ BASE_TEST_ARGS=(
   -scheme "$TEST_SCHEME" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
+  -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance "$TEST_EXECUTION_TIME_ALLOWANCE" \
   CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_SETTING" \
   test-without-building
 )
