@@ -10,7 +10,6 @@ use uuid::Uuid;
 
 use super::PanelState;
 use super::session::require_viewer;
-use crate::config::daemon::MAX_PAIR_LINK_TTL_SECONDS;
 use crate::daemon_client::{DaemonCredential, MintedLink};
 use crate::error::ApiError;
 use crate::store::accounts::Account;
@@ -155,7 +154,8 @@ async fn finalize(
                 account_id: account.id.clone(),
                 role: minted.role.clone(),
                 created_at,
-                expires_at: created_at + granted_lifetime(minted),
+                expires_at: created_at
+                    + granted_lifetime(minted, state.daemon.config.link_ttl_seconds),
             },
         )
         .await;
@@ -184,20 +184,22 @@ fn reservation_for(account_id: &str, state: &PanelState) -> PairLinkRecord {
     }
 }
 
-/// How long the daemon says this link lives.
+/// How long this link occupies one of the account's slots.
 ///
-/// A daemon that answered with something absurd would otherwise decide how
-/// long a row occupies a slot, so this falls back to what the panel asked for
-/// rather than trusting the number.
-fn granted_lifetime(minted: &MintedLink) -> Duration {
-    if minted.ttl_seconds == 0 || minted.ttl_seconds > MAX_PAIR_LINK_TTL_SECONDS {
-        return lifetime(MAX_PAIR_LINK_TTL_SECONDS);
+/// The daemon may grant less than the panel asked for, and the shorter answer
+/// is the true one. It does not get to grant more: a reply above the request,
+/// or of nothing at all, dates the row by the request instead, so a daemon
+/// that answered with something absurd cannot pin a slot the account then
+/// cannot use.
+fn granted_lifetime(minted: &MintedLink, requested_seconds: u64) -> Duration {
+    if minted.ttl_seconds == 0 || minted.ttl_seconds > requested_seconds {
+        return lifetime(requested_seconds);
     }
     lifetime(minted.ttl_seconds)
 }
 
-/// Seconds as a duration. The configured maximum is a day, so the conversion
-/// only saturates on a value this function has already refused.
+/// Seconds as a duration. The configuration refuses anything above a day, and
+/// no value reaching here exceeds it, so the conversion never saturates.
 fn lifetime(seconds: u64) -> Duration {
     Duration::seconds(i64::try_from(seconds).unwrap_or(i64::MAX))
 }

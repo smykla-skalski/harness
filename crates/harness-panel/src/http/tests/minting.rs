@@ -36,6 +36,8 @@ struct Seen {
     minted: usize,
     /// An expiry from a daemon whose clock disagrees with this host's.
     skewed_expiry: Option<String>,
+    /// A lifetime the daemon grants instead of the one it was asked for.
+    granted_ttl: Option<u64>,
 }
 
 async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
@@ -50,13 +52,17 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
                 .and_then(|value| value.to_str().ok())
                 .map(str::to_owned)
         };
-        let (pairing_id, skew) = {
+        let (pairing_id, skew, granted_ttl) = {
             let mut seen = seen.lock().expect("stub lock");
             seen.body = Some(body);
             seen.client_id = header("x-harness-remote-client-id");
             seen.authorization = header("authorization");
             seen.minted += 1;
-            (format!("pair-{}", seen.minted), seen.skewed_expiry.clone())
+            (
+                format!("pair-{}", seen.minted),
+                seen.skewed_expiry.clone(),
+                seen.granted_ttl,
+            )
         };
         // Relative to now, not a fixed date: an expiry in the past would make
         // every link the panel records read as already lapsed, and the cap
@@ -72,7 +78,7 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
             "scopes": ["read", "write"],
             "created_at": created_at.to_rfc3339(),
             "expires_at": expires_at,
-            "ttl_seconds": 600,
+            "ttl_seconds": granted_ttl.unwrap_or(600),
             "endpoint": "https://harness.example.com",
             "server_spki_sha256": "sha256/AAAA",
             "pairing_url": "harness://pair?payload=abc",
@@ -254,6 +260,56 @@ async fn a_daemon_clock_that_disagrees_does_not_reach_the_stored_row() {
     );
     // The person who asked is still shown the daemon's own deadline.
     assert!(body.contains("2000-01-01"), "{body}");
+}
+
+/// The daemon may shorten the lifetime the panel asked for, and the shorter
+/// answer is the true one.
+#[tokio::test]
+async fn a_shorter_granted_lifetime_is_what_the_row_carries() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (harness, owner) = ready(Arc::clone(&seen)).await;
+    seen.lock().expect("stub lock").granted_ttl = Some(60);
+
+    harness.post("/panel/api/pair-links", Some(&owner)).await;
+
+    let held = slot_held_for(&harness, "ada").await;
+    assert!(
+        held <= Duration::seconds(60),
+        "the row outlives the lifetime the daemon granted: {held}"
+    );
+}
+
+/// The daemon does not get to extend what it was asked for. A reply above the
+/// request, or of nothing at all, would otherwise pin one of the account's
+/// five slots for as long as the daemon cared to name.
+#[tokio::test]
+async fn a_daemon_cannot_hold_a_slot_longer_than_the_panel_asked_for() {
+    for granted in [0, 86_400] {
+        let seen = Arc::new(Mutex::new(Seen::default()));
+        let (harness, owner) = ready(Arc::clone(&seen)).await;
+        seen.lock().expect("stub lock").granted_ttl = Some(granted);
+
+        harness.post("/panel/api/pair-links", Some(&owner)).await;
+
+        let held = slot_held_for(&harness, "ada").await;
+        assert!(
+            held <= Duration::seconds(600),
+            "a granted ttl of {granted} held a slot for {held}"
+        );
+    }
+}
+
+/// How long the account's newest recorded link occupies its slot.
+async fn slot_held_for(harness: &Harness, login: &str) -> Duration {
+    let account_id = harness.account_id(login).await;
+    let recorded = harness
+        .state
+        .store
+        .pair_links_for_account(&account_id)
+        .await
+        .expect("records");
+    let link = recorded.first().expect("a recorded link");
+    link.expires_at - link.created_at
 }
 
 /// The cap bounds how many live one-time codes one account can accumulate, so
