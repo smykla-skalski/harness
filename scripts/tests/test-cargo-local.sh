@@ -1276,6 +1276,11 @@ write_fake_socket_holder() {
 import os, socket, sys, time
 
 socket_path, pid_file = sys.argv[1], sys.argv[2]
+# Before binding, not after. Everything that waits for this holder waits for the
+# socket, so a pid recorded afterwards can miss the cleanup that follows and
+# leak a listener into the next scenario.
+with open(pid_file, "a", encoding="utf-8") as handle:
+    handle.write(f"{os.getpid()}\n")
 try:
     os.unlink(socket_path)
 except OSError:
@@ -1283,8 +1288,6 @@ except OSError:
 listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 listener.bind(socket_path)
 listener.listen(16)
-with open(pid_file, "a", encoding="utf-8") as handle:
-    handle.write(f"{os.getpid()}\n")
 time.sleep(120)
 PY
 }
