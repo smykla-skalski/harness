@@ -61,8 +61,13 @@ sweep_dead_sccache_sockets() {
   [[ -d "$dir" ]] || return 0
   command -v lsof >/dev/null 2>&1 || return 0
 
+  # lsof 4.95 appends " type=STREAM" to the name field, where 4.91 printed the
+  # path alone. Matching the whole line against a socket path therefore matched
+  # nothing on a modern lsof, and this sweep unlinked the live server's socket on
+  # every run - which is precisely how the next client came to find no server and
+  # start one of its own.
   if ! live_sockets="$(lsof -U -F n 2>/dev/null \
-    | awk '/^n\// {print substr($0,2)}' \
+    | awk '/^n\// {sub(/ type=[A-Z]+$/, ""); print substr($0,2)}' \
     | sort -u)"; then
     return 0
   fi
@@ -115,6 +120,127 @@ configure_sccache_socket() {
   export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
   export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-1800}"
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
+}
+
+# Is anything answering on the socket right now. Existence of the file cannot
+# say: every orphaned server still holds a listening socket on that path, and a
+# path left behind by a dead one looks identical. Connecting is the only answer.
+#
+# The answer is a word rather than an exit status, because macOS ships a
+# /usr/bin/python3 that is a stub until the command line tools are installed and
+# fails with the same status a refused connection would, and an exit code alone
+# cannot separate "no server" from "could not ask". An unknown - a timeout under
+# load, a permission error - reads as reachable on purpose: the only action taken
+# on "no server" is starting one, and starting a second server next to a live one
+# is the failure this path exists to prevent.
+#
+# A probe that could not run at all falls back to the socket file, which is not
+# the same as starting nothing. A path with no socket file behind it is one no
+# client could reach either, so a prestart there can only help; what the fallback
+# gives up is telling a live server from an orphan's leftover path.
+sccache_server_reachable() {
+  local socket="${SCCACHE_SERVER_UDS:-}" verdict=""
+
+  [[ -n "$socket" ]] || return 1
+  if command -v python3 >/dev/null 2>&1; then
+    verdict="$(python3 - "$socket" 2>/dev/null <<'PY' || true
+import socket, sys
+
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.settimeout(2)
+try:
+    sock.connect(sys.argv[1])
+except (ConnectionRefusedError, FileNotFoundError):
+    print("absent")
+except OSError:
+    print("unknown")
+else:
+    print("reachable")
+PY
+    )"
+  fi
+
+  case "$verdict" in
+    reachable | unknown) return 0 ;;
+    absent) return 1 ;;
+  esac
+
+  # No usable probe. sweep_dead_sccache_sockets has already unlinked every
+  # socket lsof does not report as live, so a socket file that survived it is
+  # the closest thing to an answer left. Without lsof either, this reads every
+  # socket as live and leaves clients doing exactly what they do today.
+  [[ -S "$socket" ]]
+}
+
+# mkdir is the atomic primitive both platforms have; macOS ships no flock(1).
+# The holder's pid goes inside so a lock left by a killed build is reclaimed
+# rather than stalling every build after it.
+acquire_sccache_lock() {
+  local lock="$1" waited=0 owner
+
+  while (( waited < 100 )); do
+    if mkdir "$lock" 2>/dev/null; then
+      # A held lock with no pid inside is one every later build reads as stale
+      # and reclaims while this one still holds it, so a pid that cannot be
+      # written means handing the lock straight back rather than holding one
+      # that offers no serialisation.
+      if ! printf '%s\n' "$$" >"$lock/pid" 2>/dev/null; then
+        rm -rf "$lock" 2>/dev/null || true
+        return 1
+      fi
+      return 0
+    fi
+    # Not before a second has passed: a lock taken moments ago has no pid file
+    # yet, and reclaiming it would break the very serialisation it provides.
+    if (( waited > 10 )); then
+      owner="$(cat "$lock/pid" 2>/dev/null || true)"
+      if [[ ! "$owner" =~ ^[0-9]+$ ]] || ! kill -0 "$owner" 2>/dev/null; then
+        rm -rf "$lock" 2>/dev/null || true
+      fi
+    fi
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  return 1
+}
+
+# Start the one server for this repository before cargo runs. sccache lets any
+# client that finds no server start one, and a starting server unlinks the
+# socket path before it binds, so a burst of first compilations leaves one
+# server reachable and the rest orphaned: still running, still listening on the
+# same path, and still enforcing their own copy of SCCACHE_CACHE_SIZE over the
+# one cache directory. That is an eviction fight, and it is why a 30G budget
+# settled at a few gigabytes. Having a server up before the first rustc leaves
+# clients with nothing to start.
+#
+# The lock is what makes it one server rather than one per concurrent build:
+# probe and start have to be a single step, or two cargo-locals starting
+# together both see nothing and both start.
+ensure_sccache_server() {
+  local lock
+
+  [[ -n "${SCCACHE_BIN:-}" ]] || return 0
+  [[ -n "${SCCACHE_SERVER_UDS:-}" ]] || return 0
+  [[ "${HARNESS_SCCACHE_PRESTART:-1}" == "1" ]] || return 0
+
+  sccache_server_reachable && return 0
+
+  # A lock that cannot be taken means another build is starting the server this
+  # call wanted; waiting longer would buy nothing that build is not already
+  # doing, so hand the work back to the clients rather than stalling here.
+  lock="${SCCACHE_SERVER_UDS%.sock}.lock"
+  acquire_sccache_lock "$lock" || return 0
+
+  if ! sccache_server_reachable; then
+    # TMPDIR matches what rustc-cache-wrapper.sh hands sccache, so the server's
+    # scratch space does not depend on which entry point happened to start it.
+    if ! TMPDIR="${HARNESS_SCCACHE_TMPDIR:-${TMPDIR:-/tmp}}/" \
+      "$SCCACHE_BIN" --start-server >/dev/null 2>&1; then
+      printf 'cargo-local: sccache server did not start; compilations fall back to starting their own\n' >&2
+    fi
+  fi
+
+  rm -rf "$lock" 2>/dev/null || true
 }
 
 configure_sccache_tmpdir() {
@@ -584,6 +710,11 @@ if [[ "${1:-}" == "--print-env" ]]; then
   fi
   exit 0
 fi
+
+# Below the query exits on purpose: --print-env and --print-target-dir answer a
+# question about the environment, and answering one should not leave a daemon
+# running behind it.
+ensure_sccache_server
 
 if [[ "${1:-}" == "--with-group-lease" ]]; then
   shift
