@@ -109,6 +109,11 @@ impl DaemonEventStream {
         loop {
             match self.attempt().await {
                 Ok(Attempt::Unpaired) => {
+                    // The backoff counts consecutive failures to reach the
+                    // daemon, and nothing was reached for or failed here. Left
+                    // standing, it would make the first attempt after somebody
+                    // pairs the panel wait out a delay earned before they did.
+                    backoff = FIRST_RETRY;
                     sleep(UNPAIRED_RETRY).await;
                     continue;
                 }
