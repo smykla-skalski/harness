@@ -1,22 +1,10 @@
-// Tests for verify-bash, verify-write, and verify-question hooks.
-// These post-tool-use hooks validate command output, write results,
-// and question responses.
+// Tests for the verify-write and verify-question hooks.
+// These post-tool-use hooks validate write results and question responses.
 
 use harness::hooks::hook_result::Decision;
-use harness::hooks::{verify_bash, verify_question, verify_write};
+use harness::hooks::{verify_question, verify_write};
 
 use super::super::helpers::*;
-
-// ============================================================================
-// verify-bash tests
-// ============================================================================
-
-#[test]
-fn verify_bash_allows_simple_command() {
-    let ctx = make_hook_context("suite:run", make_bash_payload("echo hello"));
-    let r = verify_bash::execute(&ctx).unwrap();
-    assert!(r.decision == Decision::Allow || r.decision == Decision::Warn);
-}
 
 // ============================================================================
 // verify-write tests
@@ -49,10 +37,16 @@ fn verify_write_denies_command_log() {
 // verify-question tests
 // ============================================================================
 
+/// The retired suite:run skill never confirms, so verify-question stays inert
+/// for it regardless of the answers carried in the payload.
 #[test]
-fn verify_question_allows_simple() {
+fn verify_question_ignores_retired_runner_skill() {
     let payload = make_question_payload("Do you want to continue?", &["Yes", "No"]);
     let ctx = make_hook_context("suite:run", payload);
+    assert!(
+        !ctx.skill_active,
+        "the retired runner skill must not confirm the session"
+    );
     let r = verify_question::execute(&ctx).unwrap();
     assert!(r.decision == Decision::Allow || r.decision == Decision::Warn);
 }

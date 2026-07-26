@@ -5,7 +5,7 @@ use super::*;
 use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::Decision;
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
-use crate::run::context::{RunContext, RunLayout};
+use crate::run::context::RunLayout;
 use crate::run::test_support::build_test_run_dir;
 
 fn ctx_audit(skill: &str) -> HookContext {
@@ -23,9 +23,15 @@ fn ctx_audit(skill: &str) -> HookContext {
     )
 }
 
+/// The retired suite:run skill never confirms the session, so audit stays
+/// silent for it without reaching the run-directory branch.
 #[test]
-fn is_silent_suite_runner() {
+fn is_silent_for_retired_suite_runner() {
     let context = ctx_audit("suite:run");
+    assert!(
+        !context.skill_active,
+        "the retired runner skill must not confirm the session"
+    );
     let result = execute(&context).unwrap().to_hook_result();
     assert_eq!(result.decision, Decision::Allow);
     assert!(result.code.is_empty());
@@ -48,13 +54,12 @@ fn allows_inactive_skill() {
 }
 
 #[test]
-fn writes_audit_entry_for_suite_run_hook() {
+fn writes_audit_entry_when_a_run_dir_is_present() {
     let tempdir = tempfile::tempdir().unwrap();
     let (run_dir, _) = build_test_run_dir(tempdir.path(), "r01");
-    let run_context = RunContext::from_run_dir(&run_dir).unwrap();
 
     let mut context = HookContext::from_test_envelope(
-        "suite:run",
+        "observe",
         HookEnvelopePayload {
             tool_name: "Bash".to_string(),
             tool_input: serde_json::json!({
@@ -72,7 +77,6 @@ fn writes_audit_entry_for_suite_run_hook() {
         },
     );
     context.run_dir = Some(run_dir.clone());
-    context.run = Some(run_context);
 
     let outcome = execute(&context).unwrap();
     let mut result = outcome.normalized_result();

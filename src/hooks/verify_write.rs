@@ -82,61 +82,15 @@ fn check_runner_path_violation(
     None
 }
 
-/// Check whether this path needs an amendment log entry.
-/// Returns true for suite source files that are not `amendments.md` and not
-/// inside the run directory.
-fn needs_amendment(
-    path: &Path,
-    suite_dir_norm: Option<&Path>,
-    run_dir_norm: Option<&Path>,
-) -> bool {
-    let name = path.file_name().map_or("", |n| n.to_str().unwrap_or(""));
-    name != "amendments.md" && is_suite_source_write(path, suite_dir_norm, run_dir_norm)
-}
-
 fn verify_suite_runner(ctx: &HookContext, paths: &[&Path]) -> HookOutcome {
     let run_dir = ctx.effective_run_dir();
-    let suite_dir_norm = ctx.suite_dir().map(|sd| normalize_path(&sd));
-    let run_dir_norm = run_dir.as_ref().map(|rd| normalize_path(rd));
-    let mut amendment_needed: Option<String> = None;
     for raw_path in paths {
         let path = normalize_path(raw_path);
         if let Some(violation) = check_runner_path_violation(raw_path, &path, run_dir.as_deref()) {
             return violation;
         }
-        if amendment_needed.is_none()
-            && needs_amendment(&path, suite_dir_norm.as_deref(), run_dir_norm.as_deref())
-        {
-            amendment_needed = Some(raw_path.display().to_string());
-        }
     }
-    if let Some(path) = amendment_needed {
-        HookOutcome::from_hook_result(HookMessage::suite_amendment_required(path).into_result())
-    } else {
-        HookOutcome::allow()
-    }
-}
-
-/// Returns true when `path` is inside the suite directory but not inside the run
-/// directory. Run-dir writes are expected during a suite:run and do not need
-/// amendment tracking.
-fn is_suite_source_write(
-    path: &Path,
-    suite_dir_norm: Option<&Path>,
-    run_dir_norm: Option<&Path>,
-) -> bool {
-    let Some(sdn) = suite_dir_norm else {
-        return false;
-    };
-    if !path.starts_with(sdn) {
-        return false;
-    }
-    if let Some(rdn) = run_dir_norm
-        && path.starts_with(rdn)
-    {
-        return false;
-    }
-    true
+    HookOutcome::allow()
 }
 
 #[cfg(all(test, not(feature = "standalone-worker")))]

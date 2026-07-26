@@ -6,9 +6,15 @@ use harness::hooks::audit;
 
 use super::super::helpers::*;
 
+/// The retired suite:run skill never confirms, so audit records nothing and
+/// allows rather than reaching the run-directory branch.
 #[test]
-fn audit_silent_runner() {
+fn audit_silent_for_retired_runner_skill() {
     let ctx = make_hook_context("suite:run", make_bash_payload("echo hello"));
+    assert!(
+        !ctx.skill_active,
+        "the retired runner skill must not confirm the session"
+    );
     let r = audit::execute(&ctx).unwrap().to_hook_result();
     assert_allow(&r);
 }

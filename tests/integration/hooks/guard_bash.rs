@@ -1,137 +1,41 @@
 // Tests for the guard-bash hook.
-// Verifies denial of direct cluster binary usage (kubectl, kumactl, helm, docker, k3d),
-// legacy scripts, shell operators, suite root creation, make targets, github sidequests,
-// control file mutation, harness command chaining/looping, and admin endpoint access.
+// Verifies denial of direct cluster binary usage (kubectl, kumactl, helm,
+// docker, k3d), inline python, admin endpoint access, and suite storage
+// mutation on the suite:create surface, plus the inertness of the retired
+// suite:run skill.
 
 use harness::hooks::guard_bash;
 use harness::hooks::hook_result::HookResult;
-use harness::run::Verdict;
 
 use super::super::helpers::*;
 
-const GUARD_BASH_PAYLOAD_CASES: &[(&str, &str, bool)] = &[
-    ("suite:run", "kubectl get pods", false),
-    (
-        "suite:run",
-        "python3 tools/record_command.py -- echo hello",
-        false,
-    ),
-    (
-        "suite:run",
-        "ls -la /tmp/kumactl && /tmp/kumactl version 2>&1",
-        false,
-    ),
-    ("suite:run", "$KUMACTL version", false),
-    ("suite:run", "ls -la /tmp/kumactl", false),
-    (
-        "suite:run",
-        "harness run record --phase setup --label kumactl-version -- kumactl version",
-        true,
-    ),
-    (
-        "suite:run",
-        "harness run record --phase verify --label admin-check -- curl localhost:9901/config_dump",
-        true,
-    ),
-    (
-        "suite:run",
-        "harness envoy capture --phase verify --label config-dump \
-         --namespace kuma-demo --workload deploy/demo-client --admin-path /config_dump",
-        true,
-    ),
-    (
-        "suite:run",
-        "harness record --phase cleanup --label cleanup-g04 -- \
-         kubectl delete meshopentelemetrybackend otel-runtime \
-         meshmetric metrics-runtime -n kuma-system",
-        false,
-    ),
-    (
-        "suite:run",
-        "harness run record --phase cleanup --label cleanup-g04 -- \
-         kubectl delete meshopentelemetrybackend otel-runtime \
-         meshmetric metrics-runtime -n kuma-system",
-        false,
-    ),
-    (
-        "suite:run",
-        "harness record --phase cleanup --label cleanup-g05 -- \
-         kubectl delete meshopentelemetrybackend otel-e2e -n kuma-system",
-        true,
-    ),
-    ("suite:run", "ls -la /tmp", true),
-    (
-        "suite:run",
-        "mkdir -p /tmp/suites/my-new-suite/groups",
-        false,
-    ),
-    ("suite:run", "make k3d/cluster/stop", false),
-    ("suite:run", "gh run view 12345", false),
-    (
-        "suite:run",
-        "python3 -c 'import json; ...' run-status.json",
-        false,
-    ),
-    ("suite:run", "echo '# report' > run-report.md", false),
-    ("suite:run", "cat suite-run-state.json", false),
-    ("suite:run", "cat commands/command-log.md", false),
-    ("suite:run", "echo row >> commands/command-log.md", false),
-    (
-        "suite:run",
-        "sleep 5 && harness run record --phase verify --label ctx -- kubectl config current-context",
-        false,
-    ),
-    (
-        "suite:run",
-        "harness record --phase verify --label pods \
-         kubectl get pods -o json | jq '.items[].metadata.name'",
-        true,
-    ),
-    ("suite:run", "helm install kuma kuma/kuma", false),
-    ("suite:run", "docker ps", false),
-    ("suite:run", "k3d cluster list", false),
-    (
-        "suite:run",
-        "harness record --phase verify --label test -- echo hello",
-        true,
-    ),
-    ("suite:run", "", true),
-    ("suite:run", "wget -qO- localhost:9901/config_dump", false),
-    ("suite:create", "kubectl get pods", false),
-    ("suite:create", "harness create show --kind session", true),
-    ("suite:create", "curl localhost:9901/config_dump", false),
-    ("suite:create", "helm install kuma kuma/kuma", false),
-    ("suite:create", "docker ps", false),
-    ("suite:create", "k3d cluster list", false),
+const GUARD_BASH_PAYLOAD_CASES: &[(&str, bool)] = &[
+    ("kubectl get pods", false),
+    ("harness create show --kind session", true),
+    ("curl localhost:9901/config_dump", false),
+    ("helm install kuma kuma/kuma", false),
+    ("docker ps", false),
+    ("k3d cluster list", false),
+    ("echo $(kubectl get pods)", false),
+    ("echo '{}' | python3 -c 'import json'", false),
+    ("rm -rf ~/.local/share/harness/suites/motb", false),
+    ("", true),
+    ("echo hello", true),
 ];
 
-fn execute_payload_case(skill: &str, command: &str, case_idx: usize) -> HookResult {
-    if skill == "suite:run" {
-        let tmp = tempfile::tempdir().unwrap();
-        let run_dir = init_run(
-            tmp.path(),
-            &format!("guard-bash-case-{case_idx}"),
-            "single-zone",
-        );
-        let ctx = make_hook_context_with_run(skill, make_bash_payload(command), &run_dir);
-        return guard_bash::execute(&ctx).unwrap();
-    }
-    // For non-runner skills (e.g. suite:create), session_confirms_skill may
-    // set skill_active=false when no workflow state exists.  Force it true
-    // so the payload table tests exercise guard logic, not session isolation.
-    let mut ctx = make_hook_context(skill, make_bash_payload(command));
+fn execute_create_case(command: &str) -> HookResult {
+    // session_confirms_skill sets skill_active=false when no create workflow
+    // state exists. Force it true so these cases exercise guard logic rather
+    // than session isolation.
+    let mut ctx = make_hook_context("suite:create", make_bash_payload(command));
     ctx.skill_active = true;
     guard_bash::execute(&ctx).unwrap()
 }
 
-// ============================================================================
-// Simple allow/deny payloads (table-driven)
-// ============================================================================
-
 #[test]
 fn guard_bash_payloads() {
-    for (case_idx, &(skill, command, should_allow)) in GUARD_BASH_PAYLOAD_CASES.iter().enumerate() {
-        let r = execute_payload_case(skill, command, case_idx);
+    for &(command, should_allow) in GUARD_BASH_PAYLOAD_CASES {
+        let r = execute_create_case(command);
         if should_allow {
             assert_allow(&r);
         } else {
@@ -141,10 +45,18 @@ fn guard_bash_payloads() {
 }
 
 #[test]
-fn guard_bash_denies_cluster_binaries_even_without_tracked_run() {
-    // session_confirms_skill sets skill_active=false when no run context
-    // exists, so force skill_active=true to test the security guards in
-    // guard_suite_runner that fire before the tracked-run gate.
+fn guard_bash_ignores_inactive_skill() {
+    let mut ctx = make_hook_context("suite:create", make_bash_payload("kubectl get pods"));
+    ctx.skill_active = false;
+    let r = guard_bash::execute(&ctx).unwrap();
+    assert_allow(&r);
+}
+
+/// Installed hook registrations still pass `--skill suite:run`. The retired
+/// runner surface must stay inert even if the session is marked active, rather
+/// than falling through to the create guards.
+#[test]
+fn guard_bash_ignores_retired_runner_skill() {
     for command in [
         "kubectl get pods",
         "curl localhost:9901/config_dump",
@@ -153,123 +65,17 @@ fn guard_bash_denies_cluster_binaries_even_without_tracked_run() {
         let mut ctx = make_hook_context("suite:run", make_bash_payload(command));
         ctx.skill_active = true;
         let r = guard_bash::execute(&ctx).unwrap();
-        assert_deny(&r);
-    }
-}
-
-#[test]
-fn guard_bash_allows_safe_commands_without_tracked_run() {
-    // Force skill_active so the guards actually evaluate the command
-    // rather than short-circuiting on session isolation.
-    for command in ["gh pr checks 12345", "echo hello", "ls -la"] {
-        let mut ctx = make_hook_context("suite:run", make_bash_payload(command));
-        ctx.skill_active = true;
-        let r = guard_bash::execute(&ctx).unwrap();
         assert_allow(&r);
     }
 }
 
-// ============================================================================
-// Tests with specific message assertions or special setup
-// ============================================================================
-
+/// A payload carrying no command at all reaches the guard and allows, rather
+/// than short-circuiting earlier on session isolation.
 #[test]
-fn guard_bash_ignores_inactive_skill() {
-    let mut ctx = make_hook_context("suite:run", make_bash_payload("kubectl get pods"));
-    ctx.skill_active = false;
+fn guard_bash_allows_payload_without_a_command() {
+    let mut ctx = make_hook_context("suite:create", make_empty_payload());
+    ctx.skill_active = true;
+    assert!(ctx.skill_active, "case must reach the guard body");
     let r = guard_bash::execute(&ctx).unwrap();
     assert_allow(&r);
-}
-
-#[test]
-fn guard_hook_structured_denial_invalid_payload() {
-    // Empty payload should result in allow (no command to deny)
-    let ctx = make_hook_context("suite:run", make_empty_payload());
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_denies_harness_in_loop() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-loop", "single-zone");
-    let ctx = make_hook_context_with_run(
-        "suite:run",
-        make_bash_payload(
-            "for i in 01 02 03; do \
-             harness run apply --manifest \"g10/${i}.yaml\" --step \"g10-manifest-${i}\" || break; \
-             done",
-        ),
-        &run_dir,
-    );
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-    assert!(r.message.contains("shell chains or loops"));
-}
-
-// ============================================================================
-// Phase-gated tests (after run completion)
-// ============================================================================
-
-#[test]
-fn guard_bash_denies_rebootstrap_after_completed() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let mut status = read_run_status(&run_dir);
-    status.overall_verdict = Verdict::Pass;
-    write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness setup kuma cluster single-up kuma-1");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_denies_continuation_after_completed() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let mut status = read_run_status(&run_dir);
-    status.overall_verdict = Verdict::Pass;
-    write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness run preflight");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-}
-
-#[test]
-fn guard_bash_allows_cluster_down_after_completed() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let mut status = read_run_status(&run_dir);
-    status.overall_verdict = Verdict::Pass;
-    write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness setup kuma cluster single-down kuma-1");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_allows_report_check_after_completed() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-1", "single-zone");
-    let mut status = read_run_status(&run_dir);
-    status.overall_verdict = Verdict::Pass;
-    write_run_status(&run_dir, &status);
-    let payload = make_bash_payload("harness run report check");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_allow(&r);
-}
-
-#[test]
-fn guard_bash_denies_github_sidequest_with_active_run() {
-    let tmp = tempfile::tempdir().unwrap();
-    let run_dir = init_run(tmp.path(), "run-gh", "single-zone");
-    let payload = make_bash_payload("gh pr checks 12345");
-    let ctx = make_hook_context_with_run("suite:run", payload, &run_dir);
-    let r = guard_bash::execute(&ctx).unwrap();
-    assert_deny(&r);
-    assert!(r.message.contains("GitHub workflows"));
 }

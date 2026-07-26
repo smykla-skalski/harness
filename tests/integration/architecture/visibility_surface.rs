@@ -129,11 +129,6 @@ fn helper_modules_do_not_leak_publicly() {
         ),
         (
             "src/hooks/mod.rs",
-            "pub mod guards;",
-            "pub(crate) mod guards;",
-        ),
-        (
-            "src/hooks/mod.rs",
             "pub mod registry;",
             "pub(crate) mod registry;",
         ),

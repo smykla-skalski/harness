@@ -7,7 +7,6 @@ use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, SessionContext, SkillContext, SkillKind,
 };
 use crate::hooks::protocol::payloads::{AskUserAnswer, AskUserQuestionPrompt, HookEnvelopePayload};
-use crate::run::context::RunContext;
 use harness_kernel::kernel::tooling::ToolContext;
 
 mod hydration;
@@ -36,7 +35,6 @@ pub struct GuardContext {
     pub skill: SkillContext,
     pub skill_active: bool,
     pub run_dir: Option<PathBuf>,
-    pub run: Option<RunContext>,
     pub create_state: Option<CreateWorkflowState>,
     interaction: HookInteraction,
 }
@@ -57,7 +55,6 @@ impl GuardContext {
             skill: normalized.skill,
             skill_active,
             run_dir: hydrated.run_dir,
-            run: hydrated.run,
             create_state: hydrated.create_state,
             interaction,
         }
@@ -82,7 +79,6 @@ impl GuardContext {
             skill: normalized.skill.clone(),
             skill_active: normalized.skill.active,
             run_dir: None,
-            run: None,
             create_state: None,
             interaction,
         }
@@ -172,14 +168,16 @@ impl GuardContext {
 /// Check whether the session has evidence that the claimed skill is actually
 /// running. Hooks are registered at the project level with a hardcoded skill
 /// name, so they fire in every session. Without this gate, sessions that have
-/// nothing to do with suite:run would still enforce runner guards.
+/// nothing to do with the named skill would still enforce its guards.
 ///
-/// For the Runner skill, the session must have a run pointer (created during
-/// bootstrap). For Create, a create-workflow state must exist. Other skill
-/// kinds pass through unconditionally.
+/// The Runner skill is retired, but `harness-hook` registrations still pass
+/// `--skill suite:run`, so it never confirms: letting it through here would
+/// switch every skill-gated hook on for ordinary sessions. For Create, a
+/// create-workflow state must exist. Other skill kinds pass through
+/// unconditionally.
 fn session_confirms_skill(skill: &SkillContext, hydrated: &HydratedHookState) -> bool {
     match skill.kind {
-        SkillKind::Runner => hydrated.run.is_some(),
+        SkillKind::Runner => false,
         SkillKind::Create => hydrated.create_state.is_some(),
         // Observe and None pass through - observe checks are gated separately,
         // and None means no skill was claimed.
