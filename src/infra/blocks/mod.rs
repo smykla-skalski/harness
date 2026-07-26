@@ -2,9 +2,7 @@ mod build;
 mod clock;
 mod compose;
 mod docker;
-mod envoy;
 mod error;
-mod helm;
 mod http;
 mod kubernetes;
 pub mod kuma;
@@ -24,11 +22,7 @@ pub use docker::{
     ContainerRuntimeBackend, ContainerSnapshot, DockerContainerRuntime, container_backend_from_env,
     container_backends_from_env, container_runtime_from_env,
 };
-pub use envoy::{CaptureRequest, EnvoyIntrospector, ProxyIntrospector};
 pub use error::BlockError;
-#[cfg(feature = "helm")]
-pub use helm::HelmDeployer;
-pub use helm::{HelmSetting, PackageDeployResult, PackageDeployer};
 pub use http::{HttpClient, HttpMethod, HttpResponse, ReqwestHttpClient};
 #[cfg(feature = "k3d")]
 pub use kubernetes::K3dClusterManager;
@@ -53,10 +47,6 @@ pub use clock::FakeClock;
 pub use compose::FakeComposeOrchestrator;
 #[cfg(test)]
 pub use docker::FakeContainerRuntime;
-#[cfg(test)]
-pub use envoy::FakeProxyIntrospector;
-#[cfg(test)]
-pub use helm::FakePackageDeployer;
 #[cfg(test)]
 pub use http::FakeHttpClient;
 #[cfg(test)]
