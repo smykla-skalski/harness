@@ -27,6 +27,10 @@ struct SettingsTaskBoardLaneColorPicker: View {
     count: 6
   )
 
+  /// Ten degrees around the wheel, so a full traverse takes 36 steps.
+  private static let hueStep: CGFloat = 1 / 36
+  private static let shadeStep: CGFloat = 0.05
+
   private var appearance: TaskBoardLaneAppearance {
     TaskBoardLaneAppearance(rawValue: rawValue)
   }
@@ -79,13 +83,13 @@ struct SettingsTaskBoardLaneColorPicker: View {
           + " brightness \(percentage(components.brightness))"
       )
       .accessibilityAdjustableAction { direction in
-        adjust(\.saturation, by: direction == .increment ? 0.05 : -0.05)
+        adjust(\.saturation, by: direction == .increment ? Self.shadeStep : -Self.shadeStep)
       }
       .accessibilityAction(named: "Increase brightness") {
-        adjust(\.brightness, by: 0.05)
+        adjust(\.brightness, by: Self.shadeStep)
       }
       .accessibilityAction(named: "Decrease brightness") {
-        adjust(\.brightness, by: -0.05)
+        adjust(\.brightness, by: -Self.shadeStep)
       }
 
       HueSlider(hue: binding(\.hue))
@@ -93,7 +97,7 @@ struct SettingsTaskBoardLaneColorPicker: View {
         .accessibilityLabel("\(lane.title) custom color hue")
         .accessibilityValue("\(Int((components.hue * 360).rounded())) degrees")
         .accessibilityAdjustableAction { direction in
-          adjust(\.hue, by: direction == .increment ? 1 / 36 : -1 / 36)
+          adjust(\.hue, by: direction == .increment ? Self.hueStep : -Self.hueStep)
         }
     }
     .environment(\.cornerSize, 8)
