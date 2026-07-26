@@ -268,9 +268,9 @@ fn check_run_dir_surface(path: &Path, run_dir: &Path, denied: &DeniedBinaries) -
 
 /// Evaluate whether a write to `path` is allowed.
 ///
-/// This is the single source of truth for write-surface policy, called by ACP
-/// `Client::write_text_file`. The hook-side copy is retired: its input was a
-/// run directory nothing populated, so it could never deny.
+/// This is the single source of truth for write-surface policy, and ACP
+/// `Client::write_text_file` is its only caller. The hook-side write guard that
+/// also called it is retired; it could not deny under either of its gates.
 ///
 /// # Arguments
 ///

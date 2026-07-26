@@ -37,10 +37,11 @@ impl Hook for StaticHook {
 }
 
 /// Both tool-lifecycle hooks allow unconditionally. The guards that used to
-/// decide here were reachable only for a skill no registration claims, so they
-/// could never deny. The statics still matter: the runtime routes on their
-/// `name` and `hook_type`, and records the call and injects pending session
-/// signals around this call in `runtime::run_hook_command`.
+/// decide here could never deny: registrations do claim `--skill suite:run`,
+/// but no session can confirm that skill as active, so the gate returned allow
+/// before reaching any guard body. The statics still matter, because the runtime
+/// routes on their `name` and `hook_type` and records the call and injects
+/// pending session signals around this call in `runtime::run_hook_command`.
 #[expect(
     clippy::unnecessary_wraps,
     reason = "the signature must match the HookFn pointer type"
