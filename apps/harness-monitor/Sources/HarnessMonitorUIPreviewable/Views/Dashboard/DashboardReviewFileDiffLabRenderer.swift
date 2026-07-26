@@ -8,22 +8,32 @@ import HarnessMonitorKit
 /// before any scene is shown.
 @MainActor
 public enum DashboardReviewFileDiffLabRenderer {
+  /// Throws rather than skipping a fixture it cannot draw. A renderer that
+  /// swallows its errors exits successfully having written nothing, and the
+  /// missing image reads as a layout that produced no output.
   public static func dumpFixtures(
     toDirectory directory: String,
     widths: [CGFloat] = [480, 760, 1200]
-  ) {
+  ) throws {
     let fileManager = FileManager.default
-    try? fileManager.createDirectory(
+    try fileManager.createDirectory(
       atPath: directory,
       withIntermediateDirectories: true
     )
     for fixture in DashboardReviewFileDiffLabFixture.all {
       for mode in [FilesViewMode.split, FilesViewMode.unified] {
         for width in widths {
-          render(fixture: fixture, mode: mode, width: width, directory: directory)
+          try render(fixture: fixture, mode: mode, width: width, directory: directory)
         }
       }
     }
+  }
+
+  struct RenderFailure: Error, CustomStringConvertible {
+    let fixture: String
+    let reason: String
+
+    var description: String { "\(fixture): \(reason)" }
   }
 
   private static func render(
@@ -31,7 +41,7 @@ public enum DashboardReviewFileDiffLabRenderer {
     mode: FilesViewMode,
     width: CGFloat,
     directory: String
-  ) {
+  ) throws {
     let document = DashboardReviewFileDiffDocument(
       patch: fixture.patch,
       language: fixture.language,
@@ -47,13 +57,17 @@ public enum DashboardReviewFileDiffLabRenderer {
     )
     view.setFrameSize(NSSize(width: width, height: 32))
     view.resizeForViewportWidth(width)
+    let name = "\(slug(fixture.title))-\(mode.rawValue)-\(Int(width))"
     guard view.bounds.width > 1, view.bounds.height > 1,
       let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
-    else { return }
+    else {
+      throw RenderFailure(fixture: name, reason: "view produced no drawable bitmap")
+    }
     view.cacheDisplay(in: view.bounds, to: rep)
-    guard let data = rep.representation(using: .png, properties: [:]) else { return }
-    let name = "\(slug(fixture.title))-\(mode.rawValue)-\(Int(width)).png"
-    try? data.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name))
+    guard let data = rep.representation(using: .png, properties: [:]), !data.isEmpty else {
+      throw RenderFailure(fixture: name, reason: "bitmap did not encode to a non-empty PNG")
+    }
+    try data.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
   }
 
   private static func slug(_ title: String) -> String {
