@@ -13,8 +13,7 @@ mod fake;
 mod tests;
 
 pub use backend::{
-    ContainerRuntimeBackend, container_backend_from_env, container_backends_from_env,
-    container_runtime_from_env,
+    ContainerRuntimeBackend, container_backend_from_env, container_runtime_from_env,
 };
 pub use runtime_bollard::BollardContainerRuntime;
 pub use runtime_cli::DockerContainerRuntime;

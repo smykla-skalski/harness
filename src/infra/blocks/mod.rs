@@ -1,6 +1,5 @@
 mod build;
 mod clock;
-mod compose;
 mod docker;
 mod error;
 mod http;
@@ -11,16 +10,10 @@ mod registry;
 
 pub use build::{BuildSystem, BuildTarget, ProcessBuildSystem};
 pub use clock::{Clock, SystemClock};
-#[cfg(feature = "compose")]
-pub use compose::{BollardComposeOrchestrator, DockerComposeOrchestrator};
-pub use compose::{
-    ComposeFile, ComposeOrchestrator, ComposeTopology, HealthcheckSpec, NetworkSpec,
-    ServiceDependency, ServiceSpec,
-};
 pub use docker::{
     BollardContainerRuntime, ContainerConfig, ContainerPort, ContainerRuntime,
     ContainerRuntimeBackend, ContainerSnapshot, DockerContainerRuntime, container_backend_from_env,
-    container_backends_from_env, container_runtime_from_env,
+    container_runtime_from_env,
 };
 pub use error::BlockError;
 pub use http::{HttpClient, HttpMethod, HttpResponse, ReqwestHttpClient};
@@ -43,8 +36,6 @@ pub use registry::BlockRequirement;
 pub use build::FakeBuildSystem;
 #[cfg(test)]
 pub use clock::FakeClock;
-#[cfg(test)]
-pub use compose::FakeComposeOrchestrator;
 #[cfg(test)]
 pub use docker::FakeContainerRuntime;
 #[cfg(test)]

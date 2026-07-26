@@ -4,13 +4,12 @@ use std::sync::Arc;
 
 use crate::infra::blocks::BlockError;
 #[cfg(feature = "kuma")]
-use crate::infra::blocks::{ComposeOrchestrator, ContainerRuntime, HttpClient, ProcessExecutor};
+use crate::infra::blocks::{ContainerRuntime, HttpClient, ProcessExecutor};
 
 #[cfg(test)]
 pub mod fake;
 
 pub mod cli;
-pub mod compose;
 pub mod defaults;
 pub mod manifest;
 pub mod repo;
@@ -115,15 +114,14 @@ pub trait MeshControlPlane: Send + Sync {
 /// Default Kuma control-plane implementation backed by existing harness blocks.
 ///
 /// This is currently a thin compatibility layer over the already-existing
-/// process/container/HTTP/compose building blocks. It provides a single place
-/// for Kuma constants and domain-oriented helpers while the larger extraction
-/// proceeds incrementally.
+/// process/container/HTTP building blocks. It provides a single place for Kuma
+/// constants and domain-oriented helpers while the larger extraction proceeds
+/// incrementally.
 #[cfg(feature = "kuma")]
 pub struct KumaControlPlane {
     process: Arc<dyn ProcessExecutor>,
     http: Arc<dyn HttpClient>,
     container_runtime: Arc<dyn ContainerRuntime>,
-    compose_orchestrator: Arc<dyn ComposeOrchestrator>,
 }
 
 #[cfg(feature = "kuma")]
@@ -133,13 +131,11 @@ impl KumaControlPlane {
         process: Arc<dyn ProcessExecutor>,
         http: Arc<dyn HttpClient>,
         container_runtime: Arc<dyn ContainerRuntime>,
-        compose_orchestrator: Arc<dyn ComposeOrchestrator>,
     ) -> Self {
         Self {
             process,
             http,
             container_runtime,
-            compose_orchestrator,
         }
     }
 
@@ -156,11 +152,6 @@ impl KumaControlPlane {
     #[must_use]
     pub fn container_runtime(&self) -> &Arc<dyn ContainerRuntime> {
         &self.container_runtime
-    }
-
-    #[must_use]
-    pub fn compose_orchestrator(&self) -> &Arc<dyn ComposeOrchestrator> {
-        &self.compose_orchestrator
     }
 }
 
