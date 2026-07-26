@@ -33,9 +33,42 @@ extension HarnessMonitorStore {
     remoteDaemonReconnectGeneration &+= 1
     let generation = remoteDaemonReconnectGeneration
     remoteDaemonReconnectTask = Task { @MainActor [weak self] in
-      guard let self else { return }
-      await self.runRemoteDaemonReconnectLoop(generation: generation)
+      var attempt = 0
+      while true {
+        // The store is taken for each step and let go again before the wait.
+        // This loop only ends once the store says so, so a reference held
+        // across the backoff would keep a store nobody owns any more retrying
+        // for the life of the process.
+        let step: RemoteDaemonReconnectStep
+        if let store = self {
+          step = store.nextRemoteDaemonReconnectStep(generation: generation, attempt: attempt)
+        } else {
+          return
+        }
+        guard case .wait(let delay, let sleeper) = step else {
+          return
+        }
+        do {
+          try await sleeper.sleep(for: delay)
+        } catch {
+          self?.finishRemoteDaemonReconnect(generation: generation)
+          return
+        }
+        if let store = self {
+          guard await store.retryRemoteDaemonConnection(generation: generation) else {
+            return
+          }
+        } else {
+          return
+        }
+        attempt += 1
+      }
     }
+  }
+
+  enum RemoteDaemonReconnectStep {
+    case stop
+    case wait(Duration, any RemoteDaemonReconnectSleeping)
   }
 
   func stopRemoteDaemonReconnect() {
@@ -45,31 +78,35 @@ extension HarnessMonitorStore {
     remoteDaemonReconnectTask = nil
   }
 
-  private func runRemoteDaemonReconnectLoop(generation: UInt64) async {
-    defer { finishRemoteDaemonReconnect(generation: generation) }
-    var attempt = 0
-
-    while shouldContinueRemoteDaemonReconnect(generation: generation) {
-      let delay = reconnectDelay(for: attempt)
-      appendConnectionEvent(
-        kind: .reconnecting,
-        detail: "Remote daemon unavailable; retrying after \(delay) (attempt \(attempt + 1))"
-      )
-      do {
-        try await connection.remoteDaemonReconnectSleeper.sleep(for: delay)
-      } catch {
-        return
-      }
-      guard shouldContinueRemoteDaemonReconnect(generation: generation) else {
-        return
-      }
-
-      await reconnect()
-      guard connectionState != .online else {
-        return
-      }
-      attempt += 1
+  private func nextRemoteDaemonReconnectStep(
+    generation: UInt64,
+    attempt: Int
+  ) -> RemoteDaemonReconnectStep {
+    guard shouldContinueRemoteDaemonReconnect(generation: generation) else {
+      finishRemoteDaemonReconnect(generation: generation)
+      return .stop
     }
+    let delay = reconnectDelay(for: attempt)
+    appendConnectionEvent(
+      kind: .reconnecting,
+      detail: "Remote daemon unavailable; retrying after \(delay) (attempt \(attempt + 1))"
+    )
+    return .wait(delay, connection.remoteDaemonReconnectSleeper)
+  }
+
+  /// One reconnect attempt. Returns false when the loop should stop.
+  private func retryRemoteDaemonConnection(generation: UInt64) async -> Bool {
+    guard shouldContinueRemoteDaemonReconnect(generation: generation) else {
+      finishRemoteDaemonReconnect(generation: generation)
+      return false
+    }
+
+    await reconnect()
+    guard connectionState != .online else {
+      finishRemoteDaemonReconnect(generation: generation)
+      return false
+    }
+    return true
   }
 
   private func shouldContinueRemoteDaemonReconnect(generation: UInt64) -> Bool {

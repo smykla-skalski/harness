@@ -57,6 +57,32 @@ struct HarnessMonitorStoreObservationLifetimeTests {
     #expect(stranded < descriptorDriftAllowance)
   }
 
+  /// The stream loops re-bootstrap the connection for as long as they run, and
+  /// the recovery they schedule starts them again, so between them they never
+  /// end. Holding the store while they wait therefore keeps it working forever,
+  /// on the main actor every other test in the run is queued behind.
+  @Test("A store nobody holds any more is released")
+  func aStoreNobodyHoldsAnyMoreIsReleased() async throws {
+    weak var dropped: HarnessMonitorStore?
+    do {
+      let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+      await store.bootstrap()
+      try #require(store.connectionState == .online)
+      // The loops start on their own tasks, so a store dropped before they run
+      // would be released whether or not they let go of it.
+      try await Task.sleep(for: .milliseconds(250))
+      dropped = store
+    }
+
+    var remainingChecks = 60
+    while dropped != nil, remainingChecks > 0 {
+      remainingChecks -= 1
+      try await Task.sleep(for: .milliseconds(50))
+    }
+
+    #expect(dropped == nil)
+  }
+
   private struct DaemonUnreachable: Error {}
 
   private var watchersPerRun: Int { 200 }
