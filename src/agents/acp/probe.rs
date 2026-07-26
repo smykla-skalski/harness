@@ -10,10 +10,6 @@ pub use harness_protocol::managed_agents::acp::{
 };
 use tracing::warn;
 
-#[cfg(feature = "daemon-runtime")]
-use crate::daemon::sandboxed_from_env;
-#[cfg(feature = "daemon-runtime")]
-use harness_kernel::errors::CliError;
 use crate::workspace::{account_home_dir, dirs_home, normalized_env_value, utc_now};
 
 use super::catalog::{AcpAgentDescriptor, acp_agents};
@@ -40,26 +36,19 @@ struct ProbeCacheState {
 static PROBE_CACHE: LazyLock<Mutex<ProbeCacheState>> =
     LazyLock::new(|| Mutex::new(ProbeCacheState::default()));
 
-/// Return cached ACP probe results for the current daemon process.
-///
-/// # Panics
-/// Panics if the process-wide probe cache mutex is poisoned.
-#[must_use]
-pub fn probe_acp_agents_cached() -> AcpRuntimeProbeResponse {
-    cached_probe_snapshot().unwrap_or_else(pending_probe_response)
-}
+// Refreshing the cache can mean asking a host process instead of probing
+// locally, but only a sandboxed daemon can be in that situation. That choice
+// therefore belongs to the daemon and reaches this module as `spawn_refresh`;
+// nothing here may look at the daemon to decide for itself.
 
-/// Return the latest cached ACP probe results without blocking request paths.
-///
-/// Fresh cache entries are returned directly. Stale entries are returned
-/// immediately while a background refresh runs. When no cached data is
-/// available yet, this returns `None` and schedules the first refresh.
+/// Return cached ACP probe results, refreshing in the background through
+/// `spawn_refresh` when the cache is stale or empty.
 ///
 /// # Panics
 /// Panics if the process-wide probe cache mutex is poisoned.
 #[must_use]
-pub fn cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
-    cached_probe_snapshot_with(spawn_routed_probe_cache_refresh)
+pub fn probe_acp_agents_cached_with(spawn_refresh: fn()) -> AcpRuntimeProbeResponse {
+    cached_probe_snapshot_with(spawn_refresh).unwrap_or_else(pending_probe_response)
 }
 
 /// Return the latest process-local probe snapshot, scheduling a background
@@ -69,7 +58,16 @@ pub(crate) fn local_cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
     cached_probe_snapshot_with(spawn_local_probe_cache_refresh)
 }
 
-fn cached_probe_snapshot_with(spawn_refresh: fn()) -> Option<AcpRuntimeProbeResponse> {
+/// Return the latest cached ACP probe results without blocking request paths.
+///
+/// Fresh cache entries are returned directly. Stale entries are returned
+/// immediately while `spawn_refresh` runs a background refresh. When no cached
+/// data is available yet, this returns `None` and schedules the first refresh.
+///
+/// # Panics
+/// Panics if the process-wide probe cache mutex is poisoned.
+#[must_use]
+pub fn cached_probe_snapshot_with(spawn_refresh: fn()) -> Option<AcpRuntimeProbeResponse> {
     let mut should_refresh = false;
     let snapshot = {
         let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
@@ -103,15 +101,12 @@ fn cached_probe_snapshot_with(spawn_refresh: fn()) -> Option<AcpRuntimeProbeResp
     snapshot
 }
 
-/// Best-effort cache warm-up for the ACP runtime probe.
+/// Best-effort cache warm-up for the ACP runtime probe, refreshing through
+/// `spawn_refresh`.
 ///
 /// # Panics
 /// Panics if the process-wide probe cache mutex is poisoned.
-pub fn schedule_probe_cache_refresh() {
-    schedule_probe_cache_refresh_with(spawn_routed_probe_cache_refresh);
-}
-
-fn schedule_probe_cache_refresh_with(spawn_refresh: fn()) {
+pub fn schedule_probe_cache_refresh_with(spawn_refresh: fn()) {
     let should_refresh = {
         let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
         let entry_is_fresh = cache.entry.as_ref().is_some_and(probe_cache_entry_is_fresh);
@@ -128,42 +123,15 @@ fn schedule_probe_cache_refresh_with(spawn_refresh: fn()) {
     }
 }
 
-#[cfg(feature = "daemon-runtime")]
-fn bridge_cached_probe_snapshot() -> Result<Option<AcpRuntimeProbeResponse>, CliError> {
-    use crate::daemon::bridge::{BridgeCapability, BridgeClient};
-
-    BridgeClient::for_capability(BridgeCapability::Acp).and_then(|bridge| bridge.acp_probe())
-}
-
-fn spawn_routed_probe_cache_refresh() {
-    #[cfg(feature = "daemon-runtime")]
-    if sandboxed_from_env() {
-        spawn_bridge_probe_cache_refresh();
-        return;
-    }
-    spawn_local_probe_cache_refresh();
-}
-
-#[cfg(feature = "daemon-runtime")]
-fn spawn_bridge_probe_cache_refresh() {
-    let result = thread::Builder::new()
-        .name("acp-bridge-probe-refresh".to_string())
-        .spawn(refresh_probe_cache_from_bridge);
-    if let Err(error) = result {
-        clear_probe_cache_refresh_flag();
-        warn!(%error, "failed to spawn host bridge ACP probe refresh");
-    }
-}
-
-#[cfg(feature = "daemon-runtime")]
-fn refresh_probe_cache_from_bridge() {
-    match bridge_cached_probe_snapshot() {
-        Ok(Some(response)) => store_probe_cache(response),
-        Ok(None) => clear_probe_cache_refresh_flag(),
-        Err(error) => {
-            clear_probe_cache_refresh_flag();
-            warn!(%error, "failed to refresh ACP runtime probe from host bridge");
-        }
+/// Settle the refresh this module marked as in flight.
+///
+/// `Some` publishes a new snapshot; `None` abandons the attempt so a later
+/// caller can start another one. A refresh that never calls this leaves the
+/// cache permanently marked as refreshing.
+pub fn finish_probe_cache_refresh(response: Option<AcpRuntimeProbeResponse>) {
+    match response {
+        Some(response) => store_probe_cache(response),
+        None => clear_probe_cache_refresh_flag(),
     }
 }
 
@@ -271,7 +239,7 @@ fn probe_cache_entry_is_fresh(entry: &ProbeCacheEntry) -> bool {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-fn spawn_local_probe_cache_refresh() {
+pub(crate) fn spawn_local_probe_cache_refresh() {
     if let Err(error) = spawn_local_probe_cache_refresh_thread() {
         clear_probe_cache_refresh_flag();
         warn!(%error, "failed to spawn ACP runtime probe refresh");
@@ -486,7 +454,7 @@ mod tests {
         };
         replace_probe_cache_for_tests(Some(response.clone()), Duration::ZERO, false);
 
-        assert_eq!(cached_probe_snapshot(), Some(response));
+        assert_eq!(local_cached_probe_snapshot(), Some(response));
 
         replace_probe_cache_for_tests(None, Duration::ZERO, false);
     }
@@ -496,7 +464,7 @@ mod tests {
         let _guard = lock_probe_cache_for_tests();
         replace_probe_cache_for_tests(None, Duration::ZERO, true);
 
-        let response = probe_acp_agents_cached();
+        let response = probe_acp_agents_cached_with(spawn_local_probe_cache_refresh);
 
         assert!(response.probes.is_empty());
         assert!(!response.checked_at.is_empty());

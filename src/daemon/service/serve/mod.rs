@@ -41,7 +41,7 @@ use super::{
     ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, bridge, broadcast, http, index, process_id,
     state, tokio_watch, watch,
 };
-use crate::agents::acp::probe::schedule_probe_cache_refresh;
+use crate::daemon::acp_probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};

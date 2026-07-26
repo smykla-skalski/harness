@@ -10,7 +10,7 @@ use utoipa_axum::routes;
 
 use axum::extract::Query;
 
-use crate::agents::acp::probe::probe_acp_agents_cached;
+use crate::daemon::acp_probe::probe_acp_agents_cached;
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::protocol::{
