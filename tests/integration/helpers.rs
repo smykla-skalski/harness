@@ -10,8 +10,7 @@ use harness::app::cli::{self, Command, SetupCommand};
 use harness::app::{AppContext, Execute};
 use harness::errors::CliError;
 use harness::setup::{
-    CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupArgs, KumaSetupCommand, PreCompactArgs,
-    SessionStartArgs, SessionStopArgs,
+    CapabilitiesArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
 use sha2::{Digest, Sha256};
 
@@ -180,16 +179,6 @@ pub fn capabilities_cmd() -> Command {
         project_dir: None,
         repo_root: None,
     }))
-}
-
-pub fn cluster_cmd(args: ClusterArgs) -> Command {
-    setup_cmd(SetupCommand::Kuma(Box::new(KumaSetupArgs {
-        command: KumaSetupCommand::Cluster(args),
-    })))
-}
-
-pub fn gateway_cmd(args: GatewayArgs) -> Command {
-    setup_cmd(SetupCommand::Gateway(args))
 }
 
 pub fn pre_compact_cmd(args: PreCompactArgs) -> PreCompactArgs {

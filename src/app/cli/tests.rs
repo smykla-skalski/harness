@@ -4,7 +4,7 @@ use super::*;
 use crate::hooks::adapters::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
-use crate::setup::{CapabilitiesArgs, ClusterArgs, GatewayArgs, KumaSetupCommand};
+use crate::setup::CapabilitiesArgs;
 use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowStatus};
 
@@ -30,49 +30,6 @@ mod setup;
 mod task_board_estimates;
 #[path = "tests/task_board_policy.rs"]
 mod task_board_policy;
-
-fn expect_cluster_args(command: Command) -> ClusterArgs {
-    match command {
-        Command::Setup {
-            command: SetupCommand::Kuma(args),
-        } => match args.command {
-            KumaSetupCommand::Cluster(args) => args,
-        },
-        _ => panic!("expected Cluster command"),
-    }
-}
-
-fn assert_remote_cluster_args(args: &ClusterArgs) {
-    assert_remote_cluster_core(args);
-    assert_remote_cluster_targets(args);
-}
-
-fn assert_remote_cluster_core(args: &ClusterArgs) {
-    assert_eq!(args.provider.as_deref(), Some("remote"));
-    assert_eq!(args.push_prefix.as_deref(), Some("ghcr.io/acme/kuma"));
-    assert_eq!(args.push_tag.as_deref(), Some("pr-123"));
-    assert_eq!(args.mode, "global-zone-up");
-    assert_eq!(args.cluster_name, "kuma-1");
-    assert_eq!(args.extra_cluster_names, vec!["kuma-2", "zone-1"]);
-}
-
-fn assert_remote_cluster_targets(args: &ClusterArgs) {
-    assert_eq!(args.remote.len(), 2);
-    assert_first_remote_cluster_target(args);
-    assert_second_remote_cluster_target(args);
-}
-
-fn assert_first_remote_cluster_target(args: &ClusterArgs) {
-    assert_eq!(args.remote[0].name, "kuma-1");
-    assert_eq!(args.remote[0].kubeconfig, "/tmp/global.yaml");
-    assert_eq!(args.remote[0].context.as_deref(), Some("global"));
-}
-
-fn assert_second_remote_cluster_target(args: &ClusterArgs) {
-    assert_eq!(args.remote[1].name, "kuma-2");
-    assert_eq!(args.remote[1].kubeconfig, "/tmp/zone.yaml");
-    assert!(args.remote[1].context.is_none());
-}
 
 #[test]
 fn all_expected_subcommands_registered() {
