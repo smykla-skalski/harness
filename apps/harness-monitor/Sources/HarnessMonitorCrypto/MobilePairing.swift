@@ -57,11 +57,11 @@ public enum MobilePairingError: Error, LocalizedError, Equatable, Sendable {
       "The station rejected this pairing request (HTTP 400). The pairing link may "
         + "already have been used. Create a new pairing link and try again."
     case 500...599:
-      "The station could not complete pairing (HTTP \(statusCode)). Check that "
-        + "Harness Monitor is still running on the station, then try again."
+      "The server at this address could not complete pairing (HTTP \(statusCode)). "
+        + "Check that Harness Monitor is still running on the station, then try again."
     default:
-      "The station rejected pairing (HTTP \(statusCode)). Check that the link points "
-        + "at the station, then create a new pairing link and try again."
+      "The server at this address refused pairing (HTTP \(statusCode)). Check that "
+        + "the link points at the station, then create a new pairing link and try again."
     }
   }
 }
