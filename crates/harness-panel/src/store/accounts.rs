@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::Row;
-use sqlx::sqlite::SqliteRow;
+use sqlx::sqlite::{SqliteConnection, SqliteRow};
 
 use super::{Store, from_unix_seconds, to_unix_seconds};
 
@@ -41,34 +41,8 @@ impl Store {
         identity: &AccountIdentity,
         now: DateTime<Utc>,
     ) -> Result<Account, sqlx::Error> {
-        let timestamp = to_unix_seconds(now);
-        let row = sqlx::query(
-            "INSERT INTO accounts \
-             (id, provider, subject_id, login, display_name, avatar_url, first_seen_at, \
-              last_seen_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7) \
-             ON CONFLICT (provider, subject_id) DO UPDATE SET \
-               login = excluded.login, \
-               display_name = excluded.display_name, \
-               avatar_url = excluded.avatar_url, \
-               last_seen_at = excluded.last_seen_at \
-             RETURNING id, provider, subject_id, login, display_name, avatar_url, \
-                       first_seen_at, last_seen_at",
-        )
-        // A returning account keeps the id it was created with, because
-        // `excluded.id` is only applied on insert. Sessions and, later,
-        // approvals reference it, so it has to stay stable across renames.
-        .bind(uuid::Uuid::new_v4().to_string())
-        .bind(&identity.provider)
-        .bind(&identity.subject_id)
-        .bind(&identity.login)
-        .bind(&identity.display_name)
-        .bind(identity.avatar_url.as_deref())
-        .bind(timestamp)
-        .fetch_one(self.pool())
-        .await?;
-
-        Ok(account_from_row(&row))
+        let mut connection = self.pool().acquire().await?;
+        upsert_account_with(&mut connection, identity, now).await
     }
 
     /// Look an account up by its panel id.
@@ -103,6 +77,41 @@ impl Store {
 
         Ok(rows.iter().map(account_from_row).collect())
     }
+}
+
+pub(super) async fn upsert_account_with(
+    connection: &mut SqliteConnection,
+    identity: &AccountIdentity,
+    now: DateTime<Utc>,
+) -> Result<Account, sqlx::Error> {
+    let timestamp = to_unix_seconds(now);
+    let row = sqlx::query(
+        "INSERT INTO accounts \
+         (id, provider, subject_id, login, display_name, avatar_url, first_seen_at, \
+          last_seen_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7) \
+         ON CONFLICT (provider, subject_id) DO UPDATE SET \
+           login = excluded.login, \
+           display_name = excluded.display_name, \
+           avatar_url = excluded.avatar_url, \
+           last_seen_at = excluded.last_seen_at \
+         RETURNING id, provider, subject_id, login, display_name, avatar_url, \
+                   first_seen_at, last_seen_at",
+    )
+    // A returning account keeps the id it was created with, because
+    // `excluded.id` is only applied on insert. Sessions and, later,
+    // approvals reference it, so it has to stay stable across renames.
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(&identity.provider)
+    .bind(&identity.subject_id)
+    .bind(&identity.login)
+    .bind(&identity.display_name)
+    .bind(identity.avatar_url.as_deref())
+    .bind(timestamp)
+    .fetch_one(&mut *connection)
+    .await?;
+
+    Ok(account_from_row(&row))
 }
 
 pub(super) fn account_from_row(row: &SqliteRow) -> Account {

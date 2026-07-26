@@ -7,7 +7,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 
-use super::accounts::{Account, AccountIdentity, account_from_row};
+use super::accounts::{Account, AccountIdentity, account_from_row, upsert_account_with};
 use super::token::{OpaqueToken, hash_token};
 use super::{Store, from_unix_seconds, to_unix_seconds};
 use crate::error::PanelError;
@@ -24,10 +24,10 @@ impl Store {
     /// Record a successful identity, bind the owner when eligible, and issue
     /// the session returned to the browser.
     ///
-    /// The owner claim and session insert share one transaction. A failed
-    /// session insert therefore cannot leave the panel claimed by a callback
-    /// that never completed, while `INSERT OR IGNORE` keeps concurrent owner
-    /// callbacks first-writer-wins.
+    /// The account upsert, owner claim, and session insert share one
+    /// transaction. A failed session insert therefore cannot leave behind an
+    /// account or claim from a callback that never completed, while `INSERT OR
+    /// IGNORE` keeps concurrent owner callbacks first-writer-wins.
     ///
     /// # Errors
     /// Returns [`PanelError::Config`] when the system random source fails and
@@ -40,9 +40,9 @@ impl Store {
         now: DateTime<Utc>,
     ) -> Result<(Account, OpaqueToken), PanelError> {
         let token = OpaqueToken::generate()?;
-        let account = self.upsert_account(identity, now).await?;
         let timestamp = to_unix_seconds(now);
         let mut transaction = self.pool().begin_with("BEGIN IMMEDIATE").await?;
+        let account = upsert_account_with(transaction.as_mut(), identity, now).await?;
 
         if claim_owner {
             sqlx::query(
@@ -216,6 +216,27 @@ mod tests {
                 .expect("session")
                 .is_some()
         );
+    }
+
+    #[tokio::test]
+    async fn a_failed_session_insert_rolls_back_the_account_and_owner_claim() {
+        let store = Store::open_in_memory().await.expect("store");
+        sqlx::query(
+            "CREATE TRIGGER reject_session_insert BEFORE INSERT ON sessions \
+             BEGIN SELECT RAISE(ABORT, 'session insert rejected'); END",
+        )
+        .execute(store.pool())
+        .await
+        .expect("install failure trigger");
+
+        assert!(
+            store
+                .complete_sign_in(&ada(), true, Duration::hours(12), at(10))
+                .await
+                .is_err()
+        );
+        assert!(store.list_accounts().await.expect("accounts").is_empty());
+        assert!(store.owner_binding().await.expect("binding").is_none());
     }
 
     #[tokio::test]
