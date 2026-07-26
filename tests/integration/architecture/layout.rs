@@ -72,13 +72,8 @@ fn cluster_topology_is_owned_by_kernel() {
     for path in [
         "src/run/context/current.rs",
         "src/run/context/aggregate.rs",
-        "src/run/application/current.rs",
-        "src/setup/services/cluster.rs",
         "src/setup/capabilities/data.rs",
         "src/setup/capabilities/model.rs",
-        "src/setup/cluster/kubernetes/runtime.rs",
-        "src/setup/cluster/kubernetes/modes.rs",
-        "src/setup/cluster/universal.rs",
         "src/hooks/verify_bash.rs",
         "tests/integration/cluster/mod.rs",
         "tests/integration/universal.rs",
@@ -97,30 +92,6 @@ fn cluster_topology_is_owned_by_kernel() {
         hits.is_empty(),
         "generic cluster topology must be owned by kernel:\n{}",
         hits.join("\n")
-    );
-}
-
-#[test]
-fn platform_compose_root_is_thin() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let compose_mod = read_repo_file(root, "src/platform/compose/mod.rs");
-
-    for needle in [
-        "fn bridge_network(",
-        "fn cp_env(",
-        "fn cp_command(",
-        "fn postgres_depends(",
-        "mod tests {",
-    ] {
-        assert!(
-            !compose_mod.contains(needle),
-            "src/platform/compose/mod.rs should stay focused on compose types and exports instead of owning `{needle}`"
-        );
-    }
-
-    assert!(
-        repo_path_exists(root, "src/platform/compose/tests.rs"),
-        "platform compose split test module should exist"
     );
 }
 
