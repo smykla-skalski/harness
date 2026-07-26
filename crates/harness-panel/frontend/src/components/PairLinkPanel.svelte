@@ -241,9 +241,14 @@
             expires in {formatCountdown(leftMs)}
           </span>
         {/if}
-        <span class="visually-hidden">
-          expires <time datetime={link.expires_at}>{formatTimestamp(link.expires_at)}</time>
-        </span>
+        <!-- Only when the deadline parsed. Otherwise this would put an invalid
+             value in `datetime` and announce an expiry the visible label has just
+             said is unknown. -->
+        {#if leftMs !== null}
+          <span class="visually-hidden">
+            expires <time datetime={link.expires_at}>{formatTimestamp(link.expires_at)}</time>
+          </span>
+        {/if}
       </p>
     </div>
 

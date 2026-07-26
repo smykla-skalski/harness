@@ -23,7 +23,25 @@
   // list reflows onto a phone without either scrolling sideways or dropping a
   // column that a decision depends on.
   const approved = $derived(accounts.filter((account) => account.can_pair).length);
-  const now = Date.now();
+
+  /**
+   * Coarse enough for buckets that count whole minutes, often enough that a row
+   * reading "seen just now" stops saying it. Captured once, the clock would never
+   * move again for as long as the page stayed open, not even across a refresh,
+   * because the component instance survives one.
+   */
+  const AGE_TICK_MS = 30_000;
+
+  let now = $state(Date.now());
+
+  $effect(() => {
+    const tick = setInterval(() => {
+      now = Date.now();
+    }, AGE_TICK_MS);
+    return () => {
+      clearInterval(tick);
+    };
+  });
 
   async function decide(account: PanelAccount): Promise<void> {
     working = account.id;
