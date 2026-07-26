@@ -107,7 +107,12 @@ impl GitSourceBundleImportPlan {
         self.require_imported()
     }
 
-    pub(crate) fn require_imported(&self) -> GitResult<()> {
+    /// Verify the import landed and left the repository on the exact revision.
+    ///
+    /// # Errors
+    /// Returns `GitError` if the static contract or cleanliness checks fail, or
+    /// if the import ref does not resolve to the revision that was requested.
+    pub fn require_imported(&self) -> GitResult<()> {
         self.validate_static_contract()?;
         self.require_clean_repository()?;
         if self.optional_revision(&self.import_ref)?.as_deref() != Some(self.revision.as_str()) {

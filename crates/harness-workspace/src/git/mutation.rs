@@ -21,7 +21,12 @@ pub(crate) enum LinkedWorktreeBackend {
 
 pub(crate) const LINKED_WORKTREE_BACKEND: LinkedWorktreeBackend = LinkedWorktreeBackend::Gix;
 
-pub(crate) fn create_linked_worktree(
+/// Create a linked worktree for `branch_name` at `worktree_path`.
+///
+/// # Errors
+/// Returns `GitError` if the repository cannot be opened, has no committer
+/// identity to fall back on, or if writing the worktree and its branch fails.
+pub fn create_linked_worktree(
     repo_path: &Path,
     worktree_name: &str,
     worktree_path: &Path,
