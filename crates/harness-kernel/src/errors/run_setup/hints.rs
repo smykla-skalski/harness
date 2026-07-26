@@ -1,49 +1,38 @@
 use super::RunSetupError;
 
 impl RunSetupError {
+    /// Advice to print under the error message.
+    ///
+    /// This crate sits below the command line and cannot see which subcommands
+    /// the binaries accept, so a hint here must not name one. Several of these
+    /// used to, and went on telling readers to run cluster setup and recording
+    /// commands for years after those were retired, because nothing connected
+    /// the advice to the surface that would have contradicted it. Describe the
+    /// state to fix, or say nothing.
     #[must_use]
     pub fn hint(&self) -> Option<String> {
         match self {
-            Self::MissingRunPointer => Some("Run `harness run start` first.".into()),
-            Self::MissingRunContextValue { .. } => {
-                Some("Run `harness run start` and the required setup step first.".into())
-            }
-            Self::MissingRunLocation { .. } => {
-                Some("Pass `--run-root` or `--run-dir`, or run `harness run start` first.".into())
-            }
             Self::GatewayDownloadEmpty { .. } => {
                 Some("Check the URL and network connectivity.".into())
             }
             Self::KumactlNotFound => Some("Build kumactl first.".into()),
-            Self::TrackedKubectlRequired => {
-                Some("Run `harness run start` and `harness setup kuma cluster ...` first.".into())
-            }
-            Self::KubectlTargetOverrideForbidden { .. } => Some(
-                "Use `harness run record --cluster <name> -- kubectl ...` for another tracked member.".into(),
-            ),
             Self::UnknownTrackedCluster { choices, .. } => Some(format!("Use one of: {choices}.")),
-            Self::NonLocalKubeconfig { .. } => Some(
-                "Recreate the local cluster with `harness setup kuma cluster ...` before continuing.".into(),
-            ),
-            Self::EvidenceLabelNotFound { .. } => Some(
-                "Use `harness run record --label <label>` or inspect `commands/command-log.md`."
-                    .into(),
-            ),
             Self::ReportGroupEvidenceRequired => {
                 Some("Pass `--evidence-label <label>` or `--evidence <path>`.".into())
             }
-            Self::RunDirExists { .. } => Some(
-                "Use a new run id or resume the existing run instead of re-running `harness run start`."
-                    .into(),
-            ),
-            Self::MissingRunStatus => Some(
-                "The run-status.json file could not be loaded. Re-run `harness run start` or check the run directory."
-                    .into(),
-            ),
-            Self::ServiceReadinessTimeout { name } => Some(format!(
-                "Run `harness run kuma service down {name}` to clean up the container."
-            )),
-            Self::MissingCloseoutArtifact { .. }
+            Self::MissingRunStatus => {
+                Some("The run status file could not be loaded. Check the run directory.".into())
+            }
+            Self::MissingRunPointer
+            | Self::MissingRunContextValue { .. }
+            | Self::MissingRunLocation { .. }
+            | Self::TrackedKubectlRequired
+            | Self::KubectlTargetOverrideForbidden { .. }
+            | Self::NonLocalKubeconfig { .. }
+            | Self::EvidenceLabelNotFound { .. }
+            | Self::RunDirExists { .. }
+            | Self::ServiceReadinessTimeout { .. }
+            | Self::MissingCloseoutArtifact { .. }
             | Self::MissingStateCapture
             | Self::VerdictPending
             | Self::RunGroupAlreadyRecorded { .. }
@@ -68,3 +57,7 @@ impl RunSetupError {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "hints_tests.rs"]
+mod tests;

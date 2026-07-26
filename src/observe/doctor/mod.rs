@@ -12,8 +12,6 @@ mod checks;
 #[derive(Debug, Clone, Serialize)]
 struct DoctorTarget {
     project_dir: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    repo_root: Option<String>,
     compact_handoff: String,
 }
 
@@ -77,14 +75,11 @@ fn resolve_project_dir(raw: Option<&str>) -> Result<PathBuf, CliError> {
 }
 
 fn build_report(project_dir: &Path) -> DoctorReport {
-    let repo_root = checks::auto_detect_kuma_repo_root(project_dir);
     let compact_path = compact_latest_path(project_dir);
 
     let mut checks = vec![];
     checks.extend(checks::check_global_install(project_dir));
-    checks.extend(checks::check_lifecycle_contract(project_dir));
     checks.extend(checks::check_runtime_bootstrap_contract(project_dir));
-    checks.extend(checks::check_repo_provider_contract(repo_root.as_deref()));
     checks.push(checks::check_compact_handoff(project_dir, &compact_path));
 
     let remaining_findings: Vec<DoctorCheck> = checks
@@ -98,7 +93,6 @@ fn build_report(project_dir: &Path) -> DoctorReport {
         command: "observe doctor",
         target: DoctorTarget {
             project_dir: project_dir.display().to_string(),
-            repo_root: repo_root.as_ref().map(|path| path.display().to_string()),
             compact_handoff: compact_path.display().to_string(),
         },
         checks,
@@ -110,9 +104,6 @@ fn build_report(project_dir: &Path) -> DoctorReport {
 fn render_human(report: &DoctorReport) {
     println!("observe doctor");
     println!("project: {}", report.target.project_dir);
-    if let Some(repo_root) = &report.target.repo_root {
-        println!("repo: {repo_root}");
-    }
     println!("compact: {}", report.target.compact_handoff);
     for check in &report.checks {
         println!(
@@ -135,22 +126,34 @@ mod tests {
     use fs_err as fs;
     use temp_env::with_vars;
 
-    use super::build_report;
+    use crate::hooks::adapters::HookAgent;
+    use crate::setup::wrapper::planned_agent_bootstrap_files;
+
+    use super::{DoctorReport, build_report};
+
+    fn prepare_home(tmp: &std::path::Path) -> std::path::PathBuf {
+        let home = tmp.join("home");
+        fs::create_dir_all(home.join(".claude").join("projects")).unwrap();
+        fs::create_dir_all(home.join(".local").join("bin")).unwrap();
+        fs::write(home.join(".local").join("bin").join("harness"), "").unwrap();
+        home
+    }
+
+    fn report_for(tmp: &std::path::Path, project_dir: &std::path::Path) -> DoctorReport {
+        let home = prepare_home(tmp);
+        with_vars(
+            [
+                ("HOME", Some(home.to_str().unwrap())),
+                ("XDG_DATA_HOME", Some(tmp.to_str().unwrap())),
+            ],
+            || build_report(project_dir),
+        )
+    }
 
     #[test]
     fn build_report_omits_suite_plugin_checks() {
         let tmp = tempfile::tempdir().unwrap();
-        let home = tmp.path().join("home");
-        fs::create_dir_all(home.join(".claude").join("projects")).unwrap();
-        fs::create_dir_all(home.join(".local").join("bin")).unwrap();
-
-        let report = with_vars(
-            [
-                ("HOME", Some(home.to_str().unwrap())),
-                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
-            ],
-            || build_report(tmp.path()),
-        );
+        let report = report_for(tmp.path(), tmp.path());
 
         assert!(!report.checks.iter().any(|check| matches!(
             check.code,
@@ -159,5 +162,43 @@ mod tests {
                 | "observe_project_wrapper"
                 | "observe_project_wrapper_missing"
         )));
+    }
+
+    /// A project carrying exactly what bootstrap writes has to satisfy the
+    /// doctor. Without this, a check can outlive the thing it inspects and every
+    /// run reports a finding nobody can act on: the lifecycle check kept looking
+    /// for a plugin file that bootstrap stopped writing, so the command exited
+    /// non-zero in every project it was ever run in.
+    #[test]
+    fn a_bootstrapped_project_has_no_findings() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("project");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        for agent in [
+            HookAgent::Claude,
+            HookAgent::Codex,
+            HookAgent::Gemini,
+            HookAgent::Copilot,
+            HookAgent::Vibe,
+            HookAgent::OpenCode,
+        ] {
+            for (path, contents) in planned_agent_bootstrap_files(&project_dir, agent, &[]) {
+                fs::create_dir_all(path.parent().unwrap()).unwrap();
+                fs::write(&path, contents).unwrap();
+            }
+        }
+
+        let report = report_for(tmp.path(), &project_dir);
+        let findings: Vec<&str> = report
+            .remaining_findings
+            .iter()
+            .map(|check| check.code)
+            .collect();
+
+        assert!(
+            report.ok,
+            "a project bootstrapped from the current contract still reports: {findings:?}"
+        );
     }
 }

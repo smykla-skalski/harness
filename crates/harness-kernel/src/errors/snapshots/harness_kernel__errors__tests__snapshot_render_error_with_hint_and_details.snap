@@ -1,8 +1,8 @@
 ---
-source: src/errors/mod.rs
+source: crates/harness-kernel/src/errors/tests.rs
 expression: rendered
 ---
-ERROR [KSRCLI005] missing current run pointer
-Hint: Run `harness run start` first.
+ERROR [KSRCLI060] run has no recorded status
+Hint: The run status file could not be loaded. Check the run directory.
 Details:
-checked /tmp/ctx/current-run.json
+checked /tmp/runs/run-1/run-status.json
