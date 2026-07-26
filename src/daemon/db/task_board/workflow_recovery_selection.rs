@@ -355,8 +355,8 @@ async fn load_recovery_page_in_tx(
 }
 
 /// Loads the page's executions and settles the transaction. A truncated page
-/// stores its cursor so the next pass resumes after it, and a failed load
-/// rolls back rather than committing the cursor of a page nobody received.
+/// stores its cursor so the next pass resumes after it, and a failed load rolls
+/// the transaction back instead of committing it.
 async fn settle_recovery_selection(
     mut transaction: Transaction<'_, Sqlite>,
     page: RecoveryPage,

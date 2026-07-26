@@ -23,7 +23,7 @@ use crate::task_board::{
 };
 
 /// The four records the atomic CAS compares against each other. Every step of
-/// the CAS reads all of them and none of them changes.
+/// the CAS reads from these and none of them changes.
 pub(super) struct AtomicCasExpectation<'a> {
     pub(super) execution: &'a TaskBoardWorkflowExecutionCas,
     pub(super) updated_execution: &'a TaskBoardWorkflowExecutionRecord,

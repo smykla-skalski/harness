@@ -301,7 +301,9 @@ async fn refuse_preparation_in_tx(
 }
 
 /// Takes the lease on a screened preparation and reports the claim token. The
-/// `UPDATE` re-checks `preparing`, so a competing claimer changes no row.
+/// `UPDATE` re-checks `preparing`, so a preparation another worker claimed
+/// first is left alone here; `ensure_preparation_claim` is what later refuses
+/// a token that never took.
 pub(super) async fn claim_preparation_intent_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,

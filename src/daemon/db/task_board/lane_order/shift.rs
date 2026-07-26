@@ -24,8 +24,8 @@ pub(super) async fn store_item_in_tx(
 }
 
 /// Re-stores every neighbour whose placement `normalize_lane_entries` changed
-/// and reports the shifts. The transitioning item can be among them, so the
-/// caller drops it from the reported shifts and stores it at its own revision.
+/// and reports the shifts. The caller drops the transitioning item from the
+/// reported shifts and stores that one itself, at its own revision.
 pub(super) async fn shift_lane_entries_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     entries: &[LaneEntry],

@@ -177,8 +177,8 @@ impl AsyncDaemonDb {
 }
 
 /// Settles a recovery that already ran. An unchanged recovery still clears the
-/// candidate's quarantine, so a snapshot that turned out to need nothing is not
-/// retried on the next pass.
+/// candidate's quarantine, exactly as a changed one does, and reports no
+/// assignment.
 async fn settle_recovered_assignment(
     mut transaction: Transaction<'_, Sqlite>,
     assignment_id: &str,
@@ -215,8 +215,9 @@ async fn commit_recovery(
         .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
-/// Reports the rollback failure alongside the recovery error that caused it,
-/// because the caller returns the recovery error and would otherwise lose it.
+/// Folds the recovery error into the rollback failure. The caller returns the
+/// recovery error itself, so a rollback that also fails would otherwise be
+/// dropped unreported.
 async fn rollback_failed_recovery(
     transaction: Transaction<'_, Sqlite>,
     error: &CliError,

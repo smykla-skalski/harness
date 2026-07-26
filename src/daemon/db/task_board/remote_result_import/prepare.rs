@@ -21,8 +21,8 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, validate_task_board_workflow_execution,
 };
 
-/// The exact records a result import is prepared against: all three are read
-/// under the same transaction and none of them is allowed to have moved.
+/// The exact records a result import is prepared against, all read under the
+/// same transaction. The parent execution still has to match the caller's CAS.
 pub(super) struct LoadedResultImport {
     pub(super) assignment: TaskBoardRemoteAssignmentRecord,
     pub(super) parent: TaskBoardWorkflowExecutionRecord,

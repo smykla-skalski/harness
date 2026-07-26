@@ -42,8 +42,8 @@ pub(super) struct PreparedHide {
 }
 
 /// Screens the hide and applies `patch`, stopping before any row is
-/// tombstoned. `NotApplied` still leaves the caller a transaction to commit,
-/// because the screen's own conflict replacement may have written.
+/// tombstoned. `NotApplied` means the screen read nothing it could hide and
+/// wrote nothing, so the caller's commit settles an empty transaction.
 pub(super) async fn prepare_hide_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,

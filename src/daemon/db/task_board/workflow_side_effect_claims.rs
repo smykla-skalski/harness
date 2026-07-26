@@ -61,8 +61,8 @@ impl AsyncDaemonDb {
     }
 }
 
-/// The records a side-effect claim compares and stores. Every step reads all
-/// of them and none of them changes.
+/// The records a side-effect claim compares and stores. Every step reads from
+/// these and none of them changes.
 struct SideEffectClaimRequest<'a> {
     execution: &'a TaskBoardWorkflowExecutionCas,
     attempt: &'a TaskBoardExecutionAttemptCas,
@@ -79,7 +79,9 @@ enum SideEffectClaim {
 }
 
 /// Proves the claim can be taken and builds the parent execution to store.
-/// Writes nothing itself, so every refusal here rolls back.
+/// `Settled` has to be committed rather than dropped: the first-start
+/// admission this screen revalidates settles a blocked admission and can
+/// freeze an unconfigured start, so the screen itself may already have written.
 async fn screen_side_effect_claim_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     claim: &SideEffectClaimRequest<'_>,
