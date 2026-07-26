@@ -249,6 +249,22 @@ fn a_cursor_refuses_a_changed_board_sequence() {
 }
 
 #[test]
+fn a_decoded_cursor_refuses_an_offset_at_or_past_the_last_match() {
+    let ids = ["task-a", "task-b", "task-c"];
+
+    for offset in [ids.len() - 1, ids.len(), usize::MAX] {
+        let encoded = TaskBoardListCursor::for_page(7, offset).encode();
+        let decoded = TaskBoardListCursor::decode(&encoded).expect("shaped cursor");
+
+        assert_eq!(
+            select_page(&ids, Some(&decoded), 1, 7),
+            None,
+            "accepted offset {offset}"
+        );
+    }
+}
+
+#[test]
 fn a_legacy_cursor_is_refused_instead_of_resuming_without_a_snapshot() {
     let legacy = URL_SAFE_NO_PAD.encode("1:task-1");
 

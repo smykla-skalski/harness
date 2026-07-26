@@ -187,9 +187,10 @@ pub struct TaskBoardListPage {
 
 /// Cut `limit` items out of an ordered selection, resuming after `cursor`.
 ///
-/// `None` means the board changed after the cursor was issued. Refusing that
-/// stale continuation prevents a multi-page read from silently mixing two
-/// snapshots and omitting items that moved around its resume point.
+/// `None` means the cursor does not belong to this selection: either the board
+/// changed after it was issued or its offset could not have been emitted for
+/// these matches. Refusing either continuation prevents a multi-page read from
+/// silently mixing snapshots or treating a forged cursor as a drained board.
 #[must_use]
 pub fn select_page(
     matched_ids: &[&str],
@@ -200,7 +201,7 @@ pub fn select_page(
     if cursor.is_some_and(|cursor| !cursor.matches_change_sequence(items_change_seq)) {
         return None;
     }
-    let start = cursor.map_or(0, |cursor| resume_index(matched_ids, cursor));
+    let start = cursor.map_or(Some(0), |cursor| resume_index(matched_ids, cursor))?;
     let end = start.saturating_add(limit as usize).min(matched_ids.len());
     let next_cursor = (end < matched_ids.len() && end > start)
         .then(|| TaskBoardListCursor::for_page(items_change_seq, end - 1));
@@ -212,8 +213,9 @@ pub fn select_page(
 }
 
 /// Resolve a cursor's anchor to the index the next page starts at.
-fn resume_index(matched_ids: &[&str], cursor: &TaskBoardListCursor) -> usize {
-    cursor.offset.saturating_add(1).min(matched_ids.len())
+fn resume_index(matched_ids: &[&str], cursor: &TaskBoardListCursor) -> Option<usize> {
+    let start = cursor.offset.checked_add(1)?;
+    (start < matched_ids.len()).then_some(start)
 }
 
 /// Resolve a caller's page size, refusing an explicit out-of-range one rather
