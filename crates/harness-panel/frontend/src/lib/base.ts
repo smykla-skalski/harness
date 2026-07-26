@@ -11,6 +11,14 @@ export const BASE_PATH_SENTINEL = '/__harness_panel_base__';
 
 const BASE_META_NAME = 'harness-panel-base';
 
+/**
+ * Harness Monitor's icon, copied verbatim into the bundle root by Vite.
+ *
+ * Kept in step with the icon links in `index.html`, which is the other place it
+ * is named.
+ */
+export const MONITOR_ICON_PATH = '/harness-monitor.png';
+
 /** Read the mount point the serving binary injected into `index.html`. */
 export function readBasePath(source: Document): string {
   const meta = source.querySelector(`meta[name="${BASE_META_NAME}"]`);

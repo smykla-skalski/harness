@@ -2,6 +2,7 @@
   import type { ClipboardWriter } from '../lib/clipboard';
   import { copyText } from '../lib/clipboard';
   import { formatCountdown, formatTimestamp, remainingFraction, remainingMs } from '../lib/format';
+  import { pairingHref } from '../lib/pairing';
   import type { PairLink } from '../lib/types';
   import Chip from './Chip.svelte';
   import Plate from './Plate.svelte';
@@ -18,6 +19,12 @@
   const URGENT_MS = 5 * 60 * 1_000;
   const COPIED_SETTLE_MS = 2_500;
   const TICK_MS = 1_000;
+  /**
+   * How long to let the handoff prove itself before offering the manual route.
+   * Long enough for the operating system to bring an installed app forward, short
+   * enough that somebody stuck is not left watching a page that says nothing.
+   */
+  const HANDOFF_GRACE_MS = 1_600;
 
   let link = $state<PairLink | null>(null);
   /**
@@ -29,11 +36,14 @@
   let working = $state(false);
   let failure = $state<string | null>(null);
   let copyState = $state<'idle' | 'copied' | 'manual'>('idle');
+  let handoff = $state<'idle' | 'waiting' | 'stalled'>('idle');
   let field = $state<HTMLInputElement | null>(null);
+  let handoffControl = $state<HTMLAnchorElement | null>(null);
 
   const leftMs = $derived(link === null ? null : remainingMs(link.expires_at, nowMs));
   const expired = $derived(leftMs === 0);
   const urgent = $derived(leftMs !== null && leftMs > 0 && leftMs <= URGENT_MS);
+  const href = $derived(link === null ? null : pairingHref(link.pairing_url));
   const left = $derived.by(() => {
     if (link === null || leftMs === null) {
       return 0;
@@ -44,9 +54,9 @@
   const copyNote = $derived.by(() => {
     switch (copyState) {
       case 'copied':
-        return 'Copied to the clipboard.';
+        return 'Copied to the clipboard';
       case 'manual':
-        return 'This browser would not let the page copy. The link is selected; press Cmd-C or Ctrl-C.';
+        return 'This browser would not let the page copy. The link is selected; press Cmd-C or Ctrl-C';
       case 'idle':
         return '';
     }
@@ -84,10 +94,39 @@
     };
   });
 
+  /**
+   * Whether the handoff went anywhere cannot be asked directly, so this watches
+   * for the page losing the foreground and treats staying put as a reason to
+   * offer the manual route. A browser prompting for permission also stays put, so
+   * the hint is written as a possibility rather than as a verdict.
+   */
+  $effect(() => {
+    if (handoff !== 'waiting') {
+      return;
+    }
+    const settle = setTimeout(() => {
+      handoff = 'stalled';
+    }, HANDOFF_GRACE_MS);
+    const departed = (): void => {
+      handoff = 'idle';
+    };
+    // `blur` is the one that fires on macOS and Windows, where another app coming
+    // forward leaves the tab visible; `visibilitychange` covers a mobile browser
+    // that backgrounds the whole page instead.
+    window.addEventListener('blur', departed);
+    document.addEventListener('visibilitychange', departed);
+    return () => {
+      clearTimeout(settle);
+      window.removeEventListener('blur', departed);
+      document.removeEventListener('visibilitychange', departed);
+    };
+  });
+
   async function generate(): Promise<void> {
     working = true;
     failure = null;
     copyState = 'idle';
+    handoff = 'idle';
     try {
       const minted = await onGenerate();
       issuedMs = Date.now();
@@ -99,6 +138,15 @@
       working = false;
     }
   }
+
+  // The handoff is the next thing to do, and putting focus on it lets the whole
+  // flow finish from the keyboard without hunting for the control. Keyed on the
+  // link alone: reading the countdown here would pull focus back every second.
+  $effect(() => {
+    if (link !== null) {
+      handoffControl?.focus();
+    }
+  });
 
   async function copy(): Promise<void> {
     if (link === null) {
@@ -120,28 +168,28 @@
 <Plate label="Pair a device" tone="lead">
   {#snippet status()}
     {#if !canPair}
-      <Chip>Not allowed</Chip>
+      <Chip>Awaiting approval</Chip>
     {:else if link === null}
-      <Chip tone="good" dot>Can pair</Chip>
+      <Chip tone="clear" dot>Approved</Chip>
     {:else if expired}
-      <Chip tone="danger">Expired</Chip>
+      <Chip tone="stop">Expired</Chip>
     {:else}
-      <Chip tone="brass" dot>Link live</Chip>
+      <Chip tone="signal" dot>Link live</Chip>
     {/if}
   {/snippet}
 
   {#if !canPair}
     <p class="dim">
-      Ask the panel owner to approve this account. Once they have, you can generate a link here.
+      Ask an administrator to approve this account. Once they have, you can generate a link here
     </p>
   {:else if link === null}
-    <p>A link is shown once and cannot be shown again. Open it on the device you want to pair.</p>
-    <button class="btn btn-brass" onclick={generate} disabled={working}>
+    <p>A link is shown once and cannot be shown again. Open it on the device you want to pair</p>
+    <button class="btn btn-signal" onclick={generate} disabled={working}>
       {working ? 'Generating…' : 'Generate a pairing link'}
     </button>
   {:else}
     {#if !expired}
-      <p>Open this on the device you want to pair. It is not shown again.</p>
+      <p>This link is shown once and cannot be shown again</p>
     {/if}
     <div class="ticket" class:ticket-spent={expired}>
       <!-- Selected on focus so it can be copied in one gesture even where the
@@ -197,11 +245,39 @@
     <p class="note" class:note-quiet={copyState !== 'manual'} role="status">{copyNote}</p>
 
     {#if expired}
-      <p>This link lapsed before anything claimed it. Generate another to pair the device.</p>
+      <p>This link lapsed before anything claimed it. Generate another to pair the device</p>
     {/if}
-    <button class="btn" class:btn-brass={expired} onclick={generate} disabled={working}>
-      {working ? 'Generating…' : 'Generate another'}
-    </button>
+
+    <div class="actions">
+      {#if href !== null && !expired}
+        <!-- `harness://` is registered by the Harness apps, so on the device being
+             paired this finishes the job in one press. An anchor rather than a
+             scripted navigation: it works from the keyboard, carries the browser's
+             own copy-link menu, and is not mistaken for a popup. -->
+        <a
+          bind:this={handoffControl}
+          class="btn btn-signal"
+          {href}
+          onclick={() => (handoff = 'waiting')}
+        >
+          Open in Harness Monitor
+        </a>
+      {/if}
+      <button class="btn" class:btn-signal={expired} onclick={generate} disabled={working}>
+        {working ? 'Generating…' : 'Generate another'}
+      </button>
+    </div>
+
+    {#if !expired}
+      <p class="aside dim" role="status">
+        {#if handoff === 'stalled'}
+          Harness Monitor did not come forward. If it is not installed on this device, copy the link
+          and open it on the one you want to pair
+        {:else}
+          Pairing a different device? Copy the link and open it there instead
+        {/if}
+      </p>
+    {/if}
   {/if}
 
   {#if failure !== null}
@@ -214,14 +290,13 @@
     margin-bottom: 1rem;
   }
 
-  /* The brass edge is the cut side of the key: the one part of the page that
-     holds a live credential. */
+  /* A solid tab rather than an outline: this is the one thing on the page holding
+     a live credential, and it should read as a physical strip. */
   .well {
     align-items: center;
     background: var(--well);
-    border: 1px solid var(--brass-edge);
-    border-left: 3px solid var(--brass);
-    border-radius: var(--r-ctl);
+    border-left: 3px solid var(--signal);
+    border-radius: var(--r-well);
     display: flex;
     gap: 0.5rem;
     padding: 0.375rem 0.375rem 0.375rem 0.75rem;
@@ -242,7 +317,7 @@
   }
 
   .copy {
-    background: var(--plate);
+    background: var(--strip);
     flex: none;
     min-height: 1.875rem;
     padding: 0 0.75rem;
@@ -253,19 +328,19 @@
   .track {
     background: var(--rule);
     border-radius: 999px;
-    height: 2px;
+    height: 3px;
     margin: 0.75rem 0 0.5rem;
     overflow: hidden;
   }
 
   .fill {
-    background: var(--brass);
+    background: var(--signal);
     height: 100%;
     transition: width 1s linear;
   }
 
   .fill-urgent {
-    background: var(--clay);
+    background: var(--stop);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -298,28 +373,31 @@
 
   .count-urgent,
   .gone {
-    color: var(--clay);
+    color: var(--stop);
     font-weight: 600;
   }
 
   .ticket-spent .well {
-    border-color: var(--rule);
-    border-left-color: var(--rule-strong);
+    border-left-color: var(--rule);
   }
 
   .ticket-spent .value {
     color: var(--dim);
   }
 
-  /* Only the manual-copy instruction is ever visible here, so this reads as
-     direction rather than as the confirmation the button already gives. */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Kept in the accessibility tree for the confirmation the button already shows
+     visually, so it is announced once without repeating what is on screen. */
   .note {
     font-size: 0.8125rem;
     margin: 0 0 0.875rem;
   }
 
-  /* Kept in the accessibility tree for the confirmation the button already shows
-     visually, so it is announced once without repeating what is on screen. */
   .note-quiet {
     clip-path: inset(50%);
     height: 1px;
@@ -329,8 +407,13 @@
     width: 1px;
   }
 
+  .aside {
+    font-size: 0.8125rem;
+    margin: 0.75rem 0 0;
+  }
+
   .failure {
-    color: var(--clay);
+    color: var(--stop);
     margin: 0.875rem 0 0;
   }
 </style>

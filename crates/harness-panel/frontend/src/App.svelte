@@ -7,7 +7,7 @@
   import type { PanelApi } from './lib/api';
   import type { PanelAccount, PanelViewer } from './lib/types';
 
-  const { api }: { api: PanelApi } = $props();
+  const { api, iconUrl }: { api: PanelApi; iconUrl: string } = $props();
 
   let loading = $state(true);
   let viewer = $state<PanelViewer | null>(null);
@@ -64,7 +64,7 @@
 </script>
 
 <main class="shell">
-  <IdentityBar {viewer} onSignOut={signOut} />
+  <IdentityBar {viewer} {iconUrl} onSignOut={signOut} />
 
   {#if failure !== null}
     <Plate label="Problem" tone="alarm">

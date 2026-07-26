@@ -1,8 +1,16 @@
 /*
- * The panel is an access-control console: one person hands a time-limited key to
- * a device they cannot see. Brass carries anything that mints or holds a live
- * credential, and nothing else does, so the irreversible action never wears the
- * same colour as ordinary navigation.
+ * The panel decides who may pair and hands out a single-use permission that
+ * expires on its own. Harness Monitor's icon is a control tower over a prism fan,
+ * so the page is built from that palette and laid out like the strips a tower
+ * works from. The words on screen stay the product's own, though: an account is
+ * approved or awaiting approval, matching the control that changes it.
+ *
+ * Nothing here is outlined. Surfaces separate by fill value, and the only edges
+ * are solid tabs and internal dividers, because a page of 1px-bordered cards on
+ * a dark ground is the look every other dark panel already has.
+ *
+ * Every colour pair a reader has to resolve is measured, not assumed; the tints
+ * are pre-composited so each ratio is a fixed number.
  *
  * Primitives shared by more than one component live here rather than in scoped
  * blocks, because a class assembled from a prop (`chip-${tone}`) is invisible to
@@ -12,53 +20,57 @@
 :root {
   color-scheme: light dark;
 
-  --ink: #e8ebef;
-  --plate: #ffffff;
-  --well: #f1f4f8;
-  --rule: #dbe0e8;
-  --rule-strong: #c3cbd6;
-  --text: #111821;
-  --dim: #576270;
+  --ink: #e9ecf4;
+  --strip: #ffffff;
+  --strip-lift: #eef1f8;
+  --well: #eaeef7;
+  --rule: #d8def0;
+  --text: #101632;
+  --dim: #525b7b;
 
-  --brass: #8a5d0e;
-  --brass-soft: #f6ecd6;
-  --brass-edge: #c99a3f;
-  --on-brass: #ffffff;
+  --signal: #7a4e04;
+  --on-signal: #ffffff;
+  --clear: #0a6148;
+  --stop: #992f1c;
 
-  --jade: #0f6f62;
-  --jade-soft: #ddefeb;
+  /* Pre-composited rather than mixed at paint time, so every ratio in the design
+     is a fixed number that can be measured instead of inferred from an alpha. */
+  --clear-tint: #e2ece9;
+  --signal-tint: #eee8de;
+  --stop-tint: #f3e6e4;
 
-  --clay: #a83c27;
-  --clay-soft: #fae4df;
+  /* The fan behind the tower in the app icon, quoted once. */
+  --beam: linear-gradient(90deg, #d1892a, #1f8f62, #2f7fc4, #6f4bc4, #bd3a80);
 
   --mono: ui-monospace, sfmono-regular, 'SF Mono', menlo, consolas, 'Liberation Mono', monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', roboto, sans-serif;
 
-  --r-plate: 12px;
-  --r-ctl: 8px;
-  --r-chip: 4px;
+  --r-strip: 10px;
+  --r-ctl: 7px;
+  --r-well: 8px;
+  --r-chip: 3px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: #0f141b;
-    --plate: #171e28;
-    --well: #10161f;
-    --rule: #242f3d;
-    --rule-strong: #33404f;
-    --text: #e8edf4;
-    --dim: #93a0b2;
+    --ink: #0d1122;
+    --strip: #161c33;
+    --strip-lift: #1e2542;
+    --well: #090d1a;
+    --rule: #262e4d;
+    --text: #e8ebf7;
+    --dim: #98a1c2;
 
-    --brass: #d8a54e;
-    --brass-soft: #33291480;
-    --brass-edge: #7a5f2a;
-    --on-brass: #171104;
+    --signal: #eda43c;
+    --on-signal: #1a1204;
+    --clear: #4fc08d;
+    --stop: #ef8b7b;
 
-    --jade: #56b5a2;
-    --jade-soft: #16302c;
+    --clear-tint: #1f3641;
+    --signal-tint: #3d3435;
+    --stop-tint: #392e3f;
 
-    --clay: #de7663;
-    --clay-soft: #37201c;
+    --beam: linear-gradient(90deg, #f0a63c, #4fc08d, #3d8fd4, #8b62d9, #d9539b);
   }
 }
 
@@ -77,8 +89,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Text rather than the accent, because the accent is also what fills the primary
+   control, and an amber ring around an amber button shows nothing. */
 :focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 2px solid var(--text);
   outline-offset: 2px;
 }
 
@@ -87,7 +101,7 @@ body {
   max-width: 44rem;
 }
 
-/* Equipment marking: the plate's own name, set as a label rather than a title. */
+/* Equipment marking: the strip's own name, set as a label rather than a title. */
 .eyebrow {
   color: var(--dim);
   font: 600 0.75rem/1 var(--mono);
@@ -114,20 +128,21 @@ body {
   width: 1px;
 }
 
+/* A flight strip: one flat slab per subject, told apart from the ground by fill
+   rather than by an outline. The one the page exists for carries a solid tab. */
 .plate {
-  background: var(--plate);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-plate);
+  background: var(--strip);
+  border-radius: var(--r-strip);
   margin-bottom: 1rem;
   overflow: hidden;
 }
 
 .plate-lead {
-  border-color: var(--rule-strong);
+  border-left: 3px solid var(--signal);
 }
 
 .plate-alarm {
-  border-color: var(--clay);
+  border-left: 3px solid var(--stop);
 }
 
 .plate-head {
@@ -155,7 +170,6 @@ body {
 
 .plate-body p {
   margin: 0 0 0.875rem;
-  max-width: 34rem;
 }
 
 button {
@@ -165,8 +179,8 @@ button {
 
 .btn {
   align-items: center;
-  background: transparent;
-  border: 1px solid var(--rule-strong);
+  background: var(--strip-lift);
+  border: 0;
   border-radius: var(--r-ctl);
   color: var(--text);
   display: inline-flex;
@@ -180,51 +194,40 @@ button {
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--dim);
+  filter: brightness(1.12);
 }
 
 .btn:disabled {
   cursor: default;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
-/* The one control that mints a credential nobody can recall. */
-.btn-brass {
-  background: var(--brass);
-  border-color: var(--brass);
-  color: var(--on-brass);
+/* The controls that mint a credential nobody can recall, or hand one to an app. */
+.btn-signal {
+  background: var(--signal);
+  color: var(--on-signal);
   font-weight: 600;
 }
 
-.btn-brass:hover:not(:disabled) {
-  border-color: var(--brass);
-  filter: brightness(1.08);
-}
-
-.btn-danger {
-  border-color: color-mix(in srgb, var(--clay) 55%, transparent);
-  color: var(--clay);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: var(--clay-soft);
-  border-color: var(--clay);
+.btn-stop {
+  background: var(--stop-tint);
+  color: var(--stop);
 }
 
 .btn-quiet {
-  border-color: transparent;
+  background: transparent;
   color: var(--dim);
   padding: 0 0.5rem;
 }
 
 .btn-quiet:hover:not(:disabled) {
-  border-color: var(--rule-strong);
+  background: var(--strip-lift);
   color: var(--text);
+  filter: none;
 }
 
 .chip {
   align-items: center;
-  border: 1px solid transparent;
   border-radius: var(--r-chip);
   display: inline-flex;
   font: 600 0.6875rem/1 var(--mono);
@@ -235,6 +238,12 @@ button {
   white-space: nowrap;
 }
 
+.chip-small {
+  font-size: 0.5625rem;
+  letter-spacing: 0.1em;
+  padding: 0.2rem 0.3rem;
+}
+
 .chip-dot {
   border-radius: 50%;
   flex: none;
@@ -243,8 +252,7 @@ button {
 }
 
 .chip-neutral {
-  background: var(--well);
-  border-color: var(--rule);
+  background: var(--strip-lift);
   color: var(--dim);
 }
 
@@ -252,34 +260,31 @@ button {
   background: var(--dim);
 }
 
-.chip-good {
-  background: var(--jade-soft);
-  border-color: color-mix(in srgb, var(--jade) 35%, transparent);
-  color: var(--jade);
+.chip-clear {
+  background: var(--clear-tint);
+  color: var(--clear);
 }
 
-.chip-good .chip-dot {
-  background: var(--jade);
+.chip-clear .chip-dot {
+  background: var(--clear);
 }
 
-.chip-brass {
-  background: var(--brass-soft);
-  border-color: var(--brass-edge);
-  color: var(--brass);
+.chip-signal {
+  background: var(--signal-tint);
+  color: var(--signal);
 }
 
-.chip-brass .chip-dot {
-  background: var(--brass);
+.chip-signal .chip-dot {
+  background: var(--signal);
 }
 
-.chip-danger {
-  background: var(--clay-soft);
-  border-color: color-mix(in srgb, var(--clay) 45%, transparent);
-  color: var(--clay);
+.chip-stop {
+  background: var(--stop-tint);
+  color: var(--stop);
 }
 
-.chip-danger .chip-dot {
-  background: var(--clay);
+.chip-stop .chip-dot {
+  background: var(--stop);
 }
 
 .avatar {
@@ -292,8 +297,7 @@ button {
 
 .avatar-fallback {
   align-items: center;
-  background: var(--well);
-  border: 1px solid var(--rule);
+  background: var(--strip-lift);
   color: var(--dim);
   display: inline-flex;
   font: 600 calc(var(--avatar-size) * 0.36) / 1 var(--sans);
@@ -301,10 +305,13 @@ button {
   letter-spacing: 0.02em;
 }
 
+/* Inline-block so a command that does not fit moves to the next line whole,
+   instead of leaving its tinted background torn across two. */
 code {
   background: var(--well);
-  border: 1px solid var(--rule);
   border-radius: 4px;
+  display: inline-block;
   font: 0.8125rem/1.4 var(--mono);
+  max-width: 100%;
   padding: 0.1rem 0.3rem;
 }

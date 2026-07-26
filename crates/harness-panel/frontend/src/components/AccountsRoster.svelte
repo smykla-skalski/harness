@@ -22,7 +22,7 @@
   // A roster of people with one control each is a list, not a data table, and a
   // list reflows onto a phone without either scrolling sideways or dropping a
   // column that a decision depends on.
-  const allowed = $derived(accounts.filter((account) => account.can_pair).length);
+  const approved = $derived(accounts.filter((account) => account.can_pair).length);
   const now = Date.now();
 
   async function decide(account: PanelAccount): Promise<void> {
@@ -37,11 +37,11 @@
 
 <Plate label="Accounts">
   {#snippet status()}
-    <span class="tally mono">{allowed} of {accounts.length} can pair</span>
+    <span class="tally mono">{approved} of {accounts.length} approved</span>
   {/snippet}
 
   {#if accounts.length === 0}
-    <p class="dim">Nobody has signed in yet.</p>
+    <p class="dim">Nobody has signed in yet</p>
   {:else}
     <ul class="roster">
       {#each accounts as account (account.id)}
@@ -51,28 +51,30 @@
             <p class="name">
               {account.display_name}
               {#if account.id === viewerAccountId}
-                <Chip>You</Chip>
+                <Chip small>You</Chip>
               {/if}
             </p>
+            <!-- The state reads as the last fact about the account rather than as
+                 a badge of its own. Four tinted blocks down the right-hand side
+                 said no more than four words do, and the control beside each row
+                 already names which state it is in. -->
+            <!-- The relative time goes last because its width changes as it ages,
+                 and anything after it would shift sideways on the tick. -->
             <p class="meta mono">
               {handleLabel(readHandle(account.provider, account.login))}
+              ·
+              <span class:approved={account.can_pair}>
+                {account.can_pair ? 'approved' : 'awaiting approval'}
+              </span>
               ·
               <span title={formatTimestamp(account.last_seen_at)}>
                 seen {formatRelative(account.last_seen_at, now)}
               </span>
             </p>
           </div>
-          <!-- Fixed width so every control below it starts at the same edge; the
-               chip labels differ in length and the buttons would otherwise sit in
-               four different places. -->
-          <div class="state">
-            <Chip tone={account.can_pair ? 'good' : 'neutral'} dot={account.can_pair}>
-              {account.can_pair ? 'Can pair' : 'Cannot pair'}
-            </Chip>
-          </div>
           <button
             class="btn decide"
-            class:btn-danger={account.can_pair}
+            class:btn-stop={account.can_pair}
             disabled={working === account.id}
             onclick={() => decide(account)}
           >
@@ -117,7 +119,7 @@
     padding-top: 0;
   }
 
-  /* Takes the slack so the state and its control stay together on the right. */
+  /* Takes the slack so every control lines up on the right. */
   .who {
     flex: 1 1 10rem;
     min-width: 0;
@@ -139,24 +141,13 @@
     overflow-wrap: anywhere;
   }
 
-  .state {
-    flex: none;
-    text-align: right;
-    width: 7.25rem;
+  .approved {
+    color: var(--clear);
   }
 
   .decide {
     flex: none;
     width: 5.75rem;
-  }
-
-  /* Once the row wraps, the state and its control start a fresh line together and
-     the reserved column only pushes them apart. */
-  @media (max-width: 34rem) {
-    .state {
-      text-align: left;
-      width: auto;
-    }
   }
 
   .footnote {
