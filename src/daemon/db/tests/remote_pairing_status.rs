@@ -49,6 +49,13 @@ fn remote_pairing_status_classifies_lifecycle_without_exposing_records() {
             .expect("claimed status"),
         RemotePairingStatus::Claimed
     );
+    db.revoke_remote_client("client-status-claimed", "2026-07-13T12:01:00Z")
+        .expect("revoke claimed client");
+    assert_eq!(
+        db.load_remote_pairing_status("pairing-status-claimed", now)
+            .expect("revoked claimed status"),
+        RemotePairingStatus::Revoked
+    );
     assert_eq!(
         db.load_remote_pairing_status("pairing-status-expired", now)
             .expect("expired status"),

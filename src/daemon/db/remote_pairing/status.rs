@@ -5,9 +5,12 @@ use crate::daemon::remote_pairing::RemotePairingStatus;
 use harness_kernel::errors::CliError;
 
 const SELECT_REMOTE_PAIRING_STATUS_SQL: &str = "
-SELECT expires_at, claimed_at, json_extract(metadata_json, '$.revoked_at')
-FROM remote_pairing_codes
-WHERE pairing_id = ?1";
+SELECT p.expires_at,
+       p.claimed_at,
+       COALESCE(json_extract(p.metadata_json, '$.revoked_at'), c.revoked_at)
+FROM remote_pairing_codes p
+LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
+WHERE p.pairing_id = ?1";
 
 impl DaemonDb {
     /// Load the public lifecycle state for an opaque remote pairing id.
