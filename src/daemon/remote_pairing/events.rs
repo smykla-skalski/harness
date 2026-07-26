@@ -33,10 +33,15 @@ pub struct RemotePairingEvent {
     pub pairing: RemotePairingInventoryEntry,
     /// The client that minted the pairing, absent for one created on the host.
     ///
-    /// Kept off the wire: it decides which subscribers receive the event at
-    /// all, and a subscriber that receives one has already been proven entitled
-    /// to it. Sending it anyway would tell a broker the identifier of whichever
-    /// client minted the links it can see, which is nothing it needs.
+    /// This copy is the routing key and is skipped because the entry above
+    /// already carries the same value in its own `minted_by`, which the
+    /// inventory route serializes too. Skipping it keeps one pairing spelled
+    /// the same whether a reader received it here or read it over HTTP.
+    ///
+    /// It is emphatically not a secret held back: a subscriber only ever
+    /// receives entries it is entitled to, so the identifier it can read off
+    /// one is either its own or, for a caller entitled to everything, one the
+    /// inventory would have told it anyway.
     #[serde(skip)]
     pub minted_by: Option<String>,
 }
@@ -107,15 +112,25 @@ mod tests {
         assert!(!event(None).visible_to(Some("broker-1")));
     }
 
-    /// The identifier decides who receives the event and tells a recipient
-    /// nothing it did not already know, so it stays off the wire.
+    /// The routing copy is skipped, and the entry's own is not. An earlier
+    /// spelling of this asserted only that no `minted_by` appeared at the top
+    /// level, against a fixture whose entry carried none either, so it would
+    /// have passed whatever the nested field did.
     #[test]
-    fn the_minting_client_is_never_serialized() {
-        let encoded = serde_json::to_value(event(Some("broker-1"))).expect("serialize event");
+    fn the_event_spells_a_pairing_the_way_the_inventory_does() {
+        let mut minted = event(Some("broker-1"));
+        minted.pairing.minted_by = Some("broker-1".to_owned());
+
+        let encoded = serde_json::to_value(&minted).expect("serialize event");
+
         assert_eq!(encoded["change"], "claimed");
         assert!(
-            encoded.get("minted_by").is_none(),
-            "the minting client must not reach a subscriber: {encoded}"
+            encoded.as_object().is_some_and(|event| !event.contains_key("minted_by")),
+            "the routing copy is redundant with the entry's own: {encoded}"
+        );
+        assert_eq!(
+            encoded["pairing"]["minted_by"], "broker-1",
+            "a pairing must read the same here as it does from the inventory"
         );
     }
 }
