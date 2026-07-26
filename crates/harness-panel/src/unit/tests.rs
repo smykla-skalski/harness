@@ -228,6 +228,14 @@ fn every_required_serve_flag_is_rendered() {
 
     let command = PanelArgs::augment_args(Command::new("serve"));
     let unit = rendered();
+    // Whole words off the `ExecStart` line, not a substring of the whole unit.
+    // A substring search answers yes to a flag that only appears inside a
+    // value, and no to one rendered last with no space after it.
+    let exec_start = unit
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("a rendered ExecStart");
+    let words: Vec<&str> = exec_start.split_whitespace().collect();
     let mut missing = Vec::new();
     for argument in command.get_arguments() {
         if !argument.is_required_set() {
@@ -236,7 +244,7 @@ fn every_required_serve_flag_is_rendered() {
         let Some(long) = argument.get_long() else {
             continue;
         };
-        if !unit.contains(&format!("--{long} ")) {
+        if !words.contains(&format!("--{long}").as_str()) {
             missing.push(long.to_owned());
         }
     }

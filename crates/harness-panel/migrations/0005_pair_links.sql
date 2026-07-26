@@ -14,3 +14,9 @@ CREATE TABLE pair_links (
 );
 
 CREATE INDEX pair_links_account_id ON pair_links (account_id, created_at);
+
+-- The cap is checked on every generate, and it asks how many of one account's
+-- links have not expired. Nothing prunes this table, because the rows are what
+-- an operator reconciles against the daemon, so without this the check reads
+-- every link that account has ever been issued.
+CREATE INDEX pair_links_account_expiry ON pair_links (account_id, expires_at);

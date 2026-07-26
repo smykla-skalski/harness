@@ -167,7 +167,7 @@ impl DaemonClient {
             })?
             .with_timezone(&Utc);
         Ok(MintedLink {
-            pairing_id: minted.pairing_id,
+            pairing_id: checked_pairing_id(minted.pairing_id)?,
             role: minted.role,
             scopes: minted.scopes,
             expires_at,
@@ -258,6 +258,42 @@ struct MintSubject<'a> {
     provider: &'a str,
     subject_id: &'a str,
     display_name: &'a str,
+}
+
+/// Longest pairing id the panel will file. The daemon's own identifiers are
+/// far shorter; this only stops one being used as free storage.
+const MAX_PAIRING_ID_CHARS: usize = 200;
+
+/// The prefix the panel gives a slot it has claimed but not yet filled.
+const RESERVATION_PREFIX: &str = "reservation:";
+
+/// Check the identifier the panel will log, store, and quote back.
+///
+/// It becomes a primary key and a field in three log lines, so a control
+/// character in it forges a line in the record an operator reads to reconcile
+/// against the daemon, and the reservation prefix would make a real pairing
+/// read as a slot abandoned by a crash. The value is refused rather than
+/// repaired: a daemon that sends one of these is not one whose links should be
+/// handed out, and the message quotes it escaped.
+fn checked_pairing_id(pairing_id: String) -> Result<String, PanelError> {
+    let refuse = |why: &str| {
+        Err(PanelError::daemon(format!(
+            "the daemon returned a pairing id that {why}: {pairing_id:?}"
+        )))
+    };
+    if pairing_id.trim().is_empty() {
+        return refuse("is blank");
+    }
+    if pairing_id.chars().any(char::is_control) {
+        return refuse("carries control characters");
+    }
+    if pairing_id.chars().count() > MAX_PAIRING_ID_CHARS {
+        return refuse("is longer than the panel will file");
+    }
+    if pairing_id.starts_with(RESERVATION_PREFIX) {
+        return refuse("is spelled like one of the panel's own reservations");
+    }
+    Ok(pairing_id)
 }
 
 #[derive(Debug, Deserialize)]
