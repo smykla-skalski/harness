@@ -236,13 +236,7 @@ struct HarnessMonitorStoreTaskBoardDeletionTests {
       ])
     }
 
-    for _ in 0..<100 {
-      if client.readCallCount(.taskBoardItems(nil)) > baselineReads {
-        break
-      }
-      try? await Task.sleep(for: .milliseconds(5))
-    }
-    await Task.yield()
+    _ = await waitUntil { client.readCallCount(.taskBoardItems(nil)) > baselineReads }
 
     #expect(client.readCallCount(.taskBoardItems(nil)) == baselineReads + 1)
     #expect(store.globalTaskBoardItems.isEmpty)

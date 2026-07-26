@@ -23,20 +23,10 @@ extension HarnessMonitorMCPContractTests {
     poll: Duration = .milliseconds(10),
     condition: @escaping @MainActor () -> Bool
   ) async {
-    let deadline = ContinuousClock.now.advanced(by: timeout)
-    while ContinuousClock.now < deadline {
-      if condition() {
-        return
-      }
-      do {
-        try await Task.sleep(for: poll)
-      } catch {
-        // Cancellation makes every later sleep throw at once, so swallowing it
-        // would turn this back into the spin it replaced.
-        break
-      }
+    guard await waitUntil(timeout: timeout, pollInterval: poll, condition) else {
+      #expect(condition())
+      return
     }
-    #expect(condition())
   }
 }
 

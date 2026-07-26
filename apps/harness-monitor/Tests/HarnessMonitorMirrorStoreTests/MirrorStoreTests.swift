@@ -389,9 +389,10 @@ final class MirrorStoreRefreshConcurrencyTests: XCTestCase {
     // concurrent fetch. Give the second task ample room to reach its fetch (which
     // it would, unfixed) before asserting it did not.
     let second = Task { await store.refresh() }
-    for _ in 0..<100 {
-      await Task.yield()
-    }
+    // Asserting the second refresh coalesced, so this is an observation window:
+    // give it real time to reach a fetch it must never make. A fixed number of
+    // yields can all pass before the task is ever scheduled.
+    try? await Task.sleep(for: .milliseconds(200))
     XCTAssertEqual(client.fetchCallCount, 1, "the second refresh must coalesce, not fetch concurrently")
 
     client.openGate()

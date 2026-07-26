@@ -206,12 +206,8 @@ struct HarnessMonitorStoreTaskBoardStepModeTests {
     _ generation: UInt64,
     store: HarnessMonitorStore
   ) async -> Bool {
-    for _ in 0..<10_000 {
-      if store.taskBoardRuntimeState.stepModeMutation.latestGeneration >= generation {
-        return true
-      }
-      await Task.yield()
+    await waitUntil {
+      store.taskBoardRuntimeState.stepModeMutation.latestGeneration >= generation
     }
-    return false
   }
 }

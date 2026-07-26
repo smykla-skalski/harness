@@ -15,13 +15,10 @@ struct HarnessMonitorStoreTaskBoardBusyScopeTests {
       _ = await store.setHostBridgeCapability("mcp", enabled: true)
     }
 
-    var observedBusy = false
-    for _ in 0..<50 {
-      if store.contentUI.dashboard.isTaskBoardBusy {
-        observedBusy = true
-        break
-      }
-      await Task.yield()
+    // Asserting absence, so this is an observation window rather than a wait:
+    // long enough to catch a flip, short enough not to pad every green run.
+    let observedBusy = await waitUntil(timeout: .milliseconds(200)) {
+      store.contentUI.dashboard.isTaskBoardBusy
     }
     _ = await action.value
 
@@ -64,14 +61,7 @@ struct HarnessMonitorStoreTaskBoardBusyScopeTests {
       ])
     }
 
-    var observedBusy = false
-    for _ in 0..<50 {
-      if store.contentUI.dashboard.isTaskBoardBusy {
-        observedBusy = true
-        break
-      }
-      await Task.yield()
-    }
+    let observedBusy = await waitUntil { store.contentUI.dashboard.isTaskBoardBusy }
     _ = await mutation.value
 
     #expect(observedBusy)
@@ -111,14 +101,7 @@ struct HarnessMonitorStoreTaskBoardBusyScopeTests {
       _ = await store.deleteTaskBoardItems(ids: ["board-1"])
     }
 
-    var observedBusy = false
-    for _ in 0..<50 {
-      if store.contentUI.dashboard.isTaskBoardBusy {
-        observedBusy = true
-        break
-      }
-      await Task.yield()
-    }
+    let observedBusy = await waitUntil { store.contentUI.dashboard.isTaskBoardBusy }
     _ = await deletion.value
 
     #expect(observedBusy)

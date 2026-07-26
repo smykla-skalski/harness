@@ -229,14 +229,9 @@ struct SessionWindowNativeTabbingTests {
     existingPeerWindow.makeKeyAndOrderFront(nil)
     targetWindow.addTabbedWindow(existingPeerWindow, ordered: .above)
     lateWindow.orderFront(nil)
-    for _ in 0..<20 {
-      if targetWindow.tabbedWindows?.contains(where: { $0 === existingPeerWindow }) == true
+    _ = await waitUntil {
+      targetWindow.tabbedWindows?.contains(where: { $0 === existingPeerWindow }) == true
         || targetWindow.tabGroup === existingPeerWindow.tabGroup
-      {
-        break
-      }
-      await Task.yield()
-      try await Task.sleep(for: .milliseconds(10))
     }
     #expect(
       targetWindow.tabbedWindows?.contains(where: { $0 === existingPeerWindow }) == true

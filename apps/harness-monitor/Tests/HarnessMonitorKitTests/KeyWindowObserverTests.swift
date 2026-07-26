@@ -76,8 +76,10 @@ struct KeyWindowObserverTests {
     ]
 
     notificationCenter.post(name: NSWindow.didMiniaturizeNotification, object: nil)
-    await Task.yield()
-    await Task.yield()
+    _ = await waitUntil {
+      observer.snapshot.keyWindowIdentifier == nil
+        && observer.snapshot.prefersUserNotificationDelivery
+    }
 
     #expect(observer.snapshot.keyWindowIdentifier == nil)
     #expect(observer.snapshot.prefersUserNotificationDelivery)
@@ -106,8 +108,13 @@ struct KeyWindowObserverTests {
     application.keyWindowIdentifier = "main"
     application.keyWindowParentIdentifier = nil
     notificationCenter.post(name: NSWindow.didBecomeKeyNotification, object: nil)
-    await Task.yield()
-    await Task.yield()
+    // The resolved identity has to survive the notification unchanged, so there
+    // is no transition to wait for. Watch for the violation instead, which caps
+    // at the timeout when the observer behaves.
+    _ = await waitUntil(timeout: .milliseconds(200)) {
+      observer.snapshot.keyWindowIdentifier != "main"
+        || observer.snapshot.prefersUserNotificationDelivery
+    }
 
     #expect(observer.snapshot.keyWindowIdentifier == "main")
     #expect(observer.isKey(windowID: "main"))

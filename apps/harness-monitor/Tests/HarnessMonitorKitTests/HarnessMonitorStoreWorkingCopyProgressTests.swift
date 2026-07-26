@@ -69,11 +69,8 @@ struct HarnessMonitorStoreWorkingCopyProgressTests {
     }
 
     // `onTermination` hops to the MainActor, so let that hop land first.
-    for _ in 0..<1_000 {
-      if store.workingCopyProgressSubscriberCount(repoFullName: "acme/widgets") == 0 {
-        break
-      }
-      await Task.yield()
+    _ = await waitUntil {
+      store.workingCopyProgressSubscriberCount(repoFullName: "acme/widgets") == 0
     }
 
     #expect(store.workingCopyProgressSubscriberCount(repoFullName: "acme/widgets") == 0)

@@ -404,12 +404,6 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     _ expected: Bool,
     store: HarnessMonitorStore
   ) async -> Bool {
-    for _ in 0..<10_000 {
-      if store.contentUI.dashboard.isTaskBoardBusy == expected {
-        return true
-      }
-      await Task.yield()
-    }
-    return false
+    await waitUntil { store.contentUI.dashboard.isTaskBoardBusy == expected }
   }
 }

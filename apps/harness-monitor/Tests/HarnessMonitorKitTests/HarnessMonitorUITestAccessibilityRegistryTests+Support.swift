@@ -20,16 +20,11 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     interval: Duration = .milliseconds(10),
     _ predicate: @escaping @Sendable () async -> Bool
   ) async -> Bool {
-    let clock = ContinuousClock()
-    let deadline = clock.now + timeout
-    while clock.now < deadline {
-      if await predicate() {
-        return true
-      }
-      await Task.yield()
-      try? await Task.sleep(for: interval)
-    }
-    return await predicate()
+    await HarnessMonitorKitTests.waitUntil(
+      timeout: timeout,
+      pollInterval: interval,
+      predicate
+    )
   }
 }
 

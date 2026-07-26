@@ -60,11 +60,8 @@ struct HarnessMonitorStoreTaskBoardRefreshCoalescingTests {
       await store.refreshTaskBoardDashboardSnapshot(using: client)
       completion.didFinish = true
     }
-    for _ in 0..<20 {
-      guard store.cacheWriteSync.taskBoardRefreshRequestGeneration == baselineGeneration else {
-        break
-      }
-      await Task.yield()
+    _ = await waitUntil {
+      store.cacheWriteSync.taskBoardRefreshRequestGeneration != baselineGeneration
     }
 
     #expect(store.cacheWriteSync.taskBoardRefreshRequestGeneration > baselineGeneration)

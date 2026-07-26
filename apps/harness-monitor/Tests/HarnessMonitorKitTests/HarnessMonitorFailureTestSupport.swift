@@ -339,8 +339,10 @@ func invalidationCount<TrackedValue>(
   let trackingLoop = ObservationTrackingLoop(trackedValue: trackedValue)
   trackingLoop.arm()
   await mutation()
-  await Task.yield()
-  await Task.yield()
+  // Observation callbacks land on their own turn. Callers assert both presence
+  // and absence of an invalidation, so this is a bounded window rather than a
+  // wait for a count: it returns the moment one lands, and caps otherwise.
+  _ = await waitUntil(timeout: .milliseconds(200)) { trackingLoop.currentCount() > 0 }
   trackingLoop.stop()
 
   return trackingLoop.currentCount()
@@ -361,7 +363,7 @@ func didInvalidate<TrackedValue>(
     }
   )
   mutation()
-  await Task.yield()
-  await Task.yield()
+  // Bounded window, not a wait: callers assert absence too.
+  _ = await waitUntil(timeout: .milliseconds(200)) { flag.currentValue() }
   return flag.currentValue()
 }

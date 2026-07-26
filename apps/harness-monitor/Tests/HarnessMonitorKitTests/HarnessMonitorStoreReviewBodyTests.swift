@@ -133,11 +133,12 @@ final class HarnessMonitorStoreReviewBodyTests: XCTestCase {
     let item = makeItem(pullRequestID: "PR_1", updatedAt: "2026-05-21T00:00:00Z")
 
     async let first: () = store.prepareReviewBody(for: item)
-    await Task.yield()
-    await Task.yield()
+    // The first call has to be parked in the fetch hook before the second
+    // starts, or the test proves nothing about coalescing.
+    _ = await waitUntil { client.reviewBodyFetchCount() == 1 }
     async let second: () = store.prepareReviewBody(for: item)
-    await Task.yield()
-    await Task.yield()
+    // Give the second call real time to issue the fetch it must never issue.
+    _ = await waitUntil(timeout: .milliseconds(200)) { client.reviewBodyFetchCount() > 1 }
 
     gate.signal()
     _ = await (first, second)

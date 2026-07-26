@@ -51,7 +51,7 @@ struct HarnessMonitorMCPContractTests {
     )
 
     controller.start()
-    await Task.yield()
+    await awaitRuntimeState(controller, equals: .healthy(socketPath: "/tmp/mcp.sock"))
 
     #expect(service.recordedEnabledStates == [true])
     #expect(controller.runtimeState == .healthy(socketPath: "/tmp/mcp.sock"))
@@ -76,7 +76,10 @@ struct HarnessMonitorMCPContractTests {
     )
 
     controller.start()
-    await Task.yield()
+    // The controller is already `.disabled` here, so waiting for that state
+    // would return before `start()` had done anything. Wait for the enable
+    // attempt it records, which is what actually changes.
+    _ = await waitUntil { service.recordedEnabledStates == [false] }
 
     #expect(service.recordedEnabledStates == [false])
     #expect(controller.runtimeState == .disabled)
@@ -105,7 +108,7 @@ struct HarnessMonitorMCPContractTests {
     )
 
     controller.start()
-    await Task.yield()
+    await awaitRuntimeState(controller, equals: degradedState)
 
     #expect(controller.runtimeState == degradedState)
 
@@ -133,7 +136,7 @@ struct HarnessMonitorMCPContractTests {
     #expect(controller.runtimeState == .starting(socketPath: nil))
 
     service.finishEnable(with: .healthy(socketPath: "/tmp/mcp.sock"))
-    await Task.yield()
+    await awaitRuntimeState(controller, equals: .healthy(socketPath: "/tmp/mcp.sock"))
 
     #expect(controller.runtimeState == .healthy(socketPath: "/tmp/mcp.sock"))
 
@@ -158,23 +161,19 @@ struct HarnessMonitorMCPContractTests {
     )
 
     controller.start()
-    await Task.yield()
+    await awaitRuntimeState(controller, equals: .healthy(socketPath: "/tmp/mcp.sock"))
 
     let enabledKey = HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey
     defaults.defaults.set(false, forKey: enabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
-    try await awaitRuntimeState(
-      controller,
-      equals: .disabled,
-      timeoutSeconds: 1
-    )
+    await awaitRuntimeState(controller, equals: .disabled)
 
     #expect(controller.runtimeState == .disabled)
 
     service.nextEnabledRuntimeState = .healthy(socketPath: "/tmp/mcp.sock")
     defaults.defaults.set(true, forKey: HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
     notificationCenter.post(name: UserDefaults.didChangeNotification, object: defaults.defaults)
-    await Task.yield()
+    await awaitRuntimeState(controller, equals: .healthy(socketPath: "/tmp/mcp.sock"))
 
     #expect(service.recordedEnabledStates == [true, false, true])
     #expect(controller.runtimeState == .healthy(socketPath: "/tmp/mcp.sock"))
@@ -185,16 +184,17 @@ struct HarnessMonitorMCPContractTests {
   private func awaitRuntimeState(
     _ controller: HarnessMonitorMCPStartupController,
     equals expected: HarnessMonitorMCPRuntimeState,
-    timeoutSeconds: TimeInterval
-  ) async throws {
-    let deadline = Date().addingTimeInterval(timeoutSeconds)
-    while Date() < deadline {
-      if controller.runtimeState == expected {
-        return
-      }
-      try await Task.sleep(nanoseconds: 20_000_000)
+    timeoutSeconds: TimeInterval = 1
+  ) async {
+    let reached = await waitUntil(
+      timeout: .seconds(timeoutSeconds),
+      pollInterval: .milliseconds(20)
+    ) {
+      controller.runtimeState == expected
     }
-    #expect(controller.runtimeState == expected)
+    if !reached {
+      #expect(controller.runtimeState == expected)
+    }
   }
 }
 

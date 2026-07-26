@@ -71,11 +71,9 @@ struct SessionContentDetailSplitLayoutTests {
     }
 
     #expect(events.isEmpty)
-    await Task.yield()
+    _ = await waitUntil { events.isEmpty == false }
     #expect(events.first == "scheduled")
-    for _ in 0..<8 where events.count < 2 {
-      await Task.yield()
-    }
+    _ = await waitUntil { events.count >= 2 }
     #expect(events == ["scheduled", "ran"])
   }
 }

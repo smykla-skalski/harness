@@ -185,14 +185,14 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     }
 
     var optimisticDetail: SessionDetail?
-    for _ in 0..<100 {
-      if let detail = store.selectedSession,
+    _ = await waitUntil {
+      guard let detail = store.selectedSession,
         detail.tasks.first(where: { $0.taskId == movedTask.taskId })?.status == .awaitingReview
-      {
-        optimisticDetail = detail
-        break
+      else {
+        return false
       }
-      await Task.yield()
+      optimisticDetail = detail
+      return true
     }
     let currentDetail = try #require(optimisticDetail)
     let newerAgents = Array(currentDetail.agents.dropLast())
@@ -250,14 +250,14 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     }
 
     var optimisticDetail: SessionDetail?
-    for _ in 0..<100 {
-      if let detail = store.selectedSession,
+    _ = await waitUntil {
+      guard let detail = store.selectedSession,
         detail.tasks.first(where: { $0.taskId == movedTask.taskId })?.status == .awaitingReview
-      {
-        optimisticDetail = detail
-        break
+      else {
+        return false
       }
-      await Task.yield()
+      optimisticDetail = detail
+      return true
     }
     let currentDetail = try #require(optimisticDetail)
     let newerDetail = SessionDetail(
@@ -302,14 +302,14 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     }
 
     var observedOptimisticStatus: TaskBoardStatus?
-    for _ in 0..<50 {
-      if let status = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status,
+    _ = await waitUntil {
+      guard let status = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status,
         status == .inProgress
-      {
-        observedOptimisticStatus = status
-        break
+      else {
+        return false
       }
-      await Task.yield()
+      observedOptimisticStatus = status
+      return true
     }
     _ = await mutation.value
 
@@ -351,14 +351,14 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     }
 
     var observedOptimisticKind: TaskBoardItemKind?
-    for _ in 0..<50 {
-      if let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
+    _ = await waitUntil {
+      guard let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
         item.status == .inProgress
-      {
-        observedOptimisticKind = item.kind
-        break
+      else {
+        return false
       }
-      await Task.yield()
+      observedOptimisticKind = item.kind
+      return true
     }
     _ = await mutation.value
 
@@ -388,14 +388,14 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     }
 
     var optimisticItem: TaskBoardItem?
-    for _ in 0..<50 {
-      if let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
+    _ = await waitUntil {
+      guard let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
         item.status == .inProgress
-      {
-        optimisticItem = item
-        break
+      else {
+        return false
       }
-      await Task.yield()
+      optimisticItem = item
+      return true
     }
     _ = await mutation.value
 

@@ -164,9 +164,9 @@ struct SettingsRestorationTests {
     }
     deferrer.cancel()
 
-    for _ in 0..<4 {
-      await Task.yield()
-    }
+    // Asserting the cancel held, so this is an observation window: give the
+    // scheduled retry real time to fire wrongly rather than a few yields.
+    _ = await waitUntil(timeout: .milliseconds(200)) { appliedOffsets.isEmpty == false }
 
     #expect(appliedOffsets.isEmpty)
   }

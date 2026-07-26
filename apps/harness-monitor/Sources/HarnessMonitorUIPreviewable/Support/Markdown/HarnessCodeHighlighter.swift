@@ -152,9 +152,77 @@ enum HarnessCodeHighlighter {
     highlights(source, language: language).tokens
   }
 
+  /// Colors merged runs rather than one span at a time.
+  ///
+  /// Every range assignment splits the run table and shifts it, so coloring
+  /// span by span costs roughly spans x runs, and a large file carries tens of
+  /// thousands of spans. Painting the most common kind once as a base and then
+  /// merging neighbours that resolve to the same color leaves only the runs
+  /// that actually change. That is equivalent only while the spans tile the
+  /// source; a gap falls back, so the base can never reach a character no span
+  /// claimed.
   static func makeAttributedString(
     from highlights: HarnessCodeHighlights,
     colors: HarnessCodeTokenColors = .default
+  ) -> AttributedString {
+    guard let baseKind = tilingBaseKind(of: highlights) else {
+      return coloringEachSpan(in: highlights, colors: colors)
+    }
+    var rendered = AttributedString(highlights.source)
+    let baseColor = colors.color(for: baseKind)
+    rendered.foregroundColor = baseColor
+
+    var pendingRange: Range<String.Index>?
+    var pendingColor = baseColor
+    for span in highlights.spans {
+      let color = colors.color(for: span.kind)
+      if let range = pendingRange, color == pendingColor,
+        range.upperBound == span.range.lowerBound
+      {
+        pendingRange = range.lowerBound..<span.range.upperBound
+        continue
+      }
+      paint(pendingRange, in: &rendered, color: pendingColor, base: baseColor)
+      pendingRange = span.range
+      pendingColor = color
+    }
+    paint(pendingRange, in: &rendered, color: pendingColor, base: baseColor)
+    return rendered
+  }
+
+  /// Most frequent span kind, or nil when the spans leave a character unclaimed.
+  private static func tilingBaseKind(
+    of highlights: HarnessCodeHighlights
+  ) -> HarnessCodeToken.Kind? {
+    var counts: [HarnessCodeToken.Kind: Int] = [:]
+    var cursor = highlights.source.startIndex
+    for span in highlights.spans {
+      guard span.range.lowerBound == cursor else { return nil }
+      cursor = span.range.upperBound
+      counts[span.kind, default: 0] += 1
+    }
+    guard cursor == highlights.source.endIndex else { return nil }
+    return counts.max { $0.value < $1.value }?.key
+  }
+
+  private static func paint(
+    _ range: Range<String.Index>?,
+    in rendered: inout AttributedString,
+    color: Color,
+    base: Color
+  ) {
+    guard let range, color != base,
+      let lower = AttributedString.Index(range.lowerBound, within: rendered),
+      let upper = AttributedString.Index(range.upperBound, within: rendered)
+    else {
+      return
+    }
+    rendered[lower..<upper].foregroundColor = color
+  }
+
+  private static func coloringEachSpan(
+    in highlights: HarnessCodeHighlights,
+    colors: HarnessCodeTokenColors
   ) -> AttributedString {
     var rendered = AttributedString(highlights.source)
     for span in highlights.spans {

@@ -178,7 +178,7 @@ struct HarnessMonitorStoreConfirmationTests {
       taskID: "task-created",
       taskTitle: "Delete before any actor joins"
     )
-    await Task.yield()
+    _ = await waitUntil { store.pendingConfirmation != nil }
 
     #expect(
       store.pendingConfirmation
