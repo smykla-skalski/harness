@@ -2369,6 +2369,9 @@ const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/
 // generator parses source text rather than types, so the summaries module has
 // to keep reading it from its new file or TimelineEntryWire stops resolving.
 const TIMELINE_SOURCE: &str = include_str!("../crates/harness-protocol/src/timeline.rs");
+// The session aggregates moved to the session domain; the generator reads
+// files as text, so the summaries module has to keep reading them from there.
+const SESSION_SUMMARIES_SOURCE: &str = include_str!("../src/session/wire/summaries.rs");
 const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../src/hooks/protocol/payloads.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
@@ -3120,6 +3123,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[SUMMARIES_SOURCE],
             sources: &[
                 SUMMARIES_SOURCE,
+                SESSION_SUMMARIES_SOURCE,
                 TIMELINE_SOURCE,
                 SHARED_DAEMON_SOURCE,
                 HOOKS_PAYLOADS_SOURCE,

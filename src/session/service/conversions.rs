@@ -2,15 +2,12 @@ use std::path::PathBuf;
 
 use super::{
     BTreeMap, CURRENT_VERSION, CliError, DaemonClient, ResolvedRuntimeSessionAgent, SessionState,
+    wire,
 };
 
-// The only remaining daemon edge in this module tree: SessionSummary and
-// SessionDetail are daemon-owned aggregates in summaries.rs. Imported here
-// rather than in the parent so a sibling cannot reach back through super::.
-use crate::daemon::protocol;
 use crate::session::types::SessionPolicy;
 
-pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> SessionState {
+pub(crate) fn detail_to_session_state(detail: &wire::SessionDetail) -> SessionState {
     let agents = detail
         .agents
         .iter()
@@ -53,7 +50,7 @@ pub(crate) fn detail_to_session_state(detail: &protocol::SessionDetail) -> Sessi
 ///
 /// The summary doesn't contain agents or tasks - only the session-level
 /// fields and metrics. This is sufficient for list display.
-pub(crate) fn summary_to_session_state(summary: &protocol::SessionSummary) -> SessionState {
+pub(crate) fn summary_to_session_state(summary: &wire::SessionSummary) -> SessionState {
     SessionState {
         schema_version: CURRENT_VERSION,
         state_version: 0,
@@ -95,8 +92,8 @@ mod tests {
     use super::*;
     use crate::session::types::{SessionMetrics, SessionStatus};
 
-    fn summary_fixture() -> protocol::SessionSummary {
-        protocol::SessionSummary {
+    fn summary_fixture() -> wire::SessionSummary {
+        wire::SessionSummary {
             project_id: "proj-id".into(),
             project_name: "demo".into(),
             project_dir: Some("/origin".into()),
@@ -157,7 +154,7 @@ mod tests {
 
     #[test]
     fn detail_to_session_state_forwards_workspace_fields() {
-        let detail = protocol::SessionDetail {
+        let detail = wire::SessionDetail {
             session: summary_fixture(),
             agents: Vec::new(),
             tasks: Vec::new(),
@@ -187,7 +184,7 @@ mod tests {
         summary.external_origin = Some("/external/session-root".into());
         summary.adopted_at = Some("2026-04-20T02:03:04Z".into());
 
-        let detail = protocol::SessionDetail {
+        let detail = wire::SessionDetail {
             session: summary,
             agents: Vec::new(),
             tasks: Vec::new(),
