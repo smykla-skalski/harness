@@ -16,12 +16,26 @@ use super::super::helpers::{collect_hits_in_tree, collect_line_hits_in_tree};
 /// silently while an over-report announces itself. Split the token the way this
 /// file does if such a literal is ever needed.
 fn line_has_clippy_allow(line: &str) -> bool {
-    let token = ["allow", "(clippy::"].concat();
-    let Some(position) = line.find(&token) else {
-        return false;
-    };
-    let prefix = &line[..position];
-    prefix.contains("#[") || prefix.contains("#![")
+    // Held as two halves rather than one joined token: it keeps this file from
+    // matching its own rule, and it means walking the tree allocates nothing
+    // per line. `expect` cannot match either half, so it stays permitted.
+    const HEAD: &str = "allow";
+    const TAIL: &str = "(clippy::";
+
+    let mut consumed = 0usize;
+    while let Some(offset) = line[consumed..].find(HEAD) {
+        let position = consumed + offset;
+        let after = position + HEAD.len();
+        if line[after..].starts_with(TAIL) {
+            let prefix = &line[..position];
+            if prefix.contains("#[") || prefix.contains("#![") {
+                return true;
+            }
+        }
+        consumed = after;
+    }
+
+    false
 }
 
 #[test]
