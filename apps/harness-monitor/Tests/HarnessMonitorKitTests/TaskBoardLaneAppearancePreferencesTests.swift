@@ -270,7 +270,7 @@ struct TaskBoardLaneAppearancePreferencesTests {
 
     #expect(source.contains(".popover("))
     #expect(
-      source.contains("ColorPicker(selection: colorBinding, supportsOpacity: false)")
+      source.contains("SettingsTaskBoardLaneColorPicker(lane: lane, rawValue: $rawValue)")
     )
     #expect(source.contains("Button(\"Customize\")"))
     #expect(source.contains("laneIndicator(for: lane)"))
@@ -290,7 +290,9 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(!source.contains("Reset Symbol"))
     #expect(!source.contains("Reset Lane"))
     #expect(!source.contains("Top Bar Color"))
-    #expect(!source.contains("ColorPicker(\"Color\""))
+    // The whole point of the popover picker: nothing here may reach for the
+    // shared NSColorPanel, which SwiftUI's ColorPicker opens in its own window.
+    #expect(!source.contains("ColorPicker("))
     #expect(!source.contains("NSColorWell"))
     #expect(!source.contains("NSViewRepresentable"))
     #expect(!source.contains("@objc"))
@@ -307,6 +309,47 @@ struct TaskBoardLaneAppearancePreferencesTests {
     let colorRange = try #require(source.range(of: "colorSection"))
     let symbolRange = try #require(source.range(of: "symbolSection"))
     #expect(colorRange.lowerBound < symbolRange.lowerBound)
+  }
+
+  @Test("Lane color picker keeps both paths inside the popover")
+  func laneColorPickerKeepsBothPathsInsideThePopover() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsTaskBoardLaneColorPicker.swift")
+
+    // Presets must go through the token path rather than the custom-color one.
+    // A token resolves through the theme and keeps tracking light and dark;
+    // writing a preset as a frozen sRGB triple would pin the lane to whichever
+    // appearance happened to be active when it was picked.
+    #expect(source.contains("TaskBoardLaneColorToken.allCases"))
+    #expect(source.contains("TaskBoardLaneAppearancePreferences.settingColorToken("))
+    #expect(source.contains("Saturation("))
+    #expect(source.contains("HueSlider("))
+    #expect(!source.contains("ColorPicker("))
+    #expect(!source.contains("NSColorPanel"))
+    // A nested popover would be another window, which is what #532 removed.
+    #expect(!source.contains(".popover("))
+  }
+
+  @Test("Lane color components round-trip a stored color")
+  func laneColorComponentsRoundTripAStoredColor() throws {
+    let original = Color(.sRGB, red: 0.24, green: 0.58, blue: 0.87, opacity: 1)
+    let restored = TaskBoardLaneColorComponents(original).color
+    let originalRGB = try #require(NSColor(original).usingColorSpace(.sRGB))
+    let restoredRGB = try #require(NSColor(restored).usingColorSpace(.sRGB))
+
+    #expect(abs(originalRGB.redComponent - restoredRGB.redComponent) < 0.01)
+    #expect(abs(originalRGB.greenComponent - restoredRGB.greenComponent) < 0.01)
+    #expect(abs(originalRGB.blueComponent - restoredRGB.blueComponent) < 0.01)
+  }
+
+  @Test("A desaturated lane color no longer reports the hue that produced it")
+  func desaturatedLaneColorLosesItsHue() {
+    // This is why the picker holds the drag components in `@State` instead of
+    // re-deriving them from the lane on every change: drag down to grey and
+    // the stored color cannot say which hue you came from, so the marker would
+    // jump to red mid-gesture.
+    let grey = Color(hue: 0.6, saturation: 0, brightness: 0.5)
+
+    #expect(TaskBoardLaneColorComponents(grey).hue == 0)
   }
 
   @Test("Lane palette hues resolve to calibrated theme assets, not raw system colours")
