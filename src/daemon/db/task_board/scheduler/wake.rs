@@ -48,11 +48,7 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board automation wake enqueue")
             .await?;
         let event = enqueue_in_tx(&mut transaction, request, now).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation wake enqueue: {error}"
-            ))
-        })?;
+        commit(transaction, "task board automation wake enqueue").await?;
         Ok(event)
     }
 
@@ -92,25 +88,38 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board automation wake acknowledgement")
             .await?;
-        let rows = load_acknowledgement_rows(&mut transaction, &sequences).await?;
-        validate_acknowledgement_rows(&sequences, &rows)?;
-        let pending = rows
-            .into_iter()
-            .filter(|row| row.processed_at.is_none())
-            .map(|row| row.sequence)
-            .collect::<Vec<_>>();
-        let changed = acknowledge_pending_rows(&mut transaction, &pending, processed_at).await?;
-        if changed > 0 {
-            prune_processed_rows(&mut transaction).await?;
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation wake acknowledgement: {error}"
-            ))
-        })?;
+        let changed =
+            acknowledge_wake_rows_in_tx(&mut transaction, &sequences, processed_at).await?;
+        commit(transaction, "task board automation wake acknowledgement").await?;
         Ok(changed)
     }
+}
+
+async fn acknowledge_wake_rows_in_tx(
+    transaction: &mut sqlx::Transaction<'_, Sqlite>,
+    sequences: &[i64],
+    processed_at: DateTime<Utc>,
+) -> Result<u64, CliError> {
+    let rows = load_acknowledgement_rows(transaction, sequences).await?;
+    validate_acknowledgement_rows(sequences, &rows)?;
+    let pending = rows
+        .into_iter()
+        .filter(|row| row.processed_at.is_none())
+        .map(|row| row.sequence)
+        .collect::<Vec<_>>();
+    let changed = acknowledge_pending_rows(transaction, &pending, processed_at).await?;
+    if changed > 0 {
+        prune_processed_rows(transaction).await?;
+        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    Ok(changed)
+}
+
+async fn commit(transaction: sqlx::Transaction<'_, Sqlite>, context: &str) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 pub(super) async fn enqueue_in_tx(

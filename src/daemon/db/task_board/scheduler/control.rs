@@ -62,13 +62,7 @@ impl AsyncDaemonDb {
                 "initialize task board automation control from legacy intent: {error}"
             ))
         })?;
-        let control = load_control_in_tx(&mut transaction).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation control initialization: {error}"
-            ))
-        })?;
-        Ok(control)
+        load_and_commit_control(transaction, "task board automation control initialization").await
     }
 
     pub(crate) async fn task_board_automation_control(
@@ -114,27 +108,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board automation start")
             .await?;
-        ensure_control_row(&mut transaction, now).await?;
-        query(
-            "UPDATE task_board_orchestrator_control
-             SET desired_mode = ?1, admission_state = 'accepting', updated_at = ?2
-             WHERE singleton = 1",
-        )
-        .bind(desired_mode_label(desired_mode))
-        .bind(now.to_rfc3339())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("start task board automation: {error}")))?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        if let Some(wake) = wake {
-            super::wake::enqueue_in_tx(&mut transaction, wake, now).await?;
-        }
-        let control = load_control_in_tx(&mut transaction).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board automation start: {error}")))?;
-        Ok(control)
+        apply_automation_start_in_tx(&mut transaction, desired_mode, wake, now).await?;
+        load_and_commit_control(transaction, "task board automation start").await
     }
 
     pub(crate) async fn replace_task_board_orchestrator_settings_for_automation(
@@ -151,48 +126,14 @@ impl AsyncDaemonDb {
             settings,
         )
         .await?;
-        let changed = query(
-            "UPDATE task_board_orchestrator_control
-             SET desired_mode = ?1, admission_state = 'accepting', updated_at = ?2
-             WHERE singleton = 1 AND desired_mode != 'off'
-               AND admission_state = 'accepting'",
+        apply_settings_control_update_in_tx(
+            &mut transaction,
+            desired_mode,
+            revision.row_revision,
+            now,
         )
-        .bind(desired_mode_label(desired_mode))
-        .bind(now.to_rfc3339())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("update task board automation settings: {error}")))?
-        .rows_affected();
-        if changed > 1 {
-            return Err(db_error(
-                "task board automation settings updated multiple control rows",
-            ));
-        }
-        if changed == 1 {
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-            if desired_mode == TaskBoardAutomationDesiredMode::Continuous {
-                let revision = u64::try_from(revision.row_revision).map_err(|error| {
-                    db_error(format!("convert task board settings row revision: {error}"))
-                })?;
-                super::wake::enqueue_in_tx(
-                    &mut transaction,
-                    &TaskBoardAutomationWakeRequest {
-                        entity_id: Some("automation-settings".into()),
-                        entity_revision: Some(revision),
-                        payload: TaskBoardAutomationWakePayload::ledger_changed(
-                            TaskBoardAutomationWakeEntityKind::Settings,
-                        ),
-                    },
-                    now,
-                )
-                .await?;
-            }
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation settings update: {error}"
-            ))
-        })?;
+        .await?;
+        commit(transaction, "task board automation settings update").await?;
         Ok(revision.row_revision)
     }
 
@@ -203,32 +144,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board automation stop")
             .await?;
-        ensure_control_row(&mut transaction, now).await?;
-        query(
-            "UPDATE task_board_orchestrator_control
-             SET desired_mode = 'off', admission_state = 'draining',
-                 stop_generation = stop_generation + 1, updated_at = ?1
-             WHERE singleton = 1",
-        )
-        .bind(now.to_rfc3339())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("stop task board automation: {error}")))?;
-        query(
-            "UPDATE task_board_orchestrator_runs
-             SET state = 'cancelling', revision = revision + 1
-             WHERE state = 'running'",
-        )
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("cancel active task board automation run: {error}")))?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let control = load_control_in_tx(&mut transaction).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board automation stop: {error}")))?;
-        Ok(control)
+        apply_automation_stop_in_tx(&mut transaction, now).await?;
+        load_and_commit_control(transaction, "task board automation stop").await
     }
 
     pub(crate) async fn finish_task_board_automation_drain_if_idle(
@@ -238,20 +155,143 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board automation drain completion")
             .await?;
-        ensure_control_row(&mut transaction, now).await?;
-        let active = active_automation_count(&mut transaction).await?;
-        let changed = finish_drain_if_idle(&mut transaction, active, now).await?;
-        if changed > 0 {
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        }
-        let control = load_control_in_tx(&mut transaction).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation drain completion: {error}"
-            ))
-        })?;
-        Ok(control)
+        apply_drain_completion_in_tx(&mut transaction, now).await?;
+        load_and_commit_control(transaction, "task board automation drain completion").await
     }
+}
+
+async fn apply_automation_start_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    desired_mode: TaskBoardAutomationDesiredMode,
+    wake: Option<&TaskBoardAutomationWakeRequest>,
+    now: DateTime<Utc>,
+) -> Result<(), CliError> {
+    ensure_control_row(transaction, now).await?;
+    query(
+        "UPDATE task_board_orchestrator_control
+         SET desired_mode = ?1, admission_state = 'accepting', updated_at = ?2
+         WHERE singleton = 1",
+    )
+    .bind(desired_mode_label(desired_mode))
+    .bind(now.to_rfc3339())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("start task board automation: {error}")))?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    if let Some(wake) = wake {
+        super::wake::enqueue_in_tx(transaction, wake, now).await?;
+    }
+    Ok(())
+}
+
+async fn apply_settings_control_update_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    desired_mode: TaskBoardAutomationDesiredMode,
+    row_revision: i64,
+    now: DateTime<Utc>,
+) -> Result<(), CliError> {
+    let changed = query(
+        "UPDATE task_board_orchestrator_control
+         SET desired_mode = ?1, admission_state = 'accepting', updated_at = ?2
+         WHERE singleton = 1 AND desired_mode != 'off'
+           AND admission_state = 'accepting'",
+    )
+    .bind(desired_mode_label(desired_mode))
+    .bind(now.to_rfc3339())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("update task board automation settings: {error}")))?
+    .rows_affected();
+    if changed > 1 {
+        return Err(db_error(
+            "task board automation settings updated multiple control rows",
+        ));
+    }
+    if changed == 0 {
+        return Ok(());
+    }
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    if desired_mode == TaskBoardAutomationDesiredMode::Continuous {
+        enqueue_settings_wake_in_tx(transaction, row_revision, now).await?;
+    }
+    Ok(())
+}
+
+async fn enqueue_settings_wake_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    row_revision: i64,
+    now: DateTime<Utc>,
+) -> Result<(), CliError> {
+    let revision = u64::try_from(row_revision)
+        .map_err(|error| db_error(format!("convert task board settings row revision: {error}")))?;
+    super::wake::enqueue_in_tx(
+        transaction,
+        &TaskBoardAutomationWakeRequest {
+            entity_id: Some("automation-settings".into()),
+            entity_revision: Some(revision),
+            payload: TaskBoardAutomationWakePayload::ledger_changed(
+                TaskBoardAutomationWakeEntityKind::Settings,
+            ),
+        },
+        now,
+    )
+    .await
+    .map(|_| ())
+}
+
+async fn apply_automation_stop_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    now: DateTime<Utc>,
+) -> Result<(), CliError> {
+    ensure_control_row(transaction, now).await?;
+    query(
+        "UPDATE task_board_orchestrator_control
+         SET desired_mode = 'off', admission_state = 'draining',
+             stop_generation = stop_generation + 1, updated_at = ?1
+         WHERE singleton = 1",
+    )
+    .bind(now.to_rfc3339())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("stop task board automation: {error}")))?;
+    query(
+        "UPDATE task_board_orchestrator_runs
+         SET state = 'cancelling', revision = revision + 1
+         WHERE state = 'running'",
+    )
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("cancel active task board automation run: {error}")))?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    Ok(())
+}
+
+async fn apply_drain_completion_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    now: DateTime<Utc>,
+) -> Result<(), CliError> {
+    ensure_control_row(transaction, now).await?;
+    let active = active_automation_count(transaction).await?;
+    if finish_drain_if_idle(transaction, active, now).await? > 0 {
+        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    Ok(())
+}
+
+async fn load_and_commit_control(
+    mut transaction: Transaction<'_, Sqlite>,
+    context: &str,
+) -> Result<TaskBoardAutomationControlRecord, CliError> {
+    let control = load_control_in_tx(&mut transaction).await?;
+    commit(transaction, context).await?;
+    Ok(control)
+}
+
+async fn commit(transaction: Transaction<'_, Sqlite>, context: &str) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 pub(super) async fn ensure_control_row(

@@ -59,6 +59,21 @@ struct RunFenceRow {
     scope: TaskBoardAutomationScope,
 }
 
+/// Stale-run expiry always happens, so its audit events must be committed on the
+/// refusal paths too, not just when the run is acquired.
+struct ObservedRunAdmission {
+    expired_events: Vec<HarnessMonitorAuditEvent>,
+    decision: RunAdmissionDecision,
+}
+
+enum RunAdmissionDecision {
+    Acquire(TaskBoardAutomationControlRecord),
+    Refuse {
+        admission: TaskBoardAutomationRunAdmission,
+        context: &'static str,
+    },
+}
+
 impl AsyncDaemonDb {
     pub(crate) async fn try_acquire_task_board_automation_run(
         &self,
@@ -67,46 +82,24 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board automation run acquire")
             .await?;
-        ensure_control_row(&mut transaction, request.now).await?;
-        let expired_events =
-            super::recovery::expire_stale_runs(&mut transaction, request.now).await?;
-        if let Some(run_id) = active_run_id(&mut transaction).await? {
-            return commit_non_acquired_run(
-                transaction,
-                expired_events,
-                TaskBoardAutomationRunAdmission::Busy { run_id },
-                "busy",
-            )
-            .await;
-        }
-        let control = load_control_in_tx(&mut transaction).await?;
-        if !trigger_is_enabled(request.trigger, &control) {
-            return commit_non_acquired_run(
-                transaction,
-                expired_events,
-                TaskBoardAutomationRunAdmission::Disabled,
-                "disabled",
-            )
-            .await;
-        }
-        let lease_epoch = next_lease_epoch(&mut transaction).await?;
-        insert_run(&mut transaction, request, &control, lease_epoch).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let started_event = insert_automation_audit(
-            &mut transaction,
-            "task_board.automation.run.started",
-            &request.run_id,
-            &request.scope,
-            &request.now.to_rfc3339(),
-            json!({ "trigger": request.trigger, "dry_run": request.dry_run }),
-        )
-        .await?;
-        let mut events = expired_events;
+        let observed = evaluate_run_admission_in_tx(&mut transaction, request).await?;
+        let control = match observed.decision {
+            RunAdmissionDecision::Refuse { admission, context } => {
+                return commit_non_acquired_run(
+                    transaction,
+                    observed.expired_events,
+                    admission,
+                    context,
+                )
+                .await;
+            }
+            RunAdmissionDecision::Acquire(control) => control,
+        };
+        let (lease_epoch, started_event) =
+            acquire_run_in_tx(&mut transaction, request, &control).await?;
+        let mut events = observed.expired_events;
         events.push(started_event);
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board automation run: {error}")))?;
+        commit(transaction, "task board automation run").await?;
         broadcast_automation_audits(&events);
         Ok(TaskBoardAutomationRunAdmission::Acquired(run_lease(
             request,
@@ -130,9 +123,7 @@ impl AsyncDaemonDb {
         let control = load_control_in_tx(&mut transaction).await?;
         let fence = run_fence(lease, &control, &row.state);
         renew_run_lease(&mut transaction, lease, now).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board automation heartbeat: {error}"))
-        })?;
+        commit(transaction, "task board automation heartbeat").await?;
         Ok(fence)
     }
 
@@ -153,30 +144,105 @@ impl AsyncDaemonDb {
         }
         let control = load_control_in_tx(&mut transaction).await?;
         let outcome = final_outcome(lease, &control, &row.state, outcome);
-        finalize_run_row(&mut transaction, lease, outcome, error_kind, error, now).await?;
-        super::history::prune_terminal_run_history(&mut transaction, now).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let event = insert_automation_audit(
+        let event = finalize_run_in_tx(
             &mut transaction,
-            terminal_event_type(outcome),
-            &lease.run_id,
-            &row.scope,
-            &now.to_rfc3339(),
-            json!({
-                "outcome": outcome,
-                "error_kind": error_kind,
-                "error": error,
-            }),
+            lease,
+            &row,
+            outcome,
+            error_kind,
+            error,
+            now,
         )
         .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation run finalization: {error}"
-            ))
-        })?;
+        commit(transaction, "task board automation run finalization").await?;
         broadcast_automation_audits(slice::from_ref(&event));
         Ok(outcome)
     }
+}
+
+async fn evaluate_run_admission_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &TaskBoardRunAcquireRequest,
+) -> Result<ObservedRunAdmission, CliError> {
+    ensure_control_row(transaction, request.now).await?;
+    let expired_events = super::recovery::expire_stale_runs(transaction, request.now).await?;
+    if let Some(run_id) = active_run_id(transaction).await? {
+        return Ok(ObservedRunAdmission {
+            expired_events,
+            decision: RunAdmissionDecision::Refuse {
+                admission: TaskBoardAutomationRunAdmission::Busy { run_id },
+                context: "busy",
+            },
+        });
+    }
+    let control = load_control_in_tx(transaction).await?;
+    if !trigger_is_enabled(request.trigger, &control) {
+        return Ok(ObservedRunAdmission {
+            expired_events,
+            decision: RunAdmissionDecision::Refuse {
+                admission: TaskBoardAutomationRunAdmission::Disabled,
+                context: "disabled",
+            },
+        });
+    }
+    Ok(ObservedRunAdmission {
+        expired_events,
+        decision: RunAdmissionDecision::Acquire(control),
+    })
+}
+
+async fn acquire_run_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &TaskBoardRunAcquireRequest,
+    control: &TaskBoardAutomationControlRecord,
+) -> Result<(u64, HarnessMonitorAuditEvent), CliError> {
+    let lease_epoch = next_lease_epoch(transaction).await?;
+    insert_run(transaction, request, control, lease_epoch).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    let started_event = insert_automation_audit(
+        transaction,
+        "task_board.automation.run.started",
+        &request.run_id,
+        &request.scope,
+        &request.now.to_rfc3339(),
+        json!({ "trigger": request.trigger, "dry_run": request.dry_run }),
+    )
+    .await?;
+    Ok((lease_epoch, started_event))
+}
+
+async fn finalize_run_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    lease: &TaskBoardAutomationRunLease,
+    row: &RunFenceRow,
+    outcome: TaskBoardAutomationRunOutcome,
+    error_kind: Option<&str>,
+    error: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<HarnessMonitorAuditEvent, CliError> {
+    finalize_run_row(transaction, lease, outcome, error_kind, error, now).await?;
+    super::history::prune_terminal_run_history(transaction, now).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    insert_automation_audit(
+        transaction,
+        terminal_event_type(outcome),
+        &lease.run_id,
+        &row.scope,
+        &now.to_rfc3339(),
+        json!({
+            "outcome": outcome,
+            "error_kind": error_kind,
+            "error": error,
+        }),
+    )
+    .await
+}
+
+async fn commit(transaction: Transaction<'_, Sqlite>, context: &str) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 async fn commit_non_acquired_run(
