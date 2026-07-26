@@ -26,9 +26,11 @@ pub(super) enum TerminalAdoptionScreen {
         context: &'static str,
         outcome: TaskBoardRemoteResultAdoptionOutcome,
     },
-    /// Boxed because the adoption carries the assignment, the parent execution
-    /// and the attempt together, which unboxed is enough on its own to push the
-    /// callers of this recorder past `clippy::large_futures`.
+    /// Must stay boxed. It carries the assignment, the parent execution and the
+    /// attempt together, and unboxed that measures 19056 bytes inside
+    /// `adopt_task_board_remote_terminal_result`, over the 16384-byte threshold
+    /// of `clippy::large_futures`, which is denied here. `cargo check` will not
+    /// tell you, because the limit is a lint rather than a compile error.
     Proceed(Box<ProceedingAdoption>),
 }
 

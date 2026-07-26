@@ -115,10 +115,11 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board workflow execution CAS")
             .await?;
-        // The screen only reads, so its refusals and the write below leave the
-        // transaction in states an empty commit and a rollback cannot tell
-        // apart. One commit covers both and keeps the per-refusal commit
-        // messages from outliving the branches that produced them.
+        // The screen only reads, so a refusal reaches the commit below with
+        // nothing written and an empty commit leaves the same state as the
+        // rollback it replaces. Routing the persist arm through that same exit
+        // keeps the per-refusal commit messages from outliving the branches
+        // that produced them.
         // Both halves must stay boxed. Awaited inline they fold their frames
         // into this future, which the read-only coordinator, the remote
         // controller and the transport controller all await transitively; that

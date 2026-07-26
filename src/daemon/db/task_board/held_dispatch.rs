@@ -131,10 +131,7 @@ enum HeldClaimPreparation {
         context: &'static str,
         message: String,
     },
-    /// Boxed because the preparation carries the item twice, before and after;
-    /// unboxed it is stored twice again in the caller's future, once here and
-    /// once as the binding the match moves out.
-    Ready(Box<PreparedHeldClaim>),
+    Ready(PreparedHeldClaim),
 }
 
 /// The item and payload a held claim proved it may deliver, already advanced to
@@ -187,7 +184,7 @@ async fn prepare_held_claim_in_tx(
                 revision,
             } = state;
             advance_held_item(&mut item, decision_id, &now);
-            Ok(HeldClaimPreparation::Ready(Box::new(PreparedHeldClaim {
+            Ok(HeldClaimPreparation::Ready(PreparedHeldClaim {
                 intent_id,
                 applied,
                 item,
@@ -195,7 +192,7 @@ async fn prepare_held_claim_in_tx(
                 revision,
                 consumed_approval_grant_id,
                 now,
-            })))
+            }))
         }
     }
 }
@@ -247,11 +244,14 @@ fn advance_held_item(item: &mut TaskBoardItem, decision_id: Option<String>, now:
     now.clone_into(&mut item.updated_at);
 }
 
-/// Commit the refusal's reads and hand back the transition error it decided on.
+/// Commit what the refusal already wrote and hand back the transition error it
+/// decided on.
 ///
-/// A refusal writes nothing, so committing rather than dropping keeps it out of
-/// the rollback path, and a failed commit outranks the refusal because the
-/// caller has to hear about the durability problem first.
+/// Committing rather than dropping is load-bearing: a blocked admission has
+/// persisted its snapshot and cleared the current decision by the time the
+/// refusal is known, and rolling back would throw that away and let the next
+/// claim re-evaluate against nothing. A failed commit outranks the refusal
+/// because the caller has to hear about the durability problem first.
 async fn commit_held_refusal(
     transaction: Transaction<'_, Sqlite>,
     context: &str,
@@ -267,9 +267,8 @@ async fn commit_held_refusal(
 /// settle the transaction that made all three one delivery.
 async fn deliver_held_claim(
     mut transaction: Transaction<'_, Sqlite>,
-    prepared: Box<PreparedHeldClaim>,
+    prepared: PreparedHeldClaim,
 ) -> Result<ClaimedHeldTaskBoardDispatch, CliError> {
-    let prepared = *prepared;
     let mut applied = prepared.applied;
     let write = replace_with_lane_transition_in_tx(
         &mut transaction,

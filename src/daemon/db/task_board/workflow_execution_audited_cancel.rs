@@ -34,9 +34,12 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("audited task board remote cancellation")
             .await?;
-        // Every staleness verdict still commits rather than drops: the screen
-        // and the apply below only refuse, so an empty commit and a rollback
-        // are the same write, and one exit keeps them from drifting apart.
+        // Every staleness verdict still commits rather than drops. Nothing has
+        // been written on those paths -- the screen only reads, and the apply
+        // refuses ahead of its first write -- so an empty commit leaves the same
+        // state as the rollback it replaces. The apply's own writes reach this
+        // commit too, which is why settling at one exit keeps the verdict and
+        // the transaction from drifting apart.
         let outcome = match screen_audited_remote_cancel_in_tx(
             &mut transaction,
             expected_execution,
