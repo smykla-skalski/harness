@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
