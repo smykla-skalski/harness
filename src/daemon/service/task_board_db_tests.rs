@@ -2,15 +2,15 @@ use tempfile::tempdir;
 
 use crate::daemon::db::{AsyncDaemonDb, ColorEdit, DisplayNameEdit, ProjectEdit};
 use crate::daemon::protocol::{
-    TaskBoardCreateItemRequest, TaskBoardListItemsRequest, TaskBoardProjectUpdateRequest,
-    TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
+    TaskBoardCreateItemRequest, TaskBoardProjectUpdateRequest, TaskBoardUpdateIdentityClears,
+    TaskBoardUpdateItemRequest,
 };
 use crate::task_board::TaskBoardStatus;
 use crate::task_board::project::TaskBoardProjectSource;
 use crate::task_board::project_color::TaskBoardProjectColor;
 
 use super::{
-    create_task_board_item_db, list_task_board_items_db, update_task_board_item_db,
+    create_task_board_item_db, read_task_board_items_db, update_task_board_item_db,
     update_task_board_project_db,
 };
 
@@ -119,9 +119,7 @@ async fn a_blank_title_is_refused_and_persists_nothing() {
         .expect_err("a blank title is refused");
     assert!(error.message().contains("title"), "unexpected: {error}");
 
-    let listed = list_task_board_items_db(&db, &TaskBoardListItemsRequest::default())
-        .await
-        .expect("list items");
+    let listed = read_task_board_items_db(&db).await.expect("list items");
     assert!(listed.items.is_empty(), "a refused create persisted an item");
 }
 

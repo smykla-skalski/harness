@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, Query, RawQuery, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
@@ -12,9 +12,13 @@ use crate::daemon::protocol::{
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
     TaskBoardUpdateItemRequest, http_paths,
 };
-use crate::daemon::remote_task_board::{project_task_board_item, project_task_board_list};
+use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_item};
 use crate::daemon::remote_viewer::is_remote_viewer;
-use crate::task_board::TaskBoardStatus;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::task_board::{
+    AgentMode, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+    TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardPriority, TaskBoardStatus,
+};
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
@@ -22,16 +26,49 @@ use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
 use super::super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::{
-    TaskBoardCapabilitiesResponse, TaskBoardListItemsResponse, TaskBoardPlanningResponse,
+    TASK_BOARD_LIST_INVALID_PARAMS, TaskBoardCapabilitiesResponse, TaskBoardListItemsResponse,
+    TaskBoardPlanningResponse,
 };
 use crate::task_board::TaskBoardItem;
 
+/// Status-only query string, shared by the board's summary reads.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(super) struct TaskBoardStatusQuery {
+    pub status: Option<TaskBoardStatus>,
+}
+
+/// Query string for `GET /v1/task-board/items`.
+///
+/// `tag` repeats instead of taking a list, so it is collected from the raw
+/// query string: `serde_urlencoded`, which backs axum's `Query`, cannot
+/// deserialize a repeated key into a `Vec`.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[derive(utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(super) struct TaskBoardListQuery {
     pub status: Option<TaskBoardStatus>,
+    pub priority: Option<TaskBoardPriority>,
+    pub agent_mode: Option<AgentMode>,
+    pub project_id: Option<String>,
+    /// Case-insensitive substring over title, body, and tags.
+    #[param(max_length = 512)]
+    pub query: Option<String>,
+    /// Page size, `1..=500`; defaults to 200.
+    #[param(minimum = 1, maximum = 500)]
+    pub limit: Option<u32>,
+    /// `next_cursor` from the previous page.
+    #[param(max_length = 512)]
+    pub cursor: Option<String>,
 }
+
+// `utoipa` takes only literals for these bounds, so the schema would silently
+// stop describing what the daemon enforces if either constant moved.
+const _: () = assert!(TASK_BOARD_LIST_MAX_LIMIT == 500);
+const _: () = assert!(TASK_BOARD_LIST_MAX_QUERY_CHARS == 512);
+const _: () = assert!(TASK_BOARD_LIST_MAX_CURSOR_CHARS == 512);
+const _: () = assert!(TASK_BOARD_LIST_MAX_TAGS == 16);
 
 #[derive(Debug, Clone, Deserialize)]
 #[derive(utoipa::ToSchema)]
@@ -113,15 +150,26 @@ pub(super) async fn get_task_board_capabilities(
     get,
     path = "/v1/task-board/items",
     tag = "task-board",
-    description = "List task-board items with per-status counts and progress rollups, optionally filtered by status. Remote viewers receive a projected response with viewer-restricted fields removed",
-    params(TaskBoardListQuery),
+    description = "List one bounded page of task-board items matching the requested facets and text, with progress rollups over the whole live board. Remote viewers receive a projected response with viewer-restricted fields removed, and their facets and text match that same projection",
+    params(
+        TaskBoardListQuery,
+        (
+            "tag" = Option<Vec<String>>,
+            Query,
+            description = "Repeatable; an item must carry every requested tag",
+            max_items = 16,
+            min_length = 1,
+            pattern = r"\S",
+        ),
+    ),
     responses(
-        (status = 200, description = "Task-board items with per-status counts and progress rollups", body = TaskBoardListItemsResponse),
+        (status = 200, description = "One page of task-board items with progress rollups and the next-page cursor", body = TaskBoardListItemsResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
 pub(super) async fn get_task_board_items(
     Query(query): Query<TaskBoardListQuery>,
+    RawQuery(raw_query): RawQuery,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -129,18 +177,53 @@ pub(super) async fn get_task_board_items(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let Some(tags) = repeated_query_values(raw_query.as_deref(), "tag") else {
+        return timed_json(
+            "GET",
+            http_paths::TASK_BOARD_ITEMS,
+            &request_id,
+            start,
+            Err::<TaskBoardReadListResponse, _>(CliError::from(CliErrorKind::workflow_io(
+                TASK_BOARD_LIST_INVALID_PARAMS,
+            ))),
+        );
+    };
     let request = TaskBoardListItemsRequest {
         status: query.status,
+        priority: query.priority,
+        agent_mode: query.agent_mode,
+        project_id: query.project_id,
+        tags,
+        query: query.query,
+        limit: query.limit,
+        cursor: query.cursor,
     };
-    let result = task_board_route_executor::list_items(&state, &request)
-        .await
-        .map(|response| project_task_board_list(response, viewer));
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        result,
+        task_board_route_executor::list_items(&state, &request, viewer).await,
+    )
+}
+
+/// Collect every value a repeated query key carries, in request order.
+///
+/// `None` means the query string itself would not decode, which the caller
+/// turns into the same invalid-params refusal the rest of the selection uses:
+/// dropping the repeated values instead would answer a malformed request as
+/// though it had asked for no tags at all.
+fn repeated_query_values(raw_query: Option<&str>, key: &str) -> Option<Vec<String>> {
+    let Some(raw_query) = raw_query else {
+        return Some(Vec::new());
+    };
+    Some(
+        serde_urlencoded::from_str::<Vec<(String, String)>>(raw_query)
+            .ok()?
+            .into_iter()
+            .filter(|(name, _)| name == key)
+            .map(|(_, value)| value)
+            .collect(),
     )
 }
 

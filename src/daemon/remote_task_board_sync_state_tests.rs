@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use super::{TaskBoardReadListResponse, project_task_board_list};
-use crate::daemon::protocol::TaskBoardListItemsResponse;
+use crate::daemon::db::TaskBoardItemSnapshot;
+use crate::daemon::protocol::TaskBoardListItemsRequest;
+use crate::daemon::service::TaskBoardListSource;
 use crate::task_board::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
 };
@@ -32,17 +34,26 @@ fn item_with_synced_ref() -> TaskBoardItem {
     item
 }
 
-fn list_response() -> TaskBoardListItemsResponse {
-    TaskBoardListItemsResponse {
-        items: vec![item_with_synced_ref()],
+fn list_source() -> TaskBoardListSource {
+    TaskBoardListSource {
+        items: vec![TaskBoardItemSnapshot {
+            item: item_with_synced_ref(),
+            item_revision: 1,
+        }],
         items_change_seq: 7,
-        item_revisions: HashMap::new(),
         progress_rollups: HashMap::new(),
     }
 }
 
+fn projected(viewer: bool) -> TaskBoardReadListResponse {
+    let selection = TaskBoardListItemsRequest::default()
+        .validated_selection()
+        .expect("an unfiltered read is valid");
+    project_task_board_list(list_source(), &selection, viewer).expect("project list")
+}
+
 fn projected_sync_state(viewer: bool) -> Option<ExternalRefSyncState> {
-    match project_task_board_list(list_response(), viewer) {
+    match projected(viewer) {
         TaskBoardReadListResponse::Full(response) => response.items[0].external_refs[0]
             .sync_state
             .clone(),
@@ -73,8 +84,7 @@ fn the_list_keeps_what_the_client_reads() {
 
 #[test]
 fn the_ref_itself_survives_the_trim() {
-    let TaskBoardReadListResponse::Full(response) = project_task_board_list(list_response(), false)
-    else {
+    let TaskBoardReadListResponse::Full(response) = projected(false) else {
         panic!("a non-viewer read returns the full response");
     };
     let reference = &response.items[0].external_refs[0];
@@ -91,10 +101,45 @@ fn the_ref_itself_survives_the_trim() {
 /// trim must not be what that path depends on.
 #[test]
 fn the_viewer_projection_is_untouched() {
-    let response = project_task_board_list(list_response(), true);
+    let response = projected(true);
 
     assert!(
         matches!(response, TaskBoardReadListResponse::Viewer(_)),
         "a viewer read still gets the viewer projection"
+    );
+}
+
+#[test]
+fn the_list_materializes_revisions_for_the_returned_page_only() {
+    let mut second = item_with_synced_ref();
+    second.id = "item-2".to_owned();
+    let source = TaskBoardListSource {
+        items: vec![
+            TaskBoardItemSnapshot {
+                item: item_with_synced_ref(),
+                item_revision: 11,
+            },
+            TaskBoardItemSnapshot {
+                item: second,
+                item_revision: 22,
+            },
+        ],
+        items_change_seq: 7,
+        progress_rollups: HashMap::new(),
+    };
+    let mut request = TaskBoardListItemsRequest::default();
+    request.limit = Some(1);
+    let selection = request.validated_selection().expect("a one-item page");
+
+    let TaskBoardReadListResponse::Full(response) =
+        project_task_board_list(source, &selection, false).expect("project list")
+    else {
+        panic!("a non-viewer read returns the full response");
+    };
+
+    assert_eq!(response.items[0].id, "item-1");
+    assert_eq!(
+        response.item_revisions,
+        HashMap::from([("item-1".to_owned(), 11)])
     );
 }

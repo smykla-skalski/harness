@@ -13,6 +13,10 @@ use crate::task_board::{
 
 use super::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
 
+mod list_query;
+
+pub(crate) use list_query::project_task_board_list;
+
 const BODY_PREVIEW_CHAR_LIMIT: usize = 180;
 const BODY_PREVIEW_PREFIX_LIMIT: usize = BODY_PREVIEW_CHAR_LIMIT - 3;
 
@@ -42,6 +46,9 @@ pub(crate) struct RemoteViewerTaskBoardListResponse {
     items: Vec<RemoteViewerTaskBoardItem>,
     items_change_seq: i64,
     item_revisions: HashMap<String, i64>,
+    total_matched: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_cursor: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -81,7 +88,7 @@ pub(crate) struct RemoteViewerTaskBoardPositionSnapshot {
 /// client's sync-state model carries `status` alone, so the text is decoded
 /// straight into nothing. Read a single item when the cached title or body is
 /// wanted.
-fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
+pub(super) fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
     for reference in response
         .items
         .iter_mut()
@@ -91,32 +98,6 @@ fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
             state.title = None;
             state.body = None;
         }
-    }
-}
-
-#[must_use]
-pub(crate) fn project_task_board_list(
-    mut response: TaskBoardListItemsResponse,
-    viewer: bool,
-) -> TaskBoardReadListResponse {
-    if viewer {
-        let TaskBoardListItemsResponse {
-            items,
-            items_change_seq,
-            item_revisions,
-            ..
-        } = response;
-        TaskBoardReadListResponse::Viewer(RemoteViewerTaskBoardListResponse {
-            items: items
-                .into_iter()
-                .map(RemoteViewerTaskBoardItem::from)
-                .collect(),
-            items_change_seq,
-            item_revisions,
-        })
-    } else {
-        drop_cached_provider_text(&mut response);
-        TaskBoardReadListResponse::Full(response)
     }
 }
 

@@ -135,10 +135,31 @@ pub struct TaskBoardCreateArgs {
     pub id: Option<String>,
 }
 
+/// Read the board. Without `--limit` or `--cursor` this walks every page, so
+/// the output stays the whole matching selection even though each daemon
+/// response is bounded.
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardListArgs {
     #[arg(long, value_enum)]
     pub status: Option<TaskBoardStatus>,
+    #[arg(long, value_enum)]
+    pub priority: Option<TaskBoardPriority>,
+    #[arg(long, value_enum)]
+    pub agent_mode: Option<AgentMode>,
+    #[arg(long)]
+    pub project_id: Option<String>,
+    /// Repeatable; an item must carry every requested tag.
+    #[arg(long)]
+    pub tag: Vec<String>,
+    /// Case-insensitive substring over title, body, and tags.
+    #[arg(long)]
+    pub query: Option<String>,
+    /// Read one page of at most this many items instead of every page.
+    #[arg(long)]
+    pub limit: Option<u32>,
+    /// Read the page following a previous page's `next_cursor`.
+    #[arg(long)]
+    pub cursor: Option<String>,
     #[arg(long)]
     pub json: bool,
 }

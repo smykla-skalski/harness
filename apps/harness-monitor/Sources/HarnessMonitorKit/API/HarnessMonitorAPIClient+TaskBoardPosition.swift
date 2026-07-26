@@ -1,15 +1,21 @@
 import Foundation
 
-extension HarnessMonitorAPIClient {
+extension HarnessMonitorAPIClient: TaskBoardItemPageSource {
+  func taskBoardItemPage(
+    status: TaskBoardStatus?,
+    cursor: String?
+  ) async throws -> TaskBoardListItemsResponseWire {
+    try await get(
+      "/v1/task-board/items",
+      queryItems: taskBoardQueryItems(status: status, cursor: cursor),
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
   public func taskBoardItemsSnapshot(
     status: TaskBoardStatus? = nil
   ) async throws -> TaskBoardListItemsSnapshot {
-    let wire: TaskBoardListItemsResponseWire = try await get(
-      "/v1/task-board/items",
-      queryItems: taskBoardQueryItems(status: status),
-      decoder: PolicyWireCoding.decoder
-    )
-    return TaskBoardListItemsSnapshot(wire: wire)
+    TaskBoardListItemsSnapshot(wire: try await mergedTaskBoardItemPages(status: status))
   }
 
   public func taskBoardItemPositionSnapshot(id: String) async throws

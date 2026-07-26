@@ -7,11 +7,11 @@ use super::test_support::{read_http_request, write_http_response};
 use crate::daemon::protocol::{
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
     TaskBoardAutomationHistoryRequest, TaskBoardClearTriageOverrideRequest,
-    TaskBoardListItemsRequest, TaskBoardSetTriageOverrideRequest, TaskBoardUpdateItemRequest,
+    TaskBoardSetTriageOverrideRequest, TaskBoardUpdateItemRequest,
 };
-use crate::task_board::{TaskBoardItem, TaskBoardStatus, TriageVerdict};
+use crate::task_board::{TaskBoardItem, TriageVerdict};
 
-fn client_with(endpoint: String) -> DaemonClient {
+pub(super) fn client_with(endpoint: String) -> DaemonClient {
     DaemonClient {
         endpoint,
         token: "test-token".into(),
@@ -19,7 +19,7 @@ fn client_with(endpoint: String) -> DaemonClient {
     }
 }
 
-fn spawn_mock(
+pub(super) fn spawn_mock(
     response_status: &'static str,
     response_body: String,
 ) -> (String, Arc<Mutex<String>>, thread::JoinHandle<()>) {
@@ -42,7 +42,30 @@ fn spawn_mock(
     (endpoint, request_line, handle)
 }
 
-fn item() -> TaskBoardItem {
+/// Serve one scripted response per request and record every request line, for
+/// a client call that makes more than one round trip.
+pub(super) fn spawn_mock_sequence(
+    responses: Vec<String>,
+) -> (String, Arc<Mutex<Vec<String>>>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+    let request_lines = Arc::new(Mutex::new(Vec::new()));
+    let captured = Arc::clone(&request_lines);
+    let handle = thread::spawn(move || {
+        for response in responses {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let request = read_http_request(&mut stream);
+            captured
+                .lock()
+                .expect("request capture")
+                .push(request.lines().next().unwrap_or_default().to_string());
+            write_http_response(&mut stream, "200 OK", "application/json", &response);
+        }
+    });
+    (endpoint, request_lines, handle)
+}
+
+pub(super) fn item() -> TaskBoardItem {
     TaskBoardItem::new(
         "task-1".into(),
         "Database task".into(),
@@ -120,25 +143,6 @@ fn invalid_task_board_capability_preserves_decode_error() {
     handle.join().expect("server");
     assert!(error.to_string().contains("daemon HTTP parse response"));
     assert!(!error.to_string().contains("upgrade and restart the daemon"));
-}
-
-#[test]
-fn task_board_list_serializes_status_as_query() {
-    let response = serde_json::json!({ "items": [item()] }).to_string();
-    let (endpoint, request_line, handle) = spawn_mock("200 OK", response);
-
-    let items = client_with(endpoint)
-        .list_task_board_items(&TaskBoardListItemsRequest {
-            status: Some(TaskBoardStatus::Backlog),
-        })
-        .expect("list items");
-    handle.join().expect("server");
-
-    assert_eq!(items.len(), 1);
-    assert_eq!(
-        *request_line.lock().expect("request line"),
-        "GET /v1/task-board/items?status=backlog HTTP/1.1"
-    );
 }
 
 #[test]

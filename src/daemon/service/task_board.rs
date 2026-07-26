@@ -132,10 +132,12 @@ pub fn list_task_board_items(
         None => all_items,
     };
     Ok(TaskBoardListItemsResponse {
+        total_matched: items.len(),
         items,
         items_change_seq: 0,
         item_revisions: std::collections::HashMap::new(),
         progress_rollups,
+        next_cursor: None,
     })
 }
 /// Load one task-board item.

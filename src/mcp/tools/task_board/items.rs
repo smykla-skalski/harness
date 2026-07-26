@@ -1,11 +1,21 @@
 use serde_json::{Value, json};
 
-use crate::daemon::protocol::ws_methods;
+// These bounds come through `daemon::protocol` rather than `crate::task_board`
+// because this file also compiles into the standalone `harness-mcp` crate,
+// which has no `task_board` module.
+use crate::daemon::protocol::{
+    TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_LIST_MAX_QUERY_CHARS,
+    TASK_BOARD_LIST_MAX_TAGS, ws_methods,
+};
 use crate::mcp::tool::ToolRegistry;
 
+use super::list_walk::TaskBoardListTool;
 use super::support::{TaskBoardToolDescriptor, register_descriptors};
 
 pub(super) fn register(registry: &mut ToolRegistry) {
+    // The list endpoint is bounded, so this one tool folds the daemon's pages
+    // instead of proxying a single round trip like every descriptor below.
+    registry.register(Box::new(TaskBoardListTool::new(list_schema)));
     register_descriptors(
         registry,
         &[
@@ -13,11 +23,6 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 name: ws_methods::TASK_BOARD_CREATE,
                 description: "Create a task-board item through the running daemon.",
                 input_schema: create_schema,
-            },
-            TaskBoardToolDescriptor {
-                name: ws_methods::TASK_BOARD_LIST,
-                description: "List task-board items from the running daemon.",
-                input_schema: status_filter_schema,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_GET,
@@ -122,6 +127,17 @@ fn string_array_schema() -> Value {
     })
 }
 
+/// The daemon refuses a whitespace-only tag and caps how many one read may
+/// carry, so the tool advertises both rather than leaving a caller to find
+/// them through a failed call.
+fn tag_filter_schema() -> Value {
+    json!({
+        "type": "array",
+        "maxItems": TASK_BOARD_LIST_MAX_TAGS,
+        "items": { "type": "string", "pattern": "\\S" }
+    })
+}
+
 fn external_refs_schema() -> Value {
     json!({
         "type": "array",
@@ -148,11 +164,20 @@ fn planning_schema() -> Value {
     })
 }
 
-fn status_filter_schema() -> Value {
+fn list_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "status": { "type": "string" }
+            "status": { "type": "string" },
+            "priority": { "type": "string" },
+            "agent_mode": { "type": "string" },
+            "project_id": { "type": "string" },
+            "tags": tag_filter_schema(),
+            "query": { "type": "string", "maxLength": TASK_BOARD_LIST_MAX_QUERY_CHARS },
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": TASK_BOARD_LIST_MAX_LIMIT
+            },
+            "cursor": { "type": "string", "maxLength": TASK_BOARD_LIST_MAX_CURSOR_CHARS }
         },
         "additionalProperties": false
     })
@@ -287,7 +312,11 @@ fn plan_approve_schema() -> Value {
 mod tests {
     use serde_json::json;
 
-    use super::{create_schema, update_schema};
+    use super::{
+        TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+        TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, create_schema, list_schema,
+        update_schema,
+    };
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
     /// valid, and the daemon trims before refusing one, so the schema has to
@@ -311,6 +340,36 @@ mod tests {
                 assert_eq!(properties[field]["maximum"], json!(i64::MAX));
             }
         }
+    }
+
+    /// The daemon refuses an out-of-range page instead of clamping it, so the
+    /// advertised bounds have to match or a caller learns of the mismatch only
+    /// from a failed call.
+    #[test]
+    fn list_offers_every_facet_and_advertises_the_page_bounds() {
+        let schema = list_schema();
+        let properties = &schema["properties"];
+
+        for facet in ["status", "priority", "agent_mode", "project_id", "cursor"] {
+            assert_eq!(properties[facet]["type"], json!("string"), "{facet}");
+        }
+        assert_eq!(properties["tags"]["type"], json!("array"));
+        assert_eq!(properties["tags"]["maxItems"], json!(TASK_BOARD_LIST_MAX_TAGS));
+        assert_eq!(properties["tags"]["items"]["pattern"], json!("\\S"));
+        assert_eq!(
+            properties["query"]["maxLength"],
+            json!(TASK_BOARD_LIST_MAX_QUERY_CHARS)
+        );
+        assert_eq!(properties["limit"]["minimum"], json!(1));
+        assert_eq!(
+            properties["limit"]["maximum"],
+            json!(TASK_BOARD_LIST_MAX_LIMIT)
+        );
+        assert_eq!(
+            properties["cursor"]["maxLength"],
+            json!(TASK_BOARD_LIST_MAX_CURSOR_CHARS)
+        );
+        assert_eq!(schema["required"], json!(null));
     }
 
     #[test]

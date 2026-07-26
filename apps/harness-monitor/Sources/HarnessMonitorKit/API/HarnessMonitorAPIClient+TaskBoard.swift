@@ -6,11 +6,7 @@ extension HarnessMonitorAPIClient {
   }
 
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
-    let response: TaskBoardListItemsResponseWire = try await get(
-      "/v1/task-board/items",
-      queryItems: taskBoardQueryItems(status: status),
-      decoder: PolicyWireCoding.decoder
-    )
+    let response = try await mergedTaskBoardItemPages(status: status)
     return response.items.map(TaskBoardItem.init(wire:))
   }
 
@@ -330,10 +326,14 @@ extension HarnessMonitorAPIClient {
     )
   }
 
-  func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {
-    guard let status else {
-      return []
+  func taskBoardQueryItems(status: TaskBoardStatus?, cursor: String? = nil) -> [URLQueryItem] {
+    var query: [URLQueryItem] = []
+    if let status {
+      query.append(URLQueryItem(name: "status", value: status.rawValue))
     }
-    return [URLQueryItem(name: "status", value: status.rawValue)]
+    if let cursor {
+      query.append(URLQueryItem(name: "cursor", value: cursor))
+    }
+    return query
   }
 }

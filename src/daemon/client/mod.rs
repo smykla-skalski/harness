@@ -2,6 +2,7 @@ mod api;
 mod connection;
 mod http;
 mod task_board;
+mod task_board_list;
 mod task_board_orchestrator;
 
 #[cfg(test)]
@@ -10,6 +11,8 @@ mod api_tests;
 mod basic_tests;
 #[cfg(test)]
 mod discovery_tests;
+#[cfg(test)]
+mod task_board_list_tests;
 #[cfg(test)]
 mod task_board_tests;
 #[cfg(test)]

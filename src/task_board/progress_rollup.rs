@@ -26,8 +26,14 @@ pub struct TaskBoardProgressRollup {
 /// chain of nested umbrellas would otherwise make expensive).
 #[must_use]
 pub fn build_progress_rollups(items: &[TaskBoardItem]) -> HashMap<String, TaskBoardProgressRollup> {
+    build_progress_rollups_from(items)
+}
+
+pub(crate) fn build_progress_rollups_from<'a>(
+    items: impl IntoIterator<Item = &'a TaskBoardItem>,
+) -> HashMap<String, TaskBoardProgressRollup> {
     let live_by_id: HashMap<&str, &TaskBoardItem> = items
-        .iter()
+        .into_iter()
         .filter(|item| !item.is_deleted())
         .map(|item| (item.id.as_str(), item))
         .collect();

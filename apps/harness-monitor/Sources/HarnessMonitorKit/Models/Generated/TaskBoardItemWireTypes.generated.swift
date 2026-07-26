@@ -375,12 +375,16 @@ public struct TaskBoardListItemsResponseWire: Codable, Equatable, Sendable {
   public var itemsChangeSeq: Int64
   public var itemRevisions: [String: Int64]
   public var progressRollups: [String: TaskBoardProgressRollupWire]
+  public var totalMatched: UInt
+  public var nextCursor: String?
 
-  public init(items: [TaskBoardItemWire], itemsChangeSeq: Int64 = 0, itemRevisions: [String: Int64] = [:], progressRollups: [String: TaskBoardProgressRollupWire] = [:]) {
+  public init(items: [TaskBoardItemWire], itemsChangeSeq: Int64 = 0, itemRevisions: [String: Int64] = [:], progressRollups: [String: TaskBoardProgressRollupWire] = [:], totalMatched: UInt = 0, nextCursor: String? = nil) {
     self.items = items
     self.itemsChangeSeq = itemsChangeSeq
     self.itemRevisions = itemRevisions
     self.progressRollups = progressRollups
+    self.totalMatched = totalMatched
+    self.nextCursor = nextCursor
   }
 
   public init(from decoder: Decoder) throws {
@@ -389,6 +393,8 @@ public struct TaskBoardListItemsResponseWire: Codable, Equatable, Sendable {
     itemsChangeSeq = try container.decodeIfPresent(Int64.self, forKey: .itemsChangeSeq) ?? 0
     itemRevisions = try container.decodeIfPresent([String: Int64].self, forKey: .itemRevisions) ?? [:]
     progressRollups = try container.decodeIfPresent([String: TaskBoardProgressRollupWire].self, forKey: .progressRollups) ?? [:]
+    totalMatched = try container.decodeIfPresent(UInt.self, forKey: .totalMatched) ?? 0
+    nextCursor = try container.decodeIfPresent(String.self, forKey: .nextCursor)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -396,6 +402,8 @@ public struct TaskBoardListItemsResponseWire: Codable, Equatable, Sendable {
     case itemsChangeSeq = "items_change_seq"
     case itemRevisions = "item_revisions"
     case progressRollups = "progress_rollups"
+    case totalMatched = "total_matched"
+    case nextCursor = "next_cursor"
   }
 }
 

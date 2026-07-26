@@ -15,7 +15,7 @@ Harness task boards are cross-project work items managed through `harness task-b
 | Command | Purpose |
 | --- | --- |
 | `create` | Create a new board task. |
-| `list` | List active board tasks, optionally filtered by status. |
+| `list` | List active board tasks, filtered by field values or by text. |
 | `get` | Show one board task. |
 | `update` | Change task fields, status, priority, project, tags, or linked state. |
 | `delete` | Tombstone one board task. |
@@ -34,6 +34,22 @@ Harness task boards are cross-project work items managed through `harness task-b
 | `policy` | Manage spawn-policy switches and pending approval grants. |
 
 Common read flag: `--json`.
+
+## Finding Items
+
+`list` narrows the board by field value, by text, or by both:
+
+```bash
+harness task-board list --json \
+  [--status <status>] [--priority <priority>] [--agent-mode <mode>] \
+  [--project-id <project-id>] [--tag <tag>]... [--query <text>]
+```
+
+`--query` matches a case-insensitive substring of the title, body, or any tag. Repeated `--tag` narrows to items carrying every listed tag. Facets combine as AND.
+
+The daemon bounds every list response, so `list` walks the pages and prints the whole selection, and `--json` prints a plain array of items. Pass `--limit <1-500>` or `--cursor <cursor>` to read exactly one page instead: `--json` then prints the whole page object, and plain output prints the item lines followed by a line naming the `--cursor` argument for the page after it.
+
+A remote viewer's facets and text match that viewer's redacted projection rather than the stored item, so searching cannot reveal text the viewer is not allowed to read.
 
 ## Work Item Shape
 

@@ -6,7 +6,7 @@ use crate::daemon::protocol::{
     TaskBoardTriageHistoryRequest, WsRequest, WsResponse,
 };
 use crate::daemon::remote_task_board::{
-    project_task_board_item, project_task_board_list, project_task_board_position_snapshot,
+    project_task_board_item, project_task_board_position_snapshot,
     project_task_board_triage_current, project_task_board_triage_history,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -35,10 +35,10 @@ pub(super) async fn dispatch_task_board_list(
         return invalid_params(request);
     };
     let viewer = remote_viewer_projection_required(connection);
-    let result = task_board_route_executor::list_items(state, &body)
-        .await
-        .map(|response| project_task_board_list(response, viewer));
-    dispatch_query_result(&request.id, result)
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::list_items(state, &body, viewer).await,
+    )
 }
 
 pub(super) async fn dispatch_task_board_get(

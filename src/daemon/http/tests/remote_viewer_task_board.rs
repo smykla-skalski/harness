@@ -11,6 +11,10 @@ use crate::task_board::TaskBoardItem;
 use super::remote_viewer_support::{
     connect_remote_ws, get_http_json, register_remote_client, serve_http, ws_rpc,
 };
+use super::remote_viewer_task_board_paging::{
+    assert_viewer_pages_cover_the_selection_once, assert_viewer_pages_stay_projected,
+    seed_paged_items,
+};
 use super::remote_viewer_task_board_triage::{
     TRIAGE_ITEM_ID, assert_full_triage_current, assert_viewer_triage_current,
     assert_viewer_triage_history, assert_viewer_triage_override_mutations_are_denied,
@@ -40,12 +44,16 @@ async fn run_remote_viewer_projection_flow() {
     register_remote_client(&state, OPERATOR_ID, RemoteRole::Operator);
     seed_sensitive_item(&state).await;
     seed_triage_item(&state).await;
+    seed_paged_items(&state).await;
 
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
     assert_http_viewer_reads_and_write_denials(&client, &base_url).await;
     assert_http_operator_reads(&client, &base_url).await;
+    assert_viewer_search_cannot_probe_redacted_text(&client, &base_url).await;
+    assert_viewer_pages_cover_the_selection_once(&client, &base_url, VIEWER_ID).await;
+    assert_viewer_pages_stay_projected(&client, &base_url, VIEWER_ID).await;
     assert_ws_viewer_reads_and_write_denials(&base_url).await;
     assert_ws_operator_reads(&base_url).await;
 
@@ -95,6 +103,62 @@ async fn assert_http_viewer_reads_and_write_denials(client: &reqwest::Client, ba
 
     assert_viewer_position_mutations_are_denied(client, base_url).await;
     assert_viewer_triage_override_mutations_are_denied(client, base_url).await;
+}
+
+/// Search runs against whatever projection the caller reads, so a viewer's
+/// query can only ever distinguish items by text that same viewer could have
+/// read back. Probing the redacted title, the redacted tag, or the body past
+/// its preview has to come back empty for the viewer while an operator
+/// searching the same words finds the item.
+async fn assert_viewer_search_cannot_probe_redacted_text(client: &reqwest::Client, base_url: &str) {
+    for hidden in [
+        "title-secret",
+        "abcdefghijklmnop",
+        "github_pat_abcdefghijklmnopqrstuvwxyz123456",
+        "tail-only-detail",
+    ] {
+        let viewer = search_items(client, base_url, VIEWER_ID, hidden).await;
+        assert!(
+            viewer.is_empty(),
+            "a viewer searching '{hidden}' learned it is in the hidden text"
+        );
+        let operator = search_items(client, base_url, OPERATOR_ID, hidden).await;
+        assert!(
+            operator.iter().any(|id| id == ITEM_ID),
+            "an operator searching '{hidden}' should still match the item"
+        );
+    }
+
+    let visible = search_items(client, base_url, VIEWER_ID, "Deploy").await;
+    assert!(
+        visible.iter().any(|id| id == ITEM_ID),
+        "a viewer must still find an item by text its projection kept"
+    );
+}
+
+/// Encodes the probe properly rather than patching spaces: a probe carrying a
+/// reserved character would otherwise reach the daemon mangled, and this test
+/// reads "no match" as proof the viewer cannot see the text.
+async fn search_items(
+    client: &reqwest::Client,
+    base_url: &str,
+    client_id: &str,
+    text: &str,
+) -> Vec<String> {
+    let query = serde_urlencoded::to_string([("query", text)]).expect("encode search query");
+    let response = get_http_json(
+        client,
+        base_url,
+        &format!("{}?{query}", http_paths::TASK_BOARD_ITEMS),
+        client_id,
+    )
+    .await;
+    response["items"]
+        .as_array()
+        .expect("task board items array")
+        .iter()
+        .map(|item| item["id"].as_str().expect("item id").to_string())
+        .collect()
 }
 
 async fn assert_http_operator_reads(client: &reqwest::Client, base_url: &str) {
@@ -207,8 +271,10 @@ async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
         "schema_version": 1,
         "id": ITEM_ID,
         "title": "Deploy api_key=title-secret token=viewer-title-secret",
+        // The tail sits past the viewer's body preview, so a viewer that can
+        // find it learned something the projection withheld.
         "body": format!(
-            "Authorization: Bearer abcdefghijklmnop {}",
+            "Authorization: Bearer abcdefghijklmnop {}tail-only-detail",
             "private details ".repeat(20)
         ),
         "status": "todo",
@@ -289,6 +355,7 @@ fn assert_viewer_projection(item: &Value) {
         "workflow-secret",
         "/Users/private/worktree",
         "operator planning detail",
+        "tail-only-detail",
     ] {
         assert!(!serialized.contains(secret), "viewer item exposed {secret}");
     }

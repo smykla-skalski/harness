@@ -10480,7 +10480,7 @@
         "tags": [
           "task-board"
         ],
-        "description": "List task-board items with per-status counts and progress rollups, optionally filtered by status. Remote viewers receive a projected response with viewer-restricted fields removed",
+        "description": "List one bounded page of task-board items matching the requested facets and text, with progress rollups over the whole live board. Remote viewers receive a projected response with viewer-restricted fields removed, and their facets and text match that same projection",
         "operationId": "get_task_board_items",
         "parameters": [
           {
@@ -10490,11 +10490,82 @@
             "schema": {
               "$ref": "#/components/schemas/TaskBoardStatus"
             }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TaskBoardPriority"
+            }
+          },
+          {
+            "name": "agent_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AgentMode"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Case-insensitive substring over title, body, and tags.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, `1..=500`; defaults to 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 500,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Repeatable; an item must carry every requested tag",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "maxItems": 16
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Task-board items with per-status counts and progress rollups",
+            "description": "One page of task-board items with progress rollups and the next-page cursor",
             "content": {
               "application/json": {
                 "schema": {
@@ -30053,22 +30124,35 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TaskBoardItem"
-            }
+            },
+            "description": "One bounded page of the matched selection, in board order."
           },
           "items_change_seq": {
             "type": "integer",
             "format": "int64",
             "description": "Sequence observed with `items`; clients use this to reject stale picks."
           },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `cursor` for the next page. Absent on the last page."
+          },
           "progress_rollups": {
             "type": "object",
-            "description": "Keyed by umbrella item id, computed fresh from the full live item set\nat read time regardless of any `status` filter applied to `items`.",
+            "description": "Keyed by umbrella item id, computed fresh from the full live item set\nat read time regardless of any filter applied to `items`.",
             "additionalProperties": {
               "$ref": "#/components/schemas/TaskBoardProgressRollup"
             },
             "propertyNames": {
               "type": "string"
             }
+          },
+          "total_matched": {
+            "type": "integer",
+            "description": "How many items the request matched before paging.",
+            "minimum": 0
           }
         }
       },

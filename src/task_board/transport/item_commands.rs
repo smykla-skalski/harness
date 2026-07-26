@@ -44,20 +44,65 @@ impl Execute for TaskBoardCreateArgs {
 
 impl Execute for TaskBoardListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = daemon_client()?.list_task_board_items(&TaskBoardListItemsRequest {
-            status: self.status,
-        })?;
+        let client = daemon_client()?;
+        let request = self.request();
+        // Naming a page asks for exactly that page, so the response carries the
+        // cursor needed to ask for the next one. Every other read walks the
+        // pages here and prints the whole selection.
+        if self.limit.is_some() || self.cursor.is_some() {
+            let page = client.list_task_board_items_page(&request)?;
+            if self.json {
+                print_json(&page)?;
+            } else {
+                print_item_lines(&page.items);
+                if let Some(cursor) = &page.next_cursor {
+                    // The hint has to carry the page size back, or following
+                    // it silently reads the default page instead of the one
+                    // the caller asked for.
+                    let limit = self
+                        .limit
+                        .map(|limit| format!("--limit {limit} "))
+                        .unwrap_or_default();
+                    println!(
+                        "-- {} of {} shown; next page: {limit}--cursor {cursor}",
+                        page.items.len(),
+                        page.total_matched
+                    );
+                }
+            }
+            return Ok(0);
+        }
+        let items = client.list_task_board_items(&request)?;
         if self.json {
             print_json(&items)?;
         } else {
-            for item in items {
-                println!(
-                    "[{:?}] {} - {} ({:?})",
-                    item.priority, item.id, item.title, item.status
-                );
-            }
+            print_item_lines(&items);
         }
         Ok(0)
+    }
+}
+
+impl TaskBoardListArgs {
+    fn request(&self) -> TaskBoardListItemsRequest {
+        TaskBoardListItemsRequest {
+            status: self.status,
+            priority: self.priority,
+            agent_mode: self.agent_mode,
+            project_id: self.project_id.clone(),
+            tags: self.tag.clone(),
+            query: self.query.clone(),
+            limit: self.limit,
+            cursor: self.cursor.clone(),
+        }
+    }
+}
+
+fn print_item_lines(items: &[TaskBoardItem]) {
+    for item in items {
+        println!(
+            "[{:?}] {} - {} ({:?})",
+            item.priority, item.id, item.title, item.status
+        );
     }
 }
 

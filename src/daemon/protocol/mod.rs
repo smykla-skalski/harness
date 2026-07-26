@@ -34,6 +34,13 @@ pub use policy_transfer::*;
 pub use reviews::*;
 pub use session_requests::*;
 pub use summaries::*;
+// Re-exported here as well as from `crate::task_board` because the MCP tool
+// surface compiles into the standalone `harness-mcp` crate too, where the only
+// namespace shared with this one is `crate::daemon::protocol`.
+pub use crate::task_board::item_query_bounds::{
+    TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
+    TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
+};
 pub use task_board::*;
 pub use task_board_automation::*;
 pub use task_board_item_requests::*;

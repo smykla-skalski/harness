@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::de::DeserializeOwned;
 
 use crate::daemon::protocol::{
@@ -6,9 +8,10 @@ use crate::daemon::protocol::{
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
-    TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
-    TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardClearTriageOverrideRequest,
-    TaskBoardCreateItemRequest, TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
+    TASK_BOARD_LIST_MAX_LIMIT, TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest,
+    TaskBoardAuditResponse, TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest,
+    TaskBoardClearTriageOverrideRequest, TaskBoardCreateItemRequest,
+    TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
     TaskBoardHostListResponse, TaskBoardHostLocalResponse,
@@ -35,6 +38,10 @@ use crate::task_board::{
 };
 
 use super::DaemonClient;
+use super::task_board_list::{
+    TASK_BOARD_LIST_MAX_PAGES, changed_task_board_read, enum_label, task_board_list_query,
+    undrained_task_board_read, unusable_task_board_page,
+};
 
 #[expect(
     clippy::missing_errors_doc,
@@ -61,13 +68,75 @@ impl DaemonClient {
         self.post(http_paths::TASK_BOARD_ITEMS, request)
     }
 
+    /// Read one bounded page of matching task-board items.
+    pub fn list_task_board_items_page(
+        &self,
+        request: &TaskBoardListItemsRequest,
+    ) -> Result<TaskBoardListItemsResponse, CliError> {
+        let owned = task_board_list_query(request)?;
+        let query = owned
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect::<Vec<_>>();
+        self.get_with_query(http_paths::TASK_BOARD_ITEMS, &query)
+    }
+
+    /// Read every matching task-board item by walking the daemon's pages.
+    ///
+    /// The daemon bounds each response, so a caller that wants the whole
+    /// selection has to ask for the rest; this keeps that loop in one place
+    /// rather than in every command that reads the board.
+    ///
+    /// A walk that cannot advance fails instead of returning what it has. The
+    /// daemon only ever pairs a cursor with a non-empty page, and never
+    /// repeats the resume point it was handed, so either shape means the
+    /// daemon is not the one this client is built against - and a `Vec` has
+    /// nowhere to say the board was read only in part.
+    ///
+    /// Sequence-bound cursors prevent overlap in valid responses. Ids are
+    /// still tracked so a malformed overlapping page cannot put duplicate
+    /// rows in the returned board.
     pub fn list_task_board_items(
         &self,
         request: &TaskBoardListItemsRequest,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        let response: TaskBoardListItemsResponse =
-            self.get_task_board_with_status(http_paths::TASK_BOARD_ITEMS, request.status)?;
-        Ok(response.items)
+        let mut request = request.clone();
+        request.limit.get_or_insert(TASK_BOARD_LIST_MAX_LIMIT);
+        let mut items = Vec::new();
+        let mut seen = HashSet::new();
+        let mut items_change_seq = None;
+        for _ in 0..TASK_BOARD_LIST_MAX_PAGES {
+            let page = self.list_task_board_items_page(&request)?;
+            if let Some(expected) = items_change_seq
+                && page.items_change_seq != expected
+            {
+                return Err(changed_task_board_read(expected, page.items_change_seq));
+            }
+            items_change_seq.get_or_insert(page.items_change_seq);
+            let drained = page.items.is_empty();
+            items.extend(
+                page.items
+                    .into_iter()
+                    .filter(|item| seen.insert(item.id.clone())),
+            );
+            let Some(cursor) = page.next_cursor else {
+                return Ok(items);
+            };
+            if drained {
+                return Err(unusable_task_board_page(
+                    &cursor,
+                    "handed back a cursor with no items",
+                ));
+            }
+            if request.cursor.as_deref() == Some(cursor.as_str()) {
+                return Err(unusable_task_board_page(
+                    &cursor,
+                    "repeated the cursor it was given",
+                ));
+            }
+            request.cursor = Some(cursor);
+        }
+        Err(undrained_task_board_read())
     }
 
     pub fn get_task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
@@ -375,7 +444,7 @@ impl DaemonClient {
         let Some(status) = status else {
             return self.get(path);
         };
-        let status = task_board_status_label(status)?;
+        let status = enum_label(status, "status")?;
         self.get_with_query(path, &[("status", status.as_str())])
     }
 }
@@ -397,14 +466,6 @@ fn triage_escalation_verdict_path(escalation_id: &str) -> String {
 
 fn item_action_path(item_id: &str, action: &str) -> String {
     format!("{}/{action}", item_path(item_id))
-}
-
-fn task_board_status_label(status: TaskBoardStatus) -> Result<String, CliError> {
-    serde_json::to_value(status)
-        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?
-        .as_str()
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| CliErrorKind::workflow_serialize("task-board status is not a string").into())
 }
 
 fn task_board_upgrade_required() -> CliError {

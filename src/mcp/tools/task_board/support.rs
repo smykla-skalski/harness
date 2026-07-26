@@ -65,7 +65,7 @@ impl Tool for TaskBoardProxyTool {
     }
 }
 
-fn validate_params(params: Value, schema: &Value) -> Result<Value, ToolError> {
+pub(super) fn validate_params(params: Value, schema: &Value) -> Result<Value, ToolError> {
     let normalized = normalize_null_object(params);
     validate_value("arguments", &normalized, schema)?;
     Ok(normalized)
@@ -283,7 +283,30 @@ fn websocket_url(endpoint: &str) -> Result<String, ToolError> {
     Ok(format!("{base}{}", http_paths::WS))
 }
 
+/// What one task-board round trip produced.
+///
+/// A daemon-side refusal is not a transport failure: the MCP contract reports
+/// it as a successful call carrying an error message, so a page walk can tell
+/// "the daemon said no" apart from "the socket broke" without re-deriving the
+/// distinction from a formatted string.
+pub(super) enum TaskBoardCallOutcome {
+    Result(Value),
+    Refused(String),
+}
+
 async fn proxy_task_board_call(method: &str, params: Value) -> Result<ToolResult, ToolError> {
+    match task_board_call(method, params).await? {
+        TaskBoardCallOutcome::Result(value) => ToolResult::json_text(&value).map_err(|error| {
+            ToolError::internal(format!("serialize task-board MCP response: {error}"))
+        }),
+        TaskBoardCallOutcome::Refused(message) => Ok(ToolResult::error(message)),
+    }
+}
+
+pub(super) async fn task_board_call(
+    method: &str,
+    params: Value,
+) -> Result<TaskBoardCallOutcome, ToolError> {
     let connection = daemon_websocket_connection()?;
     let mut request = connection.url.into_client_request().map_err(|error| {
         ToolError::internal(format!("prepare daemon websocket request: {error}"))
@@ -330,7 +353,7 @@ async fn proxy_task_board_call(method: &str, params: Value) -> Result<ToolResult
             ToolError::internal(format!("decode daemon websocket response: {error}"))
         })?;
         let _ = socket.close(None).await;
-        return tool_result_from_response(method, response);
+        return outcome_from_response(method, response);
     }
 
     Err(ToolError::internal(
@@ -338,17 +361,21 @@ async fn proxy_task_board_call(method: &str, params: Value) -> Result<ToolResult
     ))
 }
 
-fn tool_result_from_response(method: &str, response: WsResponse) -> Result<ToolResult, ToolError> {
+fn outcome_from_response(
+    method: &str,
+    response: WsResponse,
+) -> Result<TaskBoardCallOutcome, ToolError> {
     if let Some(error) = response.error {
         let message = format_ws_error(method, &error);
         return match error.code.as_str() {
             "INVALID_PARAMS" | "MISSING_PARAM" => Err(ToolError::invalid(message)),
-            _ => Ok(ToolResult::error(message)),
+            _ => Ok(TaskBoardCallOutcome::Refused(message)),
         };
     }
 
-    ToolResult::json_text(&response.result.unwrap_or(Value::Null))
-        .map_err(|error| ToolError::internal(format!("serialize task-board MCP response: {error}")))
+    Ok(TaskBoardCallOutcome::Result(
+        response.result.unwrap_or(Value::Null),
+    ))
 }
 
 fn format_ws_error(method: &str, error: &WsErrorPayload) -> String {
@@ -363,147 +390,5 @@ fn format_ws_error(method: &str, error: &WsErrorPayload) -> String {
 }
 
 #[cfg(test)]
-mod validation_tests {
-    use serde_json::{Value, json};
-
-    use super::validate_params;
-
-    #[test]
-    fn null_arguments_normalize_to_an_empty_object() {
-        let schema = json!({
-            "type": "object",
-            "additionalProperties": false
-        });
-
-        assert_eq!(
-            validate_params(Value::Null, &schema).expect("normalize null"),
-            json!({})
-        );
-    }
-
-    #[test]
-    fn required_type_and_enum_constraints_are_enforced() {
-        let schema = json!({
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "enum": ["todo", "done"]
-                }
-            },
-            "required": ["status"],
-            "additionalProperties": false
-        });
-
-        assert!(validate_params(json!({}), &schema).is_err());
-        assert!(validate_params(json!({ "status": 2 }), &schema).is_err());
-        assert!(validate_params(json!({ "status": "blocked" }), &schema).is_err());
-        assert!(validate_params(json!({ "status": "todo" }), &schema).is_ok());
-    }
-
-    #[test]
-    fn empty_object_schema_rejects_unknown_fields() {
-        let schema = json!({
-            "type": "object",
-            "properties": {},
-            "additionalProperties": false
-        });
-
-        assert!(validate_params(json!({ "unexpected": true }), &schema).is_err());
-    }
-
-    #[test]
-    fn any_of_accepts_each_variant_and_rejects_the_rest() {
-        let schema = json!({
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "anyOf": [
-                        { "type": "integer", "minimum": 1 },
-                        { "type": "string" }
-                    ]
-                }
-            },
-            "additionalProperties": false
-        });
-
-        assert!(validate_params(json!({ "cursor": 12 }), &schema).is_ok());
-        assert!(validate_params(json!({ "cursor": "18446744073709551615" }), &schema).is_ok());
-        assert!(validate_params(json!({ "cursor": 0 }), &schema).is_err());
-        assert!(validate_params(json!({ "cursor": true }), &schema).is_err());
-    }
-
-    #[test]
-    fn array_items_are_validated_recursively() {
-        let schema = json!({
-            "type": "object",
-            "properties": {
-                "tags": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                }
-            },
-            "additionalProperties": false
-        });
-
-        assert!(validate_params(json!({ "tags": ["mcp", "cli"] }), &schema).is_ok());
-        assert!(validate_params(json!({ "tags": ["mcp", 1] }), &schema).is_err());
-    }
-
-    #[test]
-    fn maximum_and_disallowed_field_combinations_are_enforced() {
-        let schema = json!({
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 9_223_372_036_854_775_807_u64
-                },
-                "clear": { "type": "boolean" }
-            },
-            "allOf": [{
-                "not": {
-                    "properties": { "clear": { "const": true } },
-                    "required": ["value", "clear"]
-                }
-            }],
-            "additionalProperties": false
-        });
-
-        assert!(validate_params(json!({ "value": 1 }), &schema).is_ok());
-        assert!(
-            validate_params(json!({ "value": 9_223_372_036_854_775_807_u64 }), &schema).is_ok()
-        );
-        assert!(
-            validate_params(json!({ "value": 9_223_372_036_854_775_808_u64 }), &schema).is_err()
-        );
-        assert!(validate_params(json!({ "value": 1, "clear": false }), &schema).is_ok());
-        assert!(validate_params(json!({ "value": 1, "clear": true }), &schema).is_err());
-    }
-
-    #[test]
-    fn valid_payload_is_forwarded_without_rewriting() {
-        let schema = json!({
-            "type": "object",
-            "properties": {
-                "title": { "type": "string" },
-                "tags": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                }
-            },
-            "required": ["title"],
-            "additionalProperties": false
-        });
-        let payload = json!({
-            "title": "Split the MCP worker",
-            "tags": ["mcp", "isolation"]
-        });
-
-        assert_eq!(
-            validate_params(payload.clone(), &schema).expect("validate payload"),
-            payload
-        );
-    }
-}
+#[path = "support_tests.rs"]
+mod validation_tests;
