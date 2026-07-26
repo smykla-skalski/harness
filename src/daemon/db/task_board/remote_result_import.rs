@@ -3,13 +3,11 @@ use std::pin::Pin;
 
 use sqlx::{Sqlite, Transaction, query};
 
-use super::ORCHESTRATOR_CHANGE_SCOPE;
-use super::items::bump_change_in_tx;
 use super::remote_assignment_io_authority::{active_target_matches, has_remote_io_authority};
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, load_assignment_in_tx, to_i64,
 };
-use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
+use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{RemoteArtifactEntry, RemoteTypedResult};
 use crate::git::bundle::GitBundleImportEvidence;
@@ -17,7 +15,6 @@ use crate::task_board::TaskBoardAttemptResultArtifact;
 use crate::task_board::{
     TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardExecutionAttemptRecord,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    validate_task_board_workflow_execution,
 };
 
 #[path = "remote_result_import/evidence.rs"]
@@ -26,19 +23,35 @@ mod evidence;
 mod failure;
 #[path = "remote_result_import/model.rs"]
 mod model;
+#[path = "remote_result_import/prepare.rs"]
+mod prepare;
 #[path = "remote_result_import/storage.rs"]
 mod storage;
 use evidence::{ImportMaterials, load_import_materials};
+use prepare::{LoadedResultImport, load_result_import_target_in_tx, resolve_result_import_in_tx};
 
 type ManualImportFuture<'a> =
     Pin<Box<dyn Future<Output = Result<TaskBoardRemoteResultImportRecord, CliError>> + Send + 'a>>;
+
+type ImportAuthorityFuture<'a> = Pin<Box<dyn Future<Output = Result<(), CliError>> + Send + 'a>>;
+
+type ImportTargetFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Box<LoadedResultImport>, CliError>> + Send + 'a>>;
+
+type ResolvedImportFuture<'a> = Pin<
+    Box<
+        dyn Future<Output = Result<(TaskBoardRemoteResultImportRecord, &'static str), CliError>>
+            + Send
+            + 'a,
+    >,
+>;
 
 pub(crate) use model::{
     TaskBoardRemoteImplementationImportEvidence, TaskBoardRemoteResultImportRecord,
     TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
     TaskBoardRemoteResultImportWork,
 };
-use storage::{insert_import_in_tx, load_import_in_tx, prepared_import, require_import};
+use storage::{load_import_in_tx, require_import};
 
 impl AsyncDaemonDb {
     pub(crate) async fn prepare_task_board_remote_result_import(
@@ -50,63 +63,31 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote result import prepare")
             .await?;
-        let assignment = exact_assignment(&mut transaction, request).await?;
-        let parent = load_execution_in_tx(&mut transaction, &assignment.execution_id)
-            .await?
-            .ok_or_else(|| concurrent("remote result import execution disappeared"))?;
-        if cas_mismatch(expected, &parent).is_some() {
-            return Err(concurrent(
-                "remote result import lost its exact parent record",
-            ));
-        }
-        let materials =
-            load_import_materials(&mut transaction, &assignment, &parent, request).await?;
-        if let Some(existing) = load_import_in_tx(
+        // Same chain hazard as `mark_manual_required` below: the callers that
+        // reach this prepare are already about twenty async frames deep, and a
+        // nested helper here fails the crate's recursion limit with `E0275:
+        // overflow evaluating the requirement sqlx::SqliteStatement: Send`.
+        // Erasing both halves proves `Send` once and truncates the chain.
+        let target: ImportTargetFuture<'_> = Box::pin(load_result_import_target_in_tx(
             &mut transaction,
-            &assignment.assignment_id,
-            assignment.fencing_epoch,
-        )
-        .await?
-        {
-            require_exact_replay(&existing, request, &assignment, &parent, &materials)?;
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit replayed result import: {error}")))?;
-            return Ok(TaskBoardRemoteResultImportWork {
-                record: existing,
-                bundle: materials.bundle_artifact.content,
-            });
-        }
-        require_import_authority_available(&assignment, &parent)?;
-        let prepared = prepared_import(request, &assignment, &materials, expected)?;
-        let mut updated_parent = parent.clone();
-        updated_parent.ownership.resources.insert(
-            TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE.into(),
-            prepared.import_sha256.clone(),
-        );
-        updated_parent.updated_at = super::remote_assignment_io_authority::monotonic_time(
-            &parent.updated_at,
-            &request.prepared_at,
-        )?;
-        validate_task_board_workflow_execution(&updated_parent)
-            .map_err(|error| db_error(format!("validate result import authority: {error}")))?;
-        let record = prepared.into_record(&updated_parent);
-        insert_import_in_tx(&mut transaction, &record).await?;
-        update_execution_in_tx(
+            expected,
+            request,
+        ));
+        let loaded = target.await?;
+        let resolved: ResolvedImportFuture<'_> = Box::pin(resolve_result_import_in_tx(
             &mut transaction,
-            &TaskBoardWorkflowExecutionCas::from(&parent),
-            &updated_parent,
-        )
-        .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+            expected,
+            request,
+            &loaded,
+        ));
+        let (record, context) = resolved.await?;
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit prepared result import: {error}")))?;
+            .map_err(|error| db_error(format!("commit {context}: {error}")))?;
         Ok(TaskBoardRemoteResultImportWork {
             record,
-            bundle: materials.bundle_artifact.content,
+            bundle: loaded.materials.bundle_artifact.content,
         })
     }
 
@@ -136,7 +117,15 @@ impl AsyncDaemonDb {
             ));
         }
         require_git_evidence(&record, git)?;
-        require_import_authority(&mut transaction, &record).await?;
+        // `require_import_authority` reloads the assignment, its execution and
+        // the import materials, which makes it the deepest `Send` obligation
+        // chain reaching this recorder. E0275 reports it from the websocket
+        // dispatch task that owns the whole controller closure, so erasing it
+        // here proves `Send` once and keeps that closure inside the crate's
+        // recursion limit.
+        let authority: ImportAuthorityFuture<'_> =
+            Box::pin(require_import_authority(&mut transaction, &record));
+        authority.await?;
         if record.state == TaskBoardRemoteResultImportState::Applied {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit replayed applied result import: {error}"))

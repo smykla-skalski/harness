@@ -162,42 +162,70 @@ impl AsyncDaemonDb {
         let Some(row) = due_assignment(&mut transaction, candidate, now).await? else {
             // The captured generation may have been replaced or quarantined after paging.
             // Never clear by assignment id until this transaction proves the exact snapshot.
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit no-op remote assignment recovery: {error}"))
-            })?;
+            commit_recovery(transaction, "no-op remote assignment recovery").await?;
             return Ok(None);
         };
         let changed = match Box::pin(recover_one(&mut transaction, &row, now)).await {
             Ok(changed) => changed,
             Err(error) => {
-                transaction.rollback().await.map_err(|rollback| {
-                    db_error(format!(
-                        "rollback failed remote recovery: {rollback}; {error}"
-                    ))
-                })?;
+                rollback_failed_recovery(transaction, &error).await?;
                 return Err(error);
             }
         };
-        if !changed {
-            clear_recovery_quarantine_in_tx(&mut transaction, &candidate.assignment_id).await?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit unchanged remote assignment recovery: {error}"
-                ))
-            })?;
-            return Ok(None);
-        }
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        clear_recovery_quarantine_in_tx(&mut transaction, &candidate.assignment_id).await?;
-        let assignment = load_assignment_in_tx(&mut transaction, &candidate.assignment_id)
-            .await?
-            .ok_or_else(|| db_error("recovered remote assignment disappeared"))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit one remote assignment recovery: {error}")))?;
-        Ok(Some(assignment))
+        settle_recovered_assignment(transaction, &candidate.assignment_id, changed).await
     }
+}
+
+/// Settles a recovery that already ran. An unchanged recovery still clears the
+/// candidate's quarantine, so a snapshot that turned out to need nothing is not
+/// retried on the next pass.
+async fn settle_recovered_assignment(
+    mut transaction: Transaction<'_, Sqlite>,
+    assignment_id: &str,
+    changed: bool,
+) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
+    if !changed {
+        clear_recovery_quarantine_in_tx(&mut transaction, assignment_id).await?;
+        commit_recovery(transaction, "unchanged remote assignment recovery").await?;
+        return Ok(None);
+    }
+    let assignment = store_recovered_assignment_in_tx(&mut transaction, assignment_id).await?;
+    commit_recovery(transaction, "one remote assignment recovery").await?;
+    Ok(Some(assignment))
+}
+
+async fn store_recovered_assignment_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment_id: &str,
+) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    clear_recovery_quarantine_in_tx(transaction, assignment_id).await?;
+    load_assignment_in_tx(transaction, assignment_id)
+        .await?
+        .ok_or_else(|| db_error("recovered remote assignment disappeared"))
+}
+
+async fn commit_recovery(
+    transaction: Transaction<'_, Sqlite>,
+    context: &str,
+) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
+}
+
+/// Reports the rollback failure alongside the recovery error that caused it,
+/// because the caller returns the recovery error and would otherwise lose it.
+async fn rollback_failed_recovery(
+    transaction: Transaction<'_, Sqlite>,
+    error: &CliError,
+) -> Result<(), CliError> {
+    transaction.rollback().await.map_err(|rollback| {
+        db_error(format!(
+            "rollback failed remote recovery: {rollback}; {error}"
+        ))
+    })
 }
 
 async fn due_assignment(

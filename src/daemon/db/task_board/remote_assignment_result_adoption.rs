@@ -1,3 +1,6 @@
+use std::future::Future;
+use std::pin::Pin;
+
 use sqlx::{Sqlite, Transaction};
 
 use super::items::bump_change_in_tx;
@@ -36,6 +39,10 @@ use evidence::{load_completed_artifact, require_failed_artifact_set};
 mod screen;
 use screen::{ProceedingAdoption, TerminalAdoptionScreen, screen_terminal_adoption_in_tx};
 
+type SettledAdoptionFuture<'a> = Pin<
+    Box<dyn Future<Output = Result<TaskBoardRemoteResultAdoptionOutcome, CliError>> + Send + 'a>,
+>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteResultAdoptionOutcome {
     Updated(TaskBoardWorkflowExecutionRecord),
@@ -66,7 +73,14 @@ impl AsyncDaemonDb {
                 Ok(outcome)
             }
             TerminalAdoptionScreen::Proceed(proceed) => {
-                settle_screened_adoption(transaction, proceed).await
+                // The adoption write reaches the result-import evidence loaders
+                // through six nested frames, and every controller that calls
+                // this entry point is already about twenty frames deep, so
+                // E0275 reports the whole closure over the crate's recursion
+                // limit. Erasing here proves `Send` once for the write half.
+                let settled: SettledAdoptionFuture<'_> =
+                    Box::pin(settle_screened_adoption(transaction, proceed));
+                settled.await
             }
         }
     }
