@@ -24,7 +24,9 @@
 
 <span class="chip chip-{tone}" class:chip-small={small}>
   {#if dot}
-    <span class="chip-dot"></span>
+    <!-- Decoration for the label beside it. Without this some screen readers
+         announce the empty element as a blank item of its own. -->
+    <span class="chip-dot" aria-hidden="true"></span>
   {/if}
   {@render children()}
 </span>
