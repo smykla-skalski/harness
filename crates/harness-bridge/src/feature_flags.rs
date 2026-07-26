@@ -1,5 +1,3 @@
-pub use harness_hook::feature_flags::{RuntimeHookFlags, SUITE_HOOKS_ENV};
-
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 
 #[must_use]

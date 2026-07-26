@@ -5,8 +5,6 @@ use std::str::FromStr;
 use crate::infra::blocks::BlockRequirement;
 use harness_kernel::kernel::gate::Gate;
 
-pub const PREFLIGHT_REPLY_HEAD: &str = "suite:run/preflight:";
-
 pub const MANIFEST_FIX_GATE: Gate = Gate {
     question: "suite:run/manifest-fix: how should this failure be handled?",
     options: &[
@@ -24,35 +22,6 @@ pub fn managed_cluster_binaries() -> BTreeSet<String> {
         .flat_map(|requirement| requirement.denied_binaries().iter().copied())
         .map(ToString::to_string)
         .collect()
-}
-
-/// Preflight reply status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum PreflightReply {
-    Pass,
-    Fail,
-}
-
-impl fmt::Display for PreflightReply {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Pass => "pass",
-            Self::Fail => "fail",
-        })
-    }
-}
-
-impl FromStr for PreflightReply {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "pass" => Ok(Self::Pass),
-            "fail" => Ok(Self::Fail),
-            _ => Err(()),
-        }
-    }
 }
 
 /// Legacy Python scripts that are no longer allowed.

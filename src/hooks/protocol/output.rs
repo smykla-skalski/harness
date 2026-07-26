@@ -29,18 +29,6 @@ struct PreToolUseSpecificOutput<'a> {
 }
 
 #[derive(Serialize)]
-struct BlockingDenyOutput<'a> {
-    decision: &'static str,
-    reason: &'a str,
-}
-
-#[derive(Serialize)]
-struct BlockingInfoOutput<'a> {
-    #[serde(rename = "systemMessage")]
-    system_message: &'a str,
-}
-
-#[derive(Serialize)]
 struct PostToolUseOutput<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     decision: Option<&'static str>,
@@ -58,20 +46,6 @@ struct PostToolUseSpecificOutput<'a> {
     additional_context: Option<&'a str>,
     #[serde(rename = "toolInput", skip_serializing_if = "Option::is_none")]
     tool_input: Option<&'a Value>,
-}
-
-#[derive(Serialize)]
-struct AdditionalContextOutput<'a> {
-    #[serde(rename = "hookSpecificOutput")]
-    hook_specific_output: AdditionalContextSpecificOutput<'a>,
-}
-
-#[derive(Serialize)]
-struct AdditionalContextSpecificOutput<'a> {
-    #[serde(rename = "hookEventName")]
-    hook_event_name: &'a str,
-    #[serde(rename = "additionalContext")]
-    additional_context: &'a str,
 }
 
 fn render_json<T: Serialize>(payload: &T) -> String {
@@ -122,23 +96,6 @@ fn pre_tool_use_permission_reason(result: &NormalizedHookResult) -> Option<Strin
     has_reason.then(|| result.display_message())
 }
 
-fn render_blocking_hook_output_normalized(result: &NormalizedHookResult) -> String {
-    if result.decision == NormalizedDecision::Allow && result.additional_context.is_none() {
-        return String::new();
-    }
-    let message = result.display_message();
-    if result.decision == NormalizedDecision::Deny {
-        render_json(&BlockingDenyOutput {
-            decision: "block",
-            reason: &message,
-        })
-    } else {
-        render_json(&BlockingInfoOutput {
-            system_message: &message,
-        })
-    }
-}
-
 fn render_post_tool_use_output_normalized(
     result: &NormalizedHookResult,
     event_name: &str,
@@ -166,25 +123,6 @@ fn render_post_tool_use_output_normalized(
     })
 }
 
-fn render_additional_context_output_normalized(
-    result: &NormalizedHookResult,
-    event_name: &str,
-) -> String {
-    if result.decision == NormalizedDecision::Allow && result.additional_context.is_none() {
-        return String::new();
-    }
-    let additional_context = result
-        .additional_context
-        .as_deref()
-        .map_or_else(|| result.display_message(), str::to_owned);
-    render_json(&AdditionalContextOutput {
-        hook_specific_output: AdditionalContextSpecificOutput {
-            hook_event_name: event_name,
-            additional_context: &additional_context,
-        },
-    })
-}
-
 /// Transform a `NormalizedHookResult` into the native Claude Code hook output
 /// format for the given hook type.
 #[must_use]
@@ -199,14 +137,6 @@ pub fn render_normalized_hook_output(hook_type: HookType, result: &NormalizedHoo
     match hook_type {
         HookType::PreToolUse => render_pre_tool_use_output_normalized(result),
         HookType::PostToolUse => render_post_tool_use_output_normalized(result, "PostToolUse"),
-        HookType::PostToolUseFailure => {
-            render_post_tool_use_output_normalized(result, "PostToolUseFailure")
-        }
-        HookType::SubagentStart => {
-            render_additional_context_output_normalized(result, "SubagentStart")
-        }
-        HookType::SubagentStop => render_post_tool_use_output_normalized(result, "SubagentStop"),
-        HookType::Blocking => render_blocking_hook_output_normalized(result),
     }
 }
 

@@ -97,22 +97,13 @@ fn hook_names_are_unique() {
 fn hook_command_types_are_exhaustive() {
     for hook in [
         HookCommand::ToolGuard,
-        HookCommand::GuardStop,
         HookCommand::ToolResult,
         HookCommand::AuditTurn(AuditTurnArgs { payload: None }),
-        HookCommand::ToolFailure,
-        HookCommand::ContextAgent,
-        HookCommand::ValidateAgent,
     ] {
         assert!(
             matches!(
                 hook.hook_type(),
-                HookType::PreToolUse
-                    | HookType::PostToolUse
-                    | HookType::PostToolUseFailure
-                    | HookType::SubagentStart
-                    | HookType::SubagentStop
-                    | HookType::Blocking
+                HookType::PreToolUse | HookType::PostToolUse
             ),
             "{} had no hook type",
             hook.name()

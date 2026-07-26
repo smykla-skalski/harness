@@ -12,11 +12,9 @@ Load this file only when the repo-root `AGENTS.md` routes the current task here.
 
 Hooks intercept Codex tool usage. The constants are classified in `src/cli.rs`:
 
-- Unified tool lifecycle: `tool-guard`, `tool-result`, and `tool-failure`.
-- Blocking: `guard-stop`.
-- Subagent gates: `context-agent` and `validate-agent`.
+- Unified tool lifecycle: `tool-guard` and `tool-result`, plus the `audit-turn` shim.
 
-The four suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated behind `HARNESS_FEATURE_SUITE_HOOKS`. Re-enable them for a setup invocation with `--enable-suite-hooks` on `harness setup bootstrap`, or globally with `HARNESS_FEATURE_SUITE_HOOKS=1`. The CLI flag wins over the env var. Bootstrap logs an `info!` line per regenerated config naming any omitted family.
+The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) and the `HARNESS_FEATURE_SUITE_HOOKS` flag that gated them have been removed; only the tool lifecycle remains.
 
 Repo-policy/manual-task enforcement belongs to `aff`. Use harness setup tasks for harness-owned outputs and the separate `aff:*` tasks for aff-owned runtime hooks.
 

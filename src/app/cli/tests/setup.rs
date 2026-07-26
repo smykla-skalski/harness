@@ -48,16 +48,10 @@ fn parse_bootstrap_skip_runtime_hooks_csv() {
 }
 
 #[test]
-fn parse_bootstrap_enable_suite_hooks_flag() {
-    let cli =
-        Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-suite-hooks"]).unwrap();
-    let Command::Setup {
-        command: SetupCommand::Bootstrap(args),
-    } = cli.command
-    else {
-        panic!("expected bootstrap command");
-    };
-    assert!(args.enable_suite_hooks);
+fn parse_bootstrap_rejects_enable_suite_hooks_flag() {
+    assert!(
+        Cli::try_parse_from(["harness", "setup", "bootstrap", "--enable-suite-hooks"]).is_err()
+    );
 }
 
 #[test]

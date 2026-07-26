@@ -1,9 +1,9 @@
-use harness_kernel::errors::CliError;
 use crate::hooks::application::GuardContext;
 use crate::hooks::protocol::hook_result::HookResult;
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::run::audit::{AuditAppendRequest, append_audit_entry};
 use crate::run::workflow::{self as runner_wf, RunnerWorkflowState};
+use harness_kernel::errors::CliError;
 
 /// Explicit side effects emitted by hook handlers and applied by the engine.
 #[derive(Debug, Clone)]
@@ -125,17 +125,6 @@ pub(crate) fn persist_runner_state(
     };
     runner_wf::write_runner_state_if_current(run_dir.as_ref(), expected_transition_count, state)?;
     Ok(true)
-}
-
-pub(crate) fn transition_runner_state<F>(ctx: &GuardContext, update: F) -> Option<HookEffect>
-where
-    F: FnOnce(&RunnerWorkflowState) -> Option<RunnerWorkflowState>,
-{
-    let current = ctx.runner_state.as_ref()?;
-    update(current).map(|state| HookEffect::WriteRunnerState {
-        expected_transition_count: current.transition_count,
-        state,
-    })
 }
 
 pub(crate) fn apply_effects(

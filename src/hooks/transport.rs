@@ -3,10 +3,7 @@ use clap::{Args, Subcommand};
 use harness_kernel::kernel::skills::SKILL_NAMES;
 
 use super::adapters::HookAgent;
-use super::catalog::{
-    CONTEXT_AGENT_HOOK, GUARD_STOP_HOOK, TOOL_FAILURE_HOOK, TOOL_GUARD_HOOK, TOOL_RESULT_HOOK,
-    VALIDATE_AGENT_HOOK,
-};
+use super::catalog::{TOOL_GUARD_HOOK, TOOL_RESULT_HOOK};
 use super::registry::Hook;
 
 /// Hook lifecycle categories.
@@ -14,16 +11,12 @@ use super::registry::Hook;
 pub enum HookType {
     PreToolUse,
     PostToolUse,
-    PostToolUseFailure,
-    SubagentStart,
-    SubagentStop,
-    Blocking,
 }
 
 impl HookType {
     #[must_use]
     pub const fn is_guard(self) -> bool {
-        matches!(self, Self::PreToolUse | Self::Blocking)
+        matches!(self, Self::PreToolUse)
     }
 }
 
@@ -33,18 +26,10 @@ impl HookType {
 pub enum HookCommand {
     /// Guard tool usage before execution.
     ToolGuard,
-    /// Guard stop and session end.
-    GuardStop,
     /// Process tool results after execution.
     ToolResult,
     /// Audit a Codex turn-complete notification.
     AuditTurn(AuditTurnArgs),
-    /// Process tool failures after execution errors.
-    ToolFailure,
-    /// Validate subagent startup context.
-    ContextAgent,
-    /// Validate subagent results.
-    ValidateAgent,
 }
 
 /// Arguments for the Codex notify-based audit shim.
@@ -60,11 +45,7 @@ impl HookCommand {
     pub fn hook(&self) -> &'static dyn Hook {
         match self {
             Self::ToolGuard => TOOL_GUARD_HOOK,
-            Self::GuardStop => GUARD_STOP_HOOK,
             Self::ToolResult | Self::AuditTurn(_) => TOOL_RESULT_HOOK,
-            Self::ToolFailure => TOOL_FAILURE_HOOK,
-            Self::ContextAgent => CONTEXT_AGENT_HOOK,
-            Self::ValidateAgent => VALIDATE_AGENT_HOOK,
         }
     }
 

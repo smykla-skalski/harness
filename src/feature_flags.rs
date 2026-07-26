@@ -1,12 +1,8 @@
 //! Runtime hook feature flags.
 //!
-//! One unfinished hook family ships today but slows every tool call without
-//! useful guidance. It is off by default and re-enabled per agent install
-//! through env vars or CLI flags:
+//! Optional runtime behaviour is toggled per install through env vars or CLI
+//! flags:
 //!
-//! - `HARNESS_FEATURE_SUITE_HOOKS=1` / `--enable-suite-hooks` re-enables the
-//!   suite lifecycle hooks: `guard-stop`, `context-agent`, `validate-agent`,
-//!   `tool-failure` (Claude/Gemini/Copilot enrich-failure).
 //! - `HARNESS_FEATURE_ACP=0` disables ACP managed-agent start routes. ACP is
 //!   enabled by default now that the blocking permission modal has landed.
 //! - `HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO=1` enables background Reviews
@@ -40,7 +36,6 @@ use crate::task_board::TaskBoardTriageEscalationConfig;
 use crate::workspace::normalized_env_value;
 
 /// Env var that re-enables suite-lifecycle hooks in generated configs.
-pub const SUITE_HOOKS_ENV: &str = "HARNESS_FEATURE_SUITE_HOOKS";
 /// Env var that enables ACP managed-agent runtime routes before the modal ships.
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 /// Env var that enables background Reviews policy runs.
@@ -182,49 +177,6 @@ impl Drop for AcpRuntimeOverrideGuard {
     }
 }
 
-/// Toggles for the optional hook families written into runtime configs.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct RuntimeHookFlags {
-    /// When `true`, generate `guard-stop`, `context-agent`, `validate-agent`,
-    /// and the Claude/Gemini/Copilot `tool-failure` hook.
-    pub suite_hooks: bool,
-}
-
-impl RuntimeHookFlags {
-    /// The toggle forced on. Useful in tests that need parity with the
-    /// pre-flag baseline.
-    #[must_use]
-    pub const fn all_enabled() -> Self {
-        Self { suite_hooks: true }
-    }
-
-    /// The toggle forced off. Same as `Default`, exposed for readability at call sites.
-    #[must_use]
-    pub const fn all_disabled() -> Self {
-        Self { suite_hooks: false }
-    }
-
-    /// Resolve flags from env vars only. Used by code paths that have no CLI
-    /// surface (e.g. the doctor check that compares on-disk configs against
-    /// the bootstrap contract).
-    #[must_use]
-    pub fn from_env() -> Self {
-        Self {
-            suite_hooks: env_truthy(SUITE_HOOKS_ENV),
-        }
-    }
-
-    /// Resolve flags using CLI overrides on top of env vars. `None` means the
-    /// CLI did not supply the override; fall back to the env var.
-    #[must_use]
-    pub fn resolve(cli_suite_hooks: Option<bool>) -> Self {
-        let env = Self::from_env();
-        Self {
-            suite_hooks: cli_suite_hooks.unwrap_or(env.suite_hooks),
-        }
-    }
-}
-
 fn env_truthy(name: &str) -> bool {
     normalized_env_value(name).is_some_and(|value| env_value_truthy(&value))
 }
@@ -249,7 +201,6 @@ mod tests {
     fn with_clean_env<R>(body: impl FnOnce() -> R) -> R {
         temp_env::with_vars(
             [
-                (SUITE_HOOKS_ENV, None::<&str>),
                 (ACP_ENV, None::<&str>),
                 (REVIEWS_BACKGROUND_AUTO_ENV, None::<&str>),
                 (TASK_BOARD_AUTOMATION_V2_ENV, None::<&str>),
@@ -261,56 +212,9 @@ mod tests {
     #[test]
     fn defaults_match_feature_rollout_baselines() {
         with_clean_env(|| {
-            let flags = RuntimeHookFlags::from_env();
-            assert!(!flags.suite_hooks);
             assert!(acp_enabled_from_env());
             assert!(!reviews_background_auto_enabled_from_env());
             assert!(task_board_automation_v2_enabled_from_env());
-        });
-    }
-
-    #[test]
-    fn truthy_env_values_enable_each_flag_independently() {
-        for value in ["1", "true", "TRUE", "yes", "Yes", "on", "ON"] {
-            temp_env::with_vars([(SUITE_HOOKS_ENV, Some(value))], || {
-                let flags = RuntimeHookFlags::from_env();
-                assert!(
-                    flags.suite_hooks,
-                    "value {value:?} should enable suite hooks"
-                );
-            });
-        }
-    }
-
-    #[test]
-    fn falsy_or_unset_env_keeps_flags_disabled() {
-        for value in ["", "0", "false", "no", "off", "${NOT_EXPANDED}", "unset"] {
-            temp_env::with_vars([(SUITE_HOOKS_ENV, Some(value))], || {
-                let flags = RuntimeHookFlags::from_env();
-                assert!(
-                    !flags.suite_hooks,
-                    "value {value:?} should not enable suite hooks"
-                );
-            });
-        }
-    }
-
-    #[test]
-    fn cli_override_wins_over_env() {
-        temp_env::with_vars([(SUITE_HOOKS_ENV, Some("1"))], || {
-            let flags = RuntimeHookFlags::resolve(Some(false));
-            assert!(!flags.suite_hooks);
-
-            let flags = RuntimeHookFlags::resolve(None);
-            assert!(flags.suite_hooks);
-        });
-    }
-
-    #[test]
-    fn cli_override_can_enable_when_env_unset() {
-        with_clean_env(|| {
-            let flags = RuntimeHookFlags::resolve(Some(true));
-            assert!(flags.suite_hooks);
         });
     }
 

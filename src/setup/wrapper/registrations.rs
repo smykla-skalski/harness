@@ -1,11 +1,7 @@
-use crate::feature_flags::RuntimeHookFlags;
 use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
 
-pub(super) fn process_agent_registrations(
-    agent: HookAgent,
-    flags: RuntimeHookFlags,
-) -> Vec<HookRegistration> {
+pub(super) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     let mut registrations = Vec::new();
 
     // Lifecycle hooks registered for all runtimes. The session-start hook
@@ -30,187 +26,97 @@ pub(super) fn process_agent_registrations(
     ));
 
     match agent {
-        HookAgent::Claude => registrations.extend(claude_hooks(agent, flags)),
-        HookAgent::Codex => registrations.extend(codex_hooks(agent, flags)),
-        HookAgent::Vibe => registrations.extend(vibe_hooks(agent, flags)),
-        HookAgent::OpenCode => registrations.extend(opencode_hooks(agent, flags)),
-        HookAgent::Copilot => registrations.extend(copilot_hooks(agent, flags)),
-        HookAgent::Gemini => registrations.extend(gemini_hooks(agent, flags)),
+        HookAgent::Claude => registrations.extend(claude_hooks(agent)),
+        HookAgent::Codex => registrations.extend(codex_hooks(agent)),
+        HookAgent::Vibe => registrations.extend(vibe_hooks(agent)),
+        HookAgent::OpenCode => registrations.extend(opencode_hooks(agent)),
+        HookAgent::Copilot => registrations.extend(copilot_hooks(agent)),
+        HookAgent::Gemini => registrations.extend(gemini_hooks(agent)),
     }
 
     registrations
 }
 
-fn codex_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    shared_runtime_hooks(agent, flags)
+fn codex_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    shared_runtime_hooks(agent)
 }
 
-fn vibe_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    shared_runtime_hooks(agent, flags)
+fn vibe_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    shared_runtime_hooks(agent)
 }
 
-fn opencode_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    shared_runtime_hooks(agent, flags)
+fn opencode_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    shared_runtime_hooks(agent)
 }
 
-fn shared_runtime_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    let mut hooks = vec![command_registration(
-        "prompt-submit",
-        lifecycle_command(agent, "prompt-submit"),
-        NormalizedEvent::UserPromptSubmit,
-        None,
-    )];
-    hooks.push(hook_registration(
-        agent,
-        "tool-guard",
-        NormalizedEvent::BeforeToolUse,
-        Some(".*"),
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
-            agent,
-            "guard-stop",
-            NormalizedEvent::AgentStop,
+fn shared_runtime_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        command_registration(
+            "prompt-submit",
+            lifecycle_command(agent, "prompt-submit"),
+            NormalizedEvent::UserPromptSubmit,
             None,
-        ));
-    }
-    hooks.push(hook_registration(
-        agent,
-        "tool-result",
-        NormalizedEvent::AfterToolUse,
-        Some(".*"),
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
+        ),
+        hook_registration(
             agent,
-            "context-agent",
-            NormalizedEvent::SubagentStart,
-            None,
-        ));
-        hooks.push(hook_registration(
-            agent,
-            "validate-agent",
-            NormalizedEvent::SubagentStop,
-            None,
-        ));
-    }
-    hooks
-}
-
-fn claude_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    let mut hooks = Vec::new();
-    hooks.push(hook_registration(
-        agent,
-        "tool-guard",
-        NormalizedEvent::BeforeToolUse,
-        Some(".*"),
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
-            agent,
-            "guard-stop",
-            NormalizedEvent::AgentStop,
-            None,
-        ));
-    }
-    hooks.push(hook_registration(
-        agent,
-        "tool-result",
-        NormalizedEvent::AfterToolUse,
-        Some(".*"),
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
-            agent,
-            "tool-failure",
-            NormalizedEvent::AfterToolUseFailure,
+            "tool-guard",
+            NormalizedEvent::BeforeToolUse,
             Some(".*"),
-        ));
-        hooks.push(hook_registration(
+        ),
+        hook_registration(
             agent,
-            "context-agent",
-            NormalizedEvent::SubagentStart,
-            None,
-        ));
-        hooks.push(hook_registration(
-            agent,
-            "validate-agent",
-            NormalizedEvent::SubagentStop,
-            None,
-        ));
-    }
-    hooks
-}
-
-fn gemini_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    let mut hooks = Vec::new();
-    hooks.push(hook_registration(
-        agent,
-        "tool-guard",
-        NormalizedEvent::BeforeToolUse,
-        Some(".*"),
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
-            agent,
-            "guard-stop",
-            NormalizedEvent::AgentStop,
-            None,
-        ));
-    }
-    hooks.push(hook_registration(
-        agent,
-        "tool-result",
-        NormalizedEvent::AfterToolUse,
-        Some(".*"),
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
-            agent,
-            "tool-failure",
-            NormalizedEvent::AfterToolUseFailure,
+            "tool-result",
+            NormalizedEvent::AfterToolUse,
             Some(".*"),
-        ));
-    }
-    hooks
+        ),
+    ]
 }
 
-fn copilot_hooks(agent: HookAgent, flags: RuntimeHookFlags) -> Vec<HookRegistration> {
-    let mut hooks = vec![command_registration(
-        "prompt-submit",
-        lifecycle_command(agent, "prompt-submit"),
-        NormalizedEvent::UserPromptSubmit,
-        None,
-    )];
-    hooks.push(hook_registration(
-        agent,
-        "tool-guard",
-        NormalizedEvent::BeforeToolUse,
-        None,
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
+fn claude_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        hook_registration(
             agent,
-            "guard-stop",
-            NormalizedEvent::AgentStop,
-            None,
-        ));
-    }
-    hooks.push(hook_registration(
-        agent,
-        "tool-result",
-        NormalizedEvent::AfterToolUse,
-        None,
-    ));
-    if flags.suite_hooks {
-        hooks.push(hook_registration(
+            "tool-guard",
+            NormalizedEvent::BeforeToolUse,
+            Some(".*"),
+        ),
+        hook_registration(
             agent,
-            "tool-failure",
-            NormalizedEvent::AfterToolUseFailure,
+            "tool-result",
+            NormalizedEvent::AfterToolUse,
+            Some(".*"),
+        ),
+    ]
+}
+
+fn gemini_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        hook_registration(
+            agent,
+            "tool-guard",
+            NormalizedEvent::BeforeToolUse,
+            Some(".*"),
+        ),
+        hook_registration(
+            agent,
+            "tool-result",
+            NormalizedEvent::AfterToolUse,
+            Some(".*"),
+        ),
+    ]
+}
+
+fn copilot_hooks(agent: HookAgent) -> Vec<HookRegistration> {
+    vec![
+        command_registration(
+            "prompt-submit",
+            lifecycle_command(agent, "prompt-submit"),
+            NormalizedEvent::UserPromptSubmit,
             None,
-        ));
-    }
-    hooks
+        ),
+        hook_registration(agent, "tool-guard", NormalizedEvent::BeforeToolUse, None),
+        hook_registration(agent, "tool-result", NormalizedEvent::AfterToolUse, None),
+    ]
 }
 
 pub(super) fn lifecycle_command(agent: HookAgent, subcommand: &str) -> String {
@@ -282,50 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn defaults_omit_optional_suite_hooks_for_claude() {
-        let regs = process_agent_registrations(HookAgent::Claude, RuntimeHookFlags::default());
-        let collected = names(&regs);
-        assert_contains_none(
-            &collected,
-            &[
-                "guard-stop",
-                "context-agent",
-                "validate-agent",
-                "tool-failure",
-            ],
-        );
-        assert_contains_all(&collected, &["session-start", "tool-guard", "tool-result"]);
-    }
-
-    #[test]
-    fn defaults_omit_optional_suite_hooks_for_codex() {
-        let regs = process_agent_registrations(HookAgent::Codex, RuntimeHookFlags::default());
-        let collected = names(&regs);
-        assert_contains_none(
-            &collected,
-            &["guard-stop", "context-agent", "validate-agent"],
-        );
-        assert_contains_all(&collected, &["prompt-submit", "tool-guard"]);
-    }
-
-    #[test]
-    fn enabling_suite_hooks_adds_their_registrations() {
-        let flags = RuntimeHookFlags { suite_hooks: true };
-        let regs = process_agent_registrations(HookAgent::Claude, flags);
-        let collected = names(&regs);
-        assert_contains_all(
-            &collected,
-            &[
-                "guard-stop",
-                "context-agent",
-                "validate-agent",
-                "tool-failure",
-            ],
-        );
-    }
-
-    #[test]
-    fn all_enabled_harness_registrations_include_expected_suite_hooks() {
+    fn suite_lifecycle_hooks_are_never_registered() {
         for agent in [
             HookAgent::Claude,
             HookAgent::Codex,
@@ -334,13 +197,17 @@ mod tests {
             HookAgent::Vibe,
             HookAgent::OpenCode,
         ] {
-            let regs = process_agent_registrations(agent, RuntimeHookFlags::all_enabled());
-            let collected = names(&regs);
-            assert_contains_all(&collected, &["tool-guard", "tool-result", "guard-stop"]);
-            // Gemini does not emit subagent gates in the legacy baseline.
-            if !matches!(agent, HookAgent::Gemini | HookAgent::Copilot) {
-                assert_contains_all(&collected, &["context-agent", "validate-agent"]);
-            }
+            let collected = names(&process_agent_registrations(agent));
+            assert_contains_none(
+                &collected,
+                &[
+                    "guard-stop",
+                    "context-agent",
+                    "validate-agent",
+                    "tool-failure",
+                ],
+            );
+            assert_contains_all(&collected, &["tool-guard", "tool-result"]);
         }
     }
 }

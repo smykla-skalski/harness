@@ -137,9 +137,6 @@ Harness intercepts agent tool use through hooks that enforce tracked workflows.
 
 - **`tool-guard`** blocks direct use of cluster binaries (`kubectl`, `docker`, `k3d`, `helm`, `kumactl`, and others), `gh` during active runs, inline Python, legacy wrapper scripts, and out-of-surface writes. All cluster access goes through harness commands. The one escape hatch is `harness run record -- kubectl ...`, which routes through the tracked runner.
 - **`tool-result`** validates tool outcomes and runner-state transitions after each tool completes.
-- **`tool-failure`** enriches failed tool calls with current run-verdict context.
-
-The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are off by default to keep tool calls fast. Enable them with `--enable-suite-hooks` on a command, or globally with `HARNESS_FEATURE_SUITE_HOOKS=1`.
 
 ## Runtime backends
 
