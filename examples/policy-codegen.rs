@@ -2365,6 +2365,10 @@ const POLICY_SCENARIO_SOURCE: &str = include_str!("../src/task_board/policy_grap
 const POLICY_REPLAY_SOURCE: &str = include_str!("../src/task_board/policy_graph/replay.rs");
 const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
 const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon.rs");
+// TimelineEntry moved out of summaries.rs into the protocol crate, and this
+// generator parses source text rather than types, so the summaries module has
+// to keep reading it from its new file or TimelineEntryWire stops resolving.
+const TIMELINE_SOURCE: &str = include_str!("../crates/harness-protocol/src/timeline.rs");
 const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../src/hooks/protocol/payloads.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
@@ -2504,7 +2508,7 @@ const AGENT_TUI_INPUT_EMIT_ONLY: &[&str] = &["RawAgentTuiInputRequest"];
 // SessionRole::Worker) resolved by the symbol table. SessionRole and
 // TimelineEntry are referenced-not-defined, so they stay unsuffixed (the hand
 // Swift types).
-const CODEX_SOURCE: &str = include_str!("../src/daemon/protocol/codex.rs");
+const CODEX_SOURCE: &str = include_str!("../crates/harness-protocol/src/managed_agents/codex.rs");
 // session_requests: clean serde request/response structs. Seven types are
 // SKIP_TYPES (no Swift mirror); the rest reference session::types enums that
 // already exist hand-written in Swift, so they stay unsuffixed references.
@@ -3116,6 +3120,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[SUMMARIES_SOURCE],
             sources: &[
                 SUMMARIES_SOURCE,
+                TIMELINE_SOURCE,
                 SHARED_DAEMON_SOURCE,
                 HOOKS_PAYLOADS_SOURCE,
             ],

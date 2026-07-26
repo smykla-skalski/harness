@@ -1,7 +1,6 @@
 mod api_contract;
 mod audit;
 mod binding;
-mod codex;
 mod managed_agents;
 mod openrouter_models;
 mod policy_transfer;
@@ -27,7 +26,7 @@ pub use binding::{
     ControlPlaneActorRequest, bind_control_plane_actor_value, current_control_plane_actor_id,
     with_control_plane_actor,
 };
-pub use codex::*;
+pub use harness_protocol::managed_agents::codex::*;
 pub use managed_agents::*;
 pub use openrouter_models::*;
 pub use policy_transfer::*;
