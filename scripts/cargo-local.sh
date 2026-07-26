@@ -126,15 +126,18 @@ configure_sccache_socket() {
 # say: every orphaned server still holds a listening socket on that path, and a
 # path left behind by a dead one looks identical. Connecting is the only answer.
 #
-# An unknown - a timeout under load, a permission error - is reported as
-# reachable on purpose. The only action taken on "no server" is starting one,
-# and starting a second server next to a live one is the failure this whole
-# path exists to prevent.
-# A connect, not a stat, and a word rather than an exit status. macOS ships a
-# /usr/bin/python3 that is a stub until the command line tools are installed,
-# and it fails with the same status a refused connection would - so an exit code
-# alone cannot separate "no server" from "could not ask". Only the word "absent"
-# starts a server; anything else, including a probe that never ran, does not.
+# The answer is a word rather than an exit status, because macOS ships a
+# /usr/bin/python3 that is a stub until the command line tools are installed and
+# fails with the same status a refused connection would, and an exit code alone
+# cannot separate "no server" from "could not ask". An unknown - a timeout under
+# load, a permission error - reads as reachable on purpose: the only action taken
+# on "no server" is starting one, and starting a second server next to a live one
+# is the failure this path exists to prevent.
+#
+# A probe that could not run at all falls back to the socket file, which is not
+# the same as starting nothing. A path with no socket file behind it is one no
+# client could reach either, so a prestart there can only help; what the fallback
+# gives up is telling a live server from an orphan's leftover path.
 sccache_server_reachable() {
   local socket="${SCCACHE_SERVER_UDS:-}" verdict=""
 

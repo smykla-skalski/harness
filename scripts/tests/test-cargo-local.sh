@@ -1379,10 +1379,19 @@ prestart_socket_path() {
 }
 
 stop_prestart_servers() {
-  local pid_file="$1" pid
+  local pid_file="$1" pid waited
   while read -r pid; do
     [[ "$pid" =~ ^[0-9]+$ ]] || continue
     kill "$pid" 2>/dev/null || true
+    # A holder still alive when the scenario removes its directory keeps
+    # listening on an unlinked path for the rest of its sleep, and the next
+    # scenario inherits it as a live socket nothing in that scenario created.
+    waited=0
+    while kill -0 "$pid" 2>/dev/null && (( waited < 40 )); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    kill -9 "$pid" 2>/dev/null || true
   done <"$pid_file"
   : >"$pid_file"
 }
