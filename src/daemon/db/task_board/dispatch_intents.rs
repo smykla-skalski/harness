@@ -1,14 +1,11 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
+use self::completion::{
+    apply_dispatch_completion_in_tx, screen_dispatch_completion_in_tx, settle_dispatch_intent_in_tx,
+};
 use super::ITEMS_CHANGE_SCOPE;
-use super::admission_lifecycle::{
-    commit_dispatch_admission_in_tx, validate_worker_start_fence_in_tx,
-};
-use super::dispatch_workflow_start::{
-    insert_started_workflow_in_tx, load_claimed_applied, validate_pending_dispatch,
-    workflow_start_fence,
-};
+use super::dispatch_workflow_start::validate_pending_dispatch;
 use super::items::{bump_change_in_tx, load_item_in_tx};
 use super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
@@ -265,75 +262,11 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch completion")
             .await?;
-        let (item_id, session_id, work_item_id, execution_id) =
-            claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
-        let applied = load_claimed_applied(&mut transaction, intent_id, claim_token).await?;
-        let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        let before = item.clone();
-        let still_linked = item.session_id.as_deref() == Some(session_id.as_str())
-            && item.work_item_id.as_deref() == Some(work_item_id.as_str())
-            && item.workflow.execution_id.as_deref() == Some(execution_id.as_str());
-        if !still_linked {
-            return Err(db_error(format!(
-                "task board dispatch intent '{intent_id}' no longer matches its item linkage"
-            )));
-        }
-        if let Some((prepared_item_revision, configuration_revision)) =
-            workflow_start_fence(&applied)?
-        {
-            validate_worker_start_fence_in_tx(
-                &mut transaction,
-                Some((prepared_item_revision, configuration_revision)),
-                revision,
-            )
+        let screened =
+            screen_dispatch_completion_in_tx(&mut transaction, intent_id, claim_token).await?;
+        let item = apply_dispatch_completion_in_tx(&mut transaction, *screened, intent_id).await?;
+        settle_dispatch_intent_in_tx(&mut transaction, intent_id, claim_token, managed_worker_id)
             .await?;
-        }
-        ensure_dispatch_item_startable(&item, &session_id, &work_item_id, Some(&execution_id))?;
-        item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some("worker_running".to_string());
-        item.workflow.last_error = None;
-        item.updated_at = utc_now();
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Generic,
-        )
-        .await?;
-        let item = write.item.clone();
-        insert_started_workflow_in_tx(
-            &mut transaction,
-            &item,
-            write.item_revision,
-            intent_id,
-            &applied,
-        )
-        .await?;
-        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
-        let now = utc_now();
-        let changed = query(
-            "UPDATE task_board_dispatch_intents SET status = 'completed', last_error = NULL,
-             claim_token = NULL, claimed_at = NULL, updated_at = ?3, completed_at = ?3
-             WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'
-               AND compensation_pending = 0",
-        )
-        .bind(intent_id)
-        .bind(claim_token)
-        .bind(now)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("complete task board dispatch intent: {error}")))?
-        .rows_affected();
-        if changed != 1 {
-            return Err(db_error(format!(
-                "task board dispatch intent '{intent_id}' is not claimed"
-            )));
-        }
-        commit_dispatch_admission_in_tx(&mut transaction, intent_id, managed_worker_id).await?;
         transaction
             .commit()
             .await
@@ -341,6 +274,9 @@ impl AsyncDaemonDb {
         Ok(item)
     }
 }
+
+#[path = "dispatch_intents_completion.rs"]
+mod completion;
 
 pub(super) fn ensure_dispatch_item_startable(
     item: &TaskBoardItem,
