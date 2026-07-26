@@ -11,6 +11,7 @@ use uuid::Uuid;
 use super::PanelState;
 use super::auth::origin_matches;
 use super::session::require_viewer;
+use crate::daemon_client::pairings::RevokeError;
 use crate::daemon_client::{DaemonCredential, MintError, MintedLink};
 use crate::error::{ApiError, PanelError};
 use crate::store::accounts::Account;
@@ -89,7 +90,7 @@ async fn create_under_lock(state: &PanelState, headers: &HeaderMap) -> Result<Re
     // Recorded before it is judged, so a link that is refused below is still
     // one an operator can find and revoke on the daemon.
     finalize(state, &viewer.account, &reservation.id, &minted).await;
-    refuse_unexpected_role(state, &minted)?;
+    refuse_unexpected_role(state, &credential, &minted).await?;
 
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
@@ -164,17 +165,39 @@ async fn mint_against(
 /// owner never approved, which is the whole thing the allow-list exists to
 /// prevent.
 ///
-/// The link is already minted and the panel holds a credential that cannot
-/// revoke anything, so refusing to show the code is the most it can do: the
-/// code lapses unclaimed, and the row recorded a moment ago is what an
-/// operator reconciles against the daemon.
-fn refuse_unexpected_role(state: &PanelState, minted: &MintedLink) -> Result<(), ApiError> {
+/// The link is already minted, so withholding the code is not enough on its own
+/// — it would stay claimable for its whole lifetime by anyone who could reach
+/// the daemon another way. The panel withdraws it instead, which its
+/// `pair_manage` scope now allows for the links it issued.
+///
+/// The withdrawal is best effort and its outcome is recorded rather than
+/// raised: this is a second call to a daemon that has just behaved
+/// unexpectedly, and the refusal stands whether or not it lands. The row
+/// recorded a moment ago is what an operator reconciles against the daemon
+/// either way.
+async fn refuse_unexpected_role(
+    state: &PanelState,
+    credential: &DaemonCredential,
+    minted: &MintedLink,
+) -> Result<(), ApiError> {
     if minted.role == state.daemon.config.link_role {
         return Ok(());
     }
+    let withdrawal = match state
+        .daemon
+        .client
+        .revoke_pairing(credential, &minted.pairing_id)
+        .await
+    {
+        Ok(_) => "and has been withdrawn",
+        Err(error) => {
+            record_unwithdrawn(&minted.pairing_id, &error);
+            "and could not be withdrawn, so revoke it on the daemon"
+        }
+    };
     Err(ApiError::Internal(PanelError::daemon(format!(
         "the daemon minted a {} link where {} was asked for; pairing {} was not shown to \
-         anyone and lapses unclaimed, revoke it on the daemon",
+         anyone {withdrawal}",
         minted.role, state.daemon.config.link_role, minted.pairing_id
     ))))
 }
@@ -283,6 +306,23 @@ fn record_ambiguous(reservation_id: &str, error: &PanelError) {
         reservation_id = %reservation_id,
         %error,
         "daemon mint outcome is unknown; pairing reservation kept for reconciliation"
+    );
+}
+
+/// A link the panel refused to show and could not withdraw either.
+///
+/// Recorded at error level with the pairing id, which is the handle an operator
+/// needs: the code is live and unseen, so it lapses on its own unless somebody
+/// revokes it first.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn record_unwithdrawn(pairing_id: &str, error: &RevokeError) {
+    tracing::error!(
+        pairing_id = %pairing_id,
+        %error,
+        "panel could not withdraw a link it refused to show; revoke it on the daemon"
     );
 }
 

@@ -21,6 +21,47 @@ export interface PairLink {
   pairing_url: string;
 }
 
+/** The device a claimed link became. */
+export interface PanelPairingDevice {
+  client_id: string;
+  display_name: string;
+  platform: string;
+  /** Absent until the device makes its first authenticated request. */
+  last_seen_at?: string;
+  revoked_at?: string;
+}
+
+/** One link the panel minted, and what became of it. */
+export interface PanelPairing {
+  pairing_id: string;
+  /**
+   * `pending`, `claimed`, `active`, `expired`, or `revoked`, as the daemon
+   * reports it. Deliberately a string rather than a union: the daemon owns this
+   * vocabulary, and a state it grows should reach the page as itself instead of
+   * failing a type the panel would have to be rebuilt to widen.
+   */
+  state: string;
+  role: string;
+  created_at: string;
+  expires_at: string;
+  claimed_at?: string;
+  revoked_at?: string;
+  device?: PanelPairingDevice;
+  /**
+   * The account the link was minted for. Absent for one the panel has no record
+   * of, which only the owner is shown at all.
+   */
+  account_id?: string;
+}
+
+/** What an unpair did, as the daemon reports it. */
+export interface PairingRevoke {
+  pairing_id: string;
+  /** `device_revoked`, `link_withdrawn`, or `already_revoked`. */
+  outcome: string;
+  revoked_at: string;
+}
+
 /** The signed-in person, plus what the panel lets them see. */
 export interface PanelViewer {
   account: PanelAccount;

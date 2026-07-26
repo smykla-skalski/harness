@@ -103,8 +103,7 @@
     </ul>
     <p class="footnote dim">
       Revoking stops new links. One already generated stays claimable until it expires, and a device
-      already paired keeps working. To cut a paired device off, run this on the daemon host:
-      <code>harness-daemon remote clients revoke</code>
+      already paired keeps working. Cut those off one at a time under Paired devices
     </p>
   {/if}
 </Plate>

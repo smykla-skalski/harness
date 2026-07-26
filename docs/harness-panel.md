@@ -233,7 +233,7 @@ Then open `https://harness.example.com/panel/` and sign in. The owner also sees 
 
 Everyone starts unable to pair, including the owner. The owner approves an account from the roster, and that account can then generate its own link from its page. The link is shown once: it carries a one-time code, so the panel keeps only the pairing id, the role, and the timestamps, and never the link itself.
 
-The role and lifetime of every link come from `--pair-link-role` and `--pair-link-ttl-seconds`, never from whoever asked. A link the daemon issues under any other role is recorded and then withheld: the panel cannot revoke what it has already caused, so the most it can do is leave the code unshown to lapse unclaimed, and the row is there to revoke on the daemon. An approved account cannot choose what its link grants. Only `operator` and `viewer` may be minted: the panel holds a credential whose one power is minting, and the daemon does not check that a requested role is at or below the caller's own, so anything more would let an approved account end up with more authority than the panel itself has.
+The role and lifetime of every link come from `--pair-link-role` and `--pair-link-ttl-seconds`, never from whoever asked. A link the daemon issues under any other role is recorded, withheld, and then withdrawn, because a code nobody may see is still claimable by anyone who reaches the daemon another way. The withdrawal is best effort — it is a second call to a daemon that has just behaved unexpectedly — so the row stays either way and the log says which happened. An approved account cannot choose what its link grants. Only `operator` and `viewer` may be minted: the daemon does not check that a requested role is at or below the caller's own, so anything more would let an approved account end up with more authority than the panel itself has.
 
 An account may hold five unexpired links at once. A revoke cannot reach a link already minted, so without a cap one approved account, or whoever took its session, could leave a pile of live credentials to hunt down one at a time.
 
@@ -241,12 +241,24 @@ The slot is taken before the daemon is asked, so requests arriving together cann
 
 ### What a revoke reaches
 
-Revoking stops that account generating **new** links. It does not reach backwards:
+Withdrawing an account's approval stops it generating **new** links. It does not reach backwards:
 
 - a link already generated stays claimable until it expires
 - a device that already paired keeps working
 
-Cut off a paired device with `harness-daemon remote clients revoke` on the daemon host. The panel deliberately has no power to do that: it holds a credential that may only mint links, so it cannot revoke the devices those links produced.
+Cut those off one at a time under **Paired devices**, which is a separate action from approval and reaches each pairing individually.
+
+## Paired devices
+
+The panel shows what became of every link it minted. A signed-in person sees their own; the owner sees everyone's, with the account each belongs to.
+
+Each row carries the state the daemon reports — `pending`, `claimed`, `active`, `expired`, or `revoked` — the device on the other end once there is one, and when the pairing last changed. The state is read from the daemon on every load rather than from what the panel wrote down when it minted, so a pairing revoked on the host reads as revoked here instead of appearing to still work.
+
+Unpairing asks for confirmation, then cuts the device off immediately; an unclaimed link is withdrawn so it can no longer be claimed. Neither can be undone, and pairing that device again means generating a new link. A person may unpair their own; the owner may unpair anyone's.
+
+Who may withdraw what is decided by the panel, not the daemon. The daemon sees one broker credential for the whole panel and cannot tell one signed-in account from another, so the panel checks each pairing against its own record of who the link was minted for. A pairing that belongs to somebody else and one that does not exist get the same answer, deliberately, so the route cannot be used to discover which pairing ids exist.
+
+A pairing the panel has no record of — one whose row the mint path failed to write, which is logged at error level when it happens — can be attributed to nobody, so only the owner is shown it at all.
 
 ## Who owns the panel
 

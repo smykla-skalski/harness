@@ -8,6 +8,7 @@
 pub mod api;
 pub mod auth;
 pub mod pair_links;
+pub mod pairings;
 pub mod session;
 
 use std::collections::HashMap;
@@ -120,6 +121,11 @@ pub fn router(state: PanelState) -> Router {
         .route(&format!("{base}/auth/github/callback"), get(auth::callback))
         .route(&format!("{base}/auth/signout"), post(auth::signout))
         .route(&format!("{base}/api/pair-links"), post(pair_links::create))
+        .route(&format!("{base}/api/pairings"), get(pairings::list))
+        .route(
+            &format!("{base}/api/pairings/{{pairing_id}}/revoke"),
+            post(pairings::revoke),
+        )
         .route(&base, get(api::index))
         .route(&format!("{base}/"), get(api::index))
         // Anything else under the mount point is either a bundled file or a

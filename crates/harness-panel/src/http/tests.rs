@@ -29,6 +29,7 @@ mod companion;
 mod locks;
 mod minting;
 mod pair_links;
+mod pairings;
 
 const BODY_LIMIT: usize = 1024 * 1024;
 const COMPANION_AUTH_TOKEN: &str = "0123456789abcdef0123456789abcdef";
