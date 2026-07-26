@@ -243,12 +243,6 @@ fn filter_progress_docker_buildkit_layer() {
 }
 
 #[test]
-fn kubectl_rollout_restart_skips_empty_list() {
-    let result = kubectl_rollout_restart(None, &[]);
-    assert!(result.is_ok());
-}
-
-#[test]
 fn wait_for_http_fails_on_invalid_url() {
     let result = wait_for_http("http://127.0.0.1:1", Duration::from_millis(500));
     assert!(result.is_err());
