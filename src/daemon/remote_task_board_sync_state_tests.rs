@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::{TaskBoardReadListResponse, project_task_board_list};
+use crate::daemon::db::TaskBoardItemSnapshot;
 use crate::daemon::protocol::TaskBoardListItemsRequest;
 use crate::daemon::service::TaskBoardListSource;
 use crate::task_board::{
@@ -35,9 +36,11 @@ fn item_with_synced_ref() -> TaskBoardItem {
 
 fn list_source() -> TaskBoardListSource {
     TaskBoardListSource {
-        items: vec![item_with_synced_ref()],
+        items: vec![TaskBoardItemSnapshot {
+            item: item_with_synced_ref(),
+            item_revision: 1,
+        }],
         items_change_seq: 7,
-        item_revisions: HashMap::new(),
         progress_rollups: HashMap::new(),
     }
 }
@@ -103,5 +106,40 @@ fn the_viewer_projection_is_untouched() {
     assert!(
         matches!(response, TaskBoardReadListResponse::Viewer(_)),
         "a viewer read still gets the viewer projection"
+    );
+}
+
+#[test]
+fn the_list_materializes_revisions_for_the_returned_page_only() {
+    let mut second = item_with_synced_ref();
+    second.id = "item-2".to_owned();
+    let source = TaskBoardListSource {
+        items: vec![
+            TaskBoardItemSnapshot {
+                item: item_with_synced_ref(),
+                item_revision: 11,
+            },
+            TaskBoardItemSnapshot {
+                item: second,
+                item_revision: 22,
+            },
+        ],
+        items_change_seq: 7,
+        progress_rollups: HashMap::new(),
+    };
+    let mut request = TaskBoardListItemsRequest::default();
+    request.limit = Some(1);
+    let selection = request.validated_selection().expect("a one-item page");
+
+    let TaskBoardReadListResponse::Full(response) =
+        project_task_board_list(source, &selection, false).expect("project list")
+    else {
+        panic!("a non-viewer read returns the full response");
+    };
+
+    assert_eq!(response.items[0].id, "item-1");
+    assert_eq!(
+        response.item_revisions,
+        HashMap::from([("item-1".to_owned(), 11)])
     );
 }

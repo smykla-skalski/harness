@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
+use crate::daemon::db::TaskBoardItemSnapshot;
 use crate::daemon::protocol::{TaskBoardListItemsResponse, TaskBoardListItemsSelection};
 use crate::daemon::service::TaskBoardListSource;
-use crate::task_board::{TaskBoardQueryFields, TaskBoardQueryTarget, select_page};
+use crate::task_board::{
+    TaskBoardItem, TaskBoardQueryFields, TaskBoardQueryTarget, select_page,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
@@ -25,6 +28,23 @@ impl TaskBoardQueryTarget for RemoteViewerTaskBoardItem {
     }
 }
 
+impl TaskBoardQueryTarget for TaskBoardItemSnapshot {
+    fn query_fields(&self) -> TaskBoardQueryFields<'_> {
+        self.item.query_fields()
+    }
+}
+
+struct RevisionedItem<T> {
+    item: T,
+    item_revision: i64,
+}
+
+impl<T: TaskBoardQueryTarget> TaskBoardQueryTarget for RevisionedItem<T> {
+    fn query_fields(&self) -> TaskBoardQueryFields<'_> {
+        self.item.query_fields()
+    }
+}
+
 /// Select, page, and project one board read for the client that asked for it.
 ///
 /// A remote viewer's selection runs against that viewer's redacted projection
@@ -38,36 +58,48 @@ pub(crate) fn project_task_board_list(
     let TaskBoardListSource {
         items,
         items_change_seq,
-        item_revisions,
         progress_rollups,
     } = source;
     if viewer {
-        let page = select_matching_page(
+        let MatchedPage {
+            items,
+            total_matched,
+            next_cursor,
+        } = select_matching_page(
             items
                 .into_iter()
-                .map(RemoteViewerTaskBoardItem::from)
+                .map(|snapshot| RevisionedItem {
+                    item: RemoteViewerTaskBoardItem::from(snapshot.item),
+                    item_revision: snapshot.item_revision,
+                })
                 .collect(),
             selection,
             items_change_seq,
         )?;
+        let (items, item_revisions) = split_revisioned_page(items);
         return Ok(TaskBoardReadListResponse::Viewer(
             RemoteViewerTaskBoardListResponse {
-                item_revisions: revisions_for_page(&page.items, &item_revisions),
-                items: page.items,
+                items,
                 items_change_seq,
-                total_matched: page.total_matched,
-                next_cursor: page.next_cursor,
+                item_revisions,
+                total_matched,
+                next_cursor,
             },
         ));
     }
-    let page = select_matching_page(items, selection, items_change_seq)?;
+    let MatchedPage {
+        items,
+        total_matched,
+        next_cursor,
+    } = select_matching_page(items, selection, items_change_seq)?;
+    let (items, item_revisions) = split_snapshot_page(items);
     let mut response = TaskBoardListItemsResponse {
-        item_revisions: revisions_for_page(&page.items, &item_revisions),
-        items: page.items,
+        items,
         items_change_seq,
+        item_revisions,
         progress_rollups,
-        total_matched: page.total_matched,
-        next_cursor: page.next_cursor,
+        total_matched,
+        next_cursor,
     };
     drop_cached_provider_text(&mut response);
     Ok(TaskBoardReadListResponse::Full(response))
@@ -138,17 +170,32 @@ fn page_items<T>(items: Vec<T>, window: &[usize]) -> Vec<T> {
         .collect()
 }
 
-fn revisions_for_page<T: TaskBoardQueryTarget>(
-    items: &[T],
-    revisions: &HashMap<String, i64>,
-) -> HashMap<String, i64> {
-    items
-        .iter()
-        .filter_map(|item| {
-            let id = item.query_fields().id;
-            revisions
-                .get(id)
-                .map(|revision| (id.to_string(), *revision))
-        })
-        .collect()
+fn split_snapshot_page(
+    snapshots: Vec<TaskBoardItemSnapshot>,
+) -> (Vec<TaskBoardItem>, HashMap<String, i64>) {
+    split_revisioned_page(
+        snapshots
+            .into_iter()
+            .map(|snapshot| RevisionedItem {
+                item: snapshot.item,
+                item_revision: snapshot.item_revision,
+            }),
+    )
+}
+
+fn split_revisioned_page<T: TaskBoardQueryTarget>(
+    entries: impl IntoIterator<Item = RevisionedItem<T>>,
+) -> (Vec<T>, HashMap<String, i64>) {
+    let entries = entries.into_iter();
+    let (minimum, _) = entries.size_hint();
+    let mut items = Vec::with_capacity(minimum);
+    let mut revisions = HashMap::with_capacity(minimum);
+    for entry in entries {
+        revisions.insert(
+            entry.item.query_fields().id.to_owned(),
+            entry.item_revision,
+        );
+        items.push(entry.item);
+    }
+    (items, revisions)
 }
