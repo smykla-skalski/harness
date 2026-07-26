@@ -12,14 +12,27 @@ public enum SettingsTaskBoardLaneColorPickerRenderer {
   /// Matches the width the appearance popover gives its content.
   private static let width: CGFloat = 360
 
-  public static func dumpFixtures(toDirectory directory: String) {
-    try? FileManager.default.createDirectory(
+  /// Throws rather than skipping a fixture it cannot draw. A renderer that
+  /// swallows its errors exits successfully having written nothing, and the
+  /// missing image reads as a layout that produced no output.
+  public static func dumpFixtures(toDirectory directory: String) throws {
+    try FileManager.default.createDirectory(
       atPath: directory,
       withIntermediateDirectories: true
     )
     for fixture in fixtures {
-      write(render(fixture), named: fixture.name, directory: directory)
+      guard let rep = render(fixture) else {
+        throw RenderFailure(fixture: fixture.name, reason: "view produced no drawable bitmap")
+      }
+      try write(rep, named: fixture.name, directory: directory)
     }
+  }
+
+  struct RenderFailure: Error, CustomStringConvertible {
+    let fixture: String
+    let reason: String
+
+    var description: String { "\(fixture): \(reason)" }
   }
 
   private enum Surface {
@@ -127,8 +140,14 @@ public enum SettingsTaskBoardLaneColorPickerRenderer {
     return rep
   }
 
-  private static func write(_ rep: NSBitmapImageRep?, named name: String, directory: String) {
-    guard let data = rep?.representation(using: .png, properties: [:]) else { return }
-    try? data.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+  private static func write(
+    _ rep: NSBitmapImageRep,
+    named name: String,
+    directory: String
+  ) throws {
+    guard let data = rep.representation(using: .png, properties: [:]), !data.isEmpty else {
+      throw RenderFailure(fixture: name, reason: "bitmap did not encode to a non-empty PNG")
+    }
+    try data.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
   }
 }

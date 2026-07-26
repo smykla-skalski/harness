@@ -15,7 +15,12 @@ struct PreviewHostApp: App {
     }
     if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_LANE_COLOR_PICKER_DUMP"] {
       NSApplication.shared.setActivationPolicy(.prohibited)
-      SettingsTaskBoardLaneColorPickerRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      do {
+        try SettingsTaskBoardLaneColorPickerRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      } catch {
+        FileHandle.standardError.write(Data("lane color picker render failed: \(error)\n".utf8))
+        exit(1)
+      }
       exit(0)
     }
     for _ in Self.forceLoadedSymbolReferences {}
