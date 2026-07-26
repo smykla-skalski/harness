@@ -36,7 +36,7 @@ struct TaskBoardAutomationStatusView: View {
       switch contentMode {
       case .loading:
         TaskBoardAutomationPlaceholder(
-          title: "Updating automation status…",
+          title: "Loading automation status…",
           systemImage: "arrow.triangle.2.circlepath",
           showsProgress: true
         )
