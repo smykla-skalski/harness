@@ -33,16 +33,6 @@ impl AppContext {
     }
 }
 
-/// Resolve the repository root from an optional CLI argument, falling back to
-/// the current working directory.
-#[cfg(not(feature = "standalone-daemon"))]
-pub(crate) fn resolve_repo_root(raw: Option<&str>) -> PathBuf {
-    raw.map_or_else(
-        || env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-        PathBuf::from,
-    )
-}
-
 /// Resolve a project directory from an optional CLI argument, falling back to
 /// the current working directory.
 #[cfg(not(feature = "standalone-daemon"))]
