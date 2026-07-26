@@ -3,7 +3,7 @@ use crate::hooks::protocol::hook_result::Decision;
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
 
 fn ctx_with_questions(skill: &str, questions: &serde_json::Value) -> HookContext {
-    HookContext::from_envelope(
+    HookContext::from_test_envelope(
         skill,
         HookEnvelopePayload {
             tool_name: "AskUserQuestion".to_string(),
@@ -33,4 +33,11 @@ fn allows_suite_runner_prompts() {
         }]),
     );
     assert_eq!(execute(&ctx).unwrap().decision, Decision::Allow);
+}
+
+#[test]
+fn suite_runner_skill_is_active_in_these_tests() {
+    let ctx = ctx_with_questions("suite:run", &serde_json::json!([]));
+    assert!(ctx.skill_active, "tests must exercise the runner branch");
+    assert!(!ctx.is_suite_create());
 }
