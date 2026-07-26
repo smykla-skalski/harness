@@ -17,6 +17,22 @@ pub(super) async fn dispatch_method(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
+        ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_GET
+        | ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_SAVE
+        | ws_methods::TASK_BOARD_TRIAGE_RULES_PREVIEW => {
+            dispatch_draft_method(request, state).await
+        }
+        ws_methods::TASK_BOARD_TRIAGE_RULES_ACTIVATE
+        | ws_methods::TASK_BOARD_TRIAGE_RULES_REVISIONS
+        | ws_methods::TASK_BOARD_TRIAGE_RULES_AUDIT => {
+            dispatch_revision_method(request, state).await
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_draft_method(request: &WsRequest, state: &DaemonHttpState) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_TRIAGE_RULES_DRAFT_GET => {
             Some(dispatch_triage_rules_draft_get(request, state).await)
         }
@@ -26,6 +42,15 @@ pub(super) async fn dispatch_method(
         ws_methods::TASK_BOARD_TRIAGE_RULES_PREVIEW => {
             Some(dispatch_triage_rules_preview(request, state).await)
         }
+        _ => None,
+    }
+}
+
+async fn dispatch_revision_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_TRIAGE_RULES_ACTIVATE => {
             Some(dispatch_triage_rules_activate(request, state).await)
         }
@@ -72,7 +97,8 @@ pub(super) async fn dispatch_triage_rules_preview(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = serde_json::from_value::<TaskBoardPreviewTriageRulesRequest>(request.params.clone())
+    let Ok(body) =
+        serde_json::from_value::<TaskBoardPreviewTriageRulesRequest>(request.params.clone())
     else {
         return invalid_params(request);
     };

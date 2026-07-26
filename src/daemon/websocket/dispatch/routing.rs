@@ -385,6 +385,26 @@ async fn dispatch_acp_managed_agent_mutation(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
+        ws_methods::MANAGED_AGENT_START_ACP
+        | ws_methods::MANAGED_AGENT_STOP_ACP
+        | ws_methods::MANAGED_AGENT_PROMPT_ACP
+        | ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION => {
+            dispatch_acp_managed_agent_run(request, state).await
+        }
+        ws_methods::MANAGED_AGENT_LOGOUT_ACP
+        | ws_methods::MANAGED_AGENT_DELETE_ACP_SESSION
+        | ws_methods::MANAGED_AGENT_CLOSE_ACP_SESSION => {
+            dispatch_acp_managed_agent_session(request, state).await
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_acp_managed_agent_run(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::MANAGED_AGENT_START_ACP => {
             Some(dispatch_managed_agent_start_acp(request, state).await)
         }
@@ -397,6 +417,15 @@ async fn dispatch_acp_managed_agent_mutation(
         ws_methods::MANAGED_AGENT_RESOLVE_ACP_PERMISSION => {
             Some(dispatch_managed_agent_resolve_acp_permission(request, state).await)
         }
+        _ => None,
+    }
+}
+
+async fn dispatch_acp_managed_agent_session(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::MANAGED_AGENT_LOGOUT_ACP => {
             Some(dispatch_managed_agent_logout_acp(request, state).await)
         }

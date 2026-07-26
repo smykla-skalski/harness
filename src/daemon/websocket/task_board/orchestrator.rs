@@ -18,6 +18,37 @@ pub(super) async fn dispatch_method(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
+        ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_START
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_STOP
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE => {
+            dispatch_lifecycle_method(request, state).await
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_DETAIL
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_METRICS
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL => {
+            dispatch_run_history_method(request, state).await
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE => {
+            dispatch_settings_method(request, state).await
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC
+        | ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC => {
+            dispatch_token_sync_method(request, state).await
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_lifecycle_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS => {
             Some(dispatch_task_board_orchestrator_status(request, state).await)
         }
@@ -32,6 +63,15 @@ pub(super) async fn dispatch_method(
                 Box::pin(dispatch_task_board_orchestrator_run_once(request, state));
             Some(future.await)
         }
+        _ => None,
+    }
+}
+
+async fn dispatch_run_history_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_ORCHESTRATOR_RUNS => {
             Some(dispatch_task_board_automation_runs(request, state).await)
         }
@@ -44,6 +84,15 @@ pub(super) async fn dispatch_method(
         ws_methods::TASK_BOARD_ORCHESTRATOR_FORCE_CANCEL => {
             Some(dispatch_task_board_automation_force_cancel(request, state).await)
         }
+        _ => None,
+    }
+}
+
+async fn dispatch_settings_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
             Some(dispatch_task_board_orchestrator_settings_get(request, state).await)
         }
@@ -56,6 +105,15 @@ pub(super) async fn dispatch_method(
         ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE => {
             Some(dispatch_task_board_orchestrator_runtime_config_update(request, state).await)
         }
+        _ => None,
+    }
+}
+
+async fn dispatch_token_sync_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC => {
             Some(dispatch_task_board_orchestrator_github_tokens_sync(request, state).await)
         }

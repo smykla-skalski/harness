@@ -117,6 +117,40 @@ async fn handle_protocol_command(
     command: ProtocolCommand,
     prompt_timeout: Duration,
 ) {
+    // This match is the exhaustiveness guard for both helpers below, so a new
+    // ProtocolCommand variant fails to compile here rather than falling through
+    // one of their subsets unnoticed.
+    match command {
+        ProtocolCommand::AttachSession { .. }
+        | ProtocolCommand::PromptSession { .. }
+        | ProtocolCommand::DetachTarget { .. }
+        | ProtocolCommand::CloseRoutedSessions { .. } => {
+            handle_routed_command(
+                supervisor,
+                connection,
+                session_guard,
+                command,
+                prompt_timeout,
+            )
+            .await;
+        }
+        ProtocolCommand::Logout { .. }
+        | ProtocolCommand::ListSessions { .. }
+        | ProtocolCommand::CloseSession { .. }
+        | ProtocolCommand::DeleteSession { .. } => {
+            handle_lifecycle_command(supervisor, connection, command).await;
+        }
+    }
+}
+
+/// Commands that act on this connection's routed sessions.
+async fn handle_routed_command(
+    supervisor: Arc<AcpSessionSupervisor>,
+    connection: &ConnectionTo<Agent>,
+    session_guard: &SessionRouteGuard,
+    command: ProtocolCommand,
+    prompt_timeout: Duration,
+) {
     match command {
         ProtocolCommand::AttachSession {
             acp_id,
@@ -179,6 +213,17 @@ async fn handle_protocol_command(
                 close_routed_sessions(&supervisor, connection, session_guard, budget).await;
             let _ = response_tx.send(result);
         }
+        _ => unreachable!("handle_protocol_command routes only routed-session commands here"),
+    }
+}
+
+/// Commands that act on the agent connection's own session inventory.
+async fn handle_lifecycle_command(
+    supervisor: Arc<AcpSessionSupervisor>,
+    connection: &ConnectionTo<Agent>,
+    command: ProtocolCommand,
+) {
+    match command {
         ProtocolCommand::Logout { response_tx } => {
             let result = send_logout(&supervisor, connection).await;
             let _ = response_tx.send(result);
@@ -204,6 +249,7 @@ async fn handle_protocol_command(
             let result = lifecycle::delete_session(&supervisor, connection, session_id).await;
             let _ = response_tx.send(result);
         }
+        _ => unreachable!("handle_protocol_command routes only lifecycle commands here"),
     }
 }
 
