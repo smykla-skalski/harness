@@ -1,4 +1,8 @@
+use std::collections::HashSet;
+use std::process::Command;
 use std::{fs, path::Path};
+
+use serde_json::Value;
 
 use tempfile::{TempDir, tempdir};
 
@@ -207,42 +211,47 @@ pub(super) const MIXED_MONITOR_PBXPROJ_VERSION_FIXTURE: &str = "\
 \trootObject = DDDDDDDDDDDDDDDDDDDDDDDD /* Project object */;\n\
 }\n";
 
-/// Every workspace member's manifest, read from the real workspace manifest.
+/// Every workspace member's manifest, as cargo resolves them.
 ///
-/// `version.sh` walks the members declared in the copied root `Cargo.toml` and
-/// aborts on the first one whose manifest is missing, so a hard-coded fixture
-/// list breaks the moment a crate joins the workspace - which here is roughly
-/// weekly. Deriving it means the fixture cannot drift from the manifest at all.
+/// `version.sh` walks the members declared in the copied root manifest and
+/// aborts on the first one it cannot find, so this list has to match the
+/// workspace exactly. Asking cargo rather than reading the TOML is what makes
+/// that reliable: cargo defines the manifest format, so no whitespace variant,
+/// trailing comment, or glob member can desynchronise the two, and the failure
+/// this fixture was written to stop - a member added and never copied - cannot
+/// recur.
 fn workspace_member_manifests(root: &Path) -> Vec<String> {
-    let manifest = fs::read_to_string(root.join("Cargo.toml")).expect("workspace manifest");
-    // Split on the key and the bracket separately so `members=[` and any amount
-    // of whitespace between them parse the same. A manifest this cannot read
-    // fails loudly here, which is the outcome we want: silently copying no
-    // members would leave the script under test passing for the wrong reason.
-    let members = manifest
-        .split_once("members")
-        .expect("workspace members key")
-        .1
-        .split_once('[')
-        .expect("workspace members opener")
-        .1
-        .split_once(']')
-        .expect("workspace members terminator")
-        .0;
+    let output = Command::new(env!("CARGO"))
+        .args(["metadata", "--format-version", "1", "--no-deps", "--offline"])
+        .current_dir(root)
+        .output()
+        .expect("invoke cargo metadata");
+    assert!(
+        output.status.success(),
+        "cargo metadata failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
-    members
-        .lines()
-        .filter_map(|line| {
-            let member = line.trim().trim_end_matches(',').trim_matches('"');
-            if member.is_empty() || member.starts_with('#') {
-                return None;
-            }
-            Some(if member == "." {
-                "Cargo.toml".to_owned()
-            } else {
-                format!("{member}/Cargo.toml")
-            })
+    let metadata: Value = serde_json::from_slice(&output.stdout).expect("cargo metadata json");
+    let members: HashSet<&str> = metadata["workspace_members"]
+        .as_array()
+        .expect("cargo metadata workspace_members")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+
+    metadata["packages"]
+        .as_array()
+        .expect("cargo metadata packages")
+        .iter()
+        .filter(|package| {
+            package["id"]
+                .as_str()
+                .is_some_and(|id| members.contains(id))
         })
+        .filter_map(|package| package["manifest_path"].as_str())
+        .filter_map(|path| Path::new(path).strip_prefix(root).ok())
+        .map(|path| path.display().to_string())
         .collect()
 }
 
