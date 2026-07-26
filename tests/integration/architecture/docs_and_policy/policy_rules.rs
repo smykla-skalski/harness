@@ -1,19 +1,27 @@
 use std::path::Path;
 
-use super::super::helpers::collect_code_hits_in_tree;
+use super::super::helpers::collect_hits_in_tree;
 
 #[test]
 fn repo_contains_no_clippy_allow_attributes() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let needle = ["allow", "(clippy::"].concat();
+    // Match the attribute syntax, not the bare call. Prose naming a lint
+    // decision in backticks is not a violation, and recording why an allow was
+    // retired is behaviour we want; only a real attribute is the defect. The
+    // needles are assembled at runtime so this file does not match itself.
+    let needles = [
+        ["#[", "allow", "(clippy::"].concat(),
+        ["#![", "allow", "(clippy::"].concat(),
+    ];
+    let needle_refs: Vec<&str> = needles.iter().map(String::as_str).collect();
     let mut hits = Vec::new();
 
     for start in [root.join("src"), root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_code_hits_in_tree(
+        hits.extend(collect_hits_in_tree(
             &start,
             root,
             None,
-            &[needle.as_str()],
+            &needle_refs,
             |path, matched| format!("{path} still contains forbidden Clippy allow `{matched}`"),
         ));
     }
@@ -32,7 +40,7 @@ fn repo_contains_no_custom_macro_rules() {
     let needle = ["macro", "_rules!"].concat();
 
     for start in [root.join("src"), root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_code_hits_in_tree(
+        hits.extend(collect_hits_in_tree(
             &start,
             root,
             None,
@@ -66,7 +74,7 @@ fn tests_do_not_quit_or_kill_apps_by_name() {
     let mut hits = Vec::new();
 
     for start in [root.join("tests"), root.join("testkit")] {
-        hits.extend(collect_code_hits_in_tree(
+        hits.extend(collect_hits_in_tree(
             &start,
             root,
             None,
