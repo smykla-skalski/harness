@@ -26,6 +26,7 @@ mod policy_queues;
 mod policy_runs;
 mod project_shapes;
 mod projects;
+mod projects_backfill;
 mod provider_exclusion;
 mod provider_external_create_evidence;
 mod provider_external_create_finalize;

@@ -214,6 +214,7 @@ pub(crate) async fn initialize_startup_state(
         initialize_async_db(async_db_slot).await?;
         if let Some(async_db) = async_db_slot.get() {
             task_board_migration::migrate_task_board(async_db).await?;
+            reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
         }
         spawn_startup_background_tasks(
@@ -235,6 +236,21 @@ pub(crate) async fn initialize_startup_state(
     }
 
     result
+}
+
+/// Repair the items an earlier build could not attribute, before anything is
+/// served from them.
+///
+/// A failure is logged rather than raised: the pass restores a colour mark and
+/// a project-list entry, so a store that refuses it leaves the board exactly as
+/// this build found it, where failing startup would take the daemon down over
+/// something nobody can act on.
+async fn reattribute_task_board_items(db: &super::db::AsyncDaemonDb) {
+    match db.reattribute_unattributed_task_board_items().await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "attributed task board items to their projects"),
+        Err(error) => tracing::warn!(%error, "task board reattribution failed"),
+    }
 }
 
 fn spawn_startup_background_tasks(
