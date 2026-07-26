@@ -321,6 +321,10 @@ impl AcpAgentManagerHandle {
     /// Persist an agent-reported session title without blocking the caller's
     /// path: the title is advisory metadata, so a failed write is logged and
     /// the next update simply tries again.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "records an agent-reported session title and logs a failed write; the one tracing::warn! costs 7 of its 9 points, leaving structural 2"
+    )]
     pub(in crate::daemon::agent_acp) fn record_runtime_session_title_best_effort(
         &self,
         session_id: &str,
@@ -337,6 +341,10 @@ impl AcpAgentManagerHandle {
         }
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "rolls back an ACP orchestration registration and logs a failed rollback; the one tracing::warn! costs 7 of its 9 points, leaving structural 2"
+    )]
     pub(in crate::daemon::agent_acp) fn rollback_orchestration_registration_best_effort(
         &self,
         session_id: &str,
@@ -354,6 +362,10 @@ impl AcpAgentManagerHandle {
         }
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "syncs a disconnect into session orchestration for disconnected snapshots only, logging a failed sync; the one tracing::warn! costs 7 of its 9 points, leaving structural 2"
+    )]
     pub(in crate::daemon::agent_acp) fn sync_orchestration_disconnect_best_effort(
         &self,
         snapshot: &AcpAgentSnapshot,
@@ -376,6 +388,10 @@ impl AcpAgentManagerHandle {
         }
     }
 
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "maps an active or idle snapshot to a runtime status and syncs it, logging a failed sync; the one tracing::warn! costs 7 of its 10 points, leaving structural 3"
+    )]
     pub(in crate::daemon::agent_acp) fn sync_orchestration_runtime_status_best_effort(
         &self,
         snapshot: &AcpAgentSnapshot,
