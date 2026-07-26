@@ -1105,6 +1105,43 @@ EOF
   fi
 }
 
+scenario_socket_bound_after_the_snapshot_survives() {
+  local fake_bin="$SANDBOX/latesock-bin"
+  local tmpdir="$SOCKET_TMPDIR/latesock"
+  local socket_dir="$tmpdir/harness-sccache"
+  local late_socket="$socket_dir/late.sock"
+  local stale_socket="$socket_dir/stale.sock"
+  local output
+  mkdir -p "$fake_bin" "$socket_dir"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+  # A server binding while lsof is being asked. Its socket cannot appear in a
+  # snapshot taken before it existed, so a sweep that lists the directory
+  # afterwards reads it as an orphan and unlinks a live server's socket. On a
+  # loaded machine lsof is slow enough that concurrent builds hit this for real,
+  # and the build that lost its socket then started a second server.
+  #
+  # The stale socket is not decoration: the sweep skips lsof entirely when it has
+  # nothing to judge, so without a candidate this fake would never run.
+  cat >"$fake_bin/lsof" <<EOF
+#!/usr/bin/env bash
+: >"$late_socket"
+printf 'p1\n'
+EOF
+  chmod +x "$fake_bin/lsof"
+  : >"$stale_socket"
+
+  output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
+  if ! assert_swept "$socket_dir" "$output"; then
+    fail "late-socket scenario never reached the sweep"
+    return
+  fi
+  if [[ -e "$late_socket" ]] && [[ ! -e "$stale_socket" ]]; then
+    pass "a socket bound after the lsof snapshot survives the sweep"
+  else
+    fail "late-socket sweep wrong: late=$([[ -e "$late_socket" ]] && echo kept || echo unlinked) stale=$([[ -e "$stale_socket" ]] && echo kept || echo unlinked)"
+  fi
+}
+
 scenario_sccache_socket_is_shared_across_checkouts() {
   local base="$ROOT/tmp/cargo-local-checkouts-$$"
   local fake_bin="$SANDBOX/checkout-bin"
@@ -1617,6 +1654,7 @@ scenario_supported_sccache_is_resolved_once
 scenario_old_explicit_sccache_is_disabled
 scenario_failed_lsof_preserves_unknown_sockets
 scenario_live_socket_survives_the_sweep
+scenario_socket_bound_after_the_snapshot_survives
 scenario_sccache_server_is_started_before_cargo
 scenario_concurrent_builds_start_one_sccache_server
 scenario_unusable_python_falls_back_to_the_socket_file
