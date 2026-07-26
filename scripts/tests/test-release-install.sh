@@ -1262,12 +1262,11 @@ scenario_focused_install_rejects_corrupt_carried_binary() {
 scenario_focused_install_verifies_carried_signature() {
   start_test "focused install verifies carried binary signatures"
   local sandbox="$SANDBOX/carried-signature" old_current status=0 output
-  # Signing runs on macOS only, so both installs simulate Darwin and reach the
-  # verification through the fake codesign; off macOS the file-level Linux
-  # export would skip signing and no assertion here could ever fail.
+  # Signing runs on macOS only, so the focused install simulates Darwin to
+  # reach verification through the fake codesign; under the file-level Linux
+  # export the installer skips signing and no assertion here could ever fail.
   write_fake_release_set "$sandbox/target" 47.0.0
-  HARNESS_RELEASE_HOST_OS=Darwin \
-    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
   old_current="$(readlink "$sandbox/install-root/current")"
   write_fake_release_set "$sandbox/target" 48.0.0
   write_fake_codesign "$sandbox/fake-bin"
