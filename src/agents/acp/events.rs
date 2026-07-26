@@ -63,6 +63,10 @@ pub fn materialise_batch(
 /// Returns `None` for updates that don't map to a conversation event (e.g.,
 /// config updates, mode changes).
 #[must_use]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "maps one ACP session update to a conversation event; the single tracing::debug! for an unhandled variant costs 7 of its 9 points, leaving structural 2, which is low for a 96-line function because its arms are a wide flat mapping with one nested branch rather than nested control flow"
+)]
 pub fn materialise_one(
     update: &SessionUpdate,
     agent: &str,

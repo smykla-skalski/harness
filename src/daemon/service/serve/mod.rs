@@ -245,6 +245,10 @@ pub(crate) async fn initialize_startup_state(
 /// a project-list entry, so a store that refuses it leaves the board exactly as
 /// this build found it, where failing startup would take the daemon down over
 /// something nobody can act on.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "reports the outcome of reattributing unattributed task-board items; two of its three arms log, a count when some were attributed and the error on failure, while the zero case stays silent, so two macro expansions cost 14 of this 7-line function's 17 points, leaving structural 3"
+)]
 async fn reattribute_task_board_items(db: &super::db::AsyncDaemonDb) {
     match db.reattribute_unattributed_task_board_items().await {
         Ok(0) => {}
