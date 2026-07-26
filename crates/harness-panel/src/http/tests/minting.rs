@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use axum::Json;
 use axum::Router;
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
@@ -26,6 +26,7 @@ use super::{Harness, router, session_cookie_name};
 use crate::daemon_client::DaemonCredential;
 use crate::store::pair_links::PairLinkRecord;
 
+mod refusals;
 mod regressions;
 
 #[derive(Debug)]
@@ -59,6 +60,8 @@ struct Seen {
     granted_ttl: Option<u64>,
     /// A role the daemon issues instead of the one it was asked for.
     granted_role: Option<String>,
+    /// Every pairing id the panel asked the daemon to withdraw.
+    withdrawn: Vec<String>,
     /// Hold the daemon answer after issuance to expose approval races.
     pause: Option<Arc<MintPause>>,
     /// Return an unreadable success after issuing the link.
@@ -68,6 +71,16 @@ struct Seen {
 }
 
 async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
+    serve_daemon(seen, true).await
+}
+
+/// A daemon that mints and knows nothing about withdrawing, the way one built
+/// before the pairing-management routes answers.
+async fn mint_only_daemon(seen: Arc<Mutex<Seen>>) -> String {
+    serve_daemon(seen, false).await
+}
+
+async fn serve_daemon(seen: Arc<Mutex<Seen>>, revocable: bool) -> String {
     async fn mint(
         State(seen): State<Arc<Mutex<Seen>>>,
         headers: HeaderMap,
@@ -132,9 +145,27 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
         .into_response()
     }
 
-    let app = Router::new()
-        .route("/v1/remote/pair/mint", post(mint))
-        .with_state(seen);
+    async fn revoke(
+        State(seen): State<Arc<Mutex<Seen>>>,
+        Path(pairing_id): Path<String>,
+    ) -> Response {
+        seen.lock()
+            .expect("stub lock")
+            .withdrawn
+            .push(pairing_id.clone());
+        Json(serde_json::json!({
+            "pairing_id": pairing_id,
+            "outcome": "link_withdrawn",
+            "revoked_at": Utc::now().to_rfc3339(),
+        }))
+        .into_response()
+    }
+
+    let mut app = Router::new().route("/v1/remote/pair/mint", post(mint));
+    if revocable {
+        app = app.route("/v1/remote/pairings/{pairing_id}/revoke", post(revoke));
+    }
+    let app = app.with_state(seen);
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let address = listener.local_addr().expect("local address");
     tokio::spawn(async move {
@@ -306,35 +337,6 @@ async fn a_daemon_clock_that_disagrees_does_not_reach_the_stored_row() {
     );
     // The person who asked is still shown the daemon's own deadline.
     assert!(body.contains("2000-01-01"), "{body}");
-}
-
-/// The allow-list decides what the panel may ask for, but the daemon decides
-/// what the code grants. If a misconfigured endpoint answers with more than
-/// was asked for, showing it would hand out authority the owner never
-/// approved, and the panel cannot revoke what it has already caused.
-#[tokio::test]
-async fn a_link_of_the_wrong_role_is_never_shown_to_anyone() {
-    let seen = Arc::new(Mutex::new(Seen::default()));
-    let (harness, owner) = ready(Arc::clone(&seen)).await;
-    seen.lock().expect("stub lock").granted_role = Some("admin".to_owned());
-
-    let (status, body) = harness.post("/panel/api/pair-links", Some(&owner)).await;
-
-    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
-    assert!(
-        !body.contains("harness://pair"),
-        "the code must not reach the caller: {body}"
-    );
-    // Still written down, because the daemon minted it and an operator needs
-    // to find it to revoke it.
-    let recorded = harness
-        .state
-        .store
-        .pair_links_for_account(&harness.account_id("ada").await)
-        .await
-        .expect("records");
-    assert_eq!(recorded.len(), 1, "{recorded:?}");
-    assert_eq!(recorded[0].role, "admin");
 }
 
 /// The daemon may shorten the lifetime the panel asked for, and the shorter
