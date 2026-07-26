@@ -26,13 +26,13 @@ use crate::error::ApiError;
 /// state or a device field it grows arrives without the panel having to learn
 /// about it first.
 #[derive(Debug, Serialize)]
-struct PanelPairing {
+pub(super) struct PanelPairing {
     #[serde(flatten)]
-    pairing: DaemonPairing,
+    pub(super) pairing: DaemonPairing,
     /// The account this link was minted for. Absent for one the panel has no
     /// record of, which only the owner is shown at all.
     #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<String>,
+    pub(super) account_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -100,7 +100,11 @@ pub async fn list(
 /// only the owner sees it. That is the safe direction and the only honest one:
 /// the panel does not know who it was minted for, and showing it to whoever
 /// asks would put one person's device on another's page.
-fn visible_to(viewer: &Viewer, entry: &PanelPairing) -> bool {
+///
+/// The event socket applies this same function to what it pushes. Two spellings
+/// of one rule would be one rule until somebody widened the list and left the
+/// stream showing the older, narrower answer — or the other way round.
+pub(super) fn visible_to(viewer: &Viewer, entry: &PanelPairing) -> bool {
     viewer.is_owner || entry.account_id.as_deref() == Some(viewer.account.id.as_str())
 }
 

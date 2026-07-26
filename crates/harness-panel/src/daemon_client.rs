@@ -1,20 +1,24 @@
 //! The panel's one link to the daemon.
 //!
-//! Four calls, all over the daemon's public HTTPS listener: claiming the
-//! credential the panel runs as, once; minting a pairing link for a person the
-//! panel has authenticated; and listing and revoking what it minted. The panel
-//! never reads the daemon's database or runs its CLI; this module is the whole
-//! of the coupling.
+//! Four calls and a socket, all over the daemon's public HTTPS listener:
+//! claiming the credential the panel runs as, once; minting a pairing link for
+//! a person the panel has authenticated; listing and revoking what it minted;
+//! and a websocket held open to be told when one of those pairings changes. The
+//! panel never reads the daemon's database or runs its CLI; this module is the
+//! whole of the coupling.
 
+pub mod events;
 pub mod pairings;
 pub mod tls;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, USER_AGENT};
 use reqwest::{Client, Response};
+use rustls::ClientConfig;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -76,6 +80,11 @@ pub enum MintError {
 #[derive(Debug, Clone)]
 pub struct DaemonClient {
     http: Client,
+    /// The same configuration `http` was built with, kept because the event
+    /// socket has to run its own handshake: reqwest will not hand out the raw
+    /// stream a websocket needs, and building a second verifier would be a
+    /// second place for the pin to drift.
+    tls: Arc<ClientConfig>,
     endpoint: Url,
     domain: String,
 }
@@ -91,13 +100,14 @@ impl DaemonClient {
         let tls = pinned_client_config(config.spki_pin)?;
         let http = Client::builder()
             .timeout(REQUEST_TIMEOUT)
-            .use_preconfigured_tls(tls)
+            .use_preconfigured_tls(tls.clone())
             .build()
             .map_err(|error| {
                 PanelError::config(format!("building the daemon HTTP client: {error}"))
             })?;
         Ok(Self {
             http,
+            tls: Arc::new(tls),
             endpoint: config.endpoint.clone(),
             domain: config.domain.clone(),
         })

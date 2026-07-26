@@ -406,23 +406,3 @@ async fn a_root_companion_forwards_everything_except_the_daemon_api() {
     server.abort();
     upstream_server.abort();
 }
-
-#[tokio::test(flavor = "multi_thread")]
-async fn protocol_upgrades_under_the_prefix_are_refused() {
-    let (upstream, upstream_server) = spawn_companion_upstream().await;
-    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
-
-    let response = reqwest::Client::new()
-        .get(format!("{base_url}/panel/socket"))
-        .header("connection", "Upgrade")
-        .header("upgrade", "websocket")
-        .send()
-        .await
-        .expect("upgrade request");
-
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
-    let body: Value = response.json().await.expect("error body");
-    assert_eq!(body["error"]["code"].as_str(), Some("COMPANION_UPSTREAM"));
-    server.abort();
-    upstream_server.abort();
-}

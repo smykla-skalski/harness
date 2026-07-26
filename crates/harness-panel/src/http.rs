@@ -7,6 +7,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod events;
 pub mod pair_links;
 pub mod pairings;
 pub mod session;
@@ -27,6 +28,7 @@ use crate::config::daemon::DaemonConfig;
 use crate::config::{CompanionAuthDigest, PanelConfig};
 use crate::daemon_client::DaemonClient;
 use crate::error::PanelError;
+use crate::events::PanelEvents;
 use crate::github::GitHubClient;
 use crate::store::Store;
 
@@ -38,6 +40,11 @@ pub struct PanelState {
     pub github: Arc<GitHubClient>,
     pub assets: Arc<PanelAssets>,
     pub daemon: Arc<DaemonRuntime>,
+    /// Where the daemon connection announces what changed and every open browser
+    /// socket picks it up. Held here rather than passed to the one route that
+    /// reads it, because the connection that feeds it is started beside the
+    /// server and has to reach the same hub the router hands out.
+    pub events: PanelEvents,
     pairing_locks: Arc<PairingLocks>,
 }
 
@@ -90,6 +97,7 @@ impl PanelState {
             github: Arc::new(github),
             assets: Arc::new(assets),
             daemon: Arc::new(daemon),
+            events: PanelEvents::new(),
             pairing_locks: Arc::new(PairingLocks::default()),
         })
     }
@@ -135,6 +143,7 @@ pub fn router(state: PanelState) -> Router {
         .route(&format!("{base}/auth/signout"), post(auth::signout))
         .route(&format!("{base}/api/pair-links"), post(pair_links::create))
         .route(&format!("{base}/api/pairings"), get(pairings::list))
+        .route(&format!("{base}/api/ws"), get(events::stream))
         .route(
             &format!("{base}/api/pairings/{{pairing_id}}/revoke"),
             post(pairings::revoke),

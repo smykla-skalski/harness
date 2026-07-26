@@ -9,8 +9,11 @@ use std::sync::Arc;
 
 use axum::body::{Body, Bytes};
 use axum::extract::Request;
-use axum::http::{HeaderMap, Response, Uri, Version, header::CONTENT_LENGTH};
-use axum::routing::any;
+use axum::extract::ws::{Message, WebSocketUpgrade};
+use axum::http::{
+    HeaderMap, Response, Uri, Version, header::AUTHORIZATION, header::CONTENT_LENGTH,
+};
+use axum::routing::{any, get};
 use axum::{Json, Router};
 use futures_util::{StreamExt as _, stream};
 use serde_json::Value;
@@ -62,6 +65,51 @@ pub(super) async fn spawn_companion_upstream() -> (String, JoinHandle<()>) {
             .expect("serve companion upstream");
     });
     (format!("http://{address}"), server)
+}
+
+/// A companion that speaks websocket on one route.
+///
+/// It sends back the `Authorization` the handshake arrived with, which is what
+/// lets a test prove the daemon presented its own companion credential rather
+/// than passing the caller's through.
+pub(super) async fn spawn_companion_websocket_upstream() -> (String, JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind companion upstream");
+    let address = listener.local_addr().expect("companion upstream address");
+    let app = Router::new()
+        .route("/panel/socket", get(companion_socket))
+        .route("/panel/socket-refused", get(refuse_socket));
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .await
+            .expect("serve companion upstream");
+    });
+    (format!("http://{address}"), server)
+}
+
+async fn companion_socket(headers: HeaderMap, ws: WebSocketUpgrade) -> Response<Body> {
+    let authorization = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    ws.on_upgrade(move |mut socket| async move {
+        let _ = socket.send(Message::Text(authorization.into())).await;
+    })
+}
+
+/// A companion that will not upgrade this caller, answering the way the panel
+/// answers a browser with no session.
+async fn refuse_socket() -> Response<Body> {
+    Response::builder()
+        .status(401)
+        .header("www-authenticate", "Bearer")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"error":{"code":"unauthenticated","message":"sign in"}}"#,
+        ))
+        .expect("a refusal")
 }
 
 /// A port nothing is listening on: bind, read the address, then drop the

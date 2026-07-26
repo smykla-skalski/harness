@@ -2,16 +2,17 @@ use std::sync::PoisonError;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use axum::Json;
 use axum::body::Body;
 use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::{MatchedPath, State};
-use axum::http::{HeaderValue, Request, StatusCode, header::CONTENT_LENGTH, header::RETRY_AFTER};
+use axum::http::{Request, StatusCode, header::CONTENT_LENGTH};
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use http_body_util::{BodyExt as _, Limited};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, TryAcquireError};
 use tokio::time::timeout;
+
+use responses::{limit_response, overloaded_response, unavailable_response, with_retry_after};
 
 use super::auth::RemoteHttpLimitAudit;
 use super::auth_audit::RemoteHttpAuditMarker;
@@ -29,7 +30,6 @@ use crate::daemon::task_board_remote_transport::routes::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-const REMOTE_LIMIT_ERROR_CODE: &str = "REMOTE_LIMITS";
 pub(crate) const DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES: usize =
     DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES;
 pub(crate) const MAX_REMOTE_HTTP_BODY_LIMIT_BYTES: usize =
@@ -414,24 +414,42 @@ pub(crate) fn prepare_remote_websocket_upgrade(
     ws: WebSocketUpgrade,
     state: &DaemonHttpState,
 ) -> Result<(WebSocketUpgrade, Option<OwnedSemaphorePermit>), Box<Response>> {
+    let permit = take_remote_websocket_permit(state)?;
+    let Some(limits) = state.remote_request_limits.as_ref() else {
+        // Only reachable in local mode, where the helper above returns before
+        // asking for limits at all.
+        return Ok((ws, permit));
+    };
+    let config = limits.config();
+    Ok((
+        ws.max_message_size(config.max_websocket_message_bytes)
+            .max_frame_size(config.max_websocket_frame_bytes),
+        permit,
+    ))
+}
+
+/// One slot against the ceiling on sockets this daemon carries.
+///
+/// Separate from [`prepare_remote_websocket_upgrade`] because a relayed
+/// companion socket never becomes an axum `WebSocketUpgrade` here — the daemon
+/// hands the connection over rather than speaking the protocol — but it is a
+/// connection the daemon is holding open just the same, and leaving it outside
+/// the ceiling would make the limit describe only half of what it bounds.
+pub(crate) fn take_remote_websocket_permit(
+    state: &DaemonHttpState,
+) -> Result<Option<OwnedSemaphorePermit>, Box<Response>> {
     if state.auth_mode == DaemonHttpAuthMode::Local {
-        return Ok((ws, None));
+        return Ok(None);
     }
     let limits = state
         .remote_request_limits
         .as_ref()
         .ok_or_else(|| Box::new(unavailable_response()))?;
-    let permit = limits.try_websocket_permit().map_err(|_| {
+    limits.try_websocket_permit().map(Some).map_err(|_| {
         Box::new(overloaded_response(
             "remote WebSocket connection limit reached",
         ))
-    })?;
-    let config = limits.config();
-    Ok((
-        ws.max_message_size(config.max_websocket_message_bytes)
-            .max_frame_size(config.max_websocket_frame_bytes),
-        Some(permit),
-    ))
+    })
 }
 
 fn content_length_exceeds(request: &Request<Body>, max_bytes: usize) -> bool {
@@ -441,29 +459,6 @@ fn content_length_exceeds(request: &Request<Body>, max_bytes: usize) -> bool {
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<u64>().ok())
         .is_some_and(|length| length > u64::try_from(max_bytes).unwrap_or(u64::MAX))
-}
-
-fn unavailable_response() -> Response {
-    limit_response(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "remote request limits are unavailable",
-    )
-}
-
-fn overloaded_response(message: &str) -> Response {
-    with_retry_after(limit_response(StatusCode::TOO_MANY_REQUESTS, message))
-}
-
-fn with_retry_after(mut response: Response) -> Response {
-    if response.status() != StatusCode::TOO_MANY_REQUESTS {
-        return response;
-    }
-    if !response.headers().contains_key(RETRY_AFTER) {
-        response
-            .headers_mut()
-            .insert(RETRY_AFTER, HeaderValue::from_static("1"));
-    }
-    response
 }
 
 async fn audited_http_limit_response(
@@ -495,18 +490,6 @@ async fn audited_http_limit_response_from_snapshot(
     }
 }
 
-fn limit_response(status: StatusCode, message: &str) -> Response {
-    (
-        status,
-        Json(serde_json::json!({
-            "error": {
-                "code": REMOTE_LIMIT_ERROR_CODE,
-                "message": message,
-            }
-        })),
-    )
-        .into_response()
-}
-
+mod responses;
 #[cfg(test)]
 mod tests;

@@ -1,4 +1,6 @@
 import { panelUrl } from './base';
+import type { PanelSocketFactory, PanelStreamHandlers } from './events';
+import { openPanelStream, panelStreamUrl } from './events';
 import type {
   PairLink,
   PairingRevoke,
@@ -35,11 +37,26 @@ export interface PanelApi {
   fetchPairings(): Promise<PanelPairings>;
   /** Cut off a device, or withdraw a link nobody claimed. */
   revokePairing(pairingId: string): Promise<PairingRevoke>;
+  /**
+   * Hold a socket open for what the panel learns without being asked. Returns
+   * the function that closes it again.
+   */
+  openStream(handlers: PanelStreamHandlers): () => void;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
+/**
+ * The socket is built here rather than taken as a required argument, because
+ * only a test ever wants a different one and every caller in the app wants this.
+ */
+const browserSocket: PanelSocketFactory = (url) => new WebSocket(url);
+
+export function createPanelApi(
+  base: string,
+  fetchImpl: FetchLike,
+  createSocket: PanelSocketFactory = browserSocket,
+): PanelApi {
   const request = async (path: string, init?: RequestInit): Promise<Response> => {
     // `credentials` goes last so a caller's init cannot displace it. Every
     // route behind this helper is session-authenticated, and dropping the
@@ -107,6 +124,12 @@ export function createPanelApi(base: string, fetchImpl: FetchLike): PanelApi {
         method: 'POST',
       });
       return (await response.json()) as PairingRevoke;
+    },
+
+    openStream(handlers: PanelStreamHandlers): () => void {
+      // Resolved here rather than when the api is built, so a page that never
+      // signs anybody in never reads the location at all.
+      return openPanelStream(panelStreamUrl(base, window.location.href), handlers, createSocket);
     },
   };
 }
