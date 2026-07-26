@@ -95,11 +95,12 @@ pub(super) async fn relay_websocket(
         pump(caller, upstream).await;
     });
 
-    // Passed through rather than filtered. `Connection`, `Upgrade`, and
-    // `Sec-WebSocket-Accept` are hop-by-hop by definition and the ordinary strip
-    // would take exactly the three headers that make this a handshake; the
-    // companion is a loopback service the daemon started, not an arbitrary
-    // upstream whose headers need policing.
+    // Passed through rather than filtered. The ordinary strip would take
+    // `Connection` and `Upgrade`, which on a 101 are the handshake being agreed
+    // rather than stale state from the hop before it, and what is left without
+    // them — or without the `Sec-WebSocket-Accept` that answers the caller's key
+    // — is no handshake at all. The companion is a loopback service the daemon
+    // started, not an arbitrary upstream whose headers need policing.
     let (parts, _body) = response.into_parts();
     Response::from_parts(parts, Body::empty())
 }
