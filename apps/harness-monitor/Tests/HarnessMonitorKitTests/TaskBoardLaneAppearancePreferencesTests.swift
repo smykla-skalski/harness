@@ -292,7 +292,9 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(!source.contains("Top Bar Color"))
     // The whole point of the popover picker: nothing here may reach for the
     // shared NSColorPanel, which SwiftUI's ColorPicker opens in its own window.
-    #expect(!source.contains("ColorPicker("))
+    // Our own view name ends in "...LaneColorPicker", so blank it out first or
+    // the call that replaced ColorPicker matches the ban on ColorPicker.
+    #expect(!withoutLocalPickerName(source).contains("ColorPicker("))
     #expect(!source.contains("NSColorWell"))
     #expect(!source.contains("NSViewRepresentable"))
     #expect(!source.contains("@objc"))
@@ -323,7 +325,7 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(source.contains("TaskBoardLaneAppearancePreferences.settingColorToken("))
     #expect(source.contains("Saturation("))
     #expect(source.contains("HueSlider("))
-    #expect(!source.contains("ColorPicker("))
+    #expect(!withoutLocalPickerName(source).contains("ColorPicker("))
     // Matches the call, not the prose: the file comment explains why the panel
     // is being avoided and has every right to name it.
     #expect(!source.contains("NSColorPanel."))
@@ -403,6 +405,16 @@ struct TaskBoardLaneAppearancePreferencesTests {
     return 0.2126 * linear(color.redComponent)
       + 0.7152 * linear(color.greenComponent)
       + 0.0722 * linear(color.blueComponent)
+  }
+
+  /// Our replacement view is named `SettingsTaskBoardLaneColorPicker`, whose
+  /// call site contains `ColorPicker(` as a substring. Blanking the name keeps
+  /// a ban on SwiftUI's `ColorPicker` from matching the thing that replaced it.
+  private func withoutLocalPickerName(_ source: String) -> String {
+    source.replacingOccurrences(
+      of: "SettingsTaskBoardLaneColorPicker",
+      with: "LaneColorControl"
+    )
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
