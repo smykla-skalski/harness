@@ -11,7 +11,11 @@ unalias -a 2>/dev/null || true
 # a few gigabytes. Changing one linker flag was enough to take this host to 100
 # servers at once.
 #
-# This is a task rather than part of the build path on purpose: finding the live
+# cargo-local.sh now starts that one server up front, so a build should no
+# longer manufacture orphans. This stays for the ones already running, and for
+# servers started outside that path - a plain `cargo build`, an Xcode phase.
+#
+# It is a task rather than part of the build path on purpose: naming the live
 # server means connecting to it, which is not a price worth paying in front of
 # every one of the thousands of rustc invocations a build makes.
 

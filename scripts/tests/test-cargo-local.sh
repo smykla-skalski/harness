@@ -1041,6 +1041,34 @@ EOF
   fi
 }
 
+scenario_live_socket_survives_the_sweep() {
+  local fake_bin="$SANDBOX/livesock-bin"
+  local tmpdir="$SANDBOX/livesock-tmp"
+  local socket_dir="$tmpdir/harness-sccache"
+  local live_socket="$socket_dir/live.sock"
+  local stale_socket="$socket_dir/stale.sock"
+  mkdir -p "$fake_bin" "$socket_dir"
+  write_fake_sccache "$fake_bin/sccache" "0.16.0"
+  # lsof 4.95 prints the name field as "<path> type=STREAM"; 4.91 printed the
+  # path alone. Reading only the first shape unlinked every live socket, and the
+  # next client then found no server and started a second one.
+  cat >"$fake_bin/lsof" <<EOF
+#!/usr/bin/env bash
+printf 'p1\n'
+printf 'n%s type=STREAM\n' "$live_socket"
+EOF
+  chmod +x "$fake_bin/lsof"
+  : >"$live_socket"
+  : >"$stale_socket"
+
+  print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir" >/dev/null
+  if [[ -e "$live_socket" ]] && [[ ! -e "$stale_socket" ]]; then
+    pass "the sweep keeps a live socket and unlinks a stale one"
+  else
+    fail "sweep verdict wrong: live=$([[ -e "$live_socket" ]] && echo kept || echo unlinked) stale=$([[ -e "$stale_socket" ]] && echo kept || echo unlinked)"
+  fi
+}
+
 scenario_sccache_socket_is_shared_across_checkouts() {
   local base="$ROOT/tmp/cargo-local-checkouts-$$"
   local fake_bin="$SANDBOX/checkout-bin"
@@ -1237,6 +1265,268 @@ EOF
   fi
 }
 
+# A listener on the socket, which is what separates a started server from a
+# recorded intention to start one. Without something to connect to, the probe in
+# cargo-local would report "no server" forever and every scenario below would
+# pass while the code under test started a server per invocation.
+write_fake_socket_holder() {
+  local path="$1"
+  cat >"$path" <<'PY'
+import os, socket, sys, time
+
+socket_path, pid_file = sys.argv[1], sys.argv[2]
+try:
+    os.unlink(socket_path)
+except OSError:
+    pass
+listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+listener.bind(socket_path)
+listener.listen(16)
+with open(pid_file, "a", encoding="utf-8") as handle:
+    handle.write(f"{os.getpid()}\n")
+time.sleep(120)
+PY
+}
+
+write_fake_sccache_server() {
+  local path="$1" log="$2" holder="$3" pid_file="$4"
+  cat >"$path" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "--version" ]]; then
+  printf 'sccache 0.16.0\n'
+  exit 0
+fi
+if [[ "\${1:-}" == "--start-server" ]]; then
+  printf 'start-server\n' >>"$log"
+  python3 "$holder" "\$SCCACHE_SERVER_UDS" "$pid_file" >/dev/null 2>&1 &
+  # The real binary returns only once the server is listening, and a fake that
+  # returns earlier would let the next invocation see nothing and start again.
+  for _ in {1..200}; do
+    if [[ -S "\$SCCACHE_SERVER_UDS" ]]; then
+      exit 0
+    fi
+    sleep 0.05
+  done
+  exit 1
+fi
+printf 'unexpected fake sccache invocation: %s\n' "\$*" >&2
+exit 91
+EOF
+  chmod +x "$path"
+}
+
+write_logging_cargo() {
+  local path="$1" log="$2"
+  cat >"$path" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "-V" ]]; then
+  printf 'cargo 1.0.0\n'
+  exit 0
+fi
+printf 'cargo\n' >>"$log"
+EOF
+  chmod +x "$path"
+}
+
+# A short TMPDIR outside the sandbox on purpose. The sandbox path is long enough
+# that configure_sccache_socket would fall back to the shared /tmp root, and the
+# socket id is a hash of this repository - so these scenarios would bind, and
+# then kill, the developer's own sccache socket.
+prestart_tmpdir() {
+  printf '/tmp/cl-prestart-%s\n' "$$"
+}
+
+run_cargo_local_prestart() {
+  local fake_bin="$1" cargo_bin="$2"
+  shift 2
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    unset MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+    PATH="$fake_bin:$PATH" \
+      TMPDIR="$(prestart_tmpdir)/" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      HARNESS_CARGO_BIN="$cargo_bin" \
+      HARNESS_JOBSERVER=0 \
+      CODEX_SESSION_ID="cargo-local-prestart-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$ROOT/scripts/cargo-local.sh" "$@" >/dev/null 2>&1
+  )
+}
+
+prestart_socket_path() {
+  local fake_bin="$1"
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    PATH="$fake_bin:$PATH" \
+      TMPDIR="$(prestart_tmpdir)/" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      HARNESS_JOBSERVER=0 \
+      CODEX_SESSION_ID="cargo-local-prestart-$$" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$ROOT/scripts/cargo-local.sh" --print-env 2>/dev/null
+  ) | awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }'
+}
+
+stop_prestart_servers() {
+  local pid_file="$1" pid
+  while read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill "$pid" 2>/dev/null || true
+  done <"$pid_file"
+  : >"$pid_file"
+}
+
+scenario_sccache_server_is_started_before_cargo() {
+  local fake_bin="$SANDBOX/prestart-bin"
+  local log="$SANDBOX/prestart-log"
+  local pid_file="$SANDBOX/prestart-pids"
+  local tmpdir starts first_line
+  tmpdir="$(prestart_tmpdir)"
+  mkdir -p "$fake_bin" "$tmpdir"
+  : >"$log"
+  : >"$pid_file"
+  write_fake_socket_holder "$SANDBOX/socket-holder.py"
+  write_fake_sccache_server "$fake_bin/sccache" "$log" "$SANDBOX/socket-holder.py" "$pid_file"
+  write_logging_cargo "$fake_bin/cargo" "$log"
+
+  run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib
+  run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib
+  stop_prestart_servers "$pid_file"
+
+  starts="$(grep -c '^start-server$' "$log" || true)"
+  first_line="$(head -1 "$log")"
+  rm -rf "$tmpdir"
+
+  # Twice, because the second run is the one that proves the probe works: a
+  # server already listening must not be replaced by another one.
+  if [[ "$starts" == "1" ]] && [[ "$first_line" == "start-server" ]]; then
+    pass "one sccache server is started, before cargo runs"
+  else
+    fail "sccache prestart wrong: $starts start(s), log begins with '$first_line'"
+  fi
+}
+
+scenario_concurrent_builds_start_one_sccache_server() {
+  local fake_bin="$SANDBOX/concurrent-prestart-bin"
+  local log="$SANDBOX/concurrent-prestart-log"
+  local pid_file="$SANDBOX/concurrent-prestart-pids"
+  local tmpdir starts builds
+  tmpdir="$(prestart_tmpdir)"
+  mkdir -p "$fake_bin" "$tmpdir"
+  : >"$log"
+  : >"$pid_file"
+  write_fake_socket_holder "$SANDBOX/concurrent-socket-holder.py"
+  write_fake_sccache_server \
+    "$fake_bin/sccache" "$log" "$SANDBOX/concurrent-socket-holder.py" "$pid_file"
+  write_logging_cargo "$fake_bin/cargo" "$log"
+
+  # The burst is the whole bug: without serialisation every one of these sees no
+  # server, starts one, and all but the last are orphaned on the same path.
+  for _ in {1..8}; do
+    run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib &
+  done
+  wait
+  stop_prestart_servers "$pid_file"
+
+  starts="$(grep -c '^start-server$' "$log" || true)"
+  builds="$(grep -c '^cargo$' "$log" || true)"
+  rm -rf "$tmpdir"
+
+  if [[ "$starts" == "1" ]] && [[ "$builds" == "8" ]]; then
+    pass "a burst of concurrent builds starts exactly one sccache server"
+  else
+    fail "concurrent prestart wrong: $starts server start(s) for $builds builds"
+  fi
+}
+
+scenario_unusable_python_falls_back_to_the_socket_file() {
+  local fake_bin="$SANDBOX/nopython-prestart-bin"
+  local log="$SANDBOX/nopython-prestart-log"
+  local pid_file="$SANDBOX/nopython-prestart-pids"
+  local tmpdir socket starts
+  tmpdir="$(prestart_tmpdir)"
+  mkdir -p "$fake_bin" "$tmpdir"
+  : >"$log"
+  : >"$pid_file"
+  write_fake_socket_holder "$SANDBOX/nopython-socket-holder.py"
+  write_fake_sccache_server \
+    "$fake_bin/sccache" "$log" "$SANDBOX/nopython-socket-holder.py" "$pid_file"
+  write_logging_cargo "$fake_bin/cargo" "$log"
+
+  # Stand the server up with a working python3, then take python3 away for the
+  # run under test. macOS ships a /usr/bin/python3 that behaves like this until
+  # the command line tools are installed: present on PATH, exit 1, no output.
+  socket="$(prestart_socket_path "$fake_bin")"
+  if [[ -z "$socket" ]]; then
+    fail "could not resolve the prestart socket path"
+    rm -rf "$tmpdir"
+    return
+  fi
+  python3 "$SANDBOX/nopython-socket-holder.py" "$socket" "$pid_file" >/dev/null 2>&1 &
+  local waited=0
+  while [[ ! -S "$socket" ]] && (( waited < 200 )); do
+    sleep 0.05
+    waited=$((waited + 1))
+  done
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$fake_bin/python3"
+  chmod +x "$fake_bin/python3"
+
+  run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib
+  stop_prestart_servers "$pid_file"
+  rm -f "$fake_bin/python3"
+
+  starts="$(grep -c '^start-server$' "$log" || true)"
+  rm -rf "$tmpdir"
+
+  # A probe that cannot run must not read as "no server": starting a second one
+  # beside a live one is the failure the prestart exists to prevent.
+  if [[ "$starts" == "0" ]]; then
+    pass "an unusable python3 falls back to the socket file rather than starting a server"
+  else
+    fail "an unusable python3 started $starts sccache server(s) next to a live one"
+  fi
+}
+
+scenario_query_commands_start_no_sccache_server() {
+  local fake_bin="$SANDBOX/query-prestart-bin"
+  local log="$SANDBOX/query-prestart-log"
+  local pid_file="$SANDBOX/query-prestart-pids"
+  local tmpdir starts
+  tmpdir="$(prestart_tmpdir)"
+  mkdir -p "$fake_bin" "$tmpdir"
+  : >"$log"
+  : >"$pid_file"
+  write_fake_socket_holder "$SANDBOX/query-socket-holder.py"
+  write_fake_sccache_server \
+    "$fake_bin/sccache" "$log" "$SANDBOX/query-socket-holder.py" "$pid_file"
+  write_logging_cargo "$fake_bin/cargo" "$log"
+
+  run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" --print-env
+  run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" --print-target-dir
+  stop_prestart_servers "$pid_file"
+
+  starts="$(grep -c '^start-server$' "$log" || true)"
+  rm -rf "$tmpdir"
+
+  # Asking what the environment would be is not a build, and leaving a daemon
+  # behind for a question is a surprise every caller of these would inherit.
+  if [[ "$starts" == "0" ]]; then
+    pass "environment queries start no sccache server"
+  else
+    fail "an environment query started $starts sccache server(s)"
+  fi
+}
+
 scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_reserve_drops_an_inherited_jobserver
@@ -1265,6 +1555,11 @@ scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
 scenario_old_explicit_sccache_is_disabled
 scenario_failed_lsof_preserves_unknown_sockets
+scenario_live_socket_survives_the_sweep
+scenario_sccache_server_is_started_before_cargo
+scenario_concurrent_builds_start_one_sccache_server
+scenario_unusable_python_falls_back_to_the_socket_file
+scenario_query_commands_start_no_sccache_server
 scenario_cache_wrapper_shortens_long_tmpdir
 
 printf 'cargo-local tests: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
