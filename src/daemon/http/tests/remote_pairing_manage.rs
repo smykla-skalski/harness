@@ -238,10 +238,19 @@ async fn an_unknown_id_is_indistinguishable_from_someone_elses() {
 
     let theirs = mint_as(&base_url, OTHER_BROKER, "9999").await;
 
-    let (others, _) = revoke_as(&base_url, BROKER, &theirs).await;
-    let (absent, _) = revoke_as(&base_url, BROKER, "pairing-does-not-exist").await;
+    let (others, others_body) = revoke_as(&base_url, BROKER, &theirs).await;
+    let (absent, absent_body) = revoke_as(&base_url, BROKER, "pairing-does-not-exist").await;
 
     assert_eq!(others, absent);
+    assert_eq!(others_body, absent_body);
+    // One answer covers both, so it must assert neither. Claiming the pairing
+    // was minted elsewhere would be false for an id that matches nothing.
+    let message = absent_body["error"]["message"]
+        .as_str()
+        .expect("message")
+        .to_owned();
+    assert!(!message.contains("minted"), "{message}");
+    assert!(!message.contains("exist"), "{message}");
     server.abort();
 }
 

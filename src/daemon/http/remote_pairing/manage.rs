@@ -1,4 +1,4 @@
-//! Listing pairings and revoking one that is not the caller's own.
+//! Listing pairings and revoking somebody else's device.
 //!
 //! Both routes need the `pair_manage` scope. What that scope alone buys is the
 //! caller's own entries: the links it minted. Seeing or touching everyone
@@ -132,8 +132,8 @@ fn list_pairings(
     description = "Revoke a pairing, cutting off somebody else's device rather than the caller's own credential. A claimed link cuts off the device it became; an unclaimed one can no longer be claimed. Requires the pair_manage scope, and the caller must have minted the pairing unless it also holds admin. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
     responses(
         (status = 200, description = "Pairing revoked", body = RemotePairingRevokeResponse),
-        (status = 403, description = "Pairing belongs to another caller", body = DaemonErrorBody),
-        (status = 404, description = "No such pairing", body = DaemonErrorBody),
+        (status = 403, description = "The pairing is not available to this caller: minted by another client, or no such id. The two are deliberately indistinguishable so the route cannot be used to discover which ids exist", body = DaemonErrorBody),
+        (status = 404, description = "No such pairing, answered only to a caller entitled to see every pairing", body = DaemonErrorBody),
     ),
 )]
 async fn post_remote_pairing_revoke(
@@ -270,10 +270,15 @@ impl IntoResponse for RemotePairingManageError {
                 "pairing_store_unavailable",
                 "pairing store is unavailable",
             ),
+            // One answer covers a pairing minted by somebody else and an id
+            // that matches nothing, so it must not assert either. Saying the
+            // pairing was minted by another client would be a lie for an id
+            // that does not exist, and saying it does not exist would leak
+            // which ids do.
             Self::NotYours => manage_error(
                 StatusCode::FORBIDDEN,
-                "pairing_not_yours",
-                "this pairing was minted by another client",
+                "pairing_not_available",
+                "no pairing with that id is available to this client",
             ),
             Self::NotFound => manage_error(
                 StatusCode::NOT_FOUND,

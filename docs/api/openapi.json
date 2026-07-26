@@ -4154,7 +4154,7 @@
             }
           },
           "403": {
-            "description": "Pairing belongs to another caller",
+            "description": "The pairing is not available to this caller: minted by another client, or no such id. The two are deliberately indistinguishable so the route cannot be used to discover which ids exist",
             "content": {
               "application/json": {
                 "schema": {
@@ -4164,7 +4164,7 @@
             }
           },
           "404": {
-            "description": "No such pairing",
+            "description": "No such pairing, answered only to a caller entitled to see every pairing",
             "content": {
               "application/json": {
                 "schema": {
