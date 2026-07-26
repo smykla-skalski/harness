@@ -45,8 +45,11 @@ fn refuse_wrong_role(credential: &DaemonCredential) -> Result<(), PanelError> {
         return Ok(());
     }
     Err(PanelError::daemon(format!(
+        // The flag and the role are spelled differently, so the message says so
+        // rather than leaving an operator to wonder whether it names two things.
         "the code claimed a {} credential, not {BROKER_ROLE}; create the pairing with \
-         --role pairing-broker. Revoke client {} on the daemon, it is now orphaned",
+         --role pairing-broker, which the daemon records as {BROKER_ROLE}. Revoke client \
+         {} on the daemon, it is now orphaned",
         credential.role, credential.client_id
     )))
 }
@@ -125,7 +128,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::read_pair_code;
+    use super::{BROKER_ROLE, DaemonCredential, read_pair_code, refuse_wrong_role};
 
     #[cfg(unix)]
     fn set_mode(path: &Path, mode: u32) {
@@ -163,6 +166,40 @@ mod tests {
                 .contains("reading the daemon pairing code"),
             "the file must not have been read: {error}"
         );
+    }
+
+    /// The code is spent by the time this runs and the token only ever existed
+    /// in memory, so the client id in the message is the whole of what an
+    /// operator has to revoke the credential they cannot use. The flag spelling
+    /// differs from the role the daemon records, and both belong here because
+    /// one is what they type and the other is what they will read back.
+    #[test]
+    fn refusing_the_wrong_role_says_how_to_recover_from_it() {
+        let error = refuse_wrong_role(&DaemonCredential {
+            client_id: "panel-7".to_owned(),
+            token: "unusable".to_owned(),
+            role: "operator".to_owned(),
+        })
+        .expect_err("a credential that cannot mint must be refused");
+        let message = error.to_string();
+
+        assert!(message.contains("panel-7"), "{message}");
+        assert!(message.contains("--role pairing-broker"), "{message}");
+        assert!(message.contains(BROKER_ROLE), "{message}");
+        assert!(
+            !message.contains("unusable"),
+            "the token must not leak: {message}"
+        );
+    }
+
+    #[test]
+    fn a_broker_credential_is_accepted() {
+        refuse_wrong_role(&DaemonCredential {
+            client_id: "panel-7".to_owned(),
+            token: "usable".to_owned(),
+            role: BROKER_ROLE.to_owned(),
+        })
+        .expect("the role the panel needs");
     }
 
     #[test]
