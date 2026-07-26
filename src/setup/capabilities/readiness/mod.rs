@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
 
-use crate::infra::blocks::BollardContainerRuntime;
 use crate::workspace::dirs_home;
 
 use super::model::{Feature, FeatureInfo, ReadinessReport};
@@ -15,17 +13,12 @@ mod summaries;
 
 use checks::{build_checks, command_on_path};
 use scope::{auto_detect_kuma_repo_root, build_scope, resolve_scope_path};
-use summaries::{
-    FeatureReadinessInputs, build_platform_readiness, build_profile_readiness,
-    build_provider_readiness, build_summaries, feature_summary,
-};
+use summaries::{FeatureReadinessInputs, build_summaries, feature_summary};
 
 pub(super) trait CapabilityProbe {
     fn path_env(&self) -> String;
     fn home_dir(&self) -> PathBuf;
     fn command_on_path(&self, command: &str) -> bool;
-    fn run_command_success(&self, program: &str, args: &[&str]) -> bool;
-    fn docker_engine_reachable(&self) -> bool;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,20 +35,6 @@ impl CapabilityProbe for SystemProbe {
 
     fn command_on_path(&self, command: &str) -> bool {
         command_on_path(command, &self.path_env())
-    }
-
-    fn run_command_success(&self, program: &str, args: &[&str]) -> bool {
-        Command::new(program)
-            .args(args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success())
-    }
-
-    fn docker_engine_reachable(&self) -> bool {
-        BollardContainerRuntime::daemon_reachable()
     }
 }
 
@@ -87,10 +66,6 @@ pub(super) fn evaluate(
     let feature_inputs = FeatureReadinessInputs {
         project: &summaries.project,
         bootstrap: &summaries.bootstrap,
-        repo: &summaries.repo,
-        kubernetes: &summaries.kubernetes,
-        universal: &summaries.universal,
-        either_platform: &summaries.either_platform,
     };
     let features = feature_map
         .keys()
@@ -102,9 +77,6 @@ pub(super) fn evaluate(
         scope,
         checks,
         create: summaries.create.clone(),
-        platforms: build_platform_readiness(&summaries),
-        providers: build_provider_readiness(&summaries),
         features,
-        profiles: build_profile_readiness(&summaries),
     }
 }

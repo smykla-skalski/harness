@@ -10,7 +10,7 @@ mod model;
 #[path = "capabilities/readiness/mod.rs"]
 mod readiness;
 
-use data::{cluster_topologies, create, features, platforms, providers};
+use data::{create, features};
 use model::CapabilitiesReport;
 
 impl Execute for CapabilitiesArgs {
@@ -55,10 +55,7 @@ fn build_report_with_probe(
     let readiness = readiness::evaluate(project_dir, repo_root, &feature_map, probe);
     CapabilitiesReport {
         create: create(),
-        cluster_topologies: cluster_topologies(),
         features: feature_map,
-        platforms: platforms(),
-        providers: providers(),
         readiness,
     }
 }
