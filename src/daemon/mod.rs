@@ -34,6 +34,8 @@ pub fn sandboxed_from_env() -> bool {
     })
 }
 
+#[cfg(feature = "daemon-runtime")]
+pub(crate) mod acp_probe;
 pub mod agent_acp;
 pub mod agent_tui;
 #[cfg(feature = "daemon-runtime")]

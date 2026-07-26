@@ -7,8 +7,9 @@
 use axum::extract::ws::Message;
 use serde_json::Value;
 
-use crate::agents::acp::{catalog, probe};
+use crate::agents::acp::catalog;
 use crate::agents::runtime::models;
+use crate::daemon::acp_probe;
 use crate::daemon::protocol::{WS_CONFIG_EVENT, WsConfigPayload, WsPushEvent};
 use crate::session::persona;
 use crate::workspace::utc_now;
@@ -23,7 +24,7 @@ pub fn build_config_payload() -> WsConfigPayload {
         personas: persona::all(),
         runtime_models: models::all_catalogs(),
         acp_agents: catalog::acp_agents().into_iter().cloned().collect(),
-        runtime_probe: probe::cached_probe_snapshot(),
+        runtime_probe: acp_probe::cached_probe_snapshot(),
     }
 }
 

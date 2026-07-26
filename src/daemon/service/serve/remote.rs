@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::JoinHandle;
 
-use crate::agents::acp::probe::schedule_probe_cache_refresh;
+use crate::daemon::acp_probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
