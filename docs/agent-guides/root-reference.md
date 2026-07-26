@@ -146,10 +146,11 @@ Canonical harness version source:
 
 Derived surfaces maintained by `mise run version:*`:
 
-- `testkit/Cargo.toml`.
-- `Cargo.lock` package entries for `harness` and `harness-testkit`.
+- Every `[workspace]` member: its `[package]` version, its `Cargo.lock` entry, and the requirements other members declare on it. The set is read from the members list rather than named anywhere, so a crate is covered the day it joins the workspace.
+- `docs/api/openapi.json`, the `info.version` field only.
 - `apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`.
 - `apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist`.
+- `apps/harness-monitor/HarnessMonitor.xcodeproj/project.pbxproj`, when the generated project is present.
 
 Additional version notes:
 
