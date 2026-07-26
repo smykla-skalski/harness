@@ -4,6 +4,7 @@ use std::fmt;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand_core06::{OsRng, RngCore};
+use serde::Serialize;
 
 use super::remote::{RemoteAccessScope, RemoteRole};
 use super::remote_crypto::{
@@ -24,8 +25,8 @@ mod subject;
 pub use subject::RemotePairingSubject;
 mod create;
 mod inventory;
-pub use inventory::{RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingState};
 pub(crate) use inventory::RemotePairingObservation;
+pub use inventory::{RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingState};
 mod invitation;
 pub(crate) use create::{RemotePairingCreateParams, create_remote_pairing, pairing_expires_at};
 
@@ -294,11 +295,13 @@ pub struct RemoteStoredPairing {
     pub revoked_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum RemotePairingStatus {
     Pending,
     Claimed,
     Expired,
+    Revoked,
     Unavailable,
 }
 
@@ -309,6 +312,7 @@ impl RemotePairingStatus {
             Self::Pending => "pending",
             Self::Claimed => "claimed",
             Self::Expired => "expired",
+            Self::Revoked => "revoked",
             Self::Unavailable => "unavailable",
         }
     }

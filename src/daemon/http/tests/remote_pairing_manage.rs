@@ -92,7 +92,10 @@ async fn withdrawing_an_unclaimed_link_makes_it_unclaimable() {
     let (base_url, server) = serve_http(state).await;
 
     let minted = mint_body_as(&base_url, BROKER, "4242").await;
-    let pairing_id = minted["pairing_id"].as_str().expect("pairing id").to_owned();
+    let pairing_id = minted["pairing_id"]
+        .as_str()
+        .expect("pairing id")
+        .to_owned();
     let code = code_from_pairing_url(minted["pairing_url"].as_str().expect("pairing url"));
 
     let revoked = revoke_as(&base_url, BROKER, &pairing_id).await;
@@ -122,6 +125,17 @@ async fn withdrawing_an_unclaimed_link_makes_it_unclaimable() {
         "a withdrawn link must not read as expired: {body}"
     );
 
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_STATUS))
+        .json(&serde_json::json!({ "pairing_id": pairing_id }))
+        .send()
+        .await
+        .expect("send status request")
+        .json::<Value>()
+        .await
+        .expect("status body");
+    assert_eq!(status["status"], "revoked");
+
     // And it reads as revoked rather than pending or expired.
     let listed = list_as(&base_url, BROKER).await;
     let entry = listed
@@ -141,7 +155,10 @@ async fn revoking_a_claimed_link_cuts_off_its_device() {
     let (base_url, server) = serve_http(state).await;
 
     let minted = mint_body_as(&base_url, BROKER, "4242").await;
-    let pairing_id = minted["pairing_id"].as_str().expect("pairing id").to_owned();
+    let pairing_id = minted["pairing_id"]
+        .as_str()
+        .expect("pairing id")
+        .to_owned();
     let code = code_from_pairing_url(minted["pairing_url"].as_str().expect("pairing url"));
     let claimed = reqwest::Client::new()
         .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM))
@@ -207,7 +224,15 @@ async fn a_refused_revoke_is_recorded_as_a_denial() {
                     COALESCE(MAX(client_id), ''), COALESCE(MAX(metadata_json), '')
              FROM remote_audit_events WHERE route_or_method = 'remote.pairing.revoke'",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .expect("audit row");
 
@@ -350,17 +375,12 @@ async fn list_as(base_url: &str, client_id: &str) -> Vec<Value> {
         .expect("send list request");
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.json::<Value>().await.expect("json body");
-    body["pairings"]
-        .as_array()
-        .expect("pairings array")
-        .clone()
+    body["pairings"].as_array().expect("pairings array").clone()
 }
 
 async fn revoke_as(base_url: &str, client_id: &str, pairing_id: &str) -> (StatusCode, Value) {
     let response = reqwest::Client::new()
-        .post(format!(
-            "{base_url}/v1/remote/pairings/{pairing_id}/revoke"
-        ))
+        .post(format!("{base_url}/v1/remote/pairings/{pairing_id}/revoke"))
         .header("x-harness-remote-client-id", client_id)
         .bearer_auth(remote_token(client_id))
         .send()

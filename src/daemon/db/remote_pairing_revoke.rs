@@ -7,6 +7,7 @@
 use sqlx::{Row, Sqlite, Transaction, query};
 
 use super::remote_identity::INSERT_REMOTE_AUDIT_EVENT_SQL;
+use super::remote_identity_async::prune_remote_audit_events_in_transaction;
 use super::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome};
 
@@ -76,20 +77,7 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("load pairing {pairing_id} to revoke: {error}")))?;
 
         let Some(row) = row else {
-            // Recorded rather than rolled back: an attempt to revoke an id that
-            // does not exist is exactly what probing looks like, and the trail
-            // is the only place it would show.
-            // A failure, because nothing was revoked. Recording it as a
-            // success would put an entry in the trail claiming a revocation
-            // that never had a target.
-            record_revoke_audit(&mut transaction, audit, RemoteAuditOutcome::Failure).await?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit missing remote pairing revoke: {error}"))
-            })?;
-            return Ok(RemotePairingRevoked {
-                outcome: RemotePairingRevokeOutcome::NotFound,
-                revoked_at: revoked_at.to_owned(),
-            });
+            return finish_missing_pairing_revoke(transaction, audit, revoked_at).await;
         };
         let claimed_client_id: Option<String> = row
             .try_get("claimed_client_id")
@@ -97,9 +85,10 @@ impl AsyncDaemonDb {
         let withdrawn_at: Option<String> = row
             .try_get("withdrawn_at")
             .map_err(|error| db_error(format!("read revocation for {pairing_id}: {error}")))?;
-        let device_revoked_at: Option<String> = row.try_get("device_revoked_at").map_err(|error| {
-            db_error(format!("read device revocation for {pairing_id}: {error}"))
-        })?;
+        let device_revoked_at: Option<String> =
+            row.try_get("device_revoked_at").map_err(|error| {
+                db_error(format!("read device revocation for {pairing_id}: {error}"))
+            })?;
         // Either end can already carry it, and whichever does is the moment
         // that matters rather than the moment this request arrived.
         let already = withdrawn_at.or(device_revoked_at);
@@ -176,6 +165,25 @@ impl AsyncDaemonDb {
     }
 }
 
+async fn finish_missing_pairing_revoke(
+    mut transaction: Transaction<'_, Sqlite>,
+    audit: &RemoteAuditEvent,
+    revoked_at: &str,
+) -> Result<RemotePairingRevoked, CliError> {
+    // Recorded rather than rolled back: an attempt to revoke an id that does
+    // not exist is exactly what probing looks like, and the trail is the only
+    // place it would show. It is a failure because nothing was revoked.
+    record_revoke_audit(&mut transaction, audit, RemoteAuditOutcome::Failure).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit missing remote pairing revoke: {error}")))?;
+    Ok(RemotePairingRevoked {
+        outcome: RemotePairingRevokeOutcome::NotFound,
+        revoked_at: revoked_at.to_owned(),
+    })
+}
+
 /// Recorded even when there was nothing left to revoke, because an attempt to
 /// cut off somebody else's device is worth seeing in the trail whether or not
 /// it changed anything.
@@ -207,6 +215,7 @@ async fn record_revoke_audit(
                 audit.event_id
             ))
         })?;
+    prune_remote_audit_events_in_transaction(transaction).await?;
     Ok(())
 }
 
@@ -222,8 +231,7 @@ async fn stored_device_revocation(
         .await
         .map_err(|error| db_error(format!("read revocation for device {client_id}: {error}")))?;
     row.map_or(Ok(None), |row| {
-        row.try_get("revoked_at").map_err(|error| {
-            db_error(format!("read revocation for device {client_id}: {error}"))
-        })
+        row.try_get("revoked_at")
+            .map_err(|error| db_error(format!("read revocation for device {client_id}: {error}")))
     })
 }

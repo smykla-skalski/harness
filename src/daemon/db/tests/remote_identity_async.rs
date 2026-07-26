@@ -1,6 +1,7 @@
+use sqlx::query_scalar;
 use tempfile::tempdir;
 
-use super::{AsyncDaemonDb, DaemonDb};
+use super::{AsyncDaemonDb, DaemonDb, RemotePairingRevokeOutcome};
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
@@ -60,6 +61,48 @@ async fn remote_client_revoke_rejects_mismatched_audit_identity() {
             .expect("verify client after mismatch")
             .is_some()
     );
+}
+
+#[tokio::test]
+async fn remote_pairing_revoke_keeps_audit_retention_bounded() {
+    let temp = tempdir().expect("create remote identity tempdir");
+    let db_path = temp.path().join("harness.db");
+    let db = DaemonDb::open(&db_path).expect("open daemon db");
+    db.connection()
+        .execute_batch(
+            "
+            WITH RECURSIVE seq(value) AS (
+                SELECT 1
+                UNION ALL
+                SELECT value + 1 FROM seq WHERE value < 10000
+            )
+            INSERT INTO remote_audit_events (
+                event_id, recorded_at, request_id, client_id, route_or_method,
+                scope, scope_decision, outcome, remote_addr, error_detail,
+                metadata_json
+            )
+            SELECT 'retained-' || value, '2026-07-13T18:00:00Z', NULL, NULL,
+                   'remote.test', 'read', 'allowed', 'success', NULL, NULL, '{}'
+            FROM seq;",
+        )
+        .expect("seed retained audits");
+    drop(db);
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db");
+    let audit = revoke_audit(CLIENT_ID, "pairing-revoke-retention");
+
+    let revoked = async_db
+        .revoke_remote_pairing_with_audit("missing-pairing", "2026-07-13T18:01:00Z", &audit)
+        .await
+        .expect("record missing pairing revoke");
+
+    assert_eq!(revoked.outcome, RemotePairingRevokeOutcome::NotFound);
+    let retained = query_scalar::<_, i64>("SELECT COUNT(*) FROM remote_audit_events")
+        .fetch_one(async_db.pool())
+        .await
+        .expect("count retained audits");
+    assert_eq!(retained, 10_000);
 }
 
 fn register_client(db: &DaemonDb) {

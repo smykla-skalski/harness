@@ -312,7 +312,9 @@ impl DaemonDb {
             .execute(
                 "UPDATE remote_pairing_codes
                  SET claimed_at = ?2, claimed_client_id = ?3, claim_remote_addr = ?4
-                 WHERE pairing_id = ?1 AND claimed_at IS NULL",
+                 WHERE pairing_id = ?1
+                   AND claimed_at IS NULL
+                   AND json_extract(metadata_json, '$.revoked_at') IS NULL",
                 params![
                     pairing.pairing_id.as_str(),
                     now,
@@ -328,19 +330,32 @@ impl DaemonDb {
             })
             .map_err(RemotePairingClaimCodeError::store)?;
         if changed == 0 {
-            let error = RemotePairingError::AlreadyClaimed;
+            let revoked_at = transaction
+                .query_row(
+                    "SELECT json_extract(metadata_json, '$.revoked_at')
+                     FROM remote_pairing_codes WHERE pairing_id = ?1",
+                    [pairing.pairing_id.as_str()],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .map_err(|error| {
+                    db_error(format!(
+                        "read lost pairing {} claim state: {error}",
+                        pairing.pairing_id.as_str()
+                    ))
+                })
+                .map_err(RemotePairingClaimCodeError::store)?;
+            let (error, route) = if revoked_at.is_some() {
+                (RemotePairingError::Revoked, ROUTE_REMOTE_PAIR_REVOKED)
+            } else {
+                (RemotePairingError::AlreadyClaimed, ROUTE_REMOTE_PAIR_REPLAY)
+            };
             let error_detail = error.to_string();
             transaction
                 .rollback()
                 .map_err(|error| db_error(format!("rollback lost remote pairing claim: {error}")))
                 .map_err(RemotePairingClaimCodeError::store)?;
-            self.record_pairing_claim_failure(
-                claim,
-                now,
-                ROUTE_REMOTE_PAIR_REPLAY,
-                error_detail.as_str(),
-            )
-            .map_err(RemotePairingClaimCodeError::store)?;
+            self.record_pairing_claim_failure(claim, now, route, error_detail.as_str())
+                .map_err(RemotePairingClaimCodeError::store)?;
             return Err(RemotePairingClaimCodeError::pairing(error));
         }
         record_remote_audit_event_for_pairing(

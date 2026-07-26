@@ -23145,7 +23145,7 @@
         ],
         "properties": {
           "status": {
-            "type": "string"
+            "$ref": "#/components/schemas/RemotePairingStatus"
           }
         }
       },
@@ -23295,6 +23295,16 @@
           "active",
           "expired",
           "revoked"
+        ]
+      },
+      "RemotePairingStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "claimed",
+          "expired",
+          "revoked",
+          "unavailable"
         ]
       },
       "RemotePairingSubject": {
