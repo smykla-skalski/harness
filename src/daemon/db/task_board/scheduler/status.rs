@@ -2,6 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
 mod ledger;
+mod queue;
 mod targets;
 mod wake;
 
@@ -24,6 +25,7 @@ struct SnapshotLedger {
     runs: Vec<TaskBoardAutomationRunInfo>,
     provider_backoff: Option<ProviderBackoff>,
     open_conflict: bool,
+    queue: TaskBoardAutomationQueueSummary,
     wake: wake::WakeObservation,
     cancelable_targets: Vec<TaskBoardAutomationCancelTarget>,
     cancelable_targets_truncated: bool,
@@ -181,7 +183,7 @@ fn build_snapshot(
         last_reconciliation_at: ledger.wake.last_reconciliation_at(),
         settings_revision: ledger.settings_revision,
         policy_revision: ledger.policy_revision,
-        queue: TaskBoardAutomationQueueSummary::default(),
+        queue: ledger.queue.clone(),
         active_run: facts.active_run,
         cancelable_targets: ledger.cancelable_targets.clone(),
         cancelable_targets_truncated: ledger.cancelable_targets_truncated,

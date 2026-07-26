@@ -41,7 +41,7 @@ actor TaskBoardAutomationInspectorPresentationWorker {
     let snapshot = input.snapshot
     return TaskBoardAutomationPresentation(
       statePills: statePills(snapshot),
-      queuePills: queuePills(snapshot?.queue),
+      queueLanes: queueLanes(snapshot?.queue),
       activeRunRows: runRows(snapshot?.activeRun, referenceDate: input.referenceDate),
       timingRows: timingRows(snapshot, referenceDate: input.referenceDate),
       revisionRows: revisionRows(snapshot),
@@ -84,30 +84,50 @@ actor TaskBoardAutomationInspectorPresentationWorker {
     ]
   }
 
-  private static func queuePills(
+  private static func queueLanes(
     _ queue: TaskBoardAutomationQueueSummary?
-  ) -> [TaskBoardAutomationPill] {
+  ) -> [TaskBoardAutomationQueueLane] {
     guard let queue else { return [] }
     return [
-      queuePill("ready", "Ready", queue.ready, .accent),
-      queuePill("approval", "Approval", queue.awaitingApproval, .warning),
-      queuePill("policy", "Policy blocked", queue.policyBlocked, .danger),
-      queuePill("preparing", "Preparing", queue.preparing, .neutral),
-      queuePill("retrying", "Retrying", queue.retrying, .warning),
-      queuePill("starting", "Starting", queue.starting, .accent),
-      queuePill("active", "Active", queue.active, .success),
-      queuePill("draining", "Draining", queue.draining, .warning),
-      queuePill("cleanup", "Cleanup", queue.cleanupRequired, .danger),
+      TaskBoardAutomationQueueLane(
+        id: .waiting,
+        stages: [
+          queueStage("ready", "Ready", queue.ready, .accent),
+          queueStage("approval", "Approval", queue.awaitingApproval, .warning),
+          queueStage("policy", "Policy blocked", queue.policyBlocked, .danger),
+        ]
+      ),
+      TaskBoardAutomationQueueLane(
+        id: .execution,
+        stages: [
+          queueStage("preparing", "Preparing", queue.preparing, .neutral),
+          queueStage("starting", "Starting", queue.starting, .accent),
+          queueStage("active", "Active", queue.active, .success),
+        ]
+      ),
+      TaskBoardAutomationQueueLane(
+        id: .recovery,
+        stages: [
+          queueStage("retrying", "Retrying", queue.retrying, .warning),
+          queueStage("draining", "Draining", queue.draining, .warning),
+          queueStage("cleanup", "Cleanup", queue.cleanupRequired, .danger),
+        ]
+      ),
     ]
   }
 
-  private static func queuePill(
+  private static func queueStage(
     _ id: String,
     _ label: String,
     _ value: UInt,
     _ tone: TaskBoardAutomationTone
-  ) -> TaskBoardAutomationPill {
-    TaskBoardAutomationPill(id: id, label: label, value: String(value), tone: tone)
+  ) -> TaskBoardAutomationQueueStage {
+    TaskBoardAutomationQueueStage(
+      id: id,
+      label: label,
+      value: value,
+      tone: tone
+    )
   }
 
   private static func runRows(

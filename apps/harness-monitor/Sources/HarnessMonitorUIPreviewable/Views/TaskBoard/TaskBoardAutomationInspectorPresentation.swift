@@ -16,6 +16,26 @@ struct TaskBoardAutomationPill: Identifiable, Equatable, Sendable {
   let tone: TaskBoardAutomationTone
 }
 
+enum TaskBoardAutomationQueueLaneID: String, Identifiable, Equatable, Sendable {
+  case execution
+  case recovery
+  case waiting
+
+  var id: String { rawValue }
+}
+
+struct TaskBoardAutomationQueueStage: Identifiable, Equatable, Sendable {
+  let id: String
+  let label: String
+  let value: UInt
+  let tone: TaskBoardAutomationTone
+}
+
+struct TaskBoardAutomationQueueLane: Identifiable, Equatable, Sendable {
+  let id: TaskBoardAutomationQueueLaneID
+  let stages: [TaskBoardAutomationQueueStage]
+}
+
 struct TaskBoardAutomationValueRow: Identifiable, Equatable, Sendable {
   let id: String
   let label: String
@@ -126,7 +146,7 @@ struct TaskBoardAutomationPresentationInput: Equatable, Sendable {
 struct TaskBoardAutomationPresentation: Equatable, Sendable {
   static let empty = Self(
     statePills: [],
-    queuePills: [],
+    queueLanes: [],
     activeRunRows: [],
     timingRows: [],
     revisionRows: [],
@@ -145,7 +165,7 @@ struct TaskBoardAutomationPresentation: Equatable, Sendable {
   )
 
   let statePills: [TaskBoardAutomationPill]
-  let queuePills: [TaskBoardAutomationPill]
+  let queueLanes: [TaskBoardAutomationQueueLane]
   let activeRunRows: [TaskBoardAutomationValueRow]
   let timingRows: [TaskBoardAutomationValueRow]
   let revisionRows: [TaskBoardAutomationValueRow]

@@ -6,7 +6,7 @@ This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md` still
 
 1. Apply the repo-root contract first, including the selected `pr` or `replay` delivery mode, worktree rules, `mise`, and signed path-limited commits.
 2. Use this file for mandatory Monitor rules: Tuist generation, lanes, validation, SwiftUI/UX, and daemon ownership.
-3. Load `../../docs/agent-guides/monitor-reference.md` only for detailed lane, daemon, performance, preview, or SwiftUI rationale. Load `../../docs/agent-guides/monitor-mobile-reference.md` only for iOS, watch, CloudKit, or mobile mirror work.
+3. Load `../../docs/agent-guides/monitor-reference.md` only for detailed lane, daemon, performance, or SwiftUI rationale. Load `../../docs/agent-guides/monitor-previews.md` for preview authoring and shell-rendered snapshots. Load `../../docs/agent-guides/monitor-mobile-reference.md` only for iOS, watch, CloudKit, or mobile mirror work.
 
 ## Task routing
 
@@ -16,7 +16,7 @@ This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md` still
 | Performance and Instruments work | `../../docs/agent-guides/monitor-reference.md` |
 | Daemon ownership modes | `../../docs/agent-guides/monitor-reference.md` |
 | iOS app, watch app, CloudMirror/Crypto/MacRelay frameworks | `../../docs/agent-guides/monitor-mobile-reference.md` |
-| Previewable SwiftUI structure | `Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
+| Preview authoring and shell-rendered snapshots | `../../docs/agent-guides/monitor-previews.md`, then `Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
 | SwiftUI/API/UX rule detail | The skills listed in this file, then `docs/research/` when rationale is needed |
 
 ## Project generation
@@ -150,14 +150,13 @@ Production external launches should keep the daemon in an app-group runtime root
 
 Load detailed references only when the task touches the feature:
 
-- Lane cache routing, isolated app identity, IDE Run discovery, daemon cargo cache, Supervisor audit, performance, preview authoring, and Swift 6 traps: `../../docs/agent-guides/monitor-reference.md`.
+- Lane cache routing, isolated app identity, IDE Run discovery, daemon cargo cache, Supervisor audit, performance, and Swift 6 traps: `../../docs/agent-guides/monitor-reference.md`.
+- Preview authoring and shell-rendered snapshots: `../../docs/agent-guides/monitor-previews.md`.
 - iOS app, watch app, CloudKit, NeedsMe, CloudMirror, pairing, mobile widgets, and companion build commands: `../../docs/agent-guides/monitor-mobile-reference.md`.
 
 ## Preview authoring
 
-All `#Preview` blocks live in `HarnessMonitorUIPreviewable` and render through the `HarnessMonitorPreviewHost` app target via the `HarnessMonitorUIPreviews` scheme. For structure and naming rules, follow `Sources/HarnessMonitorUIPreviewable/AGENTS.md`.
-
-Preview render scripts are not part of the current lane model. Use Xcode canvas or a targeted `monitor:build` / `monitor:test` lane for compile verification.
+Use the headless shell workflow in `../../docs/agent-guides/monitor-previews.md` for preview authoring and visual handoff. Keep `#Preview` placement aligned with `Sources/HarnessMonitorUIPreviewable/AGENTS.md`.
 
 ## Gotchas
 

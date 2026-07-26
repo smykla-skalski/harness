@@ -22,7 +22,7 @@ struct TaskBoardAutomationManualView: View {
 
       if let controlBlockedReason {
         Label(controlBlockedReason, systemImage: "lock.trianglebadge.exclamationmark")
-          .font(.caption)
+          .scaledFont(.body)
           .foregroundStyle(HarnessMonitorTheme.caution)
           .fixedSize(horizontal: false, vertical: true)
           .padding(.vertical, HarnessMonitorTheme.spacingMD)

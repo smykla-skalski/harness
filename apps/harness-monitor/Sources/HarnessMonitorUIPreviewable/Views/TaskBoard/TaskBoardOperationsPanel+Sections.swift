@@ -44,6 +44,8 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   let footer: String?
   let background: TaskBoardOperationsSectionBackground
   let content: Content
+  @Environment(\.fontScale)
+  private var fontScale
 
   init(
     title: String,
@@ -62,14 +64,21 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       Text(title)
-        .harnessNativeFormSectionHeader()
+        .font(
+          HarnessMonitorTextSize.scaledFont(
+            .headline.weight(.semibold),
+            by: fontScale
+          )
+        )
         .foregroundStyle(.primary)
         .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
+        .accessibilityAddTraits(.isHeader)
 
       VStack(alignment: .leading, spacing: 0) {
         content
       }
       .padding(.horizontal, TaskBoardOperationsFormMetrics.sectionPadding)
+      .padding(.top, TaskBoardOperationsFormMetrics.sectionPadding)
       .padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)
       .background {
         sectionBackground

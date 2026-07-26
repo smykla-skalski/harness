@@ -6,6 +6,12 @@ import SwiftUI
 @main
 struct PreviewHostApp: App {
   init() {
+    if let dumpDirectory = ProcessInfo.processInfo.environment[
+      "HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP"
+    ] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      exit(TaskBoardInspectorPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
+    }
     // Headless render mode: dump the diff fixtures to PNGs and exit before any
     // window or dock presence appears, so verification never steals focus.
     if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_DIFF_LAB_DUMP"] {

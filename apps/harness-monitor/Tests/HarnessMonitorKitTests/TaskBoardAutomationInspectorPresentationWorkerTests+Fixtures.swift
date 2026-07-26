@@ -67,6 +67,7 @@ extension TaskBoardAutomationPresentationTests {
     admissionState: TaskBoardAutomationAdmissionState = .stopped,
     heartbeatAgeSeconds: UInt64 = 0,
     cleanupRequired: UInt = 0,
+    queue: TaskBoardAutomationQueueSummary? = nil,
     cancelableTargets: [TaskBoardAutomationCancelTarget] = [],
     cancelableTargetsTruncated: Bool = false
   ) -> TaskBoardAutomationSnapshot {
@@ -80,7 +81,7 @@ extension TaskBoardAutomationPresentationTests {
       heartbeatAgeSeconds: heartbeatAgeSeconds,
       settingsRevision: 1,
       policyRevision: 1,
-      queue: TaskBoardAutomationQueueSummary(cleanupRequired: cleanupRequired),
+      queue: queue ?? TaskBoardAutomationQueueSummary(cleanupRequired: cleanupRequired),
       cancelableTargets: cancelableTargets,
       cancelableTargetsTruncated: cancelableTargetsTruncated
     )

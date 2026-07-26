@@ -8,7 +8,8 @@ Inline previews have been extracted. Runtime implementation files should stay fr
 
 1. Apply the repo-root and app-level `AGENTS.md` files first.
 2. Use the placement and preview rules for every file in this target.
-3. Read the feature invariants only when touching the named surface. Do not load unrelated review-row or diff-canvas detail for unrelated UI work.
+3. Read `../../../../docs/agent-guides/monitor-previews.md` before authoring or rendering previews.
+4. Read the feature invariants only when touching the named surface. Do not load unrelated review-row or diff-canvas detail for unrelated UI work.
 
 ## Placement
 
@@ -28,6 +29,7 @@ Inline previews have been extracted. Runtime implementation files should stay fr
 4. Do not introduce trailing preview suffixes such as `+Preview`, `+Previews`, `Previews`, or one-off names such as `CrowdedPreview`.
 5. Keep preview-only helpers private and next to the preview file unless reused by multiple preview files in the same domain. Only then promote them to a clearly named support file such as `SettingsPreviewSupport.swift`.
 6. Before finishing a layout change, confirm that every file containing `#Preview` lives under the nearest `Previews/` folder.
+7. After every visual task, use the shell snapshot workflow in `../../../../docs/agent-guides/monitor-previews.md` and inspect every emitted image.
 
 ## Domain notes
 

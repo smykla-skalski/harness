@@ -96,20 +96,20 @@ struct TaskBoardAutomationHistoryView: View {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
           Text(run.title)
-            .font(.caption.monospaced().weight(.semibold))
+            .scaledFont(.body.monospaced().weight(.semibold))
             .lineLimit(1)
             .truncationMode(.middle)
           Spacer(minLength: 0)
           Text(run.state)
-            .font(.caption2.weight(.semibold))
+            .scaledFont(.callout.weight(.semibold))
             .foregroundStyle(run.tone.color)
         }
         Text(run.subtitle)
-          .font(.caption2)
+          .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(2)
         Text(run.startedAt)
-          .font(.caption2.monospacedDigit())
+          .scaledFont(.callout.monospacedDigit())
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
           .help(run.accessibilityTimestamp)
       }
@@ -155,7 +155,7 @@ struct TaskBoardAutomationHistoryView: View {
       )
     } else if let detail = presentation.detail {
       Text(detail.runID)
-        .font(.caption.monospaced().weight(.semibold))
+        .scaledFont(.body.monospaced().weight(.semibold))
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
       TaskBoardAutomationValueRows(rows: detail.rows)
@@ -165,7 +165,7 @@ struct TaskBoardAutomationHistoryView: View {
           detail.errorKind.map { "\($0): \(error)" } ?? error,
           systemImage: "exclamationmark.octagon.fill"
         )
-        .font(.caption)
+        .scaledFont(.body)
         .foregroundStyle(HarnessMonitorTheme.danger)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.vertical, HarnessMonitorTheme.spacingSM)
@@ -197,26 +197,26 @@ struct TaskBoardAutomationHistoryView: View {
   private func stageRow(_ stage: TaskBoardAutomationStageRow) -> some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       Text(String(stage.sequence))
-        .font(.caption2.monospacedDigit().weight(.semibold))
+        .scaledFont(.callout.monospacedDigit().weight(.semibold))
         .foregroundStyle(stage.tone.color)
         .frame(minWidth: 22, alignment: .trailing)
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
           Text(stage.title)
-            .font(.caption.weight(.semibold))
+            .scaledFont(.body.weight(.semibold))
           Spacer(minLength: 0)
           Text(stage.state)
-            .font(.caption2.weight(.semibold))
+            .scaledFont(.callout.weight(.semibold))
             .foregroundStyle(stage.tone.color)
         }
         if let summary = stage.summary {
           Text(summary)
-            .font(.caption2)
+            .scaledFont(.callout)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .fixedSize(horizontal: false, vertical: true)
         }
         Text(stage.recordedAt)
-          .font(.caption2.monospacedDigit())
+          .scaledFont(.callout.monospacedDigit())
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
           .help(stage.accessibilityTimestamp)
       }

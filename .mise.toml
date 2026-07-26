@@ -451,6 +451,10 @@ run = "apps/harness-monitor/Scripts/attach-attributegraph-breakpoint.sh"
 description = "Run the Harness Monitor xcodebuild lane wrapper (pass xcodebuild args after --)"
 run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh"
 
+[tasks."monitor:preview"]
+description = "Build the lightweight Harness Monitor preview host and render a snapshot suite (pass -- <suite> [output-directory])"
+run = "apps/harness-monitor/Scripts/render-preview-snapshots.sh"
+
 [tasks."monitor:build"]
 description = "Build the Harness Monitor macOS app (Debug) via the shared build lane"
 run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
