@@ -130,6 +130,9 @@ fn claim_remote_pairing_for_addr(
     let claim = authorize_pairing_claim(state, request, request_id, remote_addr)?;
     let claimed = claim_pairing_client(state, request.code.as_str(), &claim)?;
     log_remote_pairing_claimed(request_id, claimed.client.client_id.as_str());
+    // After the claim has committed, so a subscriber told about it can read the
+    // device and find it there.
+    super::remote_ws::publish_pairing_claim(state, claimed.client.client_id.as_str());
     Ok(remote_pair_claim_response(claimed))
 }
 

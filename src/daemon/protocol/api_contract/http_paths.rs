@@ -17,6 +17,7 @@ pub const REMOTE_PAIR_CLAIM: &str = "/v1/remote/pair/claim";
 pub const REMOTE_PAIR_STATUS: &str = "/v1/remote/pair/status";
 pub const REMOTE_PAIR_MINT: &str = "/v1/remote/pair/mint";
 pub const REMOTE_CLIENT_SELF_REVOKE: &str = "/v1/remote/client/revoke";
+pub const REMOTE_WS: &str = "/v1/remote/ws";
 pub const REMOTE_PAIRINGS: &str = "/v1/remote/pairings";
 pub const REMOTE_PAIRING_REVOKE: &str = "/v1/remote/pairings/{pairing_id}/revoke";
 pub const SESSIONS: &str = "/v1/sessions";

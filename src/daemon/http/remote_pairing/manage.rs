@@ -28,12 +28,13 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteStoredClient,
 };
-use crate::daemon::remote_pairing::RemotePairingInventoryEntry;
+use crate::daemon::remote_pairing::{RemotePairingChange, RemotePairingInventoryEntry};
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_response};
+use super::super::remote_ws::publish_pairing_change;
 use super::super::{DaemonHttpState, authenticated_remote_client, require_async_db};
 
 pub(in crate::daemon::http) fn remote_pairing_manage_routes() -> OpenApiRouter<DaemonHttpState> {
@@ -185,6 +186,11 @@ async fn revoke_pairing(
         Outcome::AlreadyRevoked => "already_revoked",
         Outcome::NotFound => return Err(RemotePairingManageError::NotFound),
     };
+    // Announced for an already-revoked pairing too. This request changed
+    // nothing, but a subscriber that missed the original cut-off is exactly the
+    // one whose view is wrong, and the event carries the state rather than the
+    // transition, so a repeat is harmless.
+    publish_pairing_change(state, RemotePairingChange::Revoked, pairing_id);
     Ok(RemotePairingRevokeResponse {
         pairing_id: pairing_id.to_owned(),
         outcome: label.to_owned(),

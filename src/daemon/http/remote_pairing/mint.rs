@@ -23,8 +23,8 @@ use crate::daemon::remote_identity::{
     expand_client_scopes, parse_remote_role, parse_remote_scope,
 };
 use crate::daemon::remote_pairing::{
-    RemotePairingCode, RemotePairingCreateParams, RemotePairingSubject, create_remote_pairing,
-    pairing_expires_at,
+    RemotePairingChange, RemotePairingCode, RemotePairingCreateParams, RemotePairingSubject,
+    create_remote_pairing, pairing_expires_at,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
@@ -177,6 +177,13 @@ fn mint_remote_pairing(
     .map_err(RemotePairMintHttpError::Create)?;
     drop(db);
     log_remote_pairing_minted(request_id, created.pairing_id.as_str());
+    // The minting client learns the pairing from this response, so the event is
+    // for its other connections and for an admin watching everything.
+    super::super::remote_ws::publish_pairing_change(
+        state,
+        RemotePairingChange::Minted,
+        created.pairing_id.as_str(),
+    );
     Ok(RemotePairMintHttpResponse {
         pairing_id: created.pairing_id,
         role: created.role,

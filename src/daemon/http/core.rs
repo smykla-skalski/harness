@@ -72,6 +72,7 @@ fn discovery_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(get_runtime_session_resolution))
         .routes(routes!(get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))
+        .route(http_paths::REMOTE_WS, get(super::remote_ws::remote_ws_upgrade))
         .route(http_paths::STREAM, get(stream_global))
 }
 

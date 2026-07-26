@@ -126,6 +126,7 @@ fn restarted_state(db_path: &std::path::Path, async_db: Arc<AsyncDaemonDb>) -> D
         remote_pairing_status_limiter: default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
+        remote_pairing_events: broadcast::channel(8).0,
         manifest: serde_json::from_value(serde_json::json!({
             "version": "48.5.0",
             "pid": 1,

@@ -49,9 +49,19 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         path: http_paths::REMOTE_PAIRINGS,
         parity: HttpRouteParity::Exempt {
             kind: WsExemptionKind::StandingDecision,
-            reason: "read by the companion panel over plain HTTP, which holds pair_manage and \
-                     opens no RPC session; mirroring it as a websocket method would require \
-                     granting the broker a channel it has no other use for",
+            reason: "read by the companion panel over plain HTTP for the state of every pairing \
+                     at once; the broker's websocket carries what changed rather than the whole \
+                     inventory, so the two answer different questions",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::REMOTE_WS,
+        parity: HttpRouteParity::Exempt {
+            kind: WsExemptionKind::Structural,
+            reason: "a websocket upgrade is the transport for the events it carries; it is not \
+                     itself an RPC call",
         },
         swift_client_exposed: false,
     },

@@ -102,7 +102,20 @@ pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [Remo
         | http_paths::MANAGED_AGENT_ATTACH
         | http_paths::POLICIES_IMPORT => Some(WRITE_SCOPES),
         http_paths::REMOTE_PAIR_MINT => Some(PAIR_MINT_SCOPES),
-        http_paths::REMOTE_PAIRINGS | http_paths::REMOTE_PAIRING_REVOKE => Some(PAIR_MANAGE_SCOPES),
+        // `REMOTE_WS` is a channel for remote clients generally rather than for
+        // pairings alone, so what it carries can grow without a second upgrade
+        // path. It shares this arm because the weakest scope its traffic
+        // requires today is the one the pairing routes need: pairing events are
+        // all it carries. A stream needing another scope has to widen this, and
+        // widening it is not a free edit — the audit context is built before the
+        // caller is authenticated, so a gate admitting any of several scopes has
+        // to name the required one before it knows which one applied.
+        //
+        // It is deliberately not a subscription on `/v1/ws`, which is gated on
+        // the `read` that the broker role does not hold and must not gain.
+        http_paths::REMOTE_PAIRINGS
+        | http_paths::REMOTE_PAIRING_REVOKE
+        | http_paths::REMOTE_WS => Some(PAIR_MANAGE_SCOPES),
         // The ACP logout and agent-session routes now carry websocket methods,
         // so their HTTP scope derives from the mirrored method like any RPC route.
         _ => route.parity.ws_method().and_then(remote_ws_scopes),

@@ -8,10 +8,19 @@ use crate::daemon::remote_pairing::{
 };
 use harness_kernel::errors::CliError;
 
+/// The columns and joins both reads share.
+///
+/// A macro rather than a `const`, because `concat!` takes literals only, and
+/// the two statements below have to be built from one spelling of this. Two
+/// hand-kept copies would let a column added to the listing go missing from the
+/// single-row read, and `read_inventory_columns` reads both by position.
+///
 /// The join is a LEFT one because an unclaimed link has no device yet, and an
 /// inner join would silently drop exactly the pending and expired rows the
 /// caller most wants to see.
-const SELECT_REMOTE_PAIRING_INVENTORY_SQL: &str = "
+macro_rules! inventory_select {
+    () => {
+        "
 SELECT p.pairing_id,
        p.role,
        p.created_at,
@@ -25,8 +34,20 @@ SELECT p.pairing_id,
        c.revoked_at
 FROM remote_pairing_codes p
 LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
-WHERE ?1 IS NULL OR json_extract(p.metadata_json, '$.minted_by') = ?1
-ORDER BY p.created_at DESC, p.pairing_id DESC";
+"
+    };
+}
+
+const SELECT_REMOTE_PAIRING_INVENTORY_SQL: &str = concat!(
+    inventory_select!(),
+    "WHERE ?1 IS NULL OR json_extract(p.metadata_json, '$.minted_by') = ?1
+ORDER BY p.created_at DESC, p.pairing_id DESC"
+);
+
+/// One pairing, for an event that has just changed it. Reading the whole
+/// inventory to answer about a single row is what this exists to avoid.
+const SELECT_REMOTE_PAIRING_ENTRY_SQL: &str =
+    concat!(inventory_select!(), "WHERE p.pairing_id = ?1");
 
 /// Who a pairing belongs to.
 ///
@@ -98,6 +119,57 @@ impl DaemonDb {
             entries.push(entry_from_columns(columns, now)?);
         }
         Ok(entries)
+    }
+
+    /// Which pairing a device claimed.
+    ///
+    /// A claim is spent by code and the caller never learns which row it was,
+    /// so this is how the change gets a pairing id to announce. A client is the
+    /// claimant of at most one pairing, because claiming mints the client.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the query fails.
+    pub(crate) fn remote_pairing_claimed_by(
+        &self,
+        client_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        self.conn
+            .query_row(
+                "SELECT pairing_id FROM remote_pairing_codes WHERE claimed_client_id = ?1",
+                [client_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|error| db_error(format!("query pairing claimed by client: {error}")))
+    }
+
+    /// One pairing as the inventory would show it, or `None` when no such row
+    /// exists.
+    ///
+    /// Deliberately unnarrowed by owner: the caller is the daemon reporting a
+    /// change it just made, not a client asking what it may see, and the entry
+    /// carries who minted it so the narrowing happens where the audience is
+    /// known.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the row or its metadata cannot be read.
+    pub(crate) fn remote_pairing_inventory_entry(
+        &self,
+        pairing_id: &str,
+        now: &str,
+    ) -> Result<Option<RemotePairingInventoryEntry>, CliError> {
+        let columns = self
+            .conn
+            .query_row(SELECT_REMOTE_PAIRING_ENTRY_SQL, [pairing_id], |row| {
+                Ok(read_inventory_columns(row))
+            })
+            .optional()
+            .map_err(|error| db_error(format!("query remote pairing entry: {error}")))?;
+
+        columns
+            .transpose()?
+            .map(|columns| entry_from_columns(columns, now))
+            .transpose()
     }
 }
 

@@ -61,6 +61,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
         remote_pairing_status_limiter: super::super::default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
+        remote_pairing_events: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),

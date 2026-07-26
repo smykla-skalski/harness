@@ -27,7 +27,9 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
+use crate::daemon::remote_pairing::{
+    RemotePairingEvent, RemotePairingRateLimiter, RemotePairingStatusRateLimiter,
+};
 use crate::daemon::service::{
     WakeDispatch, register_local_clone_progress_sender, register_task_board_working_copy_progress_sender,
     run_local_clone_gc, run_task_board_working_copy_gc,
@@ -51,6 +53,7 @@ mod recovery_snapshot_cache;
 mod remote_clients;
 mod remote_limits;
 mod remote_pairing;
+mod remote_ws;
 mod response;
 mod reviews;
 mod reviews_actions;
@@ -220,6 +223,12 @@ pub struct DaemonHttpState {
     /// [`PreparedBroadcast`]. Connection relays and SSE streams subscribe here
     /// instead of re-serializing each event per subscriber.
     pub prepared_sender: broadcast::Sender<Arc<PreparedBroadcast>>,
+    /// Pairing changes, for the remote clients holding `/v1/remote/ws` open.
+    ///
+    /// Its own channel rather than a variant on [`Self::sender`], which feeds
+    /// `/v1/ws` and `/v1/stream`: those reach every `read` client, and a pairing
+    /// change must reach only the credential that minted it.
+    pub remote_pairing_events: broadcast::Sender<Arc<RemotePairingEvent>>,
     pub manifest: DaemonManifest,
     pub daemon_epoch: String,
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,

@@ -66,6 +66,9 @@ pub async fn serve_remote_https(
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let prepared_sender = background_tasks::spawn_broadcast_fanout(&sender, &replay_buffer);
+    // Its own channel: pairing changes reach the credential that minted
+    // them, never every `read` client the broadcast fan-out serves.
+    let (remote_pairing_events, _) = broadcast::channel(256);
     let daemon_epoch = manifest.started_at.clone();
     let async_db_slot_for_audit = async_db.clone();
 
@@ -99,6 +102,7 @@ pub async fn serve_remote_https(
         remote_pairing_status_limiter: http::default_remote_pairing_status_limiter(),
         sender,
         prepared_sender,
+        remote_pairing_events,
         manifest,
         daemon_epoch,
         replay_buffer,
