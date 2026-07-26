@@ -251,10 +251,14 @@ async fn a_second_revoke_reports_that_it_was_already_done() {
     let pairing_id = mint_as(&base_url, BROKER, "4242").await;
     revoke_as(&base_url, BROKER, &pairing_id).await;
 
+    let first = revoke_as(&base_url, BROKER, &pairing_id).await.1;
     let (status, body) = revoke_as(&base_url, BROKER, &pairing_id).await;
 
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["outcome"], "already_revoked");
+    // The moment it was really cut off, not the moment this request arrived.
+    // Reporting `now` would let a retry read as the revocation that did it.
+    assert_eq!(body["revoked_at"], first["revoked_at"], "{body}");
     server.abort();
 }
 

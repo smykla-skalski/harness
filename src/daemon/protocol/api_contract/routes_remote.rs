@@ -49,7 +49,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         path: http_paths::REMOTE_PAIRINGS,
         parity: HttpRouteParity::Exempt {
             kind: WsExemptionKind::StandingDecision,
-            reason: "read by the companion panel over plain HTTP, which holds pair_manage and                      opens no RPC session; mirroring it as a websocket method would require                      granting the broker a channel it has no other use for",
+            reason: "read by the companion panel over plain HTTP, which holds pair_manage and \
+                     opens no RPC session; mirroring it as a websocket method would require \
+                     granting the broker a channel it has no other use for",
         },
         swift_client_exposed: false,
     },
@@ -58,7 +60,8 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         path: http_paths::REMOTE_PAIRING_REVOKE,
         parity: HttpRouteParity::Exempt {
             kind: WsExemptionKind::StandingDecision,
-            reason: "revokes a credential belonging to somebody else, invoked by the companion                      panel over plain HTTP for the same reason listing is",
+            reason: "revokes a credential belonging to somebody else, invoked by the companion \
+                     panel over plain HTTP for the same reason listing is",
         },
         swift_client_exposed: false,
     },

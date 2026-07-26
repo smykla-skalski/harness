@@ -96,7 +96,9 @@ pub struct RemotePairingDevice {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct RemotePairingInventoryEntry {
     pub pairing_id: String,
-    pub state: String,
+    /// The enum rather than its label, so the schema enumerates what a reader
+    /// may receive. The wire value is the same `snake_case` string either way.
+    pub state: RemotePairingState,
     pub role: String,
     pub created_at: String,
     pub expires_at: String,

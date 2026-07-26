@@ -23233,7 +23233,8 @@
             "type": "string"
           },
           "state": {
-            "type": "string"
+            "$ref": "#/components/schemas/RemotePairingState",
+            "description": "The enum rather than its label, so the schema enumerates what a reader\nmay receive. The wire value is the same snake_case string either way."
           }
         }
       },
@@ -23270,6 +23271,17 @@
             "type": "string"
           }
         }
+      },
+      "RemotePairingState": {
+        "type": "string",
+        "description": "Where a link has got to.\n\nOrdered by how far the link has travelled, so a reader can see that\n`Revoked` overrides everything else: a device whose credential was cut off\nis revoked whether or not its link had also expired.",
+        "enum": [
+          "pending",
+          "claimed",
+          "active",
+          "expired",
+          "revoked"
+        ]
       },
       "RemotePairingSubject": {
         "type": "object",

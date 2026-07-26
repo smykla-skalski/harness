@@ -2,7 +2,7 @@
 
 use rusqlite::Row;
 
-use super::{DaemonDb, db_error, decode_remote_pairing_metadata, pairing_is_expired};
+use super::{DaemonDb, OptionalExtension, db_error, decode_remote_pairing_metadata, pairing_is_expired};
 use crate::daemon::remote_pairing::{
     RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation, RemotePairingState,
 };
@@ -27,7 +27,48 @@ FROM remote_pairing_codes p
 LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
 ORDER BY p.created_at DESC, p.pairing_id DESC";
 
+/// Who a pairing belongs to.
+///
+/// Three cases rather than a nested option, because "no such pairing" and
+/// "created on the host" are different answers and a caller that conflated
+/// them would treat an operator's link as one it may revoke.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RemotePairingOwner {
+    Unknown,
+    /// Created on the host, so no remote client owns it.
+    Host,
+    /// Minted by this client.
+    Client(String),
+}
+
 impl DaemonDb {
+    /// Who minted one pairing.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the row or its metadata cannot be read.
+    pub(crate) fn remote_pairing_minted_by(
+        &self,
+        pairing_id: &str,
+    ) -> Result<RemotePairingOwner, CliError> {
+        let metadata_json: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT metadata_json FROM remote_pairing_codes WHERE pairing_id = ?1",
+                [pairing_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|error| db_error(format!("load pairing {pairing_id} owner: {error}")))?;
+        let Some(metadata_json) = metadata_json else {
+            return Ok(RemotePairingOwner::Unknown);
+        };
+        let metadata = decode_remote_pairing_metadata(&metadata_json)
+            .map_err(|error| db_error(format!("read pairing {pairing_id} owner: {error}")))?;
+        Ok(metadata
+            .minted_by
+            .map_or(RemotePairingOwner::Host, RemotePairingOwner::Client))
+    }
+
     /// Every pairing, newest first, with the device each one became.
     ///
     /// Ownership is not filtered here. The caller decides what it is entitled
@@ -130,7 +171,7 @@ fn entry_from_columns(
 
     Ok(RemotePairingInventoryEntry {
         pairing_id: columns.pairing_id,
-        state: state.as_str().to_owned(),
+        state,
         role: columns.role,
         created_at: columns.created_at,
         expires_at: columns.expires_at,

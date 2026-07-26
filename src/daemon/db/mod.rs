@@ -62,6 +62,7 @@ mod remote_identity;
 mod remote_identity_async;
 mod remote_pairing_revoke;
 pub(crate) use remote_pairing_revoke::RemotePairingRevokeOutcome;
+pub(crate) use remote_pairing::inventory::RemotePairingOwner;
 mod remote_pairing;
 mod remote_pairing_expiry;
 mod review_writes;

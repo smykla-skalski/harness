@@ -29,7 +29,7 @@ use crate::daemon::remote_pairing::{
 
 mod metadata;
 use metadata::{decode_remote_pairing_metadata, encode_remote_pairing_metadata};
-mod inventory;
+pub(super) mod inventory;
 mod status;
 
 const INSERT_REMOTE_PAIRING_SQL: &str = "

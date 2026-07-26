@@ -16,7 +16,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use crate::daemon::db::RemotePairingRevokeOutcome as Outcome;
+use crate::daemon::db::{RemotePairingOwner, RemotePairingRevokeOutcome as Outcome};
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
@@ -170,12 +170,12 @@ async fn revoke_pairing(
         .map_err(RemotePairingManageError::Store)?;
     let db = require_async_db(state, "revoke remote pairing")
         .map_err(RemotePairingManageError::Store)?;
-    let outcome = db
+    let revoked = db
         .revoke_remote_pairing_with_audit(pairing_id, revoked_at.as_str(), &audit)
         .await
         .map_err(RemotePairingManageError::Store)?;
 
-    let label = match outcome {
+    let label = match revoked.outcome {
         Outcome::DeviceRevoked => "device_revoked",
         Outcome::LinkWithdrawn => "link_withdrawn",
         Outcome::AlreadyRevoked => "already_revoked",
@@ -184,7 +184,9 @@ async fn revoke_pairing(
     Ok(RemotePairingRevokeResponse {
         pairing_id: pairing_id.to_owned(),
         outcome: label.to_owned(),
-        revoked_at,
+        // What the store reports, which for an already-revoked pairing is when
+        // it was really cut off rather than when this request arrived.
+        revoked_at: revoked.revoked_at,
     })
 }
 
@@ -209,13 +211,14 @@ fn require_may_revoke(
         .ok_or(RemotePairingManageError::StoreUnavailable)?
         .lock()
         .map_err(|_| RemotePairingManageError::StoreUnavailable)?;
-    let now = utc_now();
-    let owns = db
-        .list_remote_pairing_inventory(now.as_str())
-        .map_err(RemotePairingManageError::Store)?
-        .iter()
-        .any(|entry| entry.pairing_id == pairing_id && owned_by(entry, client_id));
+    // Asked about one pairing rather than by scanning the inventory, which
+    // would have read and decoded every row the daemon has ever issued to
+    // answer a question about one of them.
+    let owner = db
+        .remote_pairing_minted_by(pairing_id)
+        .map_err(RemotePairingManageError::Store)?;
     drop(db);
+    let owns = matches!(owner, RemotePairingOwner::Client(ref owner) if owner == client_id);
     if owns {
         Ok(())
     } else {

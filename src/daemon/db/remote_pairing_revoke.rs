@@ -4,11 +4,22 @@
 //! clients table. This is the other direction: an authorized caller cutting off
 //! a device it did not claim, or withdrawing a link nobody has claimed yet.
 
-use sqlx::{Row, query};
+use sqlx::{Row, Sqlite, Transaction, query};
 
 use super::remote_identity::INSERT_REMOTE_AUDIT_EVENT_SQL;
 use super::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::remote_identity::RemoteAuditEvent;
+
+/// What revoking did, and when the revocation it reports actually happened.
+///
+/// The timestamp is not always the request time: a second revoke reports the
+/// moment the device was really cut off, because a caller retrying otherwise
+/// cannot tell its own attempt apart from the one that did the work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RemotePairingRevoked {
+    pub outcome: RemotePairingRevokeOutcome,
+    pub revoked_at: String,
+}
 
 /// What revoking found to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,15 +49,18 @@ impl AsyncDaemonDb {
         pairing_id: &str,
         revoked_at: &str,
         audit: &RemoteAuditEvent,
-    ) -> Result<RemotePairingRevokeOutcome, CliError> {
+    ) -> Result<RemotePairingRevoked, CliError> {
         let mut transaction = self.pool().begin().await.map_err(|error| {
             db_error(format!("begin remote pairing revoke transaction: {error}"))
         })?;
 
         let row = query(
-            "SELECT claimed_client_id, json_extract(metadata_json, '$.revoked_at') AS revoked_at
-             FROM remote_pairing_codes
-             WHERE pairing_id = ?1",
+            "SELECT p.claimed_client_id,
+                    json_extract(p.metadata_json, '$.revoked_at') AS withdrawn_at,
+                    c.revoked_at AS device_revoked_at
+             FROM remote_pairing_codes p
+             LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
+             WHERE p.pairing_id = ?1",
         )
         .bind(pairing_id)
         .fetch_optional(transaction.as_mut())
@@ -57,17 +71,26 @@ impl AsyncDaemonDb {
             transaction.rollback().await.map_err(|error| {
                 db_error(format!("rollback missing remote pairing revoke: {error}"))
             })?;
-            return Ok(RemotePairingRevokeOutcome::NotFound);
+            return Ok(RemotePairingRevoked {
+                outcome: RemotePairingRevokeOutcome::NotFound,
+                revoked_at: revoked_at.to_owned(),
+            });
         };
         let claimed_client_id: Option<String> = row
             .try_get("claimed_client_id")
             .map_err(|error| db_error(format!("read claimed client for {pairing_id}: {error}")))?;
-        let already: Option<String> = row
-            .try_get("revoked_at")
+        let withdrawn_at: Option<String> = row
+            .try_get("withdrawn_at")
             .map_err(|error| db_error(format!("read revocation for {pairing_id}: {error}")))?;
+        let device_revoked_at: Option<String> = row.try_get("device_revoked_at").map_err(|error| {
+            db_error(format!("read device revocation for {pairing_id}: {error}"))
+        })?;
+        // Either end can already carry it, and whichever does is the moment
+        // that matters rather than the moment this request arrived.
+        let already = withdrawn_at.or(device_revoked_at);
 
-        let outcome = match (claimed_client_id, already) {
-            (_, Some(_)) => RemotePairingRevokeOutcome::AlreadyRevoked,
+        let (outcome, effective_at) = match (claimed_client_id, already) {
+            (_, Some(at)) => (RemotePairingRevokeOutcome::AlreadyRevoked, at),
             (Some(client_id), None) => {
                 let changed = query(
                     "UPDATE remote_clients
@@ -81,11 +104,18 @@ impl AsyncDaemonDb {
                 .map_err(|error| db_error(format!("revoke device {client_id}: {error}")))?
                 .rows_affected();
                 if changed == 1 {
-                    RemotePairingRevokeOutcome::DeviceRevoked
+                    (
+                        RemotePairingRevokeOutcome::DeviceRevoked,
+                        revoked_at.to_owned(),
+                    )
                 } else {
                     // The device revoked itself between the read and here, or
-                    // an operator did it on the host. Either way it is off.
-                    RemotePairingRevokeOutcome::AlreadyRevoked
+                    // an operator did it on the host. Either way it is off, and
+                    // this request is not what cut it off.
+                    (
+                        RemotePairingRevokeOutcome::AlreadyRevoked,
+                        revoked_at.to_owned(),
+                    )
                 }
             }
             (None, None) => {
@@ -99,38 +129,52 @@ impl AsyncDaemonDb {
                 .execute(transaction.as_mut())
                 .await
                 .map_err(|error| db_error(format!("withdraw link {pairing_id}: {error}")))?;
-                RemotePairingRevokeOutcome::LinkWithdrawn
+                (
+                    RemotePairingRevokeOutcome::LinkWithdrawn,
+                    revoked_at.to_owned(),
+                )
             }
         };
 
-        // Recorded even when there was nothing left to revoke, because an
-        // attempt to cut off somebody else's device is worth seeing in the
-        // trail whether or not it changed anything.
-        query(INSERT_REMOTE_AUDIT_EVENT_SQL)
-            .bind(&audit.event_id)
-            .bind(&audit.recorded_at)
-            .bind(audit.request_id.as_deref())
-            .bind(audit.client_id.as_deref())
-            .bind(&audit.route_or_method)
-            .bind(audit.scope.as_str())
-            .bind(audit.scope_decision.as_str())
-            .bind(audit.outcome.as_str())
-            .bind(audit.remote_addr.as_deref())
-            .bind(audit.error_detail())
-            .bind(audit.metadata_json())
-            .execute(transaction.as_mut())
-            .await
-            .map_err(|error| {
-                db_error(format!(
-                    "insert remote pairing revoke audit {}: {error}",
-                    audit.event_id
-                ))
-            })?;
+        record_revoke_audit(&mut transaction, audit).await?;
 
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit remote pairing revoke: {error}")))?;
-        Ok(outcome)
+        Ok(RemotePairingRevoked {
+            outcome,
+            revoked_at: effective_at,
+        })
     }
+}
+
+/// Recorded even when there was nothing left to revoke, because an attempt to
+/// cut off somebody else's device is worth seeing in the trail whether or not
+/// it changed anything.
+async fn record_revoke_audit(
+    transaction: &mut Transaction<'_, Sqlite>,
+    audit: &RemoteAuditEvent,
+) -> Result<(), CliError> {
+    query(INSERT_REMOTE_AUDIT_EVENT_SQL)
+        .bind(&audit.event_id)
+        .bind(&audit.recorded_at)
+        .bind(audit.request_id.as_deref())
+        .bind(audit.client_id.as_deref())
+        .bind(&audit.route_or_method)
+        .bind(audit.scope.as_str())
+        .bind(audit.scope_decision.as_str())
+        .bind(audit.outcome.as_str())
+        .bind(audit.remote_addr.as_deref())
+        .bind(audit.error_detail())
+        .bind(audit.metadata_json())
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "insert remote pairing revoke audit {}: {error}",
+                audit.event_id
+            ))
+        })?;
+    Ok(())
 }
