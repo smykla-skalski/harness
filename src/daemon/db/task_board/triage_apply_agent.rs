@@ -207,37 +207,23 @@ async fn reject_if_stale_evidence_in_tx(
 /// only if either step actually changed it.
 async fn record_and_place_agent_verdict_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    item: TaskBoardItem,
+    mut item: TaskBoardItem,
     revision: i64,
     verdict: TriageVerdict,
     rationale: &str,
     fresh_fingerprint: &str,
     decided_at: &str,
 ) -> Result<(), CliError> {
-    let bounded_rationale = is_canonical_reason_detail(rationale).then_some(rationale);
-    let existing = current_triage_decision_in_tx(transaction, &item.id).await?;
     let before = item.clone();
-    let mut item = item;
-    if let Some(cause) = triage_cause(
-        existing.as_ref(),
+    record_agent_verdict_decision_in_tx(
+        transaction,
+        &item.id,
+        verdict,
+        rationale,
         fresh_fingerprint,
-        AGENT_V1_EVALUATOR_IDENTITY,
-        AGENT_V1_EVALUATOR_VERSION,
-    ) {
-        record_triage_decision_in_tx(
-            transaction,
-            &item.id,
-            verdict,
-            TriageReasonCode::AgentVerdict,
-            bounded_rationale,
-            AGENT_V1_EVALUATOR_IDENTITY,
-            AGENT_V1_EVALUATOR_VERSION,
-            fresh_fingerprint,
-            cause,
-            decided_at,
-        )
-        .await?;
-    }
+        decided_at,
+    )
+    .await?;
     let manually_placed = item
         .lane_origin
         .as_ref()
@@ -252,20 +238,69 @@ async fn record_and_place_agent_verdict_in_tx(
         )
         .await?;
     }
-    if item != before {
-        item.updated_at = decided_at.to_string();
-        let write = replace_with_lane_transition_in_tx(
-            transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Automatic,
-        )
-        .await?;
-        let items_change_seq = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(transaction, &write, items_change_seq).await?;
-    }
+    persist_agent_verdict_change_in_tx(transaction, before, item, revision, decided_at).await
+}
+
+/// Append an `AGENT_V1` decision generation only when the agent's report is
+/// genuinely new for this evaluator and evidence; a repeat report of an
+/// unchanged verdict records nothing.
+async fn record_agent_verdict_decision_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
+    verdict: TriageVerdict,
+    rationale: &str,
+    fresh_fingerprint: &str,
+    decided_at: &str,
+) -> Result<(), CliError> {
+    let existing = current_triage_decision_in_tx(transaction, item_id).await?;
+    let Some(cause) = triage_cause(
+        existing.as_ref(),
+        fresh_fingerprint,
+        AGENT_V1_EVALUATOR_IDENTITY,
+        AGENT_V1_EVALUATOR_VERSION,
+    ) else {
+        return Ok(());
+    };
+    record_triage_decision_in_tx(
+        transaction,
+        item_id,
+        verdict,
+        TriageReasonCode::AgentVerdict,
+        is_canonical_reason_detail(rationale).then_some(rationale),
+        AGENT_V1_EVALUATOR_IDENTITY,
+        AGENT_V1_EVALUATOR_VERSION,
+        fresh_fingerprint,
+        cause,
+        decided_at,
+    )
+    .await?;
     Ok(())
+}
+
+/// Persist the item only when recording the decision or applying its
+/// placement actually changed it -- an agent report that moves nothing must
+/// not burn an item revision or emit a lane-transition audit.
+async fn persist_agent_verdict_change_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    before: TaskBoardItem,
+    mut item: TaskBoardItem,
+    revision: i64,
+    decided_at: &str,
+) -> Result<(), CliError> {
+    if item == before {
+        return Ok(());
+    }
+    item.updated_at = decided_at.to_string();
+    let write = replace_with_lane_transition_in_tx(
+        transaction,
+        before,
+        revision,
+        item,
+        LaneTransitionKind::Automatic,
+    )
+    .await?;
+    let items_change_seq = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_lane_transition_audit_in_tx(transaction, &write, items_change_seq).await
 }
 
 /// A CAS claim: only a row that is still `running` under this exact token
@@ -284,7 +319,11 @@ async fn claim_running_escalation_in_tx(
     .bind(verdict_token)
     .fetch_optional(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("load running task board triage escalation: {error}")))
+    .map_err(|error| {
+        db_error(format!(
+            "load running task board triage escalation: {error}"
+        ))
+    })
 }
 
 async fn reject_running_escalation_in_tx(

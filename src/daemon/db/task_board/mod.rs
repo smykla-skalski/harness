@@ -109,6 +109,7 @@ mod triage_override_audit;
 #[cfg(test)]
 mod triage_override_position_conflict_tests;
 mod triage_queries;
+mod triage_retained;
 mod triage_rules_activation;
 mod triage_rules_bulk_load;
 mod triage_rules_preview;

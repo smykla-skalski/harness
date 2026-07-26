@@ -3,17 +3,17 @@ use sqlx::{Sqlite, Transaction, query_as};
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::triage_apply::{
     EnsuredTriageDecision, TriageOutcome, apply_builtin_v1_triage_in_tx,
-    apply_placement_effect_in_tx, ensure_current_triage_decision_in_tx, placement_matches_verdict,
-    triage_eligible,
+    apply_placement_effect_in_tx, ensure_current_triage_decision_in_tx, triage_eligible,
 };
 use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
+use super::triage_retained::retained_effect_outcome_in_tx;
 use super::triage_rules_store::decode_rule_set;
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
     RUNTIME_RULES_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardTriageOverride,
-    TriagePriorityAction, TriageReasonCode, TriageRuleMatch, TriageRuleSetV1, TriageVerdict,
-    evaluate_triage_rule_set, evidence_fingerprint, suppress_placement_for_override,
+    TriageCause, TriagePriorityAction, TriageReasonCode, TriageRuleMatch, TriageRuleSetV1,
+    TriageVerdict, evaluate_triage_rule_set, evidence_fingerprint, suppress_placement_for_override,
 };
 
 /// The runtime-authored rule set activation currently made current, owned
@@ -104,36 +104,48 @@ pub(super) async fn apply_active_triage_in_tx(
         RUNTIME_RULES_EVALUATOR_IDENTITY,
         active.evaluator_version,
     ) else {
-        return match existing {
-            // See `apply_builtin_v1_triage_in_tx`'s identical arm: the
-            // retained decision's own evaluator identity is the correct
-            // placement producer here, not this call's active evaluator.
-            Some(existing)
-                if !placement_matches_verdict(item, existing.verdict, &existing.evaluator_identity) =>
-            {
-                let manually_placed = item
-                    .lane_origin
-                    .as_ref()
-                    .is_some_and(TaskBoardLaneOrigin::is_manual);
-                if manually_placed || suppress_placement || override_active {
-                    Ok(None)
-                } else {
-                    let producer = existing.evaluator_identity.clone();
-                    apply_placement_effect_in_tx(
-                        transaction,
-                        item,
-                        existing.verdict,
-                        decided_at,
-                        &producer,
-                    )
-                    .await?;
-                    Ok(Some(TriageOutcome::RetainedEffect(existing)))
-                }
-            }
-            _ => Ok(None),
-        };
+        return retained_effect_outcome_in_tx(
+            transaction,
+            item,
+            existing,
+            decided_at,
+            suppress_placement,
+            override_active,
+        )
+        .await;
     };
-    let decided = evaluate_active_rules(&active, item);
+    record_rule_set_decision_in_tx(
+        transaction,
+        item,
+        &active,
+        &fingerprint,
+        cause,
+        decided_at,
+        suppress_placement,
+        override_active,
+    )
+    .await
+}
+
+/// Append a fresh rule-set decision generation, apply the matched rule's
+/// `priority_action` to the in-memory item, and, unless this same mutation is
+/// manually anchored or otherwise suppresses placement, apply that verdict's
+/// placement effect under the rule-set evaluator's identity.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors record_builtin_v1_decision_in_tx plus the active rule set it evaluates"
+)]
+async fn record_rule_set_decision_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &mut TaskBoardItem,
+    active: &ActiveRuleSetEvaluator,
+    fingerprint: &str,
+    cause: TriageCause,
+    decided_at: &str,
+    suppress_placement: bool,
+    override_active: bool,
+) -> Result<Option<TriageOutcome>, CliError> {
+    let decided = evaluate_active_rules(active, item);
     let decision = record_triage_decision_in_tx(
         transaction,
         &item.id,
@@ -142,7 +154,7 @@ pub(super) async fn apply_active_triage_in_tx(
         decided.reason_detail.as_deref(),
         RUNTIME_RULES_EVALUATOR_IDENTITY,
         active.evaluator_version,
-        &fingerprint,
+        fingerprint,
         cause,
         decided_at,
     )

@@ -217,18 +217,42 @@ async fn record_triage_or_lane_audit_in_tx(
             )
             .await
         }
-        None => match mutation_kind {
-            Some(TaskBoardMutationKind::Create) => {
-                record_item_created_audit_in_tx(transaction, write, items_change_seq).await
-            }
-            Some(TaskBoardMutationKind::Update) => {
-                record_item_updated_audit_in_tx(transaction, write, items_change_seq).await
-            }
-            None => record_lane_transition_audit_in_tx(transaction, write, items_change_seq).await,
-        },
+        None => {
+            record_untriaged_mutation_audit_in_tx(
+                transaction,
+                mutation_kind,
+                write,
+                items_change_seq,
+            )
+            .await
+        }
     }
 }
 
+/// Audit a mutation that produced no triage outcome at all: a create, a plain
+/// update, or an internal lane-only move whose own call site owns whatever
+/// further audit it needs.
+async fn record_untriaged_mutation_audit_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    mutation_kind: Option<TaskBoardMutationKind>,
+    write: &LaneTransitionWrite,
+    items_change_seq: i64,
+) -> Result<(), CliError> {
+    match mutation_kind {
+        Some(TaskBoardMutationKind::Create) => {
+            record_item_created_audit_in_tx(transaction, write, items_change_seq).await
+        }
+        Some(TaskBoardMutationKind::Update) => {
+            record_item_updated_audit_in_tx(transaction, write, items_change_seq).await
+        }
+        None => record_lane_transition_audit_in_tx(transaction, write, items_change_seq).await,
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 async fn resolve_parent_update_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: &mut TaskBoardItem,
