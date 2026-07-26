@@ -12,22 +12,32 @@ use crate::daemon::protocol::{
 };
 
 use super::super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::PolicyCanvasWorkspaceResponse;
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
+use crate::daemon::protocol::PolicyCanvasWorkspaceResponse;
 
 pub(super) fn merge_policy_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
     router
+        .merge(policy_canvas_routes())
+        .merge(policy_scenario_routes())
+        .routes(routes!(post_policy_canvas_set_global_enforcement))
+}
+
+fn policy_canvas_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(get_policy_canvas_workspace))
         .routes(routes!(post_policy_canvas_create))
         .routes(routes!(post_policy_canvas_duplicate))
         .routes(routes!(post_policy_canvas_rename))
         .routes(routes!(post_policy_canvas_set_active))
         .routes(routes!(post_policy_canvas_delete))
-        .routes(routes!(post_policy_canvas_set_global_enforcement))
+}
+
+fn policy_scenario_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_policy_scenario_create))
         .routes(routes!(post_policy_scenario_update))
         .routes(routes!(post_policy_scenario_delete))

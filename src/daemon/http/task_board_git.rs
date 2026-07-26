@@ -1,7 +1,7 @@
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
@@ -16,13 +16,13 @@ use crate::task_board::{
 
 use super::DaemonHttpState;
 use super::openapi::DaemonErrorBody;
+use super::response::timed_json;
+use super::task_board::authenticated_request;
+use super::task_board_route_executor;
 use crate::daemon::protocol::{
     TaskBoardGitRuntimeKeyMaterialSyncResponse, TaskBoardGitRuntimeSecretHandoffAckResponse,
     TaskBoardGitRuntimeSecretHandoffPrepareResponse, TaskBoardGitSigningVerifyResponse,
 };
-use super::response::timed_json;
-use super::task_board::authenticated_request;
-use super::task_board_route_executor;
 
 /// Wire the git-runtime configuration, provider-credential sync, and
 /// secret-handoff endpoints onto the task-board router. Split from
@@ -32,12 +32,22 @@ pub(super) fn merge_git_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
     router
+        .merge(orchestrator_runtime_config_routes())
+        .merge(git_runtime_secret_routes())
+}
+
+fn orchestrator_runtime_config_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(
             get_task_board_orchestrator_runtime_config,
             put_task_board_orchestrator_runtime_config
         ))
         .routes(routes!(put_task_board_orchestrator_github_tokens))
         .routes(routes!(put_task_board_orchestrator_openrouter_token))
+}
+
+fn git_runtime_secret_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(get_task_board_git_identity_defaults))
         .routes(routes!(post_task_board_git_signing_verify))
         .routes(routes!(put_task_board_git_runtime_key_material))
