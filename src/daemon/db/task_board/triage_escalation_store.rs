@@ -45,20 +45,28 @@ impl AsyncDaemonDb {
         )
         .await?;
         transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board triage escalation verdict: {error}"))
+            db_error(format!(
+                "commit task board triage escalation verdict: {error}"
+            ))
         })?;
         Ok(outcome)
     }
 
     /// Count of currently `running` escalations, for the executor to size
     /// its next claim batch against `max_concurrent`.
-    pub(crate) async fn count_running_task_board_triage_escalations(&self) -> Result<usize, CliError> {
+    pub(crate) async fn count_running_task_board_triage_escalations(
+        &self,
+    ) -> Result<usize, CliError> {
         let count: i64 = query_scalar(
             "SELECT COUNT(*) FROM task_board_triage_escalations WHERE status = 'running'",
         )
         .fetch_one(self.pool())
         .await
-        .map_err(|error| db_error(format!("count running task board triage escalations: {error}")))?;
+        .map_err(|error| {
+            db_error(format!(
+                "count running task board triage escalations: {error}"
+            ))
+        })?;
         Ok(usize::try_from(count).unwrap_or(0))
     }
 
@@ -75,45 +83,22 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board triage escalation claim")
             .await?;
-        let candidates = query_as::<_, (String, String)>(
-            "SELECT escalation_id, evidence_fingerprint FROM task_board_triage_escalations
-             WHERE status = 'pending' ORDER BY requested_at ASC LIMIT ?1",
-        )
-        .bind(i64::try_from(limit).unwrap_or(i64::MAX))
-        .fetch_all(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load pending task board triage escalations: {error}")))?;
+        let candidates = load_pending_escalation_candidates_in_tx(&mut transaction, limit).await?;
         let now = utc_now();
         let mut claimed = Vec::with_capacity(candidates.len());
         for (escalation_id, evidence_fingerprint) in candidates {
-            let verdict_token = Uuid::new_v4().simple().to_string();
-            let managed_run_id = format!("triage-escalation-run-{}", Uuid::new_v4().simple());
-            let updated = query(
-                "UPDATE task_board_triage_escalations
-                 SET status = 'running', started_at = ?2, verdict_token = ?3, managed_run_id = ?4
-                 WHERE escalation_id = ?1 AND status = 'pending'",
+            if let Some(row) = claim_one_escalation_in_tx(
+                &mut transaction,
+                escalation_id,
+                evidence_fingerprint,
+                &now,
             )
-            .bind(&escalation_id)
-            .bind(&now)
-            .bind(&verdict_token)
-            .bind(&managed_run_id)
-            .execute(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("claim task board triage escalation: {error}")))?;
-            if updated.rows_affected() == 1 {
-                let item_id = item_id_for_escalation_in_tx(&mut transaction, &escalation_id).await?;
-                claimed.push(ClaimedTaskBoardTriageEscalation {
-                    escalation_id,
-                    item_id,
-                    evidence_fingerprint,
-                    verdict_token,
-                    managed_run_id,
-                });
+            .await?
+            {
+                claimed.push(row);
             }
         }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board triage escalation claim: {error}"))
-        })?;
+        commit(transaction, "task board triage escalation claim").await?;
         Ok(claimed)
     }
 
@@ -135,7 +120,11 @@ impl AsyncDaemonDb {
         let cutoff_seconds = i64::try_from(timeout_seconds).unwrap_or(i64::MAX);
         let cutoff = chrono::DateTime::parse_from_rfc3339(&now)
             .map(|parsed| parsed - chrono::Duration::seconds(cutoff_seconds))
-            .map_err(|error| db_error(format!("compute task board triage escalation cutoff: {error}")))?
+            .map_err(|error| {
+                db_error(format!(
+                    "compute task board triage escalation cutoff: {error}"
+                ))
+            })?
             .format("%Y-%m-%dT%H:%M:%SZ")
             .to_string();
         let mut transaction = self
@@ -158,9 +147,15 @@ impl AsyncDaemonDb {
         .bind(&now)
         .execute(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("sweep stale task board triage escalations: {error}")))?;
+        .map_err(|error| {
+            db_error(format!(
+                "sweep stale task board triage escalations: {error}"
+            ))
+        })?;
         transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board triage escalation sweep: {error}"))
+            db_error(format!(
+                "commit task board triage escalation sweep: {error}"
+            ))
         })?;
         Ok(stale_run_ids)
     }
@@ -232,7 +227,71 @@ async fn item_id_for_escalation_in_tx(
         .bind(escalation_id)
         .fetch_one(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("load task board triage escalation item id: {error}")))
+        .map_err(|error| {
+            db_error(format!(
+                "load task board triage escalation item id: {error}"
+            ))
+        })
+}
+
+async fn load_pending_escalation_candidates_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    limit: usize,
+) -> Result<Vec<(String, String)>, CliError> {
+    query_as::<_, (String, String)>(
+        "SELECT escalation_id, evidence_fingerprint FROM task_board_triage_escalations
+         WHERE status = 'pending' ORDER BY requested_at ASC LIMIT ?1",
+    )
+    .bind(i64::try_from(limit).unwrap_or(i64::MAX))
+    .fetch_all(transaction.as_mut())
+    .await
+    .map_err(|error| {
+        db_error(format!(
+            "load pending task board triage escalations: {error}"
+        ))
+    })
+}
+
+/// `Ok(None)` means a concurrent claim already took this row; the CAS
+/// `WHERE status = 'pending'` is what makes that safe to skip.
+async fn claim_one_escalation_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    escalation_id: String,
+    evidence_fingerprint: String,
+    now: &str,
+) -> Result<Option<ClaimedTaskBoardTriageEscalation>, CliError> {
+    let verdict_token = Uuid::new_v4().simple().to_string();
+    let managed_run_id = format!("triage-escalation-run-{}", Uuid::new_v4().simple());
+    let updated = query(
+        "UPDATE task_board_triage_escalations
+         SET status = 'running', started_at = ?2, verdict_token = ?3, managed_run_id = ?4
+         WHERE escalation_id = ?1 AND status = 'pending'",
+    )
+    .bind(&escalation_id)
+    .bind(now)
+    .bind(&verdict_token)
+    .bind(&managed_run_id)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("claim task board triage escalation: {error}")))?;
+    if updated.rows_affected() != 1 {
+        return Ok(None);
+    }
+    let item_id = item_id_for_escalation_in_tx(transaction, &escalation_id).await?;
+    Ok(Some(ClaimedTaskBoardTriageEscalation {
+        escalation_id,
+        item_id,
+        evidence_fingerprint,
+        verdict_token,
+        managed_run_id,
+    }))
+}
+
+async fn commit(transaction: Transaction<'_, Sqlite>, context: &str) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 #[cfg(test)]
