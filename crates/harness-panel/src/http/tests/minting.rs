@@ -11,14 +11,16 @@ use std::sync::{Arc, Mutex};
 
 use axum::Json;
 use axum::Router;
+use axum::body::Body;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, Method, StatusCode, header};
 use axum::routing::post;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 use tokio::net::TcpListener;
+use tower::ServiceExt;
 
-use super::Harness;
+use super::{Harness, router, session_cookie_name};
 use crate::daemon_client::DaemonCredential;
 use crate::store::pair_links::PairLinkRecord;
 
@@ -28,6 +30,10 @@ struct Seen {
     body: Option<Value>,
     client_id: Option<String>,
     authorization: Option<String>,
+    /// How many links the stub has issued, which also names each one. A real
+    /// daemon never repeats a pairing id, and a stub that did would hide a
+    /// panel that wrote every link over the same row.
+    minted: usize,
 }
 
 async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
@@ -42,18 +48,25 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
                 .and_then(|value| value.to_str().ok())
                 .map(str::to_owned)
         };
-        {
+        let pairing_id = {
             let mut seen = seen.lock().expect("stub lock");
             seen.body = Some(body);
             seen.client_id = header("x-harness-remote-client-id");
             seen.authorization = header("authorization");
-        }
+            seen.minted += 1;
+            format!("pair-{}", seen.minted)
+        };
+        // Relative to now, not a fixed date: an expiry in the past would make
+        // every link the panel records read as already lapsed, and the cap
+        // counts only unexpired ones.
+        let created_at = Utc::now();
+        let expires_at = created_at + Duration::minutes(10);
         Json(serde_json::json!({
-            "pairing_id": "pair-1",
+            "pairing_id": pairing_id,
             "role": "operator",
             "scopes": ["read", "write"],
-            "created_at": "2026-07-25T10:00:00Z",
-            "expires_at": "2026-07-25T10:10:00Z",
+            "created_at": created_at.to_rfc3339(),
+            "expires_at": expires_at.to_rfc3339(),
             "ttl_seconds": 600,
             "endpoint": "https://harness.example.com",
             "server_spki_sha256": "sha256/AAAA",
@@ -197,6 +210,62 @@ async fn minting_records_the_link_as_metadata_only() {
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].id, "pair-1");
     assert_eq!(recorded[0].role, "operator");
+}
+
+/// The cap bounds how many live one-time codes one account can accumulate, so
+/// it has to hold against requests that arrive together rather than in turn.
+/// Counting first and recording after the daemon answered left the whole round
+/// trip between the two, and a burst then saw the same free slot every time.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_burst_of_requests_cannot_mint_past_the_cap() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (harness, owner) = ready(Arc::clone(&seen)).await;
+
+    let attempts = 12;
+    let mut running = Vec::with_capacity(attempts);
+    for _ in 0..attempts {
+        let state = harness.state.clone();
+        let session = owner.clone();
+        running.push(tokio::spawn(async move {
+            let cookie = format!("{}={session}", session_cookie_name(&state));
+            let request = Harness::request()
+                .method(Method::POST)
+                .uri("/panel/api/pair-links")
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .expect("request");
+            router(state)
+                .oneshot(request)
+                .await
+                .expect("response")
+                .status()
+        }));
+    }
+
+    let mut granted = 0;
+    for task in running {
+        if task.await.expect("request task") == StatusCode::OK {
+            granted += 1;
+        }
+    }
+
+    let live = harness
+        .state
+        .store
+        .live_pair_link_count(&harness.account_id("ada").await, Utc::now())
+        .await
+        .expect("count");
+    assert!(granted <= 5, "{granted} of {attempts} requests minted");
+    assert_eq!(
+        i64::try_from(granted).expect("a small count"),
+        live,
+        "every granted request must hold exactly one slot"
+    );
+    assert_eq!(
+        seen.lock().expect("stub lock").minted,
+        granted,
+        "the daemon must not have minted a link the panel refused to hand over"
+    );
 }
 
 /// A revoke cannot reach a link already minted, so the cap is the only thing

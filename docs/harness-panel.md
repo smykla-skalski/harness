@@ -220,6 +220,8 @@ The role and lifetime of every link come from `--pair-link-role` and `--pair-lin
 
 An account may hold five unexpired links at once. A revoke cannot reach a link already minted, so without a cap one approved account, or whoever took its session, could leave a pile of live credentials to hunt down one at a time.
 
+The slot is taken before the daemon is asked, so requests arriving together cannot each see the same one free. A panel that dies between taking a slot and receiving the link leaves a row whose id begins `reservation:`, which counts against the cap until it lapses on the configured lifetime and matches no pairing on the daemon.
+
 ### What a revoke reaches
 
 Revoking stops that account generating **new** links. It does not reach backwards:
