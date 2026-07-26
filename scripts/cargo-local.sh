@@ -58,8 +58,21 @@ short_hash() {
 sweep_dead_sccache_sockets() {
   local dir="$1"
   local live_sockets sock
+  local -a candidates=()
   [[ -d "$dir" ]] || return 0
   command -v lsof >/dev/null 2>&1 || return 0
+
+  # Name the candidates before asking lsof about them, never after. A socket
+  # bound after this listing is not a candidate at all, and one already listed
+  # was bound before lsof started looking, so lsof reports it. The other order
+  # asks lsof about a socket that did not exist when it looked, and on a loaded
+  # machine that window is wide enough for a build to unlink the live server
+  # another build has just started - then find nothing there and start a second.
+  for sock in "$dir"/*.sock; do
+    [[ -e "$sock" ]] || continue
+    candidates+=("$sock")
+  done
+  (( ${#candidates[@]} > 0 )) || return 0
 
   # lsof 4.95 appends " type=STREAM" to the name field, where 4.91 printed the
   # path alone. Matching the whole line against a socket path therefore matched
@@ -72,8 +85,7 @@ sweep_dead_sccache_sockets() {
     return 0
   fi
 
-  for sock in "$dir"/*.sock; do
-    [[ -e "$sock" ]] || continue
+  for sock in "${candidates[@]}"; do
     if [[ -n "$live_sockets" ]] && grep -qxF "$sock" <<<"$live_sockets"; then
       continue
     fi
