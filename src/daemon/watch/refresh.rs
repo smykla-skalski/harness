@@ -6,10 +6,10 @@ use tokio::sync::broadcast::Sender;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{SessionSummary, StreamEvent, TaskBoardUpdatedPayload};
 use crate::daemon::{service, snapshot, timeline};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::TaskBoardAutomationSnapshot;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::state::{RefreshScope, SessionDigest, WatchChanges, WatchSnapshot};
 
@@ -143,6 +143,16 @@ async fn emit_watch_changes_async(
     if changes.sessions_updated {
         service::broadcast_sessions_updated_async(sender, Some(async_db.as_ref())).await;
     }
+    broadcast_session_fanout_async(sender, session_ids, async_db).await;
+}
+
+/// Core updates go out for every session before any extension payload, so a
+/// client never sees an extension for a session it has not been told about.
+async fn broadcast_session_fanout_async(
+    sender: &Sender<StreamEvent>,
+    session_ids: Vec<String>,
+    async_db: &Arc<AsyncDaemonDb>,
+) {
     for session_id in &session_ids {
         service::broadcast_session_updated_core_async(sender, session_id, Some(async_db.as_ref()))
             .await;

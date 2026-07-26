@@ -35,20 +35,53 @@ pub(crate) async fn settle_claimed_task_board_worker(
         Ok(worker) => worker,
         Err(error) => return handle_start_error(db, claim, error).await,
     };
+    // Boxed, not inlined: async frames nest and add, so splitting this path put
+    // three untouched callers over the 16384-byte `large_futures` cap (worst was
+    // task_board_route_executor.rs at 17304). Boxing here stops the growth
+    // propagating out of this file. The same applies to every box below.
+    Box::pin(finish_worker_settlement(
+        state, db, claim, &worker_id, worker,
+    ))
+    .await
+}
+
+async fn finish_worker_settlement(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    claim: &mut ClaimedTaskBoardDispatch,
+    worker_id: &str,
+    worker: ManagedAgentSnapshot,
+) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     if let Err(error) = validate_worker_settlement(db, claim).await {
-        return compensate_settlement_failure(state, db, claim, &worker_id, error).await;
+        return compensate_settlement_failure(state, db, claim, worker_id, error).await;
     }
     match complete_worker_settlement(db, claim).await {
         Ok(()) => Ok(Some(worker)),
         Err(error) => {
-            if completion_was_committed(db, claim).await? {
-                claim.applied.item = db.task_board_item(&claim.applied.board_item_id).await?;
-                Ok(Some(worker))
-            } else {
-                compensate_settlement_failure(state, db, claim, &worker_id, error).await
-            }
+            // Boxed to keep this frame out of the caller's future; see above.
+            Box::pin(adopt_committed_settlement(
+                state, db, claim, worker_id, worker, error,
+            ))
+            .await
         }
     }
+}
+
+/// A failed completion may still have committed, so the worker is kept and the
+/// item re-read rather than compensated away.
+async fn adopt_committed_settlement(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    claim: &mut ClaimedTaskBoardDispatch,
+    worker_id: &str,
+    worker: ManagedAgentSnapshot,
+    error: CliError,
+) -> Result<Option<ManagedAgentSnapshot>, CliError> {
+    if completion_was_committed(db, claim).await? {
+        claim.applied.item = db.task_board_item(&claim.applied.board_item_id).await?;
+        return Ok(Some(worker));
+    }
+    compensate_settlement_failure(state, db, claim, worker_id, error).await
 }
 
 async fn settle_workflow_before_start(
@@ -61,7 +94,28 @@ async fn settle_workflow_before_start(
         .managed_agent_mutation_locks
         .lock(&claim.applied.session_id, &worker_id)
         .await;
-    let existing = probe_existing_worker(state, &claim.applied, &worker_id)
+    let existing = probe_recovered_workflow_worker(state, claim, &worker_id).await?;
+    if existing.is_none()
+        && let Err(error) = authorize_workflow_start(state, db, claim).await
+    {
+        rollback_unstarted_workflow(db, claim, &error).await?;
+        return Err(error);
+    }
+    // Boxed to keep this frame out of the caller's future; see above.
+    Box::pin(settle_or_compensate_workflow(
+        state, db, claim, &worker_id, existing,
+    ))
+    .await
+}
+
+/// An uncertain probe is an error rather than "no worker", so a recovered
+/// workflow attempt is never started twice.
+async fn probe_recovered_workflow_worker(
+    state: &DaemonHttpState,
+    claim: &ClaimedTaskBoardDispatch,
+    worker_id: &str,
+) -> Result<Option<ManagedAgentSnapshot>, CliError> {
+    let existing = probe_existing_worker(state, &claim.applied, worker_id)
         .await
         .map_err(|error| {
             CliErrorKind::workflow_io(format!(
@@ -70,18 +124,38 @@ async fn settle_workflow_before_start(
         })?
         .map(|snapshot| recover_same_applied_worker(snapshot, &claim.applied))
         .transpose()?;
-    if existing.is_none()
-        && let Err(error) = authorize_workflow_start(state, db, claim).await
-    {
-        rollback_unstarted_workflow(db, claim, &error).await?;
-        return Err(error);
-    }
+    Ok(existing)
+}
+
+/// Only a recovered worker can be compensated; an attempt that never started
+/// surfaces the validation error untouched.
+async fn settle_or_compensate_workflow(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    claim: &mut ClaimedTaskBoardDispatch,
+    worker_id: &str,
+    existing: Option<ManagedAgentSnapshot>,
+) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     if let Err(error) = validate_worker_settlement(db, claim).await {
         if existing.is_some() {
-            return compensate_settlement_failure(state, db, claim, &worker_id, error).await;
+            return compensate_settlement_failure(state, db, claim, worker_id, error).await;
         }
         return Err(error);
     }
+    // Boxed to keep this frame out of the caller's future; see above.
+    Box::pin(commit_workflow_dispatch(
+        state, db, claim, worker_id, existing,
+    ))
+    .await
+}
+
+async fn commit_workflow_dispatch(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    claim: &mut ClaimedTaskBoardDispatch,
+    worker_id: &str,
+    existing: Option<ManagedAgentSnapshot>,
+) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     match db
         .prepare_task_board_workflow_dispatch(&claim.intent_id, &claim.claim_token)
         .await
@@ -91,7 +165,7 @@ async fn settle_workflow_before_start(
             Ok(existing)
         }
         Err(error) if existing.is_some() => {
-            compensate_settlement_failure(state, db, claim, &worker_id, error).await
+            compensate_settlement_failure(state, db, claim, worker_id, error).await
         }
         Err(error) => {
             rollback_unstarted_workflow(db, claim, &error).await?;
