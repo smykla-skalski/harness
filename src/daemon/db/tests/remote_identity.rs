@@ -81,8 +81,17 @@ fn remote_clients_persist_hashed_tokens_and_support_revoke_rotate() {
         vec![
             RemoteAccessScope::Read,
             RemoteAccessScope::Write,
-            RemoteAccessScope::Admin
+            RemoteAccessScope::Admin,
+            RemoteAccessScope::PairManage
         ]
+    );
+    // An administrator may see and cut off pairings without gaining the power
+    // to issue more. Minting stays with the broker, so an operator credential
+    // that leaks cannot hand out further credentials.
+    assert!(
+        !client.scopes.contains(&RemoteAccessScope::PairMint),
+        "{:?}",
+        client.scopes
     );
 
     let stored_hash: String = db
