@@ -60,6 +60,16 @@ pub struct MintedLink {
     pub pairing_url: String,
 }
 
+/// Whether a failed mint definitely issued nothing.
+#[derive(Debug)]
+pub enum MintError {
+    /// The daemon answered with a refusal. Its mint transaction did not commit.
+    NotIssued(PanelError),
+    /// The request or answer failed at a point where the daemon may have
+    /// committed the link already.
+    IssuanceUnknown(PanelError),
+}
+
 /// Talks to one daemon, over a connection pinned to its certificate.
 #[derive(Debug, Clone)]
 pub struct DaemonClient {
@@ -125,15 +135,16 @@ impl DaemonClient {
     /// account able to issue itself a credential the owner never intended.
     ///
     /// # Errors
-    /// Returns [`PanelError::Daemon`] when the daemon refuses the request or
-    /// cannot be reached.
+    /// Returns [`MintError::NotIssued`] when the daemon refuses the request and
+    /// [`MintError::IssuanceUnknown`] when it may have committed without
+    /// delivering a usable answer.
     pub async fn mint(
         &self,
         credential: &DaemonCredential,
         account: &Account,
         role: &str,
         ttl_seconds: u64,
-    ) -> Result<MintedLink, PanelError> {
+    ) -> Result<MintedLink, MintError> {
         let response = self
             .post(self.route("/v1/remote/pair/mint"))
             .header(
@@ -152,22 +163,27 @@ impl DaemonClient {
             })
             .send()
             .await
-            .map_err(|error| PanelError::daemon(format!("minting a pairing link: {error}")))?;
+            .map_err(|error| {
+                MintError::IssuanceUnknown(PanelError::daemon(format!(
+                    "minting a pairing link: {error}"
+                )))
+            })?;
 
-        let minted: MintResponse = read_json(response, "mint a pairing link").await?;
+        let minted = read_mint_json(response).await?;
         // Parsed rather than passed through: the panel shows this to the person
         // who asked and stores it beside the pairing id, so an unreadable value
         // would surface as a link with no visible deadline.
         let expires_at = DateTime::parse_from_rfc3339(&minted.expires_at)
             .map_err(|error| {
-                PanelError::daemon(format!(
+                MintError::IssuanceUnknown(PanelError::daemon(format!(
                     "the daemon returned an unreadable expiry {:?}: {error}",
                     minted.expires_at
-                ))
+                )))
             })?
             .with_timezone(&Utc);
         Ok(MintedLink {
-            pairing_id: checked_pairing_id(minted.pairing_id)?,
+            pairing_id: checked_pairing_id(minted.pairing_id)
+                .map_err(MintError::IssuanceUnknown)?,
             role: minted.role,
             scopes: minted.scopes,
             expires_at,
@@ -199,6 +215,23 @@ impl DaemonClient {
                 concat!("harness-panel/", env!("CARGO_PKG_VERSION")),
             )
     }
+}
+
+async fn read_mint_json(response: Response) -> Result<MintResponse, MintError> {
+    let status = response.status();
+    if status.is_success() {
+        return response.json().await.map_err(|error| {
+            MintError::IssuanceUnknown(PanelError::daemon(format!(
+                "reading the daemon answer: {error}"
+            )))
+        });
+    }
+
+    let detail = response.text().await.unwrap_or_default();
+    Err(MintError::NotIssued(PanelError::daemon(format!(
+        "could not mint a pairing link: the daemon answered {status}: {}",
+        detail.trim()
+    ))))
 }
 
 /// Read a daemon answer, keeping its own message when it refused.

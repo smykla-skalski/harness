@@ -204,6 +204,7 @@ sudo harness-panel pair \
   --state-dir /var/lib/harness-panel \
   --github-client-id Iv1.abc123 \
   --github-client-secret-file /etc/harness-panel/github-client-secret \
+  --companion-auth-token-file /etc/harness-panel/companion-auth-token \
   --owner-login your-github-login \
   --daemon-endpoint https://harness.example.com \
   --daemon-spki-pin sha256/BASE64 \
@@ -286,6 +287,8 @@ if ! "$panel_candidate" print-unit \
     --github-client-secret-file /etc/harness-panel/github-client-secret \
     --companion-auth-token-file /etc/harness-panel/companion-auth-token \
     --owner-login your-github-login \
+    --daemon-endpoint https://harness.example.com \
+    --daemon-spki-pin sha256/BASE64 \
     >"$panel_service_unit" ||
     ! "$panel_candidate" print-socket-unit \
       --listen 127.0.0.1:8787 \

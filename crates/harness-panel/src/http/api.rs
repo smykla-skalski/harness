@@ -8,6 +8,7 @@ use chrono::Utc;
 use serde::Serialize;
 
 use super::PanelState;
+use super::auth::origin_matches;
 use super::session::{Viewer, require_viewer};
 use crate::error::ApiError;
 use crate::store::accounts::Account;
@@ -93,17 +94,22 @@ pub async fn revoke(
     decide(&state, &headers, &account_id, false).await
 }
 
-/// A cross-site POST arrives without the session cookie, because it is
-/// `SameSite=Lax`, so it is refused as unauthenticated before reaching here.
-/// That is what keeps another origin from deciding approvals on the owner's
-/// behalf, and it is why these are POST rather than GET.
+/// `SameSite` cookies cross between sibling origins, so the request must also
+/// prove that it came from this panel.
 async fn decide(
     state: &PanelState,
     headers: &HeaderMap,
     account_id: &str,
     granted: bool,
 ) -> Result<Response, ApiError> {
+    if !origin_matches(headers, &state.config.public_origin) {
+        return Err(ApiError::Forbidden(
+            "approval requests must come from the panel origin",
+        ));
+    }
     let owner = require_owner(state, headers).await?;
+    let pairing_lock = state.pairing_lock(account_id);
+    let _pairing_guard = pairing_lock.lock().await;
 
     if !state
         .store

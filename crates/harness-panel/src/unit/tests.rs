@@ -7,6 +7,7 @@ use crate::config::{
 
 mod credential_paths;
 mod escaping;
+mod runbook;
 mod socket;
 
 fn args() -> PanelArgs {

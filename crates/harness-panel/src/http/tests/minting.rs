@@ -14,15 +14,34 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, Method, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 use tokio::net::TcpListener;
+use tokio::sync::Barrier;
 use tower::ServiceExt;
 
 use super::{Harness, router, session_cookie_name};
 use crate::daemon_client::DaemonCredential;
 use crate::store::pair_links::PairLinkRecord;
+
+mod regressions;
+
+#[derive(Debug)]
+struct MintPause {
+    started: Barrier,
+    release: Barrier,
+}
+
+impl MintPause {
+    fn new() -> Self {
+        Self {
+            started: Barrier::new(2),
+            release: Barrier::new(2),
+        }
+    }
+}
 
 /// What the stub saw, so a test can assert on the request the panel sent.
 #[derive(Debug, Default)]
@@ -40,6 +59,12 @@ struct Seen {
     granted_ttl: Option<u64>,
     /// A role the daemon issues instead of the one it was asked for.
     granted_role: Option<String>,
+    /// Hold the daemon answer after issuance to expose approval races.
+    pause: Option<Arc<MintPause>>,
+    /// Return an unreadable success after issuing the link.
+    malformed_answer: bool,
+    /// Refuse before issuing anything.
+    refusal_status: Option<StatusCode>,
 }
 
 async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
@@ -47,26 +72,43 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
         State(seen): State<Arc<Mutex<Seen>>>,
         headers: HeaderMap,
         Json(body): Json<Value>,
-    ) -> Json<Value> {
+    ) -> Response {
         let header = |name: &str| {
             headers
                 .get(name)
                 .and_then(|value| value.to_str().ok())
                 .map(str::to_owned)
         };
-        let (pairing_id, skew, granted_ttl, granted_role) = {
+        let (pairing_id, skew, granted_ttl, granted_role, pause, malformed_answer) = {
             let mut seen = seen.lock().expect("stub lock");
             seen.body = Some(body);
             seen.client_id = header("x-harness-remote-client-id");
             seen.authorization = header("authorization");
+            if let Some(status) = seen.refusal_status {
+                return (status, "stub refusal").into_response();
+            }
             seen.minted += 1;
             (
                 format!("pair-{}", seen.minted),
                 seen.skewed_expiry.clone(),
                 seen.granted_ttl,
                 seen.granted_role.clone(),
+                seen.pause.clone(),
+                seen.malformed_answer,
             )
         };
+        if let Some(pause) = pause {
+            pause.started.wait().await;
+            pause.release.wait().await;
+        }
+        if malformed_answer {
+            return (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/json")],
+                "{",
+            )
+                .into_response();
+        }
         // Relative to now, not a fixed date: an expiry in the past would make
         // every link the panel records read as already lapsed, and the cap
         // counts only unexpired ones.
@@ -87,6 +129,7 @@ async fn stub_daemon(seen: Arc<Mutex<Seen>>) -> String {
             "pairing_url": "harness://pair?payload=abc",
             "subject": {"provider": "github", "subject_id": "4242", "display_name": "Ada"}
         }))
+        .into_response()
     }
 
     let app = Router::new()
@@ -364,6 +407,7 @@ async fn a_burst_of_requests_cannot_mint_past_the_cap() {
                 .method(Method::POST)
                 .uri("/panel/api/pair-links")
                 .header(header::COOKIE, cookie)
+                .header(header::ORIGIN, &state.config.public_origin)
                 .body(Body::empty())
                 .expect("request");
             router(state)

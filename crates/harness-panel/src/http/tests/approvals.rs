@@ -118,6 +118,30 @@ async fn approving_is_not_a_get() {
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
 }
 
+/// `SameSite` cookies cross between sibling origins, so the owner being signed
+/// in is not enough to authorize a mutation.
+#[tokio::test]
+async fn another_origin_cannot_decide_an_approval() {
+    let harness = Harness::new("ada").await;
+    let owner = harness.sign_in("ada").await;
+    let grace_id = harness.account_id("grace").await;
+    let path = format!("/panel/api/accounts/{grace_id}/approve");
+
+    for origin in [None, Some("https://attacker.example.com")] {
+        let (status, body) = harness.post_from_origin(&path, Some(&owner), origin).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    }
+
+    let grace = harness.sign_in("grace").await;
+    assert!(
+        harness
+            .get("/panel/api/me", Some(&grace))
+            .await
+            .1
+            .contains("\"can_pair\":false")
+    );
+}
+
 /// The owner is a person too, and has to approve themselves like anyone else
 /// rather than being quietly exempt.
 #[tokio::test]

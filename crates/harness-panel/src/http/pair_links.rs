@@ -9,8 +9,9 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use super::PanelState;
+use super::auth::origin_matches;
 use super::session::require_viewer;
-use crate::daemon_client::{DaemonCredential, MintedLink};
+use crate::daemon_client::{DaemonCredential, MintError, MintedLink};
 use crate::error::{ApiError, PanelError};
 use crate::store::accounts::Account;
 use crate::store::pair_links::PairLinkRecord;
@@ -46,16 +47,19 @@ pub async fn create(
     State(state): State<PanelState>,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    let viewer = require_viewer(&state, &headers).await?;
+    require_panel_origin(&state, &headers)?;
 
-    // Read from the account rather than from anything the request carried, and
-    // read it now rather than trusting what the session said when it was
-    // issued: a revoke that landed a moment ago has to take effect here.
-    if !viewer.account.can_pair {
-        return Err(ApiError::Forbidden(
-            "the panel owner has not allowed this account to generate pairing links",
-        ));
-    }
+    let viewer = require_viewer(&state, &headers).await?;
+    let pairing_lock = state.pairing_lock(&viewer.account.id);
+    let _pairing_guard = pairing_lock.lock().await;
+    create_under_lock(&state, &headers).await
+}
+
+async fn create_under_lock(state: &PanelState, headers: &HeaderMap) -> Result<Response, ApiError> {
+    // Re-read under the same account lock a revoke uses. If the request waited
+    // behind a revoke, the first lookup is already stale.
+    let viewer = require_viewer(state, headers).await?;
+    require_pairing_approval(&viewer.account)?;
 
     let credential = state
         .store
@@ -69,7 +73,7 @@ pub async fn create(
     // Counting first and inserting afterwards leaves the whole daemon round
     // trip between the two, so a burst of requests would every one of them see
     // the same free slot and every one of them mint.
-    let reservation = reservation_for(&viewer.account.id, &state);
+    let reservation = reservation_for(&viewer.account.id, state);
     if !state
         .store
         .reserve_pair_link(&reservation, MAX_LIVE_LINKS_PER_ACCOUNT, Utc::now())
@@ -81,11 +85,11 @@ pub async fn create(
         ));
     }
 
-    let minted = mint_against(&state, &credential, &viewer.account, &reservation.id).await?;
+    let minted = mint_against(state, &credential, &viewer.account, &reservation.id).await?;
     // Recorded before it is judged, so a link that is refused below is still
     // one an operator can find and revoke on the daemon.
-    finalize(&state, &viewer.account, &reservation.id, &minted).await;
-    refuse_unexpected_role(&state, &minted)?;
+    finalize(state, &viewer.account, &reservation.id, &minted).await;
+    refuse_unexpected_role(state, &minted)?;
 
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
@@ -94,12 +98,31 @@ pub async fn create(
         .into_response())
 }
 
+fn require_panel_origin(state: &PanelState, headers: &HeaderMap) -> Result<(), ApiError> {
+    if origin_matches(headers, &state.config.public_origin) {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden(
+            "pairing link requests must come from the panel origin",
+        ))
+    }
+}
+
+fn require_pairing_approval(account: &Account) -> Result<(), ApiError> {
+    if account.can_pair {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden(
+            "the panel owner has not allowed this account to generate pairing links",
+        ))
+    }
+}
+
 /// Ask the daemon for the link this reservation stands for.
 ///
-/// A refusal gives the slot back, because nothing was issued and holding it
-/// would cost the account a link it never got. Failing to give it back costs
-/// the account that slot only until the reservation lapses, which is why it is
-/// recorded rather than allowed to mask the daemon's own failure.
+/// A daemon refusal gives the slot back because its transaction did not issue
+/// anything. A lost or unreadable success keeps the reservation: the link may
+/// already be live, so releasing it would let retries escape the cap.
 async fn mint_against(
     state: &PanelState,
     credential: &DaemonCredential,
@@ -119,10 +142,14 @@ async fn mint_against(
 
     match minted {
         Ok(minted) => Ok(minted),
-        Err(error) => {
+        Err(MintError::NotIssued(error)) => {
             if let Err(release) = state.store.release_pair_link(reservation_id).await {
                 record_unreleased(reservation_id, &release);
             }
+            Err(error.into())
+        }
+        Err(MintError::IssuanceUnknown(error)) => {
+            record_ambiguous(reservation_id, &error);
             Err(error.into())
         }
     }
@@ -244,6 +271,18 @@ fn record_unreleased(reservation_id: &str, error: &sqlx::Error) {
         reservation_id = %reservation_id,
         %error,
         "panel could not release a pairing link reservation; it lapses on its own"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn record_ambiguous(reservation_id: &str, error: &PanelError) {
+    tracing::warn!(
+        reservation_id = %reservation_id,
+        %error,
+        "daemon mint outcome is unknown; pairing reservation kept for reconciliation"
     );
 }
 

@@ -10,7 +10,8 @@ pub mod auth;
 pub mod pair_links;
 pub mod session;
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex as StdMutex, PoisonError};
 
 use axum::Router;
 use axum::extract::{Request, State};
@@ -18,6 +19,7 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use tokio::sync::Mutex;
 
 use crate::assets::PanelAssets;
 use crate::config::daemon::DaemonConfig;
@@ -35,6 +37,23 @@ pub struct PanelState {
     pub github: Arc<GitHubClient>,
     pub assets: Arc<PanelAssets>,
     pub daemon: Arc<DaemonRuntime>,
+    pairing_locks: Arc<PairingLocks>,
+}
+
+#[derive(Debug, Default)]
+struct PairingLocks {
+    accounts: StdMutex<HashMap<String, Arc<Mutex<()>>>>,
+}
+
+impl PairingLocks {
+    fn for_account(&self, account_id: &str) -> Arc<Mutex<()>> {
+        let mut accounts = self.accounts.lock().unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(
+            accounts
+                .entry(account_id.to_owned())
+                .or_insert_with(|| Arc::new(Mutex::new(()))),
+        )
+    }
 }
 
 /// The daemon connection, kept together so a handler cannot reach for a client
@@ -64,7 +83,12 @@ impl PanelState {
             github: Arc::new(github),
             assets: Arc::new(assets),
             daemon: Arc::new(daemon),
+            pairing_locks: Arc::new(PairingLocks::default()),
         })
+    }
+
+    pub(crate) fn pairing_lock(&self, account_id: &str) -> Arc<Mutex<()>> {
+        self.pairing_locks.for_account(account_id)
     }
 }
 
