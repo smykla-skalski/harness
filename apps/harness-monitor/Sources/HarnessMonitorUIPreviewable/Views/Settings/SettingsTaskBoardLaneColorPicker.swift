@@ -77,7 +77,7 @@ struct SettingsTaskBoardLaneColorPicker: View {
       )
       .frame(height: 96)
       .accessibilityElement()
-      .accessibilityLabel("\(lane.title) custom color saturation and brightness")
+      .accessibilityLabel("Saturation and brightness")
       .accessibilityValue(
         "Saturation \(percentage(components.saturation)),"
           + " brightness \(percentage(components.brightness))"
@@ -94,7 +94,7 @@ struct SettingsTaskBoardLaneColorPicker: View {
 
       HueSlider(hue: binding(\.hue))
         .accessibilityElement()
-        .accessibilityLabel("\(lane.title) custom color hue")
+        .accessibilityLabel("Color hue")
         .accessibilityValue("\(Int((components.hue * 360).rounded())) degrees")
         .accessibilityAdjustableAction { direction in
           adjust(\.hue, by: direction == .increment ? Self.hueStep : -Self.hueStep)
