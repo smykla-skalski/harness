@@ -120,6 +120,15 @@ async fn snapshot_counts_live_workflow_queue_without_double_counting_cleanup() {
     ] {
         seed_queue_execution(&db, id, phase, state).await;
     }
+    seed_queue_execution(&db, "terminal-human", "cleanup", "human_required").await;
+    query(
+        "UPDATE task_board_workflow_executions
+         SET completed_at = '2026-07-15T09:01:00+00:00'
+         WHERE execution_id = 'queue-execution-terminal-human'",
+    )
+    .execute(db.pool())
+    .await
+    .expect("complete human-required queue execution");
 
     assert_eq!(
         snapshot(&db).await.queue,

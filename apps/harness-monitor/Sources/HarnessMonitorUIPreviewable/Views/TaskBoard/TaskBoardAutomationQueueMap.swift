@@ -19,7 +19,7 @@ struct TaskBoardAutomationQueueMap: View, Equatable {
   }
 
   private var queueBar: some View {
-    TaskBoardAutomationQueueBarLayout(spacing: 4) {
+    TaskBoardAutomationQueueBarLayout(spacing: HarnessMonitorTheme.spacingXS) {
       ForEach(lanes) { lane in
         ForEach(lane.stages) { stage in
           stageView(stage, lane: lane.id)

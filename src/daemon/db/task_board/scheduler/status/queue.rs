@@ -56,7 +56,8 @@ pub(super) async fn load(
                     THEN 1 ELSE 0
             END), 0) AS cleanup_required
          FROM task_board_workflow_executions
-         WHERE state IN (
+         WHERE completed_at IS NULL
+           AND state IN (
             'pending', 'awaiting_approval', 'blocked', 'preparing', 'retry_wait',
             'starting', 'running', 'draining', 'human_required'
          )",
