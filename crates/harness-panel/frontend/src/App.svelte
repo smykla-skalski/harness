@@ -34,6 +34,8 @@
       failure = error instanceof Error ? error.message : String(error);
       return;
     }
+    viewer = null;
+    accounts = [];
     await load();
   }
 

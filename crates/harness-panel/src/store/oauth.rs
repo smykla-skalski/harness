@@ -20,8 +20,12 @@ use crate::error::PanelError;
 pub const MAX_ACTIVE_OAUTH_STATES: i64 = 256;
 
 impl Store {
-    /// Start a sign-in, returning the `state` value to send to GitHub, or
-    /// `None` while the global outstanding-state capacity is full.
+    /// Start a sign-in, returning the `state` value to send to GitHub.
+    ///
+    /// Once the bounded active-state window is full, its oldest value is
+    /// replaced. A public caller therefore cannot permanently exhaust sign-in
+    /// capacity by filling the window once. Any pre-existing overflow is
+    /// discarded oldest-first in the same transaction.
     ///
     /// # Errors
     /// Returns [`PanelError::Config`] when the system random source fails and
@@ -30,7 +34,7 @@ impl Store {
         &self,
         ttl: Duration,
         now: DateTime<Utc>,
-    ) -> Result<Option<OpaqueToken>, PanelError> {
+    ) -> Result<OpaqueToken, PanelError> {
         self.create_oauth_state_with_limit(ttl, now, MAX_ACTIVE_OAUTH_STATES)
             .await
     }
@@ -40,7 +44,7 @@ impl Store {
         ttl: Duration,
         now: DateTime<Utc>,
         limit: i64,
-    ) -> Result<Option<OpaqueToken>, PanelError> {
+    ) -> Result<OpaqueToken, PanelError> {
         let state = OpaqueToken::generate()?;
         let now = to_unix_seconds(now);
         let mut transaction = self.pool().begin_with("BEGIN IMMEDIATE").await?;
@@ -49,21 +53,27 @@ impl Store {
             .bind(now)
             .execute(transaction.as_mut())
             .await?;
-        let inserted = sqlx::query(
-            "INSERT INTO oauth_states (state_hash, created_at, expires_at) \
-             SELECT ?1, ?2, ?3 WHERE \
-             (SELECT COUNT(*) FROM oauth_states) < ?4",
+        // Creation times have one-second precision; `rowid` preserves insertion
+        // order when several active states share the oldest timestamp.
+        sqlx::query(
+            "DELETE FROM oauth_states WHERE state_hash IN (\
+             SELECT state_hash FROM oauth_states \
+             ORDER BY created_at ASC, rowid ASC \
+             LIMIT max(0, (SELECT COUNT(*) FROM oauth_states) - ?1 + 1))",
+        )
+        .bind(limit)
+        .execute(transaction.as_mut())
+        .await?;
+        sqlx::query(
+            "INSERT INTO oauth_states (state_hash, created_at, expires_at) VALUES (?1, ?2, ?3)",
         )
         .bind(state.hash())
         .bind(now)
         .bind(now.saturating_add(ttl.num_seconds()))
-        .bind(limit)
         .execute(transaction.as_mut())
-        .await?
-        .rows_affected()
-            > 0;
+        .await?;
         transaction.commit().await?;
-        Ok(inserted.then_some(state))
+        Ok(state)
     }
 
     /// Accept a `state` value exactly once.
@@ -108,7 +118,6 @@ mod tests {
             .create_oauth_state(Duration::minutes(10), now)
             .await
             .expect("state write")
-            .expect("state capacity")
     }
 
     #[tokio::test]
@@ -210,7 +219,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_outstanding_state_cap_is_atomic_across_connections() {
+    async fn concurrent_inserts_keep_the_outstanding_state_window_bounded() {
         let directory = tempfile::tempdir().expect("temp dir");
         let store = Store::open(directory.path()).await.expect("store");
 
@@ -218,43 +227,124 @@ mod tests {
             store.create_oauth_state_with_limit(Duration::minutes(10), at(0), 1),
             store.create_oauth_state_with_limit(Duration::minutes(10), at(0), 1)
         );
-        let issued = [first.expect("first"), second.expect("second")]
-            .into_iter()
-            .flatten()
-            .count();
+        let first = first.expect("first");
+        let second = second.expect("second");
         let stored: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM oauth_states")
             .fetch_one(store.pool())
             .await
             .expect("count");
 
-        assert_eq!(issued, 1);
         assert_eq!(stored, 1);
+        let first_active = store
+            .consume_oauth_state(first.expose(), at(1))
+            .await
+            .expect("first state");
+        let second_active = store
+            .consume_oauth_state(second.expose(), at(1))
+            .await
+            .expect("second state");
+        assert_ne!(first_active, second_active);
     }
 
     #[tokio::test]
-    async fn expired_capacity_is_reclaimed_before_issuing() {
+    async fn the_oldest_active_state_is_evicted_before_issuing() {
         let store = Store::open_in_memory().await.expect("store");
+        let first = store
+            .create_oauth_state_with_limit(Duration::minutes(10), at(0), 2)
+            .await
+            .expect("first");
+        let second = store
+            .create_oauth_state_with_limit(Duration::minutes(10), at(1), 2)
+            .await
+            .expect("second");
+        let third = store
+            .create_oauth_state_with_limit(Duration::minutes(10), at(2), 2)
+            .await
+            .expect("third");
 
         assert!(
-            store
-                .create_oauth_state_with_limit(Duration::minutes(10), at(0), 1)
+            !store
+                .consume_oauth_state(first.expose(), at(3))
                 .await
-                .expect("first")
-                .is_some()
+                .expect("oldest")
         );
         assert!(
             store
-                .create_oauth_state_with_limit(Duration::minutes(10), at(1), 1)
+                .consume_oauth_state(second.expose(), at(3))
                 .await
-                .expect("full")
-                .is_none()
+                .expect("second")
         );
         assert!(
             store
-                .create_oauth_state_with_limit(Duration::minutes(10), at(10), 1)
+                .consume_oauth_state(third.expose(), at(3))
                 .await
-                .expect("reclaimed")
-                .is_some()
+                .expect("third")
+        );
+    }
+
+    #[tokio::test]
+    async fn expired_capacity_is_pruned_before_eviction() {
+        let store = Store::open_in_memory().await.expect("store");
+        let expired = store
+            .create_oauth_state_with_limit(Duration::minutes(10), at(0), 1)
+            .await
+            .expect("first");
+        let issued = store
+            .create_oauth_state_with_limit(Duration::minutes(10), at(10), 1)
+            .await
+            .expect("reclaimed");
+
+        assert!(
+            !store
+                .consume_oauth_state(expired.expose(), at(10))
+                .await
+                .expect("expired")
+        );
+        assert!(
+            store
+                .consume_oauth_state(issued.expose(), at(10))
+                .await
+                .expect("issued")
+        );
+    }
+
+    #[tokio::test]
+    async fn preexisting_overflow_is_repaired_before_issuing() {
+        let store = Store::open_in_memory().await.expect("store");
+        for index in 0..3 {
+            sqlx::query(
+                "INSERT INTO oauth_states (state_hash, created_at, expires_at) \
+                 VALUES (?1, ?2, ?3)",
+            )
+            .bind(format!("occupied-{index}"))
+            .bind(index)
+            .bind(i64::MAX)
+            .execute(store.pool())
+            .await
+            .expect("seed overflow");
+        }
+
+        let issued = store
+            .create_oauth_state_with_limit(Duration::minutes(10), at(3), 2)
+            .await
+            .expect("issued");
+        let stored: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM oauth_states")
+            .fetch_one(store.pool())
+            .await
+            .expect("count");
+        let newest_existing: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM oauth_states WHERE state_hash = 'occupied-2'")
+                .fetch_one(store.pool())
+                .await
+                .expect("newest existing");
+
+        assert_eq!(stored, 2);
+        assert_eq!(newest_existing, 1);
+        assert!(
+            store
+                .consume_oauth_state(issued.expose(), at(4))
+                .await
+                .expect("new state")
         );
     }
 }

@@ -46,6 +46,33 @@ fn the_unit_starts_the_panel_with_the_configured_flags() {
 }
 
 #[test]
+fn a_relative_binary_path_is_refused() {
+    let error = render_unit("harness-panel", Path::new("harness-panel"), &args())
+        .expect_err("the service binary path must be absolute");
+    let message = error.to_string();
+
+    assert!(message.contains("binary path"), "{message}");
+    assert!(message.contains("must be absolute"), "{message}");
+}
+
+#[test]
+fn a_relative_client_secret_source_path_is_refused() {
+    let mut args = args();
+    args.github_client_secret_file = PathBuf::from("github-client-secret");
+
+    let error = render_unit(
+        "harness-panel",
+        Path::new("/usr/local/bin/harness-panel"),
+        &args,
+    )
+    .expect_err("the credential source path must be absolute");
+    let message = error.to_string();
+
+    assert!(message.contains("client secret source path"), "{message}");
+    assert!(message.contains("must be absolute"), "{message}");
+}
+
+#[test]
 fn the_unit_preserves_github_enterprise_endpoints() {
     let mut args = args();
     args.github_authorize_url = "https://ghe.example.com/login/oauth/authorize".to_owned();

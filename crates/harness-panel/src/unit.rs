@@ -36,10 +36,16 @@ const MAX_UNIT_NAME_CHARS: usize = 255;
 ///
 /// # Errors
 /// Returns [`PanelError::Config`] when the unit name is not one systemd would
-/// read back as a single name, when a flag would not survive systemd's
-/// `ExecStart` parsing, or when the mount point is not a usable subtree.
+/// read back as a single name, a required host path is not absolute, a flag
+/// would not survive systemd's `ExecStart` parsing, or the mount point is not a
+/// usable subtree.
 pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<String, PanelError> {
     validate_unit_name(unit)?;
+    require_absolute_path("the panel binary path", binary_path)?;
+    require_absolute_path(
+        "the github client secret source path",
+        &args.github_client_secret_file,
+    )?;
     let exec_start = render_exec_start(&serve_command(unit, binary_path, args)?);
     // The secret path is the one operator value that never reaches `ExecStart`,
     // because the command points at the credential systemd re-exposes instead.
@@ -95,6 +101,13 @@ pub fn render_unit(unit: &str, binary_path: &Path, args: &PanelArgs) -> Result<S
          [Install]\n\
          WantedBy=multi-user.target\n"
     ))
+}
+
+fn require_absolute_path(label: &str, path: &Path) -> Result<(), PanelError> {
+    if !path.is_absolute() {
+        return Err(PanelError::config(format!("{label} must be absolute")));
+    }
+    Ok(())
 }
 
 /// Refuse a value that would not survive the unit file's line structure.

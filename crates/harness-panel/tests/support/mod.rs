@@ -13,7 +13,7 @@ use axum::{Form, Router};
 use harness_panel::config::{DEFAULT_GITHUB_AUTHORIZE_URL, PanelArgs};
 use harness_panel::http::{PanelState, router};
 use harness_panel::store::Store;
-use reqwest::header::{COOKIE, LOCATION, SET_COOKIE};
+use reqwest::header::{COOKIE, LOCATION, ORIGIN, SET_COOKIE};
 use reqwest::redirect::Policy;
 use reqwest::{Client, RequestBuilder, Response, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -199,8 +199,13 @@ impl PanelUnderTest {
     }
 
     pub async fn post(&self, path: &str, cookie: Option<&str>) -> Response {
-        self.send(self.client.post(format!("{}{path}", self.base_url)), cookie)
-            .await
+        self.send(
+            self.client
+                .post(format!("{}{path}", self.base_url))
+                .header(ORIGIN, &self.base_url),
+            cookie,
+        )
+        .await
     }
 
     async fn send(&self, request: RequestBuilder, cookie: Option<&str>) -> Response {

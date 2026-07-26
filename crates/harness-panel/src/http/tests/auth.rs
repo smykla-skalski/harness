@@ -9,6 +9,7 @@ use super::super::session::{SESSION_COOKIE, sign_in_cookie_name};
 use super::{BODY_LIMIT, Harness};
 use crate::config::DEFAULT_GITHUB_AUTHORIZE_URL;
 use crate::store::oauth::MAX_ACTIVE_OAUTH_STATES;
+use crate::store::token::hash_token;
 
 #[tokio::test]
 async fn signing_out_clears_the_session_on_the_server() {
@@ -20,6 +21,7 @@ async fn signing_out_clears_the_session_on_the_server() {
             Request::builder()
                 .method("POST")
                 .uri("/panel/auth/signout")
+                .header(header::ORIGIN, harness.state.config.public_origin.as_str())
                 .header(header::COOKIE, format!("{SESSION_COOKIE}={token}"))
                 .body(Body::empty())
                 .expect("request"),
@@ -43,9 +45,6 @@ async fn signing_out_clears_the_session_on_the_server() {
     );
 }
 
-/// A cross-site POST arrives without the session cookie, because `SameSite=Lax`
-/// keeps it off such a request. Answering with an expiry anyway would still
-/// reach the browser, so another origin could sign someone out at will.
 #[tokio::test]
 async fn signing_out_without_a_session_sets_no_cookie() {
     let harness = Harness::new("ada").await;
@@ -56,6 +55,7 @@ async fn signing_out_without_a_session_sets_no_cookie() {
             Request::builder()
                 .method("POST")
                 .uri("/panel/auth/signout")
+                .header(header::ORIGIN, harness.state.config.public_origin.as_str())
                 .body(Body::empty())
                 .expect("request"),
         )
@@ -72,6 +72,39 @@ async fn signing_out_without_a_session_sets_no_cookie() {
         harness.get("/panel/api/me", Some(&token)).await.0,
         StatusCode::OK
     );
+}
+
+/// `SameSite=Lax` cookies are still sent between different origins on the same
+/// site, so the sign-out endpoint must verify the browser-supplied origin.
+#[tokio::test]
+async fn signing_out_from_a_missing_or_different_origin_is_refused() {
+    let harness = Harness::new("ada").await;
+    let token = harness.sign_in("ada").await;
+
+    for origin in [
+        None,
+        Some("https://attacker.example.com"),
+        Some("https://harness.example.com/"),
+    ] {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/panel/auth/signout")
+            .header(header::COOKIE, format!("{SESSION_COOKIE}={token}"));
+        if let Some(origin) = origin {
+            request = request.header(header::ORIGIN, origin);
+        }
+        let response = router(harness.state.clone())
+            .oneshot(request.body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert!(response.headers().get(header::SET_COOKIE).is_none());
+        assert_eq!(
+            harness.get("/panel/api/me", Some(&token)).await.0,
+            StatusCode::OK
+        );
+    }
 }
 
 /// Signing out is a state change, so a plain link or an image tag must not be
@@ -161,13 +194,14 @@ async fn starting_a_sign_in_redirects_to_github_with_the_recorded_state() {
 }
 
 #[tokio::test]
-async fn a_full_oauth_state_budget_returns_429_without_browser_state() {
+async fn a_full_oauth_state_budget_evicts_the_oldest_and_starts() {
     let harness = Harness::new("ada").await;
     for index in 0..MAX_ACTIVE_OAUTH_STATES {
         sqlx::query(
-            "INSERT INTO oauth_states (state_hash, created_at, expires_at) VALUES (?1, 0, ?2)",
+            "INSERT INTO oauth_states (state_hash, created_at, expires_at) VALUES (?1, ?2, ?3)",
         )
         .bind(format!("occupied-{index}"))
+        .bind(index)
         .bind(i64::MAX)
         .execute(harness.state.store.pool())
         .await
@@ -184,9 +218,38 @@ async fn a_full_oauth_state_budget_returns_429_without_browser_state() {
         .await
         .expect("response");
 
-    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
-    assert!(response.headers().get(header::LOCATION).is_none());
-    assert!(response.headers().get(header::SET_COOKIE).is_none());
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    let location = response
+        .headers()
+        .get(header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .expect("github redirect");
+    let state = url::Url::parse(location)
+        .expect("authorize url")
+        .query_pairs()
+        .find(|(key, _)| key == "state")
+        .map(|(_, value)| value.into_owned())
+        .expect("new state");
+    assert!(response.headers().get(header::SET_COOKIE).is_some());
+
+    let stored: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM oauth_states")
+        .fetch_one(harness.state.store.pool())
+        .await
+        .expect("count");
+    let oldest: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM oauth_states WHERE state_hash = 'occupied-0'")
+            .fetch_one(harness.state.store.pool())
+            .await
+            .expect("oldest");
+    let issued: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM oauth_states WHERE state_hash = ?1")
+        .bind(hash_token(&state))
+        .fetch_one(harness.state.store.pool())
+        .await
+        .expect("issued");
+
+    assert_eq!(stored, MAX_ACTIVE_OAUTH_STATES);
+    assert_eq!(oldest, 0);
+    assert_eq!(issued, 1);
 }
 
 /// Two start requests can leave the same browser snapshot concurrently. Their
@@ -294,4 +357,44 @@ async fn a_callback_github_refused_reports_the_reason() {
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(body.contains("The user said no"), "{body}");
+}
+
+#[tokio::test]
+async fn a_callback_github_refused_consumes_its_valid_state() {
+    let harness = Harness::new("ada").await;
+    let started = harness.start_sign_in(None).await;
+
+    let response = router(harness.state.clone())
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/panel/auth/github/callback?error=access_denied&\
+                     error_description=The+user+said+no&state={}",
+                    started.state
+                ))
+                .header(header::COOKIE, started.cookie)
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    let status = response.status();
+    let body = String::from_utf8_lossy(
+        &to_bytes(response.into_body(), BODY_LIMIT)
+            .await
+            .expect("body"),
+    )
+    .into_owned();
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body.contains("The user said no"), "{body}");
+    assert!(
+        !harness
+            .state
+            .store
+            .consume_oauth_state(&started.state, chrono::Utc::now())
+            .await
+            .expect("state lookup"),
+        "the refused callback left its state reusable"
+    );
 }

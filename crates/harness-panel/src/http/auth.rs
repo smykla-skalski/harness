@@ -1,7 +1,7 @@
 //! Starting, finishing, and ending a sign-in.
 
 use axum::extract::{Query, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum_extra::extract::cookie::CookieJar;
 use chrono::{Duration, Utc};
@@ -42,15 +42,10 @@ pub struct CallbackQuery {
 /// # Errors
 /// Returns [`ApiError::Internal`] when the sign-in cannot be recorded.
 pub async fn start(State(state): State<PanelState>, jar: CookieJar) -> Result<Response, ApiError> {
-    let Some(issued) = state
+    let issued = state
         .store
         .create_oauth_state(Duration::minutes(OAUTH_STATE_TTL_MINUTES), Utc::now())
-        .await?
-    else {
-        return Err(ApiError::RateLimited(
-            "too many sign-ins are already waiting to finish",
-        ));
-    };
+        .await?;
     let redirect = state.github.authorize_url(issued.expose());
     let jar = with_pending_sign_in(
         jar,
@@ -129,31 +124,20 @@ async fn finish_sign_in(
     headers: &HeaderMap,
     query: CallbackQuery,
 ) -> Result<AccountIdentity, ApiError> {
+    if let Some(presented) = query.state.as_deref() {
+        validate_callback_state(state, headers, presented).await?;
+    } else if query.error.is_none() {
+        return Err(ApiError::SignInFailed(
+            "the callback carried no state".to_owned(),
+        ));
+    }
+
     if let Some(error) = query.error.as_deref() {
         let detail = query.error_description.as_deref().unwrap_or(error);
         return Err(ApiError::SignInFailed(format!(
             "github refused the sign-in: {}",
             reflected_detail(detail)
         )));
-    }
-
-    let presented = query
-        .state
-        .as_deref()
-        .ok_or_else(|| ApiError::SignInFailed("the callback carried no state".to_owned()))?;
-    if !has_pending_sign_in(headers, presented) {
-        return Err(ApiError::SignInFailed(
-            "this browser did not start this sign-in, or took longer than ten minutes".to_owned(),
-        ));
-    }
-    if !state
-        .store
-        .consume_oauth_state(presented, Utc::now())
-        .await?
-    {
-        return Err(ApiError::SignInFailed(
-            "this sign-in has expired or already finished".to_owned(),
-        ));
     }
 
     let code = query
@@ -176,20 +160,47 @@ async fn finish_sign_in(
         .map_err(|error| ApiError::SignInFailed(error.to_string()))
 }
 
+async fn validate_callback_state(
+    state: &PanelState,
+    headers: &HeaderMap,
+    presented: &str,
+) -> Result<(), ApiError> {
+    if !has_pending_sign_in(headers, presented) {
+        return Err(ApiError::SignInFailed(
+            "this browser did not start this sign-in, or took longer than ten minutes".to_owned(),
+        ));
+    }
+    if !state
+        .store
+        .consume_oauth_state(presented, Utc::now())
+        .await?
+    {
+        return Err(ApiError::SignInFailed(
+            "this sign-in has expired or already finished".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 /// End the session on the server, then expire the cookie.
 ///
 /// # Errors
-/// Returns [`ApiError::Internal`] when the session cannot be deleted.
+/// Returns [`ApiError::Forbidden`] when the request origin is absent or does
+/// not exactly match the panel, and [`ApiError::Internal`] when the session
+/// cannot be deleted.
 pub async fn signout(
     State(state): State<PanelState>,
     jar: CookieJar,
     headers: HeaderMap,
 ) -> Result<Response, ApiError> {
-    // A request that presented no session has none to end, and answering it
-    // with a `Set-Cookie` anyway would sign someone out from another origin:
-    // `SameSite=Lax` keeps the cookie off a cross-site POST, but it does not
-    // stop the browser applying the expiry that comes back. Doing nothing makes
-    // that request the no-op it already was on the server.
+    if !origin_matches(&headers, &state.config.public_origin) {
+        return Err(ApiError::Forbidden(
+            "sign-out requests must come from the panel origin",
+        ));
+    }
+
+    // A request that presented no session has none to end. Doing nothing also
+    // avoids sending an expiry for a cookie the request did not carry.
     let Some(token) = session_token(&headers) else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
@@ -199,6 +210,15 @@ pub async fn signout(
     state.store.delete_session(&token).await?;
     let jar = without_cookie(jar, &state, super::session::SESSION_COOKIE);
     Ok((jar, StatusCode::NO_CONTENT).into_response())
+}
+
+fn origin_matches(headers: &HeaderMap, expected: &str) -> bool {
+    let mut origins = headers.get_all(header::ORIGIN).iter();
+    let matches = origins
+        .next()
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|origin| origin == expected);
+    matches && origins.next().is_none()
 }
 
 /// Reduce a value GitHub echoed back to something safe to put in a response.

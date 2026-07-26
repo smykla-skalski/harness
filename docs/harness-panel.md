@@ -44,27 +44,49 @@ The panel refuses to start if that file is readable by group or other. It is nev
 
 ## Installing
 
+These commands assume a Linux host running systemd, a checkout of this repository with its `mise` configuration trusted, the default install paths with `HARNESS_INSTALL_BINARY_DIR` unset, `sudo` access, an existing root-only client secret at `/etc/harness-panel/github-client-secret`, and no edits to the values between reviewing and installing the rendered unit. They are safe to rerun: the binary and unit are replaced in place, and a rendering failure leaves the installed unit untouched.
+
 ```bash
 mise run install:harness:panel
+sudo install -m 0755 "$HOME/.local/bin/harness-panel" /usr/local/bin/harness-panel
 ```
 
-Then render the unit, read it, and install it:
+The `mise` task installs the default entry point under `$HOME`. The unit uses `ProtectHome=true`, so copy that binary to `/usr/local/bin/harness-panel` before installing the unit.
+
+Render into a new temporary file, review it, and install it only if rendering succeeded:
 
 ```bash
-harness-panel print-unit \
-  --public-origin https://harness.example.com \
-  --base-path /panel \
-  --state-dir /var/lib/harness-panel \
-  --github-client-id Iv1.abc123 \
-  --github-client-secret-file /etc/harness-panel/github-client-secret \
-  --owner-login your-github-login \
-  | sudo tee /etc/systemd/system/harness-panel.service
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now harness-panel.service
+panel_unit="$(mktemp)" || exit 1
+if /usr/local/bin/harness-panel print-unit \
+    --public-origin https://harness.example.com \
+    --base-path /panel \
+    --state-dir /var/lib/harness-panel \
+    --github-client-id Iv1.abc123 \
+    --github-client-secret-file /etc/harness-panel/github-client-secret \
+    --owner-login your-github-login \
+    >"$panel_unit"; then
+  less "$panel_unit"
+  printf 'Install this unit? [y/N] '
+  read -r install_unit
+  case "$install_unit" in
+    y|Y)
+      if sudo install -m 0644 "$panel_unit" /etc/systemd/system/harness-panel.service; then
+        sudo systemctl daemon-reload &&
+          sudo systemctl enable --now harness-panel.service
+      fi
+      ;;
+    *)
+      printf 'unit not installed\n'
+      ;;
+  esac
+else
+  printf 'unit rendering failed; the installed unit was not changed\n' >&2
+fi
+rm -f "$panel_unit"
+unset install_unit panel_unit
 ```
 
-`print-unit` reads nothing off disk, so it works on a host where the secret file does not exist yet.
+`print-unit` reads nothing off disk, so rendering does not verify that the secret file exists.
 
 It ignores `--state-dir`. The rendered unit always points the panel at `%S/<unit>`, the directory `StateDirectory=` creates for it, because `ProtectSystem=strict` leaves nowhere else writable. The flag is still required because `serve` and `print-unit` take the same arguments; pass anything, or pass the path you would use when running the panel by hand.
 
@@ -109,7 +131,7 @@ One SQLite database under the state directory, holding accounts, sessions, and s
 The web app is Svelte and TypeScript under `crates/harness-panel/frontend`, built by Vite and embedded into the binary by the crate's build script. Building the crate builds the assets, so Node has to be on `PATH`; `mise` pins it.
 
 ```bash
-mise run panel:frontend:install   # once, or after the lockfile changes
+mise run panel:frontend:install   # once, or after the manifest or lockfile changes
 mise run panel:frontend:lint
 mise run panel:frontend:test
 ```

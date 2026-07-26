@@ -9,6 +9,7 @@ trap 'rm -rf "$TEST_ROOT"' EXIT
 frontend="$TEST_ROOT/frontend"
 fake_npm="$TEST_ROOT/npm"
 command mkdir -p "$frontend"
+printf '{"scripts":{"build":"vite build"}}\n' >"$frontend/package.json"
 printf '{"lockfileVersion":3}\n' >"$frontend/package-lock.json"
 
 cat >"$fake_npm" <<'FAKE_NPM'
@@ -16,6 +17,20 @@ cat >"$fake_npm" <<'FAKE_NPM'
 set -euo pipefail
 
 [[ "${1:-}" == "ci" ]] || exit 2
+[[ "${NODE_ENV:-}" == "production" ]] || exit 3
+
+include_dev=false
+for argument in "$@"; do
+  if [[ "$argument" == "--include=dev" ]]; then
+    include_dev=true
+    break
+  fi
+done
+if [[ "$include_dev" != "true" ]]; then
+  printf 'npm ci did not include dev dependencies\n' >&2
+  exit 4
+fi
+
 if ! mkdir .fake-npm-active 2>/dev/null; then
   printf 'concurrent npm ci detected\n' >&2
   exit 90
@@ -33,9 +48,22 @@ FAKE_NPM
 chmod +x "$fake_npm"
 
 run_installer() {
-  HARNESS_PANEL_FRONTEND_DIR="$frontend" \
+  NODE_ENV=production \
+    HARNESS_PANEL_FRONTEND_DIR="$frontend" \
     HARNESS_PANEL_NPM="$fake_npm" \
     "$INSTALLER"
+}
+
+assert_stamp_matches_inputs() {
+  {
+    printf 'package.json\0'
+    command cat "$frontend/package.json"
+    printf 'package-lock.json\0'
+    command cat "$frontend/package-lock.json"
+  } >"$TEST_ROOT/expected-stamp"
+  cmp -s \
+    "$TEST_ROOT/expected-stamp" \
+    "$frontend/node_modules/.harness-panel-stamp"
 }
 
 run_installer &
@@ -46,16 +74,18 @@ wait "$first_pid"
 wait "$second_pid"
 
 [[ "$(cat "$frontend/.fake-npm-count")" == "1" ]]
-cmp -s \
-  "$frontend/package-lock.json" \
-  "$frontend/node_modules/.harness-panel-stamp"
+assert_stamp_matches_inputs
+
+printf ' \n' >>"$frontend/package.json"
+run_installer
+
+[[ "$(cat "$frontend/.fake-npm-count")" == "2" ]]
+assert_stamp_matches_inputs
 
 printf ' \n' >>"$frontend/package-lock.json"
 run_installer
 
-[[ "$(cat "$frontend/.fake-npm-count")" == "2" ]]
-cmp -s \
-  "$frontend/package-lock.json" \
-  "$frontend/node_modules/.harness-panel-stamp"
+[[ "$(cat "$frontend/.fake-npm-count")" == "3" ]]
+assert_stamp_matches_inputs
 
-printf 'ok: panel frontend installs are serialized and lockfile-aware\n'
+printf 'ok: panel frontend installs are serialized, dev-complete, and manifest-aware\n'
