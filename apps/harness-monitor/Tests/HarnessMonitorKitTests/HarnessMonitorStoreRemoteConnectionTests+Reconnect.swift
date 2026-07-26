@@ -355,9 +355,9 @@ extension HarnessMonitorStoreRemoteConnectionTests {
 
     fixture.store.scheduleRemoteDaemonReconnect(after: URLError(.timedOut))
     fixture.store.scheduleRemoteDaemonReconnect(after: URLError(.networkConnectionLost))
-    for _ in 0..<10 {
-      await Task.yield()
-    }
+    // The shared loop records its backoff once; waiting for that is what tells
+    // us both schedule calls have been absorbed.
+    _ = await waitUntil { await fixture.sleeper.recordedDelays().isEmpty == false }
 
     #expect(fixture.store.remoteDaemonReconnectGeneration == generation)
     #expect(await fixture.sleeper.recordedDelays() == [.milliseconds(500)])

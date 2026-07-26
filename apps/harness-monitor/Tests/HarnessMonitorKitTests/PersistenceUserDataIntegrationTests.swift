@@ -136,11 +136,8 @@ struct PersistenceUserDataIntegrationTests {
 
     store.presentSuccessFeedback("Notification history captured")
 
-    for _ in 0..<20 {
-      if !(try harness.fetchNotificationHistory()).isEmpty {
-        break
-      }
-      await Task.yield()
+    _ = await waitUntil {
+      ((try? harness.fetchNotificationHistory()) ?? []).isEmpty == false
     }
 
     let history = try harness.fetchNotificationHistory()

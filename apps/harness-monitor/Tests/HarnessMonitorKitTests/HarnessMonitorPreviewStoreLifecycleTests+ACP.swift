@@ -86,16 +86,7 @@ extension HarnessMonitorPreviewStoreLifecycleTests {
     await store.bootstrapIfNeeded()
     // The inspect sample lands on its own task after bootstrap returns, so wait
     // for it rather than for a fixed span that a loaded machine outruns.
-    for _ in 0..<200 {
-      if store.selectedAcpInspectObservedAt != nil { break }
-      do {
-        try await Task.sleep(for: .milliseconds(50))
-      } catch {
-        // Cancellation makes every later sleep throw at once, so swallowing it
-        // would spin through the whole bound.
-        break
-      }
-    }
+    _ = await waitUntil(timeout: .seconds(10)) { store.selectedAcpInspectObservedAt != nil }
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
     #expect(

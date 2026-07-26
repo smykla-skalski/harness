@@ -586,20 +586,3 @@ private func descendant<ViewType: NSView>(
   return nil
 }
 
-@MainActor
-private func waitUntil(
-  timeout: Duration = .seconds(1),
-  interval: Duration = .milliseconds(10),
-  _ predicate: @escaping @Sendable @MainActor () -> Bool
-) async -> Bool {
-  let clock = ContinuousClock()
-  let deadline = clock.now + timeout
-  while clock.now < deadline {
-    if await MainActor.run(resultType: Bool.self, body: predicate) {
-      return true
-    }
-    await Task.yield()
-    try? await Task.sleep(for: interval)
-  }
-  return await MainActor.run(resultType: Bool.self, body: predicate)
-}

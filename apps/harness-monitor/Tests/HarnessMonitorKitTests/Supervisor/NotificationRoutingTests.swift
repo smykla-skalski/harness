@@ -161,10 +161,7 @@ final class NotificationRoutingTests: XCTestCase {
     )
 
     XCTAssertTrue(didSchedule)
-    for _ in 0..<20 {
-      if await recorder.events.count == 1 { break }
-      await Task.yield()
-    }
+    _ = await waitUntil { await recorder.events.count == 1 }
     let events = await recorder.events
     XCTAssertEqual(events.count, 1)
     guard case .scheduled(let request, let source, let severity, let actions) = events[0] else {
