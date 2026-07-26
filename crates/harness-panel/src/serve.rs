@@ -23,6 +23,7 @@ use tokio::signal;
 use tokio::time::interval;
 
 use crate::config::PanelConfig;
+use crate::daemon_client::events::DaemonEventStream;
 use crate::error::PanelError;
 use crate::http::{PanelState, router};
 use crate::store::Store;
@@ -243,7 +244,13 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
         "panel listening"
     );
 
-    tokio::spawn(prune_loop(store));
+    tokio::spawn(prune_loop(store.clone()));
+    // Started beside the server rather than inside `router`, which the tests
+    // build too: a router that dialled a daemon on construction would make every
+    // one of them open a socket to whatever happened to be listening.
+    tokio::spawn(
+        DaemonEventStream::new(state.daemon.client.clone(), store, state.events.clone()).run(),
+    );
 
     axum::serve(listener, router(state))
         .with_graceful_shutdown(shutdown_signal())
