@@ -1,7 +1,7 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
@@ -15,10 +15,10 @@ use crate::task_board::{
 
 use super::DaemonHttpState;
 use super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::TaskBoardAutomationForceCancelResponse;
 use super::response::timed_json;
 use super::task_board::{authenticated_request, authorized_control_request_parts};
 use super::task_board_route_executor;
+use crate::daemon::protocol::TaskBoardAutomationForceCancelResponse;
 
 /// Wire the orchestrator lifecycle, automation-history, and settings endpoints
 /// onto the task-board router. The git-runtime, provider-token, and
@@ -28,18 +28,28 @@ pub(super) fn merge_orchestrator_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
     router
+        .merge(orchestrator_control_routes())
+        .merge(orchestrator_automation_routes())
+}
+
+fn orchestrator_control_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(get_task_board_orchestrator_status))
         .routes(routes!(post_task_board_orchestrator_start))
         .routes(routes!(post_task_board_orchestrator_stop))
         .routes(routes!(post_task_board_orchestrator_run_once))
-        .routes(routes!(get_task_board_automation_runs))
-        .routes(routes!(get_task_board_automation_run_detail))
-        .routes(routes!(get_task_board_automation_metrics))
-        .routes(routes!(post_task_board_automation_force_cancel))
         .routes(routes!(
             get_task_board_orchestrator_settings,
             put_task_board_orchestrator_settings
         ))
+}
+
+fn orchestrator_automation_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(get_task_board_automation_runs))
+        .routes(routes!(get_task_board_automation_run_detail))
+        .routes(routes!(get_task_board_automation_metrics))
+        .routes(routes!(post_task_board_automation_force_cancel))
 }
 
 #[utoipa::path(

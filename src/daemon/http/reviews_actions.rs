@@ -4,10 +4,10 @@
 
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
@@ -29,11 +29,21 @@ pub(super) fn merge_action_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
     router
+        .merge(review_merge_progression_routes())
+        .merge(review_annotation_routes())
+}
+
+fn review_merge_progression_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_approve_reviews))
         .routes(routes!(post_merge_reviews))
         .routes(routes!(post_rerun_reviews_checks))
-        .routes(routes!(post_label_reviews))
         .routes(routes!(post_auto_reviews))
+}
+
+fn review_annotation_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
+        .routes(routes!(post_label_reviews))
         .routes(routes!(post_request_review))
         .routes(routes!(post_comment_reviews))
 }
@@ -91,7 +101,13 @@ pub(super) async fn post_merge_reviews(
         return *response;
     }
     let result = service::merge_reviews(&request).await;
-    timed_json("POST", http_paths::REVIEWS_MERGE, &request_id, start, result)
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_MERGE,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 #[utoipa::path(

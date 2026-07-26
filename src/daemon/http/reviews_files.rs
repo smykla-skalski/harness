@@ -1,9 +1,9 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
@@ -26,12 +26,22 @@ pub(super) fn merge_files_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
     router
+        .merge(review_file_content_routes())
+        .merge(review_local_clone_routes())
+}
+
+fn review_file_content_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_review_files_list))
         .routes(routes!(post_review_files_patch))
         .routes(routes!(post_review_files_preview))
         .routes(routes!(post_review_files_viewed))
         .routes(routes!(post_review_files_blob))
         .routes(routes!(post_review_files_comment))
+}
+
+fn review_local_clone_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_review_files_local_clones))
         .routes(routes!(post_review_files_local_clones_delete))
 }
@@ -251,14 +261,12 @@ pub(super) async fn post_review_files_local_clones(
     )
 }
 
-#[derive(serde::Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(serde::Deserialize, utoipa::ToSchema)]
 pub(super) struct DeleteLocalClonePayload {
     repo_key_segment: String,
 }
 
-#[derive(serde::Serialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub(super) struct DeleteLocalCloneResponseBody {
     clones: Vec<LocalCloneListEntry>,
 }

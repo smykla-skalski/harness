@@ -11,21 +11,31 @@ use crate::daemon::protocol::{
 };
 
 use super::super::openapi::DaemonErrorBody;
+use super::super::response::timed_json;
+use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
+use super::authenticated_request;
 use crate::daemon::protocol::{
     PolicyPipelineAuditResponse, PolicyPipelineGoLiveDiffResponse, PolicyPipelineMakeLiveResponse,
     PolicyPipelinePromoteResponse, PolicyPipelineReplayResponse, PolicyPipelineResponse,
     PolicyPipelineSaveDraftResponse, PolicyPipelineSimulationResponse,
 };
-use super::super::response::timed_json;
-use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
-use super::authenticated_request;
 
 pub(super) fn merge_policy_pipeline_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
     router
+        .merge(policy_pipeline_draft_routes())
+        .merge(policy_pipeline_promotion_routes())
+}
+
+fn policy_pipeline_draft_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(get_policy_pipeline, put_policy_pipeline_draft))
         .routes(routes!(post_policy_simulate))
+}
+
+fn policy_pipeline_promotion_routes() -> OpenApiRouter<DaemonHttpState> {
+    OpenApiRouter::new()
         .routes(routes!(post_policy_promote))
         .routes(routes!(post_policy_make_live))
         .routes(routes!(post_policy_go_live_diff))
