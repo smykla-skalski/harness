@@ -11,7 +11,7 @@ pub mod pair_links;
 pub mod session;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex as StdMutex, PoisonError};
+use std::sync::{Arc, Mutex as StdMutex, PoisonError, Weak};
 
 use axum::Router;
 use axum::extract::{Request, State};
@@ -42,17 +42,19 @@ pub struct PanelState {
 
 #[derive(Debug, Default)]
 struct PairingLocks {
-    accounts: StdMutex<HashMap<String, Arc<Mutex<()>>>>,
+    accounts: StdMutex<HashMap<String, Weak<Mutex<()>>>>,
 }
 
 impl PairingLocks {
     fn for_account(&self, account_id: &str) -> Arc<Mutex<()>> {
         let mut accounts = self.accounts.lock().unwrap_or_else(PoisonError::into_inner);
-        Arc::clone(
-            accounts
-                .entry(account_id.to_owned())
-                .or_insert_with(|| Arc::new(Mutex::new(()))),
-        )
+        accounts.retain(|_, lock| lock.strong_count() > 0);
+        if let Some(lock) = accounts.get(account_id).and_then(Weak::upgrade) {
+            return lock;
+        }
+        let lock = Arc::new(Mutex::new(()));
+        accounts.insert(account_id.to_owned(), Arc::downgrade(&lock));
+        lock
     }
 }
 

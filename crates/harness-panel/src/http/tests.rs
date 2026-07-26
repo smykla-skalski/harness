@@ -26,6 +26,7 @@ use crate::store::accounts::AccountIdentity;
 mod approvals;
 mod auth;
 mod companion;
+mod locks;
 mod minting;
 mod pair_links;
 
