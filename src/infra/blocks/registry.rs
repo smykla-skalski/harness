@@ -32,10 +32,13 @@ impl BlockRequirement {
         Self::Build,
     ];
 
-    /// Every binary name the managed cluster blocks refuse to have written.
+    /// The union of `denied_binaries` across every variant: the CLI names that
+    /// drive the tools these requirements stand for, such as `docker`,
+    /// `kubectl` and `kumactl`.
     ///
-    /// The ACP protocol uses this as its denied-binary set; it is the live
-    /// consumer now that the hook guards that also read it are retired.
+    /// The ACP protocol takes this as the set of binaries an agent may not
+    /// create, and is its only consumer now that the hook guards that also read
+    /// it are retired.
     #[must_use]
     pub fn all_denied_binaries() -> BTreeSet<String> {
         Self::ALL
