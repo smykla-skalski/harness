@@ -315,6 +315,26 @@ EOF
   check_rejects "harness-kernel"
 }
 
+# A path-only dependency names no version, so there is nothing to hold in sync.
+# Pinned because the scanner's silence on it reads like a case it forgot, and
+# the fix for that misreading would be to start rejecting a legal declaration.
+scenario_check_accepts_a_path_only_member_requirement() {
+  seed_sandbox
+  start_test "check accepts a member requirement that names no version"
+  perl -pi -e '
+    if (s!^harness-kernel\s*=\s*\{[^}]*\}!harness-kernel = { path = "../harness-kernel" }!) {
+      $ENV{REWROTE} = 1;
+    }
+    END { die "failed to drop the requirement version\n" unless $ENV{REWROTE}; }
+  ' "$SANDBOX/crates/harness-workspace/Cargo.toml"
+
+  if "$SCRIPT" check >/dev/null 2>&1; then
+    pass
+  else
+    fail "check flagged a path-only requirement: $("$SCRIPT" check 2>&1)"
+  fi
+}
+
 scenario_set_moves_every_shared_workspace_member() {
   seed_sandbox
   start_test "set moves every workspace member that shares the root version"
@@ -399,6 +419,7 @@ scenario_check_rejects_a_stale_member_crate
 scenario_check_rejects_a_member_added_after_the_tooling
 scenario_check_rejects_a_stale_member_requirement
 scenario_check_rejects_an_unreadable_member_requirement
+scenario_check_accepts_a_path_only_member_requirement
 scenario_set_moves_every_shared_workspace_member
 scenario_check_ignores_an_independent_member_version
 scenario_check_rejects_an_independent_member_lock_drift

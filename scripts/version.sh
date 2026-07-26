@@ -145,10 +145,12 @@ package_target_version() {
   printf '%s' "$canonical"
 }
 
-# Reports every dependency a manifest declares, so the caller can tell a stale
-# requirement from one written in a shape the in-place rewrite cannot reach.
-# The unreachable shapes are reported rather than passed over, because passing
-# over a declaration is how the version surfaces drifted apart to begin with.
+# Reports the dependencies that name a version, plus the ones written in a shape
+# the in-place rewrite cannot reach, so the caller can tell a stale requirement
+# from an unreadable one. The unreachable shapes are reported rather than passed
+# over, because passing over a declaration is how the version surfaces drifted
+# apart to begin with. A path-only dependency yields nothing on purpose: it
+# states no version, so there is none to hold in sync.
 manifest_dependency_declarations() {
   perl -ne '
     if (/^\s*\[/) {
