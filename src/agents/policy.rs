@@ -60,9 +60,9 @@ impl WriteDecision {
 
 /// Wrapper for the set of denied binary names.
 ///
-/// The set is produced by `managed_cluster_binaries()` in
-/// `hooks/cluster_policy.rs`; ACP callers can equally build it from
-/// `BlockRequirement::denied_binaries()`.
+/// The set is produced by `BlockRequirement::all_denied_binaries()` in
+/// `infra/blocks/registry.rs`, which is the single source the ACP protocol
+/// reads.
 #[derive(Debug, Clone)]
 pub struct DeniedBinaries(BTreeSet<String>);
 
@@ -268,8 +268,9 @@ fn check_run_dir_surface(path: &Path, run_dir: &Path, denied: &DeniedBinaries) -
 
 /// Evaluate whether a write to `path` is allowed.
 ///
-/// This is the single source of truth for write-surface policy. TUI hook
-/// `guard-write` and ACP `Client::write_text_file` both call this function.
+/// This is the single source of truth for write-surface policy, called by ACP
+/// `Client::write_text_file`. The hook-side copy is retired: its input was a
+/// run directory nothing populated, so it could never deny.
 ///
 /// # Arguments
 ///

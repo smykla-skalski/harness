@@ -8,8 +8,6 @@ mod runtime;
 pub(crate) mod session;
 #[cfg(test)]
 mod tests;
-pub mod tool_guard;
-pub mod tool_result;
 mod transport;
 
 pub use self::adapters::HookAgent;

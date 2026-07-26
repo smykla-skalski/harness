@@ -36,16 +36,23 @@ impl Hook for StaticHook {
     }
 }
 
-pub(crate) static TOOL_GUARD_HOOK: &dyn Hook = &StaticHook::effect(
-    "tool-guard",
-    HookType::PreToolUse,
-    super::tool_guard::execute,
-);
-pub(crate) static TOOL_RESULT_HOOK: &dyn Hook = &StaticHook::effect(
-    "tool-result",
-    HookType::PostToolUse,
-    super::tool_result::execute,
-);
+/// Both tool-lifecycle hooks allow unconditionally. The guards that used to
+/// decide here were reachable only for a skill no registration claims, so they
+/// could never deny. The statics still matter: the runtime routes on their
+/// `name` and `hook_type`, and records the call and injects pending session
+/// signals around this call in `runtime::run_hook_command`.
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the signature must match the HookFn pointer type"
+)]
+fn allow(_ctx: &GuardContext) -> Result<HookOutcome, CliError> {
+    Ok(HookOutcome::allow())
+}
+
+pub(crate) static TOOL_GUARD_HOOK: &dyn Hook =
+    &StaticHook::effect("tool-guard", HookType::PreToolUse, allow);
+pub(crate) static TOOL_RESULT_HOOK: &dyn Hook =
+    &StaticHook::effect("tool-result", HookType::PostToolUse, allow);
 
 #[cfg(test)]
 pub(crate) fn all_hooks() -> [&'static dyn Hook; 2] {
