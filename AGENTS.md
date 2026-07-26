@@ -131,7 +131,7 @@ Hook landing rule: a new hook lands with observable handler behavior, or behind 
 
 ## Code conventions
 
-- Rust 2024 edition, rustc 1.94+.
+- Rust 2024 edition, rustc 1.95+.
 - Clippy pedantic is `deny`; new Rust must pass it.
 - Errors use `CliErrorKind` variants with typed fields via `thiserror`.
 - Hook messages use `HookMessage` with `into_result()`.
