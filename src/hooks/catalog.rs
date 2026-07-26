@@ -36,12 +36,14 @@ impl Hook for StaticHook {
     }
 }
 
-/// Both tool-lifecycle hooks allow unconditionally. The guards that used to
-/// decide here could never deny: registrations do claim `--skill suite:run`,
-/// but no session can confirm that skill as active, so the gate returned allow
-/// before reaching any guard body. The statics still matter, because the runtime
-/// routes on their `name` and `hook_type` and records the call and injects
-/// pending session signals around this call in `runtime::run_hook_command`.
+/// Shared body for both tool-lifecycle hooks: neither holds any policy.
+///
+/// The statics below are the dispatch targets, and they carry the only thing
+/// the runtime needs from them — `name` and `hook_type`, which it routes and
+/// reports on. Recording the call and injecting pending session signals happen
+/// around this call in `runtime::run_hook_command`, and write-surface
+/// enforcement lives in `agents::policy::evaluate_write` behind the ACP client.
+/// So there is nothing left for a handler body to decide.
 #[expect(
     clippy::unnecessary_wraps,
     reason = "the signature must match the HookFn pointer type"
