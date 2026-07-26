@@ -208,14 +208,17 @@ struct AppOpenAnythingSourceContractTests {
   @Test("Open Anything current-window scope uses the keyed session snapshot")
   func currentWindowScopeUsesKeyedSessionSnapshot() throws {
     let scopeSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnythingScope.swift")
-    let sceneSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
+    let sceneSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
 
     #expect(scopeSource.contains("openAnythingSessionID(forWindowID:"))
     #expect(scopeSource.contains("HarnessMonitorWindowID.sessionWindow(session.sessionId)"))
     #expect(scopeSource.contains("appStore.sessionWindowSnapshot(sessionID: sessionID)"))
     #expect(scopeSource.contains("appOpenAnythingLoadedSessionOverride"))
-    #expect(sceneSource.contains("loadedSessionOverride: appOpenAnythingLoadedSessionOverride"))
+    // A changed override has to rebuild the corpus, or the palette keeps
+    // offering the window that was loaded before.
+    #expect(sceneSource.contains(".onChange(of: appOpenAnythingLoadedSessionOverride"))
+    #expect(sceneSource.contains("restartOpenAnythingCorpusDriver(loadedSessionOverride: newValue)"))
     #expect(hostSource.contains("if let loadedSessionOverride"))
   }
 

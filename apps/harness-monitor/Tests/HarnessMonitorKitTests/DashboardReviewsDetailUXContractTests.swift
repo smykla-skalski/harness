@@ -231,7 +231,7 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsReviewLabelLists.swift"
     )
     let reviewModels = try source(
-      "Sources/HarnessMonitorKit/Models/HarnessMonitorReviewActionModels.swift"
+      "Sources/HarnessMonitorKit/Models/HarnessMonitorReviewTargetModels.swift"
     )
     let fileCard = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard.swift"

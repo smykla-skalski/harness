@@ -24,7 +24,10 @@ struct TaskBoardRouteContentSourceTests {
     )
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let selectionModelSource = try taskBoardSourceFile(named: "TaskBoardCardSelectionModel.swift")
-    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    let actionsSource = try previewableTypeSource(
+      domain: "TaskBoard",
+      type: "TaskBoardOverviewActions"
+    )
 
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
     #expect(overviewSource.contains(".sheet(item: taskBoardManagementSheet)"))
@@ -382,7 +385,30 @@ struct TaskBoardRouteContentSourceTests {
     ].joined(separator: "\n")
   }
 
+  /// A type's own file together with its `Type+Extension.swift` siblings.
+  /// Naming those siblings instead goes stale as soon as a member moves into a
+  /// new one, and a file the test stops reading is a contract it stops
+  /// checking without ever saying so.
+  private func previewableTypeSource(domain: String, type: String) throws -> String {
+    let directory = previewableDomainDirectory(domain: domain)
+    let files = try FileManager.default
+      .contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+      .filter { url in
+        url.pathExtension == "swift"
+          && (url.deletingPathExtension().lastPathComponent == type
+            || url.lastPathComponent.hasPrefix("\(type)+"))
+      }
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    return try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
+  }
+
   private func previewableSourceFile(domain: String, named relativePath: String) throws -> String {
+    let fileURL = previewableDomainDirectory(domain: domain)
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func previewableDomainDirectory(domain: String) -> URL {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -390,12 +416,10 @@ struct TaskBoardRouteContentSourceTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let fileURL =
+    return
       repoRoot
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent("Views")
       .appendingPathComponent(domain)
-      .appendingPathComponent(relativePath)
-    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

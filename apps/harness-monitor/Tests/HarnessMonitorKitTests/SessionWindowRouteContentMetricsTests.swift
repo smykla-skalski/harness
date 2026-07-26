@@ -127,7 +127,10 @@ struct SessionWindowRouteContentMetricsTests {
         "evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary"
       )
     )
-    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    let actionsSource = try previewableTypeSource(
+      domain: "TaskBoard",
+      type: "TaskBoardOverviewActions"
+    )
     #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
     #expect(actionsSource.contains("store.supervisorSelectedDecisionID = decision.id"))
     #expect(actionsSource.contains("store.requestSessionRoute("))
@@ -179,7 +182,10 @@ struct SessionWindowRouteContentMetricsTests {
       named: "DashboardRouteContent.swift"
     )
     let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
-    let actionsSource = try taskBoardSourceFile(named: "TaskBoardOverviewActions.swift")
+    let actionsSource = try previewableTypeSource(
+      domain: "TaskBoard",
+      type: "TaskBoardOverviewActions"
+    )
 
     #expect(hostSource.contains("actions: TaskBoardOverviewActions(store: store, scope: scope)"))
     #expect(
@@ -335,7 +341,30 @@ struct SessionWindowRouteContentMetricsTests {
     ].joined(separator: "\n")
   }
 
+  /// A type's own file together with its `Type+Extension.swift` siblings.
+  /// Naming those siblings instead goes stale as soon as a member moves into a
+  /// new one, and a file the test stops reading is a contract it stops
+  /// checking without ever saying so.
+  private func previewableTypeSource(domain: String, type: String) throws -> String {
+    let directory = previewableDomainDirectory(domain: domain)
+    let files = try FileManager.default
+      .contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+      .filter { url in
+        url.pathExtension == "swift"
+          && (url.deletingPathExtension().lastPathComponent == type
+            || url.lastPathComponent.hasPrefix("\(type)+"))
+      }
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    return try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
+  }
+
   private func previewableSourceFile(domain: String, named relativePath: String) throws -> String {
+    let fileURL = previewableDomainDirectory(domain: domain)
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func previewableDomainDirectory(domain: String) -> URL {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -343,12 +372,10 @@ struct SessionWindowRouteContentMetricsTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let fileURL =
+    return
       repoRoot
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent("Views")
       .appendingPathComponent(domain)
-      .appendingPathComponent(relativePath)
-    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

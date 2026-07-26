@@ -186,8 +186,10 @@ struct DashboardReviewsRouteViewTests {
       named: "DashboardReviewsTextPasteSheetHost+Policy.swift")
     let prepareRange = try #require(
       source.range(of: "await preparePastedReviewTextPolicyRuntime("))
+    // Anchored on the parse itself rather than the line that assigns it, which
+    // has already been split into a declaration and an assignment once.
     let referencesRange = try #require(
-      source.range(of: "let references = await Task.detached"))
+      source.range(of: "GitHubPullRequestReferenceParser.references(in: text)"))
 
     #expect(source.contains("await preparePastedReviewTextPolicyRuntime("))
     #expect(source.contains("await store.ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies()"))

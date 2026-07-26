@@ -31,7 +31,7 @@ struct DashboardReviewsBodyAllocationContractTests {
       named: "DashboardReviewCheckListPresentation.swift"
     )
     let reviewCheckSource = try dashboardReviewsAppSource(
-      "apps/harness-monitor/Sources/HarnessMonitorKit/Models/HarnessMonitorReviewActionModels.swift"
+      "apps/harness-monitor/Sources/HarnessMonitorKit/Models/HarnessMonitorReviewTargetModels.swift"
     )
 
     #expect(
