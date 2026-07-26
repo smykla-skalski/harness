@@ -162,10 +162,7 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
         .disabled(!appearance.hasColorOverride(for: lane))
       }
 
-      ColorPicker(selection: colorBinding, supportsOpacity: false) {
-        EmptyView()
-      }
-      .labelsHidden()
+      SettingsTaskBoardLaneColorPicker(lane: lane, rawValue: $rawValue)
     }
   }
 
@@ -253,19 +250,6 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
 
   private func symbolForegroundStyle(for symbolName: String) -> Color {
     symbolName == appearance.symbolName(for: lane) ? .white : appearance.color(for: lane)
-  }
-
-  private var colorBinding: Binding<Color> {
-    Binding(
-      get: { appearance.color(for: lane) },
-      set: { color in
-        rawValue = TaskBoardLaneAppearancePreferences.settingCustomColor(
-          color,
-          for: lane,
-          rawValue: rawValue
-        )
-      }
-    )
   }
 
   private static func symbolOptions(for lane: TaskBoardInboxLane) -> [String] {

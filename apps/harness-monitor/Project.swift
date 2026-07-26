@@ -594,6 +594,7 @@ private let uiPreviewableTarget: Target = {
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
         .target(name: "HarnessMonitorPolicyCanvas"),
+        .external(name: "ColorSelector"),
         .sdk(name: "SwiftData", type: .framework),
         .sdk(name: "Vision", type: .framework)
     ]

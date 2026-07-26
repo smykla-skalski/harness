@@ -1,6 +1,15 @@
 {
-  "originHash" : "ce5a06bc9c31a57af16baed7d397ca3903b8da1a1a8c33dc5f318bf9033efa21",
+  "originHash" : "cc9619605831c93d4cd0b8554f92c6ee38becfa75b0e335070f0cf7849d483cd",
   "pins" : [
+    {
+      "identity" : "colorselector",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jaywcjlove/ColorSelector.git",
+      "state" : {
+        "revision" : "d73937d4c68894170001f331ce991ccaeffa73b5",
+        "version" : "2.3.1"
+      }
+    },
     {
       "identity" : "elk-swift",
       "kind" : "remoteSourceControl",
