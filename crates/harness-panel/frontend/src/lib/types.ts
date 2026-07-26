@@ -8,6 +8,17 @@ export interface PanelAccount {
   avatar_url: string | null;
   first_seen_at: string;
   last_seen_at: string;
+  /** Whether the owner has allowed this account to generate pairing links. */
+  can_pair: boolean;
+}
+
+/** A link the daemon minted, shown once and never stored. */
+export interface PairLink {
+  pairing_id: string;
+  role: string;
+  scopes: string[];
+  expires_at: string;
+  pairing_url: string;
 }
 
 /** The signed-in person, plus what the panel lets them see. */

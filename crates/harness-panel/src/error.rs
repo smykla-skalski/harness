@@ -32,6 +32,9 @@ pub enum PanelError {
     #[error("github sign-in: {0}")]
     GitHub(String),
 
+    #[error("daemon: {0}")]
+    Daemon(String),
+
     /// Carries no path, because this failure is about the host's ability to
     /// start threads and has nothing to do with any file the panel names.
     #[error("starting the panel async runtime: {0}")]
@@ -52,6 +55,10 @@ impl PanelError {
 
     pub fn github(message: impl Into<String>) -> Self {
         Self::GitHub(message.into())
+    }
+
+    pub fn daemon(message: impl Into<String>) -> Self {
+        Self::Daemon(message.into())
     }
 
     #[must_use]
@@ -76,6 +83,8 @@ pub enum ApiError {
     Unauthenticated,
     Forbidden(&'static str),
     RateLimited(&'static str),
+    NotFound(&'static str),
+    Unavailable(&'static str),
     BadRequest(String),
     SignInFailed(String),
     Internal(PanelError),
@@ -93,6 +102,12 @@ impl ApiError {
             Self::RateLimited(message) => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "rate_limited",
+                (*message).to_owned(),
+            ),
+            Self::NotFound(message) => (StatusCode::NOT_FOUND, "not_found", (*message).to_owned()),
+            Self::Unavailable(message) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
                 (*message).to_owned(),
             ),
             Self::BadRequest(message) => (StatusCode::BAD_REQUEST, "bad_request", message.clone()),
@@ -177,6 +192,16 @@ mod tests {
                 "rate_limited",
             ),
             (
+                ApiError::NotFound("no such account"),
+                StatusCode::NOT_FOUND,
+                "not_found",
+            ),
+            (
+                ApiError::Unavailable("not paired yet"),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+            ),
+            (
                 ApiError::BadRequest("missing code".to_owned()),
                 StatusCode::BAD_REQUEST,
                 "bad_request",
@@ -190,6 +215,22 @@ mod tests {
             let (actual_status, actual_code, _) = error.parts();
             assert_eq!(actual_status, status);
             assert_eq!(actual_code, code);
+        }
+    }
+
+    /// Adding a variant breaks this match, which is the reminder to add it to
+    /// the list above as well. The compiler cannot check that the list is
+    /// complete, only that somebody was made to look at it.
+    fn _every_variant_is_accounted_for(error: &ApiError) {
+        match error {
+            ApiError::Unauthenticated
+            | ApiError::Forbidden(_)
+            | ApiError::RateLimited(_)
+            | ApiError::NotFound(_)
+            | ApiError::Unavailable(_)
+            | ApiError::BadRequest(_)
+            | ApiError::SignInFailed(_)
+            | ApiError::Internal(_) => {}
         }
     }
 

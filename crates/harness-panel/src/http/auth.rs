@@ -229,7 +229,7 @@ pub async fn signout(
     Ok((jar, StatusCode::NO_CONTENT).into_response())
 }
 
-fn origin_matches(headers: &HeaderMap, expected: &str) -> bool {
+pub(super) fn origin_matches(headers: &HeaderMap, expected: &str) -> bool {
     let mut origins = headers.get_all(header::ORIGIN).iter();
     let matches = origins
         .next()

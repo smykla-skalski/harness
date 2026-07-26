@@ -10,6 +10,11 @@ sanitize_xcode_only_swift_environment
 CARGO_TOML="$ROOT/Cargo.toml"
 TESTKIT_CARGO_TOML="$ROOT/testkit/Cargo.toml"
 AFF_CARGO_TOML="$ROOT/aff/Cargo.toml"
+# Every crate that moves with the root version. `harness-codex-acp` and
+# `harness-openrouter-agent` are deliberately absent: they carry their own
+# versions and are not part of this release set. A crate extracted from the
+# root belongs here, and one added without it goes stale silently, because the
+# check below only compares what these arrays name.
 CORE_PACKAGE_MANIFESTS=(
   "$ROOT/crates/harness-command/Cargo.toml"
   "$ROOT/crates/harness-daemon-client/Cargo.toml"
@@ -22,6 +27,8 @@ CORE_PACKAGE_MANIFESTS=(
   "$ROOT/crates/harness-systemd/Cargo.toml"
   "$ROOT/crates/harness-systemd-protocol/Cargo.toml"
   "$ROOT/crates/harness-telemetry/Cargo.toml"
+  "$ROOT/crates/harness-kernel/Cargo.toml"
+  "$ROOT/crates/harness-workspace/Cargo.toml"
 )
 CORE_PACKAGE_NAMES=(
   "harness-command"
@@ -35,6 +42,8 @@ CORE_PACKAGE_NAMES=(
   "harness-systemd"
   "harness-systemd-protocol"
   "harness-telemetry"
+  "harness-kernel"
+  "harness-workspace"
 )
 CARGO_LOCK="$ROOT/Cargo.lock"
 MONITOR_APP_ROOT="$ROOT/apps/harness-monitor"

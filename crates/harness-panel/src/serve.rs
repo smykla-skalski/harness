@@ -223,6 +223,7 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
     let store = Store::open(&config.state_dir).await?;
     let listen = config.listen;
     let state = PanelState::new(config, store.clone())?;
+    warn_if_unpaired(&state).await?;
 
     if state.assets.is_placeholder() {
         tracing::warn!(
@@ -251,6 +252,28 @@ pub async fn run(config: PanelConfig) -> Result<(), PanelError> {
             address: bound.to_string(),
             source,
         })
+}
+
+/// Say so at start if the panel cannot mint anything yet.
+///
+/// Serving never claims. A one-time code left in a unit file would be spent on
+/// the first start and refused on every restart afterwards, so claiming is its
+/// own command; this only reports what the store already holds.
+///
+/// # Errors
+/// Returns [`PanelError::Storage`] when the credential cannot be read.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn warn_if_unpaired(state: &PanelState) -> Result<(), PanelError> {
+    if state.store.daemon_credential().await?.is_none() {
+        tracing::warn!(
+            "the panel holds no daemon credential; run `harness-panel pair` once, or nobody will \
+             be able to generate a pairing link"
+        );
+    }
+    Ok(())
 }
 
 #[expect(

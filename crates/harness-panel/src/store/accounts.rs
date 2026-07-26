@@ -28,6 +28,9 @@ pub struct Account {
     pub avatar_url: Option<String>,
     pub first_seen_at: DateTime<Utc>,
     pub last_seen_at: DateTime<Utc>,
+    /// Whether the owner has allowed this person to generate pairing links.
+    /// False until they say so, including for an account created moments ago.
+    pub can_pair: bool,
 }
 
 impl Store {
@@ -52,7 +55,7 @@ impl Store {
     pub async fn account_by_id(&self, id: &str) -> Result<Option<Account>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT id, provider, subject_id, login, display_name, avatar_url, first_seen_at, \
-                    last_seen_at \
+                    last_seen_at, can_pair \
              FROM accounts WHERE id = ?1",
         )
         .bind(id)
@@ -69,7 +72,7 @@ impl Store {
     pub async fn list_accounts(&self) -> Result<Vec<Account>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, provider, subject_id, login, display_name, avatar_url, first_seen_at, \
-                    last_seen_at \
+                    last_seen_at, can_pair \
              FROM accounts ORDER BY last_seen_at DESC, login ASC",
         )
         .fetch_all(self.pool())
@@ -100,7 +103,7 @@ pub(super) async fn upsert_account_with(
            first_seen_at = MIN(accounts.first_seen_at, excluded.first_seen_at), \
            last_seen_at = MAX(accounts.last_seen_at, excluded.last_seen_at) \
          RETURNING id, provider, subject_id, login, display_name, avatar_url, \
-                   first_seen_at, last_seen_at",
+                   first_seen_at, last_seen_at, can_pair",
     )
     // A returning account keeps the id it was created with, because
     // `excluded.id` is only applied on insert. Sessions and, later,
@@ -128,6 +131,7 @@ pub(super) fn account_from_row(row: &SqliteRow) -> Account {
         avatar_url: row.get("avatar_url"),
         first_seen_at: from_unix_seconds(row.get("first_seen_at")),
         last_seen_at: from_unix_seconds(row.get("last_seen_at")),
+        can_pair: row.get::<i64, _>("can_pair") != 0,
     }
 }
 

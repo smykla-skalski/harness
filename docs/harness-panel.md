@@ -6,7 +6,7 @@ The panel never links against the `harness` crate. It reaches the daemon the sam
 
 ## What this version does
 
-Sign-in, and the owner's view of who has signed in. Generating a pairing link from the panel is not part of it yet; the personal page says so. Until it lands, links still come from `harness-daemon remote pair create` on the host.
+Sign-in, the owner's view of who has signed in, approval, and self-service pairing links. Someone signs in, the owner approves them, and they generate their own link.
 
 ## Daemon-to-panel credential
 
@@ -68,9 +68,18 @@ Write the client secret to a file the service can read and nobody else can:
 
 ```bash
 sudo install -d -m 0700 /etc/harness-panel
-printf '%s' "$GITHUB_CLIENT_SECRET" | sudo tee /etc/harness-panel/github-client-secret >/dev/null
-sudo chmod 0400 /etc/harness-panel/github-client-secret
+client_secret_tmp="$(mktemp)" || exit 1
+if ! printf '%s' "$GITHUB_CLIENT_SECRET" >"$client_secret_tmp" ||
+    ! sudo install -m 0400 "$client_secret_tmp" /etc/harness-panel/github-client-secret; then
+  rm -f "$client_secret_tmp"
+  unset client_secret_tmp
+  exit 1
+fi
+rm -f "$client_secret_tmp"
+unset client_secret_tmp
 ```
+
+`mktemp` creates the staging file readable only by its owner, and `install` puts it in place already at 0400. Writing straight to the destination and tightening it afterwards would leave the secret world-readable for as long as the two commands take, which is a window any local process can wait for.
 
 The panel refuses to start if that file is readable by group or other. It is never taken as a flag value or an environment string, both of which any local process can read out of `/proc`.
 
@@ -111,6 +120,8 @@ elif "$panel_candidate" print-unit \
     --github-client-secret-file /etc/harness-panel/github-client-secret \
     --companion-auth-token-file /etc/harness-panel/companion-auth-token \
     --owner-login your-github-login \
+    --daemon-endpoint https://harness.example.com \
+    --daemon-spki-pin sha256/BASE64 \
     >"$panel_service_unit" &&
     "$panel_candidate" print-socket-unit \
       --listen 127.0.0.1:8787 \
@@ -164,6 +175,48 @@ The socket unit owns the loopback listener continuously and passes it to each pa
 
 The rendered service runs under `DynamicUser=yes` with an empty capability bounding set, and takes both credentials through `LoadCredential=`, which exposes protected, read-only copies to the transient user. On ACL-capable hosts the effective ACL mask may appear as a group-read mode bit; the panel accepts that only for a root-owned direct child of its systemd credential directory. `systemd-analyze security` scores it 1.1. What it still counts against the unit is inherent to the job: the panel has host network access, allocates Internet sockets, and pins no IP allow list, because GitHub's address ranges rotate and a stale list would take sign-in down without a word.
 
+## Pairing the panel with the daemon
+
+The panel mints links through the daemon, so it needs a credential of its own. Create a `pairing-broker` link on the daemon host and note both the code and the pin:
+
+```bash
+harness-daemon remote pair create --role pairing-broker
+```
+
+The output carries a `harness://pair?payload=…` link. Its payload holds the one-time code and `server_spki_sha256`; the code goes to `harness-panel pair` once, through the file below, and the pin becomes `--daemon-spki-pin`. The pin is the daemon's certificate, not a secret, and it stays the same until the certificate is renewed with a new key.
+
+Write the code to a file only root can read, then claim it once as root. The panel service never reads this file and must not be given access to it: `pair` is an operator command that runs to completion and stores the credential it claims, while `serve` only ever reads what is already stored. Claiming is separate for that reason: a one-time code left in a unit file would be spent on the first start and refused on every restart afterwards.
+
+```bash
+sudo install -d -m 0700 /etc/harness-panel
+pair_code_tmp="$(mktemp)" || exit 1
+if ! printf '%s' "$PAIR_CODE" >"$pair_code_tmp" ||
+    ! sudo install -m 0400 "$pair_code_tmp" /etc/harness-panel/daemon-pair-code; then
+  rm -f "$pair_code_tmp"
+  unset pair_code_tmp
+  exit 1
+fi
+rm -f "$pair_code_tmp"
+unset pair_code_tmp
+
+sudo harness-panel pair \
+  --public-origin https://harness.example.com \
+  --state-dir /var/lib/harness-panel \
+  --github-client-id Iv1.abc123 \
+  --github-client-secret-file /etc/harness-panel/github-client-secret \
+  --companion-auth-token-file /etc/harness-panel/companion-auth-token \
+  --owner-login your-github-login \
+  --daemon-endpoint https://harness.example.com \
+  --daemon-spki-pin sha256/BASE64 \
+  --code-file /etc/harness-panel/daemon-pair-code
+
+sudo rm /etc/harness-panel/daemon-pair-code
+```
+
+The code is a credential in transit, which is why it goes in a file rather than a flag value: any local process can read a command line out of `/proc`. `pair` refuses a code file that group or other can read, and refuses a credential the daemon issues with any role but `pairing_broker`, rather than storing one that fails later for whoever first tries to generate a link.
+
+Re-pair the same way after revoking the panel's client on the daemon.
+
 ## Checking it
 
 ```bash
@@ -175,6 +228,25 @@ Probe through the public daemon so the proxy token never enters a non-root shell
 `"assets":"bundled"` means the binary carries the real web app. `"assets":"placeholder"` means it was built with `HARNESS_PANEL_SKIP_FRONTEND_BUILD=1` and serves a stand-in page; rebuild it with Node available.
 
 Then open `https://harness.example.com/panel/` and sign in. The owner also sees everyone else who has signed in; nobody else does.
+
+## Approving someone
+
+Everyone starts unable to pair, including the owner. The owner approves an account from the roster, and that account can then generate its own link from its page. The link is shown once: it carries a one-time code, so the panel keeps only the pairing id, the role, and the timestamps, and never the link itself.
+
+The role and lifetime of every link come from `--pair-link-role` and `--pair-link-ttl-seconds`, never from whoever asked. A link the daemon issues under any other role is recorded and then withheld: the panel cannot revoke what it has already caused, so the most it can do is leave the code unshown to lapse unclaimed, and the row is there to revoke on the daemon. An approved account cannot choose what its link grants. Only `operator` and `viewer` may be minted: the panel holds a credential whose one power is minting, and the daemon does not check that a requested role is at or below the caller's own, so anything more would let an approved account end up with more authority than the panel itself has.
+
+An account may hold five unexpired links at once. A revoke cannot reach a link already minted, so without a cap one approved account, or whoever took its session, could leave a pile of live credentials to hunt down one at a time.
+
+The slot is taken before the daemon is asked, so requests arriving together cannot each see the same one free. A panel that dies between taking a slot and receiving the link leaves a row whose id begins `reservation:`, which counts against the cap until it lapses on the configured lifetime and matches no pairing on the daemon.
+
+### What a revoke reaches
+
+Revoking stops that account generating **new** links. It does not reach backwards:
+
+- a link already generated stays claimable until it expires
+- a device that already paired keeps working
+
+Cut off a paired device with `harness-daemon remote clients revoke` on the daemon host. The panel deliberately has no power to do that: it holds a credential that may only mint links, so it cannot revoke the devices those links produced.
 
 ## Who owns the panel
 
@@ -215,6 +287,8 @@ if ! "$panel_candidate" print-unit \
     --github-client-secret-file /etc/harness-panel/github-client-secret \
     --companion-auth-token-file /etc/harness-panel/companion-auth-token \
     --owner-login your-github-login \
+    --daemon-endpoint https://harness.example.com \
+    --daemon-spki-pin sha256/BASE64 \
     >"$panel_service_unit" ||
     ! "$panel_candidate" print-socket-unit \
       --listen 127.0.0.1:8787 \
@@ -353,7 +427,7 @@ The outer `remote_was_active` value survives a failed update and makes the rollb
 
 ## Where its state lives
 
-One SQLite database under the state directory, holding accounts, sessions, and sign-ins in flight. The directory is created mode 0700 and the database stores only the SHA-256 of a session token, so a copy of it is not a set of working sessions. Deleting the database signs everyone out and forgets who has signed in; it costs nothing else.
+One SQLite database under the state directory, holding accounts, sessions, sign-ins in flight, approval decisions, the credential the panel authenticates to the daemon with, and a record of which links it minted. The directory is created mode 0700 and the database stores only the SHA-256 of a session token, so a copy of it is not a set of working sessions. The daemon credential is the one secret held in the clear, because the panel has to replay it on every mint. That makes the database credential-bearing where it previously was not: the sessions beside it are only hashes, but a copy of this row mints pairing links for any identity its holder names. Treat a backup as a secret, and revoke the panel's client on the daemon if one leaks. Deleting the database signs everyone out and forgets who has signed in; it costs nothing else.
 
 ## Developing
 

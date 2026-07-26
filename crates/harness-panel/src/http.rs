@@ -7,9 +7,11 @@
 
 pub mod api;
 pub mod auth;
+pub mod pair_links;
 pub mod session;
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex as StdMutex, PoisonError, Weak};
 
 use axum::Router;
 use axum::extract::{Request, State};
@@ -17,9 +19,12 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use tokio::sync::Mutex;
 
 use crate::assets::PanelAssets;
+use crate::config::daemon::DaemonConfig;
 use crate::config::{CompanionAuthDigest, PanelConfig};
+use crate::daemon_client::DaemonClient;
 use crate::error::PanelError;
 use crate::github::GitHubClient;
 use crate::store::Store;
@@ -31,6 +36,34 @@ pub struct PanelState {
     pub store: Store,
     pub github: Arc<GitHubClient>,
     pub assets: Arc<PanelAssets>,
+    pub daemon: Arc<DaemonRuntime>,
+    pairing_locks: Arc<PairingLocks>,
+}
+
+#[derive(Debug, Default)]
+struct PairingLocks {
+    accounts: StdMutex<HashMap<String, Weak<Mutex<()>>>>,
+}
+
+impl PairingLocks {
+    fn for_account(&self, account_id: &str) -> Arc<Mutex<()>> {
+        let mut accounts = self.accounts.lock().unwrap_or_else(PoisonError::into_inner);
+        accounts.retain(|_, lock| lock.strong_count() > 0);
+        if let Some(lock) = accounts.get(account_id).and_then(Weak::upgrade) {
+            return lock;
+        }
+        let lock = Arc::new(Mutex::new(()));
+        accounts.insert(account_id.to_owned(), Arc::downgrade(&lock));
+        lock
+    }
+}
+
+/// The daemon connection, kept together so a handler cannot reach for a client
+/// built from one configuration and settings from another.
+#[derive(Debug)]
+pub struct DaemonRuntime {
+    pub client: DaemonClient,
+    pub config: DaemonConfig,
 }
 
 impl PanelState {
@@ -42,12 +75,22 @@ impl PanelState {
     pub fn new(config: PanelConfig, store: Store) -> Result<Self, PanelError> {
         let assets = PanelAssets::new(&config.base_path)?;
         let github = GitHubClient::new(config.github.clone(), config.callback_url())?;
+        let daemon = DaemonRuntime {
+            client: DaemonClient::new(&config.daemon)?,
+            config: config.daemon.clone(),
+        };
         Ok(Self {
             config: Arc::new(config),
             store,
             github: Arc::new(github),
             assets: Arc::new(assets),
+            daemon: Arc::new(daemon),
+            pairing_locks: Arc::new(PairingLocks::default()),
         })
+    }
+
+    pub(crate) fn pairing_lock(&self, account_id: &str) -> Arc<Mutex<()>> {
+        self.pairing_locks.for_account(account_id)
     }
 }
 
@@ -65,9 +108,18 @@ pub fn router(state: PanelState) -> Router {
         .route(&format!("{base}/healthz"), get(api::healthz))
         .route(&format!("{base}/api/me"), get(api::me))
         .route(&format!("{base}/api/accounts"), get(api::accounts))
+        .route(
+            &format!("{base}/api/accounts/{{id}}/approve"),
+            post(api::approve),
+        )
+        .route(
+            &format!("{base}/api/accounts/{{id}}/revoke"),
+            post(api::revoke),
+        )
         .route(&format!("{base}/auth/github/start"), get(auth::start))
         .route(&format!("{base}/auth/github/callback"), get(auth::callback))
         .route(&format!("{base}/auth/signout"), post(auth::signout))
+        .route(&format!("{base}/api/pair-links"), post(pair_links::create))
         .route(&base, get(api::index))
         .route(&format!("{base}/"), get(api::index))
         // Anything else under the mount point is either a bundled file or a

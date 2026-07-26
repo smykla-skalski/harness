@@ -5,6 +5,7 @@
 //! forwarded headers instead would let whoever can reach the listener choose
 //! where GitHub sends the authorization code.
 
+pub mod daemon;
 mod secret;
 
 use std::net::SocketAddr;
@@ -89,6 +90,23 @@ pub struct PanelArgs {
     /// How long a signed-in session stays valid.
     #[arg(long, default_value_t = DEFAULT_SESSION_TTL_HOURS, env = "HARNESS_PANEL_SESSION_TTL_HOURS")]
     pub session_ttl_hours: u32,
+
+    /// The daemon's public origin, such as `https://harness.example.com`.
+    #[arg(long, env = "HARNESS_PANEL_DAEMON_ENDPOINT")]
+    pub daemon_endpoint: String,
+
+    /// The daemon's certificate pin, as `sha256/<base64>`. Every pairing
+    /// invitation the daemon issues carries the same value.
+    #[arg(long, env = "HARNESS_PANEL_DAEMON_SPKI_PIN")]
+    pub daemon_spki_pin: String,
+
+    /// The role every link the panel mints grants.
+    #[arg(long, default_value = daemon::DEFAULT_PAIR_LINK_ROLE, env = "HARNESS_PANEL_PAIR_LINK_ROLE")]
+    pub pair_link_role: String,
+
+    /// How long a minted link stays claimable.
+    #[arg(long, default_value_t = daemon::DEFAULT_PAIR_LINK_TTL_SECONDS, env = "HARNESS_PANEL_PAIR_LINK_TTL_SECONDS")]
+    pub pair_link_ttl_seconds: u64,
 }
 
 /// Where the panel talks to GitHub, and as whom.
@@ -112,6 +130,7 @@ pub struct PanelConfig {
     pub owner_login: String,
     pub github: GitHubConfig,
     pub session_ttl: Duration,
+    pub daemon: daemon::DaemonConfig,
 }
 
 pub(crate) struct ValidatedPanelArgs {
@@ -123,6 +142,7 @@ pub(crate) struct ValidatedPanelArgs {
     token_url: Url,
     api_url: Url,
     session_ttl: Duration,
+    daemon: daemon::DaemonConfig,
 }
 
 impl PanelArgs {
@@ -152,6 +172,7 @@ impl PanelArgs {
                 api_url: validated.api_url,
             },
             session_ttl: validated.session_ttl,
+            daemon: validated.daemon,
         })
     }
 
@@ -190,6 +211,12 @@ impl PanelArgs {
             token_url: parse_endpoint("--github-token-url", &self.github_token_url)?,
             api_url: parse_endpoint("--github-api-url", &self.github_api_url)?,
             session_ttl: Duration::hours(i64::from(self.session_ttl_hours)),
+            daemon: daemon::resolve(
+                &self.daemon_endpoint,
+                &self.daemon_spki_pin,
+                &self.pair_link_role,
+                self.pair_link_ttl_seconds,
+            )?,
         })
     }
 }

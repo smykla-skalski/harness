@@ -11,7 +11,7 @@ use std::path::Path;
 
 use axum::body::{Body, to_bytes};
 use axum::http::request::Builder;
-use axum::http::{HeaderValue, Method, Request, StatusCode, header};
+use axum::http::{Method, Request, StatusCode, header};
 use chrono::Utc;
 use tower::ServiceExt;
 
@@ -23,7 +23,12 @@ use crate::config::{
 use crate::store::Store;
 use crate::store::accounts::AccountIdentity;
 
+mod approvals;
 mod auth;
+mod companion;
+mod locks;
+mod minting;
+mod pair_links;
 
 const BODY_LIMIT: usize = 1024 * 1024;
 const COMPANION_AUTH_TOKEN: &str = "0123456789abcdef0123456789abcdef";
@@ -59,6 +64,10 @@ fn args(directory: &Path, owner_login: &str) -> PanelArgs {
         github_token_url: DEFAULT_GITHUB_TOKEN_URL.to_owned(),
         github_api_url: DEFAULT_GITHUB_API_URL.to_owned(),
         session_ttl_hours: 12,
+        daemon_endpoint: "https://harness.example.com".to_owned(),
+        daemon_spki_pin: "sha256/AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=".to_owned(),
+        pair_link_role: "operator".to_owned(),
+        pair_link_ttl_seconds: 600,
     }
 }
 
@@ -95,11 +104,27 @@ impl Harness {
         Self::build(owner_login, Some("http://127.0.0.1:1/token")).await
     }
 
+    /// A panel whose daemon endpoint is a stub the test controls.
+    async fn with_daemon(owner_login: &str, daemon_endpoint: &str) -> Self {
+        Self::build_with(owner_login, None, Some(daemon_endpoint)).await
+    }
+
     async fn build(owner_login: &str, token_url: Option<&str>) -> Self {
+        Self::build_with(owner_login, token_url, None).await
+    }
+
+    async fn build_with(
+        owner_login: &str,
+        token_url: Option<&str>,
+        daemon_endpoint: Option<&str>,
+    ) -> Self {
         let directory = tempfile::tempdir().expect("temp dir");
         let mut raw = args(directory.path(), owner_login);
         if let Some(url) = token_url {
             raw.github_token_url = url.to_owned();
+        }
+        if let Some(endpoint) = daemon_endpoint {
+            raw.daemon_endpoint = endpoint.to_owned();
         }
         let config = raw.resolve().expect("valid configuration");
         let store = Store::open_in_memory().await.expect("store");
@@ -158,6 +183,87 @@ impl Harness {
         (status, String::from_utf8_lossy(&bytes).into_owned())
     }
 
+    /// The panel id of an account that has signed in, which the owner's page
+    /// would have read from the account list.
+    async fn account_id(&self, login: &str) -> String {
+        if self
+            .state
+            .store
+            .list_accounts()
+            .await
+            .expect("accounts")
+            .iter()
+            .all(|account| account.login != login)
+        {
+            self.sign_in(login).await;
+        }
+        self.state
+            .store
+            .list_accounts()
+            .await
+            .expect("accounts")
+            .into_iter()
+            .find(|account| account.login == login)
+            .expect("the account exists")
+            .id
+    }
+
+    async fn post(&self, path: &str, session: Option<&str>) -> (StatusCode, String) {
+        self.post_from_origin(path, session, Some(&self.state.config.public_origin))
+            .await
+    }
+
+    async fn post_from_origin(
+        &self,
+        path: &str,
+        session: Option<&str>,
+        origin: Option<&str>,
+    ) -> (StatusCode, String) {
+        let mut request = Self::request().method(Method::POST).uri(path);
+        if let Some(token) = session {
+            request = request.header(
+                header::COOKIE,
+                format!("{}={token}", session_cookie_name(&self.state)),
+            );
+        }
+        if let Some(origin) = origin {
+            request = request.header(header::ORIGIN, origin);
+        }
+        let response = router(self.state.clone())
+            .oneshot(request.body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), BODY_LIMIT)
+            .await
+            .expect("body");
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    /// The `Cache-Control` a POST answered with, for a body that must never be
+    /// cached.
+    async fn post_response(&self, path: &str, session: Option<&str>) -> Option<String> {
+        let mut request = Self::request()
+            .method(Method::POST)
+            .uri(path)
+            .header(header::ORIGIN, &self.state.config.public_origin);
+        if let Some(token) = session {
+            request = request.header(
+                header::COOKIE,
+                format!("{}={token}", session_cookie_name(&self.state)),
+            );
+        }
+        let response = router(self.state.clone())
+            .oneshot(request.body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned)
+    }
+
     /// Open the start route as a browser would, optionally already holding the
     /// sign-in cookie an earlier tab was issued.
     async fn start_sign_in(&self, cookie: Option<&str>) -> StartedSignIn {
@@ -194,84 +300,6 @@ impl Harness {
 
         StartedSignIn { state, cookie }
     }
-}
-
-#[tokio::test]
-async fn every_panel_route_requires_the_daemon_credential() {
-    let harness = Harness::new("ada").await;
-
-    for (method, path) in [
-        (Method::GET, "/panel/healthz"),
-        (Method::GET, "/panel/"),
-        (Method::GET, "/panel/app.js"),
-        (
-            Method::GET,
-            "/panel/auth/github/callback?code=abc&state=state",
-        ),
-        (Method::POST, "/panel/auth/signout"),
-    ] {
-        let response = router(harness.state.clone())
-            .oneshot(
-                Request::builder()
-                    .method(method)
-                    .uri(path)
-                    .body(Body::empty())
-                    .expect("request"),
-            )
-            .await
-            .expect("response");
-
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{path}");
-        assert_eq!(
-            response.headers().get(header::WWW_AUTHENTICATE),
-            Some(&HeaderValue::from_static("Bearer")),
-            "{path}"
-        );
-    }
-}
-
-#[tokio::test]
-async fn malformed_wrong_or_duplicate_daemon_credentials_are_refused() {
-    let harness = Harness::new("ada").await;
-
-    for authorization in [
-        "Basic 0123456789abcdef0123456789abcdef",
-        "bearer 0123456789abcdef0123456789abcdef",
-        "Bearer 0123456789abcdef0123456789abcdee",
-        "Bearer ",
-    ] {
-        let response = router(harness.state.clone())
-            .oneshot(
-                Request::builder()
-                    .uri("/panel/healthz")
-                    .header(header::AUTHORIZATION, authorization)
-                    .body(Body::empty())
-                    .expect("request"),
-            )
-            .await
-            .expect("response");
-
-        assert_eq!(
-            response.status(),
-            StatusCode::UNAUTHORIZED,
-            "{authorization}"
-        );
-    }
-
-    let mut duplicate = Harness::request()
-        .uri("/panel/healthz")
-        .body(Body::empty())
-        .expect("request");
-    duplicate.headers_mut().append(
-        header::AUTHORIZATION,
-        HeaderValue::from_static("Bearer 0123456789abcdef0123456789abcdef"),
-    );
-    let response = router(harness.state.clone())
-        .oneshot(duplicate)
-        .await
-        .expect("response");
-
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 /// The point of the field is that a deploy which skipped the frontend build is

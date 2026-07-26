@@ -43,6 +43,7 @@ const VIEWER = {
     avatar_url: null,
     first_seen_at: '2026-07-25T10:00:00Z',
     last_seen_at: '2026-07-25T11:00:00Z',
+    can_pair: false,
   },
   is_owner: false,
 };
@@ -155,6 +156,92 @@ describe('non-envelope failures', () => {
       status: 502,
       code: 'unknown',
       message: 'panel request failed with status 502',
+    });
+  });
+});
+
+describe('setCanPair', () => {
+  it('posts to approve or revoke and returns the updated account', async () => {
+    const approved = { ...VIEWER.account, can_pair: true };
+    const stub = stubFetch([jsonResponse(200, approved), jsonResponse(200, VIEWER.account)]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.setCanPair('acc_1', true)).resolves.toEqual(approved);
+    expect(stub.calls[0]?.url).toBe('/panel/api/accounts/acc_1/approve');
+    expect(stub.calls[0]?.init?.method).toBe('POST');
+
+    await api.setCanPair('acc_1', false);
+    expect(stub.calls[1]?.url).toBe('/panel/api/accounts/acc_1/revoke');
+  });
+
+  // An id is server-generated, but building a path by concatenation is how a
+  // future id containing a slash would silently address another route.
+  it('escapes the account id into the path', async () => {
+    const stub = stubFetch([jsonResponse(200, VIEWER.account)]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await api.setCanPair('a/b', true);
+
+    expect(stub.calls[0]?.url).toBe('/panel/api/accounts/a%2Fb/approve');
+  });
+
+  it('surfaces a refusal', async () => {
+    const stub = stubFetch([
+      jsonResponse(403, { error: { code: 'forbidden', message: 'owner only' } }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.setCanPair('acc_1', true)).rejects.toMatchObject({
+      status: 403,
+      code: 'forbidden',
+    });
+  });
+});
+
+describe('createPairLink', () => {
+  it('returns the link the daemon minted', async () => {
+    const link = {
+      pairing_id: 'pair-1',
+      role: 'operator',
+      scopes: ['read', 'write'],
+      expires_at: '2026-07-25T10:10:00Z',
+      pairing_url: 'harness://pair?payload=abc',
+    };
+    const stub = stubFetch([jsonResponse(200, link)]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.createPairLink()).resolves.toEqual(link);
+    expect(stub.calls[0]?.url).toBe('/panel/api/pair-links');
+    expect(stub.calls[0]?.init?.method).toBe('POST');
+  });
+
+  // An account the owner has not approved gets a 403, and the page has to show
+  // the panel's own sentence rather than a generic failure.
+  it('surfaces the reason an unapproved account is refused', async () => {
+    const stub = stubFetch([
+      jsonResponse(403, {
+        error: { code: 'forbidden', message: 'the panel owner has not allowed this account' },
+      }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.createPairLink()).rejects.toMatchObject({
+      status: 403,
+      message: 'the panel owner has not allowed this account',
+    });
+  });
+
+  it('surfaces a panel that has not paired with the daemon', async () => {
+    const stub = stubFetch([
+      jsonResponse(503, {
+        error: { code: 'unavailable', message: 'the panel has not paired with the daemon yet' },
+      }),
+    ]);
+    const api = createPanelApi('/panel', stub.fetch);
+
+    await expect(api.createPairLink()).rejects.toMatchObject({
+      status: 503,
+      code: 'unavailable',
     });
   });
 });

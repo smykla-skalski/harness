@@ -13,6 +13,7 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::config::GitHubConfig;
+use crate::crypto::ensure_crypto_provider;
 use crate::error::PanelError;
 use crate::store::accounts::AccountIdentity;
 
@@ -59,6 +60,7 @@ impl GitHubClient {
     /// # Errors
     /// Returns [`PanelError::GitHub`] when the HTTP client cannot be built.
     pub fn new(config: GitHubConfig, callback_url: String) -> Result<Self, PanelError> {
+        ensure_crypto_provider();
         let provider = installation_provider(&config.api_url);
         let http = Client::builder()
             .timeout(REQUEST_TIMEOUT)

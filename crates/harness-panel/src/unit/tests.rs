@@ -6,6 +6,8 @@ use crate::config::{
 };
 
 mod credential_paths;
+mod escaping;
+mod runbook;
 mod socket;
 
 fn args() -> PanelArgs {
@@ -22,6 +24,10 @@ fn args() -> PanelArgs {
         github_token_url: DEFAULT_GITHUB_TOKEN_URL.to_owned(),
         github_api_url: DEFAULT_GITHUB_API_URL.to_owned(),
         session_ttl_hours: 12,
+        daemon_endpoint: "https://harness.example.com".to_owned(),
+        daemon_spki_pin: "sha256/AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=".to_owned(),
+        pair_link_role: "operator".to_owned(),
+        pair_link_ttl_seconds: 600,
     }
 }
 
@@ -209,76 +215,45 @@ fn the_unit_grants_no_capabilities() {
     assert!(unit.contains("ProtectSystem=strict"), "{unit}");
 }
 
-/// A `%` an operator typed is not a systemd specifier, and leaving it bare
-/// would have systemd substitute something else into the command line.
+/// The unit is what actually starts the panel, so every flag `serve` requires
+/// has to appear in it. Reading the requirement off `PanelArgs` rather than
+/// listing it here is what keeps the two from drifting: a required flag added
+/// to the arguments and not to the renderer produced a unit that clap rejected
+/// at once, which under `Restart=on-failure` is a boot loop rather than a
+/// visible error.
 #[test]
-fn an_operator_supplied_percent_is_escaped() {
-    let mut args = args();
-    args.owner_login = "ada%h".to_owned();
+fn every_required_serve_flag_is_rendered() {
+    // `PanelArgs` derives `Args`, not `Parser`, so the command has to be built
+    // by augmenting an empty one.
+    use clap::{Args, Command};
 
-    let unit = render_unit(
-        "harness-panel",
-        Path::new("/usr/local/bin/harness-panel"),
-        &args,
-    )
-    .expect("a renderable unit");
+    let command = PanelArgs::augment_args(Command::new("serve"));
+    let unit = rendered();
+    // Whole words off the `ExecStart` line, not a substring of the whole unit.
+    // A substring search answers yes to a flag that only appears inside a
+    // value, and no to one rendered last with no space after it.
+    let exec_start = unit
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("a rendered ExecStart");
+    let words: Vec<&str> = exec_start.split_whitespace().collect();
+    let mut missing = Vec::new();
+    for argument in command.get_arguments() {
+        if !argument.is_required_set() {
+            continue;
+        }
+        let Some(long) = argument.get_long() else {
+            continue;
+        };
+        if !words.contains(&format!("--{long}").as_str()) {
+            missing.push(long.to_owned());
+        }
+    }
 
-    assert!(unit.contains("--owner-login \"ada%%h\""), "{unit}");
-}
-
-/// systemd expands variables after it has split the line and dropped the
-/// quotes, so a bare `$FOO` word whose variable is unset expands to no argument
-/// at all. Left unescaped, `--owner-login $UNSET` would drop the value and hand
-/// clap the next flag as the login.
-#[test]
-fn an_operator_supplied_dollar_is_escaped() {
-    let mut args = args();
-    args.owner_login = "$UNSET".to_owned();
-
-    let unit = render_unit(
-        "harness-panel",
-        Path::new("/usr/local/bin/harness-panel"),
-        &args,
-    )
-    .expect("a renderable unit");
-
-    assert!(unit.contains("--owner-login \"$$UNSET\""), "{unit}");
-    assert!(!unit.contains("--owner-login $UNSET"), "{unit}");
-}
-
-/// The secret path is the one operator value that never reaches `ExecStart`, so
-/// nothing on the command path would have refused a newline in it and the rest
-/// of the value would become its own unit directive.
-#[test]
-fn a_control_character_in_the_secret_path_is_refused() {
-    let mut args = args();
-    args.github_client_secret_file =
-        PathBuf::from("/etc/harness-panel/secret\nExecStartPost=/bin/sh -c curl");
-
-    let error = render_unit(
-        "harness-panel",
-        Path::new("/usr/local/bin/harness-panel"),
-        &args,
-    )
-    .expect_err("a newline in the secret path must be refused");
-
-    assert!(error.to_string().contains("control characters"), "{error}");
-}
-
-#[test]
-fn a_control_character_in_the_companion_auth_path_is_refused() {
-    let mut args = args();
-    args.companion_auth_token_file =
-        PathBuf::from("/etc/harness-panel/token\nExecStartPost=/bin/sh -c curl");
-
-    let error = render_unit(
-        "harness-panel",
-        Path::new("/usr/local/bin/harness-panel"),
-        &args,
-    )
-    .expect_err("a newline in the token path must be refused");
-
-    assert!(error.to_string().contains("control characters"), "{error}");
+    assert!(
+        missing.is_empty(),
+        "the rendered unit omits required serve flags: {missing:?}"
+    );
 }
 
 /// `StateDirectory=` is a space-separated list and `%S/{unit}` is emitted as a
@@ -315,55 +290,6 @@ fn an_ordinary_unit_name_is_accepted() {
             "{unit:?} should be accepted"
         );
     }
-}
-
-/// `LoadCredential=` expands specifiers just as `ExecStart` does, so a `%` an
-/// operator typed into the secret path would resolve to something else and
-/// systemd would look for the credential somewhere they never named.
-#[test]
-fn a_percent_in_the_secret_path_is_escaped() {
-    let mut args = args();
-    args.github_client_secret_file = PathBuf::from("/etc/harness-panel/100%secret");
-
-    let unit = render_unit(
-        "harness-panel",
-        Path::new("/usr/local/bin/harness-panel"),
-        &args,
-    )
-    .expect("a renderable unit");
-
-    assert!(
-        unit.contains("LoadCredential=github-client-secret:/etc/harness-panel/100%%secret"),
-        "{unit}"
-    );
-}
-
-#[test]
-fn a_percent_in_the_companion_auth_path_is_escaped() {
-    let mut args = args();
-    args.companion_auth_token_file = PathBuf::from("/etc/harness-panel/100%token");
-
-    let unit = render_unit(
-        "harness-panel",
-        Path::new("/usr/local/bin/harness-panel"),
-        &args,
-    )
-    .expect("a renderable unit");
-
-    assert!(
-        unit.contains("LoadCredential=companion-auth-token:/etc/harness-panel/100%%token"),
-        "{unit}"
-    );
-}
-
-/// The two specifiers the panel builds deliberately mean what they say, so
-/// escaping them alongside operator input would break the paths.
-#[test]
-fn the_panels_own_specifiers_stay_bare() {
-    let unit = rendered();
-
-    assert!(!unit.contains("%%S/"), "{unit}");
-    assert!(!unit.contains("%%d/"), "{unit}");
 }
 
 #[test]
