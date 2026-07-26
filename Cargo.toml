@@ -107,8 +107,6 @@ user_dirs = "0.2.0"
 walkdir = "2.5.0"
 similar = "3.0"
 serde-sarif = "0.8.0"
-k8s-openapi = { version = "0.28.0", features = ["v1_32"], optional = true }
-kube = { version = "4.0.0", features = ["runtime", "ws"], optional = true }
 axum = { version = "0.8.7", features = ["json", "ws"], optional = true }
 utoipa = "5.5.0"
 utoipa-axum = { version = "0.2.0", optional = true }
@@ -149,7 +147,7 @@ tracing-subscriber = { version = "=0.3.23", features = ["chrono", "env-filter", 
 
 [features]
 default = ["all-adapters"]
-all-adapters = ["helm", "k3d", "kubernetes", "kuma"]
+all-adapters = ["kuma"]
 bridge-runtime = [
   "dep:agent-client-protocol",
   "dep:nix",
@@ -183,9 +181,6 @@ standalone-daemon = []
 standalone-worker = ["harness-kernel/standalone-worker"]
 full-runtime = ["daemon-runtime", "mcp-runtime"]
 mcp-runtime = ["dep:harness-mcp"]
-helm = []
-k3d = []
-kubernetes = ["dep:k8s-openapi", "dep:kube"]
 kuma = []
 remote-systemd-e2e-faults = []
 tokio-console = ["harness-telemetry/tokio-console"]

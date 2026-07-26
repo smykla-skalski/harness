@@ -149,7 +149,6 @@ fn infra_exec_root_stays_a_facade() {
         "pub(crate) fn run_command(",
         "pub(crate) fn run_command_streaming(",
         "pub(crate) fn run_command_inherited(",
-        "pub fn kubectl_rollout_restart(",
         "pub fn kumactl_run(",
         "mod tests {",
     ] {
