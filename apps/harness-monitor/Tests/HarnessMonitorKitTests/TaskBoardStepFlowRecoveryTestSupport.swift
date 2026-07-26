@@ -68,7 +68,13 @@ extension TaskBoardStepFlowRecoveryTests {
       // Sleeping rather than yielding: the delivery this waits for has to hop
       // back onto the main actor, and a yield loop here re-enqueues itself
       // ahead of that hop for as long as the wait lasts.
-      try? await Task.sleep(for: .milliseconds(10))
+      do {
+        try await Task.sleep(for: .milliseconds(10))
+      } catch {
+        // Cancellation makes every later sleep throw at once, so swallowing it
+        // would spin here until the deadline.
+        return false
+      }
     }
     return false
   }

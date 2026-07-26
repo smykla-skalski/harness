@@ -88,7 +88,13 @@ extension HarnessMonitorPreviewStoreLifecycleTests {
     // for it rather than for a fixed span that a loaded machine outruns.
     for _ in 0..<200 {
       if store.selectedAcpInspectObservedAt != nil { break }
-      try? await Task.sleep(for: .milliseconds(50))
+      do {
+        try await Task.sleep(for: .milliseconds(50))
+      } catch {
+        // Cancellation makes every later sleep throw at once, so swallowing it
+        // would spin through the whole bound.
+        break
+      }
     }
 
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)

@@ -28,7 +28,13 @@ extension HarnessMonitorMCPContractTests {
       if condition() {
         return
       }
-      try? await Task.sleep(for: poll)
+      do {
+        try await Task.sleep(for: poll)
+      } catch {
+        // Cancellation makes every later sleep throw at once, so swallowing it
+        // would turn this back into the spin it replaced.
+        break
+      }
     }
     #expect(condition())
   }
