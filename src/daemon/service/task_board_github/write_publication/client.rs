@@ -44,6 +44,30 @@ pub(super) async fn publication_client_for_repository(
     stamp_repository(db, config, requested).await
 }
 
+/// Replace the configured base branch with the one the repository actually uses.
+///
+/// A single configured value cannot be right for a board spanning many
+/// repositories - `owner/alpha` branches from `master`, `owner/beta` from
+/// `main`. Refusing beats guessing: a wrong base branch surfaces much later as
+/// an unrelated-looking "branch is not visible" failure.
+pub(super) async fn resolve_base_branch(
+    publication: &mut PublicationClient,
+) -> Result<(), CliError> {
+    let detected = publication
+        .client
+        .repository_default_branch(&publication.config.owner, &publication.config.repo)
+        .await?;
+    let Some(branch) = detected.filter(|branch| !branch.trim().is_empty()) else {
+        return Err(CliErrorKind::workflow_io(format!(
+            "write workflow publication could not detect the default branch for '{}'",
+            publication.repository
+        ))
+        .into());
+    };
+    publication.config.default_branch = branch;
+    Ok(())
+}
+
 /// Build a client for a pull request's head repository, which is a different
 /// repository from the base whenever the contribution came from a fork.
 pub(super) async fn repository_publication_client(

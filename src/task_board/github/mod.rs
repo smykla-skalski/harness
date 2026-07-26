@@ -2,8 +2,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 
-use crate::task_board::policy::PolicyInput;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::task_board::policy::PolicyInput;
 
 mod client;
 mod client_graphql;
@@ -11,6 +11,7 @@ mod config;
 mod evidence;
 mod evidence_api;
 mod publication;
+mod repository;
 mod risk;
 
 pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullRequestHandle};

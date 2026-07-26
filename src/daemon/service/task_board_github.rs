@@ -134,9 +134,23 @@ pub(crate) async fn run_task_board_github_automation_async(
             );
             continue;
         };
-        let config = repository_automation_config(&defaults, &repository);
+        let mut config = repository_automation_config(&defaults, &repository);
         let client =
             GitHubApiAutomationClient::new_with_runtime_config(&token, runtime_config.clone())?;
+        match client
+            .repository_default_branch(&config.owner, &config.repo)
+            .await
+        {
+            Ok(Some(branch)) if !branch.trim().is_empty() => config.default_branch = branch,
+            // One unreachable repository must not stall the other twenty-nine.
+            Ok(_) | Err(_) => {
+                tracing::warn!(
+                    %repository,
+                    "skipping task-board GitHub automation: could not detect the default branch"
+                );
+                continue;
+            }
+        }
         run_task_board_github_automation_with_database_client(
             async_db,
             policy,

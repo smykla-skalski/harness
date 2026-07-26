@@ -5,11 +5,11 @@ use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use crate::task_board::TaskBoardGitRuntimeConfig;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};
@@ -77,6 +77,21 @@ impl GitHubApiAutomationClient {
             token: token.to_string(),
             runtime_config,
         })
+    }
+
+    /// Read a repository's default branch, to be used as a publication base.
+    ///
+    /// Deliberately not on [`GitHubAutomationClient`]: every method there takes
+    /// a `GitHubProjectConfig`, and this call has to happen while building one.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the GitHub client.
+    pub async fn repository_default_branch(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Option<String>, CliError> {
+        super::repository::default_branch_async(&self.client, owner, repo).await
     }
 }
 

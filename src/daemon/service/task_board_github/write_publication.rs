@@ -23,7 +23,10 @@ mod evidence;
 #[path = "write_publication/preparation.rs"]
 mod preparation;
 
-use client::{PublicationClient, publication_client_for_repository, repository_publication_client};
+use client::{
+    PublicationClient, publication_client_for_repository, repository_publication_client,
+    resolve_base_branch,
+};
 use evidence::{
     LocalHeadEvidence, freeze_pull_request, implementation_base, known_publication_number,
     local_head_evidence, required_branch_state, required_frozen_head, validate_published_evidence,
@@ -388,13 +391,15 @@ async fn write_publication_client(
         .into());
     }
     validate_write_publication(execution)?;
-    publication_client_for_repository(
+    let mut publication = publication_client_for_repository(
         db,
         &settings.settings,
         execution.snapshot.workflow_kind,
         execution.snapshot.execution_repository.as_deref(),
     )
-    .await
+    .await?;
+    resolve_base_branch(&mut publication).await?;
+    Ok(publication)
 }
 
 fn validate_write_publication(
