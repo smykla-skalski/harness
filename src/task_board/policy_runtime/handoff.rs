@@ -5,7 +5,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::daemon::db::AsyncDaemonDb;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::action_persistence::PolicyActionPersistence;
@@ -16,6 +15,7 @@ use super::handoff_outbox::handoff_record;
 use super::inbox::PolicyEventInbox;
 use super::models::{PolicyActionDescriptor, PolicyWorkflowEvent};
 use super::providers::{PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext};
+use super::store::PolicyActionStore;
 
 /// Provider domain for cross-cutting orchestration handoffs.
 pub const HANDOFF_PROVIDER: &str = "handoff";
@@ -51,7 +51,7 @@ impl HandoffPolicyProvider {
     }
 
     #[must_use]
-    pub(crate) fn new_database(database: Arc<AsyncDaemonDb>) -> Self {
+    pub(crate) fn new_database<S: PolicyActionStore + 'static>(database: Arc<S>) -> Self {
         Self {
             persistence: PolicyActionPersistence::database(database),
         }

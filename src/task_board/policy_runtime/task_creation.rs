@@ -7,15 +7,15 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::action_persistence::PolicyActionPersistence;
 use super::models::PolicyActionDescriptor;
 use super::providers::{PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext};
+use super::store::PolicyActionStore;
 
 /// Provider domain for cross-cutting task-board task creation.
 pub const TASK_CREATION_PROVIDER: &str = "task_board";
@@ -133,7 +133,7 @@ impl TaskCreationPolicyProvider {
     }
 
     #[must_use]
-    pub(crate) fn new_database(database: Arc<AsyncDaemonDb>) -> Self {
+    pub(crate) fn new_database<S: PolicyActionStore + 'static>(database: Arc<S>) -> Self {
         Self {
             persistence: PolicyActionPersistence::database(database),
         }

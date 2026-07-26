@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use chrono::Utc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use harness_kernel::errors::CliError;
 
 use super::handoff_outbox::HandoffRecord;
@@ -16,6 +15,7 @@ use super::models::PolicyWorkflowEvent;
 use super::notification::NotificationRecord;
 #[cfg(test)]
 use super::notification::PolicyNotificationOutbox;
+use super::store::PolicyActionStore;
 #[cfg(test)]
 use super::task_creation::PolicyTaskCreationOutbox;
 use super::task_creation::TaskCreationRecord;
@@ -24,7 +24,7 @@ use super::task_creation::TaskCreationRecord;
 pub(crate) enum PolicyActionPersistence {
     #[cfg(test)]
     LegacyFiles(PathBuf),
-    Database(Arc<AsyncDaemonDb>),
+    Database(Arc<dyn PolicyActionStore>),
 }
 
 impl PolicyActionPersistence {
@@ -35,7 +35,7 @@ impl PolicyActionPersistence {
     }
 
     #[must_use]
-    pub(crate) fn database(database: Arc<AsyncDaemonDb>) -> Self {
+    pub(crate) fn database(database: Arc<dyn PolicyActionStore>) -> Self {
         Self::Database(database)
     }
 
@@ -52,8 +52,8 @@ impl PolicyActionPersistence {
                 PolicyEventInbox::new(root.clone()).publish_at(event, now)
             }
             Self::Database(database) => {
-                database.record_policy_handoff_at(record, now).await?;
-                database.publish_policy_event_at(event, now).await?;
+                database.record_handoff_at(record, now).await?;
+                database.publish_event_at(event, now).await?;
                 Ok(())
             }
         }
@@ -69,10 +69,7 @@ impl PolicyActionPersistence {
             Self::LegacyFiles(root) => {
                 PolicyNotificationOutbox::new(root.clone()).record_at(record, now)
             }
-            Self::Database(database) => database
-                .record_policy_notification_at(record, now)
-                .await
-                .map(|_| ()),
+            Self::Database(database) => database.record_notification_at(record, now).await,
         }
     }
 
@@ -86,10 +83,7 @@ impl PolicyActionPersistence {
             Self::LegacyFiles(root) => {
                 PolicyTaskCreationOutbox::new(root.clone()).record_at(record, now)
             }
-            Self::Database(database) => database
-                .record_policy_task_creation_at(record, now)
-                .await
-                .map(|_| ()),
+            Self::Database(database) => database.record_task_creation_at(record, now).await,
         }
     }
 }

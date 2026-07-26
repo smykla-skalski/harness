@@ -53,6 +53,8 @@ pub mod http;
 pub mod index;
 pub mod launchd;
 pub mod ordering;
+#[cfg(feature = "daemon-runtime")]
+mod policy_runtime_store;
 pub mod protocol;
 #[cfg(feature = "daemon-runtime")]
 pub mod remote;
