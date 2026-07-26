@@ -4,9 +4,7 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_admission_in_tx};
-use super::admission_lifecycle::{
-    TaskBoardAdmissionCheck, renew_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
-};
+use super::admission_lifecycle::renew_dispatch_admission_in_tx;
 use super::admission_reservations::persist_admission_snapshot_in_tx;
 use super::dispatch_workflow_launch::{
     prepare_workflow_launches_for_publication, rebind_write_launch,
@@ -17,21 +15,21 @@ use super::lane_order::{
 };
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use harness_kernel::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::{
     DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
 };
+use harness_kernel::errors::CliErrorKind;
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
 
 #[path = "dispatch_preparations_helpers.rs"]
 mod helpers;
 use helpers::{
-    active_reservation, apply_preparation_to_item, decode_preparation, ensure_preparation_claim,
-    fail_preparation_admission_in_tx, insert_preparation, release_expired_preparations,
-    validate_reservable_item,
+    PreparationClaim, active_reservation, apply_preparation_to_item,
+    claim_preparation_intent_in_tx, commit_preparation, ensure_preparation_claim,
+    insert_preparation, screen_preparation_claim_in_tx, validate_reservable_item,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -226,73 +224,17 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation claim")
             .await?;
-        release_expired_preparations(&mut transaction).await?;
-        let Some(payload) = query_as::<_, (String,)>(
-            "SELECT payload_json FROM task_board_dispatch_intents
-             WHERE intent_id = ?1 AND status = 'preparing'
-               AND datetime(available_at) <= datetime('now')",
-        )
-        .bind(intent_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load task board preparation: {error}")))?
-        .map(|row| row.0) else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit empty task board preparation claim: {error}"
-                ))
-            })?;
-            return Ok(None);
+        let preparation = match screen_preparation_claim_in_tx(&mut transaction, intent_id).await? {
+            PreparationClaim::Ready(preparation) => *preparation,
+            PreparationClaim::Settled { context, refusal } => {
+                commit_preparation(transaction, context).await?;
+                return refusal.map_or(Ok(None), |reason| {
+                    Err(CliErrorKind::invalid_transition(reason).into())
+                });
+            }
         };
-        let preparation = decode_preparation(&payload)?;
-        let (item, item_revision) = load_item_in_tx(&mut transaction, &preparation.board_item_id)
-            .await?
-            .ok_or_else(|| {
-                db_error(format!(
-                    "task-board item '{}' not found",
-                    preparation.board_item_id
-                ))
-            })?;
-        if let Some(reason) = preparation_revision_error(&preparation, &item, item_revision) {
-            fail_preparation_admission_in_tx(&mut transaction, intent_id, reason).await?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit stale task board preparation: {error}"))
-            })?;
-            return Err(CliErrorKind::invalid_transition(reason).into());
-        }
-        validate_reservable_item(&item, &preparation.plan)?;
-        if let TaskBoardAdmissionCheck::Blocked(admission) =
-            revalidate_dispatch_admission_in_tx(&mut transaction, intent_id, &item, item_revision)
-                .await?
-        {
-            fail_preparation_admission_in_tx(
-                &mut transaction,
-                intent_id,
-                &admission.refusal_message(),
-            )
-            .await?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit refused task board preparation: {error}"))
-            })?;
-            return Err(CliErrorKind::invalid_transition(admission.refusal_message()).into());
-        }
-        let claim_token = format!("dispatch-prepare-{}", Uuid::new_v4().simple());
-        query(
-            "UPDATE task_board_dispatch_intents
-             SET status = 'preparing_claimed', attempts = attempts + 1,
-                 claim_token = ?2, claimed_at = ?3, updated_at = ?3
-             WHERE intent_id = ?1 AND status = 'preparing'",
-        )
-        .bind(intent_id)
-        .bind(&claim_token)
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("claim task board preparation: {error}")))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board preparation claim: {error}")))?;
+        let claim_token = claim_preparation_intent_in_tx(&mut transaction, intent_id).await?;
+        commit_preparation(transaction, "task board preparation claim").await?;
         Ok(Some(ClaimedTaskBoardDispatchPreparation {
             intent_id: intent_id.to_string(),
             claim_token,

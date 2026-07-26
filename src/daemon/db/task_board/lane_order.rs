@@ -4,18 +4,20 @@ use serde_json::json;
 use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
-use super::items::{TaskBoardItemSnapshot, insert_item_in_tx, replace_item_in_tx};
+use super::items::TaskBoardItemSnapshot;
 use super::mapper::{item_from_rows, label};
 use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::audit::upsert_audit_event_in_tx;
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };
+use harness_kernel::errors::CliErrorKind;
 
 mod automatic;
+mod shift;
+use shift::{shift_lane_entries_in_tx, store_item_in_tx};
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardItemsSnapshot {
@@ -144,11 +146,7 @@ async fn write_lane_transition_in_tx(
     }
     let changed = lane_membership_changed(before.as_ref().map(|(item, _)| item), &item);
     if !changed {
-        if before.is_some() {
-            replace_item_in_tx(transaction, &item, item_revision).await?;
-        } else {
-            insert_item_in_tx(transaction, &item, item_revision).await?;
-        }
+        store_item_in_tx(transaction, &item, item_revision, before.is_some()).await?;
         return Ok(LaneTransitionWrite {
             item,
             item_revision,
@@ -193,24 +191,9 @@ async fn write_lane_transition_in_tx(
         allow_destination_clamp,
     )?;
 
-    let mut shifted = Vec::new();
-    clear_changed_anchors_in_tx(transaction, &entries, previous, &item).await?;
-    for entry in entries
-        .iter_mut()
-        .filter(|entry| entry.before != entry.item)
-    {
-        let item_revision = next_item_revision(entry.revision)?;
-        replace_item_in_tx(transaction, &entry.item, item_revision).await?;
-        shifted.push(TaskBoardLaneShift {
-            item_id: entry.item.id.clone(),
-            item_revision,
-        });
-    }
+    let mut shifted = shift_lane_entries_in_tx(transaction, &entries, previous, &item).await?;
     let placement_changed = placement_changed(previous, &item, &shifted);
-    match before {
-        Some(_) => replace_item_in_tx(transaction, &item, item_revision).await?,
-        None => insert_item_in_tx(transaction, &item, item_revision).await?,
-    }
+    store_item_in_tx(transaction, &item, item_revision, before.is_some()).await?;
     shifted.retain(|shift| shift.item_id != item.id);
     Ok(LaneTransitionWrite {
         item,

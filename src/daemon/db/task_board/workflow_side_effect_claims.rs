@@ -1,3 +1,5 @@
+use sqlx::{Sqlite, Transaction};
+
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
@@ -37,84 +39,162 @@ impl AsyncDaemonDb {
         claimed_attempt: &TaskBoardExecutionAttemptRecord,
         now: &str,
     ) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
+        let claim = SideEffectClaimRequest {
+            execution: expected_execution,
+            attempt: expected_attempt,
+            claimed_attempt,
+            now,
+        };
         let mut transaction = self
             .begin_immediate_transaction("task board workflow side-effect claim")
             .await?;
-        let Some(parent) =
-            load_execution_in_tx(&mut transaction, &expected_execution.execution_id).await?
-        else {
-            return Err(CliErrorKind::concurrent_modification(
-                "workflow execution disappeared before side-effect claim",
-            )
-            .into());
+        let parent_state = match screen_side_effect_claim_in_tx(&mut transaction, &claim).await? {
+            SideEffectClaim::Ready(parent_state) => *parent_state,
+            SideEffectClaim::Settled(context) => {
+                commit_side_effect_claim(transaction, context).await?;
+                return Ok(None);
+            }
         };
-        let Some((index, current)) = parent
-            .attempts
-            .iter()
-            .enumerate()
-            .find(|(_, attempt)| {
-                attempt.action_key == expected_attempt.action_key
-                    && attempt.attempt == expected_attempt.attempt
-            })
-            .map(|(index, attempt)| (index, attempt.clone()))
-        else {
-            return Err(CliErrorKind::concurrent_modification(
-                "workflow attempt disappeared before side-effect claim",
-            )
-            .into());
-        };
-        if matches!(
-            claim_disposition(
-                &parent,
-                &current,
-                expected_execution,
-                expected_attempt,
-                claimed_attempt,
-            )?,
-            SideEffectClaimDisposition::AlreadyClaimed
-        ) {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit lost workflow side-effect race: {error}"))
-            })?;
-            return Ok(None);
-        }
-        if active_remote_assignment_exists_in_tx(&mut transaction, &expected_execution.execution_id)
-            .await?
-        {
-            return Err(CliErrorKind::concurrent_modification(
-                "active remote assignment fenced the local side-effect claim",
-            )
-            .into());
-        }
-        if target_selection_required(&parent, &current) {
-            return Err(CliErrorKind::concurrent_modification(
-                "workflow execution target selection is incomplete",
-            )
-            .into());
-        }
-        validate_task_board_attempt_update(&current, claimed_attempt)
-            .map_err(|error| db_error(format!("validate side-effect attempt claim: {error}")))?;
-        validate_attempt_phase(&parent, claimed_attempt)?;
-        ensure_live_revisions(&mut transaction, &parent).await?;
-        if revalidate_first_start_admission_in_tx(&mut transaction, &parent, &current, now).await?
-            == TaskBoardFirstStartAdmission::Settled
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit blocked workflow first start: {error}"))
-            })?;
-            return Ok(None);
-        }
-        let parent_state = claimed_parent_record(&parent, &current, claimed_attempt, index, now)?;
-        update_execution_in_tx(&mut transaction, expected_execution, &parent_state).await?;
-        update_attempt_in_tx(&mut transaction, expected_attempt, claimed_attempt).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board workflow side-effect claim: {error}"
-            ))
-        })?;
+        apply_side_effect_claim_in_tx(&mut transaction, &claim, &parent_state).await?;
+        commit_side_effect_claim(transaction, "task board workflow side-effect claim").await?;
         Ok(Some(claimed_attempt.clone()))
     }
+}
+
+/// The records a side-effect claim compares and stores. Every step reads from
+/// these and none of them changes.
+struct SideEffectClaimRequest<'a> {
+    execution: &'a TaskBoardWorkflowExecutionCas,
+    attempt: &'a TaskBoardExecutionAttemptCas,
+    claimed_attempt: &'a TaskBoardExecutionAttemptRecord,
+    now: &'a str,
+}
+
+/// What the screen decided. `Settled` names the commit's error context and
+/// reports no claim, because the claim was either lost to a competing writer
+/// or blocked by first-start admission.
+enum SideEffectClaim {
+    Ready(Box<TaskBoardWorkflowExecutionRecord>),
+    Settled(&'static str),
+}
+
+/// Proves the claim can be taken and builds the parent execution to store.
+/// `Settled` has to be committed rather than dropped: the first-start
+/// admission this screen revalidates settles a blocked admission and can
+/// freeze an unconfigured start, so the screen itself may already have written.
+async fn screen_side_effect_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    claim: &SideEffectClaimRequest<'_>,
+) -> Result<SideEffectClaim, CliError> {
+    let (parent, index, current) = load_side_effect_claim_target_in_tx(transaction, claim).await?;
+    if matches!(
+        claim_disposition(
+            &parent,
+            &current,
+            claim.execution,
+            claim.attempt,
+            claim.claimed_attempt,
+        )?,
+        SideEffectClaimDisposition::AlreadyClaimed
+    ) {
+        return Ok(SideEffectClaim::Settled("lost workflow side-effect race"));
+    }
+    reject_fenced_side_effect_claim_in_tx(transaction, claim, &parent, &current).await?;
+    validate_task_board_attempt_update(&current, claim.claimed_attempt)
+        .map_err(|error| db_error(format!("validate side-effect attempt claim: {error}")))?;
+    validate_attempt_phase(&parent, claim.claimed_attempt)?;
+    ensure_live_revisions(transaction, &parent).await?;
+    if revalidate_first_start_admission_in_tx(transaction, &parent, &current, claim.now).await?
+        == TaskBoardFirstStartAdmission::Settled
+    {
+        return Ok(SideEffectClaim::Settled("blocked workflow first start"));
+    }
+    let parent_state =
+        claimed_parent_record(&parent, &current, claim.claimed_attempt, index, claim.now)?;
+    Ok(SideEffectClaim::Ready(Box::new(parent_state)))
+}
+
+/// Loads the execution and the attempt the claim names. Either disappearing
+/// between the caller's read and this transaction is a lost race, not a
+/// missing row.
+async fn load_side_effect_claim_target_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    claim: &SideEffectClaimRequest<'_>,
+) -> Result<
+    (
+        TaskBoardWorkflowExecutionRecord,
+        usize,
+        TaskBoardExecutionAttemptRecord,
+    ),
+    CliError,
+> {
+    let Some(parent) = load_execution_in_tx(transaction, &claim.execution.execution_id).await?
+    else {
+        return Err(CliErrorKind::concurrent_modification(
+            "workflow execution disappeared before side-effect claim",
+        )
+        .into());
+    };
+    let Some((index, current)) = parent
+        .attempts
+        .iter()
+        .enumerate()
+        .find(|(_, attempt)| {
+            attempt.action_key == claim.attempt.action_key
+                && attempt.attempt == claim.attempt.attempt
+        })
+        .map(|(index, attempt)| (index, attempt.clone()))
+    else {
+        return Err(CliErrorKind::concurrent_modification(
+            "workflow attempt disappeared before side-effect claim",
+        )
+        .into());
+    };
+    Ok((parent, index, current))
+}
+
+/// A local side-effect claim is fenced by an active remote assignment, and by
+/// an execution whose target selection has not finished.
+async fn reject_fenced_side_effect_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    claim: &SideEffectClaimRequest<'_>,
+    parent: &TaskBoardWorkflowExecutionRecord,
+    current: &TaskBoardExecutionAttemptRecord,
+) -> Result<(), CliError> {
+    if active_remote_assignment_exists_in_tx(transaction, &claim.execution.execution_id).await? {
+        return Err(CliErrorKind::concurrent_modification(
+            "active remote assignment fenced the local side-effect claim",
+        )
+        .into());
+    }
+    if target_selection_required(parent, current) {
+        return Err(CliErrorKind::concurrent_modification(
+            "workflow execution target selection is incomplete",
+        )
+        .into());
+    }
+    Ok(())
+}
+
+async fn apply_side_effect_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    claim: &SideEffectClaimRequest<'_>,
+    parent_state: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), CliError> {
+    update_execution_in_tx(transaction, claim.execution, parent_state).await?;
+    update_attempt_in_tx(transaction, claim.attempt, claim.claimed_attempt).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    Ok(())
+}
+
+async fn commit_side_effect_claim(
+    transaction: Transaction<'_, Sqlite>,
+    context: &str,
+) -> Result<(), CliError> {
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 fn claimed_parent_record(

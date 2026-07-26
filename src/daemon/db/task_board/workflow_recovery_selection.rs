@@ -146,37 +146,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("recoverable workflow execution selection")
             .await?;
-        let eligible_count = recovery_eligible_count(&mut transaction).await?;
-        let rows = if eligible_count <= effective_limit {
-            load_canonical_page(&mut transaction, sql_limit).await?
-        } else {
-            load_truncated_page(&mut transaction, effective_limit, sql_limit).await?
-        };
-        let cursor = rows
-            .last()
-            .map(|row| (row.updated_at.clone(), row.execution_id.clone()));
-        let executions = match load_candidates(&mut transaction, rows).await {
-            Ok(executions) => executions,
-            Err(error) => {
-                transaction.rollback().await.map_err(|rollback_error| {
-                    db_error(format!(
-                        "rollback recoverable workflow selection after '{error}': {rollback_error}"
-                    ))
-                })?;
-                return Err(error);
-            }
-        };
-        if eligible_count > effective_limit {
-            let (updated_at, execution_id) =
-                cursor.ok_or_else(|| db_error("truncated workflow recovery page has no cursor"))?;
-            store_recovery_cursor(&mut transaction, &updated_at, &execution_id).await?;
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit recoverable workflow execution selection: {error}"
-            ))
-        })?;
-        Ok(executions)
+        let page = load_recovery_page_in_tx(&mut transaction, effective_limit, sql_limit).await?;
+        settle_recovery_selection(transaction, page).await
     }
 
     pub(crate) async fn remote_candidate_task_board_workflow_executions(
@@ -359,6 +330,63 @@ async fn store_selection_cursor(
     .await
     .map(|_| ())
     .map_err(|error| db_error(format!("store {} cursor: {error}", selection.context)))
+}
+
+/// One page of recovery candidates. `truncated` means more executions are
+/// eligible than the page holds, which is what makes its cursor worth storing.
+struct RecoveryPage {
+    rows: Vec<WorkflowExecutionRow>,
+    truncated: bool,
+}
+
+async fn load_recovery_page_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    effective_limit: usize,
+    sql_limit: i64,
+) -> Result<RecoveryPage, CliError> {
+    let eligible_count = recovery_eligible_count(transaction).await?;
+    let truncated = eligible_count > effective_limit;
+    let rows = if truncated {
+        load_truncated_page(transaction, effective_limit, sql_limit).await?
+    } else {
+        load_canonical_page(transaction, sql_limit).await?
+    };
+    Ok(RecoveryPage { rows, truncated })
+}
+
+/// Loads the page's executions and settles the transaction. A truncated page
+/// stores its cursor so the next pass resumes after it, and a failed load rolls
+/// the transaction back instead of committing it.
+async fn settle_recovery_selection(
+    mut transaction: Transaction<'_, Sqlite>,
+    page: RecoveryPage,
+) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
+    let cursor = page
+        .rows
+        .last()
+        .map(|row| (row.updated_at.clone(), row.execution_id.clone()));
+    let executions = match load_candidates(&mut transaction, page.rows).await {
+        Ok(executions) => executions,
+        Err(error) => {
+            transaction.rollback().await.map_err(|rollback_error| {
+                db_error(format!(
+                    "rollback recoverable workflow selection after '{error}': {rollback_error}"
+                ))
+            })?;
+            return Err(error);
+        }
+    };
+    if page.truncated {
+        let (updated_at, execution_id) =
+            cursor.ok_or_else(|| db_error("truncated workflow recovery page has no cursor"))?;
+        store_recovery_cursor(&mut transaction, &updated_at, &execution_id).await?;
+    }
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit recoverable workflow execution selection: {error}"
+        ))
+    })?;
+    Ok(executions)
 }
 
 async fn recovery_eligible_count(

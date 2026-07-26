@@ -1,13 +1,13 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 
+use self::atomic::{AtomicCasExpectation, apply_atomic_cas_in_tx, decide_atomic_cas_in_tx};
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_model::concurrent;
-use super::remote_assignment_stop_fence::{RemoteTargetStopPlan, remote_target_stop_plan_in_tx};
 use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json, label};
 use super::workflow_executions::{
-    cas_mismatch, ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,
-    update_execution_in_tx, validate_phase_change,
+    ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,
+    validate_phase_change,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
@@ -152,78 +152,25 @@ impl AsyncDaemonDb {
         expected_attempt: &TaskBoardExecutionAttemptCas,
         updated_attempt: &TaskBoardExecutionAttemptRecord,
     ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
+        let expectation = AtomicCasExpectation {
+            execution: expected_execution,
+            updated_execution,
+            attempt: expected_attempt,
+            updated_attempt,
+        };
         let mut transaction = self
             .begin_immediate_transaction("task board workflow execution and attempt CAS")
             .await?;
-        let Some(current) =
-            load_execution_in_tx(&mut transaction, &expected_execution.execution_id).await?
-        else {
-            commit_atomic_cas_noop(transaction, "missing").await?;
-            return Ok(None);
-        };
-        let Some((attempt_index, current_attempt)) = current
-            .attempts
-            .iter()
-            .enumerate()
-            .find(|(_, attempt)| {
-                attempt.action_key == expected_attempt.action_key
-                    && attempt.attempt == expected_attempt.attempt
-            })
-            .map(|(index, attempt)| (index, attempt.clone()))
-        else {
-            commit_atomic_cas_noop(transaction, "missing attempt").await?;
-            return Ok(None);
-        };
-        if cas_mismatch(expected_execution, &current).is_some()
-            || !attempt_cas_matches(expected_attempt, &current_attempt)
-        {
-            commit_atomic_cas_noop(transaction, "stale").await?;
-            return Ok(None);
-        }
-        let mut combined = updated_execution.clone();
-        let attempt = combined
-            .attempts
-            .get_mut(attempt_index)
-            .ok_or_else(|| db_error("atomic execution update removed its expected attempt"))?;
-        *attempt = updated_attempt.clone();
-        if combined == current {
-            commit_atomic_cas_noop(transaction, "unchanged").await?;
-            return Ok(Some(current));
-        }
-        validate_atomic_execution_attempt_update(
-            &current,
-            updated_execution,
-            &current_attempt,
-            updated_attempt,
-            &combined,
-        )?;
-        match remote_target_stop_plan_in_tx(&mut transaction, &current, &combined).await? {
-            RemoteTargetStopPlan::PersistCancelIntent(parent) => {
-                update_execution_in_tx(&mut transaction, expected_execution, &parent).await?;
-                bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit deferred remote cancellation CAS: {error}"))
-                })?;
-                return Ok(Some(parent));
-            }
-            RemoteTargetStopPlan::ReplayedCancelIntent(parent) => {
-                commit_atomic_cas_noop(transaction, "replayed remote cancellation").await?;
-                return Ok(Some(parent));
-            }
-            RemoteTargetStopPlan::ApplyRequested => {}
-        }
-        reject_active_remote_target_mutation(&current, &current_attempt)?;
-        update_execution_in_tx(&mut transaction, expected_execution, &combined).await?;
-        update_attempt_in_tx(&mut transaction, expected_attempt, updated_attempt).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board workflow execution and attempt CAS: {error}"
-            ))
-        })?;
-        Ok(Some(combined))
+        let settlement = decide_atomic_cas_in_tx(&mut transaction, &expectation).await?;
+        let (context, result) =
+            apply_atomic_cas_in_tx(&mut transaction, &expectation, settlement).await?;
+        commit_atomic_cas(transaction, context).await?;
+        Ok(result)
     }
 }
+
+#[path = "workflow_execution_attempts_atomic.rs"]
+mod atomic;
 
 fn reject_active_remote_target_mutation(
     parent: &TaskBoardWorkflowExecutionRecord,
@@ -250,15 +197,14 @@ fn reject_active_remote_target_mutation(
     }
 }
 
-async fn commit_atomic_cas_noop(
+async fn commit_atomic_cas(
     transaction: Transaction<'_, Sqlite>,
-    reason: &str,
+    context: &str,
 ) -> Result<(), CliError> {
-    transaction.commit().await.map_err(|error| {
-        db_error(format!(
-            "commit {reason} workflow execution and attempt CAS: {error}"
-        ))
-    })
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit {context}: {error}")))
 }
 
 pub(super) fn validate_atomic_execution_attempt_update(
