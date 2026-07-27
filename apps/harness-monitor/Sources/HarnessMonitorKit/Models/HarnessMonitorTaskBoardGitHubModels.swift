@@ -23,11 +23,9 @@ public struct TaskBoardGitHubInboxConfig: Codable, Equatable, Sendable {
   }
 }
 
+/// The publication conventions, which apply to every repository the board
+/// publishes to. The repository itself comes from the item, so this names none.
 public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
-  public let owner: String
-  public let repo: String
-  public let checkoutPath: String
-  public let defaultBranch: String
   public let branchPrefix: String
   public let mergeMethod: TaskBoardGitHubMergeMethod
   public let labels: TaskBoardGitHubAutomationLabels
@@ -36,10 +34,6 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   public let enabledAutomations: TaskBoardGitHubAutomationToggles
 
   public init(
-    owner: String = "",
-    repo: String = "",
-    checkoutPath: String = "",
-    defaultBranch: String = "main",
     branchPrefix: String = "c/",
     mergeMethod: TaskBoardGitHubMergeMethod = .squash,
     labels: TaskBoardGitHubAutomationLabels = TaskBoardGitHubAutomationLabels(),
@@ -47,10 +41,6 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
     requestedReviewers: TaskBoardGitHubRequestedReviewers = TaskBoardGitHubRequestedReviewers(),
     enabledAutomations: TaskBoardGitHubAutomationToggles = TaskBoardGitHubAutomationToggles()
   ) {
-    self.owner = owner
-    self.repo = repo
-    self.checkoutPath = checkoutPath
-    self.defaultBranch = defaultBranch
     self.branchPrefix = branchPrefix
     self.mergeMethod = mergeMethod
     self.labels = labels
@@ -60,10 +50,6 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case owner
-    case repo
-    case checkoutPath
-    case defaultBranch
     case branchPrefix
     case mergeMethod
     case labels
@@ -75,10 +61,6 @@ public struct TaskBoardGitHubProjectConfig: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
-      owner: try container.decodeIfPresent(String.self, forKey: .owner) ?? "",
-      repo: try container.decodeIfPresent(String.self, forKey: .repo) ?? "",
-      checkoutPath: try container.decodeIfPresent(String.self, forKey: .checkoutPath) ?? "",
-      defaultBranch: try container.decodeIfPresent(String.self, forKey: .defaultBranch) ?? "main",
       branchPrefix: try container.decodeIfPresent(String.self, forKey: .branchPrefix) ?? "c/",
       mergeMethod: try container.decodeIfPresent(
         TaskBoardGitHubMergeMethod.self,

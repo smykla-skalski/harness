@@ -2,13 +2,20 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
-use crate::task_board::github::{GitHubApiAutomationClient, GitHubProjectConfig};
+use crate::task_board::github::{
+    GitHubApiAutomationClient, GitHubAutomationSettings, GitHubProjectConfig,
+};
 use crate::task_board::{
     TaskBoardOrchestratorSettings, TaskBoardWorkflowKind, normalize_repository_slug,
 };
 
 use super::super::support::{automation_config, github_token_for_repository};
 use super::preparation::validate_publication_automations;
+
+/// Stands in for the base branch until the publish path detects the real one.
+/// Named rather than spelled "main" inline so a reader hitting it in a debugger
+/// sees that nothing chose it.
+const DETECTED_LATER_BASE_BRANCH: &str = "main";
 
 pub(in crate::daemon::service::task_board_github) struct PublicationClient {
     pub(in crate::daemon::service::task_board_github) config: GitHubProjectConfig,
@@ -40,7 +47,7 @@ pub(super) async fn publication_client_for_repository(
         )
         .into());
     };
-    validate_publication_automations(&config, workflow_kind)?;
+    validate_publication_automations(&config.enabled_automations, workflow_kind)?;
     stamp_repository(db, config, requested).await
 }
 
@@ -57,7 +64,10 @@ pub(super) async fn resolve_base_branch(
         .client
         .repository_default_branch(&publication.config.owner, &publication.config.repo)
         .await?;
-    let Some(branch) = detected.filter(|branch| !branch.trim().is_empty()) else {
+    let Some(branch) = detected
+        .map(|branch| branch.trim().to_owned())
+        .filter(|branch| !branch.is_empty())
+    else {
         return Err(CliErrorKind::workflow_io(format!(
             "write workflow publication could not detect the default branch for '{}'",
             publication.repository
@@ -75,12 +85,12 @@ pub(super) async fn repository_publication_client(
     base: &GitHubProjectConfig,
     repository: &str,
 ) -> Result<PublicationClient, CliError> {
-    stamp_repository(db, base.clone(), repository).await
+    stamp_repository(db, base.conventions(), repository).await
 }
 
 async fn stamp_repository(
     db: &AsyncDaemonDb,
-    mut config: GitHubProjectConfig,
+    settings: GitHubAutomationSettings,
     repository: &str,
 ) -> Result<PublicationClient, CliError> {
     let Some(repository) = normalize_repository_slug(Some(repository)) else {
@@ -100,8 +110,10 @@ async fn stamp_repository(
             "write workflow publication target is not an owner/repo repository",
         ))
     })?;
-    config.owner = owner.into();
-    config.repo = repo.into();
+    // The base branch is a placeholder until `resolve_base_branch` detects the
+    // real one. Only the publish path calls that; launch validation reads the
+    // pull request by owner and repo and never looks at the base.
+    let config = settings.for_repository(owner, repo, DETECTED_LATER_BASE_BRANCH);
     let mut runtime_config = db.task_board_runtime_config().await?;
     overlay_task_board_git_runtime_secrets(&mut runtime_config);
     let client = GitHubApiAutomationClient::new_with_runtime_config(token, runtime_config)?;

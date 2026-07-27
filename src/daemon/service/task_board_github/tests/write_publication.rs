@@ -251,7 +251,7 @@ impl PublicationFixture {
             &["-c", "commit.gpgsign=false", "commit", "-m", "reviewed"],
         );
         let reviewed_tree = git_tree(&repo, "HEAD");
-        let config = GitHubProjectConfig::new("owner", "repo", repo.clone());
+        let config = GitHubProjectConfig::new("owner", "repo");
         let head = TaskBoardPullRequestHeadIdentity {
             repository: "owner/repo".into(),
             branch: "feature/fix".into(),
@@ -285,6 +285,7 @@ impl PublicationFixture {
 
     fn client(&self, draft: bool) -> FakeGitHubClient {
         FakeGitHubClient {
+            checkout: self.repo.clone(),
             pull_request: GitHubPullRequestHandle {
                 number: 42,
                 html_url: Some("https://github.com/owner/repo/pull/42".into()),

@@ -4,10 +4,46 @@
 
 import Foundation
 
+public struct GitHubAutomationSettingsWire: Codable, Equatable, Sendable {
+  public var branchPrefix: String
+  public var mergeMethod: TaskBoardGitHubMergeMethod
+  public var labels: GitHubAutomationLabelsWire
+  public var protectedPaths: [ProtectedPathRuleWire]
+  public var requestedReviewers: GitHubRequestedReviewersWire
+  public var enabledAutomations: GitHubAutomationTogglesWire
+
+  public init(branchPrefix: String = "c/", mergeMethod: TaskBoardGitHubMergeMethod = .squash, labels: GitHubAutomationLabelsWire, protectedPaths: [ProtectedPathRuleWire] = [], requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(), enabledAutomations: GitHubAutomationTogglesWire) {
+    self.branchPrefix = branchPrefix
+    self.mergeMethod = mergeMethod
+    self.labels = labels
+    self.protectedPaths = protectedPaths
+    self.requestedReviewers = requestedReviewers
+    self.enabledAutomations = enabledAutomations
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    branchPrefix = try container.decodeIfPresent(String.self, forKey: .branchPrefix) ?? "c/"
+    mergeMethod = try container.decodeIfPresent(TaskBoardGitHubMergeMethod.self, forKey: .mergeMethod) ?? .squash
+    labels = try container.decode(GitHubAutomationLabelsWire.self, forKey: .labels)
+    protectedPaths = try container.decodeIfPresent([ProtectedPathRuleWire].self, forKey: .protectedPaths) ?? []
+    requestedReviewers = try container.decodeIfPresent(GitHubRequestedReviewersWire.self, forKey: .requestedReviewers) ?? GitHubRequestedReviewersWire()
+    enabledAutomations = try container.decode(GitHubAutomationTogglesWire.self, forKey: .enabledAutomations)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case branchPrefix = "branch_prefix"
+    case mergeMethod = "merge_method"
+    case labels
+    case protectedPaths = "protected_paths"
+    case requestedReviewers = "requested_reviewers"
+    case enabledAutomations = "enabled_automations"
+  }
+}
+
 public struct GitHubProjectConfigWire: Codable, Equatable, Sendable {
   public var owner: String
   public var repo: String
-  public var checkoutPath: String
   public var defaultBranch: String
   public var branchPrefix: String
   public var mergeMethod: TaskBoardGitHubMergeMethod
@@ -16,10 +52,9 @@ public struct GitHubProjectConfigWire: Codable, Equatable, Sendable {
   public var requestedReviewers: GitHubRequestedReviewersWire
   public var enabledAutomations: GitHubAutomationTogglesWire
 
-  public init(owner: String = "", repo: String = "", checkoutPath: String = "", defaultBranch: String = "main", branchPrefix: String = "c/", mergeMethod: TaskBoardGitHubMergeMethod = .squash, labels: GitHubAutomationLabelsWire, protectedPaths: [ProtectedPathRuleWire] = [], requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(), enabledAutomations: GitHubAutomationTogglesWire) {
+  public init(owner: String = "", repo: String = "", defaultBranch: String = "main", branchPrefix: String = "c/", mergeMethod: TaskBoardGitHubMergeMethod = .squash, labels: GitHubAutomationLabelsWire, protectedPaths: [ProtectedPathRuleWire] = [], requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(), enabledAutomations: GitHubAutomationTogglesWire) {
     self.owner = owner
     self.repo = repo
-    self.checkoutPath = checkoutPath
     self.defaultBranch = defaultBranch
     self.branchPrefix = branchPrefix
     self.mergeMethod = mergeMethod
@@ -33,7 +68,6 @@ public struct GitHubProjectConfigWire: Codable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     owner = try container.decodeIfPresent(String.self, forKey: .owner) ?? ""
     repo = try container.decodeIfPresent(String.self, forKey: .repo) ?? ""
-    checkoutPath = try container.decodeIfPresent(String.self, forKey: .checkoutPath) ?? ""
     defaultBranch = try container.decodeIfPresent(String.self, forKey: .defaultBranch) ?? "main"
     branchPrefix = try container.decodeIfPresent(String.self, forKey: .branchPrefix) ?? "c/"
     mergeMethod = try container.decodeIfPresent(TaskBoardGitHubMergeMethod.self, forKey: .mergeMethod) ?? .squash
@@ -46,7 +80,6 @@ public struct GitHubProjectConfigWire: Codable, Equatable, Sendable {
   enum CodingKeys: String, CodingKey {
     case owner
     case repo
-    case checkoutPath = "checkout_path"
     case defaultBranch = "default_branch"
     case branchPrefix = "branch_prefix"
     case mergeMethod = "merge_method"

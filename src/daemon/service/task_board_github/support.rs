@@ -5,8 +5,8 @@ use uuid::Uuid;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::session_detail_core_async;
 use crate::task_board::github::{
-    GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
-    GitHubPullRequestHandle,
+    GitHubAutomation, GitHubAutomationClient, GitHubAutomationSettings, GitHubCreatePullRequest,
+    GitHubProjectConfig, GitHubPullRequestHandle,
 };
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
 use crate::task_board::{
@@ -144,7 +144,7 @@ pub(super) async fn load_session_worktrees_async(
 /// is being published to.
 pub(super) fn automation_config(
     settings: &TaskBoardOrchestratorSettings,
-) -> Option<GitHubProjectConfig> {
+) -> Option<GitHubAutomationSettings> {
     let config = settings.github_project.clone();
     let enabled = config
         .enabled_automations

@@ -1,6 +1,5 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -24,7 +23,7 @@ async fn request_pull_request_reviewers_posts_expected_payload() {
         "user": null
     }));
     let client = automation_client_with_base_uri(endpoint);
-    let config = GitHubProjectConfig::new("owner", "repo", PathBuf::from("."));
+    let config = GitHubProjectConfig::new("owner", "repo");
 
     client
         .request_pull_request_reviewers(

@@ -17,7 +17,6 @@ extension HarnessMonitorStore {
   private func materializeTaskBoardOrchestratorSettings(
     _ settings: TaskBoardOrchestratorSettings
   ) async throws -> TaskBoardOrchestratorSettings {
-    let githubProject = settings.githubProject
     return TaskBoardOrchestratorSettings(
       stepMode: settings.stepMode,
       enabledWorkflows: settings.enabledWorkflows,
@@ -28,22 +27,9 @@ extension HarnessMonitorStore {
         kind: .taskBoardDirectory,
         isDirectory: true
       ),
-      githubProject: TaskBoardGitHubProjectConfig(
-        owner: githubProject.owner,
-        repo: githubProject.repo,
-        checkoutPath: try await materializeTaskBoardPath(
-          githubProject.checkoutPath,
-          kind: .taskBoardDirectory,
-          isDirectory: true
-        ) ?? "",
-        defaultBranch: githubProject.defaultBranch,
-        branchPrefix: githubProject.branchPrefix,
-        mergeMethod: githubProject.mergeMethod,
-        labels: githubProject.labels,
-        protectedPaths: githubProject.protectedPaths,
-        requestedReviewers: githubProject.requestedReviewers,
-        enabledAutomations: githubProject.enabledAutomations
-      ),
+      // Passes straight through: the checkout path was the one member that
+      // named a sandbox location needing a bookmark resolved, and it is gone.
+      githubProject: settings.githubProject,
       githubInbox: settings.githubInbox,
       policyVersion: settings.policyVersion
     )

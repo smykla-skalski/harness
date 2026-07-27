@@ -189,7 +189,7 @@ pub(super) async fn publish_pr_fix_branch(
             "PrFix head branch changed before publication",
         ));
     }
-    validate_publication_automations(config, TaskBoardWorkflowKind::PrFix)?;
+    validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix)?;
     let mut policy_item = item.clone();
     policy_item.project_id = Some(head.repository.clone());
     let decision = action_policy(

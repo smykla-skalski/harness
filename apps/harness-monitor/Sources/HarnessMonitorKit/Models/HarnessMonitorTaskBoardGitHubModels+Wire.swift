@@ -35,12 +35,8 @@ extension TaskBoardGitHubAutomationToggles {
 }
 
 extension TaskBoardGitHubProjectConfig {
-  init(wire: GitHubProjectConfigWire) {
+  init(wire: GitHubAutomationSettingsWire) {
     self.init(
-      owner: wire.owner,
-      repo: wire.repo,
-      checkoutPath: wire.checkoutPath,
-      defaultBranch: wire.defaultBranch,
       branchPrefix: wire.branchPrefix,
       mergeMethod: wire.mergeMethod,
       labels: TaskBoardGitHubAutomationLabels(wire: wire.labels),

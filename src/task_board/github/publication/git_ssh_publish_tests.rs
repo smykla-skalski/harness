@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command as TestCommand;
 
 use super::super::types::LocalCommitAuthor;
@@ -35,7 +35,7 @@ fn branch_validation_rejects_refspec_injection() {
 
 #[test]
 fn github_https_url_uses_plain_remote_without_token() {
-    let config = GitHubProjectConfig::new("owner", "repo", PathBuf::new());
+    let config = GitHubProjectConfig::new("owner", "repo");
 
     let url = github_https_url(&config).expect("url");
 

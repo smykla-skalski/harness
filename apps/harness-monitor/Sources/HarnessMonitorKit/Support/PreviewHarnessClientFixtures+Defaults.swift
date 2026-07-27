@@ -26,10 +26,6 @@ extension PreviewHarnessClient.Fixtures {
     dispatchStatusFilter: .todo,
     projectDir: "/Users/example/Projects/harness",
     githubProject: TaskBoardGitHubProjectConfig(
-      owner: "smykla-skalski",
-      repo: "harness",
-      checkoutPath: "/Users/example/Projects/harness",
-      defaultBranch: "main",
       branchPrefix: "task-board/",
       mergeMethod: .squash,
       labels: TaskBoardGitHubAutomationLabels(

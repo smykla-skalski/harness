@@ -20,17 +20,10 @@ final class TaskBoardSyncAvailabilityTests: XCTestCase {
     XCTAssertEqual(availability.warning, "Add a monitored repository before running sync")
   }
 
-  /// Publication targets whatever repository an item names, so a single
-  /// `githubProject` owner/repo says nothing about what sync can reach. Only the
-  /// monitored list does.
-  func testProjectRepositoryAloneDoesNotEnableSync() {
-    let settings = TaskBoardOrchestratorSettings(
-      githubProject: TaskBoardGitHubProjectConfig(owner: "example", repo: "project"),
-      policyVersion: "test"
-    )
-
-    XCTAssertFalse(TaskBoardGitHubSyncAvailability(settings: settings).canRun)
-  }
+  // The test that a configured project owner/repo alone did not enable sync is
+  // gone with the fields: settings no longer carry a publication repository, so
+  // the state it guarded cannot be built. The monitored list is now the only
+  // input, which the two tests around this cover.
 
   func testInboxRepositoryEnablesSync() {
     let settings = TaskBoardOrchestratorSettings(
