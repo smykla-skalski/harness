@@ -10,7 +10,6 @@ pub mod http_paths {
 }
 
 /// Canonical websocket method names shared with the daemon router.
-#[path = "../../../src/daemon/protocol/api_contract/ws_methods.rs"]
 pub mod ws_methods;
 
 /// Bounds the daemon holds every task-board list read to. Shared as one source

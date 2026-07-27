@@ -23,7 +23,7 @@ extension WebSocketProtocolParityTests {
   }
 
   private func daemonRPCMethodCatalogPath() throws -> URL {
-    let relativeCatalogPath = "src/daemon/protocol/api_contract/ws_methods.rs"
+    let relativeCatalogPath = "crates/harness-protocol/src/daemon/ws_methods.rs"
     let env = ProcessInfo.processInfo.environment
     let candidateRoots = [
       env["HARNESS_MONITOR_REPO_ROOT"].map(URL.init(fileURLWithPath:)),
