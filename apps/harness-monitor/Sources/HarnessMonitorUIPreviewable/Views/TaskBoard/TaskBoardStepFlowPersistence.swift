@@ -34,9 +34,16 @@ enum TaskBoardStepFlowStore {
   private static let decoder = JSONDecoder()
   private static let encoder = JSONEncoder()
 
+  /// Bytes that no longer decode are dropped instead of left in place, so a
+  /// value written by another build cannot sit on the key until some later flow
+  /// happens to overwrite it.
   static func load(from userDefaults: UserDefaults = .standard) -> TaskBoardStepFlowSnapshot? {
     guard let data = userDefaults.data(forKey: storageKey) else { return nil }
-    return try? decoder.decode(TaskBoardStepFlowSnapshot.self, from: data)
+    guard let snapshot = try? decoder.decode(TaskBoardStepFlowSnapshot.self, from: data) else {
+      userDefaults.removeObject(forKey: storageKey)
+      return nil
+    }
+    return snapshot
   }
 
   /// Saving `nil` forgets the stored flow, so ending one and never starting one

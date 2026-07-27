@@ -40,6 +40,15 @@ final class TaskBoardStepFlowPersistenceTests {
     #expect(TaskBoardStepFlowStore.load(from: defaults) == nil)
   }
 
+  @Test("Bytes that no longer decode are dropped")
+  func undecodableFlowIsDropped() {
+    defaults.set(Data("not a flow".utf8), forKey: TaskBoardStepFlowStore.storageKey)
+
+    #expect(TaskBoardStepFlowStore.load(from: defaults) == nil)
+
+    #expect(defaults.data(forKey: TaskBoardStepFlowStore.storageKey) == nil)
+  }
+
   @Test("A stored flow resumes on the live item it pinned")
   func storedFlowResumesOnLiveItem() {
     let target = item(id: "active", status: .todo)
