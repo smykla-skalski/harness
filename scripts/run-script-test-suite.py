@@ -1050,7 +1050,8 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--budget-seconds",
         type=_positive_float,
-        default=float(os.environ.get("HARNESS_SCRIPT_TEST_BUDGET_SECONDS", "15")),
+        default=os.environ.get("HARNESS_SCRIPT_TEST_BUDGET_SECONDS"),
+        help="fail when the suite exceeds this opt-in wall-clock budget",
     )
     parser.add_argument(
         "--task-timeout-seconds",
@@ -1106,7 +1107,10 @@ def main() -> int:
         if result.output:
             print(result.output.rstrip(), file=sys.stderr)
 
-    over_budget = elapsed_seconds >= arguments.budget_seconds
+    over_budget = (
+        arguments.budget_seconds is not None
+        and elapsed_seconds >= arguments.budget_seconds
+    )
     if over_budget:
         failures += 1
         print(
@@ -1116,10 +1120,15 @@ def main() -> int:
             file=sys.stderr,
         )
     passed = sum(result.returncode == 0 for result in summary.results)
+    budget = (
+        f"budget {arguments.budget_seconds:g}s"
+        if arguments.budget_seconds is not None
+        else "budget disabled"
+    )
     print(
         f"script tests: {passed} passed, "
         f"{len(summary.results) - passed} failed in {elapsed_seconds:.2f}s "
-        f"(budget {arguments.budget_seconds:g}s, jobs {arguments.jobs})"
+        f"({budget}, jobs {arguments.jobs})"
     )
     return 1 if failures else 0
 

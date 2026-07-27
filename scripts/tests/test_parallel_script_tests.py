@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +25,26 @@ def load_runner():
 
 
 class ParallelScriptTestRunnerTests(unittest.TestCase):
+    def test_total_runtime_budget_is_opt_in(self) -> None:
+        runner = load_runner()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(sys, "argv", ["run-script-test-suite.py"]),
+        ):
+            arguments = runner._arguments()
+        self.assertIsNone(arguments.budget_seconds)
+
+        with (
+            patch.dict(
+                os.environ,
+                {"HARNESS_SCRIPT_TEST_BUDGET_SECONDS": "15"},
+                clear=True,
+            ),
+            patch.object(sys, "argv", ["run-script-test-suite.py"]),
+        ):
+            arguments = runner._arguments()
+        self.assertEqual(arguments.budget_seconds, 15)
+
     def test_jobs_overlap_and_receive_private_home_and_tmpdir(self) -> None:
         runner = load_runner()
         with tempfile.TemporaryDirectory() as directory:
