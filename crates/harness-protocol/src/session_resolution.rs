@@ -35,9 +35,7 @@ pub fn session_id_from_env(agent: HookAgent) -> Option<String> {
         HookAgent::Vibe => &["VIBE_SESSION_ID"][..],
         HookAgent::OpenCode => &["OPENCODE_SESSION_ID"][..],
     };
-    candidates
-        .iter()
-        .find_map(|name| env::var(name).ok().filter(|value| !value.trim().is_empty()))
+    candidates.iter().copied().find_map(trimmed_env)
 }
 
 /// Resolve a hook context's working directory, unescaping a shell-escaped
@@ -167,6 +165,16 @@ mod tests {
     }
 
     #[test]
+    fn session_id_from_env_trims_whitespace() {
+        temp_env::with_var("VIBE_SESSION_ID", Some("  padded-session  "), || {
+            assert_eq!(
+                session_id_from_env(HookAgent::Vibe),
+                Some("padded-session".to_string())
+            );
+        });
+    }
+
+    #[test]
     fn shell_unescaped_path_undoes_backslash_escapes() {
         let escaped = std::path::Path::new("project\\@team");
         assert_eq!(
@@ -186,8 +194,12 @@ mod tests {
 
     #[test]
     fn resolve_context_cwd_returns_none_for_an_escaped_path_that_still_does_not_exist() {
-        let missing = std::path::Path::new("/does/not/exist\\@team");
-        assert_eq!(resolve_context_cwd(missing), None);
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time after unix epoch")
+            .as_nanos();
+        let missing = env::temp_dir().join(format!("harness-test-missing-{unique}\\@team"));
+        assert_eq!(resolve_context_cwd(&missing), None);
     }
 
     #[test]
