@@ -193,30 +193,61 @@ async fn select_workflow_execution_page(
         .map_err(|_| db_error(format!("{} limit is out of range", selection.context)))?;
     let mut transaction = db.begin_immediate_transaction(selection.context).await?;
     let eligible_count = selection_eligible_count(&mut transaction, selection).await?;
-    let rows = if eligible_count <= effective_limit {
-        load_selection_canonical_page(&mut transaction, selection, sql_limit).await?
-    } else {
-        load_selection_truncated_page(&mut transaction, selection, effective_limit, sql_limit)
-            .await?
-    };
+    let rows =
+        load_selection_page(&mut transaction, selection, eligible_count, effective_limit, sql_limit)
+            .await?;
     let cursor = rows
         .last()
         .map(|row| (row.updated_at.clone(), row.execution_id.clone()));
     let executions = load_candidates(&mut transaction, rows).await?;
-    if eligible_count > effective_limit {
-        let (updated_at, execution_id) = cursor.ok_or_else(|| {
-            db_error(format!(
-                "truncated {} page has no cursor",
-                selection.context
-            ))
-        })?;
-        store_selection_cursor(&mut transaction, selection, &updated_at, &execution_id).await?;
-    }
+    advance_selection_cursor_if_truncated(
+        &mut transaction,
+        selection,
+        eligible_count,
+        effective_limit,
+        cursor,
+    )
+    .await?;
     transaction
         .commit()
         .await
         .map_err(|error| db_error(format!("commit {} selection: {error}", selection.context)))?;
     Ok(executions)
+}
+
+async fn load_selection_page(
+    transaction: &mut Transaction<'_, Sqlite>,
+    selection: WorkflowSelection,
+    eligible_count: usize,
+    effective_limit: usize,
+    sql_limit: i64,
+) -> Result<Vec<WorkflowExecutionRow>, CliError> {
+    if eligible_count <= effective_limit {
+        load_selection_canonical_page(transaction, selection, sql_limit).await
+    } else {
+        load_selection_truncated_page(transaction, selection, effective_limit, sql_limit).await
+    }
+}
+
+/// Advances the durable scan cursor only when this page was truncated,
+/// leaving it untouched once a scan sees every eligible row in one pass.
+async fn advance_selection_cursor_if_truncated(
+    transaction: &mut Transaction<'_, Sqlite>,
+    selection: WorkflowSelection,
+    eligible_count: usize,
+    effective_limit: usize,
+    cursor: Option<(String, String)>,
+) -> Result<(), CliError> {
+    if eligible_count <= effective_limit {
+        return Ok(());
+    }
+    let (updated_at, execution_id) = cursor.ok_or_else(|| {
+        db_error(format!(
+            "truncated {} page has no cursor",
+            selection.context
+        ))
+    })?;
+    store_selection_cursor(transaction, selection, &updated_at, &execution_id).await
 }
 
 async fn selection_eligible_count(

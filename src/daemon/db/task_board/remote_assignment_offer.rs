@@ -83,50 +83,23 @@ impl AsyncDaemonDb {
             window.lease_expires,
             window.deadline,
         )?;
-        let mut transaction = self
+        let transaction = self
             .begin_immediate_transaction("task board remote assignment offer")
             .await?;
-        // An identity colliding with an archived legacy row is a deterministic
-        // conflict; exact replay is only ever honoured with the archive empty.
-        require_no_archival_collision_in_tx(
-            &mut transaction,
-            &request.binding.assignment_id,
-            &request.binding.idempotency_key,
-            Some(&request.request_sha256),
-            &request.binding.execution_id,
-            request.binding.fencing_epoch,
-        )
-        .await?;
-        let collisions = load_offer_collision_in_tx(&mut transaction, request).await?;
-        if !collisions.is_empty() {
-            return resolve_offer_collision(
-                transaction,
-                collisions,
-                request,
-                authenticated_principal,
-                source_content,
-            )
-            .await;
-        }
-        let prepared = match prepare_remote_offer_in_tx(
-            &mut transaction,
+        let (mut transaction, prepared) = match screen_remote_offer_admission_in_tx(
+            transaction,
             expected_execution,
             expected_attempt,
             request,
+            authenticated_principal,
+            source_content,
             window.offered,
             times,
         )
         .await?
         {
-            OfferPreparation::Stale(reason) => {
-                commit_noop(transaction, reason).await?;
-                return Ok(TaskBoardRemoteOfferOutcome::Stale);
-            }
-            OfferPreparation::Unavailable(reason) => {
-                commit_noop(transaction, reason).await?;
-                return Ok(TaskBoardRemoteOfferOutcome::Unavailable);
-            }
-            OfferPreparation::Ready(prepared) => prepared,
+            OfferPreparationScreen::Stopped(outcome) => return Ok(*outcome),
+            OfferPreparationScreen::Ready(transaction, prepared) => (transaction, prepared),
         };
         let lifecycle_trust =
             capture_lifecycle_trust_for_offer_in_tx(&mut transaction, request).await?;
@@ -145,6 +118,104 @@ impl AsyncDaemonDb {
         )
         .await?;
         commit_created_offer(transaction, assignment).await
+    }
+}
+
+/// Either the offer is already settled and the caller has nothing left to do
+/// but report it, or preparation is ready and hands the still-open
+/// transaction back so the caller can persist the claim on it.
+enum OfferPreparationScreen<'c> {
+    Stopped(Box<TaskBoardRemoteOfferOutcome>),
+    Ready(Transaction<'c, Sqlite>, Box<PreparedRemoteOffer>),
+}
+
+/// Either an archival or an in-flight collision already settled this offer,
+/// or the transaction is clear of both and ready for preparation.
+enum OfferCollisionScreen<'c> {
+    Stopped(Box<TaskBoardRemoteOfferOutcome>),
+    Clear(Transaction<'c, Sqlite>),
+}
+
+async fn screen_remote_offer_collision_in_tx<'c>(
+    mut transaction: Transaction<'c, Sqlite>,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+    source_content: Option<&[u8]>,
+) -> Result<OfferCollisionScreen<'c>, CliError> {
+    // An identity colliding with an archived legacy row is a deterministic
+    // conflict; exact replay is only ever honoured with the archive empty.
+    require_no_archival_collision_in_tx(
+        &mut transaction,
+        &request.binding.assignment_id,
+        &request.binding.idempotency_key,
+        Some(&request.request_sha256),
+        &request.binding.execution_id,
+        request.binding.fencing_epoch,
+    )
+    .await?;
+    let collisions = load_offer_collision_in_tx(&mut transaction, request).await?;
+    if !collisions.is_empty() {
+        let outcome = resolve_offer_collision(
+            transaction,
+            collisions,
+            request,
+            authenticated_principal,
+            source_content,
+        )
+        .await?;
+        return Ok(OfferCollisionScreen::Stopped(Box::new(outcome)));
+    }
+    Ok(OfferCollisionScreen::Clear(transaction))
+}
+
+async fn screen_remote_offer_admission_in_tx<'c>(
+    transaction: Transaction<'c, Sqlite>,
+    expected_execution: &TaskBoardWorkflowExecutionCas,
+    expected_attempt: &TaskBoardExecutionAttemptCas,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+    source_content: Option<&[u8]>,
+    offered_at: &str,
+    times: OfferTimes,
+) -> Result<OfferPreparationScreen<'c>, CliError> {
+    let mut transaction = match screen_remote_offer_collision_in_tx(
+        transaction,
+        request,
+        authenticated_principal,
+        source_content,
+    )
+    .await?
+    {
+        OfferCollisionScreen::Stopped(outcome) => {
+            return Ok(OfferPreparationScreen::Stopped(outcome));
+        }
+        OfferCollisionScreen::Clear(transaction) => transaction,
+    };
+    match prepare_remote_offer_in_tx(
+        &mut transaction,
+        expected_execution,
+        expected_attempt,
+        request,
+        offered_at,
+        times,
+    )
+    .await?
+    {
+        OfferPreparation::Stale(reason) => {
+            commit_noop(transaction, reason).await?;
+            Ok(OfferPreparationScreen::Stopped(Box::new(
+                TaskBoardRemoteOfferOutcome::Stale,
+            )))
+        }
+        OfferPreparation::Unavailable(reason) => {
+            commit_noop(transaction, reason).await?;
+            Ok(OfferPreparationScreen::Stopped(Box::new(
+                TaskBoardRemoteOfferOutcome::Unavailable,
+            )))
+        }
+        OfferPreparation::Ready(prepared) => {
+            Ok(OfferPreparationScreen::Ready(transaction, prepared))
+        }
     }
 }
 
@@ -215,17 +286,8 @@ async fn persist_remote_offer_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     input: PersistRemoteOfferInput<'_>,
 ) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
-    let prepared = input.prepared;
+    apply_remote_claim_in_tx(transaction, &input).await?;
     let window = input.window;
-    let (updated_parent, updated_attempt, combined) = build_remote_claim(
-        &prepared.parent,
-        &prepared.attempt,
-        prepared.attempt_index,
-        input.request,
-        window.offered,
-    )?;
-    update_execution_in_tx(transaction, input.expected_execution, &updated_parent).await?;
-    update_attempt_in_tx(transaction, input.expected_attempt, &updated_attempt).await?;
     let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
         request: input.request,
         principal: input.authenticated_principal,
@@ -246,11 +308,29 @@ async fn persist_remote_offer_in_tx(
     )
     .await?;
     bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    let assignment = load_assignment_in_tx(transaction, &input.request.binding.assignment_id)
+    load_assignment_in_tx(transaction, &input.request.binding.assignment_id)
         .await?
-        .ok_or_else(|| db_error("inserted remote assignment disappeared"))?;
+        .ok_or_else(|| db_error("inserted remote assignment disappeared"))
+}
+
+/// Writes the frozen claim onto the execution and its attempt, which is the
+/// part of persistence that a fresh assignment row does not itself carry.
+async fn apply_remote_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    input: &PersistRemoteOfferInput<'_>,
+) -> Result<(), CliError> {
+    let prepared = input.prepared;
+    let (updated_parent, updated_attempt, combined) = build_remote_claim(
+        &prepared.parent,
+        &prepared.attempt,
+        prepared.attempt_index,
+        input.request,
+        input.window.offered,
+    )?;
+    update_execution_in_tx(transaction, input.expected_execution, &updated_parent).await?;
+    update_attempt_in_tx(transaction, input.expected_attempt, &updated_attempt).await?;
     debug_assert_eq!(combined.attempts[prepared.attempt_index], updated_attempt);
-    Ok(assignment)
+    Ok(())
 }
 
 async fn commit_created_offer(

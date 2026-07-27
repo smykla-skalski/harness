@@ -41,6 +41,23 @@ pub(in crate::daemon::db::task_board) async fn settle_prepared_dispatch_in_tx(
     } else {
         release_dispatch_admission_in_tx(transaction, &intent_id).await?;
     }
+    mark_prepared_dispatch_settled_in_tx(transaction, &intent_id, execution, started).await?;
+    let directly_released = started
+        && admission_released_directly_in_tx(transaction, &intent_id, execution).await?;
+    Ok(PreparedDispatchSettlement {
+        changed: true,
+        admission_released: !started || directly_released,
+    })
+}
+
+/// Marks the prepared intent completed or failed, requiring the CAS on
+/// `workflow_prepared` to have applied.
+async fn mark_prepared_dispatch_settled_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    started: bool,
+) -> Result<(), CliError> {
     let now = utc_now();
     let changed = query(
         "UPDATE task_board_dispatch_intents
@@ -50,7 +67,7 @@ pub(in crate::daemon::db::task_board) async fn settle_prepared_dispatch_in_tx(
          WHERE intent_id = ?1 AND workflow_execution_id = ?5
            AND item_id = ?6 AND status = 'workflow_prepared'",
     )
-    .bind(&intent_id)
+    .bind(intent_id)
     .bind(if started { "completed" } else { "failed" })
     .bind((!started).then_some("workflow became terminal before target start"))
     .bind(now)
@@ -65,21 +82,26 @@ pub(in crate::daemon::db::task_board) async fn settle_prepared_dispatch_in_tx(
             "prepared dispatch changed before terminal admission settlement",
         ));
     }
-    let directly_released = started
-        && query_scalar::<_, bool>(
-            "SELECT EXISTS(
-                 SELECT 1 FROM task_board_dispatch_admission_ledger
-                 WHERE intent_id = ?1 AND managed_worker_id = ?2
-                   AND kind = 'concurrency' AND state = 'released'
-             )",
-        )
-        .bind(&intent_id)
-        .bind(workflow_owner(&execution.execution_id))
-        .fetch_one(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load terminal start admission release: {error}")))?;
-    Ok(PreparedDispatchSettlement {
-        changed: true,
-        admission_released: !started || directly_released,
-    })
+    Ok(())
+}
+
+/// Whether the durably started target released admission directly through
+/// its own worker id, rather than through the `!started` failure path.
+async fn admission_released_directly_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    execution: &TaskBoardWorkflowExecutionRecord,
+) -> Result<bool, CliError> {
+    query_scalar::<_, bool>(
+        "SELECT EXISTS(
+             SELECT 1 FROM task_board_dispatch_admission_ledger
+             WHERE intent_id = ?1 AND managed_worker_id = ?2
+               AND kind = 'concurrency' AND state = 'released'
+         )",
+    )
+    .bind(intent_id)
+    .bind(workflow_owner(&execution.execution_id))
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load terminal start admission release: {error}")))
 }

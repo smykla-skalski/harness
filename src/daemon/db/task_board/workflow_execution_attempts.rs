@@ -37,50 +37,17 @@ impl AsyncDaemonDb {
         let parent = load_execution_in_tx(&mut transaction, &proposed.execution_id)
             .await?
             .ok_or_else(|| db_error("execution attempt parent does not exist"))?;
-        let by_identity = parent.attempts.iter().find(|attempt| {
-            attempt.action_key == proposed.action_key && attempt.attempt == proposed.attempt
-        });
-        let by_key = parent
-            .attempts
-            .iter()
-            .find(|attempt| attempt.idempotency_key == proposed.idempotency_key);
-        if let (Some(by_identity), Some(by_key)) = (by_identity, by_key) {
-            let same_record = by_identity == proposed
-                && by_identity.action_key == by_key.action_key
-                && by_identity.attempt == by_key.attempt
-                && by_identity.idempotency_key == by_key.idempotency_key;
-            if same_record {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit execution attempt create no-op: {error}"))
-                })?;
-                return Ok(TaskBoardExecutionAttemptCreateOutcome {
-                    attempt: by_identity.clone(),
-                    created: false,
-                });
-            }
+        if let Some(existing) = screen_attempt_identity_collision(&parent, proposed)? {
+            let attempt = existing.clone();
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit execution attempt create no-op: {error}"))
+            })?;
+            return Ok(TaskBoardExecutionAttemptCreateOutcome {
+                attempt,
+                created: false,
+            });
         }
-        if by_identity.is_some() || by_key.is_some() {
-            return Err(db_error(
-                "execution attempt identity or idempotency key conflicts with durable state",
-            ));
-        }
-        if parent.transition.phase.is_none()
-            || matches!(
-                parent.transition.execution_state,
-                TaskBoardExecutionState::HumanRequired
-                    | TaskBoardExecutionState::Completed
-                    | TaskBoardExecutionState::Failed
-                    | TaskBoardExecutionState::Cancelled
-            )
-        {
-            return Err(db_error(
-                "workflow execution is not admitted for a new attempt",
-            ));
-        }
-        validate_attempt_phase(&parent, proposed)?;
-        validate_attempt_in_execution(&parent, proposed, None)?;
-        insert_attempt_in_tx(&mut transaction, proposed).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        write_new_execution_attempt_in_tx(&mut transaction, &parent, proposed).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!(
                 "commit task board execution attempt create: {error}"
@@ -100,35 +67,16 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board execution attempt CAS")
             .await?;
-        let Some(parent) = load_execution_in_tx(&mut transaction, &expected.execution_id).await?
-        else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit missing execution attempt CAS: {error}"))
-            })?;
-            return Ok(TaskBoardExecutionAttemptCasOutcome::Stale(None));
-        };
-        let current = parent.attempts.iter().enumerate().find(|(_, attempt)| {
-            attempt.action_key == expected.action_key && attempt.attempt == expected.attempt
-        });
-        let Some((index, current)) = current.map(|(index, attempt)| (index, attempt.clone()))
-        else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit missing execution attempt CAS: {error}"))
-            })?;
-            return Ok(TaskBoardExecutionAttemptCasOutcome::Stale(None));
-        };
-        if attempt_identity_matches(expected, &current) && current == *updated {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit unchanged execution attempt CAS: {error}"))
-            })?;
-            return Ok(TaskBoardExecutionAttemptCasOutcome::Unchanged(current));
-        }
-        if !attempt_cas_matches(expected, &current) {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit stale execution attempt CAS: {error}"))
-            })?;
-            return Ok(TaskBoardExecutionAttemptCasOutcome::Stale(Some(current)));
-        }
+        let (parent, index, current) =
+            match screen_attempt_cas_in_tx(&mut transaction, expected, updated).await? {
+                AttemptCasScreen::Stopped(outcome) => {
+                    transaction.commit().await.map_err(|error| {
+                        db_error(format!("commit resolved execution attempt CAS: {error}"))
+                    })?;
+                    return Ok(outcome);
+                }
+                AttemptCasScreen::Ready(parent, index, current) => (parent, index, current),
+            };
         reject_active_remote_target_mutation(&parent, &current)?;
         validate_task_board_attempt_update(&current, updated)
             .map_err(|error| db_error(format!("validate execution attempt CAS: {error}")))?;
@@ -171,6 +119,106 @@ impl AsyncDaemonDb {
 
 #[path = "workflow_execution_attempts_atomic.rs"]
 mod atomic;
+
+/// Validates the proposal is admissible against its exact parent state, then
+/// writes it and bumps the change ledger in one settle.
+async fn write_new_execution_attempt_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    parent: &TaskBoardWorkflowExecutionRecord,
+    proposed: &TaskBoardExecutionAttemptRecord,
+) -> Result<(), CliError> {
+    if parent.transition.phase.is_none()
+        || matches!(
+            parent.transition.execution_state,
+            TaskBoardExecutionState::HumanRequired
+                | TaskBoardExecutionState::Completed
+                | TaskBoardExecutionState::Failed
+                | TaskBoardExecutionState::Cancelled
+        )
+    {
+        return Err(db_error(
+            "workflow execution is not admitted for a new attempt",
+        ));
+    }
+    validate_attempt_phase(parent, proposed)?;
+    validate_attempt_in_execution(parent, proposed, None)?;
+    insert_attempt_in_tx(transaction, proposed).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    Ok(())
+}
+
+/// `Some` when a proposal exactly repeats an attempt already on file, so
+/// creating it is a no-op; refuses one that partially collides instead.
+fn screen_attempt_identity_collision<'a>(
+    parent: &'a TaskBoardWorkflowExecutionRecord,
+    proposed: &TaskBoardExecutionAttemptRecord,
+) -> Result<Option<&'a TaskBoardExecutionAttemptRecord>, CliError> {
+    let by_identity = parent.attempts.iter().find(|attempt| {
+        attempt.action_key == proposed.action_key && attempt.attempt == proposed.attempt
+    });
+    let by_key = parent
+        .attempts
+        .iter()
+        .find(|attempt| attempt.idempotency_key == proposed.idempotency_key);
+    if let (Some(by_identity), Some(by_key)) = (by_identity, by_key) {
+        let same_record = by_identity == proposed
+            && by_identity.action_key == by_key.action_key
+            && by_identity.attempt == by_key.attempt
+            && by_identity.idempotency_key == by_key.idempotency_key;
+        if same_record {
+            return Ok(Some(by_identity));
+        }
+    }
+    if by_identity.is_some() || by_key.is_some() {
+        return Err(db_error(
+            "execution attempt identity or idempotency key conflicts with durable state",
+        ));
+    }
+    Ok(None)
+}
+
+/// Either the CAS is already resolved (missing parent or attempt, unchanged,
+/// or stale) and the caller has nothing left but to report it, or the exact
+/// current attempt is ready for the write.
+enum AttemptCasScreen {
+    Stopped(TaskBoardExecutionAttemptCasOutcome),
+    Ready(
+        Box<TaskBoardWorkflowExecutionRecord>,
+        usize,
+        TaskBoardExecutionAttemptRecord,
+    ),
+}
+
+async fn screen_attempt_cas_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected: &TaskBoardExecutionAttemptCas,
+    updated: &TaskBoardExecutionAttemptRecord,
+) -> Result<AttemptCasScreen, CliError> {
+    let Some(parent) = load_execution_in_tx(transaction, &expected.execution_id).await? else {
+        return Ok(AttemptCasScreen::Stopped(
+            TaskBoardExecutionAttemptCasOutcome::Stale(None),
+        ));
+    };
+    let current = parent.attempts.iter().enumerate().find(|(_, attempt)| {
+        attempt.action_key == expected.action_key && attempt.attempt == expected.attempt
+    });
+    let Some((index, current)) = current.map(|(index, attempt)| (index, attempt.clone())) else {
+        return Ok(AttemptCasScreen::Stopped(
+            TaskBoardExecutionAttemptCasOutcome::Stale(None),
+        ));
+    };
+    if attempt_identity_matches(expected, &current) && current == *updated {
+        return Ok(AttemptCasScreen::Stopped(
+            TaskBoardExecutionAttemptCasOutcome::Unchanged(current),
+        ));
+    }
+    if !attempt_cas_matches(expected, &current) {
+        return Ok(AttemptCasScreen::Stopped(
+            TaskBoardExecutionAttemptCasOutcome::Stale(Some(current)),
+        ));
+    }
+    Ok(AttemptCasScreen::Ready(Box::new(parent), index, current))
+}
 
 fn reject_active_remote_target_mutation(
     parent: &TaskBoardWorkflowExecutionRecord,

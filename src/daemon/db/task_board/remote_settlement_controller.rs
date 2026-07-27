@@ -62,35 +62,21 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote settlement I/O authority")
             .await?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        require_settlement_handoff(&mut transaction, &assignment, request).await?;
-        if let Some(response) =
-            exact_receipt_or_conflict(&mut transaction, request, authenticated_principal, None)
-                .await?
-        {
-            commit_replay(transaction, "settlement authority").await?;
-            return Ok(Some(response));
-        }
-        require_current_settlement_window(&assignment, authority_at)?;
-        require_exact_terminal_assignment(&assignment, request, authenticated_principal)?;
-        claim_controller_operation_trust_in_tx(
+        let assignment = match screen_settlement_authority_claim_in_tx(
             &mut transaction,
-            &assignment,
-            TaskBoardRemoteOperationKind::Settle,
-            &request.request_sha256,
+            request,
+            authenticated_principal,
+            authority_at,
             trust,
         )
-        .await?;
-        if exact_pending_authority(&assignment, request) {
-            commit_replay(transaction, "settlement authority").await?;
-            return Ok(None);
-        }
-        if assignment.last_mutation_kind.as_deref() == Some("settle") {
-            return Err(concurrent(
-                "remote settlement conflicts with durable I/O authority",
-            ));
-        }
+        .await?
+        {
+            SettlementAuthorityScreen::Stopped(response) => {
+                commit_replay(transaction, "settlement authority").await?;
+                return Ok(*response);
+            }
+            SettlementAuthorityScreen::Ready(assignment) => assignment,
+        };
         persist_authority_in_tx(
             &mut transaction,
             &assignment,
@@ -145,6 +131,76 @@ impl AsyncDaemonDb {
             }
         }
     }
+}
+
+/// Either the claim is already resolved (an exact receipt replay, or pending
+/// settle authority this generation already holds) and the caller has
+/// nothing left but to commit and report it, or the assignment is ready for
+/// this claim to persist its own authority.
+enum SettlementAuthorityScreen {
+    Stopped(Box<Option<RemoteSettledResponse>>),
+    Ready(Box<TaskBoardRemoteAssignmentRecord>),
+}
+
+async fn screen_settlement_authority_claim_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: Option<&TaskBoardRemoteOperationTrustFence>,
+) -> Result<SettlementAuthorityScreen, CliError> {
+    let assignment = require_assignment(transaction, &request.binding.assignment_id).await?;
+    require_settlement_handoff(transaction, &assignment, request).await?;
+    if let Some(response) =
+        exact_receipt_or_conflict(transaction, request, authenticated_principal, None).await?
+    {
+        return Ok(SettlementAuthorityScreen::Stopped(Box::new(Some(response))));
+    }
+    if claim_settlement_authority_row_in_tx(
+        transaction,
+        &assignment,
+        request,
+        authenticated_principal,
+        authority_at,
+        trust,
+    )
+    .await?
+    {
+        return Ok(SettlementAuthorityScreen::Stopped(Box::new(None)));
+    }
+    Ok(SettlementAuthorityScreen::Ready(Box::new(assignment)))
+}
+
+/// Claims controller-operation trust for this settle and reports whether the
+/// generation already holds pending settle authority, which means the caller
+/// has nothing left to persist. Refuses a conflicting durable authority.
+async fn claim_settlement_authority_row_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: Option<&TaskBoardRemoteOperationTrustFence>,
+) -> Result<bool, CliError> {
+    require_current_settlement_window(assignment, authority_at)?;
+    require_exact_terminal_assignment(assignment, request, authenticated_principal)?;
+    claim_controller_operation_trust_in_tx(
+        transaction,
+        assignment,
+        TaskBoardRemoteOperationKind::Settle,
+        &request.request_sha256,
+        trust,
+    )
+    .await?;
+    if exact_pending_authority(assignment, request) {
+        return Ok(true);
+    }
+    if assignment.last_mutation_kind.as_deref() == Some("settle") {
+        return Err(concurrent(
+            "remote settlement conflicts with durable I/O authority",
+        ));
+    }
+    Ok(false)
 }
 
 /// Whether a settlement response is a replay of one already recorded, or the

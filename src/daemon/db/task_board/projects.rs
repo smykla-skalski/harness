@@ -313,23 +313,8 @@ impl AsyncDaemonDb {
                 "task board project '{project_id}' is not registered"
             )))
         })?;
-        let slug = match edit.slug {
-            Some(raw) => existing.source.normalize_slug(raw).ok_or_else(|| {
-                CliError::from(CliErrorKind::usage_error(format!(
-                    "'{raw}' cannot name a {} project",
-                    existing.source.as_str()
-                )))
-            })?,
-            None => existing.slug.clone(),
-        };
-        let display_name = match edit.display_name {
-            DisplayNameEdit::Keep => existing.display_name.clone(),
-            // A name that trims to nothing is a clear, not a stored blank.
-            DisplayNameEdit::Set(value) => Some(value.trim())
-                .filter(|value| !value.is_empty())
-                .map(ToOwned::to_owned),
-            DisplayNameEdit::Clear => None,
-        };
+        let slug = resolve_slug_edit(&existing, edit.slug)?;
+        let display_name = resolve_display_name_edit(&existing, edit.display_name);
         // The reset reads every held colour to pick the least-used one, so it
         // has to write in the same transaction it read in. Allocating first and
         // committing separately lets a registration in between take the colour
@@ -376,6 +361,32 @@ impl AsyncDaemonDb {
         self.get_task_board_project(project_id)
             .await?
             .ok_or_else(|| db_error(format!("task board project '{project_id}' vanished")))
+    }
+}
+
+fn resolve_slug_edit(existing: &TaskBoardProject, requested: Option<&str>) -> Result<String, CliError> {
+    let Some(raw) = requested else {
+        return Ok(existing.slug.clone());
+    };
+    existing.source.normalize_slug(raw).ok_or_else(|| {
+        CliError::from(CliErrorKind::usage_error(format!(
+            "'{raw}' cannot name a {} project",
+            existing.source.as_str()
+        )))
+    })
+}
+
+fn resolve_display_name_edit(
+    existing: &TaskBoardProject,
+    edit: DisplayNameEdit<'_>,
+) -> Option<String> {
+    match edit {
+        DisplayNameEdit::Keep => existing.display_name.clone(),
+        // A name that trims to nothing is a clear, not a stored blank.
+        DisplayNameEdit::Set(value) => Some(value.trim())
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned),
+        DisplayNameEdit::Clear => None,
     }
 }
 

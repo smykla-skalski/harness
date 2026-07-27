@@ -28,23 +28,45 @@ const SELECT_ACTIVE_EXECUTIONS: &str = "SELECT * FROM task_board_workflow_execut
                     'awaiting_approval', 'draining')
     ORDER BY created_at DESC, execution_id DESC LIMIT 2";
 
+/// Validates the proposal against the current revision fence, writes it, and
+/// bumps the change ledger in one settle.
+async fn write_new_workflow_execution_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    proposed: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), CliError> {
+    validate_current_create_revisions(transaction, proposed).await?;
+    insert_execution_in_tx(transaction, proposed).await?;
+    bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    Ok(())
+}
+
+/// Validates a proposed new execution before any transaction opens: it must
+/// pass the general shape check, carry the immutable read-only run context
+/// every fresh execution needs, and start with no attempts of its own.
+fn validate_new_workflow_execution_input(
+    proposed: &TaskBoardWorkflowExecutionRecord,
+) -> Result<(), CliError> {
+    validate_task_board_workflow_execution(proposed)
+        .map_err(|error| db_error(format!("validate workflow execution create: {error}")))?;
+    let run_context = proposed
+        .snapshot
+        .read_only_run_context
+        .as_ref()
+        .ok_or_else(|| db_error("new read-only workflow execution has no immutable context"))?;
+    validate_task_board_read_only_run_context(run_context)
+        .map_err(|error| db_error(format!("validate workflow run context: {error}")))?;
+    if !proposed.attempts.is_empty() {
+        return Err(db_error("new workflow execution cannot contain attempts"));
+    }
+    Ok(())
+}
+
 impl AsyncDaemonDb {
     pub(crate) async fn create_or_load_task_board_workflow_execution(
         &self,
         proposed: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
-        validate_task_board_workflow_execution(proposed)
-            .map_err(|error| db_error(format!("validate workflow execution create: {error}")))?;
-        let run_context = proposed
-            .snapshot
-            .read_only_run_context
-            .as_ref()
-            .ok_or_else(|| db_error("new read-only workflow execution has no immutable context"))?;
-        validate_task_board_read_only_run_context(run_context)
-            .map_err(|error| db_error(format!("validate workflow run context: {error}")))?;
-        if !proposed.attempts.is_empty() {
-            return Err(db_error("new workflow execution cannot contain attempts"));
-        }
+        validate_new_workflow_execution_input(proposed)?;
         let mut transaction = self
             .begin_immediate_transaction("task board workflow execution create")
             .await?;
@@ -60,9 +82,7 @@ impl AsyncDaemonDb {
                 created: false,
             });
         }
-        validate_current_create_revisions(&mut transaction, proposed).await?;
-        insert_execution_in_tx(&mut transaction, proposed).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        write_new_workflow_execution_in_tx(&mut transaction, proposed).await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!(
                 "commit task board workflow execution create: {error}"
@@ -309,12 +329,40 @@ pub(super) async fn insert_execution_in_tx(
     .map_err(|error| db_error(format!("insert workflow execution: {error}")))
 }
 
+/// The bound values that need a fallible conversion or lookup, computed once
+/// so the query builder itself binds plain values.
+struct ExecutionUpdateBindings {
+    phase: String,
+    state: String,
+    fencing_epoch: i64,
+    expected_phase: String,
+    expected_state: String,
+    expected_configuration_revision: i64,
+}
+
+fn execution_update_bindings(
+    expected: &TaskBoardWorkflowExecutionCas,
+    record: &TaskBoardWorkflowExecutionRecord,
+) -> Result<ExecutionUpdateBindings, CliError> {
+    Ok(ExecutionUpdateBindings {
+        phase: phase_label(record.transition.phase)?,
+        state: label(record.transition.execution_state, "execution state")?,
+        fencing_epoch: i64::try_from(record.ownership.fencing_epoch)
+            .map_err(|_| db_error("workflow fencing epoch is out of range"))?,
+        expected_phase: phase_label(expected.phase)?,
+        expected_state: label(expected.state, "execution state")?,
+        expected_configuration_revision: i64::try_from(expected.revisions.configuration_revision)
+            .map_err(|_| db_error("workflow configuration revision is out of range"))?,
+    })
+}
+
 pub(super) async fn update_execution_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     expected: &TaskBoardWorkflowExecutionCas,
     record: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
     let (_, _, artifacts, ownership) = execution_json(record)?;
+    let bindings = execution_update_bindings(expected, record)?;
     let rows = query(
         "UPDATE task_board_workflow_executions SET phase = ?1, state = ?2, host_id = ?3,
          fencing_epoch = ?4, available_at = ?5, blocked_reason = ?6, diagnostics_json = ?7,
@@ -322,13 +370,10 @@ pub(super) async fn update_execution_in_tx(
          WHERE execution_id = ?11 AND phase = ?12 AND state = ?13 AND item_revision = ?14
            AND configuration_revision = ?15 AND provider_revision IS ?16",
     )
-    .bind(phase_label(record.transition.phase)?)
-    .bind(label(record.transition.execution_state, "execution state")?)
+    .bind(bindings.phase)
+    .bind(bindings.state)
     .bind(&record.ownership.host_id)
-    .bind(
-        i64::try_from(record.ownership.fencing_epoch)
-            .map_err(|_| db_error("workflow fencing epoch is out of range"))?,
-    )
+    .bind(bindings.fencing_epoch)
     .bind(&record.available_at)
     .bind(&record.blocked_reason)
     .bind(artifacts)
@@ -336,13 +381,10 @@ pub(super) async fn update_execution_in_tx(
     .bind(&record.updated_at)
     .bind(&record.completed_at)
     .bind(&expected.execution_id)
-    .bind(phase_label(expected.phase)?)
-    .bind(label(expected.state, "execution state")?)
+    .bind(bindings.expected_phase)
+    .bind(bindings.expected_state)
     .bind(expected.revisions.item_revision)
-    .bind(
-        i64::try_from(expected.revisions.configuration_revision)
-            .map_err(|_| db_error("workflow configuration revision is out of range"))?,
-    )
+    .bind(bindings.expected_configuration_revision)
     .bind(&expected.revisions.provider_revision)
     .execute(transaction.as_mut())
     .await
@@ -359,13 +401,29 @@ pub(super) fn cas_mismatch(
     expected: &TaskBoardWorkflowExecutionCas,
     current: &TaskBoardWorkflowExecutionRecord,
 ) -> Option<TaskBoardWorkflowCasMismatch> {
+    cas_identity_mismatch(expected, current).or_else(|| cas_revision_mismatch(expected, current))
+}
+
+fn cas_identity_mismatch(
+    expected: &TaskBoardWorkflowExecutionCas,
+    current: &TaskBoardWorkflowExecutionRecord,
+) -> Option<TaskBoardWorkflowCasMismatch> {
     if expected.execution_id != current.execution_id {
         Some(TaskBoardWorkflowCasMismatch::ExecutionId)
     } else if expected.phase != current.transition.phase {
         Some(TaskBoardWorkflowCasMismatch::Phase)
     } else if expected.state != current.transition.execution_state {
         Some(TaskBoardWorkflowCasMismatch::State)
-    } else if expected.revisions.item_revision != current.snapshot.item_revision {
+    } else {
+        None
+    }
+}
+
+fn cas_revision_mismatch(
+    expected: &TaskBoardWorkflowExecutionCas,
+    current: &TaskBoardWorkflowExecutionRecord,
+) -> Option<TaskBoardWorkflowCasMismatch> {
+    if expected.revisions.item_revision != current.snapshot.item_revision {
         Some(TaskBoardWorkflowCasMismatch::ItemRevision)
     } else if expected.revisions.configuration_revision != current.snapshot.configuration_revision {
         Some(TaskBoardWorkflowCasMismatch::ConfigurationRevision)

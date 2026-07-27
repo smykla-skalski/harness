@@ -110,7 +110,54 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit remote artifact I/O authority: {error}")))?;
         Ok(true)
     }
+}
 
+/// `Some` when this exact content already landed under this path: an exact
+/// replay reuses it, and anything else is a path colliding with different
+/// immutable content evidence, which is always refused rather than merged.
+async fn screen_existing_artifact_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    input: &TaskBoardRemoteArtifactStoreInput<'_>,
+) -> Result<Option<TaskBoardRemoteArtifact>, CliError> {
+    let Some(existing) = load_artifact_in_tx(
+        transaction,
+        &input.binding.assignment_id,
+        input.binding.fencing_epoch,
+        &input.artifact.relative_path,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    if exact_artifact_replay(&existing, input) {
+        return Ok(Some(existing));
+    }
+    Err(concurrent(
+        "remote artifact path conflicts with immutable content evidence",
+    ))
+}
+
+/// Reuses an exact replay of an already-stored artifact, or persists the
+/// newly authenticated bytes and reads back the row this transaction wrote.
+async fn store_or_reuse_artifact_row_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    input: &TaskBoardRemoteArtifactStoreInput<'_>,
+) -> Result<TaskBoardRemoteArtifact, CliError> {
+    if let Some(existing) = screen_existing_artifact_in_tx(transaction, input).await? {
+        return Ok(existing);
+    }
+    insert_artifact_in_tx(transaction, input).await?;
+    load_artifact_in_tx(
+        transaction,
+        &input.binding.assignment_id,
+        input.binding.fencing_epoch,
+        &input.artifact.relative_path,
+    )
+    .await?
+    .ok_or_else(|| db_error("persisted remote artifact disappeared"))
+}
+
+impl AsyncDaemonDb {
     pub(crate) async fn store_task_board_remote_artifact(
         &self,
         input: &TaskBoardRemoteArtifactStoreInput<'_>,
@@ -128,33 +175,7 @@ impl AsyncDaemonDb {
             input.authenticated_principal,
             input.artifact,
         )?;
-        if let Some(existing) = load_artifact_in_tx(
-            &mut transaction,
-            &input.binding.assignment_id,
-            input.binding.fencing_epoch,
-            &input.artifact.relative_path,
-        )
-        .await?
-        {
-            if exact_artifact_replay(&existing, input) {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit replayed remote artifact: {error}"))
-                })?;
-                return Ok(existing);
-            }
-            return Err(concurrent(
-                "remote artifact path conflicts with immutable content evidence",
-            ));
-        }
-        insert_artifact_in_tx(&mut transaction, input).await?;
-        let stored = load_artifact_in_tx(
-            &mut transaction,
-            &input.binding.assignment_id,
-            input.binding.fencing_epoch,
-            &input.artifact.relative_path,
-        )
-        .await?
-        .ok_or_else(|| db_error("persisted remote artifact disappeared"))?;
+        let stored = store_or_reuse_artifact_row_in_tx(&mut transaction, input).await?;
         transaction
             .commit()
             .await

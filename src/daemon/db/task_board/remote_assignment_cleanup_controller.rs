@@ -32,30 +32,21 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote cleanup observation")
             .await?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        let receipt = exact_settlement(&mut transaction, request, principal).await?;
-        require_exact_terminal_assignment(&assignment, &receipt.request, principal)?;
-        if let Some(response) = replayed_response(&assignment, request)? {
-            require_recorded_handoff(&mut transaction, &assignment).await?;
-            commit_noop(transaction, "replayed remote cleanup observation").await?;
-            return Ok(Some(response));
-        }
-        let (parent_sha256, handoff_recorded) =
-            cleanup_parent_in_tx(&mut transaction, &assignment).await?;
-        if !handoff_recorded {
-            return Err(concurrent(
-                "remote cleanup cannot claim without a durable terminal handoff",
-            ));
-        }
-        claim_cleanup_observation_trust_in_tx(
+        let assignment = match screen_cleanup_observation_claim_in_tx(
             &mut transaction,
-            &assignment,
-            &request.request_sha256,
-            &parent_sha256,
-            trust,
+            request,
+            principal,
         )
-        .await?;
+        .await?
+        {
+            CleanupObservationClaimScreen::Replayed(response) => {
+                commit_noop(transaction, "replayed remote cleanup observation").await?;
+                return Ok(Some(*response));
+            }
+            CleanupObservationClaimScreen::Ready(assignment) => assignment,
+        };
+        claim_cleanup_observation_authority_in_tx(&mut transaction, &assignment, request, trust)
+            .await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!(
                 "commit remote cleanup observation authority: {error}"
@@ -77,39 +68,26 @@ impl AsyncDaemonDb {
             .await?;
         let assignment =
             require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        let receipt = exact_settlement(&mut transaction, request, principal).await?;
-        require_exact_terminal_assignment(&assignment, &receipt.request, principal)?;
-        if let Some(stored) = replayed_response(&assignment, request)? {
-            if stored != *response {
-                return Err(concurrent(
-                    "remote cleanup response conflicts with durable completion evidence",
-                ));
-            }
-            require_recorded_handoff(&mut transaction, &assignment).await?;
+        let (receipt, replayed) = screen_cleanup_observation_record_in_tx(
+            &mut transaction,
+            &assignment,
+            request,
+            response,
+            principal,
+        )
+        .await?;
+        if replayed {
             commit_noop(transaction, "replayed remote cleanup response").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Replayed(assignment));
         }
-        let (parent_sha256, handoff_recorded) =
-            cleanup_parent_in_tx(&mut transaction, &assignment).await?;
-        if !handoff_recorded {
-            return Err(concurrent(
-                "remote cleanup cannot manufacture a missing terminal handoff",
-            ));
-        }
-        consume_cleanup_observation_trust_in_tx(
+        settle_cleanup_observation_in_tx(
             &mut transaction,
             &assignment,
-            &request.request_sha256,
-            &parent_sha256,
-            trust,
-        )
-        .await?;
-        persist_cleanup_completion_in_tx(
-            &mut transaction,
-            &assignment,
-            &receipt.request,
+            request,
+            &receipt,
             principal,
             &response.cleanup_completed_at,
+            trust,
         )
         .await?;
         finish_mutation(
@@ -119,6 +97,96 @@ impl AsyncDaemonDb {
         )
         .await
     }
+}
+
+/// Either this exact claim already has a recorded response, or the
+/// generation is ready for a fresh claim.
+enum CleanupObservationClaimScreen {
+    Replayed(Box<RemoteCleanupObservationResponse>),
+    Ready(Box<super::TaskBoardRemoteAssignmentRecord>),
+}
+
+async fn screen_cleanup_observation_claim_in_tx(
+    transaction: &mut Transaction<'_, sqlx::Sqlite>,
+    request: &RemoteCleanupObservationRequest,
+    principal: &str,
+) -> Result<CleanupObservationClaimScreen, CliError> {
+    let assignment = require_assignment(transaction, &request.binding.assignment_id).await?;
+    let receipt = exact_settlement(transaction, request, principal).await?;
+    require_exact_terminal_assignment(&assignment, &receipt.request, principal)?;
+    if let Some(response) = replay_cleanup_claim_in_tx(transaction, &assignment, request).await? {
+        return Ok(CleanupObservationClaimScreen::Replayed(Box::new(response)));
+    }
+    Ok(CleanupObservationClaimScreen::Ready(Box::new(assignment)))
+}
+
+/// Claims cleanup-observation trust once the terminal handoff this claim
+/// needs is durably on file.
+async fn claim_cleanup_observation_authority_in_tx(
+    transaction: &mut Transaction<'_, sqlx::Sqlite>,
+    assignment: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteCleanupObservationRequest,
+    trust: &TaskBoardRemoteHostTrustFence,
+) -> Result<(), CliError> {
+    let (parent_sha256, handoff_recorded) = cleanup_parent_in_tx(transaction, assignment).await?;
+    if !handoff_recorded {
+        return Err(concurrent(
+            "remote cleanup cannot claim without a durable terminal handoff",
+        ));
+    }
+    claim_cleanup_observation_trust_in_tx(
+        transaction,
+        assignment,
+        &request.request_sha256,
+        &parent_sha256,
+        trust,
+    )
+    .await
+}
+
+/// The settlement receipt this response answers, and whether that exact
+/// response was already recorded.
+async fn screen_cleanup_observation_record_in_tx(
+    transaction: &mut Transaction<'_, sqlx::Sqlite>,
+    assignment: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteCleanupObservationRequest,
+    response: &RemoteCleanupObservationResponse,
+    principal: &str,
+) -> Result<(TaskBoardRemoteSettlementReceipt, bool), CliError> {
+    let receipt = exact_settlement(transaction, request, principal).await?;
+    require_exact_terminal_assignment(assignment, &receipt.request, principal)?;
+    let replayed = replay_cleanup_response_in_tx(transaction, assignment, request, response).await?;
+    Ok((receipt, replayed))
+}
+
+/// Consumes cleanup-observation trust and persists completion once the
+/// terminal handoff this settlement needs is durably on file.
+async fn settle_cleanup_observation_in_tx(
+    transaction: &mut Transaction<'_, sqlx::Sqlite>,
+    assignment: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteCleanupObservationRequest,
+    receipt: &TaskBoardRemoteSettlementReceipt,
+    principal: &str,
+    completed_at: &str,
+    trust: &TaskBoardRemoteHostTrustFence,
+) -> Result<(), CliError> {
+    let (parent_sha256, handoff_recorded) = cleanup_parent_in_tx(transaction, assignment).await?;
+    if !handoff_recorded {
+        return Err(concurrent(
+            "remote cleanup cannot manufacture a missing terminal handoff",
+        ));
+    }
+    consume_cleanup_observation_trust_in_tx(
+        transaction,
+        assignment,
+        &request.request_sha256,
+        &parent_sha256,
+        trust,
+    )
+    .await?;
+    persist_cleanup_completion_in_tx(transaction, assignment, &receipt.request, principal, completed_at)
+        .await?;
+    Ok(())
 }
 
 async fn cleanup_parent_in_tx(
@@ -177,6 +245,42 @@ async fn exact_settlement(
             "remote cleanup observation mismatched immutable settlement evidence",
         ))
     }
+}
+
+/// `Some` when this exact claim request already has a durable cleanup
+/// response recorded, after checking that response also has its controller
+/// handoff on file.
+async fn replay_cleanup_claim_in_tx(
+    transaction: &mut Transaction<'_, sqlx::Sqlite>,
+    assignment: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteCleanupObservationRequest,
+) -> Result<Option<RemoteCleanupObservationResponse>, CliError> {
+    let Some(response) = replayed_response(assignment, request)? else {
+        return Ok(None);
+    };
+    require_recorded_handoff(transaction, assignment).await?;
+    Ok(Some(response))
+}
+
+/// `true` when this exact response was already recorded and its controller
+/// handoff is on file; refuses a response that conflicts with the one durably
+/// recorded instead of silently accepting the caller's version.
+async fn replay_cleanup_response_in_tx(
+    transaction: &mut Transaction<'_, sqlx::Sqlite>,
+    assignment: &super::TaskBoardRemoteAssignmentRecord,
+    request: &RemoteCleanupObservationRequest,
+    response: &RemoteCleanupObservationResponse,
+) -> Result<bool, CliError> {
+    let Some(stored) = replayed_response(assignment, request)? else {
+        return Ok(false);
+    };
+    if stored != *response {
+        return Err(concurrent(
+            "remote cleanup response conflicts with durable completion evidence",
+        ));
+    }
+    require_recorded_handoff(transaction, assignment).await?;
+    Ok(true)
 }
 
 fn replayed_response(

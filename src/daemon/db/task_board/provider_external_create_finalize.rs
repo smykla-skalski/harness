@@ -126,26 +126,15 @@ async fn finalize_new_link(
         attached_at.clone_into(&mut item.updated_at);
     }
     let attached_item_revision = item_revision + 1;
-    replace_item_in_tx(&mut transaction, &item, attached_item_revision).await?;
-    update_attached_receipt(
+    write_new_link_in_tx(
         &mut transaction,
         &stored,
-        attached_at,
-        attached_item_revision,
-    )
-    .await?;
-    let conflicts_changed = supersede_create_conflicts(
-        transaction.as_mut(),
-        &stored,
         &item,
+        attached_at,
         attached_item_revision,
         provider_baseline,
     )
     .await?;
-    bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-    if conflicts_changed {
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    }
     commit(transaction, "task-board external create finalize").await?;
     let attached = attached_intent(stored, attached_at, attached_item_revision)?;
     Ok(finalize_result(
@@ -154,6 +143,33 @@ async fn finalize_new_link(
         Some(attached_item_revision),
         TaskBoardExternalCreateFinalizeDisposition::Attached,
     ))
+}
+
+/// Writes the item, the receipt, and the resulting sync conflicts for a
+/// create intent that just formed its first link to a board item.
+async fn write_new_link_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    stored: &TaskBoardExternalCreateIntent,
+    item: &TaskBoardItem,
+    attached_at: &str,
+    attached_item_revision: i64,
+    provider_baseline: &ExternalRef,
+) -> Result<(), CliError> {
+    replace_item_in_tx(transaction, item, attached_item_revision).await?;
+    update_attached_receipt(transaction, stored, attached_at, attached_item_revision).await?;
+    let conflicts_changed = supersede_create_conflicts(
+        transaction.as_mut(),
+        stored,
+        item,
+        attached_item_revision,
+        provider_baseline,
+    )
+    .await?;
+    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    if conflicts_changed {
+        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    Ok(())
 }
 
 async fn finalize_existing_link(

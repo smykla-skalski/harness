@@ -78,25 +78,41 @@ impl AsyncDaemonDb {
             &request.request_sha256,
         )
         .await?;
-        let stored = if let Some(existing) = existing {
-            existing
-        } else {
-            insert_artifact_in_tx(&mut transaction, &input).await?;
-            load_artifact_in_tx(
-                &mut transaction,
-                &request.binding.assignment_id,
-                request.binding.fencing_epoch,
-                &request.relative_path,
-            )
-            .await?
-            .ok_or_else(|| db_error("persisted remote artifact disappeared"))?
-        };
+        let stored = store_or_reuse_artifact_in_tx(
+            &mut transaction,
+            &input,
+            &request.relative_path,
+            existing,
+        )
+        .await?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit remote artifact response: {error}")))?;
         Ok(stored)
     }
+}
+
+/// Reuses an exact replay of an already-stored artifact, or persists the
+/// newly authenticated bytes and reads back the row this transaction wrote.
+async fn store_or_reuse_artifact_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    input: &TaskBoardRemoteArtifactStoreInput<'_>,
+    relative_path: &str,
+    existing: Option<TaskBoardRemoteArtifact>,
+) -> Result<TaskBoardRemoteArtifact, CliError> {
+    if let Some(existing) = existing {
+        return Ok(existing);
+    }
+    insert_artifact_in_tx(transaction, input).await?;
+    load_artifact_in_tx(
+        transaction,
+        input.binding.assignment_id.as_str(),
+        input.binding.fencing_epoch,
+        relative_path,
+    )
+    .await?
+    .ok_or_else(|| db_error("persisted remote artifact disappeared"))
 }
 
 fn validate_response_input(

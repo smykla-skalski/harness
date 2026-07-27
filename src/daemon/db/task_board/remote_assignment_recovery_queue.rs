@@ -307,39 +307,63 @@ pub(super) async fn due_assignment_page(
         false,
     )
     .await?;
-    if let Some(cursor) = cursor.as_deref()
-        && due.len() < RECOVERY_BATCH_LIMIT + 1
-    {
-        let remaining = i64::try_from(RECOVERY_BATCH_LIMIT + 1 - due.len())
-            .map_err(|_| db_error("remote recovery wrap limit is out of range"))?;
-        let mut wrapped =
-            select_due_assignment_page(&mut transaction, now, cursor, remaining, true).await?;
-        due.append(&mut wrapped);
-    }
+    append_wrapped_recovery_page(&mut transaction, now, cursor.as_deref(), &mut due).await?;
     let incomplete = due.len() > RECOVERY_BATCH_LIMIT;
     due.truncate(RECOVERY_BATCH_LIMIT);
-    let scanned_last = due.last().cloned();
-    if let Some(last) = scanned_last {
-        query(
-            "INSERT INTO task_board_reconciliation_cursors (
-                 queue, sort_updated_at, sort_execution_id
-             ) VALUES (?1, ?2, ?3)
-             ON CONFLICT(queue) DO UPDATE SET
-                 sort_updated_at = excluded.sort_updated_at,
-                 sort_execution_id = excluded.sort_execution_id",
-        )
-        .bind(RECOVERY_QUEUE)
-        .bind(now)
-        .bind(last.assignment_id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("store remote recovery cursor: {error}")))?;
-    }
+    store_recovery_cursor_in_tx(&mut transaction, now, due.last().cloned()).await?;
     transaction
         .commit()
         .await
         .map_err(|error| db_error(format!("commit remote recovery page: {error}")))?;
     Ok((due, incomplete))
+}
+
+/// Fills a short first page out to the batch limit by wrapping the scan back
+/// to the start of the cursor order, when there is a cursor to wrap from.
+async fn append_wrapped_recovery_page(
+    transaction: &mut Transaction<'_, Sqlite>,
+    now: &str,
+    cursor: Option<&str>,
+    due: &mut Vec<RawRecoveryCandidate>,
+) -> Result<(), CliError> {
+    let Some(cursor) = cursor else {
+        return Ok(());
+    };
+    if due.len() >= RECOVERY_BATCH_LIMIT + 1 {
+        return Ok(());
+    }
+    let remaining = i64::try_from(RECOVERY_BATCH_LIMIT + 1 - due.len())
+        .map_err(|_| db_error("remote recovery wrap limit is out of range"))?;
+    let mut wrapped = select_due_assignment_page(transaction, now, cursor, remaining, true).await?;
+    due.append(&mut wrapped);
+    Ok(())
+}
+
+/// Advances the durable scan cursor to the last row this page actually
+/// returned, leaving it untouched when the page came back empty.
+async fn store_recovery_cursor_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    now: &str,
+    last: Option<RawRecoveryCandidate>,
+) -> Result<(), CliError> {
+    let Some(last) = last else {
+        return Ok(());
+    };
+    query(
+        "INSERT INTO task_board_reconciliation_cursors (
+             queue, sort_updated_at, sort_execution_id
+         ) VALUES (?1, ?2, ?3)
+         ON CONFLICT(queue) DO UPDATE SET
+             sort_updated_at = excluded.sort_updated_at,
+             sort_execution_id = excluded.sort_execution_id",
+    )
+    .bind(RECOVERY_QUEUE)
+    .bind(now)
+    .bind(last.assignment_id)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("store remote recovery cursor: {error}")))?;
+    Ok(())
 }
 
 async fn select_due_assignment_page(

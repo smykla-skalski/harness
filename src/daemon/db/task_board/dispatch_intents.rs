@@ -69,6 +69,52 @@ async fn load_pending_dispatch_claim(
     .map_err(|error| db_error(format!("load pending task board dispatch: {error}")))
 }
 
+/// Decide how a claimed dispatch should resume, refusing it in place when the
+/// current item or policy state no longer allows the `Start` path.
+///
+/// Owns the transaction rather than borrowing it because the refusal branch
+/// must commit and return early with the caller's own error, not roll the
+/// refusal back.
+async fn resolve_dispatch_claim_action_in_tx<'c>(
+    mut transaction: Transaction<'c, Sqlite>,
+    board_item_id: &str,
+    pending: &PendingTaskBoardDispatch,
+    applied: &DispatchAppliedTask,
+) -> Result<(Transaction<'c, Sqlite>, TaskBoardDispatchClaimAction), CliError> {
+    if pending.compensation_pending {
+        let reason = pending
+            .last_error
+            .as_ref()
+            .filter(|reason| !reason.is_empty())
+            .cloned()
+            .ok_or_else(|| db_error("compensating task board dispatch has no reason"))?;
+        return Ok((transaction, TaskBoardDispatchClaimAction::Compensate { reason }));
+    }
+    if pending.prior_status == "starting" {
+        // A reclaimed `starting` claim can already own the deterministic
+        // worker. Its recovery path must probe that identity before current
+        // item or policy state is allowed to reject the intent.
+        return Ok((transaction, TaskBoardDispatchClaimAction::Recover));
+    }
+    if let Err(error) = validate_pending_dispatch(
+        &mut transaction,
+        board_item_id,
+        &pending.intent_id,
+        applied,
+        pending.consumed_approval_grant_id.as_deref(),
+    )
+    .await
+    {
+        transaction.commit().await.map_err(|commit_error| {
+            db_error(format!(
+                "commit refused task board worker claim: {commit_error}"
+            ))
+        })?;
+        return Err(error);
+    }
+    Ok((transaction, TaskBoardDispatchClaimAction::Start))
+}
+
 #[path = "dispatch_intents_helpers.rs"]
 pub(super) mod helpers;
 
@@ -178,39 +224,9 @@ impl AsyncDaemonDb {
             return Ok(None);
         };
         let applied = decode_applied(&pending.payload_json)?;
-        let action = if pending.compensation_pending {
-            TaskBoardDispatchClaimAction::Compensate {
-                reason: pending
-                    .last_error
-                    .as_ref()
-                    .filter(|reason| !reason.is_empty())
-                    .cloned()
-                    .ok_or_else(|| db_error("compensating task board dispatch has no reason"))?,
-            }
-        } else if pending.prior_status == "starting" {
-            // A reclaimed `starting` claim can already own the deterministic
-            // worker. Its recovery path must probe that identity before current
-            // item or policy state is allowed to reject the intent.
-            TaskBoardDispatchClaimAction::Recover
-        } else {
-            if let Err(error) = validate_pending_dispatch(
-                &mut transaction,
-                board_item_id,
-                &pending.intent_id,
-                &applied,
-                pending.consumed_approval_grant_id.as_deref(),
-            )
-            .await
-            {
-                transaction.commit().await.map_err(|commit_error| {
-                    db_error(format!(
-                        "commit refused task board worker claim: {commit_error}"
-                    ))
-                })?;
-                return Err(error);
-            }
-            TaskBoardDispatchClaimAction::Start
-        };
+        let (mut transaction, action) =
+            resolve_dispatch_claim_action_in_tx(transaction, board_item_id, &pending, &applied)
+                .await?;
         let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
         let changed =
             claim_task_board_dispatch_intent_in_tx(&mut transaction, &pending, &claim_token)
