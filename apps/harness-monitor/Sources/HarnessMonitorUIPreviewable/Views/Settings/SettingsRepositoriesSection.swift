@@ -163,7 +163,10 @@ struct SettingsRepositoriesSection: View {
         if let saveWarning {
           statusSection(message: saveWarning, color: .orange)
         }
-        RepositoriesMonitoredSection(draft: draftBinding)
+        RepositoriesMonitoredSection(
+          draft: draftBinding,
+          taskBoardDraft: $taskBoardFormState.draft
+        )
         SettingsRepositoryWorkingDirectoriesSection(
           store: store,
           repositories: draft.rows.map(\.id)
