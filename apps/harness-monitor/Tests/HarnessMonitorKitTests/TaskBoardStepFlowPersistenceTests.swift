@@ -224,8 +224,13 @@ final class TaskBoardStepFlowPersistenceTests {
       TaskBoardDispatchSelection(item: target, plan: dispatchPlan(for: target))
     )
     opened.persistStepFlow()
+    let revisionBeforeStandDown = opened.stepRailState.flowRevision
+
     opened.stepRailState.reset()
 
+    // Standing down must not read as a flow change, or the write it triggers
+    // would delete the flow this panel is meant to hand to the next one.
+    #expect(opened.stepRailState.flowRevision == revisionBeforeStandDown)
     let reopened = await railView(targetItem: target, taskBoardItems: [target])
     reopened.restoreStepFlowIfNeeded()
 

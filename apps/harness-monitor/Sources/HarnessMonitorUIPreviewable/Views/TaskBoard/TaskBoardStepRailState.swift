@@ -130,8 +130,10 @@ final class TaskBoardStepRailState {
     flowRevision &+= 1
   }
 
-  /// `hasLoadedPersistedFlow` deliberately survives: the disk read happens once
-  /// per panel, and a flow cleared here leaves nothing to read back.
+  /// Standing the panel down is not the user leaving the flow, so this bumps no
+  /// revision: the stored flow outlives step mode going off and is waiting when
+  /// it comes back on. `hasLoadedPersistedFlow` survives for the same reason -
+  /// the disk read belongs to the panel, not to the flow.
   func reset() {
     isRunning = false
     pickedSelection = nil
@@ -142,7 +144,6 @@ final class TaskBoardStepRailState {
     lockedItemID = nil
     viewingColumn = nil
     pendingRestoredFlow = nil
-    flowRevision &+= 1
     isAutomationContextExpanded = false
   }
 }
