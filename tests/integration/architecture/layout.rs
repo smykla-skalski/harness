@@ -15,7 +15,6 @@ fn new_domain_roots_exist() {
         "src/setup",
         "crates/harness-workspace/src/workspace",
         "crates/harness-kernel/src/kernel",
-        "src/platform",
         "src/infra",
         "src/hooks",
     ] {
@@ -62,12 +61,6 @@ fn cluster_topology_is_owned_by_kernel() {
         "kernel topology module should exist"
     );
 
-    let platform_mod = read_repo_file(root, "src/platform/mod.rs");
-    assert!(
-        !platform_mod.contains("pub mod cluster;"),
-        "src/platform/mod.rs should not publicly expose a cluster topology module"
-    );
-
     let mut hits = Vec::new();
     for path in [
         "src/run/context/aggregate.rs",
@@ -112,34 +105,6 @@ fn run_specs_root_is_thin() {
         repo_path_exists(root, "src/run/specs/tests.rs"),
         "run specs split test module should exist"
     );
-}
-
-#[test]
-fn platform_module_stays_internal_to_the_crate() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let lib_rs = read_repo_file(root, "src/lib.rs");
-    assert!(
-        !lib_rs.contains("pub mod platform;"),
-        "src/lib.rs should not expose platform as a public crate surface"
-    );
-    assert!(
-        lib_rs.contains("pub(crate) mod platform;"),
-        "src/lib.rs should keep platform crate-internal"
-    );
-
-    for path in [
-        "tests/integration/universal.rs",
-        "tests/integration/preflight.rs",
-        "tests/integration/compact/fingerprints.rs",
-        "tests/integration/compact/mod.rs",
-        "tests/integration/commands/session_stop.rs",
-    ] {
-        let contents = read_repo_file(root, path);
-        assert!(
-            !contents.contains("harness::platform::"),
-            "{path} should not depend on the internal platform module"
-        );
-    }
 }
 
 #[test]

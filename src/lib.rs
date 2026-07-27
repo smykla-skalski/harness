@@ -27,7 +27,6 @@ pub use harness_kernel::kernel;
 #[cfg(feature = "mcp-runtime")]
 pub use harness_mcp::mcp;
 pub mod observe;
-pub(crate) mod platform;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod reviews;
 pub mod run;

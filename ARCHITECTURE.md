@@ -20,7 +20,6 @@ flowchart LR
 
     Kernel["kernel\npure shared primitives"]
     Workspace["workspace\nambient harness state"]
-    Platform["platform\nruntime-specific adapters"]
     Infra["infra\ngeneric side effects"]
     Errors["errors\ntyped error families"]
 
@@ -45,7 +44,6 @@ flowchart LR
     Run --> Hooks
     Run --> Kernel
     Run --> Workspace
-    Run --> Platform
     Run --> Infra
     Run --> Errors
 
@@ -67,14 +65,12 @@ flowchart LR
     Setup --> Run
     Setup --> Kernel
     Setup --> Workspace
-    Setup --> Platform
     Setup --> Infra
     Setup --> Errors
 
     Hooks --> Run
     Hooks --> Create
     Hooks --> Agents
-    Hooks --> Platform
     Hooks --> Kernel
     Hooks --> Workspace
     Hooks --> Infra
@@ -82,8 +78,6 @@ flowchart LR
 
     Workspace --> Kernel
     Workspace --> Infra
-    Platform --> Kernel
-    Platform --> Infra
 ```
 
 ## What each root owns
@@ -107,7 +101,6 @@ flowchart LR
 
 These are real roots in the repo, but they are not part of the main public domain map:
 
-- `src/platform/` is crate-internal adapter code for runtime-specific behavior.
 - `src/manifests/` is crate-internal manifest plumbing.
 - `src/suite_defaults/` is crate-internal suite scaffolding and defaults.
 - `src/codec/` is test-only support code and is not part of the public library surface.
@@ -117,10 +110,10 @@ These are real roots in the repo, but they are not part of the main public domai
 The current `src/lib.rs` surface is:
 
 - public: `agents`, `app`, `create`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `session`, `setup`, `workspace`
-- crate-internal: `platform`, `manifests`, `suite_defaults`
+- crate-internal: `manifests`, `suite_defaults`
 - test-only: `codec`
 
-That means `platform` is intentionally not a stable library API even though it is a first-class internal root.
+That means `manifests` and `suite_defaults` are intentionally not stable library APIs even though they are first-class internal roots.
 
 ## Source-of-truth model
 
@@ -146,14 +139,12 @@ sequenceDiagram
     participant D as Domain
     participant G as agents
     participant W as workspace
-    participant P as platform
     participant I as infra
 
     U->>A: CLI args or hook payload
     A->>D: typed request
     D->>G: record shared agent lifecycle or ledger state if needed
     D->>W: load session or ambient state if needed
-    D->>P: ask for runtime-specific behavior if needed
     D->>I: perform side effects
     D-->>A: typed result or typed error
     A-->>U: CLI output or hook response
@@ -211,9 +202,8 @@ That keeps host wrappers thin. They translate local hook payloads, but harness o
 
 - `app` is transport only. It wires domains together, but domains must not depend on `app`. The one exception is `app::command_context::Execute`, which all command handlers implement as the transport trait.
 - `agents` owns cross-agent lifecycle and shared session state. Do not hide those concerns in `setup`, `hooks`, or host-specific runtime configs.
-- `kernel` is pure. It must not depend on product domains, `platform`, or `infra`. Known violation: `kernel::topology::parsing` imports `HARNESS_PREFIX` from `workspace`.
+- `kernel` is pure. It must not depend on product domains or `infra`. Known violation: `kernel::topology::parsing` imports `HARNESS_PREFIX` from `workspace`.
 - `workspace` owns path resolution and ambient harness files, not cross-agent workflow state.
-- `platform` is adapter code, not a public crate surface.
 - `infra` stays generic and must not depend on product domains.
 - `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or durable shared state. It reads `run`, `agents`, and `hooks` types for cluster provisioning and session coordination.
 - `hooks` normalizes and enforces policy. It reads `run` workflow state, `create` workflow state, and `agents` services to make guard decisions and record events. It should feed shared state through `agents`, not own separate durable copies.
