@@ -78,7 +78,10 @@ pub(crate) async fn run_task_board_github_automation_async(
         let client =
             GitHubApiAutomationClient::new_with_runtime_config(&token, runtime_config.clone())?;
         let branch = match client.repository_default_branch(owner, repo).await {
-            Ok(Some(branch)) if !branch.trim().is_empty() => branch,
+            // Trimmed, not just checked: a branch name carrying whitespace
+            // stamps a ref git will refuse much later, where the failure no
+            // longer points here.
+            Ok(Some(branch)) if !branch.trim().is_empty() => branch.trim().to_owned(),
             // One unreachable repository must not stall every other one, but the
             // reason has to reach the log or an auth or network fault is
             // indistinguishable from a repository that simply reports no branch.

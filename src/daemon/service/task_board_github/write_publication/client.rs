@@ -64,7 +64,10 @@ pub(super) async fn resolve_base_branch(
         .client
         .repository_default_branch(&publication.config.owner, &publication.config.repo)
         .await?;
-    let Some(branch) = detected.filter(|branch| !branch.trim().is_empty()) else {
+    let Some(branch) = detected
+        .map(|branch| branch.trim().to_owned())
+        .filter(|branch| !branch.is_empty())
+    else {
         return Err(CliErrorKind::workflow_io(format!(
             "write workflow publication could not detect the default branch for '{}'",
             publication.repository
