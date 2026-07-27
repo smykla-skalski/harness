@@ -209,6 +209,7 @@ struct RepositoriesMonitoredSection: View {
     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     .help("Publication overrides for \(row.repositoryPath)")
     .accessibilityLabel("Publication overrides for \(row.repositoryPath)")
+    .accessibilityValue(isExpanded ? "expanded" : "collapsed")
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.settingsRepositoriesOverridesDisclosure(index)
     )
