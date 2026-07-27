@@ -30,23 +30,19 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote terminal cleanup handoff")
             .await?;
-        let assignment =
-            require_assignment(&mut transaction, &expected_assignment.assignment_id).await?;
-        if assignment != *expected_assignment {
-            commit_noop(transaction, "stale terminal cleanup handoff").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(assignment));
-        }
-        let parent = load_execution_in_tx(&mut transaction, &assignment.execution_id)
-            .await?
-            .ok_or_else(|| concurrent("remote terminal cleanup parent disappeared"))?;
-        if TaskBoardWorkflowExecutionCas::from(&parent) != *expected_parent {
-            commit_noop(transaction, "stale terminal cleanup parent").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(assignment));
-        }
-        if terminal_cleanup_handoff_matches_in_tx(&mut transaction, &assignment, &parent).await? {
-            commit_noop(transaction, "replayed terminal cleanup handoff").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(assignment));
-        }
+        let (assignment, parent) = match screen_terminal_cleanup_handoff_in_tx(
+            &mut transaction,
+            expected_assignment,
+            expected_parent,
+        )
+        .await?
+        {
+            TerminalCleanupHandoffScreen::Stopped(reason, outcome) => {
+                commit_noop(transaction, reason).await?;
+                return Ok(*outcome);
+            }
+            TerminalCleanupHandoffScreen::Ready(assignment, parent) => (assignment, parent),
+        };
         require_terminal_cleanup_candidate(&assignment, &parent)?;
         record_controller_handoff_in_tx(
             &mut transaction,
@@ -85,6 +81,50 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit remote settlement handoff read: {error}")))?;
         Ok(recorded)
     }
+}
+
+/// Either the handoff is already settled against a stale identity or a stale
+/// or replayed parent generation, or the exact current assignment and parent
+/// are ready for a fresh handoff.
+enum TerminalCleanupHandoffScreen {
+    Stopped(&'static str, Box<TaskBoardRemoteMutationOutcome>),
+    Ready(
+        Box<TaskBoardRemoteAssignmentRecord>,
+        Box<TaskBoardWorkflowExecutionRecord>,
+    ),
+}
+
+async fn screen_terminal_cleanup_handoff_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected_assignment: &TaskBoardRemoteAssignmentRecord,
+    expected_parent: &TaskBoardWorkflowExecutionCas,
+) -> Result<TerminalCleanupHandoffScreen, CliError> {
+    let assignment = require_assignment(transaction, &expected_assignment.assignment_id).await?;
+    if assignment != *expected_assignment {
+        return Ok(TerminalCleanupHandoffScreen::Stopped(
+            "stale terminal cleanup handoff",
+            Box::new(TaskBoardRemoteMutationOutcome::Stale(assignment)),
+        ));
+    }
+    let parent = load_execution_in_tx(transaction, &assignment.execution_id)
+        .await?
+        .ok_or_else(|| concurrent("remote terminal cleanup parent disappeared"))?;
+    if TaskBoardWorkflowExecutionCas::from(&parent) != *expected_parent {
+        return Ok(TerminalCleanupHandoffScreen::Stopped(
+            "stale terminal cleanup parent",
+            Box::new(TaskBoardRemoteMutationOutcome::Stale(assignment)),
+        ));
+    }
+    if terminal_cleanup_handoff_matches_in_tx(transaction, &assignment, &parent).await? {
+        return Ok(TerminalCleanupHandoffScreen::Stopped(
+            "replayed terminal cleanup handoff",
+            Box::new(TaskBoardRemoteMutationOutcome::Replayed(assignment)),
+        ));
+    }
+    Ok(TerminalCleanupHandoffScreen::Ready(
+        Box::new(assignment),
+        Box::new(parent),
+    ))
 }
 
 pub(super) async fn settlement_handoff_exists_in_tx(

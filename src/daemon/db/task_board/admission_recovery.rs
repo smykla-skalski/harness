@@ -70,26 +70,10 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("missing task board admission worker recovery")
             .await?;
-        let current =
-            load_worker_recovery_in_tx(&mut transaction, &expected.managed_worker_id).await?;
-        let Some(current) = current else {
+        if !screen_missing_worker_recovery_in_tx(&mut transaction, expected).await? {
             transaction.commit().await.map_err(|error| {
                 db_error(format!(
-                    "commit absent task board admission worker recovery: {error}"
-                ))
-            })?;
-            return Ok(None);
-        };
-        if current != *expected {
-            return Err(db_error(format!(
-                "task board admission worker '{}' changed dispatch identity during recovery",
-                expected.managed_worker_id
-            )));
-        }
-        if codex_run_exists_in_tx(&mut transaction, &expected.managed_worker_id).await? {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit raced task board admission worker recovery: {error}"
+                    "commit no-op task board admission worker recovery: {error}"
                 ))
             })?;
             return Ok(None);
@@ -207,6 +191,29 @@ async fn load_worker_recovery_in_tx(
             "managed worker '{managed_worker_id}' resolved to multiple recovery records"
         ))),
     }
+}
+
+/// Whether the worker recovery still applies: `false` means the caller has
+/// nothing left to reconcile and should commit the read-only screen as-is.
+async fn screen_missing_worker_recovery_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected: &TaskBoardAdmissionWorkerRecovery,
+) -> Result<bool, CliError> {
+    let Some(current) =
+        load_worker_recovery_in_tx(transaction, &expected.managed_worker_id).await?
+    else {
+        return Ok(false);
+    };
+    if current != *expected {
+        return Err(db_error(format!(
+            "task board admission worker '{}' changed dispatch identity during recovery",
+            expected.managed_worker_id
+        )));
+    }
+    if codex_run_exists_in_tx(transaction, &expected.managed_worker_id).await? {
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 async fn codex_run_exists_in_tx(

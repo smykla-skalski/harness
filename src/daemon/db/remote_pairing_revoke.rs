@@ -63,93 +63,10 @@ impl AsyncDaemonDb {
                 db_error(format!("begin remote pairing revoke transaction: {error}"))
             })?;
 
-        let row = query(
-            "SELECT p.claimed_client_id,
-                    json_extract(p.metadata_json, '$.revoked_at') AS withdrawn_at,
-                    c.revoked_at AS device_revoked_at
-             FROM remote_pairing_codes p
-             LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
-             WHERE p.pairing_id = ?1",
-        )
-        .bind(pairing_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load pairing {pairing_id} to revoke: {error}")))?;
-
-        let Some(row) = row else {
+        let Some((outcome, effective_at)) =
+            decide_pairing_revoke_outcome_in_tx(&mut transaction, pairing_id, revoked_at).await?
+        else {
             return finish_missing_pairing_revoke(transaction, audit, revoked_at).await;
-        };
-        let claimed_client_id: Option<String> = row
-            .try_get("claimed_client_id")
-            .map_err(|error| db_error(format!("read claimed client for {pairing_id}: {error}")))?;
-        let withdrawn_at: Option<String> = row
-            .try_get("withdrawn_at")
-            .map_err(|error| db_error(format!("read revocation for {pairing_id}: {error}")))?;
-        let device_revoked_at: Option<String> =
-            row.try_get("device_revoked_at").map_err(|error| {
-                db_error(format!("read device revocation for {pairing_id}: {error}"))
-            })?;
-        // Either end can already carry it, and whichever does is the moment
-        // that matters rather than the moment this request arrived.
-        let already = withdrawn_at.or(device_revoked_at);
-
-        let (outcome, effective_at) = match (claimed_client_id, already) {
-            (_, Some(at)) => (RemotePairingRevokeOutcome::AlreadyRevoked, at),
-            (Some(client_id), None) => {
-                let changed = query(
-                    "UPDATE remote_clients
-                     SET revoked_at = ?2
-                     WHERE client_id = ?1 AND revoked_at IS NULL",
-                )
-                .bind(&client_id)
-                .bind(revoked_at)
-                .execute(transaction.as_mut())
-                .await
-                .map_err(|error| db_error(format!("revoke device {client_id}: {error}")))?
-                .rows_affected();
-                if changed == 1 {
-                    (
-                        RemotePairingRevokeOutcome::DeviceRevoked,
-                        revoked_at.to_owned(),
-                    )
-                } else {
-                    // The write lock makes this mean the device was revoked
-                    // before the SELECT, which the guard above should have
-                    // caught. Report the moment on the row rather than this
-                    // one, so a retry never claims the revocation as its own.
-                    let existing = stored_device_revocation(&mut transaction, &client_id).await?;
-                    (
-                        RemotePairingRevokeOutcome::AlreadyRevoked,
-                        existing.unwrap_or_else(|| revoked_at.to_owned()),
-                    )
-                }
-            }
-            (None, None) => {
-                let withdrawn = query(
-                    "UPDATE remote_pairing_codes
-                     SET metadata_json = json_set(metadata_json, '$.revoked_at', ?2)
-                     WHERE pairing_id = ?1 AND claimed_at IS NULL",
-                )
-                .bind(pairing_id)
-                .bind(revoked_at)
-                .execute(transaction.as_mut())
-                .await
-                .map_err(|error| db_error(format!("withdraw link {pairing_id}: {error}")))?
-                .rows_affected();
-                if withdrawn != 1 {
-                    // The guard is `claimed_at IS NULL`, so changing nothing
-                    // means the link was claimed after all. Answering
-                    // `LinkWithdrawn` would report that nobody can use the code
-                    // at the moment somebody just did.
-                    return Err(db_error(format!(
-                        "pairing {pairing_id} was claimed while it was being withdrawn"
-                    )));
-                }
-                (
-                    RemotePairingRevokeOutcome::LinkWithdrawn,
-                    revoked_at.to_owned(),
-                )
-            }
         };
 
         record_revoke_audit(&mut transaction, audit, RemoteAuditOutcome::Success).await?;
@@ -163,6 +80,115 @@ impl AsyncDaemonDb {
             revoked_at: effective_at,
         })
     }
+}
+
+/// Loads the pairing and decides what revoking it does, `None` when no such
+/// pairing exists.
+async fn decide_pairing_revoke_outcome_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    pairing_id: &str,
+    revoked_at: &str,
+) -> Result<Option<(RemotePairingRevokeOutcome, String)>, CliError> {
+    let row = query(
+        "SELECT p.claimed_client_id,
+                json_extract(p.metadata_json, '$.revoked_at') AS withdrawn_at,
+                c.revoked_at AS device_revoked_at
+         FROM remote_pairing_codes p
+         LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
+         WHERE p.pairing_id = ?1",
+    )
+    .bind(pairing_id)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load pairing {pairing_id} to revoke: {error}")))?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let claimed_client_id: Option<String> = row
+        .try_get("claimed_client_id")
+        .map_err(|error| db_error(format!("read claimed client for {pairing_id}: {error}")))?;
+    let withdrawn_at: Option<String> = row
+        .try_get("withdrawn_at")
+        .map_err(|error| db_error(format!("read revocation for {pairing_id}: {error}")))?;
+    let device_revoked_at: Option<String> = row.try_get("device_revoked_at").map_err(|error| {
+        db_error(format!("read device revocation for {pairing_id}: {error}"))
+    })?;
+    // Either end can already carry it, and whichever does is the moment
+    // that matters rather than the moment this request arrived.
+    let already = withdrawn_at.or(device_revoked_at);
+    let outcome = match (claimed_client_id, already) {
+        (_, Some(at)) => (RemotePairingRevokeOutcome::AlreadyRevoked, at),
+        (Some(client_id), None) => {
+            revoke_claimed_device_in_tx(transaction, &client_id, revoked_at).await?
+        }
+        (None, None) => withdraw_unclaimed_link_in_tx(transaction, pairing_id, revoked_at).await?,
+    };
+    Ok(Some(outcome))
+}
+
+/// Cut off the device that claimed this pairing.
+async fn revoke_claimed_device_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    client_id: &str,
+    revoked_at: &str,
+) -> Result<(RemotePairingRevokeOutcome, String), CliError> {
+    let changed = query(
+        "UPDATE remote_clients
+         SET revoked_at = ?2
+         WHERE client_id = ?1 AND revoked_at IS NULL",
+    )
+    .bind(client_id)
+    .bind(revoked_at)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("revoke device {client_id}: {error}")))?
+    .rows_affected();
+    if changed == 1 {
+        return Ok((
+            RemotePairingRevokeOutcome::DeviceRevoked,
+            revoked_at.to_owned(),
+        ));
+    }
+    // The write lock makes this mean the device was revoked before the
+    // SELECT, which the guard above should have caught. Report the moment on
+    // the row rather than this one, so a retry never claims the revocation as
+    // its own.
+    let existing = stored_device_revocation(transaction, client_id).await?;
+    Ok((
+        RemotePairingRevokeOutcome::AlreadyRevoked,
+        existing.unwrap_or_else(|| revoked_at.to_owned()),
+    ))
+}
+
+/// Mark an unclaimed link as withdrawn so nobody can claim it after this.
+async fn withdraw_unclaimed_link_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    pairing_id: &str,
+    revoked_at: &str,
+) -> Result<(RemotePairingRevokeOutcome, String), CliError> {
+    let withdrawn = query(
+        "UPDATE remote_pairing_codes
+         SET metadata_json = json_set(metadata_json, '$.revoked_at', ?2)
+         WHERE pairing_id = ?1 AND claimed_at IS NULL",
+    )
+    .bind(pairing_id)
+    .bind(revoked_at)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("withdraw link {pairing_id}: {error}")))?
+    .rows_affected();
+    if withdrawn != 1 {
+        // The guard is `claimed_at IS NULL`, so changing nothing means the
+        // link was claimed after all. Answering `LinkWithdrawn` would report
+        // that nobody can use the code at the moment somebody just did.
+        return Err(db_error(format!(
+            "pairing {pairing_id} was claimed while it was being withdrawn"
+        )));
+    }
+    Ok((
+        RemotePairingRevokeOutcome::LinkWithdrawn,
+        revoked_at.to_owned(),
+    ))
 }
 
 async fn finish_missing_pairing_revoke(

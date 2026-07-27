@@ -5,7 +5,8 @@ use sqlx::{Sqlite, Transaction, query};
 use super::remote_assignment_io_authority::active_target_matches;
 use super::remote_assignment_io_authority::monotonic_time;
 use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken, canonical_time,
+    concurrent, to_i64,
 };
 use super::remote_operation_trust::TaskBoardRemoteOperationKind;
 use super::workflow_executions::load_execution_in_tx;
@@ -136,6 +137,16 @@ pub(super) fn pending_cancel_request_for_record(
         .error
         .as_deref()
         .ok_or_else(|| concurrent("pending remote cancel journal has no reason"))?;
+    verify_pending_cancel_evidence(record, operation, reason).map(Some)
+}
+
+/// Recomputes the sealed cancel request and checks it against both copies of
+/// its digest that the journal and the operation token independently carry.
+fn verify_pending_cancel_evidence(
+    record: &TaskBoardRemoteAssignmentRecord,
+    operation: &TaskBoardRemoteControllerOperationToken,
+    reason: &str,
+) -> Result<RemoteCancelRequest, CliError> {
     let (Some("cancel"), Some(journal_sha256)) = (
         record.last_mutation_kind.as_deref(),
         record.last_mutation_sha256.as_deref(),
@@ -152,7 +163,7 @@ pub(super) fn pending_cancel_request_for_record(
             "pending remote cancel journal changed its exact request digest",
         ));
     }
-    Ok(Some(request))
+    Ok(request)
 }
 
 pub(super) async fn journal_pending_cancel_request_in_tx(

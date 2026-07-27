@@ -23,40 +23,8 @@ pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
     consumed_approval_grant_id: Option<&str>,
     reason: &str,
 ) -> Result<(), CliError> {
-    if let Some(grant_id) = consumed_approval_grant_id {
-        restore_consumed_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &utc_now())
-            .await?;
-    }
-    let (mut item, revision) = load_item_in_tx(transaction, &applied.board_item_id)
-        .await?
-        .ok_or_else(|| {
-            db_error(format!(
-                "task-board item '{}' not found",
-                applied.board_item_id
-            ))
-        })?;
-    let still_linked = item.session_id.as_deref() == Some(applied.session_id.as_str())
-        && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str());
-    if still_linked && dispatch_item_can_be_rolled_back(&item) {
-        let before = item.clone();
-        item.workflow.status = TaskBoardWorkflowStatus::Failed;
-        item.workflow.current_step_id = Some("admission".to_string());
-        item.workflow.last_error = Some(reason.to_string());
-        item.status = TaskBoardStatus::Todo;
-        item.session_id = None;
-        item.work_item_id = None;
-        item.updated_at = utc_now();
-        let write = replace_with_lane_transition_in_tx(
-            transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Generic,
-        )
+    prepare_pending_admission_refusal_in_tx(transaction, applied, consumed_approval_grant_id, reason)
         .await?;
-        let change_sequence = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(transaction, &write, change_sequence).await?;
-    }
     let now = utc_now();
     query(
         "UPDATE task_board_dispatch_intents
@@ -73,10 +41,67 @@ pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
     Ok(())
 }
 
+/// Restores any consumed approval grant and rolls the linked item back to
+/// `Todo` before the intent itself is marked failed.
+async fn prepare_pending_admission_refusal_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    applied: &DispatchAppliedTask,
+    consumed_approval_grant_id: Option<&str>,
+    reason: &str,
+) -> Result<(), CliError> {
+    if let Some(grant_id) = consumed_approval_grant_id {
+        restore_consumed_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &utc_now())
+            .await?;
+    }
+    let (item, revision) = load_item_in_tx(transaction, &applied.board_item_id)
+        .await?
+        .ok_or_else(|| {
+            db_error(format!(
+                "task-board item '{}' not found",
+                applied.board_item_id
+            ))
+        })?;
+    let still_linked = item.session_id.as_deref() == Some(applied.session_id.as_str())
+        && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str());
+    if still_linked && dispatch_item_can_be_rolled_back(&item) {
+        roll_back_dispatch_item_in_tx(transaction, item, revision, reason).await?;
+    }
+    Ok(())
+}
+
 pub(super) fn dispatch_item_can_be_rolled_back(item: &TaskBoardItem) -> bool {
     !item.is_deleted()
         && item.status == TaskBoardStatus::InProgress
         && item.workflow.status == TaskBoardWorkflowStatus::Running
+}
+
+/// Roll a refused item back to `Todo` and clear the dispatch it never got to
+/// keep, recording the failure so the next look at the item explains itself.
+async fn roll_back_dispatch_item_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    mut item: TaskBoardItem,
+    revision: i64,
+    reason: &str,
+) -> Result<(), CliError> {
+    let before = item.clone();
+    item.workflow.status = TaskBoardWorkflowStatus::Failed;
+    item.workflow.current_step_id = Some("admission".to_string());
+    item.workflow.last_error = Some(reason.to_string());
+    item.status = TaskBoardStatus::Todo;
+    item.session_id = None;
+    item.work_item_id = None;
+    item.updated_at = utc_now();
+    let write = replace_with_lane_transition_in_tx(
+        transaction,
+        before,
+        revision,
+        item,
+        LaneTransitionKind::Generic,
+    )
+    .await?;
+    let change_sequence = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_lane_transition_audit_in_tx(transaction, &write, change_sequence).await?;
+    Ok(())
 }
 
 pub(in crate::daemon::db::task_board) async fn has_active_dispatch_reservation_in_tx(

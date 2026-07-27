@@ -1,3 +1,5 @@
+use sqlx::{Sqlite, Transaction};
+
 use super::admission_lifecycle::release_managed_worker_admission_in_tx;
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -39,23 +41,7 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("load read-only workflow admissions: {error}")))?;
         let mut released = Vec::new();
         for owner in owners {
-            let Some(execution_id) = owner
-                .strip_prefix("workflow-")
-                .filter(|value| !value.is_empty())
-            else {
-                continue;
-            };
-            let retained = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(
-                     SELECT 1 FROM task_board_workflow_executions WHERE execution_id = ?1
-                 )",
-            )
-            .bind(execution_id)
-            .fetch_one(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("check read-only workflow admission: {error}")))?;
-            if !retained && release_managed_worker_admission_in_tx(&mut transaction, &owner).await?
-            {
+            if recover_orphaned_admission_owner_in_tx(&mut transaction, &owner).await? {
                 released.push(owner);
             }
         }
@@ -67,6 +53,35 @@ impl AsyncDaemonDb {
         Ok(released)
     }
 
+}
+
+/// Releases this owner's committed admission only when it names a
+/// `workflow-` execution that no longer exists; a non-workflow owner or one
+/// whose execution is still on file is left untouched.
+async fn recover_orphaned_admission_owner_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    owner: &str,
+) -> Result<bool, CliError> {
+    let Some(execution_id) = owner.strip_prefix("workflow-").filter(|value| !value.is_empty())
+    else {
+        return Ok(false);
+    };
+    let retained = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(
+             SELECT 1 FROM task_board_workflow_executions WHERE execution_id = ?1
+         )",
+    )
+    .bind(execution_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("check read-only workflow admission: {error}")))?;
+    if retained {
+        return Ok(false);
+    }
+    release_managed_worker_admission_in_tx(transaction, owner).await
+}
+
+impl AsyncDaemonDb {
     pub(crate) async fn project_task_board_read_only_workflow_terminal(
         &self,
         execution_id: &str,

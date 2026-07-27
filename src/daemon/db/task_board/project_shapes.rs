@@ -32,29 +32,8 @@ pub(crate) async fn assign_shapes_in_tx(
     // An organization that already has an outline keeps it. Reshuffling on
     // every registration would mean a board that looks different after each new
     // project, which is the opposite of what a mark is for.
-    let mut by_organization: BTreeMap<&str, TaskBoardProjectShape> = BTreeMap::new();
-    for (_, slug, shape) in &rows {
-        if let Some(shape) = shape.as_deref().and_then(TaskBoardProjectShape::parse) {
-            by_organization.entry(organization_of(slug)).or_insert(shape);
-        }
-    }
-
-    let mut pending: Vec<(&str, TaskBoardProjectShape)> = Vec::new();
-    for (project_id, slug, shape) in &rows {
-        if shape.is_some() {
-            continue;
-        }
-        let organization = organization_of(slug);
-        let assigned = if let Some(assigned) = by_organization.get(organization) {
-            *assigned
-        } else {
-            let taken: Vec<TaskBoardProjectShape> = by_organization.values().copied().collect();
-            let allocated = project_shape::allocate(&taken);
-            by_organization.insert(organization, allocated);
-            allocated
-        };
-        pending.push((project_id, assigned));
-    }
+    let mut by_organization = existing_organization_shapes(&rows);
+    let pending = assign_pending_project_shapes(&rows, &mut by_organization);
 
     for (project_id, shape) in pending {
         query("UPDATE task_board_projects SET shape = ?2 WHERE project_id = ?1 AND shape IS NULL")
@@ -67,4 +46,44 @@ pub(crate) async fn assign_shapes_in_tx(
             })?;
     }
     Ok(())
+}
+
+/// Every organization that already has a parsed outline, keeping its first
+/// (creation-ordered) shape rather than a later, possibly different one.
+fn existing_organization_shapes(
+    rows: &[(String, String, Option<String>)],
+) -> BTreeMap<&str, TaskBoardProjectShape> {
+    let mut by_organization = BTreeMap::new();
+    for (_, slug, shape) in rows {
+        if let Some(shape) = shape.as_deref().and_then(TaskBoardProjectShape::parse) {
+            by_organization.entry(organization_of(slug)).or_insert(shape);
+        }
+    }
+    by_organization
+}
+
+/// Every unshaped project's newly assigned outline, reusing its
+/// organization's shape when one is already known and allocating (and
+/// recording) a fresh one otherwise.
+fn assign_pending_project_shapes<'a>(
+    rows: &'a [(String, String, Option<String>)],
+    by_organization: &mut BTreeMap<&'a str, TaskBoardProjectShape>,
+) -> Vec<(&'a str, TaskBoardProjectShape)> {
+    let mut pending = Vec::new();
+    for (project_id, slug, shape) in rows {
+        if shape.is_some() {
+            continue;
+        }
+        let organization = organization_of(slug);
+        let assigned = if let Some(assigned) = by_organization.get(organization) {
+            *assigned
+        } else {
+            let taken: Vec<TaskBoardProjectShape> = by_organization.values().copied().collect();
+            let allocated = project_shape::allocate(&taken);
+            by_organization.insert(organization, allocated);
+            allocated
+        };
+        pending.push((project_id.as_str(), assigned));
+    }
+    pending
 }

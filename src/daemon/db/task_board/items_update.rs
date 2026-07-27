@@ -196,24 +196,9 @@ async fn apply_update_triage_in_tx(
     }
     let pre_triage_item = item.clone();
     let decided_at = item.updated_at.clone();
-    let outcome = match ingress {
-        TaskBoardTriageIngress::None => None,
-        TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
-            let direct_effect_this_call = before.status != item.status
-                || before.lane_position != item.lane_position
-                || before.lane_origin != item.lane_origin;
-            let suppress_placement =
-                ingress == TaskBoardTriageIngress::HumanUpdate && direct_effect_this_call;
-            apply_active_triage_in_tx(
-                transaction,
-                item,
-                &decided_at,
-                suppress_placement,
-                existing_override,
-            )
-            .await?
-        }
-    };
+    let outcome =
+        compute_triage_outcome_in_tx(transaction, before, item, ingress, &decided_at, existing_override)
+            .await?;
     // Reasserted for every ingress, not only `ProviderReconcile`: the
     // conflict check above only guards lane outcome, but a non-manual
     // override's *rank* still needs to track current priority ordering,
@@ -233,6 +218,36 @@ async fn apply_update_triage_in_tx(
         LaneTransitionKind::Generic
     });
     Ok((outcome, transition_kind))
+}
+
+/// Decides the triage outcome for this write, applying an active triage's
+/// placement effects when the ingress calls for it.
+async fn compute_triage_outcome_in_tx(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    before: &TaskBoardItem,
+    item: &mut TaskBoardItem,
+    ingress: TaskBoardTriageIngress,
+    decided_at: &str,
+    existing_override: Option<&TaskBoardTriageOverride>,
+) -> Result<Option<TriageOutcome>, CliError> {
+    match ingress {
+        TaskBoardTriageIngress::None => Ok(None),
+        TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
+            let direct_effect_this_call = before.status != item.status
+                || before.lane_position != item.lane_position
+                || before.lane_origin != item.lane_origin;
+            let suppress_placement =
+                ingress == TaskBoardTriageIngress::HumanUpdate && direct_effect_this_call;
+            apply_active_triage_in_tx(
+                transaction,
+                item,
+                decided_at,
+                suppress_placement,
+                existing_override,
+            )
+            .await
+        }
+    }
 }
 
 /// Rejects a human or internal-workflow write that lands the item in the

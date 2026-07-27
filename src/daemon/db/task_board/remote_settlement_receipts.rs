@@ -42,47 +42,73 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote settlement receipt")
             .await?;
-        let collisions = load_settlement_collisions_in_tx(&mut transaction, request).await?;
-        if let [receipt] = collisions.as_slice() {
-            if receipt.is_exact_replay(request, authenticated_principal) {
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!("commit replayed remote settlement: {error}"))
-                })?;
-                return Ok(receipt.clone());
-            }
-            return Err(concurrent(
-                "remote settlement conflicts with immutable receipt evidence",
-            ));
+        if let Some(receipt) =
+            screen_settlement_collision_in_tx(&mut transaction, request, authenticated_principal)
+                .await?
+        {
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit replayed remote settlement: {error}"))
+            })?;
+            return Ok(receipt);
         }
-        if !collisions.is_empty() {
-            return Err(concurrent(
-                "remote settlement identity has multiple receipt collisions",
-            ));
-        }
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        require_current_settlement_window(&assignment, settled_at)?;
-        require_exact_terminal_assignment(&assignment, request, authenticated_principal)?;
-        let response = settlement_response(request, settled_at)?;
-        insert_settlement_in_tx(
+        let receipt = write_settlement_receipt_in_tx(
             &mut transaction,
             request,
             authenticated_principal,
-            &response,
+            settled_at,
         )
         .await?;
-        let receipt = load_settlement_in_tx(&mut transaction, &request.binding.assignment_id)
-            .await?
-            .ok_or_else(|| db_error("persisted remote settlement receipt disappeared"))?;
-        super::remote_evidence_retention::prune_remote_evidence_in_tx(&mut transaction, settled_at)
-            .await?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit remote settlement receipt: {error}")))?;
         Ok(receipt)
     }
+}
 
+/// Writes the immutable settlement receipt for the exact current generation,
+/// pruning evidence this settlement makes prunable in the same transaction.
+async fn write_settlement_receipt_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    settled_at: &str,
+) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
+    let assignment = require_assignment(transaction, &request.binding.assignment_id).await?;
+    require_current_settlement_window(&assignment, settled_at)?;
+    require_exact_terminal_assignment(&assignment, request, authenticated_principal)?;
+    let response = settlement_response(request, settled_at)?;
+    insert_settlement_in_tx(transaction, request, authenticated_principal, &response).await?;
+    let receipt = load_settlement_in_tx(transaction, &request.binding.assignment_id)
+        .await?
+        .ok_or_else(|| db_error("persisted remote settlement receipt disappeared"))?;
+    super::remote_evidence_retention::prune_remote_evidence_in_tx(transaction, settled_at).await?;
+    Ok(receipt)
+}
+
+/// `Some` on an exact replay of an already-recorded receipt; refuses a
+/// colliding identity that is not that exact replay, whether one row or many.
+async fn screen_settlement_collision_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+) -> Result<Option<TaskBoardRemoteSettlementReceipt>, CliError> {
+    let collisions = load_settlement_collisions_in_tx(transaction, request).await?;
+    match collisions.as_slice() {
+        [] => Ok(None),
+        [receipt] if receipt.is_exact_replay(request, authenticated_principal) => {
+            Ok(Some(receipt.clone()))
+        }
+        [_] => Err(concurrent(
+            "remote settlement conflicts with immutable receipt evidence",
+        )),
+        _ => Err(concurrent(
+            "remote settlement identity has multiple receipt collisions",
+        )),
+    }
+}
+
+impl AsyncDaemonDb {
     pub(crate) async fn task_board_remote_settlement_receipt(
         &self,
         assignment_id: &str,

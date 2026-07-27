@@ -58,44 +58,16 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board workflow dispatch start completion")
             .await?;
-        let execution = load_execution_in_tx(&mut transaction, execution_id)
-            .await?
-            .ok_or_else(|| db_error("workflow execution disappeared before start completion"))?;
-        let Some(intent_id) = prepared_intent_id(&mut transaction, execution_id).await? else {
+        let Some((execution, intent_id)) =
+            screen_prepared_dispatch_start_in_tx(&mut transaction, execution_id).await?
+        else {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit completed workflow dispatch no-op: {error}"))
             })?;
             return Ok(false);
         };
-        if !workflow_start_is_durable_in_tx(&mut transaction, &execution).await? {
-            return Err(db_error(
-                "workflow target has not durably confirmed its exact start",
-            ));
-        }
-        commit_frozen_start_admission_in_tx(
-            &mut transaction,
-            &intent_id,
-            &workflow_owner(execution_id),
-        )
-        .await?;
-        let now = utc_now();
-        let changed = query(
-            "UPDATE task_board_dispatch_intents
-             SET status = 'completed', last_error = NULL, updated_at = ?2, completed_at = ?2
-             WHERE intent_id = ?1 AND status = 'workflow_prepared'",
-        )
-        .bind(&intent_id)
-        .bind(now)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("complete prepared workflow dispatch: {error}")))?
-        .rows_affected();
-        if changed != 1 {
-            return Err(db_error(
-                "prepared workflow dispatch changed before start completion",
-            ));
-        }
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        settle_durable_dispatch_start_in_tx(&mut transaction, &execution, execution_id, &intent_id)
+            .await?;
         transaction.commit().await.map_err(|error| {
             db_error(format!(
                 "commit task board workflow dispatch start: {error}"
@@ -103,6 +75,66 @@ impl AsyncDaemonDb {
         })?;
         Ok(true)
     }
+}
+
+/// The execution and its prepared intent, `None` once the intent already
+/// left the `workflow_prepared` status this completion targets.
+async fn screen_prepared_dispatch_start_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    execution_id: &str,
+) -> Result<Option<(TaskBoardWorkflowExecutionRecord, String)>, CliError> {
+    let execution = load_execution_in_tx(transaction, execution_id)
+        .await?
+        .ok_or_else(|| db_error("workflow execution disappeared before start completion"))?;
+    let Some(intent_id) = prepared_intent_id(transaction, execution_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some((execution, intent_id)))
+}
+
+/// Commits the frozen start admission and marks the intent completed, once
+/// the exact target has durably confirmed its start.
+async fn settle_durable_dispatch_start_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    execution_id: &str,
+    intent_id: &str,
+) -> Result<(), CliError> {
+    if !workflow_start_is_durable_in_tx(transaction, execution).await? {
+        return Err(db_error(
+            "workflow target has not durably confirmed its exact start",
+        ));
+    }
+    commit_frozen_start_admission_in_tx(transaction, intent_id, &workflow_owner(execution_id))
+        .await?;
+    mark_workflow_dispatch_completed_in_tx(transaction, intent_id).await
+}
+
+/// Marks the intent's own row completed once its exact worker durably
+/// started, requiring the CAS on `workflow_prepared` to have applied.
+async fn mark_workflow_dispatch_completed_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let changed = query(
+        "UPDATE task_board_dispatch_intents
+         SET status = 'completed', last_error = NULL, updated_at = ?2, completed_at = ?2
+         WHERE intent_id = ?1 AND status = 'workflow_prepared'",
+    )
+    .bind(intent_id)
+    .bind(now)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("complete prepared workflow dispatch: {error}")))?
+    .rows_affected();
+    if changed != 1 {
+        return Err(db_error(
+            "prepared workflow dispatch changed before start completion",
+        ));
+    }
+    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    Ok(())
 }
 
 async fn prepared_intent_id(

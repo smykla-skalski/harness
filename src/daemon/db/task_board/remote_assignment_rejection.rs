@@ -40,32 +40,11 @@ pub(super) async fn apply_rejected_offer(
         .rejection_code
         .as_deref()
         .ok_or_else(|| db_error("rejected remote offer response has no reason"))?;
-    if record.state == TaskBoardRemoteAssignmentState::Superseded
-        && record.claimed_at.is_none()
-        && record.error.as_deref() == Some(local_fallback_error(reason).as_str())
+    if let RejectedOfferScreen::Stopped(outcome) =
+        screen_rejected_offer_in_tx(&mut transaction, &record, reason).await?
     {
-        let parent = load_execution_in_tx(&mut transaction, &record.execution_id).await?;
-        let replayed = if let Some(parent) = parent.as_ref() {
-            controller_handoff_matches_in_tx(
-                &mut transaction,
-                &record,
-                TaskBoardRemoteControllerHandoffKind::LocalFallback,
-                parent,
-            )
-            .await?
-        } else {
-            false
-        };
-        commit_noop(transaction, "replayed rejected offer").await?;
-        return Ok(if replayed {
-            TaskBoardRemoteMutationOutcome::Replayed(record)
-        } else {
-            TaskBoardRemoteMutationOutcome::Stale(record)
-        });
-    }
-    if record.state != TaskBoardRemoteAssignmentState::Offered || record.claimed_at.is_some() {
-        commit_noop(transaction, "stale rejected offer").await?;
-        return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+        commit_noop(transaction, "resolved rejected offer").await?;
+        return Ok(*outcome);
     }
     ensure_rejected_offer_receipt_in_tx(
         &mut transaction,
@@ -86,6 +65,62 @@ pub(super) async fn apply_rejected_offer(
         observed_at,
     ))
     .await
+}
+
+/// Either this rejection is already resolved (a replayed or freshly stale
+/// local fallback, or an offer no longer eligible to reject) and the caller
+/// has nothing left but to commit and report it, or it is ready to apply.
+enum RejectedOfferScreen {
+    Stopped(Box<TaskBoardRemoteMutationOutcome>),
+    Ready,
+}
+
+async fn screen_rejected_offer_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &TaskBoardRemoteAssignmentRecord,
+    reason: &str,
+) -> Result<RejectedOfferScreen, CliError> {
+    if let Some(replayed) = replay_superseded_local_fallback_in_tx(transaction, record, reason).await?
+    {
+        return Ok(RejectedOfferScreen::Stopped(Box::new(if replayed {
+            TaskBoardRemoteMutationOutcome::Replayed(record.clone())
+        } else {
+            TaskBoardRemoteMutationOutcome::Stale(record.clone())
+        })));
+    }
+    if record.state != TaskBoardRemoteAssignmentState::Offered || record.claimed_at.is_some() {
+        return Ok(RejectedOfferScreen::Stopped(Box::new(
+            TaskBoardRemoteMutationOutcome::Stale(record.clone()),
+        )));
+    }
+    Ok(RejectedOfferScreen::Ready)
+}
+
+/// `Some` when this rejection already landed as a local fallback: `true` if
+/// the controller handoff for it is also on file (an exact replay), `false`
+/// if the fallback superseded the assignment before that handoff was durable.
+async fn replay_superseded_local_fallback_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &TaskBoardRemoteAssignmentRecord,
+    reason: &str,
+) -> Result<Option<bool>, CliError> {
+    if record.state != TaskBoardRemoteAssignmentState::Superseded
+        || record.claimed_at.is_some()
+        || record.error.as_deref() != Some(local_fallback_error(reason).as_str())
+    {
+        return Ok(None);
+    }
+    let Some(parent) = load_execution_in_tx(transaction, &record.execution_id).await? else {
+        return Ok(Some(false));
+    };
+    controller_handoff_matches_in_tx(
+        transaction,
+        record,
+        TaskBoardRemoteControllerHandoffKind::LocalFallback,
+        &parent,
+    )
+    .await
+    .map(Some)
 }
 
 pub(super) async fn apply_unclaimable_offer(

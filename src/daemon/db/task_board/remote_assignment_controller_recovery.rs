@@ -43,10 +43,22 @@ pub(super) async fn recover_controller_remote_assignment_in_tx(
     if parent_is_terminal_or_non_remote(&parent, assignment) {
         return supersede_detached_controller_assignment_in_tx(transaction, assignment, now).await;
     }
-    let offer_authority = parent
-        .ownership
-        .resources
-        .contains_key(TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE);
+    if let Some(recovered) =
+        recover_expired_remote_offer_in_tx(transaction, assignment, &parent, now).await?
+    {
+        return Ok(recovered);
+    }
+    recover_ambiguous_remote_start_in_tx(transaction, assignment, &parent, now).await
+}
+
+/// `Some` once an offer that expired before any durable claim or cancel has
+/// been superseded, so the caller has nothing left to recover.
+async fn recover_expired_remote_offer_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+    parent: &TaskBoardWorkflowExecutionRecord,
+    now: &str,
+) -> Result<Option<bool>, CliError> {
     let claim_authority = parent
         .ownership
         .resources
@@ -55,24 +67,28 @@ pub(super) async fn recover_controller_remote_assignment_in_tx(
         .ownership
         .resources
         .contains_key(TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE);
-    if assignment.state == TaskBoardRemoteAssignmentState::Offered
-        && !claim_authority
-        && !cancel_authority
+    if assignment.state != TaskBoardRemoteAssignmentState::Offered
+        || claim_authority
+        || cancel_authority
     {
-        if offer_authority {
-            clear_offer_io_authority_in_tx(transaction, assignment, now).await?;
-        }
-        return apply_unclaimable_offer_in_tx(
-            transaction,
-            assignment,
-            "remote offer expired before durable claim",
-            now,
-        )
-        .await?
-        .map(|_| true)
-        .ok_or_else(|| concurrent("expired remote offer lost its local fallback fence"));
+        return Ok(None);
     }
-    recover_ambiguous_remote_start_in_tx(transaction, assignment, &parent, now).await
+    let offer_authority = parent
+        .ownership
+        .resources
+        .contains_key(TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE);
+    if offer_authority {
+        clear_offer_io_authority_in_tx(transaction, assignment, now).await?;
+    }
+    apply_unclaimable_offer_in_tx(
+        transaction,
+        assignment,
+        "remote offer expired before durable claim",
+        now,
+    )
+    .await?
+    .map(|_| Some(true))
+    .ok_or_else(|| concurrent("expired remote offer lost its local fallback fence"))
 }
 
 fn require_same_generation(

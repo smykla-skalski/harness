@@ -343,31 +343,39 @@ async fn recover_one(
         return Ok(false);
     }
     if row.host_role == "controller_remote" {
-        let assignment = load_assignment_in_tx(transaction, &row.assignment_id)
-            .await?
-            .ok_or_else(|| db_error("recoverable controller assignment disappeared"))?;
-        // Preserve an in-flight offer or renew token. A late accepted offer retains
-        // the executor's immutable initial lease; a late renewal response retains the
-        // executor's rotated lease and un-strands the observational Unknown via the
-        // settlement-only renewal path (a validly-renewed live worker must not be
-        // stranded to HumanRequired by a recovery race). Other operations recover to
-        // an observational Unknown state and release their token before a later
-        // exact-generation status probe.
-        if assignment
-            .controller_operation
-            .as_ref()
-            .is_some_and(|operation| operation.kind != "offer" && operation.kind != "renew")
-        {
-            abandon_controller_operation_trust_in_tx(transaction, &assignment).await?;
-        }
-        return Box::pin(recover_controller_remote_assignment_in_tx(
-            transaction,
-            &assignment,
-            now,
-        ))
-        .await;
+        return recover_controller_remote_row_in_tx(transaction, row, now).await;
     }
     mark_outcome_unknown(transaction, row, now).await
+}
+
+async fn recover_controller_remote_row_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    row: &RecoveryRow,
+    now: &str,
+) -> Result<bool, CliError> {
+    let assignment = load_assignment_in_tx(transaction, &row.assignment_id)
+        .await?
+        .ok_or_else(|| db_error("recoverable controller assignment disappeared"))?;
+    // Preserve an in-flight offer or renew token. A late accepted offer retains
+    // the executor's immutable initial lease; a late renewal response retains the
+    // executor's rotated lease and un-strands the observational Unknown via the
+    // settlement-only renewal path (a validly-renewed live worker must not be
+    // stranded to HumanRequired by a recovery race). Other operations recover to
+    // an observational Unknown state and release their token before a later
+    // exact-generation status probe.
+    if assignment
+        .controller_operation
+        .as_ref()
+        .is_some_and(|operation| operation.kind != "offer" && operation.kind != "renew")
+    {
+        abandon_controller_operation_trust_in_tx(transaction, &assignment).await?;
+    }
+    Box::pin(recover_controller_remote_assignment_in_tx(
+        transaction,
+        &assignment,
+        now,
+    ))
+    .await
 }
 
 async fn supersede_unclaimed_host_offer(

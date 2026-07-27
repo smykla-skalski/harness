@@ -53,51 +53,65 @@ impl AsyncDaemonDb {
             accepted_at,
         )?;
         let accepted = canonical_time(accepted_at, "remote host offer acceptance time")?;
-        let mut transaction = self
+        let transaction = self
             .begin_immediate_transaction("task board remote host inbox offer")
             .await?;
-        let receipts = load_offer_receipt_collisions_in_tx(&mut transaction, request).await?;
-        if !receipts.is_empty() {
-            return resolve_receipt_collision(
-                transaction,
-                receipts,
-                request,
-                authenticated_principal,
-            )
-            .await;
+        match screen_offer_admission_in_tx(transaction, request, authenticated_principal).await? {
+            OfferAdmissionScreen::Resolved(outcome) => Ok(*outcome),
+            OfferAdmissionScreen::Continue(transaction) => {
+                accept_new_host_offer(
+                    transaction,
+                    request,
+                    authenticated_principal,
+                    host_instance_id,
+                    accepted,
+                    accepted_at,
+                )
+                .await
+            }
         }
-        // The immutable offer receipt replays above are authoritative; past them,
-        // an identity colliding with an archived legacy row is a deterministic
-        // conflict before any host, settings, capacity, source, or insert work.
-        require_no_archival_collision_in_tx(
-            &mut transaction,
-            &request.binding.assignment_id,
-            &request.binding.idempotency_key,
-            Some(&request.request_sha256),
-            &request.binding.execution_id,
-            request.binding.fencing_epoch,
-        )
-        .await?;
-        let collisions = load_offer_collision_in_tx(&mut transaction, request).await?;
-        if !collisions.is_empty() {
-            return resolve_host_collision(
-                transaction,
-                collisions,
-                request,
-                authenticated_principal,
-            )
-            .await;
-        }
-        accept_new_host_offer(
-            transaction,
-            request,
-            authenticated_principal,
-            host_instance_id,
-            accepted,
-            accepted_at,
-        )
-        .await
     }
+}
+
+/// Either resolves to an existing immutable receipt or admission conflict, or
+/// hands the still-open transaction back so the caller can accept the offer.
+enum OfferAdmissionScreen<'c> {
+    Resolved(Box<TaskBoardRemoteOfferOutcome>),
+    Continue(Transaction<'c, Sqlite>),
+}
+
+async fn screen_offer_admission_in_tx<'c>(
+    mut transaction: Transaction<'c, Sqlite>,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+) -> Result<OfferAdmissionScreen<'c>, CliError> {
+    let receipts = load_offer_receipt_collisions_in_tx(&mut transaction, request).await?;
+    if !receipts.is_empty() {
+        let outcome =
+            resolve_receipt_collision(transaction, receipts, request, authenticated_principal)
+                .await?;
+        return Ok(OfferAdmissionScreen::Resolved(Box::new(outcome)));
+    }
+    // The immutable offer receipt replays above are authoritative; past them,
+    // an identity colliding with an archived legacy row is a deterministic
+    // conflict before any host, settings, capacity, source, or insert work.
+    require_no_archival_collision_in_tx(
+        &mut transaction,
+        &request.binding.assignment_id,
+        &request.binding.idempotency_key,
+        Some(&request.request_sha256),
+        &request.binding.execution_id,
+        request.binding.fencing_epoch,
+    )
+    .await?;
+    let collisions = load_offer_collision_in_tx(&mut transaction, request).await?;
+    if !collisions.is_empty() {
+        let outcome =
+            resolve_host_collision(transaction, collisions, request, authenticated_principal)
+                .await?;
+        return Ok(OfferAdmissionScreen::Resolved(Box::new(outcome)));
+    }
+    Ok(OfferAdmissionScreen::Continue(transaction))
 }
 
 async fn accept_new_host_offer(
@@ -128,6 +142,23 @@ async fn accept_new_host_offer(
         }
         HostOfferAdmission::Accepted(accepted_offer) => accepted_offer,
     };
+    write_accepted_host_offer_in_tx(
+        transaction,
+        request,
+        authenticated_principal,
+        &accepted_offer,
+        accepted_at,
+    )
+    .await
+}
+
+async fn write_accepted_host_offer_in_tx(
+    mut transaction: Transaction<'_, Sqlite>,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+    accepted_offer: &AcceptedHostOffer,
+    accepted_at: &str,
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
     require_source_bundle_in_tx(&mut transaction, request, authenticated_principal).await?;
     let lease_id = format!("remote-lease-{}", Uuid::new_v4().simple());
     let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {

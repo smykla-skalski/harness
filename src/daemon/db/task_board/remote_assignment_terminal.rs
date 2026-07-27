@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+
 use super::remote_assignment_authority_settlement::clear_offer_io_authority_in_tx;
 use super::remote_assignment_lease::{
     commit_noop, exact_mutation_replay, finish_mutation, mutation_binding_matches,
@@ -15,7 +17,8 @@ use super::remote_operation_trust::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
-    RemoteAttemptBinding, RemoteCancelRequest, RemoteOfferDisposition, RemoteOfferResponse,
+    RemoteAttemptBinding, RemoteCancelRequest, RemoteLease, RemoteOfferDisposition,
+    RemoteOfferResponse,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use sqlx::{Sqlite, Transaction, query};
@@ -291,16 +294,7 @@ async fn apply_accepted_offer(
         commit_noop(transaction, "replayed accepted offer").await?;
         return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
     }
-    let expires = canonical_time(&lease.expires_at, "remote assignment lease expiry")?;
-    let deadline = record
-        .deadline_at
-        .as_deref()
-        .ok_or_else(|| db_error("remote assignment deadline is missing"))?;
-    if expires > canonical_time(deadline, "remote assignment deadline")? {
-        return Err(db_error(
-            "accepted remote offer lease is outside its deadline",
-        ));
-    }
+    let expires = validate_accepted_lease_deadline(lease, record.deadline_at.as_deref())?;
     if record.state == TaskBoardRemoteAssignmentState::Superseded
         && record.claimed_at.is_none()
         && record.lease_id.is_none()
@@ -320,37 +314,7 @@ async fn apply_accepted_offer(
         commit_noop(transaction, "stale accepted offer").await?;
         return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
     }
-    ensure_accepted_offer_receipt_in_tx(
-        &mut transaction,
-        record.require_offer()?,
-        record
-            .authenticated_principal
-            .as_deref()
-            .ok_or_else(|| db_error("remote assignment principal is missing"))?,
-        &lease.lease_id,
-        &lease.expires_at,
-        observed_at,
-    )
-    .await?;
-    clear_offer_io_authority_in_tx(&mut transaction, &record, observed_at).await?;
-    let rows = query(
-        "UPDATE task_board_remote_assignments SET lease_id = ?2, lease_expires_at = ?3,
-         heartbeat_at = ?4, updated_at = ?4
-         WHERE assignment_id = ?1 AND fencing_epoch = ?5 AND state = 'offered'
-           AND claimed_at IS NULL AND lease_id IS NULL",
-    )
-    .bind(&record.assignment_id)
-    .bind(&lease.lease_id)
-    .bind(&lease.expires_at)
-    .bind(observed_at)
-    .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
-    .execute(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("record accepted remote offer: {error}")))?
-    .rows_affected();
-    if rows != 1 {
-        return Err(concurrent("accepted remote offer lost its fence"));
-    }
+    write_accepted_offer_lease_in_tx(&mut transaction, &record, lease, observed_at).await?;
     if expires <= canonical_time(observed_at, "remote offer response time")? {
         let accepted = TaskBoardRemoteAssignmentRecord {
             lease_id: Some(lease.lease_id.clone()),
@@ -369,6 +333,65 @@ async fn apply_accepted_offer(
     }
     finish_mutation(transaction, &record.assignment_id, "accepted offer").await
 }
+
+/// The lease's own expiry, once confirmed to land inside the assignment's
+/// immutable deadline.
+fn validate_accepted_lease_deadline(
+    lease: &RemoteLease,
+    deadline_at: Option<&str>,
+) -> Result<DateTime<Utc>, CliError> {
+    let expires = canonical_time(&lease.expires_at, "remote assignment lease expiry")?;
+    let deadline = deadline_at.ok_or_else(|| db_error("remote assignment deadline is missing"))?;
+    if expires > canonical_time(deadline, "remote assignment deadline")? {
+        return Err(db_error(
+            "accepted remote offer lease is outside its deadline",
+        ));
+    }
+    Ok(expires)
+}
+
+/// Records the immutable acceptance receipt, clears the offer's I/O
+/// authority, and writes the lease onto the exact generation that offered it.
+async fn write_accepted_offer_lease_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &TaskBoardRemoteAssignmentRecord,
+    lease: &RemoteLease,
+    observed_at: &str,
+) -> Result<(), CliError> {
+    ensure_accepted_offer_receipt_in_tx(
+        transaction,
+        record.require_offer()?,
+        record
+            .authenticated_principal
+            .as_deref()
+            .ok_or_else(|| db_error("remote assignment principal is missing"))?,
+        &lease.lease_id,
+        &lease.expires_at,
+        observed_at,
+    )
+    .await?;
+    clear_offer_io_authority_in_tx(transaction, record, observed_at).await?;
+    let rows = query(
+        "UPDATE task_board_remote_assignments SET lease_id = ?2, lease_expires_at = ?3,
+         heartbeat_at = ?4, updated_at = ?4
+         WHERE assignment_id = ?1 AND fencing_epoch = ?5 AND state = 'offered'
+           AND claimed_at IS NULL AND lease_id IS NULL",
+    )
+    .bind(&record.assignment_id)
+    .bind(&lease.lease_id)
+    .bind(&lease.expires_at)
+    .bind(observed_at)
+    .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("record accepted remote offer: {error}")))?
+    .rows_affected();
+    if rows != 1 {
+        return Err(concurrent("accepted remote offer lost its fence"));
+    }
+    Ok(())
+}
+
 async fn retain_late_accepted_offer(
     mut transaction: Transaction<'_, Sqlite>,
     record: TaskBoardRemoteAssignmentRecord,

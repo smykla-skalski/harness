@@ -55,7 +55,7 @@ pub(crate) async fn dispatch(
     ))
     .await?;
     let result = Box::pin(service::dispatch_task_board_async(&request, async_db)).await;
-    handle_dispatch_result(state, result, async_db).await
+    Box::pin(handle_dispatch_result(state, result, async_db)).await
 }
 
 pub(crate) async fn deliver(
@@ -157,8 +157,12 @@ async fn handle_dispatch_result(
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let mut response = result?;
     if !response.applied.is_empty() {
-        let (applied, failures) =
-            worker_start::start_claimed_workers(state, &response.applied, async_db).await;
+        let (applied, failures) = Box::pin(worker_start::start_claimed_workers(
+            state,
+            &response.applied,
+            async_db,
+        ))
+        .await;
         response.applied = applied;
         response.failures.extend(failures);
         broadcast_sessions_updated(state, Some(async_db)).await;

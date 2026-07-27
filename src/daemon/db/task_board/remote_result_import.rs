@@ -135,30 +135,12 @@ impl AsyncDaemonDb {
                 "remote result import cannot advance from its durable state",
             ));
         }
-        let rows = query(
-            "UPDATE task_board_remote_result_imports
-             SET state = 'applied', applied_at = ?1
-             WHERE assignment_id = ?2 AND fencing_epoch = ?3
-               AND import_sha256 = ?4 AND state = 'prepared'",
-        )
-        .bind(applied_at)
-        .bind(assignment_id)
-        .bind(to_i64(fencing_epoch, "result import applied epoch")?)
-        .bind(import_sha256)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("persist applied result import: {error}")))?
-        .rows_affected();
-        if rows != 1 {
-            return Err(concurrent(
-                "remote result import changed before applied evidence was persisted",
-            ));
-        }
-        let updated = require_import(
+        let updated = write_applied_result_import_in_tx(
             &mut transaction,
             assignment_id,
             fencing_epoch,
             import_sha256,
+            applied_at,
         )
         .await?;
         transaction
@@ -213,6 +195,37 @@ impl AsyncDaemonDb {
         ));
         recovery.await
     }
+}
+
+/// Persists the `applied` transition and reloads the row it wrote, refusing
+/// the write when the fence it CAS'd on already moved.
+async fn write_applied_result_import_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    assignment_id: &str,
+    fencing_epoch: u64,
+    import_sha256: &str,
+    applied_at: &str,
+) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
+    let rows = query(
+        "UPDATE task_board_remote_result_imports
+         SET state = 'applied', applied_at = ?1
+         WHERE assignment_id = ?2 AND fencing_epoch = ?3
+           AND import_sha256 = ?4 AND state = 'prepared'",
+    )
+    .bind(applied_at)
+    .bind(assignment_id)
+    .bind(to_i64(fencing_epoch, "result import applied epoch")?)
+    .bind(import_sha256)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("persist applied result import: {error}")))?
+    .rows_affected();
+    if rows != 1 {
+        return Err(concurrent(
+            "remote result import changed before applied evidence was persisted",
+        ));
+    }
+    require_import(transaction, assignment_id, fencing_epoch, import_sha256).await
 }
 
 pub(super) async fn load_and_finalize_remote_implementation_import_in_tx(
