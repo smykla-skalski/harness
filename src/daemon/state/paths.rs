@@ -5,7 +5,7 @@ use crate::workspace::{
     dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
 };
 
-use super::ownership::DaemonOwnership;
+use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};
 use super::{
     APP_GROUP_ID_ENV, CURRENT_LAUNCH_AGENT_PLIST, DAEMON_DATA_HOME_ENV, DAEMON_LOCK_FILE,
     DAEMON_ROOT_OVERRIDE, LAUNCH_AGENTS_DIR, LEGACY_LAUNCH_AGENT_PLIST, MANIFEST_LOCK_FILE,
@@ -72,7 +72,7 @@ pub fn daemon_root() -> PathBuf {
 /// Daemon root for the current process's resolved [`DaemonOwnership`].
 #[must_use]
 pub fn default_daemon_root() -> PathBuf {
-    daemon_root_for_ownership(DaemonOwnership::from_env_or_default())
+    daemon_root_for_ownership(daemon_ownership_from_env_or_default())
 }
 
 /// Daemon root for an explicit ownership. Use this when you need to inspect

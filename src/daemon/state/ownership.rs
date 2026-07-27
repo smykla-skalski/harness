@@ -1,7 +1,6 @@
-use std::fmt::{self, Display, Formatter};
 use std::sync::Mutex;
 
-use serde::{Deserialize, Serialize};
+pub use harness_protocol::daemon::DaemonOwnership;
 
 use crate::workspace::normalized_env_value;
 
@@ -15,58 +14,24 @@ fn ownership_override() -> Option<DaemonOwnership> {
         .expect("ownership override mutex poisoned")
 }
 
-/// Which entry point owns this daemon process.
+/// Resolve the ownership for the current process. Priority order:
+/// 1. process-local override set via [`ScopedOwnershipOverride`]
+/// 2. `HARNESS_DAEMON_OWNERSHIP` environment variable
+/// 3. default `Managed` (the safer fallback because legacy installs all
+///    behaved like managed before the coexistence partition existed)
 ///
-/// Managed daemons are launched by `SMAppService` from the bundled Harness
-/// Monitor app. External daemons are launched by `harness-daemon dev` from a
-/// CLI shell. The two kinds run side-by-side without colliding because they
-/// keep their state in separate `<root>/daemon/<ownership>/` subtrees and use
-/// distinct launchd labels and bridge ports.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-#[derive(utoipa::ToSchema)]
-pub enum DaemonOwnership {
-    #[default]
-    Managed,
-    External,
-}
-
-impl DaemonOwnership {
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Managed => "managed",
-            Self::External => "external",
-        }
+/// A free function, not a `DaemonOwnership::from_env_or_default()` inherent
+/// method, because `DaemonOwnership` now lives in `harness-protocol` and the
+/// orphan rule blocks adding inherent methods to a foreign type from here.
+#[must_use]
+pub fn daemon_ownership_from_env_or_default() -> DaemonOwnership {
+    if let Some(value) = ownership_override() {
+        return value;
     }
-
-    /// Parse a value from the `HARNESS_DAEMON_OWNERSHIP` env or a manifest
-    /// JSON string. Case-insensitive; trims whitespace. Returns `None` for
-    /// unrecognized values so callers can decide how to default.
-    #[must_use]
-    pub fn parse(value: &str) -> Option<Self> {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "managed" => Some(Self::Managed),
-            "external" => Some(Self::External),
-            _ => None,
-        }
-    }
-
-    /// Resolve the ownership for the current process. Priority order:
-    /// 1. process-local override set via [`ScopedOwnershipOverride`]
-    /// 2. `HARNESS_DAEMON_OWNERSHIP` environment variable
-    /// 3. default `Managed` (the safer fallback because legacy installs all
-    ///    behaved like managed before the coexistence partition existed)
-    #[must_use]
-    pub fn from_env_or_default() -> Self {
-        if let Some(value) = ownership_override() {
-            return value;
-        }
-        normalized_env_value(DAEMON_OWNERSHIP_ENV)
-            .as_deref()
-            .and_then(Self::parse)
-            .unwrap_or(Self::Managed)
-    }
+    normalized_env_value(DAEMON_OWNERSHIP_ENV)
+        .as_deref()
+        .and_then(DaemonOwnership::parse)
+        .unwrap_or(DaemonOwnership::Managed)
 }
 
 /// Process-local ownership override that restores the previous value on drop.
@@ -99,12 +64,6 @@ impl Drop for ScopedOwnershipOverride {
         *OWNERSHIP_OVERRIDE
             .lock()
             .expect("ownership override mutex poisoned") = self.previous;
-    }
-}
-
-impl Display for DaemonOwnership {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
     }
 }
 

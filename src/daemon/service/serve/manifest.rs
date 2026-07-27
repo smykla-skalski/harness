@@ -22,7 +22,7 @@ pub(super) fn build_manifest(endpoint: &str, sandboxed: bool) -> Result<DaemonMa
         revision: 0,
         updated_at: String::new(),
         binary_stamp: current_binary_stamp(),
-        ownership: state::DaemonOwnership::from_env_or_default(),
+        ownership: state::daemon_ownership_from_env_or_default(),
     })
 }
 
