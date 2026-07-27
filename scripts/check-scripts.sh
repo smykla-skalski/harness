@@ -27,71 +27,6 @@ case "$mode" in
     ;;
 esac
 
-run_quiet_step() {
-  local label="$1"
-  shift
-
-  local step_timeout_seconds="${HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS:-90}"
-  if [[ ! "$step_timeout_seconds" =~ ^[0-9]+$ ]] || (( step_timeout_seconds < 1 )); then
-    printf 'error: HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS must be a positive integer (got %s)\n' \
-      "$step_timeout_seconds" >&2
-    return 1
-  fi
-
-  local log_path
-  log_path="$(mktemp "${TMPDIR:-/tmp}/check-scripts.XXXXXX")"
-
-  if python3 - "$step_timeout_seconds" "$@" >"$log_path" 2>&1 <<'PY'
-import os
-import signal
-import subprocess
-import sys
-
-timeout_seconds = int(sys.argv[1])
-command = sys.argv[2:]
-
-if not command:
-    print("missing command", file=sys.stderr)
-    sys.exit(2)
-
-process = subprocess.Popen(command, start_new_session=True)
-try:
-    process.wait(timeout=timeout_seconds)
-except subprocess.TimeoutExpired:
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        process.wait()
-    print(f"error: timed out after {timeout_seconds}s", file=sys.stderr)
-    sys.exit(124)
-
-sys.exit(process.returncode)
-PY
-  then
-    printf 'ok: %s\n' "$label"
-    rm -f "$log_path"
-    return 0
-  fi
-
-  local step_status=$?
-  if (( step_status == 124 )); then
-    printf 'error: %s timed out after %ss\n' "$label" "$step_timeout_seconds" >&2
-  else
-    printf 'error: %s failed\n' "$label" >&2
-  fi
-  cat "$log_path" >&2
-  rm -f "$log_path"
-  return 1
-}
-
 shopt -s nullglob
 
 shell_scripts=(
@@ -109,14 +44,6 @@ python_scripts=(
   "$ROOT"/scripts/lib/*.py
   "$ROOT"/scripts/tests/test_*.py
 )
-portable_root_python_tests=(
-  "$ROOT"/scripts/tests/test_disable_fsmonitor_dormant.py
-  "$ROOT"/scripts/tests/test_seed_rust_build_lane.py
-)
-macos_root_python_tests=(
-  "$ROOT"/scripts/tests/test_clean_stale_fsmonitor.py
-  "$ROOT"/scripts/tests/test_launchd_fsmonitor.py
-)
 monitor_shell_scripts=(
   "$ROOT"/apps/harness-monitor/ci_scripts/*.sh
   "$ROOT"/apps/harness-monitor/Scripts/*.sh
@@ -126,9 +53,7 @@ monitor_python_scripts=(
   "$ROOT"/apps/harness-monitor/Scripts/*.py
   "$ROOT"/apps/harness-monitor/Scripts/lib/*.py
 )
-monitor_python_tests_dir="$ROOT/apps/harness-monitor/Scripts/tests"
 monitor_python_tests=("$ROOT"/apps/harness-monitor/Scripts/tests/test_*.py)
-monitor_python_fast_tests=()
 
 if ! command -v python3 >/dev/null 2>&1; then
   printf 'error: python3 is required to compile-check or test scripts/*.py.\n' >&2
@@ -173,72 +98,5 @@ if [[ "$mode" != "--tests" ]]; then
 fi
 
 if [[ "$mode" != "--lint" ]]; then
-  if (( ${#portable_root_python_tests[@]} > 0 )); then
-    run_quiet_step \
-      "portable root python script tests" \
-      env PYTHONDONTWRITEBYTECODE=1 \
-      python3 -m unittest "${portable_root_python_tests[@]}"
-  fi
-  if [[ "$host_os" == "Darwin" ]]; then
-    if (( ${#macos_root_python_tests[@]} > 0 )); then
-      run_quiet_step \
-        "root macOS python script tests" \
-        env PYTHONDONTWRITEBYTECODE=1 \
-        python3 -m unittest "${macos_root_python_tests[@]}"
-    fi
-    for test_path in "${monitor_python_tests[@]}"; do
-      case "$(basename -- "$test_path")" in
-        test_test_swift.py)
-          ;;
-        *)
-          monitor_python_fast_tests+=("$test_path")
-          ;;
-      esac
-    done
-    if (( ${#monitor_python_fast_tests[@]} > 0 )); then
-      run_quiet_step \
-        "monitor macOS python script tests (fast subset)" \
-        env "PYTHONPATH=$monitor_python_tests_dir${PYTHONPATH:+:$PYTHONPATH}" \
-        python3 -m unittest "${monitor_python_fast_tests[@]}"
-    fi
-  else
-    printf 'ok: root macOS python script tests (skipped on %s)\n' "$host_os"
-    printf 'ok: monitor macOS python script tests (skipped on %s)\n' "$host_os"
-  fi
-fi
-
-if [[ "$mode" != "--lint" ]]; then
-  run_quiet_step "check-scripts shell tests" "$ROOT/scripts/tests/test-check-scripts.sh"
-  run_quiet_step "cargo-local shell tests" "$ROOT/scripts/tests/test-cargo-local.sh"
-  run_quiet_step "Rust build-lane cache canary" "$ROOT/scripts/rust-build-cache-canary.sh"
-  run_quiet_step "jobserver shell tests" "$ROOT/scripts/tests/test-jobserver.sh"
-  run_quiet_step \
-    "panel frontend install shell tests" \
-    "$ROOT/scripts/tests/test-panel-frontend-install.sh"
-  run_quiet_step "run-unit-tests shell tests" "$ROOT/scripts/tests/test-run-unit-tests.sh"
-  run_quiet_step "Linux-only command shell tests" "$ROOT/scripts/tests/test-run-linux-only.sh"
-  run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
-  run_quiet_step "version shell tests" "$ROOT/scripts/tests/test-version.sh"
-  # The suite spawns real install/lock/retention subprocesses (including a
-  # 120s "live worker" simulation) and takes ~6 real minutes even with zero
-  # host contention, well past the shared 90s/180s step default.
-  HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS="${HARNESS_CHECK_SCRIPTS_RELEASE_INSTALL_TIMEOUT_SECONDS:-600}" \
-    run_quiet_step "release install shell tests" "$ROOT/scripts/tests/test-release-install.sh"
-  run_quiet_step "remote-daemon-deploy shell tests" "$ROOT/scripts/tests/test-remote-daemon-deploy.sh"
-  run_quiet_step "clean-build-caches shell tests" "$ROOT/scripts/tests/test-clean-build-caches.sh"
-  run_quiet_step "clean-stale-lanes shell tests" "$ROOT/scripts/tests/test-clean-stale-lanes.sh"
-  run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
-  if [[ "${HARNESS_CHECK_SCRIPTS_FULL:-0}" == "1" ]]; then
-    HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS="${HARNESS_CHECK_SCRIPTS_FULL_TIMEOUT_SECONDS:-${HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS:-600}}" \
-      run_quiet_step "stale-scan shell tests" "$ROOT/scripts/tests/test-stale-scan.sh"
-  else
-    printf 'ok: stale-scan shell tests (skipped in fast mode; set HARNESS_CHECK_SCRIPTS_FULL=1)\n'
-  fi
-  run_quiet_step "swarm e2e contract shell tests" "$ROOT/scripts/tests/test-e2e-swarm-contract.sh"
-  run_quiet_step "e2e triage-run shell tests" "$ROOT/scripts/tests/test-e2e-triage-run.sh"
-  run_quiet_step \
-    "recording triage shell tests" \
-    "$ROOT/scripts/e2e/recording-triage/tests/run-all.sh"
-  run_quiet_step "swarm iterate shell tests" "$ROOT/scripts/swarm-iterate/tests/run-all.sh"
-  run_quiet_step "active ledger shell check" "$ROOT/scripts/swarm-iterate/check-active-ledger.sh"
+  exec python3 "$ROOT/scripts/run-script-test-suite.py" --suite all
 fi

@@ -74,15 +74,30 @@ gitdir_for_pid() {
   local lsof_output
   lsof_output="$(/usr/sbin/lsof -p "$pid" 2>/dev/null)"
 
-  local dir_hit
-  dir_hit="$(
-    printf '%s\n' "$lsof_output" \
-      | /usr/bin/awk '$5=="DIR" {print $9}' \
-      | /usr/bin/grep -E '\.git(/worktrees/[^/]+)?$' \
-      | /usr/bin/awk '{ print length($0), $0 }' \
-      | /usr/bin/sort -rn \
-      | /usr/bin/awk 'NR==1 { sub(/^[0-9]+ /, ""); print; exit }'
-  )"
+  local dir_hit="" deepest="" ipc_hit="" line type path
+  local -a fields=()
+  while IFS= read -r line; do
+    read -ra fields <<<"$line"
+    ((${#fields[@]} >= 9)) || continue
+    type="${fields[4]}"
+    path="${fields[8]}"
+    if [[ "$type" == "DIR" ]]; then
+      if [[ "$path" =~ \.git(/worktrees/[^/]+)?$ ]] \
+          && (( ${#path} > ${#dir_hit} )); then
+        dir_hit="$path"
+      fi
+      if [[ ! "$path" =~ ^(/System(/.*)?|/Users|/|/dev(/.*)?|/private)$ ]] \
+          && [[ "$path" != "$HOME" ]] \
+          && (( ${#path} > ${#deepest} )); then
+        deepest="$path"
+      fi
+    fi
+    path="${fields[${#fields[@]} - 1]}"
+    if [[ -z "$ipc_hit" && "$path" == /*/fsmonitor--daemon.ipc ]]; then
+      ipc_hit="${path%/fsmonitor--daemon.ipc}"
+    fi
+  done <<<"$lsof_output"
+
   if [[ -n "$dir_hit" ]]; then
     printf '%s\n' "$dir_hit"
     return 0
@@ -91,12 +106,6 @@ gitdir_for_pid() {
   # Absolute-path IPC socket: dirname is the gitdir. Reject the bare
   # basename `fsmonitor--daemon.ipc` (no slash) -- that means lsof reported
   # it relative to an unprintable cwd, not the absolute path we need.
-  local ipc_hit
-  ipc_hit="$(
-    printf '%s\n' "$lsof_output" \
-      | /usr/bin/awk '$NF ~ /\/fsmonitor--daemon\.ipc$/ {print $NF; exit}' \
-      | /usr/bin/sed 's|/fsmonitor--daemon\.ipc$||'
-  )"
   if [[ -n "$ipc_hit" ]]; then
     printf '%s\n' "$ipc_hit"
     return 0
@@ -105,16 +114,6 @@ gitdir_for_pid() {
   # Fallback for main-repo daemons where lsof shows only the basename of
   # the IPC socket: the deepest open DIR fd (ignoring system / home roots)
   # is the worktree, and `<worktree>/.git` is the gitdir.
-  local deepest
-  deepest="$(
-    printf '%s\n' "$lsof_output" \
-      | /usr/bin/awk '$5=="DIR" {print $9}' \
-      | /usr/bin/grep -vE '^(/System(/.*)?$|/Users$|/$|/dev(/.*)?$|/private$)' \
-      | /usr/bin/grep -v "^${HOME}\$" \
-      | /usr/bin/awk '{ print length($0), $0 }' \
-      | /usr/bin/sort -rn \
-      | /usr/bin/awk 'NR==1 { sub(/^[0-9]+ /, ""); print; exit }'
-  )"
   if [[ -n "$deepest" && -e "$deepest/.git" ]]; then
     printf '%s/.git\n' "$deepest"
   fi
@@ -155,7 +154,8 @@ parse_etime_seconds() {
 pid_etimes_seconds() {
   local pid="$1"
   local etime parsed
-  etime="$(/bin/ps -o etime= -p "$pid" 2>/dev/null | /usr/bin/tr -d ' \t\n')"
+  etime="$(/bin/ps -o etime= -p "$pid" 2>/dev/null)"
+  etime="${etime//[[:space:]]/}"
   [[ -n "$etime" ]] || return 0
   if parsed="$(parse_etime_seconds "$etime")"; then
     printf '%s\n' "$parsed"

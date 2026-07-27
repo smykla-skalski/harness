@@ -1,12 +1,36 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+if [[ -n "${_HARNESS_INTERNAL_TEST_ONLY_SCRIPT_DIR:-}" ]]; then
+  if [[ -z "${HARNESS_SCRIPT_TEST_JOB:-}" ]]; then
+    printf 'error: deterministic script directory is test-only\n' >&2
+    exit 2
+  fi
+  SCRIPT_DIR="$_HARNESS_INTERNAL_TEST_ONLY_SCRIPT_DIR"
+else
+  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+fi
 ROOT="${HARNESS_MONITOR_APP_ROOT:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)}"
-CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+if [[ -n "${_HARNESS_INTERNAL_TEST_ONLY_CHECKOUT_ROOT:-}" ]]; then
+  if [[ -z "${HARNESS_SCRIPT_TEST_JOB:-}" ]]; then
+    printf 'error: deterministic checkout root is test-only\n' >&2
+    exit 2
+  fi
+  CHECKOUT_ROOT="$_HARNESS_INTERNAL_TEST_ONLY_CHECKOUT_ROOT"
+else
+  CHECKOUT_ROOT="$(CDPATH='' cd -- "$ROOT/../.." && pwd)"
+fi
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
-COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
+if [[ -n "${_HARNESS_INTERNAL_TEST_ONLY_COMMON_REPO_ROOT:-}" ]]; then
+  if [[ -z "${HARNESS_SCRIPT_TEST_JOB:-}" ]]; then
+    printf 'error: deterministic common repo root is test-only\n' >&2
+    exit 2
+  fi
+  COMMON_REPO_ROOT="$_HARNESS_INTERNAL_TEST_ONLY_COMMON_REPO_ROOT"
+else
+  COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
+fi
 CALLER_PWD="$(pwd -P)"
 # shellcheck source=apps/harness-monitor/Scripts/lib/monitor-lanes.sh
 source "$SCRIPT_DIR/lib/monitor-lanes.sh"

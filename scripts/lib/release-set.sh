@@ -3,6 +3,14 @@
 # Canonical release inventory shared by the build coordinator, installer, and
 # their regression tests. Keep binary and build-leaf entries positionally
 # aligned when adding or removing a release executable.
+release_require_script_test_override() {
+  local variable="$1"
+  if [[ -z "${HARNESS_SCRIPT_TEST_JOB:-}" ]]; then
+    printf 'error: %s is test-only\n' "$variable" >&2
+    return 2
+  fi
+}
+
 # shellcheck disable=SC2034
 HARNESS_RELEASE_BINARIES=(
   harness
@@ -53,6 +61,60 @@ unset harness_release_host_os
 HARNESS_RELEASE_ALL_BINARIES=("${HARNESS_RELEASE_BINARIES[@]}" aff)
 # shellcheck disable=SC2034
 HARNESS_RELEASE_ALL_BUILD_LEAVES=("${HARNESS_RELEASE_BUILD_LEAVES[@]}" aff)
+
+if [[ -n "${HARNESS_RELEASE_TEST_PROCESS_START_MARKER:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_RELEASE_TEST_PROCESS_START_MARKER || exit $?
+fi
+
+if [[ -n "${HARNESS_INSTALL_TEST_INVENTORY_BINARIES:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_INSTALL_TEST_INVENTORY_BINARIES || exit $?
+  read -r -a release_test_binaries \
+    <<<"$HARNESS_INSTALL_TEST_INVENTORY_BINARIES"
+  read -r -a release_test_leaves \
+    <<<"${HARNESS_INSTALL_TEST_INVENTORY_LEAVES:-}"
+  read -r -a release_test_darwin_inactive \
+    <<<"${HARNESS_INSTALL_TEST_DARWIN_INACTIVE_BINARIES:-}"
+  if (( ${#release_test_binaries[@]} != ${#release_test_leaves[@]} )); then
+    printf 'test release inventory binaries and leaves must align\n' >&2
+    exit 2
+  fi
+  HARNESS_RELEASE_ALL_BINARIES=()
+  HARNESS_RELEASE_ALL_BUILD_LEAVES=()
+  HARNESS_RELEASE_BINARIES=()
+  HARNESS_RELEASE_BUILD_LEAVES=()
+  HARNESS_RELEASE_INACTIVE_BINARIES=()
+  for index in "${!release_test_leaves[@]}"; do
+    release_test_binary="${release_test_binaries[index]}"
+    release_test_leaf="${release_test_leaves[index]}"
+    release_test_is_inactive=0
+    if [[ "${HARNESS_RELEASE_HOST_OS:-$(command uname -s)}" == Darwin ]] \
+      && (( ${#release_test_darwin_inactive[@]} > 0 )); then
+      for release_test_inactive in "${release_test_darwin_inactive[@]}"; do
+        if [[ "$release_test_binary" == "$release_test_inactive" ]]; then
+          HARNESS_RELEASE_INACTIVE_BINARIES+=("$release_test_binary")
+          release_test_is_inactive=1
+          break
+        fi
+      done
+    fi
+    (( release_test_is_inactive == 0 )) || continue
+    HARNESS_RELEASE_ALL_BINARIES+=("$release_test_binary")
+    HARNESS_RELEASE_ALL_BUILD_LEAVES+=("$release_test_leaf")
+    if [[ "$release_test_leaf" != aff ]]; then
+      HARNESS_RELEASE_BINARIES+=("$release_test_binary")
+      HARNESS_RELEASE_BUILD_LEAVES+=("$release_test_leaf")
+    fi
+  done
+  if (( ${#HARNESS_RELEASE_ALL_BINARIES[@]} == 0 )); then
+    printf 'test release inventory must include an active binary\n' >&2
+    exit 2
+  fi
+  unset release_test_binaries release_test_leaves
+  unset release_test_darwin_inactive release_test_binary release_test_leaf
+  unset release_test_is_inactive release_test_inactive
+fi
 
 # Populated by release_set_resolve_selectors.
 # shellcheck disable=SC2034
@@ -141,6 +203,10 @@ release_normalize_target_dir() {
 
 release_pipeline_process_start_marker() {
   local pid="$1"
+  if [[ -n "${HARNESS_RELEASE_TEST_PROCESS_START_MARKER:-}" ]]; then
+    printf '%s\n' "$HARNESS_RELEASE_TEST_PROCESS_START_MARKER"
+    return 0
+  fi
   LC_ALL=C command ps -p "$pid" -o lstart= 2>/dev/null \
     | command awk '{$1=$1; print; exit}'
 }

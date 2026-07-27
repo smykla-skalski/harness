@@ -6,6 +6,31 @@ shopt -s nullglob
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
+if [[ "${HARNESS_INSTALL_TEST_TRUST_ARTIFACTS:-0}" == "1" ]]; then
+  release_require_script_test_override HARNESS_INSTALL_TEST_TRUST_ARTIFACTS
+fi
+if [[ -n "${HARNESS_INSTALL_TEST_LIVE_EXECUTABLES_FILE:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_INSTALL_TEST_LIVE_EXECUTABLES_FILE
+fi
+if [[ "${HARNESS_INSTALL_TEST_EXIT_AFTER_LOCK:-0}" == "1" ]]; then
+  release_require_script_test_override HARNESS_INSTALL_TEST_EXIT_AFTER_LOCK
+fi
+if [[ -n "${HARNESS_INSTALL_TEST_ACTIVATED_FILE:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_INSTALL_TEST_ACTIVATED_FILE
+fi
+if [[ -n "${HARNESS_INSTALL_TEST_CONTINUE_FILE:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_INSTALL_TEST_CONTINUE_FILE
+fi
+if [[ -n "${HARNESS_INSTALL_TEST_ACTIVATED_FILE:-}" \
+  && -z "${HARNESS_INSTALL_TEST_CONTINUE_FILE:-}" ]] \
+  || [[ -z "${HARNESS_INSTALL_TEST_ACTIVATED_FILE:-}" \
+    && -n "${HARNESS_INSTALL_TEST_CONTINUE_FILE:-}" ]]; then
+  printf 'HARNESS_INSTALL_TEST_ACTIVATED_FILE and HARNESS_INSTALL_TEST_CONTINUE_FILE must be set together\n' >&2
+  exit 2
+fi
 
 selectors=()
 print_mode=""
@@ -73,6 +98,10 @@ staged_link_failure_injected=0
 shadow_candidates=()
 shadow_backup_paths=()
 shadow_backup_sources=()
+mv_supports_target=0
+if command mv --help 2>&1 | command grep -q -- '-T'; then
+  mv_supports_target=1
+fi
 
 all_binaries=("${HARNESS_RELEASE_ALL_BINARIES[@]}")
 selected_binaries=("${RELEASE_SET_SELECTED_BINARIES[@]}")
@@ -130,7 +159,11 @@ build_path() {
 }
 
 binary_version() {
-  "$1" --version 2>/dev/null | command awk 'NR == 1 {print $2}'
+  local output name version
+  output="$("$1" --version 2>/dev/null)" || return 1
+  read -r name version _ <<<"$output"
+  [[ -n "$name" && -n "$version" ]] || return 1
+  printf '%s\n' "$version"
 }
 
 legacy_adapter_probe_is_owned() {
@@ -171,8 +204,11 @@ legacy_adapter_probe_is_owned() {
 binary_is_owned() {
   local name="$1"
   local path="$2"
-  local reported_name expected_probe
+  local output reported_name expected_probe
   [[ -x "$path" ]] || return 1
+  if [[ "${HARNESS_INSTALL_TEST_TRUST_ARTIFACTS:-0}" == "1" ]]; then
+    return 0
+  fi
 
   case "$name" in
     harness-codex-acp|harness-openrouter-agent)
@@ -181,12 +217,16 @@ binary_is_owned() {
       [[ "$reported_name" == "$expected_probe" ]]
       ;;
     harness)
-      reported_name="$("$path" --version 2>/dev/null | command awk 'NR == 1 {print $1}')"
+      output="$("$path" --version 2>/dev/null)" || return 1
+      read -r reported_name _ <<<"$output"
       [[ "$reported_name" == "$name" ]] \
-        && "$path" --help 2>/dev/null | command grep -Fq 'Harness CLI'
+        || return 1
+      output="$("$path" --help 2>/dev/null)" || return 1
+      [[ "$output" == *"Harness CLI"* ]]
       ;;
     *)
-      reported_name="$("$path" --version 2>/dev/null | command awk 'NR == 1 {print $1}')"
+      output="$("$path" --version 2>/dev/null)" || return 1
+      read -r reported_name _ <<<"$output"
       [[ "$reported_name" == "$name" ]]
       ;;
   esac
@@ -216,8 +256,14 @@ signing_identity_for() {
 atomic_replace_symlink() {
   local target="$1"
   local destination="$2"
+  local destination_parent="${destination%/*}"
   local staged_link="${destination}.next-${lock_token}"
-  command mkdir -p "$(dirname -- "$destination")"
+  if [[ "$destination_parent" == "$destination" ]]; then
+    destination_parent=.
+  elif [[ -z "$destination_parent" ]]; then
+    destination_parent=/
+  fi
+  command mkdir -p "$destination_parent"
   command rm -f "$staged_link"
   staged_link_paths+=("$staged_link")
   command ln -s "$target" "$staged_link"
@@ -227,7 +273,7 @@ atomic_replace_symlink() {
     printf 'injected staged-link publication failure\n' >&2
     return 94
   fi
-  if command mv --help 2>&1 | command grep -q -- '-T'; then
+  if (( mv_supports_target == 1 )); then
     if ! command mv -Tf "$staged_link" "$destination"; then
       command rm -f "$staged_link"
       return 1
@@ -244,7 +290,7 @@ atomic_restore_backup() {
   local backup="$1"
   local destination="$2"
   [[ -e "$backup" || -L "$backup" ]] || return 0
-  if command mv --help 2>&1 | command grep -q -- '-T'; then
+  if (( mv_supports_target == 1 )); then
     command mv -Tf "$backup" "$destination"
   else
     command mv -fh "$backup" "$destination"
@@ -252,9 +298,15 @@ atomic_restore_backup() {
 }
 
 process_start_marker() {
-  local pid="$1"
-  LC_ALL=C command ps -p "$pid" -o lstart= 2>/dev/null \
-    | command awk '{$1=$1; print; exit}'
+  local pid="$1" marker
+  if [[ -n "${HARNESS_RELEASE_TEST_PROCESS_START_MARKER:-}" ]]; then
+    printf '%s\n' "$HARNESS_RELEASE_TEST_PROCESS_START_MARKER"
+    return 0
+  fi
+  marker="$(LC_ALL=C command ps -p "$pid" -o lstart= 2>/dev/null)" || return 1
+  marker="${marker#"${marker%%[![:space:]]*}"}"
+  marker="${marker%"${marker##*[![:space:]]}"}"
+  printf '%s\n' "$marker"
 }
 
 lock_age_seconds() {
@@ -575,19 +627,16 @@ normalize_existing_install() {
   done
 }
 
-hash_file() {
-  if command -v shasum >/dev/null 2>&1; then
-    command shasum -a 256 "$1" | command awk '{print $1}'
-  else
-    command cksum "$1" | command awk '{print $1 "-" $2}'
-  fi
-}
-
 hash_text() {
+  local output checksum size
   if command -v shasum >/dev/null 2>&1; then
-    printf '%s' "$1" | command shasum -a 256 | command awk '{print substr($1, 1, 16)}'
+    output="$(printf '%s' "$1" | command shasum -a 256)"
+    checksum="${output%% *}"
+    printf '%s\n' "${checksum:0:16}"
   else
-    printf '%s' "$1" | command cksum | command awk '{print $1}'
+    output="$(printf '%s' "$1" | command cksum)"
+    read -r checksum size _ <<<"$output"
+    printf '%s\n' "$checksum"
   fi
 }
 
@@ -644,6 +693,13 @@ collect_live_release_process_state() {
   live_executable_paths=""
   live_process_commands=""
   live_process_scan_available=0
+  if [[ -n "${HARNESS_INSTALL_TEST_LIVE_EXECUTABLES_FILE:-}" ]]; then
+    live_executable_paths="$(
+      command cat "$HARNESS_INSTALL_TEST_LIVE_EXECUTABLES_FILE"
+    )"
+    live_process_scan_available=1
+    return 0
+  fi
   for path in "$install_root"/*; do
     [[ -d "$path/bin" && ! -L "$path" ]] || continue
     name="${path##*/}"
@@ -835,7 +891,7 @@ validate_exact_inventory() {
   local bin_dir="$1"
   local path name
   for path in "$bin_dir"/*; do
-    name="$(basename -- "$path")"
+    name="${path##*/}"
     if ! binary_is_known "$name"; then
       printf 'candidate contains unknown binary %s\n' "$path" >&2
       return 1
@@ -874,7 +930,8 @@ validate_candidate_set() {
       printf 'candidate %s failed its identity probe at %s\n' "$name" "$path" >&2
       return 1
     fi
-    if binary_is_selected "$name"; then
+    if binary_is_selected "$name" \
+      && [[ "${HARNESS_INSTALL_TEST_TRUST_ARTIFACTS:-0}" != "1" ]]; then
       case "$name" in
         harness-codex-acp|harness-openrouter-agent)
           ;;
@@ -897,7 +954,9 @@ validate_candidate_set() {
 prepare_candidate() {
   local expected_version="$1"
   local digest_input="${selected_binaries[*]}|$previous_target|$harness_signing_identity|$aff_signing_identity|$harness_skip_codesign|$aff_skip_codesign"
-  local name source checksum build_id candidate_id candidate_dir identity
+  local name source checksum checksum_line checksum_output="" size
+  local checksum_mode build_id candidate_id candidate_dir identity
+  local -a checksum_paths=()
 
   candidate_stage="$install_root/.candidate-${lock_token}.staging"
   command rm -rf "$candidate_stage"
@@ -923,7 +982,35 @@ prepare_candidate() {
   for name in "${all_binaries[@]}"; do
     source="$candidate_stage/bin/$name"
     if [[ -f "$source" ]]; then
-      checksum="$(hash_file "$source")"
+      checksum_paths+=("$source")
+    fi
+  done
+  if (( ${#checksum_paths[@]} == 0 )); then
+    printf 'candidate contains no release binaries\n' >&2
+    return 1
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    checksum_mode="shasum"
+    checksum_output="$(command shasum -a 256 "${checksum_paths[@]}")"
+  else
+    checksum_mode="cksum"
+    checksum_output="$(command cksum "${checksum_paths[@]}")"
+  fi
+  for name in "${all_binaries[@]}"; do
+    source="$candidate_stage/bin/$name"
+    if [[ -f "$source" ]]; then
+      checksum_line="${checksum_output%%$'\n'*}"
+      if [[ "$checksum_output" == *$'\n'* ]]; then
+        checksum_output="${checksum_output#*$'\n'}"
+      else
+        checksum_output=""
+      fi
+      if [[ "$checksum_mode" == shasum ]]; then
+        checksum="${checksum_line%% *}"
+      else
+        read -r checksum size _ <<<"$checksum_line"
+        checksum="$checksum-$size"
+      fi
       digest_input+="|$name:$checksum"
     else
       digest_input+="|$name:absent"
@@ -1066,6 +1153,10 @@ acquire_lock
 if [[ -n "${HARNESS_INSTALL_TEST_HOLD_LOCK_SECONDS:-}" ]]; then
   sleep "$HARNESS_INSTALL_TEST_HOLD_LOCK_SECONDS"
 fi
+if [[ "${HARNESS_INSTALL_TEST_EXIT_AFTER_LOCK:-0}" == "1" ]]; then
+  completed=1
+  exit 0
+fi
 if [[ -L "$current_link" ]]; then
   original_current_target="$(command readlink "$current_link")"
 fi
@@ -1099,6 +1190,17 @@ fi
 if [[ -n "${HARNESS_INSTALL_TEST_HOLD_AFTER_ACTIVATION_SECONDS:-}" ]]; then
   sleep "$HARNESS_INSTALL_TEST_HOLD_AFTER_ACTIVATION_SECONDS"
 fi
+if [[ -n "${HARNESS_INSTALL_TEST_ACTIVATED_FILE:-}" ]]; then
+  : >"$HARNESS_INSTALL_TEST_ACTIVATED_FILE"
+  for _ in {1..400}; do
+    [[ -e "$HARNESS_INSTALL_TEST_CONTINUE_FILE" ]] && break
+    sleep 0.025
+  done
+  if [[ ! -e "$HARNESS_INSTALL_TEST_CONTINUE_FILE" ]]; then
+    printf 'timed out waiting for test activation observer\n' >&2
+    exit 98
+  fi
+fi
 
 published_link_count=0
 for name in "${selected_binaries[@]}"; do
@@ -1114,7 +1216,10 @@ for name in "${selected_binaries[@]}"; do
   fi
 done
 
-validate_candidate_set "$current_link/bin" "$expected_version"
+# The candidate was fully validated before its directory was atomically moved
+# into place. Activation only switches `current`, so repeat the structural
+# inventory check without executing and signature-checking every binary again.
+validate_exact_inventory "$current_link/bin"
 if harness_cli_is_selected; then
   reconcile_shadowed_harness_binaries
 fi

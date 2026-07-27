@@ -21,12 +21,17 @@ SOCKET_TMPDIR="$(mktemp -d /tmp/cl-socket.XXXXXX)"
 # socket - the exact failure the sweep exists to stop causing. Borrowing the
 # mktemp suffix keeps the name unique per run, where a pid would be reused.
 TEST_USER="${SOCKET_TMPDIR##*/}"
+TEST_RUN_TOKEN="${HARNESS_SCRIPT_TEST_RUN_TOKEN:-manual}"
 PASS_COUNT=0
 FAIL_COUNT=0
 # The suite injects command shims through PATH. A host BASH_ENV can run shell
 # activation hooks in every child Bash and replace that controlled PATH before
 # cargo-local sees it, silently turning a fake-python scenario into a real one.
 export BASH_ENV=
+
+test_pool_key() {
+  printf 'pool-%s-%s-%s\n' "$TEST_RUN_TOKEN" "$1" "$$"
+}
 
 # Every socket under a root that still answers a connect. Used both to assert
 # this suite leaves nothing running and to clean up if it ever does.
@@ -223,8 +228,10 @@ print_cargo_env_with_pool_key() {
   cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
   budget=$((cpu - 1))
   (( budget < 1 )) && budget=1
-  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
-    --repo-root "$pool_key" --budget "$budget" >/dev/null 2>&1 || true
+  if [[ "${HARNESS_TEST_SKIP_POOL_PRESTART:-0}" != "1" ]]; then
+    python3 "$ROOT/scripts/harness-jobserver.py" ensure \
+      --repo-root "$pool_key" --budget "$budget" >/dev/null 2>&1 || true
+  fi
   (
     unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
     unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
@@ -254,15 +261,21 @@ spec.loader.exec_module(mod)
 print(mod.pool_dir(sys.argv[2]))
 PY
 )" || return 0
-  pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
-  # The lock file outlives the process that wrote it, and a dead supervisor's
-  # pid gets recycled - on a box also running other agents' builds, signalling
-  # it blind can kill something unrelated to this suite.
-  if [[ "$pid" =~ ^[0-9]+$ ]]; then
-    case "$(ps -p "$pid" -o command= 2>/dev/null)" in
-      *harness-jobserver.py*supervise*) kill "$pid" 2>/dev/null || true ;;
-    esac
-  fi
+  for _ in {1..50}; do
+    pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+    # The lock file outlives the process that wrote it, and a dead supervisor's
+    # pid gets recycled - on a box also running other agents' builds, signalling
+    # it blind can kill something unrelated to this suite.
+    if [[ "$pid" =~ ^[0-9]+$ ]]; then
+      case "$(ps -p "$pid" -o command= 2>/dev/null)" in
+        *harness-jobserver.py*supervise*)
+          kill "$pid" 2>/dev/null || true
+          break
+          ;;
+      esac
+    fi
+    sleep 0.01
+  done
   rm -rf "$dir" 2>/dev/null || true
 }
 
@@ -300,7 +313,7 @@ EOF
 }
 
 scenario_nextest_build_phase_keeps_the_whole_pool() {
-  local key="pool-buildphase-$$"
+  local key; key="$(test_pool_key buildphase)"
   local fake="$SANDBOX/token-cargo"
   local log="$SANDBOX/token-log"
   local scratch="$SANDBOX/buildphase-tmp"
@@ -314,9 +327,10 @@ scenario_nextest_build_phase_keeps_the_whole_pool() {
     --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
 
   (
-    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+    unset HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
     unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
-    TMPDIR="$scratch/" \
+    CARGO_TARGET_DIR="$scratch/target" \
+      TMPDIR="$scratch/" \
       PATH="$(fifo_capable_make_path):$PATH" \
       TOKEN_LOG="$log" \
       SCCACHE_BIN='' RUSTC_WRAPPER='' \
@@ -353,7 +367,7 @@ scenario_nextest_build_phase_keeps_the_whole_pool() {
 }
 
 scenario_build_only_flag_precedes_a_separator() {
-  local key="pool-sep-$$"
+  local key; key="$(test_pool_key sep)"
   local fake="$SANDBOX/sep-cargo"
   local log="$SANDBOX/sep-log"
   local scratch="$SANDBOX/sep-tmp"
@@ -367,9 +381,10 @@ scenario_build_only_flag_precedes_a_separator() {
     --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
 
   (
-    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+    unset HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
     unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
-    TMPDIR="$scratch/" \
+    CARGO_TARGET_DIR="$scratch/target" \
+      TMPDIR="$scratch/" \
       PATH="$(fifo_capable_make_path):$PATH" \
       TOKEN_LOG="$log" \
       SCCACHE_BIN='' RUSTC_WRAPPER='' \
@@ -394,7 +409,7 @@ scenario_build_only_flag_precedes_a_separator() {
 }
 
 scenario_nextest_detection_skips_global_flag_values() {
-  local key="pool-flagvalue-$$"
+  local key; key="$(test_pool_key flagvalue)"
   local fake="$SANDBOX/flagvalue-cargo"
   local log="$SANDBOX/flagvalue-log"
   local scratch="$SANDBOX/flagvalue-tmp"
@@ -409,9 +424,10 @@ scenario_nextest_detection_skips_global_flag_values() {
 
   run_flagvalue() {
     (
-      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+      unset HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
       unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
-      TMPDIR="$scratch/" \
+      CARGO_TARGET_DIR="$scratch/target" \
+        TMPDIR="$scratch/" \
         PATH="$(fifo_capable_make_path):$PATH" \
         TOKEN_LOG="$log" \
         SCCACHE_BIN='' RUSTC_WRAPPER='' \
@@ -449,7 +465,7 @@ scenario_nextest_detection_skips_global_flag_values() {
 }
 
 scenario_nextest_detection_handles_toolchain_and_list() {
-  local key="pool-detect-$$"
+  local key; key="$(test_pool_key detect)"
   local fake="$SANDBOX/detect-cargo"
   local log="$SANDBOX/detect-log"
   local scratch="$SANDBOX/detect-tmp"
@@ -464,9 +480,10 @@ scenario_nextest_detection_handles_toolchain_and_list() {
 
   run_detect() {
     (
-      unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
+      unset HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
       unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
-      TMPDIR="$scratch/" \
+      CARGO_TARGET_DIR="$scratch/target" \
+        TMPDIR="$scratch/" \
         PATH="$(fifo_capable_make_path):$PATH" \
         TOKEN_LOG="$log" \
         SCCACHE_BIN='' RUSTC_WRAPPER='' \
@@ -503,7 +520,7 @@ scenario_nextest_detection_handles_toolchain_and_list() {
 }
 
 scenario_jobserver_pool_takes_over_build_sizing() {
-  local key="pool-sizing-$$"
+  local key; key="$(test_pool_key sizing)"
   local output cpu
   output="$(print_cargo_env_with_pool_key "$key")"
   cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
@@ -528,13 +545,18 @@ scenario_jobserver_pool_takes_over_build_sizing() {
 
 scenario_old_make_keeps_the_pool_at_arms_length() {
   local key fake_bin output version expected_mode skipped
+  local shared_pool_key; shared_pool_key="$(test_pool_key make-new)"
   local -a cases=("4.3:reserve" "3.81:reserve" "4.4.1:pool" "5.0:pool" "bmake-nonsense:reserve")
   local entry
 
   for entry in "${cases[@]}"; do
     version="${entry%%:*}"
     expected_mode="${entry##*:}"
-    key="pool-make-$version-$$"
+    if [[ "$expected_mode" == "pool" ]]; then
+      key="$shared_pool_key"
+    else
+      key="$(test_pool_key "make-$version")"
+    fi
     fake_bin="$SANDBOX/make-$version"
     mkdir -p "$fake_bin"
     if [[ "$version" == bmake-nonsense ]]; then
@@ -544,29 +566,34 @@ scenario_old_make_keeps_the_pool_at_arms_length() {
     fi
     chmod +x "$fake_bin/make"
 
-    output="$(HARNESS_TEST_MAKE_ON_PATH=1 PATH="$fake_bin:$PATH" \
+    output="$(HARNESS_TEST_MAKE_ON_PATH=1 \
+      HARNESS_TEST_SKIP_POOL_PRESTART="$([[ "$expected_mode" == "reserve" ]] && printf 1 || printf 0)" \
+      PATH="$fake_bin:$PATH" \
       print_cargo_env_with_pool_key "$key")"
-    stop_pool_for_key "$key"
     skipped="$(awk -F= '$1 == "JOBSERVER_SKIPPED" { print $2 }' <<<"$output")"
 
     if ! assert_line "JOBSERVER=$expected_mode" "$output"; then
       fail "make $version should give $expected_mode: $(grep '^JOBSERVER=' <<<"$output")"
+      stop_pool_for_key "$shared_pool_key"
       return
     fi
     if [[ "$expected_mode" == reserve && "$skipped" != "old-make" ]]; then
       fail "make $version fell back without naming why: JOBSERVER_SKIPPED=$skipped"
+      stop_pool_for_key "$shared_pool_key"
       return
     fi
     if [[ "$expected_mode" == pool && -n "$skipped" ]]; then
       fail "make $version attached but claimed a skip: JOBSERVER_SKIPPED=$skipped"
+      stop_pool_for_key "$shared_pool_key"
       return
     fi
   done
+  stop_pool_for_key "$shared_pool_key"
   pass "a make too old for a fifo endpoint keeps the static reserve"
 }
 
 scenario_pool_endpoint_never_reaches_make() {
-  local key="pool-make-$$"
+  local key; key="$(test_pool_key make)"
   local output makeflags endpoint probe status=0
 
   output="$(print_cargo_env_with_pool_key "$key")"
@@ -601,7 +628,7 @@ scenario_pool_endpoint_never_reaches_make() {
 }
 
 scenario_reserve_drops_an_inherited_jobserver() {
-  local key="pool-inherited-$$"
+  local key; key="$(test_pool_key inherited)"
   local output
   # A stale endpoint is the reachable case: this script exports exactly this
   # shape, and a child inheriting one whose pool has died would attach, get no
@@ -627,7 +654,7 @@ scenario_reserve_drops_an_inherited_jobserver() {
 }
 
 scenario_jobserver_absent_falls_back_to_the_reserve() {
-  local key="pool-absent-$$"
+  local key; key="$(test_pool_key absent)"
   local output share cpu expected
   output="$(print_cargo_env_with_pool_key "$key" env HARNESS_JOBSERVER=0)"
   stop_pool_for_key "$key"
@@ -652,7 +679,7 @@ scenario_jobserver_absent_falls_back_to_the_reserve() {
 }
 
 scenario_explicit_job_override_beats_the_pool() {
-  local key="pool-override-$$"
+  local key; key="$(test_pool_key override)"
   local output
   output="$(print_cargo_env_with_pool_key "$key" env HARNESS_CARGO_JOBS=3)"
   stop_pool_for_key "$key"
@@ -1998,47 +2025,81 @@ scenario_wrapper_parses_with_system_bash() {
   fi
 }
 
-scenario_wrapper_parses_with_system_bash
-scenario_jobserver_pool_takes_over_build_sizing
-scenario_jobserver_absent_falls_back_to_the_reserve
-scenario_reserve_drops_an_inherited_jobserver
-scenario_pool_endpoint_never_reaches_make
-scenario_old_make_keeps_the_pool_at_arms_length
-scenario_explicit_job_override_beats_the_pool
-scenario_nextest_build_phase_keeps_the_whole_pool
-scenario_build_only_flag_precedes_a_separator
-scenario_nextest_detection_handles_toolchain_and_list
-scenario_nextest_detection_skips_global_flag_values
-scenario_missing_tmpdir_uses_short_external_fallback
-scenario_concurrent_tmpdir_creation_is_idempotent
-scenario_unusable_tmpdir_uses_short_external_fallback
-scenario_usable_tmpdir_is_preserved
-scenario_agent_build_jobs_leave_room_for_later_arrivals
-scenario_agent_jobs_hold_their_reserved_share
-scenario_target_dir_is_shared_across_sessions
-scenario_print_target_dir_matches_the_build_dir
-scenario_default_lane_still_seeds_under_lock
-scenario_same_target_lane_fails_fast_with_owner
-scenario_unusable_lane_lock_python_is_actionable
-scenario_sccache_socket_survives_session_scoped_tmpdir
-scenario_sccache_socket_is_shared_across_checkouts
-scenario_repo_tmpdir_fallback_is_session_scoped
-scenario_symlinked_repo_tmpdir_base_is_rejected
-scenario_unsafe_socket_dir_disables_sccache
-scenario_single_thread_nextest_override_is_rejected
-scenario_noncanonical_nextest_override_is_rejected
-scenario_supported_sccache_is_resolved_once
-scenario_old_explicit_sccache_is_disabled
-scenario_empty_sccache_bin_disables_the_cache
-scenario_unprobeable_socket_is_preserved
-scenario_live_socket_survives_the_sweep
-scenario_young_socket_survives_the_sweep
-scenario_sccache_server_is_started_before_cargo
-scenario_concurrent_builds_start_one_sccache_server
-scenario_unusable_python_falls_back_to_the_socket_file
-scenario_query_commands_start_no_sccache_server
-scenario_cache_wrapper_shortens_long_tmpdir
-scenario_suite_leaves_no_sccache_server_behind
+CARGO_LOCAL_TEST_SCENARIOS=(
+  scenario_wrapper_parses_with_system_bash
+  scenario_jobserver_pool_takes_over_build_sizing
+  scenario_jobserver_absent_falls_back_to_the_reserve
+  scenario_reserve_drops_an_inherited_jobserver
+  scenario_pool_endpoint_never_reaches_make
+  scenario_old_make_keeps_the_pool_at_arms_length
+  scenario_explicit_job_override_beats_the_pool
+  scenario_nextest_build_phase_keeps_the_whole_pool
+  scenario_build_only_flag_precedes_a_separator
+  scenario_nextest_detection_handles_toolchain_and_list
+  scenario_nextest_detection_skips_global_flag_values
+  scenario_missing_tmpdir_uses_short_external_fallback
+  scenario_concurrent_tmpdir_creation_is_idempotent
+  scenario_unusable_tmpdir_uses_short_external_fallback
+  scenario_usable_tmpdir_is_preserved
+  scenario_agent_build_jobs_leave_room_for_later_arrivals
+  scenario_agent_jobs_hold_their_reserved_share
+  scenario_target_dir_is_shared_across_sessions
+  scenario_print_target_dir_matches_the_build_dir
+  scenario_default_lane_still_seeds_under_lock
+  scenario_same_target_lane_fails_fast_with_owner
+  scenario_unusable_lane_lock_python_is_actionable
+  scenario_sccache_socket_survives_session_scoped_tmpdir
+  scenario_sccache_socket_is_shared_across_checkouts
+  scenario_repo_tmpdir_fallback_is_session_scoped
+  scenario_unsafe_socket_dir_disables_sccache
+  scenario_single_thread_nextest_override_is_rejected
+  scenario_noncanonical_nextest_override_is_rejected
+  scenario_supported_sccache_is_resolved_once
+  scenario_old_explicit_sccache_is_disabled
+  scenario_empty_sccache_bin_disables_the_cache
+  scenario_unprobeable_socket_is_preserved
+  scenario_live_socket_survives_the_sweep
+  scenario_young_socket_survives_the_sweep
+  scenario_sccache_server_is_started_before_cargo
+  scenario_concurrent_builds_start_one_sccache_server
+  scenario_unusable_python_falls_back_to_the_socket_file
+  scenario_query_commands_start_no_sccache_server
+  scenario_cache_wrapper_shortens_long_tmpdir
+  scenario_suite_leaves_no_sccache_server_behind
+  scenario_symlinked_repo_tmpdir_base_is_rejected
+)
+
+run_all() {
+  local scenario
+  for scenario in "${CARGO_LOCAL_TEST_SCENARIOS[@]}"; do
+    "$scenario"
+  done
+}
+
+case "${1:-}" in
+  --list)
+    printf '%s\n' "${CARGO_LOCAL_TEST_SCENARIOS[@]}"
+    exit 0
+    ;;
+  --scenario)
+    (( $# == 2 )) || {
+      printf 'usage: %s [--list|--scenario NAME]\n' "${0##*/}" >&2
+      exit 2
+    }
+    if [[ "$2" != scenario_* ]] || ! declare -F "$2" >/dev/null; then
+      printf 'unknown cargo-local test scenario: %s\n' "$2" >&2
+      exit 2
+    fi
+    "$2"
+    ;;
+  "")
+    run_all
+    ;;
+  *)
+    printf 'usage: %s [--list|--scenario NAME]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
 
 printf 'cargo-local tests: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
 (( FAIL_COUNT == 0 ))
