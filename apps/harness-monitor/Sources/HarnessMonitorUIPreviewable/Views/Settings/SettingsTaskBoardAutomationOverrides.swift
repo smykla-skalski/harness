@@ -49,7 +49,8 @@ extension TaskBoardGitSettingsDraft {
   }
 
   func automationConfig(for repository: String) -> TaskBoardRepositoryAutomationConfig? {
-    automationRepositories.first { $0.repository.lowercased() == repository.lowercased() }
+    guard let slug = Self.canonicalSlug(repository) else { return nil }
+    return automationRepositories.first { Self.canonicalSlug($0.repository) == slug }
   }
 
   func overriddenKinds(for repository: String) -> [SettingsRepositoryAutomationOverrideKind] {
@@ -137,11 +138,11 @@ extension TaskBoardGitSettingsDraft {
     for repository: String,
     _ mutate: (inout TaskBoardRepositoryAutomationConfig) -> Void
   ) {
-    let slug = repository.lowercased()
-    let index = automationRepositories.firstIndex { $0.repository.lowercased() == slug }
+    guard let slug = Self.canonicalSlug(repository) else { return }
+    let index = automationRepositories.firstIndex { Self.canonicalSlug($0.repository) == slug }
     var config =
       index.map { automationRepositories[$0] }
-      ?? TaskBoardRepositoryAutomationConfig(repository: repository)
+      ?? TaskBoardRepositoryAutomationConfig(repository: slug)
     mutate(&config)
 
     // An entry that says nothing is worse than no entry: it survives every save
@@ -153,6 +154,13 @@ extension TaskBoardGitSettingsDraft {
     case (nil, false): automationRepositories.append(config)
     case (nil, true): break
     }
+  }
+
+  /// Match the way the daemon canonicalizes a slug before it looks an override
+  /// up. A stored value the daemon still resolves must not read as missing
+  /// here, or the pane offers to configure a repository that already is.
+  private static func canonicalSlug(_ repository: String) -> String? {
+    SettingsGitHubRepositoryNormalization.repositoryEntry(repository)
   }
 
   private func normalizedLines(from value: String) -> [String] {

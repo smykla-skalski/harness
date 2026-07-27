@@ -22,9 +22,11 @@ struct RepositoriesMonitoredSection: View {
 
   /// An expanded row outgrows a fixed row height, so the table only reserves
   /// space for collapsed ones and lets the expanded panels push it taller.
+  /// Counted against the rows that still exist rather than against the expanded
+  /// set, which keeps the id of a repository deleted while it was open.
   private var repositoriesTableRowsHeight: CGFloat {
     let visibleRows = min(draft.rows.count, 12)
-    let expanded = min(expandedRows.count, visibleRows)
+    let expanded = min(draft.rows.count { expandedRows.contains($0.id) }, visibleRows)
     return CGFloat(visibleRows) * 44 + CGFloat(expanded) * 320
   }
 

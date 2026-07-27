@@ -90,6 +90,32 @@ struct SettingsTaskBoardAutomationOverridesTests {
     #expect(draft.overriddenKinds(for: "smykla/personal").isEmpty)
   }
 
+  @Test("Editing a stored override never forks it into a second entry")
+  func editingAStoredOverrideKeepsOneEntry() {
+    var draft = Self.draft(
+      repositories: [
+        TaskBoardRepositoryAutomationConfig(
+          repository: "  KumaHQ/Kuma  ",
+          requestedReviewers: GitHubRequestedReviewersWire(reviewers: ["work-reviewer"])
+        )
+      ]
+    )
+
+    draft.beginOverriding(.labels, for: "kumahq/kuma")
+
+    #expect(draft.snapshot.orchestratorSettings.repositories.count == 1)
+    #expect(draft.overriddenKinds(for: "kumahq/kuma").count == 2)
+  }
+
+  @Test("A repository that is not a slug configures nothing")
+  func nonSlugRepositoriesConfigureNothing() {
+    var draft = Self.draft()
+
+    draft.beginOverriding(.labels, for: "kuma")
+
+    #expect(draft.snapshot.orchestratorSettings.repositories.isEmpty)
+  }
+
   @Test("An override matches its repository regardless of slug casing")
   func overridesMatchCaseInsensitively() {
     var draft = Self.draft(
