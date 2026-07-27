@@ -73,7 +73,12 @@ extension TaskBoardOverviewView {
       if hasAggregateSummary {
         aggregateSummaryRow
       }
-      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      // Only pushes apart when both sides carry something. An unconditional
+      // spacer strands the controls at the trailing edge of a row whose
+      // leading half is empty.
+      if hasAggregateSummary && (showsFilterControls || hasHeaderActions) {
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      }
       if showsFilterControls {
         TaskBoardFilterControls(
           filters: boardFiltersBinding,

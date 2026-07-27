@@ -6,6 +6,18 @@ enum TaskBoardFilterPreferences {
   static let storageKey = "harness.task-board.filters.v1"
   static let emptyRawValue = ""
 
+  /// Both coders live as long as the app does. Every caller here is a view
+  /// reading or writing the stored value as someone works the filter, and a
+  /// coder built per interaction is the allocation the Monitor performance
+  /// rules keep off view-driven paths.
+  @MainActor private static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
+  @MainActor private static let decoder = JSONDecoder()
+
   /// Decoding runs on every view body that reads the stored raw value, so a
   /// repeat of the same string answers from the memo instead of the decoder.
   @MainActor private static var memoizedRawValue: String?
@@ -22,12 +34,11 @@ enum TaskBoardFilterPreferences {
     return decoded
   }
 
+  @MainActor
   static func rawValue(for state: TaskBoardFilterState) -> String {
     guard !state.isEmpty else {
       return emptyRawValue
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
     guard
       let data = try? encoder.encode(Storage(state: state)),
       let rawValue = String(data: data, encoding: .utf8)
@@ -38,23 +49,10 @@ enum TaskBoardFilterPreferences {
   }
 
   @MainActor
-  static func load(from userDefaults: UserDefaults = .standard) -> TaskBoardFilterState {
-    state(from: userDefaults.string(forKey: storageKey) ?? emptyRawValue)
-  }
-
-  static func save(_ state: TaskBoardFilterState, to userDefaults: UserDefaults = .standard) {
-    let rawValue = rawValue(for: state)
-    if rawValue.isEmpty {
-      userDefaults.removeObject(forKey: storageKey)
-    } else {
-      userDefaults.set(rawValue, forKey: storageKey)
-    }
-  }
-
   private static func decode(_ rawValue: String) -> TaskBoardFilterState {
     guard
       let data = rawValue.data(using: .utf8),
-      let storage = try? JSONDecoder().decode(Storage.self, from: data)
+      let storage = try? decoder.decode(Storage.self, from: data)
     else {
       return .init()
     }

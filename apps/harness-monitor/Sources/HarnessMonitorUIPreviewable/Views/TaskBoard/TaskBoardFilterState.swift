@@ -140,8 +140,9 @@ struct TaskBoardFilterState: Equatable, Sendable {
     Self.toggleMembership(of: source, in: &sources)
   }
 
-  /// Reduce one tag to the form a facet compares. Tags are stored exactly as
-  /// they were typed, so `"Backend "` and `"backend"` are the same tag here.
+  /// Reduce one tag to the form a facet compares, which is the form `tags`
+  /// holds. A board item keeps its own tags exactly as they were typed, so
+  /// `"Backend "` and `"backend"` both select through this one key.
   static func tagKey(_ tag: String) -> String {
     tag.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
