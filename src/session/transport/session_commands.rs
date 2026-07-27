@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::client::DaemonClient;
-use crate::session::wire::{AdoptSessionRequest, ObserveSessionRequest};
-use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
+use crate::session::wire::{AdoptSessionRequest, ObserveSessionRequest, SessionDetail};
 use crate::session::{observe, service};
+use harness_daemon_client::DaemonClient;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::support::{agent_to_str, daemon_client, print_json, resolve_project_dir};
 
@@ -260,12 +260,15 @@ impl Execute for SessionObserveArgs {
         } else if let (Some(actor), Some(client)) = (actor, DaemonClient::try_connect()) {
             // Daemon-backed observe tasks must go through the dedicated observe
             // mutation so issue metadata survives canonical persistence.
-            let _ = client.observe_session(
-                &self.session_id,
-                &ObserveSessionRequest {
-                    actor: Some(actor.to_string()),
-                },
-            )?;
+            let request = ObserveSessionRequest {
+                actor: Some(actor.to_string()),
+            };
+            let url = format!("/v1/sessions/{}/observe", self.session_id);
+            let _: SessionDetail = client.post(&url, &request).map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "daemon observe session: {error}"
+                )))
+            })?;
             observe::execute_session_observe(&self.session_id, &project, self.json, None)
         } else {
             observe::execute_session_observe(&self.session_id, &project, self.json, actor)
