@@ -6,10 +6,7 @@ use super::helpers::{collect_hits_in_tree, read_repo_file, repo_path_exists};
 fn application_submodules_are_not_public_library_surface() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
-    for (path, needle) in [
-        ("src/create/mod.rs", "pub mod application;"),
-        ("src/hooks/mod.rs", "pub mod application;"),
-    ] {
+    for (path, needle) in [("src/hooks/mod.rs", "pub mod application;")] {
         let contents = read_repo_file(root, path);
         assert!(
             !contents.contains(needle),
@@ -43,18 +40,6 @@ fn application_submodules_are_not_public_library_surface() {
 #[test]
 fn transport_command_modules_stay_internal_to_domains() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-
-    for (path, needle) in [("src/create/mod.rs", "pub mod commands;")] {
-        let contents = read_repo_file(root, path);
-        assert!(
-            !contents.contains(needle),
-            "{path} should keep `commands` crate-internal instead of exporting `{needle}`"
-        );
-        assert!(
-            contents.contains("pub(crate) mod commands;"),
-            "{path} should expose `commands` as crate-internal only"
-        );
-    }
 
     for path in [
         "src/app/cli.rs",
@@ -145,9 +130,7 @@ fn helper_modules_do_not_leak_publicly() {
 
     let hooks_root = read_repo_file(root, "src/hooks/mod.rs");
     assert!(
-        hooks_root.contains(
-            "pub use self::session::{PreCompactHookInput, SessionStartHookInput, SessionStartHookOutput};"
-        ),
+        hooks_root.contains("pub use self::session::SessionStartHookOutput;"),
         "src/hooks/mod.rs should re-export session hook payload types through the hooks facade"
     );
 }

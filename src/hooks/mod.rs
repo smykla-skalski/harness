@@ -14,7 +14,7 @@ pub use self::adapters::HookAgent;
 pub use self::application::GuardContext;
 pub use self::effects::HookOutcome;
 pub use self::protocol::{context, hook_result, output, payloads, result};
-pub use self::session::{PreCompactHookInput, SessionStartHookInput, SessionStartHookOutput};
-pub use self::transport::{AuditTurnArgs, HookArgs, HookCommand, HookType};
+pub use self::session::SessionStartHookOutput;
+pub use self::transport::{AuditTurnArgs, HookCommand, HookType};
 
 pub use self::runtime::run_hook_command;

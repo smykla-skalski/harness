@@ -13,7 +13,6 @@ flowchart LR
     Agents["agents\nshared agent lifecycle, ledger,\nruntime adapters"]
     Session["session\nmulti-agent orchestration"]
     Run["run\ntracked suite execution"]
-    Create["create\nsuite creation workflow"]
     Observe["observe\nlive session inspection and fix routing"]
     Setup["setup\nbootstrap and session lifecycle"]
     Hooks["hooks\nagent-facing policy and protocol"]
@@ -47,11 +46,6 @@ flowchart LR
     Run --> Infra
     Run --> Errors
 
-    Create --> Kernel
-    Create --> Workspace
-    Create --> Infra
-    Create --> Errors
-
     Observe --> Hooks
     Observe --> Agents
     Observe --> Run
@@ -69,7 +63,6 @@ flowchart LR
     Setup --> Errors
 
     Hooks --> Run
-    Hooks --> Create
     Hooks --> Agents
     Hooks --> Kernel
     Hooks --> Workspace
@@ -88,7 +81,6 @@ flowchart LR
 | `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `src/run/`       | retired suite execution; no CLI command reaches it and it is being removed         |
-| `src/create/`    | retired suite authoring; no CLI command reaches it and it is being removed         |
 | `src/observe/`   | live session inspection, doctor diagnostics, classifiers, dump/scan/watch flows, and fix routing for improving skills and suites |
 | `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
@@ -109,7 +101,7 @@ These are real roots in the repo, but they are not part of the main public domai
 
 The current `src/lib.rs` surface is:
 
-- public: `agents`, `app`, `create`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `session`, `setup`, `workspace`
+- public: `agents`, `app`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `session`, `setup`, `workspace`
 - crate-internal: `manifests`, `suite_defaults`
 - test-only: `codec`
 
@@ -158,14 +150,12 @@ flowchart TD
     Agents["agents\nshared project agent ledger,\nsession registry, runtime adapters"]
     Session["session\norchestration state, work items,\nrole permissions"]
     Run["run\nrunner state, metadata, reports"]
-    Create["create\nsuite:create state"]
     Observe["observe\nobserver state"]
     Setup["setup\nsession and bootstrap state"]
     Hooks["hooks\nnormalized hook context"]
 
     Workspace --> Agents
     Workspace --> Run
-    Workspace --> Create
     Workspace --> Observe
     Workspace --> Setup
     Workspace --> Hooks
@@ -206,7 +196,7 @@ That keeps host wrappers thin. They translate local hook payloads, but harness o
 - `workspace` owns path resolution and ambient harness files, not cross-agent workflow state.
 - `infra` stays generic and must not depend on product domains.
 - `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or durable shared state. It reads `run`, `agents`, and `hooks` types for cluster provisioning and session coordination.
-- `hooks` normalizes and enforces policy. It reads `run` workflow state, `create` workflow state, and `agents` services to make guard decisions and record events. It should feed shared state through `agents`, not own separate durable copies.
+- `hooks` normalizes and enforces policy. It reads `run` workflow state and `agents` services to make guard decisions and record events. It should feed shared state through `agents`, not own separate durable copies.
 - `observe` is the live inspection and improvement loop for skills and suites. It reads the shared harness ledger through `agents` storage and checks run pointers from `run`. It falls back to legacy host transcript storage for compatibility. The classifier pipeline is extended with coordination checks for multi-agent sessions.
 - `session` owns multi-agent orchestration: session lifecycle, role-based permissions, work items, and cross-agent observation. It delegates log scanning to `observe` classifiers and runtime discovery to `agents/runtime`. It must not bypass the existing observation pipeline.
 - Shared pure concepts belong in `kernel`. Shared path/state discovery belongs in `workspace`. Shared durable multi-agent state belongs in `agents`. Orchestration state (sessions, roles, tasks) belongs in `session`.

@@ -6,7 +6,6 @@ pub mod agents;
 pub mod app;
 #[cfg(test)]
 mod codec;
-pub mod create;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod daemon;
 // Deliberate public API facade, not scaffolding: `harness::errors`,

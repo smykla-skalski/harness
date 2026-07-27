@@ -3,38 +3,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::path::{Path, PathBuf};
 
-/// Input payload for the session-start hook.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SessionStartHookInput {
-    #[serde(default)]
-    pub source: String,
-    #[serde(default)]
-    pub session_id: String,
-    #[serde(default)]
-    pub transcript_path: Option<String>,
-    #[serde(default)]
-    pub cwd: String,
-    #[serde(default)]
-    pub raw_keys: Vec<String>,
-}
-
-/// Input payload for the pre-compact hook.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PreCompactHookInput {
-    #[serde(default)]
-    pub trigger: String,
-    #[serde(default)]
-    pub custom_instructions: Option<String>,
-    #[serde(default)]
-    pub session_id: String,
-    #[serde(default)]
-    pub transcript_path: Option<String>,
-    #[serde(default)]
-    pub cwd: String,
-    #[serde(default)]
-    pub raw_keys: Vec<String>,
-}
-
 /// Output payload for the session-start hook.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

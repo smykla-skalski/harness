@@ -48,42 +48,6 @@ fn hooks_application_context_root_stays_prod_only() {
 }
 
 #[test]
-fn create_workflow_root_stays_focused_on_runtime_state() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workflow = fs::read_to_string(root.join("src/create/workflow.rs")).unwrap();
-
-    for needle in [
-        "struct StoredCreateWorkflowData",
-        "struct StoredCreateWorkflowState",
-        "fn to_stored(&self)",
-        "fn from_stored(",
-        "fn serialize<S>(",
-        "fn deserialize<D>(",
-        "pub fn create_state_path()",
-        "pub fn read_create_state()",
-        "pub fn write_create_state(",
-        "pub fn can_write(",
-        "pub fn can_request_gate(",
-        "pub enum CreateNextAction",
-        "pub fn next_action(",
-    ] {
-        assert!(
-            !workflow.contains(needle),
-            "src/create/workflow.rs should stay focused on runtime state and gating instead of owning `{needle}`"
-        );
-    }
-
-    assert!(
-        root.join("src/create/workflow/storage.rs").exists(),
-        "create workflow storage split module should exist"
-    );
-    assert!(
-        root.join("src/create/workflow/policy.rs").exists(),
-        "create workflow policy split module should exist"
-    );
-}
-
-#[test]
 fn hook_protocol_roots_stay_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 

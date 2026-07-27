@@ -1,8 +1,5 @@
 use clap::{Args, Subcommand};
 
-use harness_kernel::kernel::skills::SKILL_NAMES;
-
-use super::adapters::HookAgent;
 use super::catalog::{TOOL_GUARD_HOOK, TOOL_RESULT_HOOK};
 use super::registry::Hook;
 
@@ -69,18 +66,4 @@ impl HookCommand {
             _ => None,
         }
     }
-}
-
-/// Arguments for `harness-hook`.
-#[derive(Debug, Clone, Args)]
-pub struct HookArgs {
-    /// Hook transport/agent protocol.
-    #[arg(long, value_enum, default_value_t = HookAgent::Claude)]
-    pub agent: HookAgent,
-    /// Skill name (suite:run or suite:create).
-    #[arg(value_parser = clap::builder::PossibleValuesParser::new(SKILL_NAMES))]
-    pub skill: String,
-    /// Hook to run.
-    #[command(subcommand)]
-    pub hook: HookCommand,
 }

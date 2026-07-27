@@ -48,7 +48,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - **Fix safety**: auto_fix_guarded
 - **Owner**: harness
 - **Root cause**: workflow or state machine in wrong state
-- **Fix target**: owning workflow under `src/run/`, `src/create/`, `src/hooks/`
+- **Fix target**: owning workflow under `src/run/`, `src/hooks/`
 - **Validation**: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### naming_error
@@ -72,7 +72,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - **Fix safety**: triage_required
 - **Owner**: harness or product
 - **Root cause**: stale state, corrupted payloads, missing artifacts
-- **Fix target**: `src/run/`, `src/create/`, `src/workspace/`, `src/observe/`
+- **Fix target**: `src/run/`, `src/workspace/`, `src/observe/`
 - **Validation**: rerun affected flow plus repo gates
 
 ### subagent_issue
@@ -134,6 +134,6 @@ TMPDIR=/tmp mise run test
 
 **Build failure**: fix Rust code, then run repo gates.
 
-**Stale state**: check owning state store under `src/run/`, `src/create/`, `src/workspace/`, `src/observe/`.
+**Stale state**: check owning state store under `src/run/`, `src/workspace/`, `src/observe/`.
 
 **Old names or old paths**: search for stale subcommands, skill names, or storage paths and align with current harness contract.
