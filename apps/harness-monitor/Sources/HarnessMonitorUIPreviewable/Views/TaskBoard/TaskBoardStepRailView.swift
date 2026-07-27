@@ -56,7 +56,7 @@ struct TaskBoardStepRailView: View {
   var body: some View {
     TaskBoardSection(title: "Manual Steps") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        TaskBoardStepRailTargetView(item: activeItem, isPicked: stepFlow.hasPicked)
+        TaskBoardStepRailTargetView(item: activeItem, isPicked: hasPickedActiveItem)
         Divider()
         stageSplit
         Divider()

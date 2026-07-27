@@ -41,6 +41,15 @@ extension TaskBoardStepRailView {
     return item.id == pickedItemID ? stepRailState.restoredPickedPrompt : nil
   }
 
+  /// The one answer to "this flow has a pick". Both the stage and the panel
+  /// heading read it, so a restored pick can never offer Deliver under a
+  /// heading that still calls the item an untouched target.
+  var hasPickedActiveItem: Bool {
+    if stepFlow.hasPicked { return true }
+    guard let pickedItemID, let activeItemID = activeItem?.id else { return false }
+    return pickedItemID == activeItemID
+  }
+
   var deliveryItemID: String? {
     stepFlow.deliveryItemID(
       pickedItemID: pickedItemID,
@@ -53,7 +62,7 @@ extension TaskBoardStepRailView {
       for: TaskBoardStepStageInputs(
         item: activeItem,
         latestRecord: stepFlow.latestRecord,
-        hasPicked: stepFlow.hasPicked || (pickedItemID != nil && pickedItemID == activeItem?.id),
+        hasPicked: hasPickedActiveItem,
         hasDelivered: stepRailState.delivery != nil,
         canDeliver: deliveryItemID != nil
       )

@@ -123,6 +123,9 @@ final class TaskBoardStepFlowPersistenceTests {
     #expect(view.stagePlan.stage == .readyToDeliver)
     #expect(view.stagePlan.primaryAction == .deliver)
     #expect(view.activePrompt == "durable prompt")
+    // The heading reads the same signal, so it cannot call a picked item an
+    // untouched target.
+    #expect(view.hasPickedActiveItem)
   }
 
   @Test("A flow the user already started outranks the stored one")
