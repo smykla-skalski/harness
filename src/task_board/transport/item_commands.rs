@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use harness_daemon_client::DaemonClient;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::infra::io;
 use crate::task_board::TASK_BOARD_LIST_MAX_LIMIT;
 use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
@@ -136,6 +137,7 @@ impl Execute for TaskBoardGetArgs {
 
 impl Execute for TaskBoardUpdateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.id)?;
         let client = leaf_daemon_client()?;
         let current = self
             .fields
@@ -205,6 +207,7 @@ impl TaskBoardUpdateArgs {
 
 impl Execute for TaskBoardDeleteArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.id)?;
         let item: TaskBoardItem = leaf_daemon_client()?
             .delete(&item_path(&self.id))
             .map_err(|error| leaf_daemon_client_error("delete task-board item", &error))?;
@@ -231,6 +234,7 @@ impl Execute for TaskBoardAuditArgs {
 }
 
 fn get_task_board_item(client: &DaemonClient, item_id: &str) -> Result<TaskBoardItem, CliError> {
+    io::validate_safe_segment(item_id)?;
     client
         .get(&item_path(item_id), &[])
         .map_err(|error| leaf_daemon_client_error("get task-board item", &error))
@@ -392,4 +396,87 @@ fn undrained_task_board_read() -> CliError {
 
 fn item_path(item_id: &str) -> String {
     format!("/v1/task-board/items/{item_id}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_board::transport::item_args::TaskBoardItemFieldArgs;
+    use crate::task_board::transport::{
+        TaskBoardUpdateClearEstimateArgs, TaskBoardUpdateClearLinkArgs,
+        TaskBoardUpdateClearStateArgs,
+    };
+
+    fn empty_fields() -> TaskBoardItemFieldArgs {
+        TaskBoardItemFieldArgs {
+            external_ref: Vec::new(),
+            planning_summary: None,
+            approved_by: None,
+            approved_at: None,
+            workflow_execution_id: None,
+            workflow_status: None,
+            workflow_current_step_id: None,
+            workflow_attempts: None,
+            workflow_branch: None,
+            workflow_worktree: None,
+            workflow_pr_number: None,
+            workflow_pr_url: None,
+            workflow_last_error: None,
+            workflow_policy_trace_id: Vec::new(),
+            session_id: None,
+            work_item_id: None,
+            estimated_tokens: None,
+            estimated_cost_microusd: None,
+        }
+    }
+
+    /// A daemon route path is one URL segment per `{item_id}` placeholder; an
+    /// id smuggling a path separator or `..` would target a different route
+    /// than the one asked for, since neither `item_path` nor the leaf client
+    /// URL-encodes it.
+    #[test]
+    fn delete_rejects_an_id_that_would_escape_its_path_segment() {
+        let error = TaskBoardDeleteArgs {
+            id: "../orchestrator/stop".to_string(),
+        }
+        .execute(&AppContext)
+        .expect_err("an id with a path separator must be rejected before any request is sent");
+        assert!(error.to_string().contains("../orchestrator/stop"));
+    }
+
+    #[test]
+    fn update_rejects_an_id_that_would_escape_its_path_segment() {
+        let error = TaskBoardUpdateArgs {
+            id: "foo/../bar".to_string(),
+            title: None,
+            body: None,
+            status: None,
+            priority: None,
+            agent_mode: None,
+            kind: None,
+            tag: Vec::new(),
+            project_id: None,
+            target_project_type: Vec::new(),
+            parent_id: None,
+            fields: empty_fields(),
+            clear_links: TaskBoardUpdateClearLinkArgs {
+                clear_project: false,
+                clear_session: false,
+                clear_work_item: false,
+                clear_parent: false,
+            },
+            clear_estimates: TaskBoardUpdateClearEstimateArgs {
+                clear_estimated_tokens: false,
+                clear_estimated_cost_microusd: false,
+            },
+            clear_state: TaskBoardUpdateClearStateArgs {
+                clear_external_refs: false,
+                clear_planning: false,
+                clear_workflow: false,
+            },
+        }
+        .execute(&AppContext)
+        .expect_err("an id with a path separator must be rejected before any request is sent");
+        assert!(error.to_string().contains("foo/../bar"));
+    }
 }
