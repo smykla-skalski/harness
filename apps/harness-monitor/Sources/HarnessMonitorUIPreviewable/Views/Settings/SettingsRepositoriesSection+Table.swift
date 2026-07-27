@@ -20,6 +20,10 @@ struct RepositoriesMonitoredSection: View {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
+  /// Shared by the disclosure button and the header spacer above it, so the
+  /// columns stay aligned when either one moves.
+  private let disclosureColumnWidth: CGFloat = 24
+
   /// An expanded row outgrows a fixed row height, so the table only reserves
   /// space for collapsed ones and lets the expanded panels push it taller.
   /// Counted against the rows that still exist rather than against the expanded
@@ -100,7 +104,7 @@ struct RepositoriesMonitoredSection: View {
   private var repositoriesTableHeader: some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
       Color.clear
-        .frame(width: 18, height: 1)
+        .frame(width: disclosureColumnWidth, height: 1)
       Text("Owner")
         .frame(maxWidth: .infinity, alignment: .leading)
       Text("Repository")
@@ -205,7 +209,11 @@ struct RepositoriesMonitoredSection: View {
     } label: {
       Image(systemName: "chevron.right")
         .rotationEffect(.degrees(isExpanded ? 90 : 0))
-        .frame(width: 18, height: 18)
+        // The glyph is small, but the target must not be: 24pt is the macOS
+        // minimum, and the shape makes the padding around the chevron clickable
+        // rather than leaving a hole the pointer can land in.
+        .frame(width: disclosureColumnWidth, height: disclosureColumnWidth)
+        .contentShape(Rectangle())
     }
     .buttonStyle(.borderless)
     .foregroundStyle(HarnessMonitorTheme.secondaryInk)
