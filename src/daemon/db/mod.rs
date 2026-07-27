@@ -158,6 +158,7 @@ pub(crate) use task_board::{
     REMOTE_START_PREFLIGHT_FAILURE_CLASS, ReservedTaskBoardDispatch,
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
+    TaskBoardPreparationRelease,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
     TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardItemsSnapshot,
     TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,

@@ -27,10 +27,21 @@ const PREPARATION_LEASE_SECONDS: i64 = 30;
 #[path = "dispatch_preparations_helpers.rs"]
 mod helpers;
 use helpers::{
-    PreparationClaim, active_reservation, apply_preparation_to_item,
-    claim_preparation_intent_in_tx, commit_preparation, ensure_preparation_claim,
-    insert_preparation, screen_preparation_claim_in_tx, validate_reservable_item,
+    PREPARATION_MAX_ATTEMPTS, PreparationClaim, active_reservation, apply_preparation_to_item,
+    claim_preparation_intent_in_tx, claimed_attempts_in_tx, commit_preparation,
+    ensure_preparation_claim, fail_preparation_admission_in_tx, insert_preparation,
+    preparation_retry_delay_seconds, rearm_preparation_in_tx, screen_preparation_claim_in_tx,
+    validate_reservable_item,
 };
+
+/// What a release did with the preparation it was handed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TaskBoardPreparationRelease {
+    /// Queued for another attempt once the wait elapses.
+    Retrying { delay_seconds: i64 },
+    /// Retired after spending its budget; the item is dispatchable again.
+    GaveUp { attempts: i64 },
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct TaskBoardDispatchPreparation {
@@ -408,32 +419,26 @@ impl AsyncDaemonDb {
         Ok(applied)
     }
 
+    /// Hands a failed preparation back to the queue, or retires it once its
+    /// retry budget is spent so the item stops being held by a dispatch that
+    /// cannot finish.
     pub(crate) async fn release_task_board_dispatch_preparation(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
         reason: &str,
-    ) -> Result<(), CliError> {
-        let changed = query(
-            "UPDATE task_board_dispatch_intents
-             SET status = 'preparing', claim_token = NULL, claimed_at = NULL,
-                 last_error = ?3, available_at = datetime('now', '+1 second'), updated_at = ?4
-             WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
-        )
-        .bind(&claim.intent_id)
-        .bind(&claim.claim_token)
-        .bind(reason)
-        .bind(utc_now())
-        .execute(self.pool())
-        .await
-        .map_err(|error| db_error(format!("release task board preparation: {error}")))?
-        .rows_affected();
-        if changed == 1 {
-            Ok(())
-        } else {
-            Err(db_error(format!(
-                "task board preparation '{}' is not claimed",
-                claim.intent_id
-            )))
+    ) -> Result<TaskBoardPreparationRelease, CliError> {
+        let mut transaction = self
+            .begin_immediate_transaction("task board dispatch preparation release")
+            .await?;
+        let attempts = claimed_attempts_in_tx(&mut transaction, claim).await?;
+        if attempts >= PREPARATION_MAX_ATTEMPTS {
+            fail_preparation_admission_in_tx(&mut transaction, &claim.intent_id, reason).await?;
+            commit_preparation(transaction, "task board preparation give-up").await?;
+            return Ok(TaskBoardPreparationRelease::GaveUp { attempts });
         }
+        let delay_seconds = preparation_retry_delay_seconds(attempts);
+        rearm_preparation_in_tx(&mut transaction, claim, reason, delay_seconds).await?;
+        commit_preparation(transaction, "task board preparation release").await?;
+        Ok(TaskBoardPreparationRelease::Retrying { delay_seconds })
     }
 }

@@ -23,6 +23,7 @@ mod admission_evidence;
 mod admission_lifecycle_tests;
 mod dispatch;
 mod dispatch_claims;
+mod dispatch_retry_budget;
 mod imports;
 mod items_parent;
 mod remote_hosts;
