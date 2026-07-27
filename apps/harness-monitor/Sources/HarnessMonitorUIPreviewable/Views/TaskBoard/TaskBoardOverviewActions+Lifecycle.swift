@@ -5,8 +5,9 @@ import SwiftUI
 extension TaskBoardOverviewActions {
   // MARK: - Item lifecycle
 
-  /// `outcome` is how the full form learns to dismiss itself. A lane's quick add
-  /// stays open on purpose, so it passes none.
+  /// Both callers pass an `outcome` and read opposite halves of it: the full
+  /// form dismisses on `succeeded`, and a lane's quick add stays open, taking
+  /// `failedTitle` to put back the text it cleared when it submitted.
   func createTaskBoardItem(
     _ request: TaskBoardCreateItemRequest,
     outcome: TaskBoardItemCreationOutcome? = nil
