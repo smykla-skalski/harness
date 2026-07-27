@@ -48,7 +48,7 @@ fn task_board_orchestrator_has_one_runner() {
     let source = std::fs::read_to_string(root.join("src/task_board/orchestrator.rs"))
         .expect("read task-board orchestrator module");
     assert!(
-        !source.contains("pub struct TaskBoardOrchestrator"),
+        !source.contains("struct TaskBoardOrchestrator"),
         "the retired file-backed orchestrator runner must not return"
     );
 }
