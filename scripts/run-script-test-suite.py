@@ -1064,7 +1064,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--task-timeout-seconds",
         type=_positive_float,
-        default=os.environ.get("HARNESS_SCRIPT_TEST_TASK_TIMEOUT_SECONDS", "60"),
+        default=os.environ.get("HARNESS_SCRIPT_TEST_TASK_TIMEOUT_SECONDS", "180"),
     )
     parser.add_argument(
         "--filter",

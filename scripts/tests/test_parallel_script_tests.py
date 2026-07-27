@@ -35,6 +35,7 @@ class ParallelScriptTestRunnerTests(unittest.TestCase):
         ):
             arguments = runner._arguments()
         self.assertIsNone(arguments.budget_seconds)
+        self.assertEqual(arguments.task_timeout_seconds, 180)
 
         with (
             patch.dict(
