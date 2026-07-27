@@ -1996,7 +1996,8 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     // Remote-routing configuration is not consumed by the initial automation
     // inspector mapping. JSONDecoder safely ignores these response keys while
     // the automation status, workflow kind, and scheduler settings ship.
-    ("TaskBoardOrchestratorSettings", "repositories"),
+    // `repositories` left this list when per-repository publication overrides
+    // shipped: the settings screen has to show what each one overrides.
     ("TaskBoardOrchestratorSettings", "execution_hosts"),
     ("TaskBoardOrchestratorSettings", "local_execution_host"),
     ("TaskBoardOrchestratorSettings", "admission_policy"),
@@ -2991,6 +2992,7 @@ const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // default fn resolves POLICY_VERSION.
 const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardOrchestratorSettings",
+    "TaskBoardRepositoryAutomationConfig",
     "TaskBoardGitHubInboxConfig",
     "TaskBoardOrchestratorTickInfo",
     "TaskBoardOrchestratorRunSummary",
@@ -3453,8 +3455,15 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output: ORCHESTRATOR_OUTPUT,
             description: "the Rust task-board orchestrator settings and status tree",
-            defaults: &[ORCHESTRATOR_TYPES_SOURCE],
-            sources: &[ORCHESTRATOR_TYPES_SOURCE, POLICY_SOURCE],
+            // The settings source is a defaults source too, not just a symbol
+            // one: the repository config's `enabled` resolves `default_true`
+            // from there.
+            defaults: &[ORCHESTRATOR_TYPES_SOURCE, TASK_BOARD_AUTOMATION_SETTINGS_SOURCE],
+            sources: &[
+                ORCHESTRATOR_TYPES_SOURCE,
+                POLICY_SOURCE,
+                TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
+            ],
         },
         GeneratedModule {
             output: TASK_BOARD_AUTOMATION_OUTPUT,

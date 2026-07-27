@@ -36,9 +36,10 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var scheduling: TaskBoardAutomationSchedulingSettings?
   public var retry: TaskBoardAutomationRetrySettings?
   public var reviewers: TaskBoardReviewerSettings?
+  public var repositories: [TaskBoardRepositoryAutomationConfig]
   public var policyVersion: String
 
-  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubAutomationSettingsWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, policyVersion: String = "task-board-policy-v1") {
+  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubAutomationSettingsWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, repositories: [TaskBoardRepositoryAutomationConfig] = [], policyVersion: String = "task-board-policy-v1") {
     self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
@@ -49,6 +50,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     self.scheduling = scheduling
     self.retry = retry
     self.reviewers = reviewers
+    self.repositories = repositories
     self.policyVersion = policyVersion
   }
 
@@ -64,6 +66,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     scheduling = try container.decodeIfPresent(TaskBoardAutomationSchedulingSettings.self, forKey: .scheduling)
     retry = try container.decodeIfPresent(TaskBoardAutomationRetrySettings.self, forKey: .retry)
     reviewers = try container.decodeIfPresent(TaskBoardReviewerSettings.self, forKey: .reviewers)
+    repositories = try container.decodeIfPresent([TaskBoardRepositoryAutomationConfig].self, forKey: .repositories) ?? []
     policyVersion = try container.decodeIfPresent(String.self, forKey: .policyVersion) ?? "task-board-policy-v1"
   }
 
@@ -78,6 +81,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     case scheduling
     case retry
     case reviewers
+    case repositories
     case policyVersion = "policy_version"
   }
 }
@@ -266,5 +270,54 @@ public struct TaskBoardWorkflowExecutionCountWire: Codable, Equatable, Sendable 
   enum CodingKeys: String, CodingKey {
     case status
     case count
+  }
+}
+
+public struct TaskBoardRepositoryAutomationConfig: Codable, Equatable, Sendable {
+  public var repository: String
+  public var enabled: Bool
+  public var workflows: [TaskBoardOrchestratorWorkflow]
+  public var preferredHostId: String?
+  public var executionCheckoutPath: String?
+  public var requestedReviewers: GitHubRequestedReviewersWire?
+  public var protectedPaths: [ProtectedPathRuleWire]?
+  public var labels: GitHubAutomationLabelsWire?
+  public var enabledAutomations: GitHubAutomationTogglesWire?
+
+  public init(repository: String, enabled: Bool = true, workflows: [TaskBoardOrchestratorWorkflow] = [], preferredHostId: String? = nil, executionCheckoutPath: String? = nil, requestedReviewers: GitHubRequestedReviewersWire? = nil, protectedPaths: [ProtectedPathRuleWire]? = nil, labels: GitHubAutomationLabelsWire? = nil, enabledAutomations: GitHubAutomationTogglesWire? = nil) {
+    self.repository = repository
+    self.enabled = enabled
+    self.workflows = workflows
+    self.preferredHostId = preferredHostId
+    self.executionCheckoutPath = executionCheckoutPath
+    self.requestedReviewers = requestedReviewers
+    self.protectedPaths = protectedPaths
+    self.labels = labels
+    self.enabledAutomations = enabledAutomations
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    repository = try container.decode(String.self, forKey: .repository)
+    enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+    workflows = try container.decodeIfPresent([TaskBoardOrchestratorWorkflow].self, forKey: .workflows) ?? []
+    preferredHostId = try container.decodeIfPresent(String.self, forKey: .preferredHostId)
+    executionCheckoutPath = try container.decodeIfPresent(String.self, forKey: .executionCheckoutPath)
+    requestedReviewers = try container.decodeIfPresent(GitHubRequestedReviewersWire.self, forKey: .requestedReviewers)
+    protectedPaths = try container.decodeIfPresent([ProtectedPathRuleWire].self, forKey: .protectedPaths)
+    labels = try container.decodeIfPresent(GitHubAutomationLabelsWire.self, forKey: .labels)
+    enabledAutomations = try container.decodeIfPresent(GitHubAutomationTogglesWire.self, forKey: .enabledAutomations)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case repository
+    case enabled
+    case workflows
+    case preferredHostId = "preferred_host_id"
+    case executionCheckoutPath = "execution_checkout_path"
+    case requestedReviewers = "requested_reviewers"
+    case protectedPaths = "protected_paths"
+    case labels
+    case enabledAutomations = "enabled_automations"
   }
 }
