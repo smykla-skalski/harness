@@ -118,23 +118,24 @@ scenario_dev_lanes_follow_their_worktree() {
   reset_tmp_root
   local repo="$TEST_TMP_ROOT/repo"
   local live_worktree="$TEST_TMP_ROOT/live"
-  local output="" live_seg orphan_seg
+  local output="" live_seg orphan_seg main_seg
 
   make_repo "$repo"
   git -C "$repo" worktree add -b live "$live_worktree" >/dev/null
   live_seg="$(dev_segment_for_path "$(cd "$live_worktree" && pwd -P)")"
-  orphan_seg="wt-long-gone-0123456789abcdef"
+  main_seg="$(cargo_lane_main_segment)"
+  orphan_seg="wt-long-gone-0123456789abcdef-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
 
-  mkdir -p "$repo/target/dev/local/debug" \
+  mkdir -p "$repo/target/dev/$main_seg/debug" \
     "$repo/target/dev/$live_seg/debug" \
     "$repo/target/dev/$orphan_seg/debug"
-  echo x > "$repo/target/dev/local/debug/a"
+  echo x > "$repo/target/dev/$main_seg/debug/a"
   echo x > "$repo/target/dev/$live_seg/debug/a"
   echo x > "$repo/target/dev/$orphan_seg/debug/a"
 
   output="$(run_cleanup "$live_worktree" "$repo" --dry-run)"
 
-  assert_contains "$output" "keep (main   ) local"
+  assert_contains "$output" "keep (main   ) $main_seg"
   assert_contains "$output" "$live_seg"
   assert_contains "$output" "drop (dry-run) $orphan_seg"
   assert_exists "$repo/target/dev/$orphan_seg"
@@ -142,7 +143,7 @@ scenario_dev_lanes_follow_their_worktree() {
   output="$(run_cleanup "$live_worktree" "$repo")"
   assert_absent "$repo/target/dev/$orphan_seg"
   assert_exists "$repo/target/dev/$live_seg"
-  assert_exists "$repo/target/dev/local"
+  assert_exists "$repo/target/dev/$main_seg"
   pass
 }
 
@@ -150,7 +151,7 @@ scenario_leased_dev_lane_survives_even_when_orphaned() {
   start_test "a cargo lane with a live build lease is kept even with no worktree left"
   reset_tmp_root
   local repo="$TEST_TMP_ROOT/repo"
-  local seg="wt-leased-fedcba9876543210"
+  local seg="wt-leased-fedcba9876543210-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
   local holder_pid=""
 
   make_repo "$repo"
@@ -177,8 +178,8 @@ scenario_corrupt_lease_does_not_pin_a_lane() {
   start_test "a lease holding 0 or junk is corrupt, not a live build"
   reset_tmp_root
   local repo="$TEST_TMP_ROOT/repo"
-  local zero_seg="wt-zero-00000000000000aa"
-  local junk_seg="wt-junk-00000000000000bb"
+  local zero_seg="wt-zero-00000000000000aa-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+  local junk_seg="wt-junk-00000000000000bb-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
 
   make_repo "$repo"
   mkdir -p "$repo/target/dev/$zero_seg" "$repo/target/dev/$junk_seg" \
@@ -203,7 +204,7 @@ scenario_dev_segment_derivation_matches_cargo_local() {
     "$ROOT/scripts/cargo-local.sh" --print-target-dir)")"
   derived="$(dev_segment_for_path "$(cd "$ROOT" && pwd -P)")"
 
-  if [[ "$printed" == "local" ]]; then
+  if [[ "$printed" == "$(cargo_lane_main_segment)" ]]; then
     pass
     return 0
   fi

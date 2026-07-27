@@ -2,11 +2,15 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/cargo-lane.sh
+source "$ROOT/scripts/lib/cargo-lane.sh"
 SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/rust-build-cache-canary.XXXXXX")"
 PROJECT_A="$SANDBOX/projects/a"
 PROJECT_B="$SANDBOX/projects/b"
-TARGET_A="$SANDBOX/target/dev/wt-canary-a"
-TARGET_B="$SANDBOX/target/dev/wt-canary-b"
+SEGMENT_A="wt-canary-a-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+SEGMENT_B="wt-canary-b-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+TARGET_A="$SANDBOX/target/dev/$SEGMENT_A"
+TARGET_B="$SANDBOX/target/dev/$SEGMENT_B"
 CARGO_HOME_CANARY="$SANDBOX/cargo-home"
 CARGO_BIN="${HARNESS_CARGO_BIN:-cargo}"
 
@@ -89,13 +93,15 @@ set +e
 python3 "$ROOT/scripts/seed-rust-build-lane.py" \
   --repo-root "$SANDBOX" \
   --target-dir "$TARGET_B" \
-  --target-segment wt-canary-b \
+  --target-segment "$SEGMENT_B" \
+  --lane-format-version "$HARNESS_CARGO_LANE_FORMAT_VERSION" \
   --require-seed &
 first_seed_pid=$!
 python3 "$ROOT/scripts/seed-rust-build-lane.py" \
   --repo-root "$SANDBOX" \
   --target-dir "$TARGET_B" \
-  --target-segment wt-canary-b \
+  --target-segment "$SEGMENT_B" \
+  --lane-format-version "$HARNESS_CARGO_LANE_FORMAT_VERSION" \
   --require-seed &
 second_seed_pid=$!
 wait "$first_seed_pid"

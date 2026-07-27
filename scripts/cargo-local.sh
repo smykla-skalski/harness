@@ -9,6 +9,8 @@ ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)"
 source "$ROOT/scripts/lib/run-step.sh"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$ROOT/scripts/lib/common-repo-root.sh"
+# shellcheck source=scripts/lib/cargo-lane.sh
+source "$ROOT/scripts/lib/cargo-lane.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 lease_dir="$COMMON_REPO_ROOT/target/.cargo-local/leases"
 lease_path=""
@@ -664,9 +666,9 @@ session_id="$(first_nonempty_env \
 # target directory would turn concurrent branches into invalidation churn.
 # register_build_lease keys the lease file the same way, so cache cleanup can
 # match target/dev/<segment> directly without reconstructing a session id.
-target_segment="local"
+target_segment="$(cargo_lane_main_segment)"
 if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
-  target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
+  target_segment="$(cargo_lane_segment_for_path "$ROOT")"
 fi
 target_dir_is_default=0
 if [[ -z "${CARGO_TARGET_DIR:-}" ]] && [[ -z "${HARNESS_CARGO_TARGET_DIR:-}" ]]; then
@@ -680,6 +682,56 @@ target_dir="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/ta
 if [[ "${1:-}" == "--print-target-dir" ]]; then
   printf '%s\n' "$target_dir"
   exit 0
+fi
+
+# The lease below measures host-wide concurrency; this lock answers a different
+# question: whether another Cargo process can mutate this exact target directory
+# at the same time. A tiny supervisor holds the fcntl lock while this command
+# runs, forwards termination signals, and releases when the command ends. Stale
+# metadata never blocks a lane, and background compiler-cache daemons never
+# inherit the descriptor.
+if [[ "${1:-}" != "--print-env" ]]; then
+  # The override lets the socket-probe regression test put a broken python3 on
+  # PATH without disabling lane exclusion for the fake Cargo command.
+  lane_lock_python="${HARNESS_CARGO_LANE_LOCK_PYTHON:-python3}"
+  lane_lock_helper="$ROOT/scripts/cargo-lane-lock.py"
+  if [[ ! -f "$lane_lock_helper" ]]; then
+    printf 'cargo-local: build-lane lock helper is missing: %s\n' "$lane_lock_helper" >&2
+    exit 70
+  fi
+  report_lane_lock_python_requirement() {
+    {
+      printf 'cargo-local: a working Python 3 interpreter is required for exclusive Cargo build lanes\n'
+      printf '  interpreter: %s\n' "$lane_lock_python"
+      printf '  fix: run xcode-select --install or set HARNESS_CARGO_LANE_LOCK_PYTHON to a working Python 3 executable\n'
+    } >&2
+  }
+  if ! command -v "$lane_lock_python" >/dev/null 2>&1; then
+    report_lane_lock_python_requirement
+    exit 70
+  fi
+  lane_lock_target="$(
+    "$lane_lock_python" -c 'import os, sys; print(os.path.realpath(os.path.abspath(sys.argv[1])))' \
+      "$target_dir"
+  )" || {
+    report_lane_lock_python_requirement
+    exit 70
+  }
+  lane_lock_key="$(short_hash "$lane_lock_target")"
+  lane_lock_is_held=0
+  lane_lock_supervisor_pid="${HARNESS_CARGO_LANE_LOCK_SUPERVISOR_PID:-}"
+  if [[ "${HARNESS_CARGO_LANE_LOCK_KEY:-}" == "$lane_lock_key" ]] \
+    && [[ "$lane_lock_supervisor_pid" =~ ^[1-9][0-9]*$ ]] \
+    && cargo_lane_pid_is_alive "$lane_lock_supervisor_pid"; then
+    lane_lock_is_held=1
+  fi
+  if (( ! lane_lock_is_held )); then
+    exec "$lane_lock_python" "$lane_lock_helper" \
+      --lock-root "$COMMON_REPO_ROOT/target/.cargo-local/lane-locks" \
+      --lock-key "$lane_lock_key" \
+      --target-dir "$target_dir" \
+      -- "$0" "$@"
+  fi
 fi
 
 if [[ "$skip_build_lease" == "1" ]]; then
@@ -741,6 +793,7 @@ fi
 
 if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
+  printf 'CARGO_LANE_FORMAT_VERSION=%s\n' "$HARNESS_CARGO_LANE_FORMAT_VERSION"
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
   printf 'NEXTEST_TEST_THREADS=%s\n' "$NEXTEST_TEST_THREADS"
   printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
@@ -800,7 +853,8 @@ seed_fresh_build_lane() {
   if ! python3 "$ROOT/scripts/seed-rust-build-lane.py" \
     --repo-root "$COMMON_REPO_ROOT" \
     --target-dir "$target_dir" \
-    --target-segment "$target_segment"; then
+    --target-segment "$target_segment" \
+    --lane-format-version "$HARNESS_CARGO_LANE_FORMAT_VERSION"; then
     printf 'cargo-local: lane seeding failed safely; starting cold\n' >&2
   fi
 }

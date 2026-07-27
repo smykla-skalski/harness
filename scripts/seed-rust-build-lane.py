@@ -23,7 +23,7 @@ RESULT_FAILED = "failed"
 
 EXIT_UNSUPPORTED = 3
 EXIT_NO_DONOR = 4
-SEGMENT_PATTERN = re.compile(r"^(?:local|wt-[A-Za-z0-9._-]+)$")
+SEGMENT_PATTERN = re.compile(r"^(?:local|wt-[A-Za-z0-9._-]+)-v[1-9][0-9]*$")
 HEARTBEAT_SECONDS = 10
 
 Log = Callable[[str], None]
@@ -67,11 +67,23 @@ def has_live_lease(lease_dir: Path, segment: str) -> bool:
     return False
 
 
-def donor_from_path(path: Path, lease_dir: Path) -> Donor | None:
+def segment_matches_format(segment: str, lane_format_version: int) -> bool:
+    return bool(
+        lane_format_version > 0
+        and SEGMENT_PATTERN.fullmatch(segment)
+        and segment.endswith(f"-v{lane_format_version}")
+    )
+
+
+def donor_from_path(
+    path: Path,
+    lease_dir: Path,
+    lane_format_version: int,
+) -> Donor | None:
     if (
         path.is_symlink()
         or not path.is_dir()
-        or not SEGMENT_PATTERN.fullmatch(path.name)
+        or not segment_matches_format(path.name, lane_format_version)
         or has_live_lease(lease_dir, path.name)
     ):
         return None
@@ -108,7 +120,12 @@ def donor_from_path(path: Path, lease_dir: Path) -> Donor | None:
     )
 
 
-def find_donors(target_base: Path, target: Path, lease_dir: Path) -> list[Donor]:
+def find_donors(
+    target_base: Path,
+    target: Path,
+    lease_dir: Path,
+    lane_format_version: int,
+) -> list[Donor]:
     donors: list[Donor] = []
     try:
         children = target_base.iterdir()
@@ -118,7 +135,7 @@ def find_donors(target_base: Path, target: Path, lease_dir: Path) -> list[Donor]
     for child in children:
         if child == target:
             continue
-        donor = donor_from_path(child, lease_dir)
+        donor = donor_from_path(child, lease_dir, lane_format_version)
         if donor is not None:
             donors.append(donor)
 
@@ -197,9 +214,13 @@ def validate_layout(
     repo_root_arg: Path,
     target_arg: Path,
     target_segment: str,
+    lane_format_version: int,
 ) -> tuple[Path, Path, Path]:
-    if not SEGMENT_PATTERN.fullmatch(target_segment):
-        raise ValueError(f"invalid target segment: {target_segment}")
+    if not segment_matches_format(target_segment, lane_format_version):
+        raise ValueError(
+            f"target segment {target_segment!r} does not use "
+            f"lane format version {lane_format_version}"
+        )
 
     repo_root = repo_root_arg.expanduser().resolve(strict=True)
     target_root = repo_root / "target"
@@ -292,6 +313,7 @@ def seed_lane(
     repo_root: Path,
     target: Path,
     target_segment: str,
+    lane_format_version: int,
     *,
     clone: Clone = clone_debug_tree,
     log: Log = lambda message: print(message, file=sys.stderr, flush=True),
@@ -300,6 +322,7 @@ def seed_lane(
         repo_root,
         target,
         target_segment,
+        lane_format_version,
     )
     seed_lock_path = (
         repo_root.resolve(strict=True)
@@ -314,7 +337,12 @@ def seed_lane(
         if target.exists():
             return RESULT_EXISTS
 
-        for donor in find_donors(target_base, target, lease_dir):
+        for donor in find_donors(
+            target_base,
+            target,
+            lease_dir,
+            lane_format_version,
+        ):
             donor_lock = acquire_lock(donor.lock_path, wait=False, log=log)
             if donor_lock is None:
                 continue
@@ -355,6 +383,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", required=True, type=Path)
     parser.add_argument("--target-dir", required=True, type=Path)
     parser.add_argument("--target-segment", required=True)
+    parser.add_argument("--lane-format-version", required=True, type=int)
     parser.add_argument(
         "--require-seed",
         action="store_true",
@@ -370,6 +399,7 @@ def main() -> int:
             args.repo_root,
             args.target_dir,
             args.target_segment,
+            args.lane_format_version,
         )
     except (OSError, ValueError) as error:
         print(f"cargo-local: invalid build-lane seed request: {error}", file=sys.stderr)

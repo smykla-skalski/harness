@@ -9,10 +9,18 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   exit 1
 fi
 
-# Mirrors cargo-local.sh's target_segment for a linked worktree. The caller owns
-# the main-checkout case, which cargo-local.sh names "local". Both fall back the
-# same way, because a host without shasum still has to name the same directory
-# the build wrote to. A test pins this against `cargo-local.sh
+# Any change that makes an old Cargo target unsafe or misleading as a seed must
+# increment this value. The version belongs in every segment name so a fresh
+# lane can only clone artifacts produced under the same cache contract.
+HARNESS_CARGO_LANE_FORMAT_VERSION=2
+
+cargo_lane_main_segment() {
+  printf 'local-v%s\n' "$HARNESS_CARGO_LANE_FORMAT_VERSION"
+}
+
+# Mirrors cargo-local.sh's target_segment for a linked worktree. Both fall back
+# the same way, because a host without shasum still has to name the same
+# directory the build wrote to. A test pins this against `cargo-local.sh
 # --print-target-dir`, since a derivation that drifts stops matching live lanes
 # and starts reclaiming them out from under their worktree.
 cargo_lane_segment_for_path() {
@@ -27,7 +35,8 @@ cargo_lane_segment_for_path() {
   else
     digest="$(printf '%s' "$path" | tr -cs '[:alnum:]._-' '-')"
   fi
-  printf 'wt-%s-%s\n' "$name" "${digest:0:16}"
+  printf 'wt-%s-%s-v%s\n' \
+    "$name" "${digest:0:16}" "$HARNESS_CARGO_LANE_FORMAT_VERSION"
 }
 
 # kill -0 fails both when a PID is gone and when it belongs to another user we

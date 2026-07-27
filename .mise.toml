@@ -38,7 +38,7 @@ description = "Preview clean:launch-services: report stale Harness Monitor Launc
 run = "./scripts/clean-stale-launch-services.sh --dry-run"
 
 [tasks."clean:caches"]
-description = "Reclaim disk by removing repo Rust targets, daemon Cargo target, Xcode derived roots, SwiftPM .build dirs, repo tmp, and global build caches; keeps target/dev/local and target/dev/wt-* segments with a live cargo-local.sh lease (pass --dry-run, --aggressive, or --force/-f to also remove ms-playwright cache after --)"
+description = "Reclaim disk by removing repo Rust targets, daemon Cargo target, Xcode derived roots, SwiftPM .build dirs, repo tmp, and global build caches; keeps versioned target/dev lanes with a live cargo-local.sh lease (pass --dry-run, --aggressive, or --force/-f to also remove ms-playwright cache after --)"
 run = "./scripts/clean-build-caches.sh"
 
 [tasks."clean:lanes"]
@@ -151,6 +151,10 @@ run = "./scripts/check-scripts.sh --lint"
 description = "Run repo-local helper script regression tests"
 run = "HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 ./scripts/check-scripts.sh --tests"
 
+[tasks."test:scripts:cargo-local"]
+description = "Run cargo-local lane isolation and cache regression tests"
+run = "./scripts/tests/test-cargo-local.sh"
+
 [tasks."test:scripts:release-install"]
 description = "Run the release build coordinator and atomic installer shell tests"
 run = "./scripts/tests/test-release-install.sh"
@@ -167,9 +171,14 @@ run = "./scripts/run-unit-tests.sh"
 description = "Run one root Harness unit-test process with native libtest for fast iteration (e.g. -- dispatch_retry_budget, or -- full::test::name -- --exact)"
 run = "./scripts/cargo-local.sh test -p harness --lib --features full-runtime"
 
+[tasks."test:architecture"]
+description = "Run dependency-light Task Board architecture checks with native libtest (e.g. -- task_board_storage::task_board_orchestrator_has_one_runner -- --exact)"
+run = "./scripts/cargo-local.sh test -p harness-architecture-tests --lib"
+
 [tasks."test:integration"]
-description = "Run fast integration tests in parallel with process isolation"
+description = "Run source-tree contracts plus runtime integration tests with process isolation"
 run = [
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-architecture-tests --lib",
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --test integration_daemon --features full-runtime",
@@ -352,7 +361,7 @@ run = "./scripts/cargo-local.sh --with-group-lease ./scripts/check-feature-isola
 hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-kernel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-kernel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

@@ -5,6 +5,8 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/clean-build-caches.sh"
+# shellcheck source=scripts/lib/cargo-lane.sh
+source "$ROOT/scripts/lib/cargo-lane.sh"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -106,7 +108,7 @@ unused_pid() {
 }
 
 # Builds a fixture repo whose target/ mirrors the shared cargo-local.sh
-# layout: target/dev/local (the main checkout, a genuinely running
+# layout: the versioned main-checkout segment (a genuinely running
 # background process holds its lease), a linked-worktree segment with a live
 # lease, one with a dead lease (PID has already exited), one with no lease
 # file at all, a stray top-level entry directly under target/ that predates
@@ -114,24 +116,29 @@ unused_pid() {
 # segment directory), and an empty fake-home/ the caller can point HOME at
 # so the script's global-cache section doesn't size the real
 # $HOME/Library/Caches/*. Worktree segment and lease keys reuse
-# cargo-local.sh's real wt-<worktree>-<hash> shape so the fixture exercises
+# cargo-local.sh's real wt-<worktree>-<hash>-v<format> shape so the fixture exercises
 # dashes and digits in the match, not just plain words.
 make_shared_target_fixture() {
   local repo="$1"
+  local main_seg live_seg dead_seg nolease_seg
+  main_seg="$(cargo_lane_main_segment)"
+  live_seg="wt-live-0e4eb0f4-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+  dead_seg="wt-dead-1a2b3c4d-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+  nolease_seg="wt-nolease-3f4e5d6c-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
   mkdir -p "$repo/scripts/lib"
   mkdir -p "$repo/fake-home"
   cp "$SCRIPT" "$repo/scripts/clean-build-caches.sh"
   cp "$ROOT/scripts/lib/common-repo-root.sh" "$repo/scripts/lib/common-repo-root.sh"
   cp "$ROOT/scripts/lib/cargo-lane.sh" "$repo/scripts/lib/cargo-lane.sh"
 
-  mkdir -p "$repo/target/dev/local/debug"
-  mkdir -p "$repo/target/dev/wt-live-0e4eb0f4/debug"
-  mkdir -p "$repo/target/dev/wt-dead-1a2b3c4d/debug"
-  mkdir -p "$repo/target/dev/wt-nolease-3f4e5d6c/debug"
-  echo "obj" > "$repo/target/dev/local/debug/harness"
-  echo "obj" > "$repo/target/dev/wt-live-0e4eb0f4/debug/harness"
-  echo "obj" > "$repo/target/dev/wt-dead-1a2b3c4d/debug/harness"
-  echo "obj" > "$repo/target/dev/wt-nolease-3f4e5d6c/debug/harness"
+  mkdir -p "$repo/target/dev/$main_seg/debug"
+  mkdir -p "$repo/target/dev/$live_seg/debug"
+  mkdir -p "$repo/target/dev/$dead_seg/debug"
+  mkdir -p "$repo/target/dev/$nolease_seg/debug"
+  echo "obj" > "$repo/target/dev/$main_seg/debug/harness"
+  echo "obj" > "$repo/target/dev/$live_seg/debug/harness"
+  echo "obj" > "$repo/target/dev/$dead_seg/debug/harness"
+  echo "obj" > "$repo/target/dev/$nolease_seg/debug/harness"
   echo "stray" > "$repo/target/stray-legacy-artifact"
   echo "stray" > "$repo/target/dev/.rustc_info.json"
 
@@ -140,36 +147,40 @@ make_shared_target_fixture() {
   sleep 300 &
   local_pid=$!
   LIVE_LEASE_PIDS+=("$local_pid")
-  printf '%s\n' "$local_pid" > "$repo/target/.cargo-local/leases/local-$local_pid"
+  printf '%s\n' "$local_pid" > "$repo/target/.cargo-local/leases/$main_seg-$local_pid"
 
   local wt_live_pid
   sleep 300 &
   wt_live_pid=$!
   LIVE_LEASE_PIDS+=("$wt_live_pid")
   printf '%s\n' "$wt_live_pid" \
-    > "$repo/target/.cargo-local/leases/wt-live-0e4eb0f4-$wt_live_pid"
+    > "$repo/target/.cargo-local/leases/$live_seg-$wt_live_pid"
 
   local dead_pid
   dead_pid="$(unused_pid)"
   printf '%s\n' "$dead_pid" \
-    > "$repo/target/.cargo-local/leases/wt-dead-1a2b3c4d-$dead_pid"
+    > "$repo/target/.cargo-local/leases/$dead_seg-$dead_pid"
 }
 
 scenario_dry_run_keeps_leased_segment() {
   start_test "dry-run keeps a segment with a live cargo-local.sh lease"
   reset_tmp_root
   local repo="$TEST_TMP_ROOT/repo"
-  local output=""
+  local output="" main_seg live_seg dead_seg nolease_seg
+  main_seg="$(cargo_lane_main_segment)"
+  live_seg="wt-live-0e4eb0f4-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+  dead_seg="wt-dead-1a2b3c4d-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
+  nolease_seg="wt-nolease-3f4e5d6c-v$HARNESS_CARGO_LANE_FORMAT_VERSION"
 
   make_shared_target_fixture "$repo"
   mkdir -p "$repo/fake-tmp"
   output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
     ./scripts/clean-build-caches.sh --dry-run)"
 
-  assert_output_line_contains "$output" "target/dev/local" "(active build, kept)"
-  assert_output_line_contains "$output" "target/dev/wt-live-0e4eb0f4" "(active build, kept)"
-  assert_output_line_contains "$output" "target/dev/wt-dead-1a2b3c4d" "(dry-run)"
-  assert_output_line_contains "$output" "target/dev/wt-nolease-3f4e5d6c" "(dry-run)"
+  assert_output_line_contains "$output" "target/dev/$main_seg" "(active build, kept)"
+  assert_output_line_contains "$output" "target/dev/$live_seg" "(active build, kept)"
+  assert_output_line_contains "$output" "target/dev/$dead_seg" "(dry-run)"
+  assert_output_line_contains "$output" "target/dev/$nolease_seg" "(dry-run)"
   assert_output_line_contains "$output" "target/stray-legacy-artifact" "(dry-run)"
   assert_output_line_contains "$output" "target/dev/.rustc_info.json" "(dry-run)"
   pass
