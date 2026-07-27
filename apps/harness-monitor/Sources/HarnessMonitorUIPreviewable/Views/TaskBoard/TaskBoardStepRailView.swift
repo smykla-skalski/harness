@@ -219,8 +219,8 @@ struct TaskBoardStepRailView: View {
       whatNext: plan.whatNext
     ) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        if plan.stage == .readyToDeliver, let selection = activeSelection {
-          TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
+        if plan.stage == .readyToDeliver, let activePrompt {
+          TaskBoardStepPromptPreview(prompt: activePrompt)
         }
         if offersActions(plan) {
           actionRow(plan)

@@ -8,12 +8,13 @@ extension TaskBoardStepRailView {
   /// on the body path.
   var stepFlowSnapshot: TaskBoardStepFlowSnapshot? {
     guard let lockedItemID = stepRailState.lockedItemID else { return nil }
-    let picked = stepRailState.pickedSelection
-    let matchesFlow = picked?.item.id == lockedItemID
+    guard let picked = stepRailState.pickedSelection, picked.item.id == lockedItemID else {
+      return TaskBoardStepFlowSnapshot(lockedItemID: lockedItemID)
+    }
     return TaskBoardStepFlowSnapshot(
       lockedItemID: lockedItemID,
-      pickedPlan: matchesFlow ? picked?.plan : nil,
-      pickedItemUpdatedAt: matchesFlow ? picked?.item.updatedAt : nil
+      pickedPrompt: picked.plan.renderedPrompt,
+      pickedItemUpdatedAt: picked.item.updatedAt
     )
   }
 
@@ -44,7 +45,7 @@ extension TaskBoardStepRailView {
     else {
       return
     }
-    state.adoptRestoredFlow(itemID: restored.itemID, pickedSelection: restored.pickedSelection)
+    state.adoptRestoredFlow(itemID: restored.itemID, pickedPrompt: restored.pickedPrompt)
   }
 
   func persistStepFlow() {

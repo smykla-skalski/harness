@@ -7,20 +7,23 @@ import HarnessMonitorKit
 /// the board is mid-process.
 struct TaskBoardStepFlowSnapshot: Codable, Equatable, Sendable {
   var lockedItemID: String
-  /// The plan Pick loaded, so a picked but undelivered item still offers Deliver
-  /// with the prompt the user already read.
-  var pickedPlan: TaskBoardDispatchPlan?
+  /// The prompt Pick rendered, so a picked but undelivered item still offers
+  /// Deliver with the prompt the user already read. Only the prompt: the rest of
+  /// a dispatch plan is readiness, policy, and intent state that the daemon
+  /// re-derives, so storing it would bloat preferences with fields that are
+  /// stale by the time anything reads them back.
+  var pickedPrompt: String?
   /// The picked item's revision. A live item that has moved past it no longer
   /// matches the stored prompt.
   var pickedItemUpdatedAt: String?
 
   init(
     lockedItemID: String,
-    pickedPlan: TaskBoardDispatchPlan? = nil,
+    pickedPrompt: String? = nil,
     pickedItemUpdatedAt: String? = nil
   ) {
     self.lockedItemID = lockedItemID
-    self.pickedPlan = pickedPlan
+    self.pickedPrompt = pickedPrompt
     self.pickedItemUpdatedAt = pickedItemUpdatedAt
   }
 }
@@ -52,7 +55,7 @@ enum TaskBoardStepFlowStore {
 
 struct TaskBoardStepRestoredFlow: Equatable, Sendable {
   let itemID: String
-  let pickedSelection: TaskBoardDispatchSelection?
+  let pickedPrompt: String?
 }
 
 enum TaskBoardStepFlowRestoration {
@@ -72,24 +75,18 @@ enum TaskBoardStepFlowRestoration {
     }
     return TaskBoardStepRestoredFlow(
       itemID: item.id,
-      pickedSelection: pickedSelection(for: item, snapshot: snapshot)
+      pickedPrompt: pickedPrompt(for: item, snapshot: snapshot)
     )
   }
 
   /// The stored prompt only survives while it still describes the live item.
   /// An edited item would otherwise show the old prompt next to a Deliver that
   /// dispatches the daemon's freshly rendered one.
-  private static func pickedSelection(
+  private static func pickedPrompt(
     for item: TaskBoardItem,
     snapshot: TaskBoardStepFlowSnapshot
-  ) -> TaskBoardDispatchSelection? {
-    guard
-      let plan = snapshot.pickedPlan,
-      plan.boardItemId == item.id,
-      snapshot.pickedItemUpdatedAt == item.updatedAt
-    else {
-      return nil
-    }
-    return TaskBoardDispatchSelection(item: item, plan: plan)
+  ) -> String? {
+    guard snapshot.pickedItemUpdatedAt == item.updatedAt else { return nil }
+    return snapshot.pickedPrompt
   }
 }

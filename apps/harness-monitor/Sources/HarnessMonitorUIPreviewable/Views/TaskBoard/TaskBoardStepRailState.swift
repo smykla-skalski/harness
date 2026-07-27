@@ -41,6 +41,10 @@ final class TaskBoardStepRailState {
   private(set) var flowRevision: UInt64 = 0
   /// A rail node the user tapped to read ahead; nil shows the live current stage.
   var viewingColumn: TaskBoardStepColumn?
+  /// The prompt a restored pick rendered, kept until this session's own Pick
+  /// replaces it or the flow ends. Stands in for `pickedSelection`, which an
+  /// earlier launch cannot hand over: only the prompt is worth storing.
+  private(set) var restoredPickedPrompt: String?
   /// The stored flow this panel has read but not yet resolved against the live
   /// board. Read from disk once; restoration then retries against it as board
   /// snapshots arrive, and clears it once the flow is adopted or superseded.
@@ -79,6 +83,7 @@ final class TaskBoardStepRailState {
   func applyPick(_ selection: TaskBoardDispatchSelection?) {
     pickedSelection = selection
     delivery = nil
+    restoredPickedPrompt = nil
     // Always track the picked item, clearing the lock when Pick returned nil.
     lockedItemID = selection?.item.id
     flowRevision &+= 1
@@ -87,8 +92,8 @@ final class TaskBoardStepRailState {
   /// Adopts the flow an earlier launch stored. Deliberately no revision bump:
   /// this is what the stored flow already says, and treating it as a change
   /// would rewrite the same bytes on every panel mount.
-  func adoptRestoredFlow(itemID: String, pickedSelection: TaskBoardDispatchSelection?) {
-    self.pickedSelection = pickedSelection
+  func adoptRestoredFlow(itemID: String, pickedPrompt: String?) {
+    restoredPickedPrompt = pickedPrompt
     lockedItemID = itemID
     pendingRestoredFlow = nil
   }
@@ -117,6 +122,7 @@ final class TaskBoardStepRailState {
   /// Clears the per-item flow so the wizard follows the next target.
   func resetFlow() {
     pickedSelection = nil
+    restoredPickedPrompt = nil
     delivery = nil
     lockedItemID = nil
     viewingColumn = nil
@@ -129,6 +135,7 @@ final class TaskBoardStepRailState {
   func reset() {
     isRunning = false
     pickedSelection = nil
+    restoredPickedPrompt = nil
     delivery = nil
     confirmation = nil
     approvalRefreshGeneration = 0

@@ -19,7 +19,7 @@ final class TaskBoardStepFlowPersistenceTests {
     let target = item(id: "active", status: .todo)
     let snapshot = TaskBoardStepFlowSnapshot(
       lockedItemID: target.id,
-      pickedPlan: dispatchPlan(for: target),
+      pickedPrompt: "durable prompt",
       pickedItemUpdatedAt: target.updatedAt
     )
 
@@ -46,15 +46,14 @@ final class TaskBoardStepFlowPersistenceTests {
     let restored = TaskBoardStepFlowRestoration.restoredFlow(
       snapshot: TaskBoardStepFlowSnapshot(
         lockedItemID: target.id,
-        pickedPlan: dispatchPlan(for: target),
+        pickedPrompt: "durable prompt",
         pickedItemUpdatedAt: target.updatedAt
       ),
       items: [item(id: "other", status: .todo), target]
     )
 
     #expect(restored?.itemID == target.id)
-    #expect(restored?.pickedSelection?.item == target)
-    #expect(restored?.pickedSelection?.plan.renderedPrompt == "durable prompt")
+    #expect(restored?.pickedPrompt == "durable prompt")
   }
 
   @Test("A prompt the item has moved past is dropped, its flow kept")
@@ -64,14 +63,14 @@ final class TaskBoardStepFlowPersistenceTests {
     let restored = TaskBoardStepFlowRestoration.restoredFlow(
       snapshot: TaskBoardStepFlowSnapshot(
         lockedItemID: picked.id,
-        pickedPlan: dispatchPlan(for: picked),
+        pickedPrompt: "durable prompt",
         pickedItemUpdatedAt: picked.updatedAt
       ),
       items: [live]
     )
 
     #expect(restored?.itemID == live.id)
-    #expect(restored?.pickedSelection == nil)
+    #expect(restored?.pickedPrompt == nil)
   }
 
   @Test("A flow the board has not produced yet stays pending")
@@ -101,7 +100,7 @@ final class TaskBoardStepFlowPersistenceTests {
     TaskBoardStepFlowStore.save(
       TaskBoardStepFlowSnapshot(
         lockedItemID: target.id,
-        pickedPlan: dispatchPlan(for: target),
+        pickedPrompt: "durable prompt",
         pickedItemUpdatedAt: target.updatedAt
       ),
       in: defaults
@@ -114,7 +113,7 @@ final class TaskBoardStepFlowPersistenceTests {
     #expect(view.stepRailState.lockedItemID == target.id)
     #expect(view.stagePlan.stage == .readyToDeliver)
     #expect(view.stagePlan.primaryAction == .deliver)
-    #expect(view.activeSelection?.plan.renderedPrompt == "durable prompt")
+    #expect(view.activePrompt == "durable prompt")
   }
 
   @Test("A flow the user already started outranks the stored one")
@@ -142,7 +141,7 @@ final class TaskBoardStepFlowPersistenceTests {
     let live = item(id: "active", status: .todo, updatedAt: "2026-07-19T12:30:00Z")
     let snapshot = TaskBoardStepFlowSnapshot(
       lockedItemID: picked.id,
-      pickedPlan: dispatchPlan(for: picked),
+      pickedPrompt: "durable prompt",
       pickedItemUpdatedAt: picked.updatedAt
     )
     TaskBoardStepFlowStore.save(snapshot, in: defaults)
@@ -170,7 +169,7 @@ final class TaskBoardStepFlowPersistenceTests {
 
     let stored = TaskBoardStepFlowStore.load(from: defaults)
     #expect(stored?.lockedItemID == target.id)
-    #expect(stored?.pickedPlan?.renderedPrompt == "durable prompt")
+    #expect(stored?.pickedPrompt == "durable prompt")
     #expect(stored?.pickedItemUpdatedAt == target.updatedAt)
   }
 
@@ -184,7 +183,7 @@ final class TaskBoardStepFlowPersistenceTests {
 
     let stored = TaskBoardStepFlowStore.load(from: defaults)
     #expect(stored?.lockedItemID == target.id)
-    #expect(stored?.pickedPlan == nil)
+    #expect(stored?.pickedPrompt == nil)
   }
 
   @Test("Ending the flow forgets the stored step")
