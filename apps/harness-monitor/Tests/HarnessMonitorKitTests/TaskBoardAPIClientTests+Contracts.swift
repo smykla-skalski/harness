@@ -247,6 +247,9 @@ extension TaskBoardAPIClientTests {
         ]
       )
     )
+    #expect(
+      status.settings.githubProject.protectedPaths.map(\.pattern) == ["apps/harness-monitor"]
+    )
     #expect(runtimeConfig.global.authorName == "Harness Bot")
     #expect(runOnce.lastRun?.sync.total == 1)
     #expect(runOnce.lastRun?.policyTraceIds == ["trace-1"])
