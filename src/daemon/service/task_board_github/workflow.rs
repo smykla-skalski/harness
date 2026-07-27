@@ -10,8 +10,6 @@ use crate::task_board::{
 };
 use harness_kernel::errors::CliErrorKind;
 
-#[cfg(test)]
-use super::AutomationRequest;
 use super::DatabaseAutomationRequest;
 use super::support::{
     STEP_BRANCH_PUSHED, STEP_EVIDENCE_FAILED, STEP_MERGED, STEP_MISSING_WORKTREE, STEP_PR_FAILED,
@@ -25,28 +23,11 @@ mod pull_request;
 
 use pull_request::prepare_pull_request_state;
 
-#[cfg(test)]
-pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWorkflowState {
-    let context = AutomationContext {
-        policy: super::support::AutomationPolicy::LegacyRoot(request.board_root),
-        config: request.config,
-        item: request.item,
-        client: request.client,
-        host_id: request.host_id,
-        expected_parent: None,
-    };
-    let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
-        AutomationFlow::Continue(prepared) => prepared,
-        AutomationFlow::Done(workflow) => return workflow,
-    };
-    continue_automation(&context, &mut prepared).await
-}
-
 pub(super) async fn automate_item_with_database_policy(
     request: DatabaseAutomationRequest<'_>,
 ) -> TaskBoardWorkflowState {
     let context = AutomationContext {
-        policy: super::support::AutomationPolicy::Database(request.policy),
+        policy: request.policy,
         config: request.config,
         item: request.item,
         client: request.client,

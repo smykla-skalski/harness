@@ -11,9 +11,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DatabaseAutomationRequest;
-use super::support::{
-    AutomationPolicy, action_policy, load_session_worktrees_async, managed_branch_name,
-};
+use super::support::{action_policy, load_session_worktrees_async, managed_branch_name};
 use super::workflow::automate_item_with_database_policy;
 
 #[path = "write_publication/client.rs"]
@@ -195,7 +193,7 @@ pub(super) async fn publish_pr_fix_branch(
     let mut policy_item = item.clone();
     policy_item.project_id = Some(head.repository.clone());
     let decision = action_policy(
-        AutomationPolicy::Database(policy),
+        policy,
         &policy_item,
         PolicyAction::PushBranch,
         Some(&head.branch),

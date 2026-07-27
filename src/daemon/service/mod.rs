@@ -284,8 +284,6 @@ mod task_board_evaluation;
 mod task_board_github;
 #[cfg(test)]
 mod task_board_host;
-#[cfg(test)]
-mod task_board_orchestrator;
 mod task_board_orchestrator_control;
 mod task_board_orchestrator_db;
 mod task_board_orchestrator_run_lease;
@@ -430,12 +428,6 @@ pub(crate) use task_board_evaluation::evaluate_task_board_async;
 #[cfg(test)]
 pub use task_board_host::{
     task_board_host_list, task_board_host_local, task_board_host_set_project_types,
-};
-#[cfg(test)]
-pub use task_board_orchestrator::{
-    run_task_board_orchestrator_once, start_task_board_orchestrator, stop_task_board_orchestrator,
-    task_board_orchestrator_settings, task_board_orchestrator_status,
-    update_task_board_orchestrator_settings,
 };
 pub(crate) use task_board_orchestrator_control::{
     start_task_board_orchestrator_db, stop_task_board_orchestrator_db,
