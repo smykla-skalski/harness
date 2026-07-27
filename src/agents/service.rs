@@ -8,153 +8,10 @@ use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::exec::RUNTIME;
 use crate::session::service as orchestration_service;
-use crate::setup::services::session as session_service;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::storage;
-
-/// Start or resume the active agent session for a project.
-///
-/// # Errors
-/// Returns `CliError` when the shared agent session ledger cannot be updated or
-/// when restoring pending compact handoff state fails.
-pub async fn session_start(
-    agent: HookAgent,
-    project_dir: PathBuf,
-    session_id_hint: Option<String>,
-) -> Result<Option<String>, CliError> {
-    task::spawn_blocking(move || {
-        session_service::bootstrap_project_wrapper(&project_dir);
-        let session_id =
-            resolve_or_create_session_id(agent, &project_dir, session_id_hint.as_deref())?;
-        storage::set_current_session_id(&project_dir, agent, &session_id)?;
-        storage::append_session_marker(&project_dir, agent, &session_id, "session_start")?;
-        signal_managed_terminal_readiness_if_managed();
-        session_service::restore_compact_handoff(&project_dir)
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "session-start join error: {error}"
-        )))
-    })?
-}
-
-/// When running inside a daemon-managed TUI process, signal the daemon that
-/// this agent is ready to accept input. The `HARNESS_AGENT_TUI_ID` env var is
-/// set by the daemon at spawn time; its presence identifies a managed TUI.
-fn signal_managed_terminal_readiness_if_managed() {
-    let Ok(tui_id) = env::var("HARNESS_AGENT_TUI_ID") else {
-        return;
-    };
-    if tui_id.is_empty() {
-        return;
-    }
-    signal_managed_terminal_readiness(&tui_id);
-}
-
-// The connection and the endpoint are the only daemon-shaped things this needs;
-// going through the leaf `harness-daemon-client` (already used by `harness-hook`
-// for the same signal) keeps this domain code from depending on the root
-// crate's typed `daemon::client` facade.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn signal_managed_terminal_readiness(tui_id: &str) {
-    use harness_daemon_client::DaemonClient;
-
-    let Some(client) = DaemonClient::try_connect() else {
-        tracing::debug!(tui_id = %tui_id, "no daemon client for managed terminal readiness signal");
-        return;
-    };
-    let result = client.post::<_, serde_json::Value>(
-        &format!("/v1/managed-agents/{tui_id}/ready"),
-        &serde_json::json!({}),
-    );
-    match result {
-        Ok(_) => tracing::info!(tui_id = %tui_id, "managed terminal readiness signaled to daemon"),
-        Err(error) => tracing::warn!(
-            %error,
-            tui_id = %tui_id,
-            "failed to signal managed terminal readiness"
-        ),
-    }
-}
-
-/// Stop the active agent session for a project.
-///
-/// # Errors
-/// Returns `CliError` when the shared agent session ledger cannot be updated.
-pub async fn session_stop(
-    agent: HookAgent,
-    project_dir: PathBuf,
-    session_id_hint: Option<String>,
-) -> Result<(), CliError> {
-    task::spawn_blocking(move || {
-        let session_id = session_id_hint
-            .or_else(|| {
-                storage::current_session_id(&project_dir, agent)
-                    .ok()
-                    .flatten()
-            })
-            .unwrap_or_else(|| default_session_id(agent));
-        storage::append_session_marker(&project_dir, agent, &session_id, "session_stop")?;
-        storage::clear_current_session_id(&project_dir, agent)?;
-        Ok(())
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "session-stop join error: {error}"
-        )))
-    })?
-}
-
-/// Record a prompt-submission event through the harness-owned agent ledger.
-///
-/// The caller parses the raw hook payload into `context`; that framing is a
-/// hooks concern, so this function only normalizes the session id and appends
-/// the ledger entry.
-///
-/// # Errors
-/// Returns `CliError` when the shared agent storage cannot be updated.
-pub async fn prompt_submit(
-    agent: HookAgent,
-    project_dir: PathBuf,
-    session_id_hint: Option<String>,
-    context: NormalizedHookContext,
-) -> Result<(), CliError> {
-    task::spawn_blocking(move || {
-        let mut context = context;
-        context.event = NormalizedEvent::UserPromptSubmit;
-        if context.session.cwd.is_none() {
-            context.session.cwd = Some(project_dir.clone());
-        }
-        let session_id = if context.session.session_id.trim().is_empty() {
-            resolve_or_create_session_id(agent, &project_dir, session_id_hint.as_deref())?
-        } else {
-            context.session.session_id.clone()
-        };
-        storage::set_current_session_id(&project_dir, agent, &session_id)?;
-        storage::append_hook_event(
-            &project_dir,
-            agent,
-            &session_id,
-            "agents",
-            "user-prompt-submit",
-            &context,
-            &NormalizedHookResult::allow(),
-        )
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "prompt-submit join error: {error}"
-        )))
-    })?
-}
 
 /// Record a normalized hook event in the shared agent ledger.
 ///
@@ -356,21 +213,6 @@ pub fn resolve_known_session_id(
         return Ok(Some(session_id));
     }
     storage::current_session_id(project_dir, agent)
-}
-
-/// Resolve the effective session ID for a hook or lifecycle event.
-///
-/// # Errors
-/// Returns `CliError` when the existing session registry cannot be read.
-pub fn resolve_or_create_session_id(
-    agent: HookAgent,
-    project_dir: &Path,
-    session_id_hint: Option<&str>,
-) -> Result<String, CliError> {
-    if let Some(existing) = resolve_known_session_id(agent, project_dir, session_id_hint)? {
-        return Ok(existing);
-    }
-    Ok(default_session_id(agent))
 }
 
 fn session_id_from_env(agent: HookAgent) -> Option<String> {

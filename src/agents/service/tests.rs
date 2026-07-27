@@ -6,35 +6,12 @@ use serde_json::json;
 
 use super::*;
 use crate::agents::kind::DisconnectReason;
-use crate::agents::runtime::signal::{
-    DeliveryConfig, Signal, SignalPayload, SignalPriority, read_pending_signals,
-};
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::session::service as session_service;
 use crate::session::types::{AgentStatus, SessionRole, SessionStatus};
-
-fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    with_isolated_harness_env(tmp.path(), || {
-        temp_env::with_vars(
-            [
-                (
-                    "XDG_DATA_HOME",
-                    Some(tmp.path().to_str().expect("xdg data path")),
-                ),
-                ("CLAUDE_SESSION_ID", Some("agent-service-session")),
-            ],
-            || {
-                let project = tmp.path().join("project");
-                fs::create_dir_all(&project).expect("create project directory");
-                test_fn(&project);
-            },
-        );
-    });
-}
 
 fn with_temp_project_without_runtime_ids<F: FnOnce(&Path)>(project_name: &str, test_fn: F) {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -55,90 +32,6 @@ fn with_temp_project_without_runtime_ids<F: FnOnce(&Path)>(project_name: &str, t
                 fs::create_dir_all(&project).expect("create project directory");
                 test_fn(&project);
             },
-        );
-    });
-}
-
-fn sample_signal() -> Signal {
-    Signal {
-        signal_id: "sig-preserve-001".into(),
-        version: 1,
-        created_at: "2026-03-28T12:00:00Z".into(),
-        expires_at: "2026-03-28T12:05:00Z".into(),
-        source_agent: "leader".into(),
-        command: "inject_context".into(),
-        priority: SignalPriority::Normal,
-        payload: SignalPayload {
-            message: "preserve pending signal".into(),
-            action_hint: None,
-            related_files: vec![],
-            metadata: json!(null),
-        },
-        delivery: DeliveryConfig {
-            max_retries: 3,
-            retry_count: 0,
-            idempotency_key: None,
-        },
-    }
-}
-
-#[test]
-fn session_start_preserves_pending_signals() {
-    with_temp_project(|project| {
-        RUNTIME
-            .block_on(session_start(
-                HookAgent::Claude,
-                project.to_path_buf(),
-                Some("sess-preserve".to_string()),
-            ))
-            .expect("initial session start");
-
-        let runtime = super::super::runtime::runtime_for(HookAgent::Claude);
-        runtime
-            .write_signal(project, "sess-preserve", &sample_signal())
-            .expect("write pending signal");
-
-        let signal_dir = runtime.signal_dir(project, "sess-preserve");
-        assert_eq!(
-            read_pending_signals(&signal_dir)
-                .expect("read pending signals before restart")
-                .len(),
-            1,
-        );
-
-        RUNTIME
-            .block_on(session_start(
-                HookAgent::Claude,
-                project.to_path_buf(),
-                Some("sess-preserve".to_string()),
-            ))
-            .expect("resume session");
-
-        assert_eq!(
-            read_pending_signals(&signal_dir)
-                .expect("read pending signals after restart")
-                .len(),
-            1,
-            "session restart must not drop queued signals",
-        );
-    });
-}
-
-#[test]
-fn session_start_returns_no_additional_context_without_compact_handoff() {
-    with_temp_project(|project| {
-        let has_context = RUNTIME
-            .block_on(session_start(
-                HookAgent::Claude,
-                project.to_path_buf(),
-                Some("sess-policy".to_string()),
-            ))
-            .expect("session start")
-            .is_none();
-
-        assert!(
-            has_context,
-            "session-start should stay silent when there is no compact handoff to restore"
         );
     });
 }

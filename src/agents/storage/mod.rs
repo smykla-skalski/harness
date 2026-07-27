@@ -166,6 +166,15 @@ pub(crate) fn append_hook_event(
     })
 }
 
+// #797 deleted this crate's own session-start/session-stop callers as dead
+// code, but `crates/harness-hook` mirrors this file via `#[path]` and its own
+// session-start/session-stop commands still call this; each crate's
+// dead-code check runs on its own copy, so this shows as unreachable here
+// even though the daemon's timeline still renders the `agent_session_marker`
+// entries it writes for that sibling crate. `expect` cannot stand in for
+// `allow`: harness-hook's compilation of this same line finds the call very
+// much alive, and an unfulfilled `expect` is itself a lint there.
+#[allow(dead_code)]
 pub(crate) fn append_session_marker(
     project_dir: &Path,
     agent: HookAgent,
