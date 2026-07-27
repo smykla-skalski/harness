@@ -116,7 +116,7 @@ fn local_branch_snapshot(
     // The worktree scope only covers the worktree itself. A session workspace is
     // a linked worktree, so its gitdir lives in the origin checkout and needs
     // its own grant.
-    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree);
+    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree_scope.path());
     let repository = GitRepository::discover(worktree_scope.path())
         .map_err(|error| snapshot_error("discover repository", error))?;
     let repo = repository
