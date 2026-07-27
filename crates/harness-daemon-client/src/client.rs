@@ -14,6 +14,8 @@ const HEALTH_TIMEOUT: Duration = Duration::from_millis(500);
 const API_READY_TIMEOUT: Duration = Duration::from_secs(2);
 const API_READY_INTERVAL: Duration = Duration::from_millis(100);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+const SESSION_START_TIMEOUT: Duration = Duration::from_secs(30);
+const TASK_BOARD_OPERATION_TIMEOUT: Duration = Duration::from_mins(2);
 
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
@@ -132,7 +134,12 @@ impl DaemonClient {
         Response: DeserializeOwned,
     {
         let response = self
-            .request(self.http.post(self.url(path)).json(request))
+            .request(
+                self.http
+                    .post(self.url(path))
+                    .json(request)
+                    .timeout(mutation_timeout_for_path(path)),
+            )
             .send()
             .map_err(ClientError::Request)?;
         Self::decode(response, "POST", path)
@@ -152,7 +159,12 @@ impl DaemonClient {
         Response: DeserializeOwned,
     {
         let response = self
-            .request(self.http.put(self.url(path)).json(request))
+            .request(
+                self.http
+                    .put(self.url(path))
+                    .json(request)
+                    .timeout(mutation_timeout_for_path(path)),
+            )
             .send()
             .map_err(ClientError::Request)?;
         Self::decode(response, "PUT", path)
@@ -298,6 +310,31 @@ enum Readiness {
     NotReady,
 }
 
+/// Mirrors the root facade's `daemon::client::http::mutation_timeout_for_path`.
+/// A handful of task-board and policy mutations are known long-running
+/// operations; without this, every `post`/`put` inherited the client's flat
+/// 5s default and would fail against a real daemon on anything slower than
+/// that, a regression the facade's callers never hit because it already
+/// special-cased these paths.
+fn mutation_timeout_for_path(path: &str) -> Duration {
+    if path == "/v1/sessions" {
+        SESSION_START_TIMEOUT
+    } else if matches!(
+        path,
+        "/v1/task-board/sync"
+            | "/v1/task-board/dispatch"
+            | "/v1/task-board/dispatch/deliver"
+            | "/v1/task-board/evaluate"
+            | "/v1/task-board/orchestrator/run-once"
+            | "/v1/policies/dump"
+            | "/v1/policies/import"
+    ) {
+        TASK_BOARD_OPERATION_TIMEOUT
+    } else {
+        REQUEST_TIMEOUT
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::{Read as _, Write as _};
@@ -441,5 +478,32 @@ mod tests {
             .delete::<()>("/v1/sessions/abc")
             .expect("204 with an empty body should decode as unit");
         server.join().expect("server");
+    }
+
+    #[test]
+    fn mutation_timeout_for_path_matches_known_long_running_routes() {
+        assert_eq!(
+            mutation_timeout_for_path("/v1/sessions"),
+            SESSION_START_TIMEOUT
+        );
+        for path in [
+            "/v1/task-board/sync",
+            "/v1/task-board/dispatch",
+            "/v1/task-board/dispatch/deliver",
+            "/v1/task-board/evaluate",
+            "/v1/task-board/orchestrator/run-once",
+            "/v1/policies/dump",
+            "/v1/policies/import",
+        ] {
+            assert_eq!(
+                mutation_timeout_for_path(path),
+                TASK_BOARD_OPERATION_TIMEOUT,
+                "{path} should use the task-board operation timeout"
+            );
+        }
+        assert_eq!(
+            mutation_timeout_for_path("/v1/task-board/items"),
+            REQUEST_TIMEOUT
+        );
     }
 }
