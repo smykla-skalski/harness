@@ -1,25 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
-#[cfg(test)]
-use std::future::Future;
-#[cfg(test)]
-use std::path::Path;
 
-#[cfg(test)]
-use tokio::runtime::Builder as TokioRuntimeBuilder;
 use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
-#[cfg(test)]
-use crate::daemon::db::DaemonDb;
-#[cfg(test)]
-use crate::daemon::service::session_detail_core;
 use crate::daemon::service::session_detail_core_async;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
-#[cfg(test)]
-use crate::task_board::policy_graph::resolve_gate_policy;
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
 use crate::task_board::{
     BuiltInPolicyGate, ExternalProvider, ExternalRef, ExternalRefProvider, PolicyAction,
@@ -28,15 +16,9 @@ use crate::task_board::{
 };
 use crate::task_board::{normalize_repository_slug, task_board_read_only_execution_repository};
 use harness_kernel::errors::CliError;
-#[cfg(test)]
-use harness_kernel::errors::CliErrorKind;
 
-#[derive(Clone, Copy)]
-pub(super) enum AutomationPolicy<'a> {
-    #[cfg(test)]
-    LegacyRoot(&'a Path),
-    Database(Option<(&'a str, &'a PolicyGraph)>),
-}
+/// The live canvas a decision is evaluated against, when one is published.
+pub(super) type AutomationPolicy<'a> = Option<(&'a str, &'a PolicyGraph)>;
 
 use super::super::task_board_runtime::external_sync_config_for_repository;
 
@@ -142,22 +124,6 @@ pub(super) fn update_pull_request_metadata(
     workflow.pr_url.clone_from(&pull_request.html_url);
 }
 
-#[cfg(test)]
-pub(super) fn load_session_worktrees(
-    items: &[TaskBoardItem],
-    db: Option<&DaemonDb>,
-) -> Result<BTreeMap<String, String>, CliError> {
-    let mut worktrees = BTreeMap::new();
-    for session_id in items.iter().filter_map(|item| item.session_id.as_deref()) {
-        let detail = session_detail_core(session_id, db)?;
-        let path = detail.session.worktree_path.trim();
-        if !path.is_empty() {
-            worktrees.insert(session_id.to_string(), path.to_string());
-        }
-    }
-    Ok(worktrees)
-}
-
 pub(super) async fn load_session_worktrees_async(
     items: &[TaskBoardItem],
     async_db: &AsyncDaemonDb,
@@ -222,15 +188,7 @@ pub(super) fn action_policy(
         pull_request: pull_request.map(|number| number.to_string()),
         ..PolicySubject::default()
     };
-    let graph = match policy {
-        #[cfg(test)]
-        AutomationPolicy::LegacyRoot(root) => resolve_gate_policy(root)
-            .map(|document| (document.canvas_id.clone(), document.document.clone())),
-        AutomationPolicy::Database(policy) => {
-            policy.map(|(canvas_id, document)| (Some(canvas_id.to_string()), document.clone()))
-        }
-    };
-    if let Some((canvas_id, document)) = graph
+    if let Some((canvas_id, document)) = policy
         && document.mode != PolicyPipelineMode::Draft
     {
         let simulation = document.simulate(&policy_input);
@@ -243,7 +201,7 @@ pub(super) fn action_policy(
                 simulation.visited_node_ids,
                 "task_board_github",
             )
-            .with_canvas_id(canvas_id),
+            .with_canvas_id(Some(canvas_id.to_owned())),
         );
         return decision;
     }
@@ -290,17 +248,6 @@ pub(super) fn policy_blocked(
 
 pub(super) fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", Uuid::new_v4().simple())
-}
-
-#[cfg(test)]
-pub(super) fn run_blocking<T>(
-    future: impl Future<Output = Result<T, CliError>>,
-) -> Result<T, CliError> {
-    TokioRuntimeBuilder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| CliErrorKind::workflow_io(format!("create task-board runtime: {error}")))?
-        .block_on(future)
 }
 
 fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> String {
