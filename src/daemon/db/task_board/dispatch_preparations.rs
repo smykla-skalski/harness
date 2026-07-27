@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_admission_in_tx};
+use super::dispatch_preparation_claim::TaskBoardPreparationClaim;
 use super::admission_lifecycle::renew_dispatch_admission_in_tx;
 use super::admission_reservations::persist_admission_snapshot_in_tx;
 use super::dispatch_workflow_launch::{
@@ -230,29 +231,46 @@ impl AsyncDaemonDb {
         })
     }
 
-    pub(crate) async fn claim_task_board_dispatch_preparation(
+    /// Claims a preparation, or reports why it could not be claimed.
+    pub(crate) async fn attempt_task_board_dispatch_preparation_claim(
         &self,
         intent_id: &str,
-    ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
+    ) -> Result<TaskBoardPreparationClaim, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation claim")
             .await?;
         let preparation = match screen_preparation_claim_in_tx(&mut transaction, intent_id).await? {
             PreparationClaim::Ready(preparation) => *preparation,
-            PreparationClaim::Settled { context, refusal } => {
+            PreparationClaim::Unavailable(reason) => {
+                commit_preparation(transaction, "unclaimable task board preparation").await?;
+                return Ok(TaskBoardPreparationClaim::Unavailable(reason));
+            }
+            PreparationClaim::Refused { context, reason } => {
                 commit_preparation(transaction, context).await?;
-                return refusal.map_or(Ok(None), |reason| {
-                    Err(CliErrorKind::invalid_transition(reason).into())
-                });
+                return Err(CliErrorKind::invalid_transition(reason).into());
             }
         };
         let claim_token = claim_preparation_intent_in_tx(&mut transaction, intent_id).await?;
         commit_preparation(transaction, "task board preparation claim").await?;
-        Ok(Some(ClaimedTaskBoardDispatchPreparation {
-            intent_id: intent_id.to_string(),
-            claim_token,
-            preparation,
-        }))
+        Ok(TaskBoardPreparationClaim::Claimed(Box::new(
+            ClaimedTaskBoardDispatchPreparation {
+                intent_id: intent_id.to_string(),
+                claim_token,
+                preparation,
+            },
+        )))
+    }
+
+    /// For callers that only act on the claim itself. Anything reported to a
+    /// person should take the reason from the attempt above instead.
+    pub(crate) async fn claim_task_board_dispatch_preparation(
+        &self,
+        intent_id: &str,
+    ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
+        Ok(self
+            .attempt_task_board_dispatch_preparation_claim(intent_id)
+            .await?
+            .claimed())
     }
 
     pub(crate) async fn claim_next_task_board_dispatch_preparation(

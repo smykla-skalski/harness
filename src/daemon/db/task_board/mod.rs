@@ -8,6 +8,7 @@ pub(super) use admission_lifecycle::release_managed_worker_admission_in_tx;
 mod aggregates;
 mod automation_cancel_targets;
 mod dispatch_intents;
+mod dispatch_preparation_claim;
 mod dispatch_preparations;
 mod dispatch_workflow_launch;
 mod dispatch_workflow_start;
@@ -250,6 +251,9 @@ pub(crate) use admission_recovery::{
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
 };
 pub(crate) use dispatch_intents::{ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
+pub(crate) use dispatch_preparation_claim::{
+    TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,
+};
 pub(crate) use dispatch_preparations::{
     ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
     TASK_BOARD_PREPARATION_MAX_ATTEMPTS, TaskBoardPreparationRelease,
