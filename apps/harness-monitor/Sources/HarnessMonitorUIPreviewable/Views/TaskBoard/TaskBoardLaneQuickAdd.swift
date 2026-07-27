@@ -21,4 +21,14 @@ enum TaskBoardLaneQuickAdd {
     // suppresses automatic triage placement for a create that asked for one.
     return TaskBoardCreateItemRequest(title: title, status: status)
   }
+
+  /// What the field should hold after a create failed. The field is cleared the
+  /// moment someone submits, so the text has to come back from somewhere - but
+  /// only into a field they have not already started retyping, because the
+  /// failure is reported by a toast either way and silently overwriting a second
+  /// title loses more than it saves.
+  static func restoredTitle(current: String, afterFailed failed: String?) -> String? {
+    guard let failed, !failed.isEmpty, current.isBlank else { return nil }
+    return failed
+  }
 }

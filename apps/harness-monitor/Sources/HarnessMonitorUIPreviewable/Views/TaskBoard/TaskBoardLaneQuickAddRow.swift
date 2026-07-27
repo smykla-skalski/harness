@@ -9,6 +9,7 @@ struct TaskBoardLaneQuickAddRow: View {
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   @State private var title: String
+  @State private var creationOutcome = TaskBoardItemCreationOutcome()
   @FocusState private var isFieldFocused: Bool
   @Environment(\.fontScale)
   private var fontScale
@@ -127,8 +128,22 @@ struct TaskBoardLaneQuickAddRow: View {
       RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
         .strokeBorder(laneColor.opacity(0.5), lineWidth: 1)
     }
+    // Not `.defaultFocus`, which is the usual advice for initial placement: it
+    // takes effect during the presenting view's first body evaluation, and this
+    // app has a standing rule against programmatic focus there after a run of
+    // same-frame FocusedValue faults. `.task` lands after that frame settles.
     .task {
       isFieldFocused = true
+    }
+    .onChange(of: creationOutcome.failedTitle) { _, failedTitle in
+      guard
+        let restored = TaskBoardLaneQuickAdd.restoredTitle(
+          current: title,
+          afterFailed: failedTitle
+        )
+      else { return }
+      title = restored
+      creationOutcome.failedTitle = nil
     }
     .onChange(of: isFieldFocused) { _, focused in
       // An empty field someone has clicked away from is clutter; one they left
@@ -141,13 +156,15 @@ struct TaskBoardLaneQuickAddRow: View {
 
   /// Deliberately not gated on an action being in flight: creating a task marks
   /// the board busy for a moment, and disabling the field on its own submit is
-  /// what would break typing several in a row.
+  /// what would break typing several in a row. The field clears immediately for
+  /// the same reason, and a create that fails puts its title back.
   private func submit() {
     guard let request = TaskBoardLaneQuickAdd.request(title: title, lane: lane) else {
       return
     }
     title = ""
-    actions.createTaskBoardItem(request)
+    creationOutcome.failedTitle = nil
+    actions.createTaskBoardItem(request, outcome: creationOutcome)
   }
 
   private func dismiss() {

@@ -70,6 +70,29 @@ struct TaskBoardLaneQuickAddTests {
     #expect(request.tags.isEmpty)
   }
 
+  @Test("A failed create puts its title back into a field left empty")
+  func failedCreatePutsItsTitleBackIntoAnEmptyField() {
+    #expect(
+      TaskBoardLaneQuickAdd.restoredTitle(current: "", afterFailed: "Ship it") == "Ship it"
+    )
+    #expect(
+      TaskBoardLaneQuickAdd.restoredTitle(current: "   ", afterFailed: "Ship it") == "Ship it"
+    )
+  }
+
+  /// The toast reports the failure either way, so overwriting a second title
+  /// loses more than putting the first one back saves.
+  @Test("A failed create never overwrites a title typed since")
+  func failedCreateNeverOverwritesATitleTypedSince() {
+    #expect(TaskBoardLaneQuickAdd.restoredTitle(current: "Next one", afterFailed: "Ship it") == nil)
+  }
+
+  @Test("Nothing is restored when no create failed")
+  func nothingIsRestoredWhenNoCreateFailed() {
+    #expect(TaskBoardLaneQuickAdd.restoredTitle(current: "", afterFailed: nil) == nil)
+    #expect(TaskBoardLaneQuickAdd.restoredTitle(current: "", afterFailed: "") == nil)
+  }
+
   @MainActor
   @Test("An open quick add hands the board's keystrokes to the field")
   func openQuickAddHandsBoardKeystrokesToTheField() {

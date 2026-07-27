@@ -15,9 +15,13 @@ extension TaskBoardOverviewActions {
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Creating task board item") {
         let success = await store.createTaskBoardItem(request: request)
-        guard success, let outcome else { return }
+        guard let outcome else { return }
         await MainActor.run {
-          outcome.succeeded = true
+          if success {
+            outcome.succeeded = true
+          } else {
+            outcome.failedTitle = request.title
+          }
         }
       }
     )

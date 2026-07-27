@@ -6,6 +6,9 @@ import SwiftUI
 @Observable
 final class TaskBoardItemCreationOutcome {
   var succeeded = false
+  /// The title a failed create was carrying, so a caller that cleared its field
+  /// the moment it submitted can offer the text back instead of losing it.
+  var failedTitle: String?
 }
 
 struct TaskBoardTriageInspectorLoadKey: Hashable {
