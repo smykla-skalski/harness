@@ -32,26 +32,32 @@ import SwiftUI
     .frame(width: 640)
 }
 
-/// The filter bar as the board carries it: how many values are on, the values
-/// themselves, and a way to drop any one of them.
+/// The row the board carries above its lanes: what is left, the search, the
+/// facets, and a way to drop any one value.
 struct TaskBoardFilterBarPreview: View {
   @State private var filters: TaskBoardFilterState
+  @State private var searchText: String
 
-  init(filters: TaskBoardFilterState) {
+  init(filters: TaskBoardFilterState, searchText: String = "") {
     _filters = State(initialValue: filters)
+    _searchText = State(initialValue: searchText)
   }
 
   var body: some View {
-    let inventory = TaskBoardFilterPreviewFixtures.inventory(for: filters)
+    let inventory = TaskBoardFilterPreviewFixtures.inventory(for: filters, search: searchText)
     return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
         TaskBoardSummaryPill(
-          value: "\(TaskBoardFilterPreviewFixtures.matchCount(for: filters))",
+          value: "\(TaskBoardFilterPreviewFixtures.matchCount(for: filters, search: searchText))",
           label: "Open",
           systemImage: "rectangle.stack",
           tint: HarnessMonitorTheme.secondaryInk
         )
         Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        TaskBoardSearchField(
+          text: $searchText,
+          candidates: TaskBoardFilterPreviewFixtures.searchCandidates(for: filters)
+        )
         TaskBoardFilterControls(filters: $filters, inventory: inventory)
           .fixedSize(horizontal: true, vertical: false)
       }
@@ -99,14 +105,27 @@ struct TaskBoardFacetFilterOptionsPreview: View {
   }
 }
 
-/// A board its own filter has emptied, naming the filter responsible.
+/// A board its own filter or search has emptied, naming what is responsible.
 struct TaskBoardFilterEmptyStatePreview: View {
-  @State private var filters = TaskBoardFilterPreviewFixtures.emptyingFilters
+  @State private var filters: TaskBoardFilterState
+  @State private var searchText: String
+
+  init(
+    filters: TaskBoardFilterState = TaskBoardFilterPreviewFixtures.emptyingFilters,
+    searchText: String = ""
+  ) {
+    _filters = State(initialValue: filters)
+    _searchText = State(initialValue: searchText)
+  }
 
   var body: some View {
     TaskBoardFilteredEmptyStateView(
       filters: $filters,
-      responsibleFacets: TaskBoardFilterPreviewFixtures.responsibleFacets(for: filters)
+      searchText: $searchText,
+      responsibleCauses: TaskBoardFilterPreviewFixtures.responsibleCauses(
+        for: filters,
+        search: searchText
+      )
     )
     .frame(maxWidth: .infinity, minHeight: 180)
     .background(
@@ -126,6 +145,14 @@ enum TaskBoardFilterPreviewFixtures {
     return filters
   }
 
+  /// On its own it leaves plenty; with a search for `zone` it leaves nothing,
+  /// which is the case where both are named.
+  static var searchEmptyingFilters: TaskBoardFilterState {
+    var filters = TaskBoardFilterState()
+    filters.toggleProject("project-harness")
+    return filters
+  }
+
   static var emptyingFilters: TaskBoardFilterState {
     var filters = TaskBoardFilterState()
     filters.togglePriority(.critical)
@@ -134,29 +161,57 @@ enum TaskBoardFilterPreviewFixtures {
     return filters
   }
 
-  static func inventory(for filters: TaskBoardFilterState) -> TaskBoardFilterInventory {
-    board(for: filters).inventory
+  static func inventory(
+    for filters: TaskBoardFilterState,
+    search: String = ""
+  ) -> TaskBoardFilterInventory {
+    board(for: filters, search: search).inventory
   }
 
-  static func matchCount(for filters: TaskBoardFilterState) -> Int {
-    board(for: filters).items.count
+  static func matchCount(for filters: TaskBoardFilterState, search: String = "") -> Int {
+    board(for: filters, search: search).items.count
   }
 
-  static func responsibleFacets(for filters: TaskBoardFilterState) -> [TaskBoardFilterFacet] {
-    board(for: filters).responsibleFacets
+  static func responsibleCauses(
+    for filters: TaskBoardFilterState,
+    search: String = ""
+  ) -> [TaskBoardNarrowingCause] {
+    board(for: filters, search: search).responsibleCauses
   }
 
-  private static func board(for filters: TaskBoardFilterState) -> TaskBoardFilteredBoard {
+  static func searchCandidates(for filters: TaskBoardFilterState) -> [TaskBoardSearchCandidate] {
+    board(for: filters).searchCandidates
+  }
+
+  /// The rows the real index produces, so a snapshot never shows a suggestion
+  /// the engine would not.
+  static func suggestions(
+    query: String,
+    for filters: TaskBoardFilterState = TaskBoardFilterState()
+  ) -> [TaskBoardSearchSuggestion] {
+    guard
+      let index = try? TaskBoardSearchSuggestionIndex(candidates: searchCandidates(for: filters))
+    else {
+      return []
+    }
+    return index.suggestions(query: query)
+  }
+
+  static func board(
+    for filters: TaskBoardFilterState,
+    search: String = ""
+  ) -> TaskBoardFilteredBoard {
     TaskBoardFilteredBoard(
       scopedItems: items,
       visibleItems: items,
       inboxItems: [],
-      decisionIDs: [],
+      decisions: [],
       projectLabelResolver: TaskBoardProjectLabelResolver(
         projects: projects,
         projectIDs: items.compactMap(\.taskBoardRepositoryIdentity)
       ),
-      filters: filters
+      filters: filters,
+      search: TaskBoardSearchQuery(search)
     )
   }
 
@@ -204,6 +259,9 @@ enum TaskBoardFilterPreviewFixtures {
     item(
       id: "kuma-docs",
       title: "Document the policy merge order",
+      // Carries `zone` only in the body, so a search reaching it proves the
+      // board reads more than the titles it shows.
+      body: "Explain how a zone inherits a mesh policy and where the order breaks.",
       status: .toReview,
       priority: .low,
       tags: ["docs"],
@@ -252,6 +310,7 @@ enum TaskBoardFilterPreviewFixtures {
   private static func item(
     id: String,
     title: String,
+    body: String = "",
     status: TaskBoardStatus,
     priority: TaskBoardPriority,
     tags: [String],
@@ -263,7 +322,7 @@ enum TaskBoardFilterPreviewFixtures {
       schemaVersion: 1,
       id: id,
       title: title,
-      body: "",
+      body: body,
       status: status,
       priority: priority,
       tags: tags,

@@ -76,10 +76,14 @@ extension TaskBoardOverviewView {
       // Only pushes apart when both sides carry something. An unconditional
       // spacer strands the controls at the trailing edge of a row whose
       // leading half is empty.
-      if hasAggregateSummary && (showsFilterControls || hasHeaderActions) {
+      if hasAggregateSummary && (showsNarrowingControls || hasHeaderActions) {
         Spacer(minLength: HarnessMonitorTheme.spacingMD)
       }
-      if showsFilterControls {
+      if showsNarrowingControls {
+        TaskBoardSearchField(
+          text: boardSearchTextBinding,
+          candidates: currentPresentation.searchCandidates
+        )
         TaskBoardFilterControls(
           filters: boardFiltersBinding,
           inventory: currentPresentation.filterInventory
@@ -93,10 +97,12 @@ extension TaskBoardOverviewView {
   }
 
   /// Offered once the board holds something worth narrowing, and kept on while
-  /// a filter is active even after it has hidden everything.
-  var showsFilterControls: Bool {
+  /// a filter or a search is active even after it has hidden everything.
+  var showsNarrowingControls: Bool {
     taskBoardSessionID == nil
-      && (currentPresentation.hasUnfilteredContent || !boardFilters.isEmpty)
+      && (currentPresentation.hasUnfilteredContent
+        || !boardFilters.isEmpty
+        || !boardSearchFieldText.isEmpty)
   }
 
   var activeFilterChips: [TaskBoardActiveFilterChip] {
@@ -180,8 +186,11 @@ extension TaskBoardOverviewView {
 
   var boardSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      if hasAggregateSummary || hasHeaderActions || showsFilterControls {
+      if hasAggregateSummary || hasHeaderActions || showsNarrowingControls {
+        // The search suggestions hang out of this row over what follows it, and
+        // a later sibling in a stack draws on top by default.
         boardAccessoryRow
+          .zIndex(1)
       }
       let chips = activeFilterChips
       if !chips.isEmpty {

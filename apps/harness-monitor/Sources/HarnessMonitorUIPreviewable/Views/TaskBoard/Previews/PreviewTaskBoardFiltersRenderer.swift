@@ -86,6 +86,63 @@ public enum TaskBoardFilterPreviewRenderer {
       ) {
         TaskBoardFilterEmptyStatePreview()
       }
+      && render(
+        name: "search-field-idle",
+        size: NSSize(width: 420, height: 100),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardSearchFieldPreview(searchText: "")
+      }
+      && render(
+        name: "search-suggestions",
+        size: NSSize(width: 420, height: 260),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardSearchFieldPreview(searchText: "polcy", showsSuggestions: true)
+      }
+      && render(
+        name: "search-suggestions-largest-text",
+        size: NSSize(width: 520, height: 340),
+        textSizeIndex: largestIndex,
+        directory: directory
+      ) {
+        TaskBoardSearchFieldPreview(searchText: "polcy", showsSuggestions: true)
+      }
+      && render(
+        name: "search-with-filters",
+        size: NSSize(width: 980, height: 170),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterBarPreview(
+          filters: TaskBoardFilterPreviewFixtures.narrowedFilters,
+          searchText: "policy"
+        )
+      }
+      && render(
+        name: "search-empty-state",
+        size: NSSize(width: 640, height: 260),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterEmptyStatePreview(
+          filters: TaskBoardFilterState(),
+          searchText: "nothing here"
+        )
+      }
+      && render(
+        name: "search-and-filter-empty-state",
+        size: NSSize(width: 680, height: 280),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterEmptyStatePreview(
+          filters: TaskBoardFilterPreviewFixtures.searchEmptyingFilters,
+          searchText: "zone"
+        )
+      }
   }
 
   @MainActor
