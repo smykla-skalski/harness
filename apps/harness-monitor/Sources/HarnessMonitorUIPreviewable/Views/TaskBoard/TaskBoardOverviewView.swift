@@ -299,7 +299,11 @@ extension TaskBoardOverviewView {
   /// board someone is asking for back is the one they already had.
   @MainActor
   func applySearchTextWhenSettled() async {
-    let pending = searchText
+    // Whitespace alone is not a search, so it settles like a clear instead of
+    // making the board sit out a wait that changes nothing. The trim belongs
+    // here and not in the field's binding: stripping the space as someone
+    // types it would leave them unable to type a second word.
+    let pending = searchText.isBlank ? "" : searchText
     if !pending.isEmpty {
       try? await Task.sleep(for: .milliseconds(180))
       guard !Task.isCancelled else { return }

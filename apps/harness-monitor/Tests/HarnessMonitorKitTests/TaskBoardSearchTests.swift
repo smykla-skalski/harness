@@ -132,6 +132,24 @@ struct TaskBoardSearchTests {
     #expect(!TaskBoardSearchQuery("ingress").matches(card))
   }
 
+  @Test("A search beside several facets does not bury one and inside another")
+  func searchBesideSeveralFacetsReadsGrammatically() {
+    #expect(
+      TaskBoardFilterEmptyState.description(
+        responsibleCauses: [.search, .facet(.project), .facet(.priority)]
+      ) == """
+        Nothing on the board matches the search, the project filter \
+        and the priority filter together.
+        """
+    )
+    // Facets on their own still share the shorter phrase.
+    #expect(
+      TaskBoardFilterEmptyState.description(
+        responsibleCauses: [.facet(.project), .facet(.priority)]
+      ) == "Nothing on the board matches the project and priority filters together."
+    )
+  }
+
   @Test("Facet counts keep applying the search")
   func facetCountsKeepApplyingTheSearch() {
     let matcher = TaskBoardFilterMatcher(

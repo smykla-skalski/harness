@@ -38,16 +38,25 @@ enum TaskBoardFilterEmptyState {
   }
 
   /// The search reads as itself; a facet reads as the field it narrows.
+  ///
+  /// Several facets normally share one phrase, which reads better than spelling
+  /// each out. The exception is a search standing beside them: "the search and
+  /// the project and priority filters" buries one "and" inside another, so
+  /// there the facets go back to a phrase each and the commas do the joining.
   private static func phrases(for causes: [TaskBoardNarrowingCause]) -> [String] {
-    var phrases: [String] = []
-    if causes.contains(.search) {
-      phrases.append("the search")
-    }
+    let hasSearch = causes.contains(.search)
     let facetNames = causes.compactMap { cause -> String? in
       guard case .facet(let facet) = cause else { return nil }
       return facet.title.lowercased()
     }
-    if !facetNames.isEmpty {
+
+    var phrases: [String] = hasSearch ? ["the search"] : []
+    guard !facetNames.isEmpty else {
+      return phrases
+    }
+    if hasSearch && facetNames.count > 1 {
+      phrases.append(contentsOf: facetNames.map { "the \($0) filter" })
+    } else {
       phrases.append("the \(list(facetNames)) \(facetNames.count == 1 ? "filter" : "filters")")
     }
     return phrases
