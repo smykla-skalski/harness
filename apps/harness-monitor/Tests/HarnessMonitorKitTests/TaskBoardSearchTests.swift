@@ -132,7 +132,7 @@ struct TaskBoardSearchTests {
     #expect(!TaskBoardSearchQuery("ingress").matches(card))
   }
 
-  @Test("A search beside several facets does not bury one and inside another")
+  @Test("A search beside several facets does not bury one 'and' inside another")
   func searchBesideSeveralFacetsReadsGrammatically() {
     #expect(
       TaskBoardFilterEmptyState.description(

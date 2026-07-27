@@ -22,7 +22,10 @@ struct TaskBoardSearchField: View {
   @State private var fieldSize: CGSize = .zero
 
   var body: some View {
-    field
+    // Read once, so the task's identity and the snapshot it runs against are
+    // the same value rather than two reads of state that can move between them.
+    let request = suggestionRequest
+    return field
       .frame(
         minWidth: 150 * controlScale,
         idealWidth: 220 * controlScale,
@@ -38,8 +41,8 @@ struct TaskBoardSearchField: View {
       .overlay(alignment: .topLeading) {
         suggestionList
       }
-      .task(id: suggestionRequest) {
-        await refreshSuggestions(for: suggestionRequest)
+      .task(id: request) {
+        await refreshSuggestions(for: request)
       }
       .onExitCommand {
         suppressedText = text
@@ -155,9 +158,11 @@ struct TaskBoardSearchField: View {
       }
       return
     }
+    // The request's own candidates, not the view's: indexing a set this result
+    // is about to be discarded for is work nobody asked for.
     let matches = await suggestionWorker.suggestions(
       query: request.query,
-      candidates: candidates
+      candidates: request.candidates
     )
     guard !Task.isCancelled, request == suggestionRequest else {
       return
