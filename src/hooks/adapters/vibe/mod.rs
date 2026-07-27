@@ -95,9 +95,7 @@ impl AgentAdapter for VibeAdapter {
     fn event_name(&self, event: &NormalizedEvent) -> Option<&str> {
         match event {
             NormalizedEvent::BeforeToolUse => Some("tool.execute.before"),
-            NormalizedEvent::AfterToolUse | NormalizedEvent::AfterToolUseFailure => {
-                Some("tool.execute.after")
-            }
+            NormalizedEvent::AfterToolUse => Some("tool.execute.after"),
             NormalizedEvent::AgentStop | NormalizedEvent::SessionEnd => Some("stop"),
             NormalizedEvent::SessionStart => Some("session.created"),
             _ => None,

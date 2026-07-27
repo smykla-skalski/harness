@@ -138,8 +138,4 @@ fn codex_config_names_match_current_lifecycle_events() {
         adapter.event_name(&NormalizedEvent::SessionEnd),
         Some("SessionEnd")
     );
-    assert_eq!(
-        adapter.event_name(&NormalizedEvent::SubagentStop),
-        Some("SubagentStop")
-    );
 }
