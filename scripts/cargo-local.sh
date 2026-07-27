@@ -694,16 +694,27 @@ if [[ "${1:-}" != "--print-env" ]]; then
   # The override lets the socket-probe regression test put a broken python3 on
   # PATH without disabling lane exclusion for the fake Cargo command.
   lane_lock_python="${HARNESS_CARGO_LANE_LOCK_PYTHON:-python3}"
-  if ! command -v "$lane_lock_python" >/dev/null 2>&1 \
-    || [[ ! -f "$ROOT/scripts/cargo-lane-lock.py" ]]; then
-    printf 'cargo-local: Python lane-lock helper is required for Cargo commands\n' >&2
+  lane_lock_helper="$ROOT/scripts/cargo-lane-lock.py"
+  if [[ ! -f "$lane_lock_helper" ]]; then
+    printf 'cargo-local: build-lane lock helper is missing: %s\n' "$lane_lock_helper" >&2
+    exit 70
+  fi
+  report_lane_lock_python_requirement() {
+    {
+      printf 'cargo-local: a working Python 3 interpreter is required for exclusive Cargo build lanes\n'
+      printf '  interpreter: %s\n' "$lane_lock_python"
+      printf '  fix: run xcode-select --install or set HARNESS_CARGO_LANE_LOCK_PYTHON to a working Python 3 executable\n'
+    } >&2
+  }
+  if ! command -v "$lane_lock_python" >/dev/null 2>&1; then
+    report_lane_lock_python_requirement
     exit 70
   fi
   lane_lock_target="$(
     "$lane_lock_python" -c 'import os, sys; print(os.path.realpath(os.path.abspath(sys.argv[1])))' \
       "$target_dir"
   )" || {
-    printf 'cargo-local: could not resolve the Cargo target lane\n' >&2
+    report_lane_lock_python_requirement
     exit 70
   }
   lane_lock_key="$(short_hash "$lane_lock_target")"
@@ -715,7 +726,7 @@ if [[ "${1:-}" != "--print-env" ]]; then
     lane_lock_is_held=1
   fi
   if (( ! lane_lock_is_held )); then
-    exec "$lane_lock_python" "$ROOT/scripts/cargo-lane-lock.py" \
+    exec "$lane_lock_python" "$lane_lock_helper" \
       --lock-root "$COMMON_REPO_ROOT/target/.cargo-local/lane-locks" \
       --lock-key "$lane_lock_key" \
       --target-dir "$target_dir" \

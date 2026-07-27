@@ -1216,6 +1216,37 @@ scenario_same_target_lane_fails_fast_with_owner() {
   fi
 }
 
+scenario_unusable_lane_lock_python_is_actionable() {
+  local fake_bin="$SANDBOX/lane-python-bin"
+  local fake_python="$fake_bin/python3"
+  local fake_cargo="$fake_bin/cargo"
+  local target_dir="$SANDBOX/lane-python-target"
+  local scratch="$SANDBOX/lane-python-tmp"
+  local output="" status=0
+  mkdir -p "$fake_bin" "$scratch"
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$fake_python"
+  printf '#!/usr/bin/env bash\nexit 99\n' >"$fake_cargo"
+  chmod +x "$fake_python" "$fake_cargo"
+
+  set +e
+  output="$(
+    HARNESS_CARGO_LANE_LOCK_PYTHON="$fake_python" \
+      run_exclusive_lane_command \
+        "$fake_cargo" "$target_dir" "$scratch" build --lib 2>&1
+  )"
+  status=$?
+  set -e
+
+  if (( status == 70 )) \
+    && assert_contains "working Python 3 interpreter" "$output" \
+    && assert_contains "HARNESS_CARGO_LANE_LOCK_PYTHON" "$output" \
+    && assert_contains "xcode-select --install" "$output"; then
+    pass "an unusable lane-lock Python reports the concrete remediation"
+  else
+    fail "unusable lane-lock Python was not actionable (status=$status): $output"
+  fi
+}
+
 scenario_sccache_socket_survives_session_scoped_tmpdir() {
   local fake_bin="$SANDBOX/socket-share-bin"
   local first second first_sock second_sock first_tmp second_tmp
@@ -1985,6 +2016,7 @@ scenario_target_dir_is_shared_across_sessions
 scenario_print_target_dir_matches_the_build_dir
 scenario_default_lane_still_seeds_under_lock
 scenario_same_target_lane_fails_fast_with_owner
+scenario_unusable_lane_lock_python_is_actionable
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_sccache_socket_is_shared_across_checkouts
 scenario_repo_tmpdir_fallback_is_session_scoped
