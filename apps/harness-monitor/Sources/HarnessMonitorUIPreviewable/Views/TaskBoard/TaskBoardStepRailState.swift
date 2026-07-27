@@ -37,6 +37,10 @@ final class TaskBoardStepRailState {
   var lockedItemID: String?
   /// A rail node the user tapped to read ahead; nil shows the live current stage.
   var viewingColumn: TaskBoardStepColumn?
+  /// Whether the flow stored by an earlier launch has already been offered to
+  /// this panel. Restoration runs on every board snapshot until the stored item
+  /// resolves, and this stops it from reclaiming a flow the user moved on from.
+  var hasRestoredPersistedFlow = false
   /// Whether the automation-context footer is open. Held here rather than left
   /// to `DisclosureGroup` so the label can drive it from a full-width tap.
   var isAutomationContextExpanded = false

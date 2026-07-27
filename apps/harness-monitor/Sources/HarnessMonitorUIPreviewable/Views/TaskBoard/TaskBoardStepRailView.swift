@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -10,6 +11,9 @@ struct TaskBoardStepRailView: View {
   let taskBoardItems: [TaskBoardItem]
   let isActionInFlight: Bool
   let actions: TaskBoardOverviewActions
+  /// Where the guided flow is stored between launches. Injectable so tests never
+  /// touch the app's own preferences.
+  var flowDefaults: UserDefaults = .standard
 
   @Environment(\.openWindow)
   var openWindow
@@ -82,7 +86,15 @@ struct TaskBoardStepRailView: View {
       Text(confirmationMessage(confirmation))
     }
     .onChange(of: status.stepMode) {
-      if !status.stepMode { state.reset() }
+      if !status.stepMode { endStepFlow() }
+    }
+    .onChange(of: stepFlowRestorationRevision, initial: true) { _, _ in
+      restoreStepFlowIfNeeded()
+    }
+    // Deliberately without `initial`: the panel mounts before restoration runs,
+    // and writing the empty flow then would forget the stored one.
+    .onChange(of: stepFlowSnapshot) { _, _ in
+      persistStepFlow()
     }
     .onChange(of: stagePlan.stage) { _, newStage in
       AccessibilityNotification.Announcement("Step Mode stage: \(newStage.title)").post()
