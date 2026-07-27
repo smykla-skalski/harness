@@ -103,10 +103,15 @@ def write_owner(
     os.fsync(fd)
 
 
-def run_owner(command: list[str], environment: dict[str, str], fd: int) -> int:
+def run_owner(
+    command: list[str],
+    environment: dict[str, str],
+    fd: int,
+    target_dir: str,
+) -> int:
     process = subprocess.Popen(command, env=environment, close_fds=True)
     try:
-        write_owner(fd, environment["CARGO_TARGET_DIR"], command, process.pid)
+        write_owner(fd, target_dir, command, process.pid)
     except OSError:
         process.terminate()
         process.wait()
@@ -150,8 +155,7 @@ def main() -> int:
         environment = os.environ.copy()
         environment["HARNESS_CARGO_LANE_LOCK_KEY"] = args.lock_key
         environment["HARNESS_CARGO_LANE_LOCK_SUPERVISOR_PID"] = str(os.getpid())
-        environment["CARGO_TARGET_DIR"] = args.target_dir
-        return run_owner(args.command, environment, fd)
+        return run_owner(args.command, environment, fd, args.target_dir)
     except OSError as error:
         print(f"cargo-local: cannot run the lane owner: {error}", file=sys.stderr)
         return 70

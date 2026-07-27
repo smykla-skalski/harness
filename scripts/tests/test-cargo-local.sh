@@ -1001,6 +1001,69 @@ scenario_print_target_dir_matches_the_build_dir() {
   fi
 }
 
+scenario_default_lane_still_seeds_under_lock() {
+  local checkout="$SANDBOX/default-seed-checkout"
+  local fake_bin="$checkout/fake-bin"
+  local scratch="$checkout/tmp"
+  local seed_log="$checkout/seed.log"
+  local cargo_log="$checkout/cargo.log"
+  local explicit_target="$checkout/explicit-target"
+  local seed_calls cargo_calls
+  mkdir -p "$checkout/scripts/lib" "$fake_bin" "$scratch"
+  cp "$ROOT/scripts/cargo-local.sh" "$checkout/scripts/cargo-local.sh"
+  cp "$ROOT/scripts/cargo-lane-lock.py" "$checkout/scripts/cargo-lane-lock.py"
+  cp "$ROOT/scripts/lib/"*.sh "$checkout/scripts/lib/"
+  chmod +x "$checkout/scripts/cargo-local.sh" "$checkout/scripts/cargo-lane-lock.py"
+  write_logging_cargo "$fake_bin/cargo" "$cargo_log"
+  : >"$seed_log"
+  cat >"$checkout/scripts/seed-rust-build-lane.py" <<'PY'
+import os
+import pathlib
+import sys
+
+arguments = sys.argv[1:]
+with open(os.environ["LANE_SEED_LOG"], "a", encoding="utf-8") as log:
+    log.write(" ".join(arguments) + "\n")
+target = pathlib.Path(arguments[arguments.index("--target-dir") + 1])
+target.mkdir(parents=True)
+PY
+
+  (
+    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    LANE_SEED_LOG="$seed_log" \
+      HARNESS_CARGO_BIN="$fake_bin/cargo" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER=0 \
+      SCCACHE_BIN='' \
+      RUSTC_WRAPPER='' \
+      TMPDIR="$scratch/" \
+      "$checkout/scripts/cargo-local.sh" build --lib
+  )
+  LANE_SEED_LOG="$seed_log" \
+    CARGO_TARGET_DIR="$explicit_target" \
+    HARNESS_CARGO_BIN="$fake_bin/cargo" \
+    HARNESS_CARGO_SKIP_LEASE=1 \
+    HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+    HARNESS_JOBSERVER=0 \
+    SCCACHE_BIN='' \
+    RUSTC_WRAPPER='' \
+    TMPDIR="$scratch/" \
+    "$checkout/scripts/cargo-local.sh" check --lib
+
+  seed_calls="$(wc -l <"$seed_log" | tr -d ' ')"
+  cargo_calls="$(wc -l <"$cargo_log" | tr -d ' ')"
+  if [[ "$seed_calls" == "1" ]] \
+    && [[ "$cargo_calls" == "2" ]] \
+    && grep -Fq -- "--target-segment local-v2" "$seed_log" \
+    && [[ -d "$checkout/target/dev/local-v2" ]] \
+    && [[ ! -e "$explicit_target" ]]; then
+    pass "the lock preserves default-lane seeding without seeding explicit targets"
+  else
+    fail "default seeding was lost under the lane lock (seed=$seed_calls cargo=$cargo_calls)"
+  fi
+}
+
 write_lane_blocking_cargo() {
   local path="$1"
   cat >"$path" <<'EOF'
@@ -1920,6 +1983,7 @@ scenario_agent_build_jobs_leave_room_for_later_arrivals
 scenario_agent_jobs_hold_their_reserved_share
 scenario_target_dir_is_shared_across_sessions
 scenario_print_target_dir_matches_the_build_dir
+scenario_default_lane_still_seeds_under_lock
 scenario_same_target_lane_fails_fast_with_owner
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_sccache_socket_is_shared_across_checkouts
