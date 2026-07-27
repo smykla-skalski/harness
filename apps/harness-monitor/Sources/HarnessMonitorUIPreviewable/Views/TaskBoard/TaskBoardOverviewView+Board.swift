@@ -80,12 +80,13 @@ extension TaskBoardOverviewView {
 
   var emptyState: some View {
     Group {
-      if currentPresentation.responsibleFilterFacets.isEmpty {
+      if currentPresentation.responsibleNarrowingCauses.isEmpty {
         ContentUnavailableView("No Open Tasks", systemImage: "tray")
       } else {
         TaskBoardFilteredEmptyStateView(
           filters: boardFiltersBinding,
-          responsibleFacets: currentPresentation.responsibleFilterFacets
+          searchText: boardSearchTextBinding,
+          responsibleCauses: currentPresentation.responsibleNarrowingCauses
         )
       }
     }

@@ -51,7 +51,7 @@ struct TaskBoardFilterPresentationTests {
 
     #expect(!presentation.hasBoardContent)
     #expect(presentation.hasUnfilteredContent)
-    #expect(presentation.responsibleFilterFacets == [.project])
+    #expect(presentation.responsibleNarrowingCauses == [.facet(.project)])
   }
 
   @Test("A project facet is keyed on the identity, so a rename only moves the label")
@@ -130,7 +130,7 @@ struct TaskBoardFilterPresentationTests {
       )
     )
 
-    #expect(presentation.responsibleFilterFacets.isEmpty)
+    #expect(presentation.responsibleNarrowingCauses.isEmpty)
     #expect(presentation.filterInventory.priorities.map(\.id) == ["critical", "low"])
     // The two spellings of one tag collapse into a single option, and the one
     // card carrying both counts once towards it.
@@ -139,9 +139,53 @@ struct TaskBoardFilterPresentationTests {
     #expect(presentation.filterInventory.tags.map(\.count) == [1])
   }
 
+  @Test("Search narrows the board wherever the card sits, and reports itself when it empties it")
+  func searchNarrowsAcrossLanesAndReportsItself() async {
+    let items = [
+      item(id: "zone-sync", status: .todo, title: "Retry zone sync"),
+      item(id: "zone-docs", status: .inReview, title: "Docs", body: "How a zone inherits"),
+      item(id: "reconciler", status: .todo, title: "Split the reconciler"),
+    ]
+    let worker = TaskBoardOverviewPresentationWorker()
+
+    let narrowed = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: items,
+        decisionItems: [],
+        scopeSessionID: nil,
+        taskBoardProjects: [],
+        searchText: "zone"
+      )
+    )
+
+    #expect(narrowed.taskBoardItems.map(\.id) == ["zone-sync", "zone-docs"])
+    #expect(narrowed.responsibleNarrowingCauses.isEmpty)
+    // Suggestions are drawn before the search narrows anything, so the card
+    // someone is still typing towards is in there.
+    #expect(narrowed.searchCandidates.map(\.id) == items.map(\.id))
+
+    let emptied = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: items,
+        decisionItems: [],
+        scopeSessionID: nil,
+        taskBoardProjects: [],
+        searchText: "ingress"
+      )
+    )
+
+    #expect(!emptied.hasBoardContent)
+    #expect(emptied.hasUnfilteredContent)
+    #expect(emptied.responsibleNarrowingCauses == [.search])
+  }
+
   private func item(
     id: String,
     status: TaskBoardStatus,
+    title: String = "Board item",
+    body: String = "Body",
     priority: TaskBoardPriority = .medium,
     tags: [String] = [],
     projectId: String? = nil,
@@ -151,8 +195,8 @@ struct TaskBoardFilterPresentationTests {
     TaskBoardItem(
       schemaVersion: 1,
       id: id,
-      title: "Board item",
-      body: "Body",
+      title: title,
+      body: body,
       status: status,
       priority: priority,
       tags: tags,

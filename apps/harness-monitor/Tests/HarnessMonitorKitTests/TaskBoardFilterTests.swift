@@ -38,7 +38,8 @@ struct TaskBoardFilterTests {
 
     #expect(matcher.matches(fields(projectKey: "kumahq/kuma")))
     #expect(!matcher.matches(fields(priority: .low)))
-    #expect(!matcher.matches(.decision))
+    // An open decision carries no facet at all.
+    #expect(!matcher.matches(TaskBoardFilterFields()))
   }
 
   @Test("Status is not a facet: the lanes already are the statuses")
@@ -103,7 +104,8 @@ struct TaskBoardFilterTests {
 
     #expect(!population.contains { matcher.matches($0) })
     #expect(
-      TaskBoardFilterMatcher.responsibleFacets(in: population, matcher: matcher) == [.priority]
+      TaskBoardFilterMatcher.responsibleCauses(in: population, matcher: matcher)
+        == [.facet(.priority)]
     )
   }
 
@@ -116,8 +118,8 @@ struct TaskBoardFilterTests {
     let population = [fields(priority: .low, projectKey: "harness")]
 
     #expect(
-      TaskBoardFilterMatcher.responsibleFacets(in: population, matcher: matcher)
-        == [.project, .priority]
+      TaskBoardFilterMatcher.responsibleCauses(in: population, matcher: matcher)
+        == [.facet(.project), .facet(.priority)]
     )
   }
 

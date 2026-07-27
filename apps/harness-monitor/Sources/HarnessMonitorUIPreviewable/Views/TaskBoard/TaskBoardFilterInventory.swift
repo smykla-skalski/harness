@@ -72,8 +72,11 @@ extension TaskBoardFilterInventory {
     var sources = FacetTally()
 
     mutating func record(_ fields: TaskBoardFilterFields, matcher: TaskBoardFilterMatcher) {
+      // An active search keeps applying while a facet counts itself: a value
+      // has to report what it would leave on the board in front of someone,
+      // not on the board they would have without their own search.
       func counts(_ facet: TaskBoardFilterFacet) -> Bool {
-        matcher.matches(fields, excluding: facet)
+        matcher.matches(fields, excluding: .facet(facet))
       }
 
       if let projectKey = fields.projectKey {

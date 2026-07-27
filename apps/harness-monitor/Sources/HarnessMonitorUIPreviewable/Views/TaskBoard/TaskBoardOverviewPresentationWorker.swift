@@ -10,16 +10,20 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
   /// The registered project catalog every card resolves its name through.
   let taskBoardProjects: [TaskBoardProjectSummary]
   let filters: TaskBoardFilterState
+  /// Text as the field holds it, once the keystrokes have settled.
+  let searchText: String
 
-  /// Spelled out so `filters` can default without giving up `let`: a value
-  /// this snapshot hands to an actor should not be mutable after the fact.
+  /// Spelled out so `filters` and `searchText` can default without giving up
+  /// `let`: a value this snapshot hands to an actor should not be mutable after
+  /// the fact.
   init(
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem],
     decisionItems: [DecisionPresentationItem],
     scopeSessionID: String?,
     taskBoardProjects: [TaskBoardProjectSummary],
-    filters: TaskBoardFilterState = TaskBoardFilterState()
+    filters: TaskBoardFilterState = TaskBoardFilterState(),
+    searchText: String = ""
   ) {
     self.snapshot = snapshot
     self.taskBoardItems = taskBoardItems
@@ -27,6 +31,7 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
     self.scopeSessionID = scopeSessionID
     self.taskBoardProjects = taskBoardProjects
     self.filters = filters
+    self.searchText = searchText
   }
 }
 
@@ -48,8 +53,9 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     aggregateBlockedCount: 0,
     aggregateDoneCount: 0,
     filterInventory: .empty,
+    searchCandidates: [],
     hasUnfilteredContent: false,
-    responsibleFilterFacets: []
+    responsibleNarrowingCauses: []
   )
 
   let taskBoardItems: [TaskBoardItem]
@@ -69,10 +75,13 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let aggregateBlockedCount: Int
   let aggregateDoneCount: Int
   let filterInventory: TaskBoardFilterInventory
-  /// Whether the board holds anything at all, filter aside.
+  /// What the search field suggests from: the cards the facets leave, before
+  /// the search narrows them.
+  let searchCandidates: [TaskBoardSearchCandidate]
+  /// Whether the board holds anything at all, filter and search aside.
   let hasUnfilteredContent: Bool
-  /// Populated only when the filter is what left the board empty.
-  let responsibleFilterFacets: [TaskBoardFilterFacet]
+  /// Populated only when the filter or the search is what left the board empty.
+  let responsibleNarrowingCauses: [TaskBoardNarrowingCause]
 
   var hasBoardContent: Bool {
     !taskBoardItems.isEmpty
@@ -186,9 +195,10 @@ actor TaskBoardOverviewPresentationWorker {
       scopedItems: scopedTaskBoardItems,
       visibleItems: visibleItems,
       inboxItems: uniqueInboxItems(input.snapshot.items),
-      decisionIDs: sortedOpenDecisionIDs(input.decisionItems),
+      decisions: sortedOpenDecisions(input.decisionItems),
       projectLabelResolver: projectLabelResolver,
-      filters: input.filters
+      filters: input.filters,
+      search: TaskBoardSearchQuery(input.searchText)
     )
     let taskBoardItems = filtered.items
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
@@ -268,8 +278,9 @@ actor TaskBoardOverviewPresentationWorker {
       aggregateBlockedCount: taskBoardBlockedCount + (inboxItemsByLane[.failed]?.count ?? 0),
       aggregateDoneCount: taskBoardDoneCount + input.snapshot.completedItemCount,
       filterInventory: filtered.inventory,
+      searchCandidates: filtered.searchCandidates,
       hasUnfilteredContent: filtered.hasUnfilteredContent,
-      responsibleFilterFacets: filtered.responsibleFacets
+      responsibleNarrowingCauses: filtered.responsibleCauses
     )
   }
 
@@ -306,7 +317,9 @@ actor TaskBoardOverviewPresentationWorker {
     }
   }
 
-  private static func sortedOpenDecisionIDs(_ decisions: [DecisionPresentationItem]) -> [String] {
+  private static func sortedOpenDecisions(
+    _ decisions: [DecisionPresentationItem]
+  ) -> [DecisionPresentationItem] {
     decisions
       .filter { $0.statusRaw == "open" }
       .sorted { left, right in
@@ -320,7 +333,6 @@ actor TaskBoardOverviewPresentationWorker {
         }
         return left.id < right.id
       }
-      .map(\.id)
   }
 
   private static func severityRank(_ severity: String) -> Int {

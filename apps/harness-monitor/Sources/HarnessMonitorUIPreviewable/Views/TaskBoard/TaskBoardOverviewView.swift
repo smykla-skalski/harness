@@ -45,6 +45,12 @@ public struct TaskBoardOverviewView: View {
   var laneAppearancePreferencesRawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
   @AppStorage(TaskBoardFilterPreferences.storageKey)
   var filterPreferencesRawValue = TaskBoardFilterPreferences.emptyRawValue
+  /// What the field holds right now. The filter is a view someone keeps, so it
+  /// is stored; a search is something they are in the middle of, so it is not.
+  @State private var searchText = ""
+  /// What the board is narrowed by: the field's text once the keystrokes have
+  /// settled, so a half-typed word never empties the lanes on the way through.
+  @State private var appliedSearchText = ""
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -144,6 +150,9 @@ public struct TaskBoardOverviewView: View {
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }
+    .task(id: searchText) {
+      await applySearchTextWhenSettled()
+    }
     .onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration) {
       requestDeleteSelectedTaskBoardCards()
     }
@@ -173,7 +182,8 @@ public struct TaskBoardOverviewView: View {
       decisionItems: decisionItems,
       scopeSessionID: taskBoardSessionID,
       taskBoardProjects: store?.globalTaskBoardProjects ?? [],
-      filters: boardFilters
+      filters: boardFilters,
+      searchText: boardSearchText
     )
   }
 
@@ -191,6 +201,21 @@ public struct TaskBoardOverviewView: View {
     Binding(
       get: { boardFilters },
       set: { filterPreferencesRawValue = TaskBoardFilterPreferences.rawValue(for: $0) }
+    )
+  }
+
+  /// Scoped the same way the filter is, and for the same reason.
+  var boardSearchText: String {
+    taskBoardSessionID == nil ? appliedSearchText : ""
+  }
+
+  /// What the field holds, which leads the applied text by a keystroke or two.
+  var boardSearchFieldText: String { searchText }
+
+  var boardSearchTextBinding: Binding<String> {
+    Binding(
+      get: { searchText },
+      set: { searchText = $0 }
     )
   }
 
@@ -268,6 +293,20 @@ extension TaskBoardOverviewView {
       }
     }
     .accessibilityIdentifier("harness.task-board.evaluation-summary")
+  }
+
+  /// Holds the board still until the typing stops. Clearing skips the wait: the
+  /// board someone is asking for back is the one they already had.
+  @MainActor
+  func applySearchTextWhenSettled() async {
+    let pending = searchText
+    if !pending.isEmpty {
+      try? await Task.sleep(for: .milliseconds(180))
+      guard !Task.isCancelled else { return }
+    }
+    if appliedSearchText != pending {
+      appliedSearchText = pending
+    }
   }
 
   @MainActor
