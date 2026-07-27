@@ -77,9 +77,11 @@ fn sees_every_pairing(client: Option<&RemoteStoredClient>) -> bool {
     path = "/v1/remote/pairings",
     tag = "pairing",
     description = "List pairing links and the devices they became, alongside the version of the daemon answering. Requires the pair_manage scope, which shows the caller the links it minted; a caller that also holds admin sees every pairing. Beyond the shared middleware causes, this route answers 503 when the pairing store is unavailable",
+    // 503 is one of the cross-cutting responses the generator references from
+    // every operation. Declaring it here instead keeps that reference out, and
+    // the route's own description already says what makes this one 503.
     responses(
         (status = 200, description = "Pairings the caller may see", body = RemotePairingListResponse),
-        (status = 503, description = "Pairing store unavailable", body = DaemonErrorBody),
     ),
 )]
 async fn get_remote_pairings(
@@ -144,7 +146,6 @@ fn list_pairings(
         (status = 200, description = "Pairing revoked", body = RemotePairingRevokeResponse),
         (status = 403, description = "The pairing is not available to this caller: minted by another client, or no such id. The two are deliberately indistinguishable so the route cannot be used to discover which ids exist", body = DaemonErrorBody),
         (status = 404, description = "No such pairing, answered only to a caller entitled to see every pairing", body = DaemonErrorBody),
-        (status = 503, description = "Pairing store unavailable", body = DaemonErrorBody),
     ),
 )]
 async fn post_remote_pairing_revoke(
