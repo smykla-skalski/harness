@@ -24,6 +24,12 @@ struct PreviewHostApp: App {
       }
       exit(0)
     }
+    if let dumpDirectory = ProcessInfo.processInfo.environment[
+      "HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP"
+    ] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      exit(TaskBoardFilterPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
+    }
     if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_LANE_COLOR_PICKER_DUMP"] {
       NSApplication.shared.setActivationPolicy(.prohibited)
       do {

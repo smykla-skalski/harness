@@ -1,0 +1,137 @@
+import AppKit
+import SwiftUI
+
+/// Shell snapshots for the board's filter surfaces.
+public enum TaskBoardFilterPreviewRenderer {
+  @MainActor
+  public static func dump(toDirectory directory: String) -> Bool {
+    do {
+      try FileManager.default.createDirectory(
+        atPath: directory,
+        withIntermediateDirectories: true
+      )
+    } catch {
+      return false
+    }
+
+    let defaultIndex = HarnessMonitorTextSize.defaultIndex
+    let largestIndex = HarnessMonitorTextSize.scales.count - 1
+    return render(
+      name: "filter-bar-idle",
+      size: NSSize(width: 900, height: 120),
+      textSizeIndex: defaultIndex,
+      directory: directory
+    ) {
+      TaskBoardFilterBarPreview(filters: TaskBoardFilterState())
+    }
+      && render(
+        name: "filter-bar-active",
+        size: NSSize(width: 900, height: 160),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterBarPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
+      }
+      && render(
+        name: "filter-bar-active-largest-text",
+        size: NSSize(width: 900, height: 260),
+        textSizeIndex: largestIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterBarPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
+      }
+      && render(
+        name: "filter-project-dropdown",
+        size: NSSize(width: 340, height: 160),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFacetFilterOptionsPreview(
+          facet: .project,
+          filters: TaskBoardFilterPreviewFixtures.narrowedFilters
+        )
+      }
+      && render(
+        name: "filter-priority-dropdown",
+        size: NSSize(width: 340, height: 184),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFacetFilterOptionsPreview(
+          facet: .priority,
+          filters: TaskBoardFilterPreviewFixtures.narrowedFilters
+        )
+      }
+      && render(
+        name: "filter-popover",
+        size: NSSize(width: 420, height: 400),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterPopoverPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
+      }
+      && render(
+        name: "filter-popover-largest-text",
+        size: NSSize(width: 500, height: 520),
+        textSizeIndex: largestIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterPopoverPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
+      }
+      && render(
+        name: "filter-empty-state",
+        size: NSSize(width: 640, height: 260),
+        textSizeIndex: defaultIndex,
+        directory: directory
+      ) {
+        TaskBoardFilterEmptyStatePreview()
+      }
+  }
+
+  @MainActor
+  private static func render<Content: View>(
+    name: String,
+    size: NSSize,
+    textSizeIndex: Int,
+    directory: String,
+    @ViewBuilder content: () -> Content
+  ) -> Bool {
+    let hosted =
+      content()
+      .padding(HarnessMonitorTheme.spacingLG)
+      .frame(width: size.width, height: size.height, alignment: .topLeading)
+      // Stands in for the board's own chrome. Without it the capture is
+      // transparent, and every unselected chip and secondary label reads as
+      // invisible against whatever the viewer composites it onto.
+      .background(Color(nsColor: .windowBackgroundColor))
+      .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
+    let view = NSHostingView(rootView: hosted)
+    // Theme colors are asset-backed, so they resolve against the view's own
+    // appearance and not the scene modifier alone.
+    view.appearance = NSAppearance(named: .darkAqua)
+    view.setFrameSize(size)
+    view.layoutSubtreeIfNeeded()
+
+    guard
+      let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+    else {
+      return false
+    }
+    view.cacheDisplay(in: view.bounds, to: bitmap)
+    guard let data = bitmap.representation(using: .png, properties: [:]), !data.isEmpty else {
+      return false
+    }
+
+    do {
+      try data.write(
+        to: URL(fileURLWithPath: directory)
+          .appendingPathComponent(name)
+          .appendingPathExtension("png"),
+        options: .atomic
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+}
