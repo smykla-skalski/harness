@@ -95,6 +95,7 @@ fn leave_session_outside_a_tokio_runtime_uses_the_fake_daemon() {
         let _lock = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
 
         let response_body = fake_session_detail(session_id);
+        let expected_path = format!("POST /v1/sessions/{session_id}/leave ");
         let server = std::thread::spawn(move || {
             loop {
                 let (mut stream, _) = listener.accept().expect("accept");
@@ -109,8 +110,8 @@ fn leave_session_outside_a_tokio_runtime_uses_the_fake_daemon() {
                     continue;
                 }
                 assert!(
-                    first_line.starts_with("POST /v1/sessions/"),
-                    "unexpected request: {first_line}"
+                    first_line.starts_with(&expected_path),
+                    "expected {expected_path:?}, got: {first_line}"
                 );
                 write_response(&mut stream, &response_body);
                 return;
