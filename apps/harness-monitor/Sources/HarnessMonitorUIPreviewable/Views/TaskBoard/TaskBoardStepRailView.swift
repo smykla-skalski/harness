@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -10,6 +11,9 @@ struct TaskBoardStepRailView: View {
   let taskBoardItems: [TaskBoardItem]
   let isActionInFlight: Bool
   let actions: TaskBoardOverviewActions
+  /// Where the guided flow is stored between launches. Injectable so tests never
+  /// touch the app's own preferences.
+  let flowDefaults: UserDefaults
 
   @Environment(\.openWindow)
   var openWindow
@@ -52,7 +56,7 @@ struct TaskBoardStepRailView: View {
   var body: some View {
     TaskBoardSection(title: "Manual Steps") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        TaskBoardStepRailTargetView(item: activeItem, isPicked: stepFlow.hasPicked)
+        TaskBoardStepRailTargetView(item: activeItem, isPicked: hasPickedActiveItem)
         Divider()
         stageSplit
         Divider()
@@ -83,6 +87,14 @@ struct TaskBoardStepRailView: View {
     }
     .onChange(of: status.stepMode) {
       if !status.stepMode { state.reset() }
+    }
+    .onChange(of: stepFlowRestorationRevision, initial: true) { _, _ in
+      restoreStepFlowIfNeeded()
+    }
+    // Deliberately without `initial`: the panel mounts before restoration runs,
+    // and writing the empty flow then would forget the stored one.
+    .onChange(of: state.flowRevision) { _, _ in
+      persistStepFlow()
     }
     .onChange(of: stagePlan.stage) { _, newStage in
       AccessibilityNotification.Announcement("Step Mode stage: \(newStage.title)").post()
@@ -207,8 +219,8 @@ struct TaskBoardStepRailView: View {
       whatNext: plan.whatNext
     ) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        if plan.stage == .readyToDeliver, let selection = activeSelection {
-          TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
+        if plan.stage == .readyToDeliver, let activePrompt {
+          TaskBoardStepPromptPreview(prompt: activePrompt)
         }
         if offersActions(plan) {
           actionRow(plan)

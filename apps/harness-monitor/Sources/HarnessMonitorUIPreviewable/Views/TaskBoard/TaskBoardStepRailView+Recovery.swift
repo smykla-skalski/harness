@@ -22,17 +22,37 @@ extension TaskBoardStepRailView {
 
   var activeItem: TaskBoardItem? { stepFlow.item }
 
-  var activeSelection: TaskBoardDispatchSelection? {
+  /// The item this session's Pick loaded, or the one a restored pick named. A
+  /// launch cannot hand over its dispatch plan, so the restored half is an
+  /// identity plus the prompt the user had already read.
+  var pickedItemID: String? {
+    if let pickedItemID = stepRailState.pickedSelection?.item.id { return pickedItemID }
+    return stepRailState.restoredPickedPrompt == nil ? nil : stepRailState.lockedItemID
+  }
+
+  /// The prompt the Deliver step previews: this session's pick, then the plan
+  /// the daemon still holds for the item, then the restored pick's.
+  var activePrompt: String? {
     guard let item = activeItem else { return nil }
-    if stepRailState.pickedSelection?.item.id == item.id {
-      return stepRailState.pickedSelection
+    if let picked = stepRailState.pickedSelection, picked.item.id == item.id {
+      return picked.plan.renderedPrompt
     }
-    return stepFlow.dispatchPlan.map { TaskBoardDispatchSelection(item: item, plan: $0) }
+    if let plan = stepFlow.dispatchPlan { return plan.renderedPrompt }
+    return item.id == pickedItemID ? stepRailState.restoredPickedPrompt : nil
+  }
+
+  /// The one answer to "this flow has a pick". Both the stage and the panel
+  /// heading read it, so a restored pick can never offer Deliver under a
+  /// heading that still calls the item an untouched target.
+  var hasPickedActiveItem: Bool {
+    if stepFlow.hasPicked { return true }
+    guard let pickedItemID, let activeItemID = activeItem?.id else { return false }
+    return pickedItemID == activeItemID
   }
 
   var deliveryItemID: String? {
     stepFlow.deliveryItemID(
-      pickedSelection: stepRailState.pickedSelection,
+      pickedItemID: pickedItemID,
       heldDispatches: status.heldDispatches
     )
   }
@@ -42,7 +62,7 @@ extension TaskBoardStepRailView {
       for: TaskBoardStepStageInputs(
         item: activeItem,
         latestRecord: stepFlow.latestRecord,
-        hasPicked: stepFlow.hasPicked,
+        hasPicked: hasPickedActiveItem,
         hasDelivered: stepRailState.delivery != nil,
         canDeliver: deliveryItemID != nil
       )

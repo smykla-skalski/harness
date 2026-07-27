@@ -39,7 +39,8 @@ extension TaskBoardOverviewView {
           targetItem: currentPresentation.stepRailTargetItem,
           taskBoardItems: taskBoardItems,
           isActionInFlight: isActionInFlight,
-          actions: actions
+          actions: actions,
+          flowDefaults: .standard
         )
       }
     }

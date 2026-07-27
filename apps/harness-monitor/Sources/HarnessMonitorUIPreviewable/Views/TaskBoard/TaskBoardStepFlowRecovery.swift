@@ -16,11 +16,11 @@ struct TaskBoardStepRecoveredFlow: Equatable, Sendable {
   let hasPicked: Bool
 
   func deliveryItemID(
-    pickedSelection: TaskBoardDispatchSelection?,
+    pickedItemID: String?,
     heldDispatches: TaskBoardHeldDispatchSummary
   ) -> String? {
     guard let itemID = item?.id else { return nil }
-    let wasPicked = pickedSelection?.item.id == itemID
+    let wasPicked = pickedItemID == itemID
     let isHeld = heldDispatches.items.contains { $0.boardItemId == itemID }
     return wasPicked || isHeld ? itemID : nil
   }

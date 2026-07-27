@@ -320,7 +320,7 @@ struct TaskBoardRouteContentSourceTests {
     #expect(
       actionsSource.contains(
         "await MainActor.run {\n          state.requestApprovalRefresh()"
-          + "\n          state.pickedSelection = selection"
+          + "\n          state.applyPick(selection)"
       )
     )
   }

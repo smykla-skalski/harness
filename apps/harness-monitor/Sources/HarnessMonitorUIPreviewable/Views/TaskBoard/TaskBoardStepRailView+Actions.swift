@@ -41,10 +41,7 @@ extension TaskBoardStepRailView {
         let selection = await store.pickTaskBoardDispatch()
         await MainActor.run {
           state.requestApprovalRefresh()
-          state.pickedSelection = selection
-          state.delivery = nil
-          // Always track the picked item, clearing the lock when Pick returned nil.
-          state.lockedItemID = selection?.item.id
+          state.applyPick(selection)
           state.finish()
         }
       }

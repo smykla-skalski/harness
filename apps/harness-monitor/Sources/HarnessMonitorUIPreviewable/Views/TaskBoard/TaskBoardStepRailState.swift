@@ -28,15 +28,28 @@ final class TaskBoardStepRailState {
   }
 
   var isRunning = false
-  var pickedSelection: TaskBoardDispatchSelection?
+  private(set) var pickedSelection: TaskBoardDispatchSelection?
   var delivery: TaskBoardDispatchDelivery?
   var confirmation: Confirmation?
   var approvalRefreshGeneration: UInt64 = 0
   /// The board item the guided flow follows through its lifecycle, even after it
   /// leaves the Todo column. Set on pick.
-  var lockedItemID: String?
+  private(set) var lockedItemID: String?
+  /// Bumps whenever the flow the next launch should reopen on changes. The panel
+  /// watches this rather than the stored value itself, which would mean rebuilding
+  /// and comparing that value, prompt included, on every body pass.
+  private(set) var flowRevision: UInt64 = 0
   /// A rail node the user tapped to read ahead; nil shows the live current stage.
   var viewingColumn: TaskBoardStepColumn?
+  /// The prompt a restored pick rendered, kept until this session's own Pick
+  /// replaces it or the flow ends. Stands in for `pickedSelection`, which an
+  /// earlier launch cannot hand over: only the prompt is worth storing.
+  private(set) var restoredPickedPrompt: String?
+  /// The stored flow this panel has read but not yet resolved against the live
+  /// board. Read from disk once; restoration then retries against it as board
+  /// snapshots arrive, and clears it once the flow is adopted or superseded.
+  var pendingRestoredFlow: TaskBoardStepFlowSnapshot?
+  var hasLoadedPersistedFlow = false
   /// Whether the automation-context footer is open. Held here rather than left
   /// to `DisclosureGroup` so the label can drive it from a full-width tap.
   var isAutomationContextExpanded = false
@@ -62,6 +75,27 @@ final class TaskBoardStepRailState {
   func preserveFlowIdentity(itemID: String?) {
     guard lockedItemID == nil, let itemID else { return }
     lockedItemID = itemID
+    flowRevision &+= 1
+  }
+
+  /// Pick loaded a plan, so the flow follows that item and drops any delivery
+  /// recorded for the previous one.
+  func applyPick(_ selection: TaskBoardDispatchSelection?) {
+    pickedSelection = selection
+    delivery = nil
+    restoredPickedPrompt = nil
+    // Always track the picked item, clearing the lock when Pick returned nil.
+    lockedItemID = selection?.item.id
+    flowRevision &+= 1
+  }
+
+  /// Adopts the flow an earlier launch stored. Deliberately no revision bump:
+  /// this is what the stored flow already says, and treating it as a change
+  /// would rewrite the same bytes on every panel mount.
+  func adoptRestoredFlow(itemID: String, pickedPrompt: String?) {
+    restoredPickedPrompt = pickedPrompt
+    lockedItemID = itemID
+    pendingRestoredFlow = nil
   }
 
   /// Captures the item the user is about to authorize before showing the dialog.
@@ -88,19 +122,28 @@ final class TaskBoardStepRailState {
   /// Clears the per-item flow so the wizard follows the next target.
   func resetFlow() {
     pickedSelection = nil
+    restoredPickedPrompt = nil
     delivery = nil
     lockedItemID = nil
     viewingColumn = nil
+    pendingRestoredFlow = nil
+    flowRevision &+= 1
   }
 
+  /// Standing the panel down is not the user leaving the flow, so this bumps no
+  /// revision: the stored flow outlives step mode going off and is waiting when
+  /// it comes back on. `hasLoadedPersistedFlow` survives for the same reason -
+  /// the disk read belongs to the panel, not to the flow.
   func reset() {
     isRunning = false
     pickedSelection = nil
+    restoredPickedPrompt = nil
     delivery = nil
     confirmation = nil
     approvalRefreshGeneration = 0
     lockedItemID = nil
     viewingColumn = nil
+    pendingRestoredFlow = nil
     isAutomationContextExpanded = false
   }
 }
