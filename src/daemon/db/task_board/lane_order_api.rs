@@ -13,11 +13,11 @@ use super::lane_order::{
 use super::lane_order_audit::record_lane_position_audit_in_tx;
 use super::triage_apply::{override_implied_status, reapply_active_override_outcome_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, TaskBoardTriageOverride,
     validate_lane_placement,
 };
+use harness_kernel::errors::CliErrorKind;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardLanePositionInput {
@@ -54,68 +54,23 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board lane position")
             .await?;
-        ensure_expected_sequence_in_tx(&mut transaction, input.expected_items_change_seq).await?;
-        let (mut item, revision, existing_override) =
-            load_item_with_triage_override_in_tx(&mut transaction, &input.item_id)
-                .await?
-                .ok_or_else(|| {
-                    db_error(format!("task-board item '{}' not found", input.item_id))
-                })?;
-        ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
-        if item.deleted_at.is_some() {
-            return Err(
-                CliErrorKind::invalid_transition("cannot place a deleted task-board item").into(),
-            );
-        }
-        let requested_status = input
-            .status
-            .unwrap_or(item.status)
-            .canonical_persisted_status();
-        reject_if_destination_conflicts_with_active_override(
-            item.status.canonical_persisted_status(),
-            requested_status,
-            existing_override.as_ref(),
-        )?;
-        let before = item.clone();
-        let audit_before = before.clone();
-        item.status = requested_status;
-        item.lane_position = Some(input.lane_position);
-        item.lane_origin = Some(TaskBoardLaneOrigin::Manual {
-            actor: input.actor.clone(),
-        });
-        let now = utc_now();
-        item.lane_set_at = Some(now.clone());
-        item.updated_at = now;
-        validate_lane_placement(&item).map_err(db_error)?;
+        let (before, revision, item, audit_before) =
+            prepare_manual_lane_position_in_tx(&mut transaction, &input).await?;
         apply_task_board_item_status_transition_in_tx(&mut transaction, &item).await?;
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Manual,
+        settle_manual_lane_mutation_in_tx(
+            transaction,
+            ManualLaneMutation {
+                before,
+                revision,
+                item,
+                transition: LaneTransitionKind::Manual,
+                audit_before: &audit_before,
+                actor: &input.actor,
+                audit_kind: TaskBoardLanePositionAuditKind::Set,
+                commit_context: "commit task-board lane position",
+            },
         )
-        .await?;
-        let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_position_audit_in_tx(
-            &mut transaction,
-            &audit_before,
-            &write,
-            items_change_seq,
-            &input.actor,
-            TaskBoardLanePositionAuditKind::Set,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task-board lane position: {error}")))?;
-        Ok(TaskBoardLaneMutationResult {
-            item: write.item,
-            item_revision: write.item_revision,
-            items_change_seq,
-            shifted: write.shifted,
-        })
+        .await
     }
 
     /// Reset an item to derived default ordering under one item-list sequence CAS.
@@ -131,33 +86,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board lane reset")
             .await?;
-        ensure_expected_sequence_in_tx(&mut transaction, input.expected_items_change_seq).await?;
         let (mut item, revision, existing_override) =
-            load_item_with_triage_override_in_tx(&mut transaction, &input.item_id)
-                .await?
-                .ok_or_else(|| {
-                    db_error(format!("task-board item '{}' not found", input.item_id))
-                })?;
-        ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
-        if item.deleted_at.is_some() {
-            return Err(
-                CliErrorKind::invalid_transition("cannot reset a deleted task-board item").into(),
-            );
-        }
-        if item.lane_position.is_none() {
-            return Err(CliErrorKind::invalid_transition(
-                "task-board item has no explicit position to reset",
-            )
-            .into());
-        }
-        if existing_override.is_some()
-            && has_active_dispatch_reservation_in_tx(&mut transaction, &item.id).await?
-        {
-            return Err(CliErrorKind::invalid_transition(
-                "task-board item has an active dispatch reservation; wait for it to clear before resetting an overridden item's position",
-            )
-            .into());
-        }
+            prepare_lane_reset_in_tx(&mut transaction, &input).await?;
         let before = item.clone();
         let audit_before = before.clone();
         clear_placement(&mut item);
@@ -171,34 +101,20 @@ impl AsyncDaemonDb {
         )
         .await?;
         let transition = override_reapply_transition.unwrap_or(LaneTransitionKind::Generic);
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            transition,
+        settle_manual_lane_mutation_in_tx(
+            transaction,
+            ManualLaneMutation {
+                before,
+                revision,
+                item,
+                transition,
+                audit_before: &audit_before,
+                actor: &input.actor,
+                audit_kind: TaskBoardLanePositionAuditKind::Reset,
+                commit_context: "commit task-board lane reset",
+            },
         )
-        .await?;
-        let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_position_audit_in_tx(
-            &mut transaction,
-            &audit_before,
-            &write,
-            items_change_seq,
-            &input.actor,
-            TaskBoardLanePositionAuditKind::Reset,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task-board lane reset: {error}")))?;
-        Ok(TaskBoardLaneMutationResult {
-            item: write.item,
-            item_revision: write.item_revision,
-            items_change_seq,
-            shifted: write.shifted,
-        })
+        .await
     }
 
     /// Later automation can use this internal seam without replacing manual
@@ -218,11 +134,7 @@ impl AsyncDaemonDb {
                 .await?
                 .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
         let before = item.clone();
-        let manually_placed = before
-            .lane_origin
-            .as_ref()
-            .is_some_and(TaskBoardLaneOrigin::is_manual);
-        if manually_placed || existing_override.is_some() {
+        if preserves_existing_lane_placement(&before, existing_override.as_ref()) {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit preserved existing lane placement: {error}"))
             })?;
@@ -233,27 +145,169 @@ impl AsyncDaemonDb {
         let now = utc_now();
         item.lane_set_at = Some(now.clone());
         item.updated_at = now;
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Automatic,
-        )
-        .await?;
-        let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, items_change_seq).await?;
-        transaction
-            .commit()
+        settle_automatic_lane_mutation_in_tx(transaction, before, revision, item)
             .await
-            .map_err(|error| db_error(format!("commit automatic lane position: {error}")))?;
-        Ok(Some(TaskBoardLaneMutationResult {
-            item: write.item,
-            item_revision: write.item_revision,
-            items_change_seq,
-            shifted: write.shifted,
-        }))
+            .map(Some)
     }
+}
+
+struct ManualLaneMutation<'a> {
+    before: TaskBoardItem,
+    revision: i64,
+    item: TaskBoardItem,
+    transition: LaneTransitionKind,
+    audit_before: &'a TaskBoardItem,
+    actor: &'a str,
+    audit_kind: TaskBoardLanePositionAuditKind,
+    commit_context: &'static str,
+}
+
+async fn settle_manual_lane_mutation_in_tx(
+    mut transaction: Transaction<'_, Sqlite>,
+    mutation: ManualLaneMutation<'_>,
+) -> Result<TaskBoardLaneMutationResult, CliError> {
+    let ManualLaneMutation {
+        before,
+        revision,
+        item,
+        transition,
+        audit_before,
+        actor,
+        audit_kind,
+        commit_context,
+    } = mutation;
+    let write =
+        replace_with_lane_transition_in_tx(&mut transaction, before, revision, item, transition)
+            .await?;
+    let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_lane_position_audit_in_tx(
+        &mut transaction,
+        audit_before,
+        &write,
+        items_change_seq,
+        actor,
+        audit_kind,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("{commit_context}: {error}")))?;
+    Ok(TaskBoardLaneMutationResult {
+        item: write.item,
+        item_revision: write.item_revision,
+        items_change_seq,
+        shifted: write.shifted,
+    })
+}
+
+async fn settle_automatic_lane_mutation_in_tx(
+    mut transaction: Transaction<'_, Sqlite>,
+    before: TaskBoardItem,
+    revision: i64,
+    item: TaskBoardItem,
+) -> Result<TaskBoardLaneMutationResult, CliError> {
+    let write = replace_with_lane_transition_in_tx(
+        &mut transaction,
+        before,
+        revision,
+        item,
+        LaneTransitionKind::Automatic,
+    )
+    .await?;
+    let items_change_seq = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_lane_transition_audit_in_tx(&mut transaction, &write, items_change_seq).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit automatic lane position: {error}")))?;
+    Ok(TaskBoardLaneMutationResult {
+        item: write.item,
+        item_revision: write.item_revision,
+        items_change_seq,
+        shifted: write.shifted,
+    })
+}
+
+async fn prepare_manual_lane_position_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    input: &TaskBoardLanePositionInput,
+) -> Result<(TaskBoardItem, i64, TaskBoardItem, TaskBoardItem), CliError> {
+    ensure_expected_sequence_in_tx(transaction, input.expected_items_change_seq).await?;
+    let (mut item, revision, existing_override) =
+        load_item_with_triage_override_in_tx(transaction, &input.item_id)
+            .await?
+            .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
+    ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
+    if item.deleted_at.is_some() {
+        return Err(
+            CliErrorKind::invalid_transition("cannot place a deleted task-board item").into(),
+        );
+    }
+    let requested_status = input
+        .status
+        .unwrap_or(item.status)
+        .canonical_persisted_status();
+    reject_if_destination_conflicts_with_active_override(
+        item.status.canonical_persisted_status(),
+        requested_status,
+        existing_override.as_ref(),
+    )?;
+    let before = item.clone();
+    let audit_before = before.clone();
+    item.status = requested_status;
+    item.lane_position = Some(input.lane_position);
+    item.lane_origin = Some(TaskBoardLaneOrigin::Manual {
+        actor: input.actor.clone(),
+    });
+    let now = utc_now();
+    item.lane_set_at = Some(now.clone());
+    item.updated_at = now;
+    validate_lane_placement(&item).map_err(db_error)?;
+    Ok((before, revision, item, audit_before))
+}
+
+async fn prepare_lane_reset_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    input: &TaskBoardLaneResetInput,
+) -> Result<(TaskBoardItem, i64, Option<TaskBoardTriageOverride>), CliError> {
+    ensure_expected_sequence_in_tx(transaction, input.expected_items_change_seq).await?;
+    let (item, revision, existing_override) =
+        load_item_with_triage_override_in_tx(transaction, &input.item_id)
+            .await?
+            .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
+    ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
+    if item.deleted_at.is_some() {
+        return Err(
+            CliErrorKind::invalid_transition("cannot reset a deleted task-board item").into(),
+        );
+    }
+    if item.lane_position.is_none() {
+        return Err(CliErrorKind::invalid_transition(
+            "task-board item has no explicit position to reset",
+        )
+        .into());
+    }
+    if existing_override.is_some()
+        && has_active_dispatch_reservation_in_tx(transaction, &item.id).await?
+    {
+        return Err(CliErrorKind::invalid_transition(
+            "task-board item has an active dispatch reservation; wait for it to clear before resetting an overridden item's position",
+        )
+        .into());
+    }
+    Ok((item, revision, existing_override))
+}
+
+fn preserves_existing_lane_placement(
+    item: &TaskBoardItem,
+    existing_override: Option<&TaskBoardTriageOverride>,
+) -> bool {
+    existing_override.is_some()
+        || item
+            .lane_origin
+            .as_ref()
+            .is_some_and(TaskBoardLaneOrigin::is_manual)
 }
 
 async fn ensure_expected_sequence_in_tx(
