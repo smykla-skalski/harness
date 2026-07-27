@@ -14,9 +14,9 @@
 #                            (ms-playwright is reported but NOT removed; pass --force/-f to remove it)
 #
 # target/ is shared across every worktree via cargo-local.sh's
-# CARGO_TARGET_DIR: target/dev/local for the main checkout, or
-# target/dev/wt-<worktree-name>-<hash> per linked worktree, shared by every
-# session that builds in that checkout, all rooted at the common repo.
+# CARGO_TARGET_DIR: target/dev/local-v<format> for the main checkout, or
+# target/dev/wt-<worktree-name>-<hash>-v<format> per linked worktree, shared by
+# every session that builds in that checkout, all rooted at the common repo.
 # Segments with a live target/.cargo-local/leases/ entry are actively
 # building and are kept, not deleted, so this script never rips a build out
 # from under a running session; every other entry under target/dev/ is
@@ -147,7 +147,7 @@ section() {
   printf '\n[%s]\n' "$1"
 }
 
-# A segment (target/dev/local or target/dev/wt-<worktree>-<hash>) is leased
+# A versioned segment under target/dev is leased
 # when a cargo-local.sh lease file names it with a PID that's still alive.
 segment_is_leased() {
   cargo_lane_segment_is_leased "$LEASE_DIR" "$1"

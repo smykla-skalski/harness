@@ -1,6 +1,4 @@
-use std::path::Path;
-
-use super::helpers::{collect_hits_in_paths, collect_hits_in_tree};
+use super::helpers::{collect_hits_in_paths, collect_hits_in_tree, repo_root};
 
 const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[
     ("src/task_board/store.rs", "pub struct TaskBoardStore"),
@@ -46,7 +44,7 @@ const FILE_STORAGE_SYMBOLS: &[&str] = &[
 /// Orchestrator tests belong on the `AsyncDaemonDb` path.
 #[test]
 fn task_board_orchestrator_has_one_runner() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     for retired in [
         "src/daemon/service/task_board_orchestrator.rs",
         "src/daemon/service/task_board_orchestrator",
@@ -60,7 +58,7 @@ fn task_board_orchestrator_has_one_runner() {
 
 #[test]
 fn task_board_cli_transport_is_daemon_only() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let mut hits = collect_hits_in_tree(
         &root.join("src/task_board/transport"),
         root,
@@ -83,7 +81,7 @@ fn task_board_cli_transport_is_daemon_only() {
 
 #[test]
 fn live_task_board_consumers_do_not_reopen_legacy_storage() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     let paths = [
         "src/daemon/service/task_board_db.rs",
         "src/daemon/service/task_board_orchestrator_db.rs",
@@ -127,7 +125,7 @@ fn live_task_board_consumers_do_not_reopen_legacy_storage() {
 
 #[test]
 fn legacy_task_board_file_repositories_are_test_only() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root = repo_root();
     for (relative_path, declaration) in LEGACY_FILE_REPOSITORIES {
         let source = std::fs::read_to_string(root.join(relative_path))
             .unwrap_or_else(|error| panic!("read {relative_path}: {error}"));

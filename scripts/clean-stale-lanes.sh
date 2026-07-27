@@ -265,7 +265,7 @@ dev_segment_has_worktree() {
 dev_segment_for_worktree() {
   local path="$1" resolved
   resolved="$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P)" || return 1
-  [[ "$resolved" == "$MAIN_WORKTREE_ROOT" ]] && { printf 'local\n'; return 0; }
+  [[ "$resolved" == "$MAIN_WORKTREE_ROOT" ]] && { cargo_lane_main_segment; return 0; }
   cargo_lane_segment_for_path "$resolved"
 }
 
@@ -276,7 +276,7 @@ process_dev_segment() {
   local segment="$1" path="$2"
   [[ -d "$path" ]] || return 0
   dev_segments_touched=$((dev_segments_touched + 1))
-  if [[ "$segment" == "local" ]]; then
+  if [[ "$segment" == "$(cargo_lane_main_segment)" ]]; then
     record_keep "dev" "main" "$segment" "$path"
     return 0
   fi

@@ -154,7 +154,7 @@ It deliberately skips three things:
 Reclaim this session's two build caches first, because `git worktree remove` deletes the only name that maps the shared lane back to this session. `mise run clean:lanes` reclaims neither: it covers `xcode-derived-lanes/` and always keeps the current worktree.
 
 - `<worktree>/target` - direct `cargo` and `cargo nextest` output.
-- `<main-checkout>/target/dev/wt-<worktree-name>-<hash>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
+- `<main-checkout>/target/dev/wt-<worktree-name>-<hash>-v<format>` - everything from `scripts/cargo-local.sh`, which every `mise run test:*` task uses. Sits outside the worktree and is usually the larger.
 
 Every other session holds its own `target/dev/wt-*` lane, so ask `cargo-local.sh` for this one rather than matching a name by eye, and clear any target-dir override first, since the script honours one and would otherwise answer with the redirect. A lease is named `<segment>-<pid>` and holds that PID inside, and a running build's lane must survive, so the delete stands down while one of those PIDs is alive. Mirror `segment_is_leased` in `clean-build-caches.sh`: require the filename to match the PID it carries, and count a PID that fails `kill -0` but still appears in `ps` as alive, since a build owned by another user cannot be signalled. Judging by the file alone instead would let a lease from a crashed build block reclamation for good, stranding the lane just as surely as never running this step.
 

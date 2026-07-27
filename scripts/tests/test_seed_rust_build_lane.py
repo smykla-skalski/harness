@@ -26,6 +26,7 @@ def load_script() -> ModuleType:
 
 
 seed = load_script()
+LANE_FORMAT_VERSION = 2
 
 
 class SeedRustBuildLaneTests(unittest.TestCase):
@@ -57,18 +58,23 @@ class SeedRustBuildLaneTests(unittest.TestCase):
         self.clone_sources.append(source)
         shutil.copytree(source, destination)
 
-    def run_seed(self, segment: str = "wt-destination") -> str:
+    def segment(self, name: str, version: int = LANE_FORMAT_VERSION) -> str:
+        return f"wt-{name}-v{version}"
+
+    def run_seed(self, segment: str | None = None) -> str:
+        segment = segment or self.segment("destination")
         return seed.seed_lane(
             self.repo_root,
             self.target_base / segment,
             segment,
+            LANE_FORMAT_VERSION,
             clone=self.clone,
             log=self.messages.append,
         )
 
     def test_richest_idle_lane_seeds_destination(self) -> None:
-        small = self.create_donor("wt-small", artifacts=1)
-        richest = self.create_donor("wt-rich", artifacts=4)
+        small = self.create_donor(self.segment("small"), artifacts=1)
+        richest = self.create_donor(self.segment("rich"), artifacts=4)
         same_time = 1_700_000_000_000_000_000
         for donor in (small, richest):
             os.utime(donor / "debug" / "deps", ns=(same_time, same_time))
@@ -78,14 +84,16 @@ class SeedRustBuildLaneTests(unittest.TestCase):
 
         self.assertEqual(result, seed.RESULT_SEEDED)
         self.assertEqual(self.clone_sources, [richest / "debug"])
-        self.assertTrue((self.target_base / "wt-destination" / "debug").is_dir())
+        self.assertTrue(
+            (self.target_base / self.segment("destination") / "debug").is_dir()
+        )
         self.assertTrue(
             any("4 cached artifacts" in message for message in self.messages)
         )
 
     def test_most_recent_lane_wins_over_larger_stale_lane(self) -> None:
-        stale = self.create_donor("wt-stale", artifacts=5)
-        recent = self.create_donor("wt-recent", artifacts=1)
+        stale = self.create_donor(self.segment("stale"), artifacts=5)
+        recent = self.create_donor(self.segment("recent"), artifacts=1)
         stale_time = 1_600_000_000_000_000_000
         os.utime(stale / "debug" / "deps", ns=(stale_time, stale_time))
         os.utime(stale / ".rustc_info.json", ns=(stale_time, stale_time))
@@ -96,8 +104,8 @@ class SeedRustBuildLaneTests(unittest.TestCase):
         self.assertEqual(self.clone_sources, [recent / "debug"])
 
     def test_lane_with_live_lease_is_skipped(self) -> None:
-        busy = self.create_donor("wt-busy", artifacts=5)
-        idle = self.create_donor("wt-idle", artifacts=1)
+        busy = self.create_donor(self.segment("busy"), artifacts=5)
+        idle = self.create_donor(self.segment("idle"), artifacts=1)
         lease_dir = self.repo_root / "target" / ".cargo-local" / "leases"
         lease_dir.mkdir(parents=True)
         (lease_dir / f"{busy.name}-{os.getpid()}").write_text(
@@ -111,8 +119,8 @@ class SeedRustBuildLaneTests(unittest.TestCase):
         self.assertEqual(self.clone_sources, [idle / "debug"])
 
     def test_existing_destination_is_never_replaced(self) -> None:
-        self.create_donor("wt-donor", artifacts=2)
-        destination = self.target_base / "wt-destination"
+        self.create_donor(self.segment("donor"), artifacts=2)
+        destination = self.target_base / self.segment("destination")
         destination.mkdir()
         marker = destination / "keep"
         marker.write_text("owned\n", encoding="utf-8")
@@ -124,8 +132,8 @@ class SeedRustBuildLaneTests(unittest.TestCase):
         self.assertEqual(marker.read_text(encoding="utf-8"), "owned\n")
 
     def test_cargo_locked_donor_is_skipped(self) -> None:
-        idle = self.create_donor("wt-idle", artifacts=1)
-        locked = self.create_donor("wt-locked", artifacts=5)
+        idle = self.create_donor(self.segment("idle"), artifacts=1)
+        locked = self.create_donor(self.segment("locked"), artifacts=5)
         with (locked / "debug" / ".cargo-build-lock").open("a+b") as lock_file:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             result = self.run_seed()
@@ -140,7 +148,8 @@ class SeedRustBuildLaneTests(unittest.TestCase):
             seed.seed_lane(
                 self.repo_root,
                 outside,
-                "wt-destination",
+                self.segment("destination"),
+                LANE_FORMAT_VERSION,
                 clone=self.clone,
                 log=self.messages.append,
             )
@@ -148,8 +157,11 @@ class SeedRustBuildLaneTests(unittest.TestCase):
         self.assertFalse(outside.exists())
 
     def test_symlinked_donor_is_ignored(self) -> None:
-        real = self.create_donor("wt-real", artifacts=2)
-        (self.target_base / "wt-link").symlink_to(real, target_is_directory=True)
+        real = self.create_donor(self.segment("real"), artifacts=2)
+        (self.target_base / self.segment("link")).symlink_to(
+            real,
+            target_is_directory=True,
+        )
 
         result = self.run_seed()
 
@@ -168,25 +180,57 @@ class SeedRustBuildLaneTests(unittest.TestCase):
             self.run_seed()
 
     def test_unsupported_copy_leaves_no_partial_lane(self) -> None:
-        self.create_donor("wt-donor", artifacts=2)
+        self.create_donor(self.segment("donor"), artifacts=2)
 
         def unsupported(_source: Path, _destination: Path, _log: object) -> None:
             raise seed.CopyOnWriteUnsupported("test filesystem")
 
         result = seed.seed_lane(
             self.repo_root,
-            self.target_base / "wt-destination",
-            "wt-destination",
+            self.target_base / self.segment("destination"),
+            self.segment("destination"),
+            LANE_FORMAT_VERSION,
             clone=unsupported,
             log=self.messages.append,
         )
 
         self.assertEqual(result, seed.RESULT_UNSUPPORTED)
-        self.assertFalse((self.target_base / "wt-destination").exists())
+        self.assertFalse(
+            (self.target_base / self.segment("destination")).exists()
+        )
         self.assertEqual(
-            list(self.target_base.glob(".wt-destination.seed-*")),
+            list(
+                self.target_base.glob(
+                    f".{self.segment('destination')}.seed-*"
+                )
+            ),
             [],
         )
+
+    def test_donor_from_an_older_lane_format_is_ignored(self) -> None:
+        old = self.create_donor(self.segment("old", version=1), artifacts=8)
+        current = self.create_donor(self.segment("current"), artifacts=1)
+        newer_time = 1_800_000_000_000_000_000
+        os.utime(old / "debug" / "deps", ns=(newer_time, newer_time))
+        os.utime(old / ".rustc_info.json", ns=(newer_time, newer_time))
+
+        result = self.run_seed()
+
+        self.assertEqual(result, seed.RESULT_SEEDED)
+        self.assertEqual(self.clone_sources, [current / "debug"])
+
+    def test_destination_must_match_the_lane_format(self) -> None:
+        destination = self.segment("destination", version=1)
+
+        with self.assertRaisesRegex(ValueError, "lane format version 2"):
+            seed.seed_lane(
+                self.repo_root,
+                self.target_base / destination,
+                destination,
+                LANE_FORMAT_VERSION,
+                clone=self.clone,
+                log=self.messages.append,
+            )
 
 
 if __name__ == "__main__":

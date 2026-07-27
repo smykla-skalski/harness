@@ -1001,6 +1001,158 @@ scenario_print_target_dir_matches_the_build_dir() {
   fi
 }
 
+write_lane_blocking_cargo() {
+  local path="$1"
+  cat >"$path" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-V" ]]; then
+  printf 'cargo 1.0.0\n'
+  exit 0
+fi
+printf '%s\n' "$*" >>"$LANE_CARGO_LOG"
+if mkdir "$LANE_HOLDER" 2>/dev/null; then
+  if [[ ! -e "$LANE_DESCENDANT_PID" ]]; then
+    sleep 120 </dev/null >/dev/null 2>&1 &
+    printf '%s\n' "$!" >"$LANE_DESCENDANT_PID"
+  fi
+  printf '%s\n%s\n' \
+    "$HARNESS_CARGO_LANE_LOCK_KEY" \
+    "$HARNESS_CARGO_LANE_LOCK_SUPERVISOR_PID" >"$LANE_OWNER_ENV"
+  printf 'ready\n' >"$LANE_READY"
+  while [[ ! -e "$LANE_RELEASE" ]]; do
+    sleep 0.025
+  done
+  rmdir "$LANE_HOLDER"
+fi
+EOF
+  chmod +x "$path"
+}
+
+run_exclusive_lane_command() {
+  local fake_cargo="$1" target_dir="$2" scratch="$3"
+  shift 3
+  (
+    CARGO_TARGET_DIR="$target_dir" \
+      HARNESS_CARGO_BIN="$fake_cargo" \
+      HARNESS_CARGO_SEED_LANE=0 \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      HARNESS_JOBSERVER=0 \
+      SCCACHE_BIN='' \
+      RUSTC_WRAPPER='' \
+      TMPDIR="$scratch/" \
+      "$ROOT/scripts/cargo-local.sh" "$@"
+  )
+}
+
+scenario_same_target_lane_fails_fast_with_owner() {
+  local fake_bin="$SANDBOX/lane-lock-bin"
+  local fake_cargo="$fake_bin/cargo"
+  local target_dir="$SANDBOX/lane-lock-target"
+  local scratch="$SANDBOX/lane-lock-tmp"
+  local first_log="$SANDBOX/lane-lock-first.log"
+  local cargo_log="$SANDBOX/lane-lock-cargo.log"
+  local holder="$SANDBOX/lane-lock-holder"
+  local ready="$SANDBOX/lane-lock-ready"
+  local release="$SANDBOX/lane-lock-release"
+  local descendant_pid_file="$SANDBOX/lane-lock-descendant-pid"
+  local owner_env="$SANDBOX/lane-lock-owner-env"
+  local output="" query="" status=0 first_status=0 reacquire_status=0 waited=0 started elapsed invocations first_pid descendant_pid
+  local stale_key stale_supervisor_pid new_supervisor_pid
+  mkdir -p "$fake_bin" "$scratch"
+  : >"$cargo_log"
+  write_lane_blocking_cargo "$fake_cargo"
+
+  LANE_CARGO_LOG="$cargo_log" \
+    LANE_HOLDER="$holder" \
+    LANE_READY="$ready" \
+    LANE_RELEASE="$release" \
+    LANE_DESCENDANT_PID="$descendant_pid_file" \
+    LANE_OWNER_ENV="$owner_env" \
+    run_exclusive_lane_command \
+      "$fake_cargo" "$target_dir" "$scratch" build --lib >"$first_log" 2>&1 &
+  first_pid=$!
+
+  while [[ ! -e "$ready" ]] && kill -0 "$first_pid" 2>/dev/null && (( waited < 200 )); do
+    sleep 0.025
+    waited=$((waited + 1))
+  done
+  if [[ ! -e "$ready" ]]; then
+    touch "$release"
+    wait "$first_pid" 2>/dev/null || true
+    descendant_pid="$(cat "$descendant_pid_file" 2>/dev/null || true)"
+    if [[ "$descendant_pid" =~ ^[0-9]+$ ]]; then
+      kill "$descendant_pid" 2>/dev/null || true
+    fi
+    fail "the lane owner did not reach cargo: $(tr '\n' ' ' <"$first_log")"
+    return
+  fi
+
+  started="$(date +%s)"
+  set +e
+  output="$(
+    LANE_CARGO_LOG="$cargo_log" \
+      LANE_HOLDER="$holder" \
+      LANE_READY="$ready" \
+      LANE_RELEASE="$release" \
+      LANE_DESCENDANT_PID="$descendant_pid_file" \
+      LANE_OWNER_ENV="$owner_env" \
+      run_exclusive_lane_command \
+        "$fake_cargo" "$target_dir" "$scratch" build --lib 2>&1
+  )"
+  status=$?
+  set -e
+  elapsed=$(($(date +%s) - started))
+  query="$(
+    run_exclusive_lane_command \
+      "$fake_cargo" "$target_dir" "$scratch" --print-target-dir 2>/dev/null
+  )"
+
+  touch "$release"
+  wait "$first_pid" || first_status=$?
+  stale_key="$(sed -n '1p' "$owner_env")"
+  stale_supervisor_pid="$(sed -n '2p' "$owner_env")"
+  set +e
+  LANE_CARGO_LOG="$cargo_log" \
+    LANE_HOLDER="$holder" \
+    LANE_READY="$ready" \
+    LANE_RELEASE="$release" \
+    LANE_DESCENDANT_PID="$descendant_pid_file" \
+    LANE_OWNER_ENV="$owner_env" \
+    HARNESS_CARGO_LANE_LOCK_KEY="$stale_key" \
+    HARNESS_CARGO_LANE_LOCK_SUPERVISOR_PID="$stale_supervisor_pid" \
+    run_exclusive_lane_command \
+      "$fake_cargo" "$target_dir" "$scratch" check --lib >/dev/null 2>&1
+  reacquire_status=$?
+  set -e
+  invocations="$(wc -l <"$cargo_log" | tr -d ' ')"
+  new_supervisor_pid="$(sed -n '2p' "$owner_env")"
+  descendant_pid="$(cat "$descendant_pid_file" 2>/dev/null || true)"
+  if [[ "$descendant_pid" =~ ^[0-9]+$ ]]; then
+    kill "$descendant_pid" 2>/dev/null || true
+    wait "$descendant_pid" 2>/dev/null || true
+  fi
+
+  if (( status == 75 )) \
+    && (( elapsed <= 2 )) \
+    && (( first_status == 0 )) \
+    && (( reacquire_status == 0 )) \
+    && [[ "$query" == "$target_dir" ]] \
+    && [[ "$invocations" == "2" ]] \
+    && [[ "$stale_supervisor_pid" =~ ^[1-9][0-9]*$ ]] \
+    && [[ "$new_supervisor_pid" =~ ^[1-9][0-9]*$ ]] \
+    && [[ "$new_supervisor_pid" != "$stale_supervisor_pid" ]] \
+    && assert_contains "build lane is already in use" "$output" \
+    && assert_contains "target: $target_dir" "$output" \
+    && grep -Eq 'owner PID: [1-9][0-9]*' <<<"$output" \
+    && assert_contains "owner command:" "$output" \
+    && assert_contains "build --lib" "$output"; then
+    pass "one target lane fails fast with owner details and releases before descendants exit"
+  else
+    fail "same-lane exclusion failed (status=$status elapsed=${elapsed}s first=$first_status reacquire=$reacquire_status cargo=$invocations query=$query): $output"
+  fi
+}
+
 scenario_sccache_socket_survives_session_scoped_tmpdir() {
   local fake_bin="$SANDBOX/socket-share-bin"
   local first second first_sock second_sock first_tmp second_tmp
@@ -1495,15 +1647,17 @@ prestart_tmpdir() {
 }
 
 run_cargo_local_prestart() {
-  local fake_bin="$1" cargo_bin="$2"
+  local fake_bin="$1" cargo_bin="$2" target_dir
   shift 2
+  target_dir="$(mktemp -d "$SANDBOX/prestart-target.XXXXXX")"
   (
     unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
     unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
     unset HARNESS_SCCACHE_TMPDIR
-    unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    unset HARNESS_CARGO_TARGET_DIR
     unset MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
-    PATH="$fake_bin:$PATH" \
+    CARGO_TARGET_DIR="$target_dir" \
+      PATH="$fake_bin:$PATH" \
       TMPDIR="$(prestart_tmpdir)/" \
       SCCACHE_BIN="$fake_bin/sccache" \
       RUSTC_WRAPPER='' \
@@ -1627,7 +1781,7 @@ scenario_unusable_python_falls_back_to_the_socket_file() {
   local fake_bin="$SANDBOX/nopython-prestart-bin"
   local log="$SANDBOX/nopython-prestart-log"
   local pid_file="$SANDBOX/nopython-prestart-pids"
-  local tmpdir socket starts
+  local tmpdir socket starts real_python
   tmpdir="$(prestart_tmpdir)"
   mkdir -p "$fake_bin" "$tmpdir"
   : >"$log"
@@ -1636,6 +1790,7 @@ scenario_unusable_python_falls_back_to_the_socket_file() {
   write_fake_sccache_server \
     "$fake_bin/sccache" "$log" "$SANDBOX/nopython-socket-holder.py" "$pid_file"
   write_logging_cargo "$fake_bin/cargo" "$log"
+  real_python="$(command -v python3)"
 
   # Stand the server up with a working python3, then take python3 away for the
   # run under test. macOS ships a /usr/bin/python3 that behaves like this until
@@ -1655,7 +1810,8 @@ scenario_unusable_python_falls_back_to_the_socket_file() {
   printf '#!/usr/bin/env bash\nexit 1\n' >"$fake_bin/python3"
   chmod +x "$fake_bin/python3"
 
-  run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib
+  HARNESS_CARGO_LANE_LOCK_PYTHON="$real_python" \
+    run_cargo_local_prestart "$fake_bin" "$fake_bin/cargo" build --lib
   stop_prestart_servers "$pid_file"
   rm -f "$fake_bin/python3"
 
@@ -1764,6 +1920,7 @@ scenario_agent_build_jobs_leave_room_for_later_arrivals
 scenario_agent_jobs_hold_their_reserved_share
 scenario_target_dir_is_shared_across_sessions
 scenario_print_target_dir_matches_the_build_dir
+scenario_same_target_lane_fails_fast_with_owner
 scenario_sccache_socket_survives_session_scoped_tmpdir
 scenario_sccache_socket_is_shared_across_checkouts
 scenario_repo_tmpdir_fallback_is_session_scoped

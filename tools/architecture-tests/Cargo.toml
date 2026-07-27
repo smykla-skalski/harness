@@ -1,0 +1,12 @@
+[package]
+name = "harness-architecture-tests"
+version = "53.1.1"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

@@ -16,6 +16,7 @@ members = [
   "crates/harness-telemetry",
   "crates/harness-workspace",
   "testkit",
+  "tools/architecture-tests",
   "tools/openapi-codegen",
   "tools/policy-codegen",
 ]
