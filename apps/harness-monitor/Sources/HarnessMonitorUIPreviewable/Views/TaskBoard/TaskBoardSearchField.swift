@@ -172,6 +172,9 @@ struct TaskBoardSearchField: View {
 /// view struct is the one thing SwiftUI cannot compare, so it would rebuild
 /// these rows on every pass the field makes.
 private struct TaskBoardSearchSuggestionList: View {
+  private static let rowInset = HarnessMonitorTheme.spacingXS
+  private static let rowCornerRadius = HarnessMonitorTheme.cornerRadiusSM - rowInset
+
   let suggestions: [TaskBoardSearchSuggestion]
   let width: CGFloat
   @Binding var text: String
@@ -188,10 +191,13 @@ private struct TaskBoardSearchSuggestionList: View {
         } label: {
           TaskBoardSearchSuggestionRow(suggestion: suggestion)
         }
-        .harnessInteractiveCardButtonStyle(cornerRadius: HarnessMonitorTheme.spacingSM)
+        .harnessInteractiveCardButtonStyle(cornerRadius: Self.rowCornerRadius)
         .accessibilityLabel("Search for \(suggestion.title)")
       }
     }
+    // Inset by the difference between the two radii, so a row's highlight sits
+    // concentric inside the container's curve instead of squaring off over it.
+    .padding(Self.rowInset)
     .frame(width: width, alignment: .leading)
     .background(
       .regularMaterial,
