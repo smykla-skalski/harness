@@ -48,13 +48,9 @@ extension TaskBoardStepRailView {
     state.adoptRestoredFlow(itemID: restored.itemID, pickedPrompt: restored.pickedPrompt)
   }
 
+  /// The one write path. Every change to the flow identity bumps the revision
+  /// the panel watches, so nothing else needs to store the flow by hand.
   func persistStepFlow() {
     TaskBoardStepFlowStore.save(stepFlowSnapshot, in: flowDefaults)
-  }
-
-  /// Step mode ended, so there is no flow left to resume.
-  func endStepFlow() {
-    stepRailState.reset()
-    persistStepFlow()
   }
 }

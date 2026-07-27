@@ -214,19 +214,22 @@ final class TaskBoardStepFlowPersistenceTests {
     #expect(TaskBoardStepFlowStore.load(from: defaults) == nil)
   }
 
-  @Test("Leaving step mode forgets the stored step")
-  func leavingStepModeForgetsStoredStep() async {
+  /// The panel is unmounted when step mode goes off, so the flow it stored is
+  /// still there when step mode comes back on.
+  @Test("A stored flow survives a step mode round trip")
+  func storedFlowSurvivesStepModeRoundTrip() async {
     let target = item(id: "active", status: .todo)
-    TaskBoardStepFlowStore.save(
-      TaskBoardStepFlowSnapshot(lockedItemID: target.id),
-      in: defaults
+    let opened = await railView(targetItem: target, taskBoardItems: [target])
+    opened.stepRailState.applyPick(
+      TaskBoardDispatchSelection(item: target, plan: dispatchPlan(for: target))
     )
-    let view = await railView(targetItem: target, taskBoardItems: [target])
-    view.restoreStepFlowIfNeeded()
+    opened.persistStepFlow()
+    opened.stepRailState.reset()
 
-    view.endStepFlow()
+    let reopened = await railView(targetItem: target, taskBoardItems: [target])
+    reopened.restoreStepFlowIfNeeded()
 
-    #expect(view.stepRailState.lockedItemID == nil)
-    #expect(TaskBoardStepFlowStore.load(from: defaults) == nil)
+    #expect(reopened.stepRailState.lockedItemID == target.id)
+    #expect(reopened.activePrompt == "durable prompt")
   }
 }

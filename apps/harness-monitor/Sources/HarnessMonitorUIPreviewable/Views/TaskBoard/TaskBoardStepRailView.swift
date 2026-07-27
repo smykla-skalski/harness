@@ -86,7 +86,7 @@ struct TaskBoardStepRailView: View {
       Text(confirmationMessage(confirmation))
     }
     .onChange(of: status.stepMode) {
-      if !status.stepMode { endStepFlow() }
+      if !status.stepMode { state.reset() }
     }
     .onChange(of: stepFlowRestorationRevision, initial: true) { _, _ in
       restoreStepFlowIfNeeded()
