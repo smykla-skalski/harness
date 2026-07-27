@@ -74,13 +74,10 @@ impl AgentAdapter for ClaudeAdapter {
         match event {
             NormalizedEvent::BeforeToolUse => Some("PreToolUse"),
             NormalizedEvent::AfterToolUse => Some("PostToolUse"),
-            NormalizedEvent::AfterToolUseFailure => Some("PostToolUseFailure"),
             NormalizedEvent::Notification => Some("Notification"),
             NormalizedEvent::SessionStart => Some("SessionStart"),
             NormalizedEvent::SessionEnd => Some("SessionEnd"),
             NormalizedEvent::AgentStop => Some("Stop"),
-            NormalizedEvent::SubagentStart => Some("SubagentStart"),
-            NormalizedEvent::SubagentStop => Some("SubagentStop"),
             NormalizedEvent::BeforeCompaction => Some("PreCompact"),
             _ => None,
         }

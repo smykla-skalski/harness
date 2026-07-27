@@ -401,15 +401,10 @@ fn normalized_event_name(event: &NormalizedEvent) -> &'static str {
         NormalizedEvent::UserPromptSubmit => "user_prompt_submit",
         NormalizedEvent::BeforeToolUse => "before_tool_use",
         NormalizedEvent::AfterToolUse => "after_tool_use",
-        NormalizedEvent::AfterToolUseFailure => "after_tool_use_failure",
         NormalizedEvent::SessionStart => "session_start",
         NormalizedEvent::SessionEnd => "session_end",
-        NormalizedEvent::AgentStart => "agent_start",
         NormalizedEvent::AgentStop => "agent_stop",
-        NormalizedEvent::SubagentStart => "subagent_start",
-        NormalizedEvent::SubagentStop => "subagent_stop",
         NormalizedEvent::BeforeCompaction => "before_compaction",
-        NormalizedEvent::AfterCompaction => "after_compaction",
         NormalizedEvent::Notification | NormalizedEvent::AgentSpecific(_) => "notification",
     }
 }
@@ -442,7 +437,7 @@ fn render_canonical_line(
                 "input": tool.input_raw,
             }],
         }),
-        (NormalizedEvent::AfterToolUse | NormalizedEvent::AfterToolUseFailure, Some(tool)) => {
+        (NormalizedEvent::AfterToolUse, Some(tool)) => {
             let response = tool.response.clone().unwrap_or(Value::Null);
             serde_json::json!({
                 "role": "user",
@@ -451,7 +446,7 @@ fn render_canonical_line(
                     "tool_name": tool.original_name,
                     "content": serde_json::to_string(&response)
                         .map_err(|error| CliErrorKind::serialize(format!("tool response: {error}")))?,
-                    "is_error": matches!(context.event, NormalizedEvent::AfterToolUseFailure),
+                    "is_error": false,
                     "raw": response,
                 }],
             })

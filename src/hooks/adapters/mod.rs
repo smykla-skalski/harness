@@ -110,17 +110,12 @@ pub(crate) fn payload_event(payload: &ProcessHookPayload) -> NormalizedEvent {
         Some("PostToolUse" | "AfterTool" | "AfterToolUse" | "tool.execute.after") => {
             NormalizedEvent::AfterToolUse
         }
-        Some("PostToolUseFailure" | "AfterToolUseFailure") => NormalizedEvent::AfterToolUseFailure,
         Some("SessionStart" | "session.created") => NormalizedEvent::SessionStart,
         Some("SessionEnd" | "session.deleted") => NormalizedEvent::SessionEnd,
-        Some("BeforeAgent") => NormalizedEvent::AgentStart,
         Some("Stop" | "AfterAgent" | "stop") => NormalizedEvent::AgentStop,
-        Some("SubagentStart") => NormalizedEvent::SubagentStart,
-        Some("SubagentStop") => NormalizedEvent::SubagentStop,
         Some("PreCompact" | "PreCompress" | "session.compacting") => {
             NormalizedEvent::BeforeCompaction
         }
-        Some("PostCompact") => NormalizedEvent::AfterCompaction,
         Some("Notification") => NormalizedEvent::Notification,
         Some(other) => NormalizedEvent::AgentSpecific(other.to_string()),
         None => NormalizedEvent::unspecified(),

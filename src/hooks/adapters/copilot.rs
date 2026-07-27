@@ -135,7 +135,6 @@ impl AgentAdapter for CopilotAdapter {
             NormalizedEvent::UserPromptSubmit => Some("userPromptSubmitted"),
             NormalizedEvent::BeforeToolUse => Some("preToolUse"),
             NormalizedEvent::AfterToolUse => Some("postToolUse"),
-            NormalizedEvent::AfterToolUseFailure => Some("errorOccurred"),
             NormalizedEvent::SessionStart => Some("sessionStart"),
             NormalizedEvent::SessionEnd | NormalizedEvent::AgentStop => Some("sessionEnd"),
             _ => None,

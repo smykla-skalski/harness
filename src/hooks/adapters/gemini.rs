@@ -111,12 +111,9 @@ impl AgentAdapter for GeminiAdapter {
     fn event_name(&self, event: &NormalizedEvent) -> Option<&str> {
         match event {
             NormalizedEvent::BeforeToolUse => Some("BeforeTool"),
-            NormalizedEvent::AfterToolUse | NormalizedEvent::AfterToolUseFailure => {
-                Some("AfterTool")
-            }
+            NormalizedEvent::AfterToolUse => Some("AfterTool"),
             NormalizedEvent::SessionStart => Some("SessionStart"),
             NormalizedEvent::SessionEnd => Some("SessionEnd"),
-            NormalizedEvent::AgentStart => Some("BeforeAgent"),
             NormalizedEvent::AgentStop => Some("AfterAgent"),
             NormalizedEvent::BeforeCompaction => Some("PreCompress"),
             _ => None,

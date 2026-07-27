@@ -132,8 +132,6 @@ impl AgentAdapter for CodexAdapter {
             NormalizedEvent::SessionStart => Some("SessionStart"),
             NormalizedEvent::SessionEnd => Some("SessionEnd"),
             NormalizedEvent::AgentStop => Some("Stop"),
-            NormalizedEvent::SubagentStart => Some("SubagentStart"),
-            NormalizedEvent::SubagentStop => Some("SubagentStop"),
             NormalizedEvent::BeforeCompaction => Some("PreCompact"),
             _ => None,
         }
