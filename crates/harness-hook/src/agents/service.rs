@@ -7,8 +7,9 @@ use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::session::service as orchestration_service;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::{compact, utc_now};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session_resolution::{self, resolve_context_cwd, trimmed_env};
 
 use super::storage;
 
@@ -260,41 +261,6 @@ fn signal_managed_terminal_readiness_if_managed() {
     }
 }
 
-fn trimmed_env(key: &str) -> Option<String> {
-    env::var(key)
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
-
-fn resolve_context_cwd(path: &Path) -> Option<PathBuf> {
-    if path.is_dir() {
-        return Some(path.to_path_buf());
-    }
-    shell_unescaped_path(path).filter(|candidate| candidate.is_dir())
-}
-
-fn shell_unescaped_path(path: &Path) -> Option<PathBuf> {
-    let raw = path.to_str()?;
-    let mut changed = false;
-    let mut unescaped = String::with_capacity(raw.len());
-    let mut chars = raw.chars().peekable();
-    while let Some(character) = chars.next() {
-        if character == '\\'
-            && let Some(next) = chars.peek().copied()
-            && next != '\\'
-            && next != '/'
-        {
-            unescaped.push(next);
-            let _ = chars.next();
-            changed = true;
-            continue;
-        }
-        unescaped.push(character);
-    }
-    changed.then(|| PathBuf::from(unescaped))
-}
-
 /// Resolve a known session ID for a hook or lifecycle event.
 ///
 /// # Errors
@@ -304,13 +270,9 @@ pub fn resolve_known_session_id(
     project_dir: &Path,
     hint: Option<&str>,
 ) -> Result<Option<String>, CliError> {
-    if let Some(value) = hint.filter(|value| !value.trim().is_empty()) {
-        return Ok(Some(value.to_string()));
-    }
-    if let Some(value) = session_id_from_env(agent) {
-        return Ok(Some(value));
-    }
-    storage::current_session_id(project_dir, agent)
+    session_resolution::resolve_known_session_id(agent, hint, || {
+        storage::current_session_id(project_dir, agent)
+    })
 }
 
 fn resolve_or_create_session_id(
@@ -318,22 +280,12 @@ fn resolve_or_create_session_id(
     project_dir: &Path,
     hint: Option<&str>,
 ) -> Result<String, CliError> {
-    Ok(resolve_known_session_id(agent, project_dir, hint)?
-        .unwrap_or_else(|| default_session_id(agent)))
-}
-
-fn session_id_from_env(agent: HookAgent) -> Option<String> {
-    let candidates = match agent {
-        HookAgent::Claude => &["CLAUDE_SESSION_ID"][..],
-        HookAgent::Codex => &["CODEX_SESSION_ID", "CODEX_THREAD_ID"][..],
-        HookAgent::Gemini => &["GEMINI_SESSION_ID", "CLAUDE_SESSION_ID"][..],
-        HookAgent::Copilot => &["COPILOT_SESSION_ID"][..],
-        HookAgent::Vibe => &["VIBE_SESSION_ID"][..],
-        HookAgent::OpenCode => &["OPENCODE_SESSION_ID"][..],
-    };
-    candidates
-        .iter()
-        .find_map(|name| env::var(name).ok().filter(|value| !value.trim().is_empty()))
+    session_resolution::resolve_or_create_session_id(
+        agent,
+        hint,
+        || storage::current_session_id(project_dir, agent),
+        default_session_id,
+    )
 }
 
 fn default_session_id(agent: HookAgent) -> String {

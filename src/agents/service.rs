@@ -10,6 +10,7 @@ use crate::infra::exec::RUNTIME;
 use crate::session::service as orchestration_service;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session_resolution::{self, resolve_context_cwd, trimmed_env};
 
 use super::storage;
 
@@ -162,41 +163,6 @@ fn disconnect_managed_runtime_session_if_ended(
     )
 }
 
-fn trimmed_env(key: &str) -> Option<String> {
-    env::var(key)
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
-
-fn resolve_context_cwd(path: &Path) -> Option<PathBuf> {
-    if path.is_dir() {
-        return Some(path.to_path_buf());
-    }
-    shell_unescaped_path(path).filter(|candidate| candidate.is_dir())
-}
-
-fn shell_unescaped_path(path: &Path) -> Option<PathBuf> {
-    let raw = path.to_str()?;
-    let mut changed = false;
-    let mut unescaped = String::with_capacity(raw.len());
-    let mut chars = raw.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '\\'
-            && let Some(next) = chars.peek().copied()
-            && next != '\\'
-            && next != '/'
-        {
-            unescaped.push(next);
-            let _ = chars.next();
-            changed = true;
-            continue;
-        }
-        unescaped.push(ch);
-    }
-    changed.then(|| PathBuf::from(unescaped))
-}
-
 /// Resolve a known session ID for a hook or lifecycle event.
 ///
 /// # Errors
@@ -206,27 +172,9 @@ pub fn resolve_known_session_id(
     project_dir: &Path,
     session_id_hint: Option<&str>,
 ) -> Result<Option<String>, CliError> {
-    if let Some(session_id) = session_id_hint.filter(|value| !value.trim().is_empty()) {
-        return Ok(Some(session_id.to_string()));
-    }
-    if let Some(session_id) = session_id_from_env(agent) {
-        return Ok(Some(session_id));
-    }
-    storage::current_session_id(project_dir, agent)
-}
-
-fn session_id_from_env(agent: HookAgent) -> Option<String> {
-    let candidates = match agent {
-        HookAgent::Claude => &["CLAUDE_SESSION_ID"][..],
-        HookAgent::Codex => &["CODEX_SESSION_ID", "CODEX_THREAD_ID"][..],
-        HookAgent::Gemini => &["GEMINI_SESSION_ID", "CLAUDE_SESSION_ID"][..],
-        HookAgent::Copilot => &["COPILOT_SESSION_ID"][..],
-        HookAgent::Vibe => &["VIBE_SESSION_ID"][..],
-        HookAgent::OpenCode => &["OPENCODE_SESSION_ID"][..],
-    };
-    candidates
-        .iter()
-        .find_map(|name| env::var(name).ok().filter(|value| !value.trim().is_empty()))
+    session_resolution::resolve_known_session_id(agent, session_id_hint, || {
+        storage::current_session_id(project_dir, agent)
+    })
 }
 
 // `AgentAdapter::name` returns this same string, but going through the hook
