@@ -2,7 +2,7 @@ use std::env;
 
 use clap::Args;
 
-use harness_workspace::command_context::{AppContext, Execute};
+use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
     TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
     TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,

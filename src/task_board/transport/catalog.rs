@@ -1,4 +1,4 @@
-use harness_workspace::command_context::AppContext;
+use crate::app::command_context::AppContext;
 use crate::task_board::wire::TaskBoardCatalogRequest;
 use harness_kernel::errors::CliError;
 
