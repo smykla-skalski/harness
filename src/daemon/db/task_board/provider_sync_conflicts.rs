@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use sqlx::{SqliteConnection, query, query_as};
+use sqlx::{SqliteConnection, query, query_as, query_scalar};
 
 use crate::daemon::db::task_board::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
@@ -119,6 +119,13 @@ pub(super) async fn replace_open_sync_conflicts_in_connection(
     conflicts: &[TaskBoardSyncConflict],
 ) -> Result<SyncConflictReplacement, CliError> {
     require_conflict_scope(item_id, provider, external_ref, item_revision, conflicts)?;
+    if conflicts.is_empty()
+        && open_conflict_fields(connection, item_id, provider, external_ref)
+            .await?
+            .is_empty()
+    {
+        return Ok(SyncConflictReplacement::default());
+    }
     require_item_revision(connection, item_id, item_revision).await?;
     let mut replacement =
         supersede_removed_conflicts(connection, item_id, provider, external_ref, conflicts).await?;
@@ -139,6 +146,16 @@ pub(super) async fn supersede_open_sync_conflicts_in_connection(
     resolved_fields: &[ExternalSyncField],
     resolved_at: &str,
 ) -> Result<bool, CliError> {
+    if resolved_fields.is_empty() {
+        return Ok(false);
+    }
+    let open_fields = open_conflict_fields(connection, item_id, provider, external_ref).await?;
+    if !resolved_fields
+        .iter()
+        .any(|field| open_fields.iter().any(|open| open == field_label(*field)))
+    {
+        return Ok(false);
+    }
     require_item_revision(connection, item_id, item_revision).await?;
     let mut changed = false;
     for field in resolved_fields {
@@ -160,6 +177,30 @@ pub(super) async fn supersede_open_sync_conflicts_in_connection(
             > 0;
     }
     Ok(changed)
+}
+
+/// Earlier writes in the same sync can shift this item's lane and revision.
+/// Callers keep the revision fence only when conflict rows would change.
+async fn open_conflict_fields(
+    connection: &mut SqliteConnection,
+    item_id: &str,
+    provider: ExternalProvider,
+    external_ref: &str,
+) -> Result<Vec<String>, CliError> {
+    query_scalar(
+        "SELECT field FROM task_board_sync_conflicts
+         WHERE item_id = ?1 AND provider = ?2 AND external_ref = ?3 AND state = 'open'",
+    )
+    .bind(item_id)
+    .bind(provider_label(provider))
+    .bind(external_ref)
+    .fetch_all(connection)
+    .await
+    .map_err(|error| {
+        db_error(format!(
+            "read open task-board sync conflict fields: {error}"
+        ))
+    })
 }
 
 fn require_conflict_scope(
