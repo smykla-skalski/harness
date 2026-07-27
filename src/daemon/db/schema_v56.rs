@@ -79,12 +79,6 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
         .map_err(|error| super::db_error(format!("apply schema v56 inbox migration: {error}")))?;
     rewrite_json_statuses(&transaction)?;
     transaction
-        .execute(
-            "UPDATE schema_meta SET value = '56' WHERE key = 'version'",
-            [],
-        )
-        .map_err(|error| super::db_error(format!("stamp schema v56: {error}")))?;
-    transaction
         .commit()
         .map_err(|error| super::db_error(format!("commit schema v56 inbox migration: {error}")))
 }
