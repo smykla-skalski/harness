@@ -6,6 +6,14 @@ import Testing
 @MainActor
 @Suite("Step Mode flow recovery")
 struct TaskBoardStepFlowRecoveryTests {
+  /// These tests never exercise flow storage, but the rail they build must not
+  /// be able to reach the app's own preferences to prove it.
+  let scratch: ScratchUserDefaults
+
+  init() throws {
+    scratch = try ScratchUserDefaults(label: "step-flow-recovery")
+  }
+
   @Test("Successful Sync preserves every active-flow identity field")
   func successfulSyncPreservesActiveFlow() {
     let item = item(id: "active", status: .inProgress)

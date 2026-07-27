@@ -39,7 +39,8 @@ extension TaskBoardStepFlowRecoveryTests {
       targetItem: targetItem,
       taskBoardItems: taskBoardItems,
       isActionInFlight: false,
-      actions: TaskBoardOverviewActions(store: store, scope: .dashboard)
+      actions: TaskBoardOverviewActions(store: store, scope: .dashboard),
+      flowDefaults: scratch.userDefaults
     )
   }
 

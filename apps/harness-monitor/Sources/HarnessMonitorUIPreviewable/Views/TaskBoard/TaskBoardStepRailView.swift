@@ -13,7 +13,7 @@ struct TaskBoardStepRailView: View {
   let actions: TaskBoardOverviewActions
   /// Where the guided flow is stored between launches. Injectable so tests never
   /// touch the app's own preferences.
-  var flowDefaults: UserDefaults = .standard
+  let flowDefaults: UserDefaults
 
   @Environment(\.openWindow)
   var openWindow

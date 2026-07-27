@@ -7,13 +7,11 @@ import Testing
 @MainActor
 @Suite("Step Mode flow persistence")
 final class TaskBoardStepFlowPersistenceTests {
-  /// One throwaway defaults domain per test, dropped when the suite instance
-  /// goes away, so a stored flow never reaches the app's real preferences.
-  let suiteName = "io.harnessmonitor.tests.step-flow.\(UUID().uuidString)"
-  lazy var defaults = UserDefaults(suiteName: suiteName) ?? .standard
+  let scratch: ScratchUserDefaults
+  var defaults: UserDefaults { scratch.userDefaults }
 
-  deinit {
-    UserDefaults().removePersistentDomain(forName: suiteName)
+  init() throws {
+    scratch = try ScratchUserDefaults(label: "step-flow")
   }
 
   @Test("A saved flow survives a reload")

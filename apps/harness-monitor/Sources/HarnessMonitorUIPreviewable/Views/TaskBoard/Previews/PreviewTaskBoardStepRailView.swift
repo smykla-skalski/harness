@@ -119,7 +119,8 @@ private enum TaskBoardStepRailPreviewFixtures {
       targetItem: item,
       taskBoardItems: item.map { [$0] } ?? [],
       isActionInFlight: false,
-      actions: TaskBoardOverviewActions(store: store, scope: .dashboard)
+      actions: TaskBoardOverviewActions(store: store, scope: .dashboard),
+      flowDefaults: .standard
     )
     .padding(24)
     .frame(width: 900)
