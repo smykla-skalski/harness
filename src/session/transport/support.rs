@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::daemon::client::DaemonClient;
 use crate::hooks::adapters::HookAgent;
+use harness_daemon_client::ClientError;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::resolve_project_dir as resolve_project_path;
 
@@ -32,6 +33,15 @@ pub(super) fn daemon_client() -> Result<DaemonClient, CliError> {
         )
         .into()
     })
+}
+
+/// Shared error mapper for command surfaces that call the leaf
+/// `harness-daemon-client` directly instead of this module's `daemon_client()`,
+/// which returns the unrelated root-facade client of the same type name.
+pub(super) fn daemon_client_error(operation: &str, error: &ClientError) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "daemon {operation}: {error}"
+    )))
 }
 
 pub(super) fn capability_args(values: &[String]) -> Vec<String> {

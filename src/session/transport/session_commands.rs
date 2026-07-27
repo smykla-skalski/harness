@@ -7,10 +7,12 @@ use crate::session::types::SessionRole;
 use crate::session::wire::{AdoptSessionRequest, ObserveSessionRequest, SessionDetail};
 use crate::session::{observe, service};
 use harness_daemon_client::DaemonClient;
-use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::CliError;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::support::{agent_to_str, daemon_client, print_json, resolve_project_dir};
+use super::support::{
+    agent_to_str, daemon_client, daemon_client_error, print_json, resolve_project_dir,
+};
 
 #[derive(Debug, Clone, Args)]
 pub struct SessionStartArgs {
@@ -267,11 +269,9 @@ impl Execute for SessionObserveArgs {
                 actor: Some(actor.to_string()),
             };
             let url = format!("/v1/sessions/{}/observe", self.session_id);
-            let _: SessionDetail = daemon_client_leaf.post(&url, &request).map_err(|error| {
-                CliError::from(CliErrorKind::workflow_io(format!(
-                    "daemon observe session: {error}"
-                )))
-            })?;
+            let _: SessionDetail = daemon_client_leaf
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("observe session", &error))?;
             observe::execute_session_observe(&self.session_id, &project, self.json, None)
         } else {
             observe::execute_session_observe(&self.session_id, &project, self.json, actor)

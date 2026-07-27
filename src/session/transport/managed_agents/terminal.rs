@@ -1,13 +1,13 @@
 use clap::{Args, ValueEnum};
 
-use harness_daemon_client::{ClientError, DaemonClient};
+use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::managed_agents::tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest,
 };
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::print_json;
+use crate::session::transport::support::{daemon_client_error, print_json};
 use crate::session::wire::ManagedAgentSnapshot;
 
 // Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade
@@ -20,12 +20,6 @@ fn daemon_client() -> Result<DaemonClient, CliError> {
         )
         .into()
     })
-}
-
-fn daemon_client_error(operation: &str, error: &ClientError) -> CliError {
-    CliError::from(CliErrorKind::workflow_io(format!(
-        "daemon {operation}: {error}"
-    )))
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

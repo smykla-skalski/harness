@@ -8,19 +8,11 @@ use crate::session::wire::{
     SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
-use harness_daemon_client::{ClientError, DaemonClient};
+use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::support::{print_json, resolve_project_dir};
-
-// Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade,
-// so these commands stay free of a daemon-crate dependency.
-fn daemon_client_error(operation: &str, error: &ClientError) -> CliError {
-    CliError::from(CliErrorKind::workflow_io(format!(
-        "daemon {operation}: {error}"
-    )))
-}
+use super::support::{daemon_client_error, print_json, resolve_project_dir};
 
 fn task_action_url(session_id: &str, task_id: &str, action: &str) -> String {
     format!("/v1/sessions/{session_id}/tasks/{task_id}/{action}")

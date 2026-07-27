@@ -10,7 +10,7 @@ use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::support::{print_json, resolve_project_dir};
+use super::support::{daemon_client_error, print_json, resolve_project_dir};
 
 #[derive(Debug, Clone, Args)]
 pub struct SessionImproverApplyArgs {
@@ -62,11 +62,9 @@ impl Execute for SessionImproverApplyArgs {
                 dry_run: self.dry_run,
             };
             let url = format!("/v1/sessions/{}/improver/apply", self.session_id);
-            client.post(&url, &request).map_err(|error| {
-                CliError::from(CliErrorKind::workflow_io(format!(
-                    "daemon improver apply: {error}"
-                )))
-            })?
+            client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("improver apply", &error))?
         } else {
             improver_apply_local(self, &PathBuf::from(&local_project), &new_contents)?
         };
