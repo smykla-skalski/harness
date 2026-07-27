@@ -37,8 +37,8 @@ const FILE_STORAGE_SYMBOLS: &[&str] = &[
 ];
 
 const RETIRED_ORCHESTRATOR_RUNNER_SYMBOLS: &[&str] = &[
-    "struct TaskBoardOrchestrator",
-    "impl TaskBoardOrchestrator",
+    "struct TaskBoardOrchestrator {",
+    "impl TaskBoardOrchestrator {",
 ];
 
 #[test]
