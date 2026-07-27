@@ -1,19 +1,24 @@
 use super::{
-    CliError, CliErrorKind, DaemonClient, Path, PathBuf, SessionMetrics, SessionRole, SessionState,
-    SessionStatus, canonicalize_persisted_session_state, daemon_index, detail_to_session_state,
-    load_state_or_err, reconcile_expired_pending_signals, storage, summary_to_session_state,
-    validate_policy_preset,
+    CliError, CliErrorKind, Path, PathBuf, SessionMetrics, SessionRole, SessionState,
+    SessionStatus, canonicalize_persisted_session_state, daemon_client_error, daemon_index,
+    detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals, storage,
+    summary_to_session_state, validate_policy_preset, wire,
 };
-use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
 use crate::workspace::utc_now;
+use harness_daemon_client::DaemonClient;
+use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
 
 /// Load the current session state.
 ///
 /// # Errors
 /// Returns `CliError` if the session is not found.
 pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionState, CliError> {
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        let detail = client.get_session_detail(session_id)?;
+        let detail: wire::SessionDetail = client
+            .get(&format!("/v1/sessions/{session_id}"), &[])
+            .map_err(|error| daemon_client_error("get session detail", &error))?;
         let mut state = detail_to_session_state(&detail);
         state.metrics = SessionMetrics::recalculate(&state);
         return Ok(state);
@@ -96,8 +101,12 @@ pub fn build_recovery_tui_request(
 /// # Errors
 /// Returns `CliError` on storage failures.
 pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<SessionState>, CliError> {
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        let summaries = client.list_sessions()?;
+        let summaries: Vec<wire::SessionSummary> = client
+            .get("/v1/sessions", &[])
+            .map_err(|error| daemon_client_error("list sessions", &error))?;
         let mut sessions: Vec<SessionState> = summaries
             .into_iter()
             .filter(|summary| include_all || summary.status.is_default_visible())
@@ -139,8 +148,12 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
 /// # Errors
 /// Returns `CliError` on discovery failures.
 pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliError> {
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        let summaries = client.list_sessions()?;
+        let summaries: Vec<wire::SessionSummary> = client
+            .get("/v1/sessions", &[])
+            .map_err(|error| daemon_client_error("list sessions", &error))?;
         let mut sessions: Vec<SessionState> = summaries
             .into_iter()
             .filter(|summary| include_all || summary.status.is_default_visible())
@@ -150,6 +163,8 @@ pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliE
         return Ok(sessions);
     }
 
+    // Same `daemon::index` back-edge as `resolve_session_project_dir` below;
+    // see its comment.
     let resolved = daemon_index::discover_sessions(include_all)?;
     let mut sessions: Vec<SessionState> = resolved
         .into_iter()
@@ -184,13 +199,21 @@ pub fn resolve_session_project_dir(
     {
         return Ok(local_project_dir.to_path_buf());
     }
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        let detail = client.get_session_detail(session_id)?;
+        let detail: wire::SessionDetail = client
+            .get(&format!("/v1/sessions/{session_id}"), &[])
+            .map_err(|error| daemon_client_error("get session detail", &error))?;
         return Ok(detail
             .session
             .project_dir
             .map_or_else(|| PathBuf::from(detail.session.context_root), PathBuf::from));
     }
+    // This resolves through `daemon::index`'s filesystem-scanning discovery
+    // because `daemon::index` has no HTTP-reachable equivalent: it's a
+    // daemon-internal module that the daemon's own mutation fallbacks also use
+    // directly to resolve a project dir, not a client the leaf transport wraps.
     let resolved = daemon_index::resolve_session(session_id)?;
     Ok(resolved
         .project
