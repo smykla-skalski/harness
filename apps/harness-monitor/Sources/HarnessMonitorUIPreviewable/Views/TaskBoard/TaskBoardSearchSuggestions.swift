@@ -1,5 +1,8 @@
 import Foundation
 import HarnessMonitorKit
+import OSLog
+
+private let searchIndexLog = Logger(subsystem: "io.harnessmonitor", category: "task-board-search")
 
 /// One card as the suggestions read it.
 ///
@@ -76,8 +79,17 @@ actor TaskBoardSearchSuggestionWorker {
       return []
     }
     if searchIndex == nil || candidates != indexedCandidates {
-      searchIndex = try? TaskBoardSearchSuggestionIndex(candidates: candidates)
-      indexedCandidates = candidates
+      do {
+        searchIndex = try TaskBoardSearchSuggestionIndex(candidates: candidates)
+        indexedCandidates = candidates
+      } catch {
+        // Only the static field configuration can fail here, so this is a
+        // programmer error rather than something a board can provoke. The
+        // board itself stays searchable; only the rows under the field go.
+        searchIndexLog.error("task board suggestion index failed: \(error, privacy: .public)")
+        searchIndex = nil
+        indexedCandidates = []
+      }
     }
     return searchIndex?.suggestions(query: trimmed, limit: limit) ?? []
   }
