@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 # shellcheck source=scripts/lib/common-repo-root.sh
 source "$ROOT/scripts/lib/common-repo-root.sh"
+# shellcheck source=scripts/lib/cargo-lane.sh
+source "$ROOT/scripts/lib/cargo-lane.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 
 SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/cargo-local-test.XXXXXX")"
@@ -1008,7 +1010,8 @@ scenario_default_lane_still_seeds_under_lock() {
   local seed_log="$checkout/seed.log"
   local cargo_log="$checkout/cargo.log"
   local explicit_target="$checkout/explicit-target"
-  local seed_calls cargo_calls
+  local main_segment seed_calls cargo_calls
+  main_segment="$(cargo_lane_main_segment)"
   mkdir -p "$checkout/scripts/lib" "$fake_bin" "$scratch"
   cp "$ROOT/scripts/cargo-local.sh" "$checkout/scripts/cargo-local.sh"
   cp "$ROOT/scripts/cargo-lane-lock.py" "$checkout/scripts/cargo-lane-lock.py"
@@ -1055,8 +1058,8 @@ PY
   cargo_calls="$(wc -l <"$cargo_log" | tr -d ' ')"
   if [[ "$seed_calls" == "1" ]] \
     && [[ "$cargo_calls" == "2" ]] \
-    && grep -Fq -- "--target-segment local-v2" "$seed_log" \
-    && [[ -d "$checkout/target/dev/local-v2" ]] \
+    && grep -Fq -- "--target-segment $main_segment" "$seed_log" \
+    && [[ -d "$checkout/target/dev/$main_segment" ]] \
     && [[ ! -e "$explicit_target" ]]; then
     pass "the lock preserves default-lane seeding without seeding explicit targets"
   else
