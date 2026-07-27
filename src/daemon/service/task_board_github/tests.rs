@@ -11,7 +11,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 use tempfile::tempdir;
 
 use super::support::{STEP_MERGED, STEP_WAITING_FOR_REVIEW, managed_branch_name};
-use super::{AutomationRequest, automate_item};
+use super::{DatabaseAutomationRequest, automate_item_with_database_policy};
 
 const TEST_HOST_ID: &str = "host1234";
 
@@ -98,14 +98,15 @@ async fn automation_opens_reviews_and_merges_prs() {
         parent_interleaving: std::sync::Mutex::new(None),
     };
 
-    let workflow = automate_item(AutomationRequest {
-        board_root: temp.path(),
+    let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
+        policy: None,
         config: &config,
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
         client: &client,
         host_id: TEST_HOST_ID,
+        expected_parent: None,
     })
     .await;
 
@@ -205,14 +206,15 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         parent_interleaving: std::sync::Mutex::new(None),
     };
 
-    let workflow = automate_item(AutomationRequest {
-        board_root: temp.path(),
+    let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
+        policy: None,
         config: &config,
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
         client: &client,
         host_id: TEST_HOST_ID,
+        expected_parent: None,
     })
     .await;
 
@@ -297,14 +299,15 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         parent_interleaving: std::sync::Mutex::new(None),
     };
 
-    let workflow = automate_item(AutomationRequest {
-        board_root: temp.path(),
+    let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
+        policy: None,
         config: &config,
         dry_run: false,
         item: &item,
         session_worktrees: &BTreeMap::new(),
         client: &client,
         host_id: TEST_HOST_ID,
+        expected_parent: None,
     })
     .await;
 
