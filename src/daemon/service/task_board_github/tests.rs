@@ -43,7 +43,7 @@ async fn automation_opens_reviews_and_merges_prs() {
         &["-c", "commit.gpgsign=false", "commit", "-m", "feature"],
     );
 
-    let mut config = GitHubProjectConfig::new("owner", "repo", repo.clone());
+    let mut config = GitHubProjectConfig::new("owner", "repo");
     config
         .enabled_automations
         .enabled
@@ -60,6 +60,7 @@ async fn automation_opens_reviews_and_merges_prs() {
     item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
     let expected_branch = managed_branch_name(&config, &item.id, TEST_HOST_ID);
     let client = FakeGitHubClient {
+        checkout: repo.clone(),
         pull_request: GitHubPullRequestHandle {
             number: 42,
             html_url: Some("https://example.test/pull/42".to_string()),
@@ -146,7 +147,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         &["remote", "add", "origin", remote.to_string_lossy().as_ref()],
     );
     run_git(&repo, &["push", "-u", "origin", "HEAD:main"]);
-    let mut config = GitHubProjectConfig::new("owner", "repo", repo.clone());
+    let mut config = GitHubProjectConfig::new("owner", "repo");
     config
         .enabled_automations
         .enabled
@@ -168,6 +169,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
     item.workflow.branch = Some(expected_branch.clone());
     item.workflow.pr_number = Some(7);
     let client = FakeGitHubClient {
+        checkout: repo.clone(),
         pull_request: GitHubPullRequestHandle {
             number: 7,
             html_url: Some("https://example.test/pull/7".to_string()),
@@ -249,7 +251,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
     );
     run_git(&repo, &["push", "-u", "origin", "HEAD:main"]);
 
-    let config = GitHubProjectConfig::new("owner", "repo", repo.clone());
+    let config = GitHubProjectConfig::new("owner", "repo");
     let mut item = TaskBoardItem::new(
         "task-3".to_string(),
         "Task".to_string(),
@@ -261,6 +263,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
     item.workflow.worktree = Some(repo.to_string_lossy().into_owned());
     let expected_branch = managed_branch_name(&config, &item.id, TEST_HOST_ID);
     let client = FakeGitHubClient {
+        checkout: repo.clone(),
         pull_request: GitHubPullRequestHandle {
             number: 99,
             html_url: Some("https://example.test/pull/99".to_string()),
@@ -321,14 +324,14 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
 
 #[test]
 fn managed_branch_name_includes_host_prefix() {
-    let config = GitHubProjectConfig::new("owner", "repo", PathBuf::new());
+    let config = GitHubProjectConfig::new("owner", "repo");
     let branch = managed_branch_name(&config, "dup-1", "abcdef12");
     assert_eq!(branch, "c/dup-1-abcdef12");
 }
 
 #[test]
 fn managed_branch_name_truncates_long_host_id() {
-    let config = GitHubProjectConfig::new("owner", "repo", PathBuf::new());
+    let config = GitHubProjectConfig::new("owner", "repo");
     let long_host = "abcdef0123456789-extra";
     let branch = managed_branch_name(&config, "dup-1", long_host);
     assert_eq!(branch, "c/dup-1-abcdef01");

@@ -25,8 +25,7 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 .task_board_orchestrator_settings()
                 .await
                 .expect("load orchestrator settings");
-            settings.github_project =
-                TaskBoardGitHubProjectConfig::new("example", "compass", project.to_path_buf());
+            settings.github_project = TaskBoardGitHubProjectConfig::default();
             db.replace_task_board_orchestrator_settings(&settings)
                 .await
                 .expect("configure write publication");

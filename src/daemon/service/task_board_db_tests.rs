@@ -20,25 +20,50 @@ async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
         .expect("database")
 }
 
+/// Settings saved before the single publication repository was removed still
+/// carry `owner`, `repo`, `checkout_path` and `default_branch` in their stored
+/// JSON. They have to load, and the values have to stay ignored.
 #[tokio::test]
-async fn external_sync_ignores_the_hidden_legacy_project_repository() {
+async fn settings_stored_with_a_publication_repository_still_load() {
     let directory = tempdir().expect("tempdir");
     let db = connect(&directory).await;
-    let mut settings = TaskBoardOrchestratorSettings::default();
-    settings.github_project.owner = "legacy-owner".into();
-    settings.github_project.repo = "hidden-repository-735".into();
-    settings.github_inbox.repositories = vec!["visible-owner/monitored-repository".into()];
-    db.replace_task_board_orchestrator_settings(&settings)
+    db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
         .await
-        .expect("save settings");
+        .expect("seed settings row");
+    sqlx::query("UPDATE task_board_orchestrator_settings SET settings_json = ?1 WHERE singleton = 1")
+        .bind(
+            serde_json::json!({
+                "github_project": {
+                    "owner": "legacy-owner",
+                    "repo": "hidden-repository-735",
+                    "checkout_path": "/legacy/checkout",
+                    "default_branch": "legacy-trunk",
+                    "branch_prefix": "legacy/",
+                },
+                "github_inbox": { "repositories": ["visible-owner/monitored-repository"] },
+            })
+            .to_string(),
+        )
+        .execute(db.pool())
+        .await
+        .expect("store legacy settings");
 
+    let settings = db
+        .task_board_orchestrator_settings()
+        .await
+        .expect("load legacy settings");
     let config = active_external_sync_config_db(&db)
         .await
         .expect("external sync config");
 
+    assert_eq!(
+        settings.github_project.branch_prefix, "legacy/",
+        "a field that survived the removal must still be read"
+    );
     assert_ne!(
         config.github_repository(),
-        Some("legacy-owner/hidden-repository-735")
+        Some("legacy-owner/hidden-repository-735"),
+        "the removed publication repository must not come back through sync"
     );
     assert_eq!(
         config.github_inbox_repositories(),

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::task_board::github::{GitHubAutomation, GitHubProjectConfig};
+use crate::task_board::github::{GitHubAutomation, GitHubAutomationToggles};
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowState,
 };
@@ -40,22 +40,19 @@ pub(in crate::daemon::service::task_board_github) fn default_publication_result(
     publication_number(workflow.pr_number, frozen_number).map(|number| (number, mutated))
 }
 
+/// Takes the toggles rather than a config, because it is called both before a
+/// repository is known and after one is stamped on, and those are two types.
 pub(in crate::daemon::service::task_board_github) fn validate_publication_automations(
-    config: &GitHubProjectConfig,
+    enabled_automations: &GitHubAutomationToggles,
     workflow_kind: TaskBoardWorkflowKind,
 ) -> Result<(), CliError> {
-    if !config
-        .enabled_automations
-        .enables(GitHubAutomation::CreateBranch)
-    {
+    if !enabled_automations.enables(GitHubAutomation::CreateBranch) {
         return Err(invalid_transition(
             "write workflow publication requires CreateBranch automation",
         ));
     }
     if workflow_kind == TaskBoardWorkflowKind::DefaultTask
-        && !config
-            .enabled_automations
-            .enables(GitHubAutomation::OpenPullRequest)
+        && !enabled_automations.enables(GitHubAutomation::OpenPullRequest)
     {
         return Err(invalid_transition(
             "DefaultTask publication requires OpenPullRequest automation",

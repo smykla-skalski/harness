@@ -12,7 +12,7 @@ use super::super::{
     TaskBoardRepositoryAutomationConfig, TaskBoardReviewerSettings, validate_task_board_policy,
 };
 
-pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProjectConfig;
+pub use crate::task_board::github::GitHubAutomationSettings as TaskBoardGitHubProjectConfig;
 
 pub const CURRENT_ORCHESTRATOR_STATE_VERSION: u32 = 1;
 

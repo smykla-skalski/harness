@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -10,6 +10,10 @@ use crate::task_board::github::{
 use super::{git_ref, git_ref_exists, git_tree, remote_repo_path, run_git};
 
 pub(super) struct FakeGitHubClient {
+    /// Where the fake's git remote lives. The real client resolves this from
+    /// the token and the repository slug, so the config never carried it and
+    /// the fake has to be told.
+    pub(super) checkout: PathBuf,
     pub(super) pull_request: GitHubPullRequestHandle,
     pub(super) evidence: GitHubMergeEvidence,
     pub(super) create_calls: Mutex<usize>,
@@ -25,10 +29,10 @@ pub(super) struct FakeGitHubClient {
 impl GitHubAutomationClient for FakeGitHubClient {
     async fn get_branch_state(
         &self,
-        config: &GitHubProjectConfig,
+        _config: &GitHubProjectConfig,
         branch: &str,
     ) -> Result<Option<GitHubBranchState>, CliError> {
-        let remote = remote_repo_path(config.checkout_path.as_path());
+        let remote = remote_repo_path(self.checkout.as_path());
         let reference = format!("refs/heads/{branch}");
         if !git_ref_exists(&remote, &reference) {
             return Ok(None);
@@ -56,7 +60,7 @@ impl GitHubAutomationClient for FakeGitHubClient {
         branch: &str,
         expected_parent: Option<&str>,
     ) -> Result<(), CliError> {
-        let remote = remote_repo_path(config.checkout_path.as_path());
+        let remote = remote_repo_path(self.checkout.as_path());
         if let Some(interloper) = self
             .parent_interleaving
             .lock()

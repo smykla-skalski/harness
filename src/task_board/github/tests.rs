@@ -1,10 +1,9 @@
-use std::path::PathBuf;
 
 use super::*;
 use crate::task_board::policy::{BuiltInPolicyGate, PolicyDecision, PolicyGate, PolicyReasonCode};
 
 fn config() -> GitHubProjectConfig {
-    let mut config = GitHubProjectConfig::new("smykla-skalski", "harness", PathBuf::from("."));
+    let mut config = GitHubProjectConfig::new("smykla-skalski", "harness");
     config.protected_paths = vec![
         ProtectedPathRule::new("Cargo.toml"),
         ProtectedPathRule::new("src/security"),

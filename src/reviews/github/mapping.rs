@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::mem;
-use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 
@@ -390,7 +389,7 @@ pub(super) fn append_repository_labels(
 
 pub(super) fn github_project_config(repository: &str) -> Option<GitHubProjectConfig> {
     let (owner, repo) = repository.split_once('/')?;
-    Some(GitHubProjectConfig::new(owner, repo, PathBuf::new()))
+    Some(GitHubProjectConfig::new(owner, repo))
 }
 
 pub(super) fn action_result(

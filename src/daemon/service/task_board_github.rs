@@ -68,14 +68,17 @@ pub(crate) async fn run_task_board_github_automation_async(
             );
             continue;
         };
-        let mut config = repository_automation_config(&defaults, &repository);
+        let Some((owner, repo)) = repository.split_once('/') else {
+            tracing::warn!(
+                %repository,
+                "skipping task-board GitHub automation: repository is not an owner/name slug"
+            );
+            continue;
+        };
         let client =
             GitHubApiAutomationClient::new_with_runtime_config(&token, runtime_config.clone())?;
-        match client
-            .repository_default_branch(&config.owner, &config.repo)
-            .await
-        {
-            Ok(Some(branch)) if !branch.trim().is_empty() => config.default_branch = branch,
+        let branch = match client.repository_default_branch(owner, repo).await {
+            Ok(Some(branch)) if !branch.trim().is_empty() => branch,
             // One unreachable repository must not stall every other one, but the
             // reason has to reach the log or an auth or network fault is
             // indistinguishable from a repository that simply reports no branch.
@@ -94,7 +97,8 @@ pub(crate) async fn run_task_board_github_automation_async(
                 );
                 continue;
             }
-        }
+        };
+        let config = defaults.for_repository(owner, repo, branch);
         run_task_board_github_automation_with_database_client(
             async_db,
             policy,
@@ -129,19 +133,6 @@ fn group_items_by_repository(items: &[TaskBoardItem]) -> BTreeMap<String, Vec<&T
         }
     }
     grouped
-}
-
-/// Stamp one repository onto the conventions shared by all of them.
-fn repository_automation_config(
-    defaults: &GitHubProjectConfig,
-    repository: &str,
-) -> GitHubProjectConfig {
-    let mut config = defaults.clone();
-    if let Some((owner, repo)) = repository.split_once('/') {
-        config.owner = owner.into();
-        config.repo = repo.into();
-    }
-    config
 }
 
 #[expect(

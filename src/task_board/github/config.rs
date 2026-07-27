@@ -1,7 +1,67 @@
-use std::path::{Path, PathBuf};
-
 use serde::{Deserialize, Serialize};
 
+/// The publication conventions every repository shares.
+///
+/// This is what gets stored. It deliberately names no repository: publication
+/// targets whatever repository an item came from, so a single configured owner
+/// and repo would only invite values that quietly have no effect.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(utoipa::ToSchema)]
+pub struct GitHubAutomationSettings {
+    #[serde(default = "default_branch_prefix")]
+    pub branch_prefix: String,
+    #[serde(default)]
+    pub merge_method: GitHubMergeMethod,
+    #[serde(default)]
+    pub labels: GitHubAutomationLabels,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub protected_paths: Vec<ProtectedPathRule>,
+    #[serde(default, skip_serializing_if = "GitHubRequestedReviewers::is_empty")]
+    pub requested_reviewers: GitHubRequestedReviewers,
+    #[serde(default)]
+    pub enabled_automations: GitHubAutomationToggles,
+}
+
+impl Default for GitHubAutomationSettings {
+    fn default() -> Self {
+        Self {
+            branch_prefix: default_branch_prefix(),
+            merge_method: GitHubMergeMethod::Squash,
+            labels: GitHubAutomationLabels::default(),
+            protected_paths: Vec::new(),
+            requested_reviewers: GitHubRequestedReviewers::default(),
+            enabled_automations: GitHubAutomationToggles::default(),
+        }
+    }
+}
+
+impl GitHubAutomationSettings {
+    /// Stamp one repository onto the shared conventions. The caller resolves
+    /// `default_branch` from that repository rather than from settings, because
+    /// the board publishes to repositories with different ones.
+    #[must_use]
+    pub fn for_repository(
+        &self,
+        owner: impl Into<String>,
+        repo: impl Into<String>,
+        default_branch: impl Into<String>,
+    ) -> GitHubProjectConfig {
+        GitHubProjectConfig {
+            owner: owner.into(),
+            repo: repo.into(),
+            default_branch: default_branch.into(),
+            branch_prefix: self.branch_prefix.clone(),
+            merge_method: self.merge_method,
+            labels: self.labels.clone(),
+            protected_paths: self.protected_paths.clone(),
+            requested_reviewers: self.requested_reviewers.clone(),
+            enabled_automations: self.enabled_automations.clone(),
+        }
+    }
+}
+
+/// One publication's target: the conventions above, plus the repository this
+/// particular change lands in. Built per item, never stored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
 pub struct GitHubProjectConfig {
@@ -9,9 +69,6 @@ pub struct GitHubProjectConfig {
     pub owner: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub repo: String,
-    #[serde(default, skip_serializing_if = "empty_path")]
-    #[schema(value_type = String)]
-    pub checkout_path: PathBuf,
     #[serde(default = "default_branch")]
     pub default_branch: String,
     #[serde(default = "default_branch_prefix")]
@@ -34,10 +91,6 @@ fn default_branch() -> String {
 
 fn default_branch_prefix() -> String {
     "c/".to_string()
-}
-
-fn empty_path(path: &Path) -> bool {
-    path.as_os_str().is_empty()
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,24 +148,28 @@ pub struct ProtectedPathRule {
 
 impl GitHubProjectConfig {
     #[must_use]
-    pub fn new(owner: impl Into<String>, repo: impl Into<String>, checkout_path: PathBuf) -> Self {
-        Self {
-            owner: owner.into(),
-            repo: repo.into(),
-            checkout_path,
-            default_branch: "main".to_string(),
-            branch_prefix: "c/".to_string(),
-            merge_method: GitHubMergeMethod::Squash,
-            labels: GitHubAutomationLabels::default(),
-            protected_paths: Vec::new(),
-            requested_reviewers: GitHubRequestedReviewers::default(),
-            enabled_automations: GitHubAutomationToggles::default(),
-        }
+    pub fn new(owner: impl Into<String>, repo: impl Into<String>) -> Self {
+        GitHubAutomationSettings::default().for_repository(owner, repo, default_branch())
     }
 
     #[must_use]
     pub fn repository_slug(&self) -> String {
         format!("{}/{}", self.owner, self.repo)
+    }
+
+    /// The conventions without the repository, for stamping a different one on.
+    /// A pull request from a fork publishes to the head repository while keeping
+    /// everything else the base publication was built with.
+    #[must_use]
+    pub fn conventions(&self) -> GitHubAutomationSettings {
+        GitHubAutomationSettings {
+            branch_prefix: self.branch_prefix.clone(),
+            merge_method: self.merge_method,
+            labels: self.labels.clone(),
+            protected_paths: self.protected_paths.clone(),
+            requested_reviewers: self.requested_reviewers.clone(),
+            enabled_automations: self.enabled_automations.clone(),
+        }
     }
 
     #[must_use]
@@ -123,18 +180,7 @@ impl GitHubProjectConfig {
 
 impl Default for GitHubProjectConfig {
     fn default() -> Self {
-        Self {
-            owner: String::new(),
-            repo: String::new(),
-            checkout_path: PathBuf::new(),
-            default_branch: default_branch(),
-            branch_prefix: default_branch_prefix(),
-            merge_method: GitHubMergeMethod::Squash,
-            labels: GitHubAutomationLabels::default(),
-            protected_paths: Vec::new(),
-            requested_reviewers: GitHubRequestedReviewers::default(),
-            enabled_automations: GitHubAutomationToggles::default(),
-        }
+        GitHubAutomationSettings::default().for_repository("", "", default_branch())
     }
 }
 
