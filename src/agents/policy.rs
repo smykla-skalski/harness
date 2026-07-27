@@ -60,7 +60,7 @@ impl WriteDecision {
 
 /// Wrapper for the set of denied binary names.
 ///
-/// The set is produced by `BlockRequirement::all_denied_binaries()` in
+/// The set is produced by `all_denied_binaries()` in
 /// `infra/blocks/registry.rs`, which is the single source the ACP protocol
 /// reads.
 #[derive(Debug, Clone)]
