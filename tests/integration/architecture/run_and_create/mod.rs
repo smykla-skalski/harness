@@ -1,12 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use super::helpers::{
-    assert_file_contains_needles, assert_file_lacks_needles, collect_hits_in_paths, read_repo_file,
-    repo_path_exists,
-};
-
-mod create_boundary;
+use super::helpers::{read_repo_file, repo_path_exists};
 
 #[test]
 fn run_domain_does_not_depend_on_block_registry() {
