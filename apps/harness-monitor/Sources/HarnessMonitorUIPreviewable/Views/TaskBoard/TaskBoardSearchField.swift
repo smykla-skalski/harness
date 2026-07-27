@@ -198,6 +198,10 @@ private struct TaskBoardSearchSuggestionList: View {
         }
         .harnessInteractiveCardButtonStyle(cornerRadius: Self.rowCornerRadius)
         .accessibilityLabel("Search for \(suggestion.title)")
+        // Two cards can carry the same title in different projects, and the
+        // subtitle is the only thing telling them apart on screen.
+        .accessibilityValue(suggestion.subtitle)
+        .accessibilityHint("Fills the search field with this title")
       }
     }
     // Inset by the difference between the two radii, so a row's highlight sits
