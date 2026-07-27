@@ -4,8 +4,8 @@ import HarnessMonitorKit
 /// the view, so without this a restart mid-process reopens on the first step.
 extension TaskBoardStepRailView {
   /// What the next launch needs to reopen on this step: the pinned item and the
-  /// plan Pick loaded for it. Built only when the flow actually changed, never
-  /// on the body path.
+  /// prompt Pick rendered for it. Built only when the flow actually changed,
+  /// never on the body path.
   var stepFlowSnapshot: TaskBoardStepFlowSnapshot? {
     guard let lockedItemID = stepRailState.lockedItemID else { return nil }
     guard let picked = stepRailState.pickedSelection, picked.item.id == lockedItemID else {

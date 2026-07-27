@@ -37,7 +37,7 @@ final class TaskBoardStepRailState {
   private(set) var lockedItemID: String?
   /// Bumps whenever the flow the next launch should reopen on changes. The panel
   /// watches this rather than the stored value itself, which would mean rebuilding
-  /// and deep-comparing a dispatch plan on every body pass.
+  /// and comparing that value, prompt included, on every body pass.
   private(set) var flowRevision: UInt64 = 0
   /// A rail node the user tapped to read ahead; nil shows the live current stage.
   var viewingColumn: TaskBoardStepColumn?
