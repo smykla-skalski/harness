@@ -31817,10 +31817,30 @@
           "enabled": {
             "type": "boolean"
           },
+          "enabled_automations": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAutomationToggles"
+              }
+            ]
+          },
           "execution_checkout_path": {
             "type": [
               "string",
               "null"
+            ]
+          },
+          "labels": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAutomationLabels"
+              }
             ]
           },
           "preferred_host_id": {
@@ -31829,8 +31849,27 @@
               "null"
             ]
           },
+          "protected_paths": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ProtectedPathRule"
+            }
+          },
           "repository": {
             "type": "string"
+          },
+          "requested_reviewers": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubRequestedReviewers"
+              }
+            ]
           },
           "workflows": {
             "type": "array",
