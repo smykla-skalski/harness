@@ -64,12 +64,15 @@ pub(super) async fn require_pending_cursor(
     expected: &ScanRow,
 ) -> Result<(), CliError> {
     let pending = load_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?;
-    if pending.as_ref() == Some(&(expected.order_at.clone(), expected.assignment_id.clone())) {
-        Ok(())
-    } else {
-        Err(db_error(
+    match pending {
+        Some((order_at, assignment_id))
+            if order_at == expected.order_at && assignment_id == expected.assignment_id =>
+        {
+            Ok(())
+        }
+        _ => Err(db_error(
             "remote controller scan completion lost its pending cursor",
-        ))
+        )),
     }
 }
 
