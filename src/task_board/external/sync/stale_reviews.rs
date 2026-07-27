@@ -62,7 +62,7 @@ fn allows_stale_review_reconcile(options: ExternalSyncOptions) -> bool {
     options.status.is_none_or(|status| {
         matches!(
             status.canonical_persisted_status(),
-            TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+            TaskBoardStatus::Inbox | TaskBoardStatus::Todo
         )
     })
 }

@@ -64,7 +64,7 @@ async fn failed_close_keeps_link_and_backoff_does_not_create_duplicate() {
 
     assert_eq!(pushes.lock().expect("push log").as_slice(), ["done-1"]);
     let state = stored_sync_state(&board).await;
-    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.status, Some(TaskBoardStatus::Inbox));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
     assert_eq!(
         board
@@ -88,7 +88,7 @@ async fn failed_close_keeps_link_and_backoff_does_not_create_duplicate() {
         update.precondition_updated_at.as_deref() == Some("provider-revision-1")
     }));
     let state = stored_sync_state(&board).await;
-    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.status, Some(TaskBoardStatus::Inbox));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
 }
 
@@ -112,7 +112,7 @@ async fn create_only_provider_reports_done_status_as_unsupported() {
     );
     assert!(!operations[1].applied);
     let state = stored_sync_state(&board).await;
-    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.status, Some(TaskBoardStatus::Inbox));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
     assert_eq!(state.project_id.as_deref(), Some("acme/widgets"));
 }
@@ -368,7 +368,7 @@ fn task_from_request(request: &ExternalCreateRequest, updated_at: Option<String>
         ),
         title: request.title().into(),
         body: request.body().into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some(request.provider_target().into()),
         updated_at,
         ..ExternalTask::default()

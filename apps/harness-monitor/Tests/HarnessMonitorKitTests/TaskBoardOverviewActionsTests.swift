@@ -71,13 +71,13 @@ struct TaskBoardOverviewActionsTests {
     let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
     let liveInboxItems = Self.makeLiveInboxItems(sessionID: "session-a", task: currentTask)
 
-    // Payload captured the task in the backlog lane with `.open` status, but
+    // Payload captured the task in the inbox lane with `.open` status, but
     // the selected session's live copy has since moved to `.inProgress`.
     let dragItem = TaskBoardCardDragItem.inbox(
       sessionID: "session-a",
       taskID: "task-a",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(!actions.moveCards([dragItem], to: .inReview, liveInboxItems: liveInboxItems))
@@ -96,7 +96,7 @@ struct TaskBoardOverviewActionsTests {
       sessionID: "session-a",
       taskID: "task-a",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(!actions.moveCards([dragItem], to: .inReview, liveInboxItems: liveInboxItems))
@@ -118,7 +118,7 @@ struct TaskBoardOverviewActionsTests {
       sessionID: "session-a",
       taskID: "task-a",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(!actions.moveCards([dragItem], to: .inProgress, liveInboxItems: liveInboxItems))
@@ -136,7 +136,7 @@ struct TaskBoardOverviewActionsTests {
       sessionID: "session-a",
       taskID: "task-a",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(actions.moveCards([dragItem], to: .inProgress, liveInboxItems: liveInboxItems))
@@ -150,7 +150,7 @@ struct TaskBoardOverviewActionsTests {
       sessionID: "session-a",
       taskID: "task-a",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(
@@ -217,7 +217,7 @@ struct TaskBoardOverviewActionsTests {
       sessionID: "session-a",
       taskID: "task-a",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(

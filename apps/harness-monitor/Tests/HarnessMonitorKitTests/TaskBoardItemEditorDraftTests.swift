@@ -65,7 +65,7 @@ struct TaskBoardItemEditorDraftTests {
   func statusMenusExposeOnlyCurrentTaskBoardLanes() {
     let expectedFilterTitles = [
       "All Items",
-      "Backlog",
+      "Inbox",
       "Todo",
       "Planning",
       "In Progress",

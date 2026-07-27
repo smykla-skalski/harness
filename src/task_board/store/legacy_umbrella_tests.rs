@@ -5,7 +5,7 @@ use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::TaskBoardStatus;
 
 #[test]
-fn legacy_markdown_umbrella_statuses_read_and_rewrite_as_backlog() {
+fn legacy_markdown_statuses_read_and_rewrite_as_inbox() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));
     let path = store.tasks_dir().join("legacy-umbrella.md");
@@ -16,7 +16,7 @@ fn legacy_markdown_umbrella_statuses_read_and_rewrite_as_backlog() {
 schema_version: 1
 id: legacy-umbrella
 title: Legacy lane
-status: umbrella
+status: backlog
 priority: medium
 agent_mode: headless
 external_refs:
@@ -34,13 +34,13 @@ body
     .expect("write legacy item");
 
     let loaded = store.get("legacy-umbrella").expect("read legacy item");
-    assert_eq!(loaded.status, TaskBoardStatus::Backlog);
+    assert_eq!(loaded.status, TaskBoardStatus::Inbox);
     assert_eq!(
         loaded.external_refs[0]
             .sync_state
             .as_ref()
             .and_then(|state| state.status),
-        Some(TaskBoardStatus::Backlog)
+        Some(TaskBoardStatus::Inbox)
     );
 
     store
@@ -54,6 +54,6 @@ body
         .expect("rewrite legacy item");
 
     let contents = fs::read_to_string(path).expect("read canonical item");
-    assert_eq!(contents.matches("status: backlog").count(), 2);
+    assert_eq!(contents.matches("status: inbox").count(), 2);
     assert!(!contents.contains("status: umbrella"));
 }

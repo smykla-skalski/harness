@@ -436,7 +436,7 @@ fn assert_task(task: &ExternalTask, number: u64, body: &str) {
     );
     assert_eq!(task.title, "Task title");
     assert_eq!(task.body, body);
-    assert_eq!(task.status, TaskBoardStatus::Backlog);
+    assert_eq!(task.status, TaskBoardStatus::Inbox);
     assert_eq!(task.project_id.as_deref(), Some("acme/widgets"));
     assert_eq!(task.updated_at.as_deref(), Some("revision-1"));
 }

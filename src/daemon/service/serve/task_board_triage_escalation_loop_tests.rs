@@ -149,7 +149,7 @@ async fn drain_tick_marks_the_row_failed_when_the_worker_spawn_errors() {
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     db.create_task_board_item_with_triage(item)
         .await
         .expect("create item");

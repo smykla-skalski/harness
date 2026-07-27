@@ -16,21 +16,21 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item_no_labels(id: &str) -> TaskBoardItem {
+fn inbox_item_no_labels(id: &str) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Vague title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item
 }
 
 #[tokio::test]
 async fn claiming_moves_pending_to_running_with_a_token_and_run_id() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
 
@@ -56,10 +56,10 @@ async fn claiming_moves_pending_to_running_with_a_token_and_run_id() {
 #[tokio::test]
 async fn claim_respects_the_limit_and_leaves_the_rest_pending() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item 1");
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-2"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-2"))
         .await
         .expect("create item 2");
 
@@ -81,7 +81,7 @@ async fn claim_respects_the_limit_and_leaves_the_rest_pending() {
 #[tokio::test]
 async fn sweep_times_out_a_running_row_past_its_deadline() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
     let claimed = db
@@ -119,7 +119,7 @@ async fn sweep_times_out_a_running_row_past_its_deadline() {
 #[tokio::test]
 async fn sweep_leaves_a_freshly_claimed_row_running() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
     db.claim_pending_task_board_triage_escalations(1)
@@ -140,7 +140,7 @@ async fn sweep_leaves_a_freshly_claimed_row_running() {
 #[tokio::test]
 async fn a_failed_spawn_marks_the_row_failed_with_the_real_reason_not_stuck_running() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
     let claimed = db
@@ -173,7 +173,7 @@ async fn a_failed_spawn_marks_the_row_failed_with_the_real_reason_not_stuck_runn
 #[tokio::test]
 async fn status_for_item_reports_pending_then_running_then_nothing() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
 

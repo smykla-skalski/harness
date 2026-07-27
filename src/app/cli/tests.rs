@@ -174,12 +174,12 @@ fn parse_task_board_update_planning_fields() {
 }
 
 #[test]
-fn parse_task_board_backlog_status_and_reject_legacy_umbrella() {
-    let cli = Cli::try_parse_from(["harness", "task-board", "list", "--status", "backlog"])
-        .expect("parse backlog status");
+fn parse_task_board_inbox_status_and_reject_legacy_umbrella() {
+    let cli = Cli::try_parse_from(["harness", "task-board", "list", "--status", "inbox"])
+        .expect("parse inbox status");
     match task_board_command(cli.command) {
         TaskBoardCommand::List(args) => {
-            assert_eq!(args.status, Some(TaskBoardStatus::Backlog));
+            assert_eq!(args.status, Some(TaskBoardStatus::Inbox));
         }
         _ => panic!("expected TaskBoard List"),
     }

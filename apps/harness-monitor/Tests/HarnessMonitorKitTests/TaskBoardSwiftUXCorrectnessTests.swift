@@ -201,25 +201,25 @@ struct TaskBoardSwiftUXCorrectnessTests {
 
   // MARK: - #31 drag preserves source status
 
-  @Test("Dragging a planning item into Backlog applies backlog status")
-  func draggingPlanningItemIntoBacklogAppliesBacklogStatus() {
+  @Test("Dragging a planning item into Inbox applies inbox status")
+  func draggingPlanningItemIntoInboxAppliesInboxStatus() {
     let item = sampleTaskBoardItem(status: .planning)
-    let resolved = TaskBoardInboxLane.backlog.taskBoardDropStatus(for: item)
-    #expect(resolved == .backlog)
+    let resolved = TaskBoardInboxLane.inbox.taskBoardDropStatus(for: item)
+    #expect(resolved == .inbox)
   }
 
-  @Test("Dragging a new item into Backlog applies backlog status")
-  func draggingNewItemIntoBacklogAppliesBacklogStatus() {
+  @Test("Dragging a new item into Inbox applies inbox status")
+  func draggingNewItemIntoInboxAppliesInboxStatus() {
     let item = sampleTaskBoardItem(status: .new)
-    let resolved = TaskBoardInboxLane.backlog.taskBoardDropStatus(for: item)
-    #expect(resolved == .backlog)
+    let resolved = TaskBoardInboxLane.inbox.taskBoardDropStatus(for: item)
+    #expect(resolved == .inbox)
   }
 
-  @Test("Dragging a todo item into Backlog applies backlog status")
-  func draggingTodoItemIntoBacklogAppliesBacklogStatus() {
+  @Test("Dragging a todo item into Inbox applies inbox status")
+  func draggingTodoItemIntoInboxAppliesInboxStatus() {
     let item = sampleTaskBoardItem(status: .todo)
-    let resolved = TaskBoardInboxLane.backlog.taskBoardDropStatus(for: item)
-    #expect(resolved == .backlog)
+    let resolved = TaskBoardInboxLane.inbox.taskBoardDropStatus(for: item)
+    #expect(resolved == .inbox)
   }
 
   // MARK: - #33 ordered unique lines

@@ -15,14 +15,14 @@ use crate::task_board::{
 
 /// Only dispatchable, live, unlinked, pre-dispatch items are `BuiltInV1`'s
 /// business. Everything else (umbrellas, tombstones, already-dispatched
-/// items, and items past Backlog/Todo) gets no decision at all.
+/// items, and items past Inbox/Todo) gets no decision at all.
 pub(super) fn triage_eligible(item: &TaskBoardItem) -> bool {
     item.kind.is_dispatchable()
         && !item.is_deleted()
         && item.work_item_id.is_none()
         && matches!(
             item.status.canonical_persisted_status(),
-            TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+            TaskBoardStatus::Inbox | TaskBoardStatus::Todo
         )
 }
 
@@ -68,7 +68,7 @@ impl EnsuredTriageDecision {
 /// Evaluate and, where warranted, apply the `BuiltInV1` deterministic triage
 /// check table against `item` in place, inside the caller's ongoing
 /// transaction. Mutates `item.status`/`lane_position`/`lane_origin`/
-/// `lane_set_at` for a Backlog-to-Todo promotion, a Todo-to-Backlog demotion,
+/// `lane_set_at` for a Inbox-to-Todo promotion, a Todo-to-Inbox demotion,
 /// or a re-rank of an already-Todo item whose priority (or other ranked
 /// evidence) changed. `suppress_placement` covers a direct human or provider
 /// effect on status/placement within the very same mutation (a plain manual
@@ -226,7 +226,7 @@ pub(super) async fn apply_placement_effect_in_tx(
     match verdict {
         TriageVerdict::Todo => promote_to_todo_in_tx(transaction, item, decided_at, producer).await,
         TriageVerdict::Undecided => {
-            demote_automatic_todo_to_backlog(item);
+            demote_automatic_todo_to_inbox(item);
             Ok(())
         }
     }
@@ -269,7 +269,7 @@ pub(super) async fn apply_override_placement_effect_in_tx(
             )
             .await?;
         }
-        TriageVerdict::Undecided => demote_automatic_todo_to_backlog(item),
+        TriageVerdict::Undecided => demote_automatic_todo_to_inbox(item),
     }
     Ok(LaneTransitionKind::Automatic)
 }
@@ -282,7 +282,7 @@ pub(super) async fn apply_override_placement_effect_in_tx(
 pub(super) const fn override_implied_status(verdict: TriageVerdict) -> TaskBoardStatus {
     match verdict {
         TriageVerdict::Todo => TaskBoardStatus::Todo,
-        TriageVerdict::Undecided => TaskBoardStatus::Backlog,
+        TriageVerdict::Undecided => TaskBoardStatus::Inbox,
     }
 }
 
@@ -326,7 +326,7 @@ pub(super) async fn reapply_active_override_outcome_in_tx(
     Ok(placement_changed.then_some(transition))
 }
 
-/// Promotes an eligible Backlog item to Todo, or re-ranks an item that is
+/// Promotes an eligible Inbox item to Todo, or re-ranks an item that is
 /// already Todo (its evidence changed for some other reason, such as a
 /// priority edit, while the verdict itself stayed Todo). The caller has
 /// already confirmed the item is not manually placed and placement is not
@@ -339,7 +339,7 @@ async fn promote_to_todo_in_tx(
     producer: &str,
 ) -> Result<(), CliError> {
     let status = item.status.canonical_persisted_status();
-    if status != TaskBoardStatus::Backlog && status != TaskBoardStatus::Todo {
+    if status != TaskBoardStatus::Inbox && status != TaskBoardStatus::Todo {
         return Ok(());
     }
     let position = compute_builtin_v1_todo_position_in_tx(transaction, item).await?;
@@ -363,7 +363,7 @@ async fn promote_to_todo_with_producer_in_tx(
     preserve_any_automatic_producer: bool,
 ) -> Result<(), CliError> {
     let status = item.status.canonical_persisted_status();
-    if status != TaskBoardStatus::Backlog && status != TaskBoardStatus::Todo {
+    if status != TaskBoardStatus::Inbox && status != TaskBoardStatus::Todo {
         return Ok(());
     }
     let position = compute_builtin_v1_todo_position_in_tx(transaction, item).await?;
@@ -387,14 +387,14 @@ async fn promote_to_todo_with_producer_in_tx(
     Ok(())
 }
 
-/// Undecided always means Backlog for a non-manual, non-suppressed item,
+/// Undecided always means Inbox for a non-manual, non-suppressed item,
 /// whether it is arriving fresh (created Todo by default, never placed) or
 /// falling back from a prior `BuiltInV1` Todo placement.
-fn demote_automatic_todo_to_backlog(item: &mut TaskBoardItem) {
+fn demote_automatic_todo_to_inbox(item: &mut TaskBoardItem) {
     if item.status.canonical_persisted_status() != TaskBoardStatus::Todo {
         return;
     }
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.lane_position = None;
     item.lane_origin = None;
     item.lane_set_at = None;
@@ -452,7 +452,7 @@ pub(super) fn placement_matches_verdict(
                 )
         }
         TriageVerdict::Undecided => {
-            item.status.canonical_persisted_status() == TaskBoardStatus::Backlog
+            item.status.canonical_persisted_status() == TaskBoardStatus::Inbox
                 && item.lane_position.is_none()
                 && item.lane_origin.is_none()
                 && item.lane_set_at.is_none()

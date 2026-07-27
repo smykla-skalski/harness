@@ -74,7 +74,7 @@ struct MobileRemoteTaskBoardWire: Decodable, Sendable {
   }
 
   private static let statusTitles = [
-    "backlog": "Backlog",
+    "inbox": "Inbox",
     "todo": "Todo",
     "new": "New",
     "planning": "Planning",

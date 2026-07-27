@@ -48,7 +48,7 @@ fn bug_rule_set() -> TriageRuleSetV1 {
 /// (a) The blocking bug's own 4-step repro: `triage_cause` used to see a
 /// bare identity mismatch between an `AGENT_V1` decision and `BuiltInV1`
 /// (the active evaluator) on every later touch, re-deciding Undecided,
-/// demoting the agent-placed Todo back to Backlog, and re-enqueuing a fresh
+/// demoting the agent-placed Todo back to Inbox, and re-enqueuing a fresh
 /// (paid) escalation for evidence that never actually changed.
 #[tokio::test]
 async fn an_agent_todo_verdict_survives_an_unrelated_touch() {
@@ -166,7 +166,7 @@ async fn a_genuine_evidence_change_after_an_agent_verdict_redecides_and_reenqueu
     let item = db.task_board_item("item-1").await.expect("load item");
     assert_eq!(
         item.status,
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
         "the active evaluator's fresh Undecided verdict must land"
     );
     assert_eq!(

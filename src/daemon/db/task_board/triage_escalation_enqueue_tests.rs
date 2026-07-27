@@ -19,14 +19,14 @@ fn enabled_config() -> TaskBoardTriageEscalationConfig {
     }
 }
 
-fn backlog_item_no_labels(id: &str) -> TaskBoardItem {
+fn inbox_item_no_labels(id: &str) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Vague title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item
 }
 
@@ -53,7 +53,7 @@ async fn an_undecided_item_enqueues_a_pending_escalation_when_enabled() {
     let (_directory, db) = connect().await;
     db.set_triage_escalation_config(enabled_config());
 
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
 
@@ -68,7 +68,7 @@ async fn escalation_is_never_enqueued_when_the_feature_is_disabled() {
     let (_directory, db) = connect().await;
     // Feature stays off by default -- no set_triage_escalation_config call.
 
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
 
@@ -80,7 +80,7 @@ async fn a_second_touch_with_unchanged_evidence_does_not_enqueue_a_duplicate() {
     let (_directory, db) = connect().await;
     db.set_triage_escalation_config(enabled_config());
 
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
     let first = active_escalation_row(&db, "item-1")
@@ -112,7 +112,7 @@ async fn a_fingerprint_change_supersedes_the_still_pending_escalation_and_enqueu
     let (_directory, db) = connect().await;
     db.set_triage_escalation_config(enabled_config());
 
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
     let first = active_escalation_row(&db, "item-1")
@@ -165,7 +165,7 @@ async fn an_active_override_suppresses_enqueue() {
     let (_directory, db) = connect().await;
     db.set_triage_escalation_config(enabled_config());
 
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item");
     // Clear whatever escalation the create produced, then set an override
@@ -203,11 +203,11 @@ async fn the_queue_depth_bound_suppresses_enqueue_without_erroring_ingress() {
     config.max_pending = 1;
     db.set_triage_escalation_config(config);
 
-    db.create_task_board_item_with_triage(backlog_item_no_labels("item-1"))
+    db.create_task_board_item_with_triage(inbox_item_no_labels("item-1"))
         .await
         .expect("create item 1");
     let result = db
-        .create_task_board_item_with_triage(backlog_item_no_labels("item-2"))
+        .create_task_board_item_with_triage(inbox_item_no_labels("item-2"))
         .await;
 
     assert!(result.is_ok(), "ingress never errors on a full escalation queue");

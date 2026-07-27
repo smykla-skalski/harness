@@ -7,7 +7,7 @@ use crate::task_board::{
 };
 
 async fn seed_with_override(db: &AsyncDaemonDb, item_id: &str, verdict: TriageVerdict) {
-    db.create_task_board_item(backlog_item(item_id))
+    db.create_task_board_item(inbox_item(item_id))
         .await
         .expect("seed item");
     let expected_item_revision = revision(db, item_id).await;
@@ -33,7 +33,7 @@ async fn human_update_rejects_a_status_write_conflicting_with_a_todo_override() 
 
     let error = db
         .update_task_board_item_with_triage("item-1", |item| {
-            item.status = TaskBoardStatus::Backlog;
+            item.status = TaskBoardStatus::Inbox;
             Ok(true)
         })
         .await
@@ -111,7 +111,7 @@ async fn human_update_with_nothing_to_rerank_does_not_churn_placement() {
 #[tokio::test]
 async fn human_update_reranks_a_nonmanual_todo_override_around_a_manual_anchor() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("anchor"))
+    db.create_task_board_item(inbox_item("anchor"))
         .await
         .expect("seed anchor");
     db.set_task_board_lane_position(TaskBoardLanePositionInput {
@@ -125,7 +125,7 @@ async fn human_update_reranks_a_nonmanual_todo_override_around_a_manual_anchor()
     .await
     .expect("anchor via the position API");
 
-    let mut sibling = backlog_item("sibling");
+    let mut sibling = inbox_item("sibling");
     sibling.status = TaskBoardStatus::Todo;
     sibling.priority = TaskBoardPriority::High;
     sibling.lane_position = Some(1);
@@ -227,7 +227,7 @@ async fn provider_reconcile_reapplies_a_todo_override_after_a_conflicting_status
 
     let mutation = db
         .update_task_board_item_with_provider_triage("item-1", |item| {
-            item.status = TaskBoardStatus::Backlog;
+            item.status = TaskBoardStatus::Inbox;
             Ok(true)
         })
         .await
@@ -268,7 +268,7 @@ async fn provider_reconcile_reapplies_an_undecided_override_after_a_conflicting_
         .expect("mutation applied");
     assert_eq!(
         mutation.item.status,
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
         "the active override's lane must survive a conflicting provider write"
     );
 }
@@ -311,7 +311,7 @@ async fn provider_reconcile_with_no_status_change_does_not_churn_placement() {
     assert_eq!(mutation.item_revision, before_revision + 1);
 }
 
-/// The override governs Backlog-versus-Todo placement only -- an ordinary
+/// The override governs Inbox-versus-Todo placement only -- an ordinary
 /// human exit to a non-triage lifecycle status must never be blocked just
 /// because a triage override happens to be active.
 #[tokio::test]
@@ -360,7 +360,7 @@ async fn human_update_enforces_the_override_again_on_return_to_a_triage_lane() {
     let before_revision = revision(&db, "item-1").await;
     let error = db
         .update_task_board_item_with_triage("item-1", |item| {
-            item.status = TaskBoardStatus::Backlog;
+            item.status = TaskBoardStatus::Inbox;
             Ok(true)
         })
         .await

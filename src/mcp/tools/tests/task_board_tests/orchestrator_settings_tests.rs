@@ -25,7 +25,7 @@ async fn update_tool_proxies_every_public_field_to_running_daemon() {
         "step_mode": true,
         "enabled_workflows": ["default_task", "pr_review"],
         "dry_run_default": true,
-        "dispatch_status_filter": "backlog",
+        "dispatch_status_filter": "inbox",
         "clear_dispatch_status_filter": false,
         "project_dir": "/tmp/project",
         "clear_project_dir": false,

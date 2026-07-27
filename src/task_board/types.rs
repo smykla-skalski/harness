@@ -208,7 +208,7 @@ pub enum TaskBoardWorkflowStatus {
 #[serde(rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]
 pub enum TaskBoardStatus {
-    Backlog,
+    Inbox,
     #[default]
     Todo,
     Planning,
@@ -380,22 +380,26 @@ mod tests {
     use super::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 
     #[test]
-    fn backlog_is_the_canonical_status_wire_value() {
+    fn inbox_is_the_canonical_status_wire_value() {
         assert_eq!(
-            serde_json::to_string(&TaskBoardStatus::Backlog).expect("serialize backlog"),
-            "\"backlog\""
+            serde_json::to_string(&TaskBoardStatus::Inbox).expect("serialize inbox"),
+            "\"inbox\""
         );
         assert_eq!(
-            serde_json::from_str::<TaskBoardStatus>("\"backlog\"").expect("deserialize backlog"),
-            TaskBoardStatus::Backlog
+            serde_json::from_str::<TaskBoardStatus>("\"inbox\"").expect("deserialize inbox"),
+            TaskBoardStatus::Inbox
         );
     }
 
     #[test]
-    fn public_status_wire_rejects_legacy_umbrella() {
+    fn public_status_wire_rejects_legacy_lane_names() {
         assert!(
             serde_json::from_str::<TaskBoardStatus>("\"umbrella\"").is_err(),
             "legacy umbrella is accepted only at persisted-data migration boundaries"
+        );
+        assert!(
+            serde_json::from_str::<TaskBoardStatus>("\"backlog\"").is_err(),
+            "legacy backlog is accepted only at persisted-data migration boundaries"
         );
     }
 

@@ -110,7 +110,7 @@ mod tests {
         reference.sync_state = Some(ExternalRefSyncState {
             title: Some("Base title".into()),
             body: Some(String::new()),
-            status: Some(TaskBoardStatus::Backlog),
+            status: Some(TaskBoardStatus::Inbox),
             project_id: Some("acme/widgets".into()),
             updated_at: Some("2026-07-15T10:00:00Z".into()),
             synced_at: Some("2026-07-15T10:00:00Z".into()),

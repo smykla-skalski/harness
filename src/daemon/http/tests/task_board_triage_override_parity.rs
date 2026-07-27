@@ -57,7 +57,7 @@ async fn assert_triage_override_set_and_clear_parity() {
             "Verify override set/clear parity.".into(),
             "2026-07-23T00:00:00Z".into(),
         );
-        item.status = TaskBoardStatus::Backlog;
+        item.status = TaskBoardStatus::Inbox;
         db.create_task_board_item(item).await.expect("create item");
     }
     let (base_url, server) = serve_http(state).await;
@@ -184,7 +184,7 @@ async fn assert_stale_triage_override_cas_parity() {
         "Verify override CAS errors.".into(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     let db = state.async_db.get().expect("async db");
     db.create_task_board_item(item).await.expect("create item");
     let (base_url, server) = serve_http(state).await;
@@ -237,7 +237,7 @@ async fn assert_clear_without_active_override_parity() {
         "Verify clear without an override errors.".into(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     let db = state.async_db.get().expect("async db");
     db.create_task_board_item(item).await.expect("create item");
     let (base_url, server) = serve_http(state).await;

@@ -14,14 +14,14 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+fn inbox_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = tags;
     item
 }
@@ -67,7 +67,7 @@ async fn seed_active_dispatch_reservation(db: &AsyncDaemonDb, item_id: &str) {
 #[tokio::test]
 async fn preview_excludes_items_under_an_active_dispatch_reservation() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("reserved", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("reserved", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     seed_active_dispatch_reservation(&db, "reserved").await;
@@ -86,7 +86,7 @@ async fn preview_excludes_items_under_an_active_dispatch_reservation() {
 #[tokio::test]
 async fn preview_never_writes_anything() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
 
@@ -112,13 +112,13 @@ async fn preview_never_writes_anything() {
         .fetch_one(db.pool())
         .await
         .expect("read status");
-    assert_eq!(status, "backlog");
+    assert_eq!(status, "inbox");
 }
 
 #[tokio::test]
 async fn invalid_candidate_preview_reports_no_diff() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     let mut invalid = bug_rule_set();
@@ -132,7 +132,7 @@ async fn invalid_candidate_preview_reports_no_diff() {
 #[tokio::test]
 async fn an_active_override_never_reports_a_governing_placement_change() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("overridden", Vec::new()))
+    db.create_task_board_item(inbox_item("overridden", Vec::new()))
         .await
         .expect("create item");
     db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
@@ -169,18 +169,18 @@ async fn an_active_override_never_reports_a_governing_placement_change() {
 #[tokio::test]
 async fn a_manually_anchored_item_never_reports_a_governing_placement_change() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("anchored", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("anchored", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     sqlx::query(
         "UPDATE task_board_items SET
-             status = 'backlog', lane_position = 0, lane_origin = 'manual',
+             status = 'inbox', lane_position = 0, lane_origin = 'manual',
              lane_actor = 'human-1', lane_set_at = '2026-07-24T00:00:00Z'
          WHERE item_id = 'anchored'",
     )
     .execute(db.pool())
     .await
-    .expect("anchor item manually in backlog");
+    .expect("anchor item manually in inbox");
 
     let result = db
         .preview_task_board_triage_rules(bug_rule_set())

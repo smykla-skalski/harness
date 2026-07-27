@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 /// A bound loopback socket that never calls `accept`. The kernel still
-/// completes the TCP handshake for the backlog, so a client connects and then
+/// completes the TCP handshake for the inbox, so a client connects and then
 /// waits forever for a reply - the "daemon accepted the socket and went quiet"
 /// case.
 final class LoopbackListener {

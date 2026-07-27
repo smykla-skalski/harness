@@ -180,7 +180,7 @@ public struct MobileTaskBoardSummary: Codable, Equatable, Identifiable, Sendable
   }
 
   private static func canonicalStatus(_ status: String) -> String {
-    status == "umbrella" ? "backlog" : status
+    status == "umbrella" ? "inbox" : status
   }
 
   private static func canonicalStatusTitle(
@@ -188,9 +188,9 @@ public struct MobileTaskBoardSummary: Codable, Equatable, Identifiable, Sendable
     statusTitle: String
   ) -> String {
     if sourceStatus == "umbrella"
-      || (sourceStatus == "backlog" && statusTitle == "Umbrella")
+      || (sourceStatus == "inbox" && statusTitle == "Umbrella")
     {
-      return "Backlog"
+      return "Inbox"
     }
     return statusTitle
   }

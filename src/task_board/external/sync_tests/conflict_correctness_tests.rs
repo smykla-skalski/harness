@@ -31,7 +31,7 @@ async fn push_precondition_failure_persists_three_way_conflict() {
         "remote-1",
         "Concurrent remote edit",
         "Old body",
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
     ));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
 
@@ -80,7 +80,7 @@ async fn prefer_remote_supersedes_existing_open_conflict() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     );
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
@@ -129,7 +129,7 @@ async fn pull_report_supersedes_only_converged_known_conflict_fields() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     );
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
@@ -174,7 +174,7 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
             "remote-1",
             "Remote edit",
             "Remote body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     );
     let updates = client.updates.clone();
@@ -269,7 +269,7 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
                 "remote-1",
                 "Remote edit",
                 "Old body",
-                TaskBoardStatus::Backlog,
+                TaskBoardStatus::Inbox,
             )
         }],
     );

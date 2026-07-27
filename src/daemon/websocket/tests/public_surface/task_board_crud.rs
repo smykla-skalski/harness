@@ -90,7 +90,7 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
                 ws_methods::TASK_BOARD_UPDATE,
                 // The label lands with this update so `BuiltInV1` triage keeps
                 // its Todo verdict; an unlabelled item is `NoMeaningfulLabels`
-                // and the same update would demote it back to Backlog.
+                // and the same update would demote it back to Inbox.
                 json!({
                     "id": "board-ws-crud",
                     "status": "todo",

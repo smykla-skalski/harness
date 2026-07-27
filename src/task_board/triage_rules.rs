@@ -72,7 +72,7 @@ pub enum TriagePriorityAction {
 }
 
 /// The closed, typed condition vocabulary over stable Task Board facts.
-/// Every eligible item is already a dispatchable `Task` in Backlog or Todo
+/// Every eligible item is already a dispatchable `Task` in Inbox or Todo
 /// (see `triage_eligible`), so `kind` carries no discriminating power here
 /// and is deliberately not part of this vocabulary. Title and body are free
 /// text and deliberately excluded too -- conditions are closed and typed,

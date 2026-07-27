@@ -22,7 +22,7 @@ async fn fake_client_pulls_tasks_without_network() {
     assert_eq!(client.provider(), ExternalProvider::GitHub);
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].title, "Remote task");
-    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Inbox);
 }
 
 #[tokio::test]

@@ -193,7 +193,7 @@ fn observed_review_status(snapshot: &GitHubPullRequestSnapshot) -> Option<TaskBo
         return Some(TaskBoardStatus::Done);
     }
     if snapshot.viewer_review_requested == Some(true) {
-        return Some(TaskBoardStatus::Backlog);
+        return Some(TaskBoardStatus::Inbox);
     }
     None
 }
@@ -209,7 +209,7 @@ pub(crate) fn reconciled_external_status(
         return current;
     };
     let Some(last_external) = last_synced.map(canonical_external_status) else {
-        return if current_external == TaskBoardStatus::Backlog && observed == TaskBoardStatus::Done
+        return if current_external == TaskBoardStatus::Inbox && observed == TaskBoardStatus::Done
         {
             TaskBoardStatus::Done
         } else {

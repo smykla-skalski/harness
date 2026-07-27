@@ -10,7 +10,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardLaneOrigin, TaskBoardTriageDecis
 /// resetting status independent of triage, for example) can leave the item's
 /// placement out of sync with the existing, unchanged decision. Reapply that
 /// decision's placement without appending a new history generation, so a
-/// restore never strands a prior Todo verdict unranked or in Backlog; a
+/// restore never strands a prior Todo verdict unranked or in Inbox; a
 /// genuinely unchanged item still reports no decision at all.
 ///
 /// The retained decision's own evaluator identity is the correct placement

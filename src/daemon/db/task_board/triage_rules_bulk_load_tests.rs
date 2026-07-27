@@ -14,25 +14,25 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+fn inbox_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = tags;
     item
 }
 
 #[tokio::test]
-async fn loads_every_live_backlog_and_todo_item_with_its_decision_and_override() {
+async fn loads_every_live_inbox_and_todo_item_with_its_decision_and_override() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-a", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("item-a", vec!["kind/bug".into()]))
         .await
         .expect("create item-a");
-    db.create_task_board_item(backlog_item("item-b", Vec::new()))
+    db.create_task_board_item(inbox_item("item-b", Vec::new()))
         .await
         .expect("create item-b");
 
@@ -56,12 +56,12 @@ async fn loads_every_live_backlog_and_todo_item_with_its_decision_and_override()
 }
 
 #[tokio::test]
-async fn excludes_deleted_and_non_backlog_todo_items() {
+async fn excludes_deleted_and_non_inbox_todo_items() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("kept", Vec::new()))
+    db.create_task_board_item(inbox_item("kept", Vec::new()))
         .await
         .expect("create kept");
-    let mut done = backlog_item("done", Vec::new());
+    let mut done = inbox_item("done", Vec::new());
     done.status = TaskBoardStatus::Done;
     db.create_task_board_item(done).await.expect("create done");
 
@@ -79,7 +79,7 @@ async fn excludes_deleted_and_non_backlog_todo_items() {
 #[tokio::test]
 async fn reports_the_current_decision_verdict_when_one_exists() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("triaged", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("triaged", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     let mut transaction = db

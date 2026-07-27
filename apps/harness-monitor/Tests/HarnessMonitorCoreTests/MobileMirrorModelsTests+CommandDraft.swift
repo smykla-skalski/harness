@@ -149,7 +149,7 @@ extension MobileMirrorModelsCommandTests {
         kind: .taskBoardDispatch,
         confirmationText: "Dispatch task.",
         target: target,
-        payload: ["status": "backlog"]
+        payload: ["status": "inbox"]
       ).validate()
     )
     for (legacyStatus, canonicalStatus) in [

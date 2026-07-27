@@ -69,7 +69,7 @@ async fn failed_provider_scope_does_not_block_a_successful_scope() {
         Box::new(ScopedPullClient::failing("acme/broken")),
         Box::new(ScopedPullClient::successful(
             "acme/widgets",
-            external_task("acme/widgets#17", TaskBoardStatus::Backlog),
+            external_task("acme/widgets#17", TaskBoardStatus::Inbox),
         )),
     ];
 
@@ -122,7 +122,7 @@ async fn a_mutual_parent_cycle_does_not_abort_the_batch_or_get_stuck() {
             cyclic_task("acme/widgets#101", "acme/widgets#100"),
             ExternalTask {
                 title: unrelated_title.into(),
-                ..external_task("acme/widgets#102", TaskBoardStatus::Backlog)
+                ..external_task("acme/widgets#102", TaskBoardStatus::Inbox)
             },
         ]
     };
@@ -241,7 +241,7 @@ async fn pull_title_conflict_persists_three_way_values_without_overwriting_local
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Base title".into()),
         body: Some(String::new()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: Some("acme/widgets".into()),
         updated_at: Some("2026-07-15T10:00:00Z".into()),
         synced_at: Some("2026-07-15T10:00:00Z".into()),
@@ -303,7 +303,7 @@ async fn remote_open_state_never_resets_an_internal_in_progress_lane() {
     db.create_task_board_item(item).await.expect("create item");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(ScopedPullClient::successful(
         "acme/widgets",
-        external_task("acme/widgets#18", TaskBoardStatus::Backlog),
+        external_task("acme/widgets#18", TaskBoardStatus::Inbox),
     ))];
 
     crate::task_board::external::sync_external_tasks_scoped(&db, pull_options(), &clients)
@@ -451,7 +451,7 @@ fn cyclic_task(external_id: &str, parent_external_id: &str) -> ExternalTask {
             ExternalProvider::GitHub,
             parent_external_id,
         )),
-        ..external_task(external_id, TaskBoardStatus::Backlog)
+        ..external_task(external_id, TaskBoardStatus::Inbox)
     }
 }
 
@@ -491,7 +491,7 @@ fn linked_item(id: &str, status: TaskBoardStatus) -> TaskBoardItem {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Remote task".into()),
         body: Some(String::new()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: Some("acme/widgets".into()),
         updated_at: Some("2026-07-15T10:00:00Z".into()),
         synced_at: Some("2026-07-15T10:00:00Z".into()),

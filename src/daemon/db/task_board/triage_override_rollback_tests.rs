@@ -71,7 +71,7 @@ async fn decision_count(db: &AsyncDaemonDb, item_id: &str) -> i64 {
 /// promoting `item_id` to Todo must shift it -- proving a failed final audit
 /// write rolls back that shifted row too, not just the candidate.
 async fn anchor_sibling_at_todo_slot_zero(db: &AsyncDaemonDb, item_id: &str) {
-    db.create_task_board_item(backlog_item(item_id))
+    db.create_task_board_item(inbox_item(item_id))
         .await
         .expect("seed sibling");
     query(
@@ -90,7 +90,7 @@ async fn anchor_sibling_at_todo_slot_zero(db: &AsyncDaemonDb, item_id: &str) {
 async fn set_rolls_back_every_write_when_the_final_audit_insert_fails() {
     let (_directory, db) = connect().await;
     anchor_sibling_at_todo_slot_zero(&db, "sibling-0").await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -156,7 +156,7 @@ async fn set_rolls_back_every_write_when_the_final_audit_insert_fails() {
 #[tokio::test]
 async fn clear_rolls_back_every_write_when_the_final_audit_insert_fails() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;

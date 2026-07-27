@@ -104,7 +104,7 @@ fn repair_dispatch_status_filter(document: &mut Value) -> bool {
         return false;
     };
     if status_value.as_str() == Some("umbrella") {
-        document["dispatch_status_filter"] = Value::String("backlog".to_string());
+        document["dispatch_status_filter"] = Value::String("inbox".to_string());
         return true;
     }
     let Ok(status) = serde_json::from_value::<TaskBoardStatus>(status_value) else {

@@ -75,7 +75,7 @@ extension TaskBoardInboxLane {
     switch self {
     case .todo, .inProgress, .inReview, .toReview, .failed:
       true
-    case .umbrella, .backlog, .planning, .agenticReview, .testing, .humanRequired:
+    case .umbrella, .inbox, .planning, .agenticReview, .testing, .humanRequired:
       false
     }
   }

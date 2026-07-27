@@ -262,7 +262,7 @@ fn pulled_task(external_id: &str, title: &str) -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: title.into(),
         body: String::new(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: None,
         updated_at: Some("2026-07-16T10:00:00Z".into()),
         ..ExternalTask::default()
@@ -281,7 +281,7 @@ fn linked_item(id: &str, title: &str) -> TaskBoardItem {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Base title".into()),
         body: Some("Body".into()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: None,
         updated_at: Some("2026-07-16T10:00:00Z".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
@@ -296,7 +296,7 @@ fn remote_task(title: &str) -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, "remote-linked"),
         title: title.into(),
         body: "Body".into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: None,
         updated_at: Some("2026-07-16T10:05:00Z".into()),
         ..ExternalTask::default()
@@ -327,7 +327,7 @@ fn stale_review_item() -> TaskBoardItem {
         .with_url("https://example.test/org/repository/pull/17")
         .into_core_ref();
     reference.sync_state = Some(ExternalRefSyncState {
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         ..ExternalRefSyncState::default()
     });
     item.external_refs = vec![reference];

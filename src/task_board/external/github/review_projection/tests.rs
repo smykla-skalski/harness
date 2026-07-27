@@ -126,7 +126,7 @@ fn active_review_request_preserves_local_workflow_progress() {
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
             "2026-07-11T10:00:00Z",
         )),
     }];
@@ -215,7 +215,7 @@ fn completed_remote_review_does_not_interrupt_active_execution() {
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
             "2026-07-11T10:00:00Z",
         )),
     }];
@@ -271,7 +271,7 @@ fn candidate_projection_reloads_refs_edited_after_listing() {
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
             "2026-07-11T10:00:00Z",
         )),
     }];
@@ -356,7 +356,7 @@ fn active_imported_reviews_are_discovered_for_exact_resolution() {
         external_id: "Example/Repo#42".into(),
         url: Some("https://github.com/Example/Repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
             "2026-07-11T10:00:00Z",
         )),
     }];

@@ -33,7 +33,7 @@ pub(super) async fn route_session_notification(
     }
     // The conversation itself is history harness already stored, so forwarding
     // it would write a second copy of every turn and show the Monitor the whole
-    // backlog as if it had just been said.
+    // inbox as if it had just been said.
     if notification_guard.is_replaying(&routed.notification.session_id) {
         log_replayed_notification(&routed.notification.session_id);
         return Ok(());

@@ -81,7 +81,7 @@ final class TaskBoardIntentTests: XCTestCase {
 
   func testTaskBoardStatusEnumRoundTripsWithDaemonValues() {
     let currentStatuses: [TaskBoardStatus] = [
-      .backlog,
+      .inbox,
       .todo,
       .planning,
       .inProgress,
@@ -107,10 +107,10 @@ final class TaskBoardIntentTests: XCTestCase {
     XCTAssertEqual(TaskBoardStatusEnum(daemonValue: .blocked).daemonValue, .failed)
   }
 
-  func testTaskBoardStatusEnumMapsUnknownDaemonValuesToBacklog() {
+  func testTaskBoardStatusEnumMapsUnknownDaemonValuesToInbox() {
     XCTAssertEqual(
       TaskBoardStatusEnum(daemonValue: .unknown("future_status")).daemonValue,
-      .backlog
+      .inbox
     )
   }
 

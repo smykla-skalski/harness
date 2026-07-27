@@ -427,7 +427,7 @@ pub(super) fn create_evidence(
     baseline.sync_state = Some(ExternalRefSyncState {
         title: Some(intent.snapshot.title.clone()),
         body: Some(intent.snapshot.body.clone()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: Some(intent.snapshot.provider_target.clone()),
         updated_at: Some(revision.into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),

@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn no_baseline_workflow_status_push_records_canonical_backlog_truth() {
+async fn no_baseline_workflow_status_push_records_canonical_inbox_truth() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let mut item = TaskBoardItem::new(
@@ -47,7 +47,7 @@ async fn no_baseline_workflow_status_push_records_canonical_backlog_truth() {
             .sync_state
             .as_ref()
             .and_then(|state| state.status),
-        Some(TaskBoardStatus::Backlog)
+        Some(TaskBoardStatus::Inbox)
     );
 }
 
@@ -162,6 +162,6 @@ async fn local_todo_reopen_survives_pull_and_pushes_remote_open() {
             .sync_state
             .as_ref()
             .and_then(|state| state.status),
-        Some(TaskBoardStatus::Backlog)
+        Some(TaskBoardStatus::Inbox)
     );
 }

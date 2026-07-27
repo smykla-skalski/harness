@@ -179,7 +179,7 @@ async fn apply_update_triage_in_tx(
 ) -> Result<(Option<TriageOutcome>, LaneTransitionKind), CliError> {
     // `None` shares the same reject check as `HumanUpdate`: every internal
     // workflow write (planning approval, dispatch, ...) that lands the item
-    // in Backlog/Todo must respect an active override too, not only the
+    // in Inbox/Todo must respect an active override too, not only the
     // public update API. `ProviderReconcile` is the sole exception --
     // it reasserts the override instead of rejecting, via its own path below.
     if matches!(
@@ -237,7 +237,7 @@ async fn apply_update_triage_in_tx(
 
 /// Rejects a human or internal-workflow write that lands the item in the
 /// wrong triage lane, atomically -- silently reasserting instead would
-/// discard the caller's intent. Only Backlog/Todo is in scope; a lifecycle
+/// discard the caller's intent. Only Inbox/Todo is in scope; a lifecycle
 /// exit to Done etc. is always allowed and leaves the override dormant.
 fn reject_if_conflicts_with_active_override(
     before: &TaskBoardItem,
@@ -253,7 +253,7 @@ fn reject_if_conflicts_with_active_override(
     }
     if !matches!(
         requested_status,
-        TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+        TaskBoardStatus::Inbox | TaskBoardStatus::Todo
     ) {
         return Ok(());
     }

@@ -275,7 +275,7 @@ fn settings_read_repairs_legacy_dispatch_status_filter_on_disk() {
 }
 
 #[test]
-fn settings_read_repairs_umbrella_filter_to_backlog_on_disk() {
+fn settings_read_repairs_umbrella_filter_to_inbox_on_disk() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("board");
     fs::create_dir_all(&root).expect("create board root");
@@ -294,10 +294,10 @@ fn settings_read_repairs_umbrella_filter_to_backlog_on_disk() {
 
     assert_eq!(
         settings.dispatch_status_filter,
-        Some(TaskBoardStatus::Backlog)
+        Some(TaskBoardStatus::Inbox)
     );
     let contents = fs::read_to_string(settings_path).expect("read repaired settings");
-    assert!(contents.contains("\"dispatch_status_filter\": \"backlog\""));
+    assert!(contents.contains("\"dispatch_status_filter\": \"inbox\""));
     assert!(!contents.contains("\"dispatch_status_filter\": \"umbrella\""));
 }
 

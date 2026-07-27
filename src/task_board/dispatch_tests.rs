@@ -208,9 +208,9 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
 }
 
 #[test]
-fn backlog_items_are_not_dispatchable() {
+fn inbox_items_are_not_dispatchable() {
     let mut item = ready_item();
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
 
     let plan = build_dispatch_plan(&item);
 
@@ -218,7 +218,7 @@ fn backlog_items_are_not_dispatchable() {
         plan.readiness,
         DispatchReadiness::Blocked {
             reason: DispatchBlockReason::Status {
-                status: TaskBoardStatus::Backlog,
+                status: TaskBoardStatus::Inbox,
             },
         }
     );

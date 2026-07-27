@@ -141,7 +141,7 @@ fn v47_override_columns_reject_incoherent_writes() {
                  planning_json, workflow_json, session_id, work_item_id, usage_json,
                  created_at, updated_at, deleted_at, revision, workflow_kind
              ) VALUES (
-                 'item-1', 1, 'Title', '', 'backlog', 'medium', '[]',
+                 'item-1', 1, 'Title', '', 'inbox', 'medium', '[]',
                  NULL, '[]', 'headless', NULL, '{}', '{}', NULL, NULL, '{}',
                  '2026-07-22T00:00:00Z', '2026-07-22T00:00:00Z', NULL, 1,
                  'default_task'
@@ -322,7 +322,7 @@ fn seed_task_board_item(db: &DaemonDb) {
                  planning_json, workflow_json, session_id, work_item_id, usage_json,
                  created_at, updated_at, deleted_at, revision, workflow_kind
              ) VALUES (
-                 'item-1', 1, 'Title', '', 'backlog', 'medium', '[]',
+                 'item-1', 1, 'Title', '', 'inbox', 'medium', '[]',
                  NULL, '[]', 'headless', NULL, '{}', '{}', NULL, NULL, '{}',
                  '2026-07-22T00:00:00Z', '2026-07-22T00:00:00Z', NULL, 1,
                  'default_task'

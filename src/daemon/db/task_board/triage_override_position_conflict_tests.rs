@@ -13,14 +13,14 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str) -> TaskBoardItem {
+fn inbox_item(id: &str) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item
 }
 
@@ -47,7 +47,7 @@ async fn audit_count(db: &AsyncDaemonDb) -> i64 {
 }
 
 async fn seed_with_override(db: &AsyncDaemonDb, item_id: &str, verdict: TriageVerdict) {
-    db.create_task_board_item(backlog_item(item_id))
+    db.create_task_board_item(inbox_item(item_id))
         .await
         .expect("seed item");
     let expected_item_revision = revision(db, item_id).await;
@@ -75,7 +75,7 @@ async fn set_lane_position_rejects_a_destination_conflicting_with_a_todo_overrid
     let error = db
         .set_task_board_lane_position(TaskBoardLanePositionInput {
             item_id: "item-1".into(),
-            status: Some(TaskBoardStatus::Backlog),
+            status: Some(TaskBoardStatus::Inbox),
             lane_position: 0,
             actor: "human-1".into(),
             expected_item_revision: before_revision,

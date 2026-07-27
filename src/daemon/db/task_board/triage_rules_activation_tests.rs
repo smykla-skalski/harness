@@ -15,14 +15,14 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+fn inbox_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = tags;
     item
 }
@@ -107,10 +107,10 @@ async fn invalid_candidate_is_rejected_and_never_reaches_the_revision_table() {
 #[tokio::test]
 async fn activating_a_valid_candidate_reevaluates_eligible_items_and_records_the_evaluator() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
-    db.create_task_board_item(backlog_item("plain-item", Vec::new()))
+    db.create_task_board_item(inbox_item("plain-item", Vec::new()))
         .await
         .expect("create item");
 
@@ -124,7 +124,7 @@ async fn activating_a_valid_candidate_reevaluates_eligible_items_and_records_the
 
     assert_eq!(item_status(&db, "bug-item").await, "todo");
     assert_eq!(item_priority(&db, "bug-item").await, "critical");
-    assert_eq!(item_status(&db, "plain-item").await, "backlog");
+    assert_eq!(item_status(&db, "plain-item").await, "inbox");
 
     let (identity, version) = current_decision_evaluator(&db, "bug-item").await;
     assert_eq!(identity, RUNTIME_RULES_EVALUATOR_IDENTITY);
@@ -177,7 +177,7 @@ async fn activating_a_second_revision_supersedes_the_first() {
 #[tokio::test]
 async fn deactivating_reverts_eligible_items_to_the_builtin_v1_default() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     let activation = db
@@ -207,7 +207,7 @@ async fn deactivating_reverts_eligible_items_to_the_builtin_v1_default() {
 #[tokio::test]
 async fn activation_failing_after_supersede_and_insert_rolls_back_completely() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     let first = db
@@ -277,7 +277,7 @@ async fn concurrent_item_creation_and_activation_serialize_without_anomaly() {
     let (_directory, db) = connect().await;
 
     let (create_result, activate_result) = tokio::join!(
-        db.create_task_board_item_with_triage(backlog_item("concurrent-item", vec!["kind/bug".into()])),
+        db.create_task_board_item_with_triage(inbox_item("concurrent-item", vec!["kind/bug".into()])),
         db.activate_task_board_triage_rules(Some(bug_rule_set()), "owner".into(), None)
     );
 

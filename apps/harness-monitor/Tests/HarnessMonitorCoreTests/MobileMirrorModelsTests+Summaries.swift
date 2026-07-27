@@ -151,21 +151,21 @@ extension MobileMirrorModelsCommandTests {
 
     let item = try JSONDecoder().decode(MobileTaskBoardSummary.self, from: Data(payload.utf8))
 
-    XCTAssertEqual(item.status, "backlog")
-    XCTAssertEqual(item.statusTitle, "Backlog")
-    XCTAssertEqual(item.commandPayload["status"], "backlog")
+    XCTAssertEqual(item.status, "inbox")
+    XCTAssertEqual(item.statusTitle, "Inbox")
+    XCTAssertEqual(item.commandPayload["status"], "inbox")
 
     var staleItem = item
     staleItem.status = "umbrella"
     staleItem.statusTitle = "Umbrella"
-    XCTAssertEqual(staleItem.commandPayload["status"], "backlog")
+    XCTAssertEqual(staleItem.commandPayload["status"], "inbox")
 
     let encoded = try JSONEncoder().encode(staleItem)
     let object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: encoded) as? [String: Any]
     )
-    XCTAssertEqual(object["status"] as? String, "backlog")
-    XCTAssertEqual(object["statusTitle"] as? String, "Backlog")
+    XCTAssertEqual(object["status"] as? String, "inbox")
+    XCTAssertEqual(object["statusTitle"] as? String, "Inbox")
     XCTAssertFalse(String(decoding: encoded, as: UTF8.self).lowercased().contains("umbrella"))
   }
 }

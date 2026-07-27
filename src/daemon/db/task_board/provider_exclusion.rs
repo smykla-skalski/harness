@@ -433,7 +433,7 @@ async fn is_hideable_for_provider_exclusion_in_tx(
     }
     if !matches!(
         item.status.canonical_persisted_status(),
-        TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+        TaskBoardStatus::Inbox | TaskBoardStatus::Todo
     ) {
         return Ok(false);
     }

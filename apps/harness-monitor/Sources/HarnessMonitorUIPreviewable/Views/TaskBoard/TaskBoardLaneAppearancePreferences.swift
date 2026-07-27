@@ -209,17 +209,17 @@ enum TaskBoardLaneAppearancePreferences {
       (try? JSONDecoder()
         .decode([String: TaskBoardLaneAppearanceOverride].self, from: data)) ?? [:]
     var overrides: [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] = [:]
-    for (key, value) in decoded where key != "umbrella" && !value.isEmpty {
+    for (key, value) in decoded where key != "umbrella" && key != "backlog" && !value.isEmpty {
       guard let lane = TaskBoardInboxLane(rawValue: key) else {
         continue
       }
       overrides[lane] = value
     }
-    if overrides[.backlog] == nil,
-      let legacyOverride = decoded["umbrella"],
+    if overrides[.inbox] == nil,
+      let legacyOverride = decoded["backlog"] ?? decoded["umbrella"],
       !legacyOverride.isEmpty
     {
-      overrides[.backlog] = legacyOverride
+      overrides[.inbox] = legacyOverride
     }
     return overrides
   }
@@ -371,7 +371,7 @@ enum TaskBoardLaneAppearancePreferences {
     switch lane {
     case .umbrella:
       .purple
-    case .backlog, .planning:
+    case .inbox, .planning:
       .warmAccent
     case .todo:
       .secondaryInk

@@ -83,7 +83,7 @@ impl ExternalCreateRecoveryClient for DurableCreateClient {
             reference: ExternalTaskRef::new(self.provider, external_id),
             title: request.title().into(),
             body: request.body().into(),
-            status: TaskBoardStatus::Backlog,
+            status: TaskBoardStatus::Inbox,
             // The real GitHub client reports the repository it created in, and
             // the evidence records that provider-side project verbatim.
             project_id: Some(request.provider_target().into()),

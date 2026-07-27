@@ -15,14 +15,14 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+fn inbox_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = tags;
     item
 }
@@ -80,7 +80,7 @@ async fn decision_generation_count(db: &AsyncDaemonDb, item_id: &str) -> i64 {
 #[tokio::test]
 async fn an_item_with_an_active_dispatch_reservation_is_skipped_entirely() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("reserved", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("reserved", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     seed_active_dispatch_reservation(&db, "reserved").await;
@@ -90,7 +90,7 @@ async fn an_item_with_an_active_dispatch_reservation_is_skipped_entirely() {
         .await
         .expect("activate");
     assert_eq!(result.reevaluated_item_count, 0);
-    assert_eq!(item_status(&db, "reserved").await, "backlog", "reserved item is untouched");
+    assert_eq!(item_status(&db, "reserved").await, "inbox", "reserved item is untouched");
 }
 
 /// Regression test: `activate(candidate=None, expected=None)` when nothing
@@ -102,7 +102,7 @@ async fn an_item_with_an_active_dispatch_reservation_is_skipped_entirely() {
 #[tokio::test]
 async fn deactivating_when_nothing_is_active_records_zero_decisions() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item("plain", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("plain", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     let count_before = decision_generation_count(&db, "plain").await;
@@ -125,7 +125,7 @@ async fn deactivating_when_nothing_is_active_records_zero_decisions() {
 #[tokio::test]
 async fn a_second_consecutive_deactivation_is_a_decision_noop() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
 
@@ -155,7 +155,7 @@ async fn a_second_consecutive_deactivation_is_a_decision_noop() {
 #[tokio::test]
 async fn an_item_under_an_active_override_keeps_its_override_placement_but_gets_a_fresh_decision() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("overridden", Vec::new()))
+    db.create_task_board_item(inbox_item("overridden", Vec::new()))
         .await
         .expect("create item");
     db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
@@ -176,7 +176,7 @@ async fn an_item_under_an_active_override_keeps_its_override_placement_but_gets_
     assert!(result.activated);
 
     // The override still wins placement (Todo), even though the new rule
-    // set's default outcome for an unlabeled item is Undecided/Backlog.
+    // set's default outcome for an unlabeled item is Undecided/Inbox.
     assert_eq!(item_status(&db, "overridden").await, "todo");
     let producer: String = query_scalar("SELECT lane_producer FROM task_board_items WHERE item_id = ?1")
         .bind("overridden")

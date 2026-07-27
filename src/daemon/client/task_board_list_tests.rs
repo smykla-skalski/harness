@@ -11,7 +11,7 @@ fn task_board_list_serializes_status_as_query() {
 
     let items = client_with(endpoint)
         .list_task_board_items(&TaskBoardListItemsRequest {
-            status: Some(TaskBoardStatus::Backlog),
+            status: Some(TaskBoardStatus::Inbox),
             ..TaskBoardListItemsRequest::default()
         })
         .expect("list items");
@@ -20,7 +20,7 @@ fn task_board_list_serializes_status_as_query() {
     assert_eq!(items.len(), 1);
     assert_eq!(
         *request_line.lock().expect("request line"),
-        "GET /v1/task-board/items?status=backlog&limit=500 HTTP/1.1"
+        "GET /v1/task-board/items?status=inbox&limit=500 HTTP/1.1"
     );
 }
 

@@ -212,7 +212,7 @@ async fn remote_create_with_failed_local_link_retains_created_reference_evidence
         .expect("exact provider baseline");
     assert_eq!(baseline.title.as_deref(), Some("Task"));
     assert_eq!(baseline.body.as_deref(), Some(""));
-    assert_eq!(baseline.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(baseline.status, Some(TaskBoardStatus::Inbox));
     assert_eq!(baseline.project_id.as_deref(), Some("acme/widgets"));
     assert_eq!(baseline.updated_at.as_deref(), Some("provider-revision-1"));
     let error = batch
@@ -296,7 +296,7 @@ async fn created_preflight_suppresses_pull_base_revision_persistence() {
     baseline.sync_state = Some(ExternalRefSyncState {
         title: Some("Task".into()),
         body: Some(String::new()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: Some("acme/widgets".into()),
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),
@@ -359,7 +359,7 @@ impl ExternalSyncClient for RecoveryPullClient {
             reference: ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17"),
             title: "Task".into(),
             body: String::new(),
-            status: TaskBoardStatus::Backlog,
+            status: TaskBoardStatus::Inbox,
             project_id: Some("acme/widgets".into()),
             updated_at: Some("provider-revision-1".into()),
             ..ExternalTask::default()

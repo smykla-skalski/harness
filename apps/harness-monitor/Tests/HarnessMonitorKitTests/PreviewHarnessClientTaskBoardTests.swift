@@ -84,7 +84,7 @@ struct PreviewHarnessClientTaskBoardTests {
     let item = try #require(items.first)
 
     let planning = try await client.beginTaskBoardPlan(id: item.id)
-    #expect(planning.transition.fromStatus == .backlog)
+    #expect(planning.transition.fromStatus == .inbox)
     #expect(planning.transition.toStatus == .planning)
     #expect(planning.item.status == .planning)
 
@@ -106,7 +106,7 @@ struct PreviewHarnessClientTaskBoardTests {
   @Test("Preview client applies a CAS position set and reset")
   func previewClientAppliesPositionMutations() async throws {
     let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
-    let item = try #require(try await client.taskBoardItems(status: .backlog).first)
+    let item = try #require(try await client.taskBoardItems(status: .inbox).first)
     let before = try await client.taskBoardItemPositionSnapshot(id: item.id)
     let set = try await client.setTaskBoardItemPosition(
       id: item.id,
@@ -174,7 +174,7 @@ struct PreviewHarnessClientTaskBoardTests {
   @Test("Preview position set compacts a materialized default source slot")
   func previewPositionSetCompactsMaterializedDefaultSourceSlot() async throws {
     let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
-    let source = try #require(try await client.taskBoardItems(status: .backlog).first)
+    let source = try #require(try await client.taskBoardItems(status: .inbox).first)
     let sourceAnchor = try await client.createTaskBoardItem(
       request: TaskBoardCreateItemRequest(title: "Source anchor")
     )
@@ -182,7 +182,7 @@ struct PreviewHarnessClientTaskBoardTests {
     _ = try await client.setTaskBoardItemPosition(
       id: sourceAnchor.id,
       request: TaskBoardSetItemPositionRequest(
-        status: .backlog, lanePosition: 1,
+        status: .inbox, lanePosition: 1,
         expectedItemRevision: sourceAnchorSnapshot.itemRevision,
         expectedItemsChangeSeq: sourceAnchorSnapshot.itemsChangeSeq
       )
@@ -332,7 +332,7 @@ struct PreviewHarnessClientTaskBoardTests {
   @Test("Preview position reset rejects default placement with the public state error")
   func previewPositionResetRejectsDefaultPlacement() async throws {
     let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
-    let item = try #require(try await client.taskBoardItems(status: .backlog).first)
+    let item = try #require(try await client.taskBoardItems(status: .inbox).first)
     let snapshot = try await client.taskBoardItemPositionSnapshot(id: item.id)
 
     do {

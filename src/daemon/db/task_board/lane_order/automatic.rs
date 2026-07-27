@@ -277,7 +277,7 @@ mod tests {
             entry(automatic("automatic", 3, TaskBoardPriority::Low)),
         ];
         let mut moved = previous.clone();
-        moved.status = TaskBoardStatus::Backlog;
+        moved.status = TaskBoardStatus::Inbox;
         moved.lane_position = None;
         moved.lane_origin = None;
         moved.lane_set_at = None;
@@ -287,7 +287,7 @@ mod tests {
             Some(&previous),
             &mut moved,
             Some(TaskBoardStatus::Todo),
-            Some(TaskBoardStatus::Backlog),
+            Some(TaskBoardStatus::Inbox),
         )
         .expect("normalize automatic removal");
 
@@ -301,7 +301,7 @@ mod tests {
         let previous = automatic("removed", 0, TaskBoardPriority::High);
         let mut entries = vec![entry(manual("manual", 1))];
         let mut moved = previous.clone();
-        moved.status = TaskBoardStatus::Backlog;
+        moved.status = TaskBoardStatus::Inbox;
         moved.lane_position = None;
         moved.lane_origin = None;
         moved.lane_set_at = None;
@@ -311,7 +311,7 @@ mod tests {
             Some(&previous),
             &mut moved,
             Some(TaskBoardStatus::Todo),
-            Some(TaskBoardStatus::Backlog),
+            Some(TaskBoardStatus::Inbox),
         )
         .expect("normalize required manual compaction");
 

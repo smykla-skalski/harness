@@ -301,7 +301,7 @@ mod tests {
             reference: ExternalTaskRef::new(ExternalProvider::GitHub, request.item_id()),
             title: request.title().to_owned(),
             body: request.body().to_owned(),
-            status: TaskBoardStatus::Backlog,
+            status: TaskBoardStatus::Inbox,
             project_id: Some(request.provider_target().to_owned()),
             updated_at: Some("revision-1".into()),
             ..ExternalTask::default()

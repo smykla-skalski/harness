@@ -1,6 +1,6 @@
 # Task Board Workflow
 
-Harness task boards are cross-project work items managed through `harness task-board`. Use this guide for backlog intake, planning review, dispatch readiness, and overview reporting.
+Harness task boards are cross-project work items managed through `harness task-board`. Use this guide for inbox intake, planning review, dispatch readiness, and overview reporting.
 
 ## Contract
 

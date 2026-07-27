@@ -406,7 +406,7 @@ fn github_issue_search_status(state: &str) -> TaskBoardStatus {
     if state.eq_ignore_ascii_case("closed") {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::Backlog
+        TaskBoardStatus::Inbox
     }
 }
 
@@ -421,7 +421,7 @@ fn github_inbox_issue_status(state: &str) -> TaskBoardStatus {
     if state.eq_ignore_ascii_case("closed") {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::Backlog
+        TaskBoardStatus::Inbox
     }
 }
 
@@ -471,8 +471,8 @@ mod status_tests {
     use super::*;
 
     #[test]
-    fn github_issue_search_status_maps_open_to_backlog_and_closed_to_done() {
-        assert_eq!(github_issue_search_status("OPEN"), TaskBoardStatus::Backlog);
+    fn github_issue_search_status_maps_open_to_inbox_and_closed_to_done() {
+        assert_eq!(github_issue_search_status("OPEN"), TaskBoardStatus::Inbox);
         assert_eq!(github_issue_search_status("closed"), TaskBoardStatus::Done);
     }
 }

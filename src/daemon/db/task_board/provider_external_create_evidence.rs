@@ -89,7 +89,7 @@ fn complete_provider_state(state: &ExternalRefSyncState) -> bool {
         && state.body.is_some()
         && matches!(
             state.status,
-            Some(TaskBoardStatus::Backlog | TaskBoardStatus::Done)
+            Some(TaskBoardStatus::Inbox | TaskBoardStatus::Done)
         )
 }
 

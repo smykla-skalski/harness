@@ -179,7 +179,7 @@ async fn reconcile_reevaluated_placement_in_tx(
 /// `AGENT_V1` verdict this reevaluation must not disturb) places under ITS OWN
 /// evaluator identity and verdict, never the active evaluator's hypothetical,
 /// unrecorded outcome -- otherwise a rule-set activation would churn an
-/// agent-placed Todo back to Backlog on every activation without ever
+/// agent-placed Todo back to Inbox on every activation without ever
 /// recording why.
 fn retained_placement<'a>(
     recorded: bool,

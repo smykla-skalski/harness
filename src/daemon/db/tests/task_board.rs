@@ -133,7 +133,7 @@ async fn task_board_items_round_trip_and_mutate_atomically() {
 }
 
 #[tokio::test]
-async fn v36_umbrella_rows_open_and_rewrite_as_backlog() {
+async fn v36_umbrella_rows_open_and_rewrite_as_inbox() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("harness.db");
     {
@@ -167,13 +167,13 @@ async fn v36_umbrella_rows_open_and_rewrite_as_backlog() {
         .task_board_item("legacy-umbrella")
         .await
         .expect("load migrated item");
-    assert_eq!(loaded.status, TaskBoardStatus::Backlog);
+    assert_eq!(loaded.status, TaskBoardStatus::Inbox);
     assert_eq!(
         loaded.external_refs[0]
             .sync_state
             .as_ref()
             .and_then(|state| state.status),
-        Some(TaskBoardStatus::Backlog)
+        Some(TaskBoardStatus::Inbox)
     );
     db.update_task_board_item("legacy-umbrella", |item| {
         item.title = "Canonical".to_string();
@@ -195,8 +195,8 @@ async fn v36_umbrella_rows_open_and_rewrite_as_backlog() {
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .expect("read canonical status values");
-    assert_eq!(status, "backlog");
-    assert_eq!(sync_status, "backlog");
+    assert_eq!(status, "inbox");
+    assert_eq!(sync_status, "inbox");
 }
 
 #[tokio::test]

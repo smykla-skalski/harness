@@ -392,7 +392,7 @@ mod tests {
         core_reference.sync_state = Some(ExternalRefSyncState {
             title: Some("Title".into()),
             body: Some("Body".into()),
-            status: Some(TaskBoardStatus::Backlog),
+            status: Some(TaskBoardStatus::Inbox),
             project_id: None,
             updated_at: Some("provider-revision-1".into()),
             synced_at: Some("2026-07-16T10:00:00Z".into()),

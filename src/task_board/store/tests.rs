@@ -246,7 +246,7 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
         item.status = if index % 2 == 0 {
             TaskBoardStatus::InProgress
         } else {
-            TaskBoardStatus::Backlog
+            TaskBoardStatus::Inbox
         };
         item.priority = TaskBoardPriority::High;
         store

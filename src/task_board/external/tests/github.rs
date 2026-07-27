@@ -34,7 +34,7 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
     let item = board
         .get("github-7-7902699be42c8a8e46fbbb4501726517")
         .expect("load imported github task");
-    assert_eq!(item.status, TaskBoardStatus::Backlog);
+    assert_eq!(item.status, TaskBoardStatus::Inbox);
     assert_eq!(item.project_id, None);
     assert_eq!(item.execution_repository.as_deref(), Some("owner/repo"));
     assert!(item.planning.approved_by.is_none());
@@ -52,7 +52,7 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
 }
 
 #[tokio::test]
-async fn sync_external_tasks_imports_github_inbox_items_as_backlog_with_plan_pending_approval() {
+async fn sync_external_tasks_imports_github_inbox_items_as_inbox_with_plan_pending_approval() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
@@ -61,7 +61,7 @@ async fn sync_external_tasks_imports_github_inbox_items_as_backlog_with_plan_pen
             "owner/repo#19",
             "Review requested",
             "owner/repo",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     ))];
 
@@ -82,7 +82,7 @@ async fn sync_external_tasks_imports_github_inbox_items_as_backlog_with_plan_pen
     let item = board
         .get("github-owner-repo-19-983c1507241b6007ac5729cfcea78b64")
         .expect("load imported github inbox task");
-    assert_eq!(item.status, TaskBoardStatus::Backlog);
+    assert_eq!(item.status, TaskBoardStatus::Inbox);
     assert_eq!(item.project_id, None);
     assert_eq!(item.execution_repository.as_deref(), Some("owner/repo"));
     assert!(item.planning.summary.is_some());

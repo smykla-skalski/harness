@@ -216,7 +216,7 @@ async fn reset_reapplies_an_active_todo_override_instead_of_leaving_it_unranked(
 }
 
 #[tokio::test]
-async fn reset_reapplies_an_active_undecided_override_by_demoting_to_backlog() {
+async fn reset_reapplies_an_active_undecided_override_by_demoting_to_inbox() {
     let (_directory, db) = connect().await;
     db.create_task_board_item(item("a", "2026-07-23T10:00:00Z"))
         .await
@@ -247,7 +247,7 @@ async fn reset_reapplies_an_active_undecided_override_by_demoting_to_backlog() {
     let overridden_a = item_from(&overridden, "a");
     assert_eq!(
         overridden_a.status,
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
         "the override's status win applies even to a manual anchor"
     );
     assert_eq!(
@@ -264,8 +264,8 @@ async fn reset_reapplies_an_active_undecided_override_by_demoting_to_backlog() {
             expected_items_change_seq: overridden.items_change_seq,
         })
         .await
-        .expect("reset converges the stray manual slot with the overridden Backlog status");
-    assert_eq!(reset.item.status, TaskBoardStatus::Backlog);
+        .expect("reset converges the stray manual slot with the overridden Inbox status");
+    assert_eq!(reset.item.status, TaskBoardStatus::Inbox);
     assert_eq!(reset.item.lane_position, None);
     assert_eq!(reset.item.lane_origin, None);
 }

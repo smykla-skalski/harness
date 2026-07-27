@@ -59,16 +59,16 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(restoredAppearance.hasOverride(for: .agenticReview))
   }
 
-  @Test("Legacy Umbrella override loads as Backlog and writes canonically")
-  func legacyUmbrellaOverrideLoadsAsBacklogAndWritesCanonically() {
+  @Test("Legacy Umbrella override loads as Inbox and writes canonically")
+  func legacyUmbrellaOverrideLoadsAsInboxAndWritesCanonically() {
     let legacyRawValue = #"{"umbrella":{"colorToken":"purple","symbolName":"archivebox"}}"#
 
     let overrides = TaskBoardLaneAppearancePreferences.overrides(from: legacyRawValue)
     let canonicalRawValue = TaskBoardLaneAppearancePreferences.rawValue(for: overrides)
 
-    #expect(overrides[.backlog]?.colorToken == .purple)
-    #expect(overrides[.backlog]?.symbolName == "archivebox")
-    #expect(canonicalRawValue.contains(#""backlog""#))
+    #expect(overrides[.inbox]?.colorToken == .purple)
+    #expect(overrides[.inbox]?.symbolName == "archivebox")
+    #expect(canonicalRawValue.contains(#""inbox""#))
     #expect(!canonicalRawValue.contains("umbrella"))
   }
 

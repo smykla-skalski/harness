@@ -96,7 +96,7 @@ async fn assert_triage_history_parity() {
         "Has an initial decision.".into(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     let db = state.async_db.get().expect("async db").clone();
     db.create_task_board_item_with_triage(item)
         .await

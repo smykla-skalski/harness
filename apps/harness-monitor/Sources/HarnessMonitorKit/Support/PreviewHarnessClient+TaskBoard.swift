@@ -156,7 +156,7 @@ extension PreviewHarnessClient {
 
 extension TaskBoardStatus {
   private static let previewTaskStatusByBoardStatus: [Self: TaskStatus] = [
-    .backlog: .open,
+    .inbox: .open,
     .todo: .open,
     .planning: .open,
     .agenticReview: .open,

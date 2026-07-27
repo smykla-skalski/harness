@@ -147,7 +147,7 @@ struct TaskBoardManagementTriageSection: View {
 
   private static let ineligibleExplanationText =
     "Triage override is not available for this item "
-    + "(only a live Task in Backlog or Todo, with no linked work item, can be overridden)"
+    + "(only a live Task in Inbox or Todo, with no linked work item, can be overridden)"
 
   private var ineligibleExplanation: some View {
     Text(Self.ineligibleExplanationText)
@@ -191,7 +191,7 @@ struct TaskBoardManagementTriageSection: View {
         .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.caution)
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
         .disabled(isActionInFlight)
-        .help("Override triage: leave this item Undecided in Backlog")
+        .help("Override triage: leave this item Undecided in Inbox")
         .accessibilityIdentifier("harness.task-board.manage-item.triage.set-undecided")
       }
     }
