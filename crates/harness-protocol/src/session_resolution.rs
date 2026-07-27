@@ -41,7 +41,8 @@ pub fn session_id_from_env(agent: HookAgent) -> Option<String> {
 }
 
 /// Resolve a hook context's working directory, unescaping a shell-escaped
-/// path when the literal path does not exist.
+/// path when the literal path is not itself a directory (whether because it
+/// does not exist or because it names a file).
 #[must_use]
 pub fn resolve_context_cwd(path: &Path) -> Option<PathBuf> {
     if path.is_dir() {
