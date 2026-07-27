@@ -9,6 +9,7 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
   let scopeSessionID: String?
   /// The registered project catalog every card resolves its name through.
   let taskBoardProjects: [TaskBoardProjectSummary]
+  var filters = TaskBoardFilterState()
 }
 
 struct TaskBoardOverviewPresentation: Equatable, Sendable {
@@ -27,7 +28,10 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     aggregateOpenCount: 0,
     aggregateReviewCount: 0,
     aggregateBlockedCount: 0,
-    aggregateDoneCount: 0
+    aggregateDoneCount: 0,
+    filterInventory: .empty,
+    hasUnfilteredContent: false,
+    responsibleFilterFacets: []
   )
 
   let taskBoardItems: [TaskBoardItem]
@@ -46,6 +50,11 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let aggregateReviewCount: Int
   let aggregateBlockedCount: Int
   let aggregateDoneCount: Int
+  let filterInventory: TaskBoardFilterInventory
+  /// Whether the board holds anything at all, filter aside.
+  let hasUnfilteredContent: Bool
+  /// Populated only when the filter is what left the board empty.
+  let responsibleFilterFacets: [TaskBoardFilterFacet]
 
   var hasBoardContent: Bool {
     !taskBoardItems.isEmpty
@@ -148,11 +157,26 @@ actor TaskBoardOverviewPresentationWorker {
       } else {
         input.taskBoardItems
       }
-    let taskBoardItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(scopedTaskBoardItems)
+    let visibleItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(scopedTaskBoardItems)
+    // Resolved before the filter narrows anything: which repository names are
+    // ambiguous is a property of the whole board, not of the current view of it.
+    let projectLabelResolver = TaskBoardProjectLabelResolver(
+      projects: input.taskBoardProjects,
+      projectIDs: visibleItems.compactMap(\.taskBoardRepositoryIdentity)
+    )
+    let filtered = TaskBoardFilteredBoard(
+      scopedItems: scopedTaskBoardItems,
+      visibleItems: visibleItems,
+      inboxItems: uniqueInboxItems(input.snapshot.items),
+      decisionIDs: sortedOpenDecisionIDs(input.decisionItems),
+      projectLabelResolver: projectLabelResolver,
+      filters: input.filters
+    )
+    let taskBoardItems = filtered.items
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
       TaskBoardInboxLane(taskBoardItem: item) ?? .inbox
     }
-    let inboxItems = uniqueInboxItems(input.snapshot.items)
+    let inboxItems = filtered.inboxItems
     let inboxItemsByLane = Dictionary(grouping: inboxItems, by: \.lane)
     let inboxItemsByID = Dictionary(
       inboxItems.map { item in
@@ -160,7 +184,7 @@ actor TaskBoardOverviewPresentationWorker {
       },
       uniquingKeysWith: { first, _ in first }
     )
-    let decisionIDs = sortedOpenDecisionIDs(input.decisionItems)
+    let decisionIDs = filtered.decisionIDs
     let decisionIDsByLane: [TaskBoardInboxLane: [String]] =
       decisionIDs.isEmpty ? [:] : [.humanRequired: decisionIDs]
 
@@ -169,17 +193,11 @@ actor TaskBoardOverviewPresentationWorker {
       count + (apiItemsByLane[lane]?.count ?? 0)
     }
     let taskBoardBlockedCount = apiItemsByLane[.failed]?.count ?? 0
-    let taskBoardDoneCount = scopedTaskBoardItems.count {
-      $0.deletedAt == nil && $0.status == .done
-    }
+    let taskBoardDoneCount = filtered.doneCount
     // A closed umbrella stays visible in its own lane (unlike an ordinary closed
     // item, which drops off the board entirely), so it is in `taskBoardItems` -
     // exclude it here or it would double-count as both open and done.
     let taskBoardOpenCount = taskBoardItems.count { $0.status != .done }
-    let projectLabelResolver = TaskBoardProjectLabelResolver(
-      projects: input.taskBoardProjects,
-      projectIDs: taskBoardItems.compactMap(\.taskBoardRepositoryIdentity)
-    )
     // One parser (and its 3 formatters) for the whole snapshot, not one per card.
     let dateParser = TaskBoardCardDateParser()
 
@@ -230,7 +248,10 @@ actor TaskBoardOverviewPresentationWorker {
           count + (inboxItemsByLane[lane]?.count ?? 0)
         },
       aggregateBlockedCount: taskBoardBlockedCount + (inboxItemsByLane[.failed]?.count ?? 0),
-      aggregateDoneCount: taskBoardDoneCount + input.snapshot.completedItemCount
+      aggregateDoneCount: taskBoardDoneCount + input.snapshot.completedItemCount,
+      filterInventory: filtered.inventory,
+      hasUnfilteredContent: filtered.hasUnfilteredContent,
+      responsibleFilterFacets: filtered.responsibleFacets
     )
   }
 

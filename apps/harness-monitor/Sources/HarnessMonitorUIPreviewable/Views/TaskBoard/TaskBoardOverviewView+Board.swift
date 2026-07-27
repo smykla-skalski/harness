@@ -79,11 +79,20 @@ extension TaskBoardOverviewView {
   }
 
   var emptyState: some View {
-    ContentUnavailableView("No Open Tasks", systemImage: "tray")
-      .font(bodyFont)
-      .frame(maxWidth: .infinity, minHeight: 180)
-      .background(
-        .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
+    Group {
+      if currentPresentation.responsibleFilterFacets.isEmpty {
+        ContentUnavailableView("No Open Tasks", systemImage: "tray")
+      } else {
+        TaskBoardFilteredEmptyStateView(
+          filters: boardFiltersBinding,
+          responsibleFacets: currentPresentation.responsibleFilterFacets
+        )
+      }
+    }
+    .font(bodyFont)
+    .frame(maxWidth: .infinity, minHeight: 180)
+    .background(
+      .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
   }
 
   func decisions(in lane: TaskBoardInboxLane) -> [Decision] {

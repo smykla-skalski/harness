@@ -73,13 +73,29 @@ extension TaskBoardOverviewView {
       if hasAggregateSummary {
         aggregateSummaryRow
       }
-      if hasAggregateSummary && hasHeaderActions {
-        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      if showsFilterControls {
+        TaskBoardFilterControls(
+          filters: boardFiltersBinding,
+          inventory: currentPresentation.filterInventory
+        )
+        .fixedSize(horizontal: true, vertical: false)
       }
       if hasHeaderActions {
         headerActions
       }
     }
+  }
+
+  /// Offered once the board holds something worth narrowing, and kept on while
+  /// a filter is active even after it has hidden everything.
+  var showsFilterControls: Bool {
+    taskBoardSessionID == nil
+      && (currentPresentation.hasUnfilteredContent || !boardFilters.isEmpty)
+  }
+
+  var activeFilterChips: [TaskBoardActiveFilterChip] {
+    currentPresentation.filterInventory.activeChips(for: boardFilters)
   }
 
   var hasHeaderActions: Bool {
@@ -159,8 +175,12 @@ extension TaskBoardOverviewView {
 
   var boardSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      if hasAggregateSummary || hasHeaderActions {
+      if hasAggregateSummary || hasHeaderActions || showsFilterControls {
         boardAccessoryRow
+      }
+      let chips = activeFilterChips
+      if !chips.isEmpty {
+        TaskBoardActiveFilterChips(filters: boardFiltersBinding, chips: chips)
       }
       boardContent
         .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
