@@ -9,7 +9,25 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
   let scopeSessionID: String?
   /// The registered project catalog every card resolves its name through.
   let taskBoardProjects: [TaskBoardProjectSummary]
-  var filters = TaskBoardFilterState()
+  let filters: TaskBoardFilterState
+
+  /// Spelled out so `filters` can default without giving up `let`: a value
+  /// this snapshot hands to an actor should not be mutable after the fact.
+  init(
+    snapshot: TaskBoardInboxSnapshot,
+    taskBoardItems: [TaskBoardItem],
+    decisionItems: [DecisionPresentationItem],
+    scopeSessionID: String?,
+    taskBoardProjects: [TaskBoardProjectSummary],
+    filters: TaskBoardFilterState = TaskBoardFilterState()
+  ) {
+    self.snapshot = snapshot
+    self.taskBoardItems = taskBoardItems
+    self.decisionItems = decisionItems
+    self.scopeSessionID = scopeSessionID
+    self.taskBoardProjects = taskBoardProjects
+    self.filters = filters
+  }
 }
 
 struct TaskBoardOverviewPresentation: Equatable, Sendable {

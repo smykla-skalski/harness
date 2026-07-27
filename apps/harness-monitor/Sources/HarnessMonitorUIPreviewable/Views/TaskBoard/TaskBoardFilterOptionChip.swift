@@ -25,8 +25,14 @@ struct TaskBoardFilterOptionChip: View {
     }
     .harnessFilterChipButtonStyle(isSelected: isSelected)
     .harnessNativeFormControl()
-    .help("\(option.count) item\(option.count == 1 ? "" : "s") match \(option.label)")
+    .help(helpText)
     .accessibilityValue(isSelected ? "selected" : "not selected")
+  }
+
+  private var helpText: String {
+    option.count == 1
+      ? "1 item matches \(option.label)"
+      : "\(option.count) items match \(option.label)"
   }
 }
 
