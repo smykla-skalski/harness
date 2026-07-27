@@ -3,12 +3,13 @@ use std::env;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, normalize_repository_slug,
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse, normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::{daemon_client, print_json};
+use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardOrchestratorGithubTokensArgs {
@@ -31,7 +32,9 @@ impl Execute for TaskBoardOrchestratorGithubTokensArgs {
             .into());
         }
         let request = self.sync_request()?;
-        let response = daemon_client()?.sync_task_board_github_tokens(&request)?;
+        let response: TaskBoardGitHubTokensSyncResponse = leaf_daemon_client()?
+            .put("/v1/task-board/orchestrator/github-tokens", &request)
+            .map_err(|error| leaf_daemon_client_error("sync task-board github tokens", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
