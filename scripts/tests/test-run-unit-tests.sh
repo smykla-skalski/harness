@@ -22,16 +22,23 @@ pass() {
   printf 'PASS: %s\n' "$1" >&2
 }
 
-# Extract the real test:unit task block so the sandboxed mise.toml can never
-# drift from the actual repo wiring the fix is supposed to cover.
+# Extract the real broad and focused unit-test task blocks so the sandboxed
+# mise.toml can never drift from the actual repo wiring under test.
 awk '
-  /^\[tasks\."test:unit"\]$/ { capture = 1 }
-  capture && /^\[tasks\./ && !/^\[tasks\."test:unit"\]$/ { capture = 0 }
+  function wanted(line) {
+    return line == "[tasks.\"test:unit\"]" \
+      || line == "[tasks.\"test:unit:harness\"]"
+  }
+  wanted($0) { capture = 1 }
+  capture && /^\[tasks\./ && !wanted($0) { capture = 0 }
   capture { print }
 ' "$ROOT/.mise.toml" >"$SANDBOX/.mise.toml"
 
 if ! grep -q 'run = "\./scripts/run-unit-tests\.sh"' "$SANDBOX/.mise.toml"; then
   fail "test:unit task no longer delegates to scripts/run-unit-tests.sh; extracted block: $(<"$SANDBOX/.mise.toml")"
+fi
+if ! grep -q 'run = "\./scripts/cargo-local\.sh test -p harness --lib --features full-runtime"' "$SANDBOX/.mise.toml"; then
+  fail "test:unit:harness no longer uses one native root test process; extracted block: $(<"$SANDBOX/.mise.toml")"
 fi
 
 mkdir -p "$SANDBOX/scripts"
@@ -72,6 +79,10 @@ run_task() {
   (cd "$SANDBOX" && mise run test:unit "$@")
 }
 
+run_harness_task() {
+  (cd "$SANDBOX" && mise run test:unit:harness "$@")
+}
+
 reset_calls() {
   rm -rf "$calls_dir"
 }
@@ -110,10 +121,13 @@ scenario_no_arguments_preserves_all_three_groups() {
     && assert_call_matches 2 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-kernel -p harness-panel -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit \
     && assert_call_matches 3 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd; then
-    pass "no-argument invocation still exercises all three package groups unfiltered"
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd \
+    && grep -Fq "==> test:unit 1/3: root Harness library" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 2/3: supporting workspace crates" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 3/3: Linux systemd crate" "$SANDBOX/no-args.log"; then
+    pass "no-argument invocation exercises and identifies all three groups"
   else
-    fail "no-argument invocation did not preserve the original three-group invocations: $(calls_snapshot)"
+    fail "no-argument invocation did not preserve and identify all three groups: $(calls_snapshot)"
   fi
 }
 
@@ -182,10 +196,27 @@ scenario_rejects_shell_injection_attempt() {
   fi
 }
 
+scenario_focused_harness_task_runs_one_native_process() {
+  reset_calls
+  local test_name="daemon::storage::tests::dispatch_retry_budget"
+  if ! run_harness_task -- "$test_name" -- --exact >"$SANDBOX/focused.log" 2>&1; then
+    fail "focused Harness unit-test run failed: $(<"$SANDBOX/focused.log")"
+    return
+  fi
+  if assert_call_count 1 \
+    && assert_call_matches 1 \
+      test -p harness --lib --features full-runtime "$test_name" -- --exact; then
+    pass "focused Harness task runs one native libtest process with exact filtering"
+  else
+    fail "focused Harness task invoked unrelated packages or changed filter boundaries: $(calls_snapshot)"
+  fi
+}
+
 scenario_no_arguments_preserves_all_three_groups
 scenario_forwards_simple_filter_to_every_group
 scenario_preserves_multiword_single_token_filter
 scenario_rejects_shell_injection_attempt
+scenario_focused_harness_task_runs_one_native_process
 
 printf 'run-unit-tests tests: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
 (( FAIL_COUNT == 0 ))

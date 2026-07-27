@@ -55,20 +55,8 @@ short_hash() {
   printf '%s\n' "${digest:0:16}"
 }
 
-# One question, answered by connecting: is a server listening on this path right
-# now. The file cannot answer it - every orphaned server still holds a listening
-# socket on the path it was started with, and a path left behind by a dead one
-# looks identical from the filesystem.
-#
-# The answer is a word rather than an exit status because macOS ships a
-# /usr/bin/python3 that stays a stub until the command line tools are installed
-# and fails with the same status a refused connection would, and an exit code
-# alone cannot separate "nothing is listening" from "could not ask".
-sccache_socket_state() {
-  local socket="${1:-}" verdict=""
-
-  if [[ -n "$socket" ]] && command -v python3 >/dev/null 2>&1; then
-    verdict="$(python3 - "$socket" 2>/dev/null <<'PY' || true
+probe_sccache_socket() {
+  python3 - "$1" <<'PY'
 import errno, socket, sys
 
 # Errors that prove nothing is serving this path: no listener, no file, or a
@@ -96,7 +84,26 @@ else:
 finally:
     sock.close()
 PY
-    )"
+}
+
+# One question, answered by connecting: is a server listening on this path right
+# now. The file cannot answer it - every orphaned server still holds a listening
+# socket on the path it was started with, and a path left behind by a dead one
+# looks identical from the filesystem.
+#
+# The answer is a word rather than an exit status because macOS ships a
+# /usr/bin/python3 that stays a stub until the command line tools are installed
+# and fails with the same status a refused connection would, and an exit code
+# alone cannot separate "nothing is listening" from "could not ask".
+#
+# Keep the Python heredoc outside the command substitution. macOS Bash 3.2
+# cannot parse a heredoc nested directly inside $(), and release tests use that
+# system shell deliberately.
+sccache_socket_state() {
+  local socket="${1:-}" verdict=""
+
+  if [[ -n "$socket" ]] && command -v python3 >/dev/null 2>&1; then
+    verdict="$(probe_sccache_socket "$socket" 2>/dev/null || true)"
   fi
 
   case "$verdict" in
@@ -651,15 +658,19 @@ session_id="$(first_nonempty_env \
   COPILOT_SESSION_ID \
   OPENCODE_SESSION_ID || true)"
 
-# Key the build cache by checkout, not by session. Session keying handed every
-# new agent a cold rebuild of the whole workspace, and Cargo's incremental
-# output is opaque to sccache, so no shared cache could absorb that cost.
-# register_build_lease below keys the lease file the same way, so
-# clean-build-caches.sh can match a target/dev/<segment> directory straight
-# against a lease file instead of reverse-engineering it from a session id.
+# Keep each checkout's writable Cargo state isolated. A fresh lane is seeded
+# below from an idle lane with copy-on-write clones; Cargo then validates the
+# fingerprints and rebuilds only branch-local differences. Sharing one writable
+# target directory would turn concurrent branches into invalidation churn.
+# register_build_lease keys the lease file the same way, so cache cleanup can
+# match target/dev/<segment> directly without reconstructing a session id.
 target_segment="local"
 if [[ "$ROOT" != "$COMMON_REPO_ROOT" ]]; then
   target_segment="wt-$(sanitize_segment "$(basename -- "$ROOT")")-$(short_hash "$ROOT")"
+fi
+target_dir_is_default=0
+if [[ -z "${CARGO_TARGET_DIR:-}" ]] && [[ -z "${HARNESS_CARGO_TARGET_DIR:-}" ]]; then
+  target_dir_is_default=1
 fi
 target_dir="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
 
@@ -696,9 +707,10 @@ configure_tmpdir
 
 resolve_sccache_bin || true
 if [[ -n "${SCCACHE_BIN:-}" ]]; then
-  # sccache reads these only in the process that starts the server, so a
-  # per-worktree value would make path normalization depend on whichever
-  # checkout happened to start it. Keep it repo-wide and predictable.
+  # sccache reads this only in the process that starts the server. Keep the
+  # setting repo-wide for compiler families that honour it, but do not mistake
+  # it for a Rust cross-worktree cache: sccache's Rust key still hashes rustc's
+  # checkout-specific working directory and source arguments.
   export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$COMMON_REPO_ROOT}"
   # Swallowing a socket failure would leave sccache enabled on whatever default
   # endpoint it picks, which can be a localhost TCP port any local user can
@@ -732,6 +744,11 @@ if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
   printf 'NEXTEST_TEST_THREADS=%s\n' "$NEXTEST_TEST_THREADS"
   printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
+  if (( target_dir_is_default )) && [[ "${HARNESS_CARGO_SEED_LANE:-1}" != "0" ]]; then
+    printf 'BUILD_LANE_SEED=cow\n'
+  else
+    printf 'BUILD_LANE_SEED=disabled\n'
+  fi
   printf 'MAKEFLAGS=%s\n' "${MAKEFLAGS:-}"
   printf 'CARGO_MAKEFLAGS=%s\n' "${CARGO_MAKEFLAGS:-}"
   printf 'JOBSERVER=%s\n' "$jobserver_mode"
@@ -769,6 +786,26 @@ fi
 # Below the query exits on purpose: --print-env and --print-target-dir answer a
 # question about the environment, and answering one should not leave a daemon
 # running behind it.
+seed_fresh_build_lane() {
+  (( target_dir_is_default )) || return 0
+  [[ "${HARNESS_CARGO_SEED_LANE:-1}" != "0" ]] || return 0
+  [[ ! -e "$target_dir" && ! -L "$target_dir" ]] || return 0
+
+  if ! command -v python3 >/dev/null 2>&1 \
+    || [[ ! -f "$ROOT/scripts/seed-rust-build-lane.py" ]]; then
+    printf 'cargo-local: lane seeding helper is unavailable; starting cold\n' >&2
+    return 0
+  fi
+
+  if ! python3 "$ROOT/scripts/seed-rust-build-lane.py" \
+    --repo-root "$COMMON_REPO_ROOT" \
+    --target-dir "$target_dir" \
+    --target-segment "$target_segment"; then
+    printf 'cargo-local: lane seeding failed safely; starting cold\n' >&2
+  fi
+}
+
+seed_fresh_build_lane
 ensure_sccache_server
 
 if [[ "${1:-}" == "--with-group-lease" ]]; then

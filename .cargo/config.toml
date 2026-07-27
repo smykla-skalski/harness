@@ -1,3 +1,8 @@
+[unstable]
+# Git worktrees give identical files different mtimes. Checksum fingerprints let
+# an isolated COW-seeded lane reuse artifacts when content is unchanged.
+checksum-freshness = true
+
 [build]
 rustc-wrapper = "scripts/rustc-cache-wrapper.sh"
 rustflags = ["--cfg", "tokio_unstable"]
