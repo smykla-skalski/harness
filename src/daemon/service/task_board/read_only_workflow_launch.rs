@@ -6,6 +6,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
+use crate::sandbox;
 use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
@@ -180,6 +181,9 @@ pub(super) async fn resolve_worktree_head(worktree: &str) -> Result<String, CliE
 }
 
 fn local_head(worktree: &Path) -> Result<String, CliError> {
+    // Bind the grant, never `let _ =`: it must outlive every read below, or a
+    // sandboxed daemon loses access to the origin gitdir mid-call.
+    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree);
     let repository = GitRepository::discover(worktree)
         .map_err(|error| invalid_transition(format!("discover review repository: {error}")))?;
     let repository = repository

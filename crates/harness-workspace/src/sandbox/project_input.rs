@@ -5,8 +5,10 @@
 //! On macOS the guard holds the bookmark's security-scope grant; the daemon
 //! must finish any work that touches the origin path before the guard drops,
 //! otherwise CFURL revokes
-//! access mid-operation. Filesystem work under the sessions root does not
-//! need the scope active.
+//! access mid-operation. Plain filesystem work under the sessions root does not
+//! need the scope active, but git work on a session worktree does, because a
+//! linked worktree keeps its gitdir in the origin - see
+//! [`super::hold_worktree_origin_grant`].
 
 use std::fs;
 use std::path::{Path, PathBuf};

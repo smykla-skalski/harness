@@ -7,5 +7,7 @@ pub mod bookmarks;
 pub mod migration;
 mod project_input;
 pub mod resolver; // macOS-only; resolver.rs is gated by #![cfg(target_os = "macos")]
+mod worktree_origin;
 
 pub use project_input::{ProjectInputScope, resolve_path_input, resolve_project_input};
+pub use worktree_origin::{WorktreeOriginGrant, hold_worktree_origin_grant};

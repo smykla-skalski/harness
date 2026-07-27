@@ -100,6 +100,9 @@ impl GitPublishPlan {
     }
 
     fn publish(&self) -> Result<(), CliError> {
+        // `new` resolved the worktree scope and dropped it; the git work happens
+        // here, on a blocking worker, so the origin grant belongs here too.
+        let _origin_grant = sandbox::hold_worktree_origin_grant(&self.worktree);
         self.git_output(
             [
                 "fetch",

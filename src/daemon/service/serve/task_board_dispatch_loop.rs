@@ -69,11 +69,22 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
         };
         if let Err((_, error)) =
             Box::pin(prepare_claimed_task_board_dispatch(db, &preparation)).await
-            && let Err(release_error) = db
+        {
+            // Retries are re-armed a second out, so a preparation that can never
+            // succeed loops forever. Without this line the only trace is the
+            // intent row's `last_error`, which nothing surfaces.
+            warn!(
+                intent_id = %preparation.intent_id,
+                board_item_id = %preparation.preparation.board_item_id,
+                attempt_error = %error,
+                "task board dispatch preparation failed; releasing for retry"
+            );
+            if let Err(release_error) = db
                 .release_task_board_dispatch_preparation(&preparation, &error.to_string())
                 .await
-        {
-            warn!(%release_error, "task board dispatch preparation release failed");
+            {
+                warn!(%release_error, "task board dispatch preparation release failed");
+            }
         }
     }
     if let Err(error) = Box::pin(super::recover_remote_assignments_before_local_work(

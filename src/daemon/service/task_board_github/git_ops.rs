@@ -85,6 +85,7 @@ fn branch_publication(
     remote_default_branch: Option<&GitHubBranchState>,
 ) -> Result<BranchPublication, CliError> {
     let worktree_scope = sandbox::resolve_project_input(worktree)?;
+    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree_scope.path());
     let repository = GitRepository::discover(worktree_scope.path())
         .map_err(|error| CliErrorKind::workflow_io(error.to_string()))?;
     let repo = repository
