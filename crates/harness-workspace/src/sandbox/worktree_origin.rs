@@ -10,7 +10,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use harness_kernel::errors::CliError;
 use tracing::warn;
 
 use super::{ProjectInputScope, resolve_path_input};
@@ -49,6 +48,10 @@ impl WorktreeOriginGrant {
 /// reach worktrees that need no grant at all, and refusing here would turn a
 /// working read into a failure.
 #[must_use]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 pub fn hold_worktree_origin_grant(worktree: &Path) -> WorktreeOriginGrant {
     let Some(origin) = read_origin_marker(worktree) else {
         return WorktreeOriginGrant::inert();
@@ -58,18 +61,16 @@ pub fn hold_worktree_origin_grant(worktree: &Path) -> WorktreeOriginGrant {
             origin: Some(scope.path().to_path_buf()),
             _scope: Some(scope),
         },
-        Err(error) => refuse_grant(worktree, &origin, &error),
+        Err(error) => {
+            warn!(
+                origin = %origin.display(),
+                worktree = %worktree.display(),
+                %error,
+                "session worktree origin could not be granted; git reads may be refused"
+            );
+            WorktreeOriginGrant::inert()
+        }
     }
-}
-
-fn refuse_grant(worktree: &Path, origin: &Path, error: &CliError) -> WorktreeOriginGrant {
-    warn!(
-        origin = %origin.display(),
-        worktree = %worktree.display(),
-        %error,
-        "session worktree origin could not be granted; git reads may be refused"
-    );
-    WorktreeOriginGrant::inert()
 }
 
 /// Read `<session_root>/.origin` for a `<session_root>/workspace` worktree.
