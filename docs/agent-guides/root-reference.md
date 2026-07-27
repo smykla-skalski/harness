@@ -114,7 +114,7 @@ Three files name the toolchain - `rust-toolchain.toml`, `.mise.toml`, and `mise.
 
 ## Check lanes
 
-`mise run check` runs the default Harness quality gates. Delivery requires the smallest owning `mise` check task for each component or crate the change touched, not a full-repository gate. `mise run check:full` remains an optional diagnostic that adds `harness:check:feature-isolation`, which checks each crate on its own so its features resolve the way they will for a dependent that selects it alone. That stays eleven separate invocations on purpose: one `--workspace` run unifies features across every selected package, so a crate that only builds because a sibling switched on an optional dependency would still pass.
+`mise run check` runs the default Harness quality gates. Delivery requires the smallest owning `mise` check task for each component or crate the change touched, not a full-repository gate. `mise run check:full` remains an optional diagnostic that adds `harness:check:feature-isolation`, which checks each crate on its own so its features resolve the way they will for a dependent that selects it alone. That stays fourteen separate invocations on purpose: one `--workspace` run unifies features across every selected package, so a crate that only builds because a sibling switched on an optional dependency would still pass.
 
 ## Build lane and fsmonitor cleanup
 
