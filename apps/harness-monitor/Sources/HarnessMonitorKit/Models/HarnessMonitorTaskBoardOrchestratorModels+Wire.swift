@@ -24,6 +24,7 @@ extension TaskBoardOrchestratorSettings {
       scheduling: wire.scheduling,
       retry: wire.retry,
       reviewers: wire.reviewers,
+      repositories: wire.repositories,
       policyVersion: wire.policyVersion
     )
   }
