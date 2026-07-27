@@ -32,6 +32,17 @@ use super::helpers::collect_hits_in_paths;
 /// already carries, everywhere the daemon's own mutation fallbacks reach
 /// these functions directly from an async worker.
 ///
+/// With every `task_board::transport` caller moved off it, the facade's own
+/// `daemon::client::task_board`/`task_board_orchestrator`/`task_board_list`
+/// modules (and their dedicated test files) had zero callers left anywhere in
+/// the tree - confirmed by checking every other construction site of
+/// `daemon::client::DaemonClient`, not just this one - so they were deleted
+/// outright rather than left as an unused duplicate of the ported logic
+/// above. That in turn left the facade's own `put` (in `daemon::client::http`)
+/// with no caller either, since only the deleted task-board methods ever used
+/// it; `get`/`get_optional`/`post`/`delete` there still back the managed-agent
+/// and session methods in `daemon::client::api` and stay.
+///
 /// `session::transport::support`'s `daemon_client()` helper (still needed by
 /// the managed-agent command surfaces that did not move this round) is not
 /// covered here either.

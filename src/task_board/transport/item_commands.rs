@@ -19,8 +19,10 @@ use super::{
     print_json,
 };
 
-/// Stop the page walk after this many pages, mirroring the leaf client's own
-/// former host in `daemon::client::task_board_list`: a daemon that keeps
+/// Stop the page walk after this many pages. Ported from the now-deleted
+/// `daemon::client::task_board_list` (the root facade's module, not the leaf
+/// client's) along with the query-string rendering and page-walk faults below
+/// -- this is their only copy now, not a duplicate of it. A daemon that keeps
 /// offering one more distinct cursor would otherwise grow the walk without
 /// bound.
 const TASK_BOARD_LIST_MAX_PAGES: usize = 200;
