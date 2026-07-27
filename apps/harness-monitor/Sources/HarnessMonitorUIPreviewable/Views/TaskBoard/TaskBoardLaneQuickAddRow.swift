@@ -105,7 +105,10 @@ struct TaskBoardLaneQuickAddRow: View {
       Button(action: dismiss) {
         Image(systemName: "xmark")
           .font(labelFont)
-          .frame(width: 18, height: 18)
+          // The glyph is small, the target must not be: 24pt is the macOS
+          // minimum, and the shape makes the padding around the mark clickable
+          // rather than leaving a hole the pointer can land in.
+          .frame(width: 24, height: 24)
           .contentShape(Rectangle())
       }
       .harnessPlainButtonStyle()
