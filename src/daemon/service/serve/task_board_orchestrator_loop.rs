@@ -10,8 +10,6 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use harness_kernel::errors::CliError;
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
-#[cfg(test)]
-use crate::task_board::TaskBoardOrchestratorState;
 use crate::task_board::{TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorStatus};
 
 struct AutonomousOrchestratorIntent {
@@ -121,10 +119,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
-
     use super::*;
-    use crate::task_board::{TaskBoardOrchestrator, TaskBoardOrchestratorStatus};
+    use crate::task_board::TaskBoardOrchestratorStatus;
 
     #[tokio::test]
     async fn autonomous_tick_skips_when_not_enabled_or_running() {
@@ -160,38 +156,6 @@ mod tests {
         .expect("drive tick");
 
         assert!(!did_run);
-    }
-
-    #[tokio::test]
-    async fn autonomous_tick_prefers_database_over_conflicting_legacy_file() {
-        let temp = tempdir().expect("tempdir");
-        let xdg = temp.path().join("xdg");
-        let xdg_value = xdg.to_string_lossy().into_owned();
-        temp_env::async_with_vars([("XDG_DATA_HOME", Some(xdg_value.as_str()))], async {
-            TaskBoardOrchestrator::new(xdg.join("harness/task-board"))
-                .start()
-                .expect("start legacy orchestrator");
-            let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
-                .await
-                .expect("open database");
-            db.replace_task_board_orchestrator_state(&state(false, false))
-                .await
-                .expect("save database state");
-
-            let loaded = orchestrator_state(&db).await.expect("load database state");
-
-            assert!(!loaded.enabled);
-            assert!(!loaded.running);
-        })
-        .await;
-    }
-
-    fn state(enabled: bool, running: bool) -> TaskBoardOrchestratorState {
-        TaskBoardOrchestratorState {
-            enabled,
-            running,
-            ..TaskBoardOrchestratorState::default()
-        }
     }
 
     fn intent(enabled: bool, running: bool, step_mode: bool) -> AutonomousOrchestratorIntent {

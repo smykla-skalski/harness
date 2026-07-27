@@ -1,18 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 #[cfg(test)]
-use std::future::Future;
-#[cfg(test)]
 use std::path::Path;
 
-#[cfg(test)]
-use tokio::runtime::Builder as TokioRuntimeBuilder;
 use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
-#[cfg(test)]
-use crate::daemon::db::DaemonDb;
-#[cfg(test)]
-use crate::daemon::service::session_detail_core;
 use crate::daemon::service::session_detail_core_async;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
@@ -28,8 +20,6 @@ use crate::task_board::{
 };
 use crate::task_board::{normalize_repository_slug, task_board_read_only_execution_repository};
 use harness_kernel::errors::CliError;
-#[cfg(test)]
-use harness_kernel::errors::CliErrorKind;
 
 #[derive(Clone, Copy)]
 pub(super) enum AutomationPolicy<'a> {
@@ -140,22 +130,6 @@ pub(super) fn update_pull_request_metadata(
 ) {
     workflow.pr_number = Some(pull_request.number);
     workflow.pr_url.clone_from(&pull_request.html_url);
-}
-
-#[cfg(test)]
-pub(super) fn load_session_worktrees(
-    items: &[TaskBoardItem],
-    db: Option<&DaemonDb>,
-) -> Result<BTreeMap<String, String>, CliError> {
-    let mut worktrees = BTreeMap::new();
-    for session_id in items.iter().filter_map(|item| item.session_id.as_deref()) {
-        let detail = session_detail_core(session_id, db)?;
-        let path = detail.session.worktree_path.trim();
-        if !path.is_empty() {
-            worktrees.insert(session_id.to_string(), path.to_string());
-        }
-    }
-    Ok(worktrees)
 }
 
 pub(super) async fn load_session_worktrees_async(
@@ -290,17 +264,6 @@ pub(super) fn policy_blocked(
 
 pub(super) fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", Uuid::new_v4().simple())
-}
-
-#[cfg(test)]
-pub(super) fn run_blocking<T>(
-    future: impl Future<Output = Result<T, CliError>>,
-) -> Result<T, CliError> {
-    TokioRuntimeBuilder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| CliErrorKind::workflow_io(format!("create task-board runtime: {error}")))?
-        .block_on(future)
 }
 
 fn pull_request_body(item: &TaskBoardItem, config: &GitHubProjectConfig) -> String {

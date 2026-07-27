@@ -481,3 +481,6 @@ async fn save_run_summary(
     db.replace_task_board_orchestrator_state(&state).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

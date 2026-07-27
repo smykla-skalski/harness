@@ -3,20 +3,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::daemon::db::AsyncDaemonDb;
-#[cfg(test)]
-use crate::daemon::db::DaemonDb;
-#[cfg(test)]
-use crate::daemon::state::load_task_board_git_runtime_config;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
-#[cfg(test)]
-use crate::github_api::{GitHubProtectedClient, republish_current_data_change};
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
 };
-#[cfg(test)]
-use crate::task_board::store::TaskBoardItemPatch;
-#[cfg(test)]
-use crate::task_board::{MachineRegistry, TaskBoardStore};
 use crate::task_board::{
     PolicyGraph, TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
     task_board_read_only_execution_repository,
@@ -38,8 +28,6 @@ pub(crate) use write_publication::{
 };
 
 use self::support::{automation_config, github_token_for_repository, load_session_worktrees_async};
-#[cfg(test)]
-use self::support::{load_session_worktrees, run_blocking};
 #[cfg(test)]
 use self::workflow::automate_item;
 use self::workflow::automate_item_with_database_policy;
@@ -64,47 +52,6 @@ pub(super) struct DatabaseAutomationRequest<'a> {
     pub client: &'a dyn GitHubAutomationClient,
     pub host_id: &'a str,
     pub expected_parent: Option<&'a str>,
-}
-
-#[cfg(test)]
-pub(crate) fn run_task_board_github_automation(
-    board_root: &Path,
-    settings: &TaskBoardOrchestratorSettings,
-    input: &TaskBoardOrchestratorDispatchInput,
-    items: &[TaskBoardItem],
-    db: Option<&DaemonDb>,
-) -> Result<(), CliError> {
-    let Some(defaults) = automation_config(settings) else {
-        return Ok(());
-    };
-    let host_id = MachineRegistry::new(board_root.to_path_buf())
-        .ensure_local()?
-        .id;
-    let session_worktrees = load_session_worktrees(items, db)?;
-    let mut runtime_config = load_task_board_git_runtime_config()?;
-    overlay_task_board_git_runtime_secrets(&mut runtime_config);
-    for (repository, grouped) in group_items_by_repository(items) {
-        let Some(token) = github_token_for_repository(Some(&repository)) else {
-            tracing::warn!(
-                %repository,
-                "skipping task-board GitHub automation: no token for this repository"
-            );
-            continue;
-        };
-        let config = repository_automation_config(&defaults, &repository);
-        let client =
-            GitHubApiAutomationClient::new_with_runtime_config(&token, runtime_config.clone())?;
-        run_blocking(run_task_board_github_automation_with_client(
-            board_root,
-            &config,
-            input,
-            &grouped,
-            &session_worktrees,
-            &client,
-            host_id.as_str(),
-        ))?;
-    }
-    Ok(())
 }
 
 pub(crate) async fn run_task_board_github_automation_async(
@@ -210,45 +157,6 @@ fn repository_automation_config(
         config.repo = repo.into();
     }
     config
-}
-
-#[cfg(test)]
-async fn run_task_board_github_automation_with_client(
-    board_root: &Path,
-    config: &GitHubProjectConfig,
-    input: &TaskBoardOrchestratorDispatchInput,
-    items: &[&TaskBoardItem],
-    session_worktrees: &BTreeMap<String, String>,
-    client: &dyn GitHubAutomationClient,
-    host_id: &str,
-) -> Result<(), CliError> {
-    let board = TaskBoardStore::new(board_root.to_path_buf());
-    for item in items {
-        let revision_before = GitHubProtectedClient::data_revision();
-        let workflow = automate_item(AutomationRequest {
-            board_root,
-            config,
-            item,
-            session_worktrees,
-            dry_run: input.dry_run,
-            client,
-            host_id,
-        })
-        .await;
-        if !input.dry_run && workflow != item.workflow {
-            board.update(
-                &item.id,
-                TaskBoardItemPatch {
-                    workflow: Some(workflow),
-                    ..TaskBoardItemPatch::default()
-                },
-            )?;
-            if GitHubProtectedClient::data_revision() != revision_before {
-                republish_current_data_change("task_board.github.local_automation_ready");
-            }
-        }
-    }
-    Ok(())
 }
 
 #[expect(
