@@ -4,6 +4,7 @@ use crate::session::types::{HarnessSessionId, ManagedAgentId, ManagedAgentRef, R
 use crate::session::wire;
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use tokio::runtime::Handle;
 
 use super::{apply_register_agent_runtime_session, ensure_known_runtime, storage, utc_now};
 
@@ -30,7 +31,15 @@ pub fn register_agent_runtime_session(
     // same registration call) keeps this domain code from depending on the
     // root crate's typed `daemon::client` facade; the wire types are already
     // domain-owned, so the generic client needs nothing daemon-shaped from us.
-    if let Some(client) = DaemonClient::try_connect() {
+    //
+    // The tokio-runtime check mirrors a guard the root facade's client enforced
+    // internally: this call can run on the daemon's own async worker threads,
+    // through `register_agent_runtime_session_direct`'s no-database fallback,
+    // and a blocking round trip back to that same process would hold a worker
+    // thread open with nothing to free it until the request times out.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
         let request = wire::AgentRuntimeSessionRegistrationRequest {
             managed_agent_id: managed_agent_id.to_string(),
             runtime: runtime_name.to_string(),
