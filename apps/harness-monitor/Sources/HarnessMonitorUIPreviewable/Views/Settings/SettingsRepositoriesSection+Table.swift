@@ -30,7 +30,7 @@ struct RepositoriesMonitoredSection: View {
   /// set, which keeps the id of a repository deleted while it was open.
   private var repositoriesTableRowsHeight: CGFloat {
     let visibleRows = min(draft.rows.count, 12)
-    let expanded = min(draft.rows.count { expandedRows.contains($0.id) }, visibleRows)
+    let expanded = min(draft.rows.count(where: { expandedRows.contains($0.id) }), visibleRows)
     return CGFloat(visibleRows) * 44 + CGFloat(expanded) * 320
   }
 
