@@ -17574,6 +17574,33 @@
           }
         }
       },
+      "GitHubAutomationSettings": {
+        "type": "object",
+        "description": "The publication conventions every repository shares.\n\nThis is what gets stored. It deliberately names no repository: publication\ntargets whatever repository an item came from, so a single configured owner\nand repo would only invite values that quietly have no effect.",
+        "properties": {
+          "branch_prefix": {
+            "type": "string"
+          },
+          "enabled_automations": {
+            "$ref": "#/components/schemas/GitHubAutomationToggles"
+          },
+          "labels": {
+            "$ref": "#/components/schemas/GitHubAutomationLabels"
+          },
+          "merge_method": {
+            "$ref": "#/components/schemas/GitHubMergeMethod"
+          },
+          "protected_paths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectedPathRule"
+            }
+          },
+          "requested_reviewers": {
+            "$ref": "#/components/schemas/GitHubRequestedReviewers"
+          }
+        }
+      },
       "GitHubAutomationToggles": {
         "type": "object",
         "properties": {
@@ -17634,44 +17661,6 @@
           },
           "operation": {
             "type": "string"
-          }
-        }
-      },
-      "GitHubProjectConfig": {
-        "type": "object",
-        "properties": {
-          "branch_prefix": {
-            "type": "string"
-          },
-          "checkout_path": {
-            "type": "string"
-          },
-          "default_branch": {
-            "type": "string"
-          },
-          "enabled_automations": {
-            "$ref": "#/components/schemas/GitHubAutomationToggles"
-          },
-          "labels": {
-            "$ref": "#/components/schemas/GitHubAutomationLabels"
-          },
-          "merge_method": {
-            "$ref": "#/components/schemas/GitHubMergeMethod"
-          },
-          "owner": {
-            "type": "string"
-          },
-          "protected_paths": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProtectedPathRule"
-            }
-          },
-          "repo": {
-            "type": "string"
-          },
-          "requested_reviewers": {
-            "$ref": "#/components/schemas/GitHubRequestedReviewers"
           }
         }
       },
@@ -30710,7 +30699,7 @@
             "$ref": "#/components/schemas/TaskBoardGitHubInboxConfig"
           },
           "github_project": {
-            "$ref": "#/components/schemas/GitHubProjectConfig"
+            "$ref": "#/components/schemas/GitHubAutomationSettings"
           },
           "local_execution_host": {
             "$ref": "#/components/schemas/TaskBoardLocalExecutionHostConfig"
@@ -30813,7 +30802,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/GitHubProjectConfig"
+                "$ref": "#/components/schemas/GitHubAutomationSettings"
               }
             ]
           },

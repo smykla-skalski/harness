@@ -191,9 +191,6 @@ extension RecordingHarnessClient {
       dispatchStatusFilter: .todo,
       projectDir: "/tmp/harness",
       githubProject: TaskBoardGitHubProjectConfig(
-        owner: "example",
-        repo: "harness",
-        checkoutPath: "/tmp/harness",
         protectedPaths: [TaskBoardProtectedPathRule(pattern: "apps/harness-monitor")],
         enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.syncTaskBoard, .autoMerge])
       ),

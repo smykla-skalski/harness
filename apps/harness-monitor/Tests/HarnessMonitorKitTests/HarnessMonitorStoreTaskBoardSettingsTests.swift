@@ -380,10 +380,6 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
         dispatchStatusFilter: .todo,
         projectDir: nil,
         githubProject: TaskBoardGitHubProjectConfig(
-          owner: "example",
-          repo: "harness",
-          checkoutPath: "",
-          defaultBranch: "main",
           branchPrefix: "c/"
         ),
         githubInbox: TaskBoardGitHubInboxConfig(),

@@ -89,9 +89,6 @@ extension TaskBoardAPIClientTests {
         projectDir: "/tmp/next",
         clearProjectDir: false,
         githubProject: TaskBoardGitHubProjectConfig(
-          owner: "example",
-          repo: "harness",
-          checkoutPath: "/tmp/harness",
           protectedPaths: [TaskBoardProtectedPathRule(pattern: "src/security")],
           enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [
             .syncTaskBoard, .autoMerge,

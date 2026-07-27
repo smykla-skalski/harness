@@ -24,11 +24,10 @@ struct TaskBoardGitHubProjectWireDecodingTests {
       }
       """#
     let data = try #require(payload.data(using: .utf8))
-    let wire = try decoder.decode(GitHubProjectConfigWire.self, from: data)
+    let wire = try decoder.decode(GitHubAutomationSettingsWire.self, from: data)
     let config = TaskBoardGitHubProjectConfig(wire: wire)
 
-    #expect(config.owner == "acme")
-    #expect(config.checkoutPath == "/checkouts/widget")
+    #expect(config.branchPrefix == "c/")
     #expect(config.mergeMethod == .rebase)
     #expect(config.labels.managed == "m")
     #expect(config.labels.autoMerge == "am")

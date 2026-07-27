@@ -1328,7 +1328,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardSyncSummary",
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
-    // GitHubProjectConfig sub-tree (github/config.rs) nested in the orchestrator settings.
+    // GitHubAutomationSettings sub-tree (github/config.rs) nested in the orchestrator settings.
+    // GitHubProjectConfig shares it but is never sent: it is built per publication.
+    "GitHubAutomationSettings",
     "GitHubProjectConfig",
     "GitHubAutomationLabels",
     "GitHubRequestedReviewers",
@@ -1451,9 +1453,12 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // the Swift hand enum TaskBoardGitHubMergeMethod.
     ("GitHubMergeMethod", "TaskBoardGitHubMergeMethod"),
     // orchestrator settings.github_project: the Rust field uses the type alias
-    // TaskBoardGitHubProjectConfig (= github::GitHubProjectConfig), so repoint it at the
-    // already-generated GitHubProjectConfigWire instead of re-emitting the sub-tree.
-    ("TaskBoardGitHubProjectConfig", "GitHubProjectConfigWire"),
+    // TaskBoardGitHubProjectConfig (= github::GitHubAutomationSettings), so repoint it at the
+    // already-generated GitHubAutomationSettingsWire instead of re-emitting the sub-tree.
+    (
+        "TaskBoardGitHubProjectConfig",
+        "GitHubAutomationSettingsWire",
+    ),
     // task_board.rs policy-canvas read cluster: Rust PolicyPipelineDocument is a
     // type alias for PolicyGraph (policy_graph.rs:389). The Swift app re-models it
     // as the hand PolicyPipelineDocument (Kit, explicit snake CodingKeys,
@@ -2963,11 +2968,14 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
 ];
 const GITHUB_CONFIG_SOURCE: &str = include_str!("../src/task_board/github/config.rs");
 const GITHUB_CONFIG_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitHubProjectWireTypes.generated.swift";
-// The GitHubProjectConfig sub-tree nested in TaskBoardOrchestratorSettings.github_project. The
-// five structs suffix to *Wire; GitHubMergeMethod/GitHubAutomation ride bare via TYPE_RENAMES (the
-// decoder-agnostic Swift TaskBoardGitHubMergeMethod/TaskBoardGitHubAutomation); checkout_path is the
-// PathBuf the new ext maps to String; default_branch/default_branch_prefix come from the same file.
+// The GitHubAutomationSettings sub-tree nested in
+// TaskBoardOrchestratorSettings.github_project. The structs suffix to *Wire;
+// GitHubMergeMethod/GitHubAutomation ride bare via TYPE_RENAMES (the decoder-agnostic Swift
+// TaskBoardGitHubMergeMethod/TaskBoardGitHubAutomation); default_branch/default_branch_prefix come
+// from the same file. GitHubProjectConfig rides along because the two share this sub-tree, but the
+// app never sees one: it is built per publication from the settings plus the item's repository.
 const GITHUB_CONFIG_EMIT_ONLY: &[&str] = &[
+    "GitHubAutomationSettings",
     "GitHubProjectConfig",
     "GitHubAutomationLabels",
     "GitHubRequestedReviewers",

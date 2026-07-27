@@ -247,8 +247,6 @@ extension TaskBoardAPIClientTests {
         ]
       )
     )
-    #expect(status.settings.githubProject.owner == "example")
-    #expect(status.settings.githubProject.repo == "harness")
     #expect(runtimeConfig.global.authorName == "Harness Bot")
     #expect(runOnce.lastRun?.sync.total == 1)
     #expect(runOnce.lastRun?.policyTraceIds == ["trace-1"])

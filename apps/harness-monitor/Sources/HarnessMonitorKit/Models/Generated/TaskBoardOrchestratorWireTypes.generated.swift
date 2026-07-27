@@ -31,14 +31,14 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var dryRunDefault: Bool
   public var dispatchStatusFilter: TaskBoardStatus?
   public var projectDir: String?
-  public var githubProject: GitHubProjectConfigWire
+  public var githubProject: GitHubAutomationSettingsWire
   public var githubInbox: TaskBoardGitHubInboxConfigWire
   public var scheduling: TaskBoardAutomationSchedulingSettings?
   public var retry: TaskBoardAutomationRetrySettings?
   public var reviewers: TaskBoardReviewerSettings?
   public var policyVersion: String
 
-  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubProjectConfigWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, policyVersion: String = "task-board-policy-v1") {
+  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubAutomationSettingsWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, policyVersion: String = "task-board-policy-v1") {
     self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
@@ -59,7 +59,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     dryRunDefault = try container.decodeIfPresent(Bool.self, forKey: .dryRunDefault) ?? true
     dispatchStatusFilter = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .dispatchStatusFilter)
     projectDir = try container.decodeIfPresent(String.self, forKey: .projectDir)
-    githubProject = try container.decode(GitHubProjectConfigWire.self, forKey: .githubProject)
+    githubProject = try container.decode(GitHubAutomationSettingsWire.self, forKey: .githubProject)
     githubInbox = try container.decodeIfPresent(TaskBoardGitHubInboxConfigWire.self, forKey: .githubInbox) ?? TaskBoardGitHubInboxConfigWire()
     scheduling = try container.decodeIfPresent(TaskBoardAutomationSchedulingSettings.self, forKey: .scheduling)
     retry = try container.decodeIfPresent(TaskBoardAutomationRetrySettings.self, forKey: .retry)

@@ -7,15 +7,11 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var dryRunDefault = true
   var dispatchStatusFilter: DispatchStatusFilterChoice = .all
   var projectDir = ""
-  var owner = ""
-  var repo = ""
-  var checkoutPath = ""
   var githubInboxRepositoriesText = ""
   var githubInboxLabelFilterText = ""
   var githubInboxRepositoryOwnerInput = ""
   var githubInboxRepositoryNameInput = ""
   var githubInboxLabelInput = ""
-  var defaultBranch = "main"
   var branchPrefix = "c/"
   var mergeMethod: TaskBoardGitHubMergeMethod = .squash
   var managedLabel = "harness:managed"
@@ -60,12 +56,8 @@ struct TaskBoardGitSettingsDraft: Equatable {
     dryRunDefault = orchestrator.dryRunDefault
     dispatchStatusFilter = DispatchStatusFilterChoice(status: orchestrator.dispatchStatusFilter)
     projectDir = orchestrator.projectDir ?? ""
-    owner = project.owner
-    repo = project.repo
-    checkoutPath = project.checkoutPath
     githubInboxRepositoriesText = orchestrator.githubInbox.repositories.joined(separator: "\n")
     githubInboxLabelFilterText = orchestrator.githubInbox.labelFilter.joined(separator: "\n")
-    defaultBranch = project.defaultBranch
     branchPrefix = project.branchPrefix
     mergeMethod = project.mergeMethod
     managedLabel = project.labels.managed
@@ -159,10 +151,6 @@ struct TaskBoardGitSettingsDraft: Equatable {
         dispatchStatusFilter: dispatchStatusFilter.status,
         projectDir: normalized(projectDir),
         githubProject: TaskBoardGitHubProjectConfig(
-          owner: owner.trimmingCharacters(in: .whitespacesAndNewlines),
-          repo: repo.trimmingCharacters(in: .whitespacesAndNewlines),
-          checkoutPath: checkoutPath.trimmingCharacters(in: .whitespacesAndNewlines),
-          defaultBranch: normalized(defaultBranch) ?? "main",
           branchPrefix: normalized(branchPrefix) ?? "c/",
           mergeMethod: mergeMethod,
           labels: TaskBoardGitHubAutomationLabels(

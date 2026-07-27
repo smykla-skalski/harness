@@ -110,9 +110,6 @@ extension TaskBoardAPIClientTests {
         dispatchStatusFilter: .agenticReview,
         projectDir: "/tmp/next",
         githubProject: TaskBoardGitHubProjectConfig(
-          owner: "example",
-          repo: "harness",
-          checkoutPath: "/tmp/harness",
           enabledAutomations: TaskBoardGitHubAutomationToggles(enabled: [.autoMerge])
         ),
         githubInbox: TaskBoardGitHubInboxConfig(repositories: ["example/harness", "example/aff"]),

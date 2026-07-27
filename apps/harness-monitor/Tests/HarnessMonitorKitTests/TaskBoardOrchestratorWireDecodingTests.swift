@@ -12,6 +12,9 @@ import Testing
 struct TaskBoardOrchestratorWireDecodingTests {
   private let decoder = PolicyWireCoding.decoder
 
+  /// Keeps `owner`, `repo`, `checkout_path` and `default_branch`, which the
+  /// daemon stopped sending. Settings saved before their removal still carry
+  /// them, so decoding has to tolerate them rather than fail.
   private let githubProjectJSON = #"""
     {
       "owner": "acme", "repo": "widget", "checkout_path": "/checkouts/widget",
@@ -49,8 +52,8 @@ struct TaskBoardOrchestratorWireDecodingTests {
     #expect(settings.dryRunDefault == false)
     #expect(settings.dispatchStatusFilter == .todo)
     #expect(settings.projectDir == "/work/proj")
-    #expect(settings.githubProject.owner == "acme")
-    #expect(settings.githubProject.checkoutPath == "/checkouts/widget")
+    #expect(settings.githubProject.branchPrefix == "c/")
+    #expect(settings.githubProject.mergeMethod == .rebase)
     #expect(settings.githubInbox.repositories == ["acme/widget"])
     #expect(settings.githubInbox.labelFilter == ["bug"])
     #expect(settings.policyVersion == "task-board-policy-v1")
@@ -119,7 +122,7 @@ struct TaskBoardOrchestratorWireDecodingTests {
     #expect(status.workflowExecutionCounts.map(\.status) == [.running, .completed])
     #expect(status.workflowExecutionCounts.map(\.count) == [3, 7])
     #expect(status.settings.enabledWorkflows == [.defaultTask])
-    #expect(status.settings.githubProject.repo == "widget")
+    #expect(status.settings.githubProject.mergeMethod == .rebase)
     #expect(status.automation == nil)
     expectAutomationDefaults(status.settings)
   }
