@@ -1,8 +1,8 @@
 use clap::Args;
 
-use harness_workspace::command_context::{AppContext, Execute};
-use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
+use harness_kernel::errors::CliError;
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::super::application::execute;
 use super::mode::ObserveMode;

@@ -5,7 +5,6 @@ use std::thread;
 
 use clap::Parser;
 use harness::app::cli::{self, Command};
-use harness_workspace::command_context::{AppContext, Execute};
 use harness::daemon::protocol::{
     PolicyApprovalGrantResolveResponse, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasWorkspaceResponse,
@@ -25,6 +24,7 @@ use harness::task_board::{
     TaskBoardStatus, WorkerIntent,
 };
 use harness_testkit::with_isolated_harness_env;
+use harness_workspace::command_context::{AppContext, Execute};
 use serde_json::Value;
 use tempfile::tempdir;
 

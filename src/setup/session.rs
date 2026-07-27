@@ -1,9 +1,9 @@
 use clap::Args;
 
-use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::hooks::SessionStartHookOutput;
 use crate::setup::services::session as session_service;
 use harness_kernel::errors::CliError;
+use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};
 
 impl Execute for SessionStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {

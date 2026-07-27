@@ -19,10 +19,10 @@ use harness_testkit::with_isolated_harness_env;
 use serde_json::json;
 use tempfile::tempdir;
 
-use harness_workspace::command_context::{AppContext, Execute};
 use crate::daemon::client::test_support::install_fake_running_xdg_daemon;
 use crate::session::service;
 use crate::session::types::{ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::improver::SessionImproverApplyArgs;
 use super::task::{

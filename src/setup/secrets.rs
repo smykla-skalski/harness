@@ -20,8 +20,8 @@ use security_framework::passwords::{
 #[cfg(any(target_os = "macos", test))]
 use sha1::{Digest, Sha1};
 
-use harness_workspace::command_context::AppContext;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::AppContext;
 
 #[cfg(any(target_os = "macos", test))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";

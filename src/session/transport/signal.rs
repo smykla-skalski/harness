@@ -1,8 +1,8 @@
 use clap::Args;
 
-use harness_workspace::command_context::{AppContext, Execute};
-use harness_kernel::errors::CliError;
 use crate::session::service;
+use harness_kernel::errors::CliError;
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::support::{print_json, resolve_project_dir};
 
