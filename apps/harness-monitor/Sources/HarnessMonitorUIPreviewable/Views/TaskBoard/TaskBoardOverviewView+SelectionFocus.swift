@@ -19,7 +19,7 @@ extension TaskBoardOverviewView {
       !selectedIDs.isEmpty,
       !isActionInFlight,
       selectionModelValue.selectedItemID == nil,
-      !selectionModelValue.isCreatingItem,
+      selectionModelValue.acceptsBoardShortcuts,
       actions.canDeleteTargets
     else {
       return false

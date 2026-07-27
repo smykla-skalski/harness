@@ -11,6 +11,15 @@ final class TaskBoardCardSelectionModel {
   private(set) var orderedVisibleIDs: [TaskBoardCardID] = []
   var selectedItemID: String?
   var isCreatingItem = false
+  /// The one lane whose quick-add field is open, if any.
+  private(set) var quickAddLane: TaskBoardInboxLane?
+
+  /// False while a text field the board hosts has the keystrokes. The Edit menu
+  /// binds bare Delete, and a menu key equivalent beats a focused field to it,
+  /// so a lane composer left out of this gate deletes cards as someone types.
+  var acceptsBoardShortcuts: Bool {
+    !isCreatingItem && quickAddLane == nil
+  }
 
   var selectedIDs: Set<TaskBoardCardID> {
     multiSelection.selectedIDs
@@ -68,6 +77,7 @@ final class TaskBoardCardSelectionModel {
   }
 
   func beginCreatingItem() {
+    quickAddLane = nil
     selectedItemID = nil
     isCreatingItem = true
   }
@@ -75,5 +85,17 @@ final class TaskBoardCardSelectionModel {
   func clearSelectedItem() {
     selectedItemID = nil
     isCreatingItem = false
+  }
+
+  func beginQuickAdd(in lane: TaskBoardInboxLane) {
+    guard quickAddLane != lane else { return }
+    quickAddLane = lane
+  }
+
+  /// Takes the lane so the field that just lost focus cannot close the one that
+  /// took it: opening a second lane's field ends the first, in that order.
+  func endQuickAdd(in lane: TaskBoardInboxLane) {
+    guard quickAddLane == lane else { return }
+    quickAddLane = nil
   }
 }

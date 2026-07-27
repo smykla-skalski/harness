@@ -5,15 +5,17 @@ import SwiftUI
 extension TaskBoardOverviewActions {
   // MARK: - Item lifecycle
 
+  /// `outcome` is how the full form learns to dismiss itself. A lane's quick add
+  /// stays open on purpose, so it passes none.
   func createTaskBoardItem(
     _ request: TaskBoardCreateItemRequest,
-    outcome: TaskBoardItemCreationOutcome
+    outcome: TaskBoardItemCreationOutcome? = nil
   ) {
     guard canCreateItem, let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Creating task board item") {
         let success = await store.createTaskBoardItem(request: request)
-        guard success else { return }
+        guard success, let outcome else { return }
         await MainActor.run {
           outcome.succeeded = true
         }

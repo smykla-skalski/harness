@@ -326,18 +326,24 @@ private struct TaskBoardCardChrome: ViewModifier {
   }
 
   private var cardSurfaceFill: Color {
-    switch colorScheme {
-    case .dark:
-      if reduceTransparency {
-        return Color(red: 0.225, green: 0.26, blue: 0.27)
-      }
-      return Color(red: 0.205, green: 0.24, blue: 0.25)
-    default:
-      if reduceTransparency {
-        return Color(red: 0.98, green: 0.99, blue: 0.995)
-      }
-      return Color(red: 0.99, green: 0.995, blue: 1)
+    taskBoardCardSurfaceFill(colorScheme: colorScheme, reduceTransparency: reduceTransparency)
+  }
+}
+
+/// Shared so anything that has to sit level with a card - the lane's quick-add
+/// field, for one - reads the same surface rather than a second copy of it.
+func taskBoardCardSurfaceFill(colorScheme: ColorScheme, reduceTransparency: Bool) -> Color {
+  switch colorScheme {
+  case .dark:
+    if reduceTransparency {
+      return Color(red: 0.225, green: 0.26, blue: 0.27)
     }
+    return Color(red: 0.205, green: 0.24, blue: 0.25)
+  default:
+    if reduceTransparency {
+      return Color(red: 0.98, green: 0.99, blue: 0.995)
+    }
+    return Color(red: 0.99, green: 0.995, blue: 1)
   }
 }
 

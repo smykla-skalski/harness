@@ -46,6 +46,9 @@ struct TaskBoardLaneUnifiedColumn: View {
   let selectionModel: TaskBoardCardSelectionModel
   let actions: TaskBoardOverviewActions
   let liveInboxItems: TaskBoardLiveInboxItems
+  /// Seeds the quick-add field for a static render. `var` (not `let`): a `let`
+  /// with a default drops out of the memberwise init entirely.
+  var quickAddDraftTitle = ""
   @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
@@ -137,7 +140,23 @@ struct TaskBoardLaneUnifiedColumn: View {
         }
       }
       .taskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted)
+
+      // Pinned under the cards rather than scrolling with them: in a lane deep
+      // enough to scroll, an affordance that scrolls away is one you go looking
+      // for.
+      if showsQuickAdd {
+        TaskBoardLaneQuickAddRow(
+          lane: lane,
+          selectionModel: selectionModel,
+          actions: actions,
+          draftTitle: quickAddDraftTitle
+        )
+      }
     }
+  }
+
+  private var showsQuickAdd: Bool {
+    actions.canCreateItem && lane.acceptsQuickAddedTask
   }
 
   @ViewBuilder private var laneScrollSurface: some View {
