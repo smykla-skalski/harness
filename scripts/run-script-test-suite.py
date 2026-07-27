@@ -170,7 +170,7 @@ def _signal_pids(pids: Iterable[int], sent_signal: signal.Signals) -> None:
 
 def _process_commands() -> dict[int, str]:
     completed = subprocess.run(
-        ("/bin/ps", "-Ao", "pid=,command="),
+        ("/bin/ps", "-ww", "-Ao", "pid=,command="),
         check=False,
         capture_output=True,
         text=True,
