@@ -12,8 +12,11 @@ use super::{
 use harness_daemon_client::DaemonClient;
 use tokio::runtime::Handle;
 
-/// Build the `/v1/sessions/{id}/tasks/{id}/{action}` URL shared by every
-/// task-scoped daemon mutation below.
+/// Build the `/v1/sessions/{id}/tasks/{id}/{action}` URL shared by
+/// `assign_task`, `drop_task`, `update_task`, and `record_task_checkpoint`.
+/// `create_task_with_source` and `delete_task` hit their own action-less
+/// paths, and `list_tasks` reads the session detail endpoint instead, so none
+/// of the three go through this helper.
 fn task_action_url(session_id: &str, task_id: &str, action: &str) -> String {
     format!("/v1/sessions/{session_id}/tasks/{task_id}/{action}")
 }
