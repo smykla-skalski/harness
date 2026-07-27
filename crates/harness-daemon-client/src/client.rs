@@ -138,6 +138,45 @@ impl DaemonClient {
         Self::decode(response, "POST", path)
     }
 
+    /// Perform an authenticated PUT and decode its JSON response.
+    ///
+    /// # Errors
+    /// Returns [`ClientError`] on transport, non-success status, or decode failure.
+    pub fn put<Request, Response>(
+        &self,
+        path: &str,
+        request: &Request,
+    ) -> Result<Response, ClientError>
+    where
+        Request: Serialize + ?Sized,
+        Response: DeserializeOwned,
+    {
+        let response = self
+            .request(self.http.put(self.url(path)).json(request))
+            .send()
+            .map_err(ClientError::Request)?;
+        Self::decode(response, "PUT", path)
+    }
+
+    /// Perform an authenticated DELETE and decode its JSON response.
+    ///
+    /// Every daemon DELETE route takes its identifier from the path (or an
+    /// optional query) rather than a JSON body, so this carries no request
+    /// parameter -- unlike `post`/`put`, which always send one.
+    ///
+    /// # Errors
+    /// Returns [`ClientError`] on transport, non-success status, or decode failure.
+    pub fn delete<Response>(&self, path: &str) -> Result<Response, ClientError>
+    where
+        Response: DeserializeOwned,
+    {
+        let response = self
+            .request(self.http.delete(self.url(path)))
+            .send()
+            .map_err(ClientError::Request)?;
+        Self::decode(response, "DELETE", path)
+    }
+
     fn from_manifest(manifest: &DaemonManifest) -> Result<Self, ClientError> {
         let path = if manifest.token_path.trim().is_empty() {
             state::auth_token_path()
@@ -295,6 +334,81 @@ mod tests {
             Some(Payload {
                 value: "ok".to_string()
             })
+        );
+        server.join().expect("server");
+    }
+
+    #[derive(Debug, Serialize)]
+    struct UpdateRequest {
+        value: String,
+    }
+
+    #[test]
+    fn put_sends_bearer_auth_and_json_body_and_decodes_response() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let endpoint = format!("http://{}", listener.local_addr().expect("address"));
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut request = [0_u8; 2048];
+            let size = stream.read(&mut request).expect("read request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("PUT /v1/example HTTP/1.1"));
+            assert!(
+                request
+                    .to_ascii_lowercase()
+                    .contains("authorization: bearer secret")
+            );
+            assert!(request.contains("{\"value\":\"updated\"}"));
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 14\r\n\r\n{\"value\":\"ok\"}",
+                )
+                .expect("write response");
+        });
+
+        let client = DaemonClient::test_client(endpoint, "secret");
+        let request = UpdateRequest {
+            value: "updated".to_string(),
+        };
+        assert_eq!(
+            client
+                .put::<UpdateRequest, Payload>("/v1/example", &request)
+                .expect("put"),
+            Payload {
+                value: "ok".to_string()
+            }
+        );
+        server.join().expect("server");
+    }
+
+    #[test]
+    fn delete_sends_bearer_auth_and_decodes_response() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let endpoint = format!("http://{}", listener.local_addr().expect("address"));
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut request = [0_u8; 2048];
+            let size = stream.read(&mut request).expect("read request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("DELETE /v1/example HTTP/1.1"));
+            assert!(
+                request
+                    .to_ascii_lowercase()
+                    .contains("authorization: bearer secret")
+            );
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 14\r\n\r\n{\"value\":\"ok\"}",
+                )
+                .expect("write response");
+        });
+
+        let client = DaemonClient::test_client(endpoint, "secret");
+        assert_eq!(
+            client.delete::<Payload>("/v1/example").expect("delete"),
+            Payload {
+                value: "ok".to_string()
+            }
         );
         server.join().expect("server");
     }
