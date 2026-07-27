@@ -77,6 +77,7 @@ fn repository_checkout_source_is_optional_absolute_and_canonical() {
         workflows: vec![TaskBoardOrchestratorWorkflow::DefaultTask],
         preferred_host_id: Some("remote-a".into()),
         execution_checkout_path: None,
+        ..TaskBoardRepositoryAutomationConfig::default()
     };
     validate_repository_remote_execution_config(&repository).expect("optional checkout source");
     repository.execution_checkout_path = Some("/srv/harness/remotes/acme-widgets".into());
@@ -115,6 +116,7 @@ fn repository_routing_references_only_configured_trust_anchors() {
         workflows: vec![TaskBoardOrchestratorWorkflow::DefaultTask],
         preferred_host_id: Some("remote-a".into()),
         execution_checkout_path: Some("/srv/harness/remotes/acme-widgets".into()),
+        ..TaskBoardRepositoryAutomationConfig::default()
     };
     validate_remote_execution_configuration(
         std::slice::from_ref(&host),

@@ -161,6 +161,7 @@ impl AcceptanceFixture {
             workflows: vec![TaskBoardOrchestratorWorkflow::DefaultTask],
             preferred_host_id: Some(HOST_ID.into()),
             execution_checkout_path: None,
+            ..TaskBoardRepositoryAutomationConfig::default()
         }];
         db.replace_task_board_orchestrator_settings(&settings)
             .await

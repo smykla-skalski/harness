@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::task_board::TaskBoardRepositoryAutomationConfig;
+
 /// The publication conventions every repository shares.
 ///
 /// This is what gets stored. It deliberately names no repository: publication
@@ -36,6 +38,35 @@ impl Default for GitHubAutomationSettings {
 }
 
 impl GitHubAutomationSettings {
+    /// Apply one repository's overrides to the shared conventions.
+    ///
+    /// Each `Some` replaces its value whole rather than merging into it: a
+    /// board fed from work and personal repositories needs to *drop* a reviewer
+    /// set, not only add to one, and a union could never express that.
+    #[must_use]
+    pub fn merged_with(&self, overrides: &TaskBoardRepositoryAutomationConfig) -> Self {
+        Self {
+            branch_prefix: self.branch_prefix.clone(),
+            merge_method: self.merge_method,
+            labels: overrides
+                .labels
+                .clone()
+                .unwrap_or_else(|| self.labels.clone()),
+            protected_paths: overrides
+                .protected_paths
+                .clone()
+                .unwrap_or_else(|| self.protected_paths.clone()),
+            requested_reviewers: overrides
+                .requested_reviewers
+                .clone()
+                .unwrap_or_else(|| self.requested_reviewers.clone()),
+            enabled_automations: overrides
+                .enabled_automations
+                .clone()
+                .unwrap_or_else(|| self.enabled_automations.clone()),
+        }
+    }
+
     /// Stamp one repository onto the shared conventions. The caller resolves
     /// `default_branch` from that repository rather than from settings, because
     /// the board publishes to repositories with different ones.

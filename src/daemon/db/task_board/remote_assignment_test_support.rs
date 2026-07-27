@@ -252,6 +252,7 @@ async fn configure_controller(db: &AsyncDaemonDb, max_attempts: Option<u32>) {
         workflows: vec![TaskBoardOrchestratorWorkflow::Review],
         preferred_host_id: Some(HOST.into()),
         execution_checkout_path: None,
+        ..TaskBoardRepositoryAutomationConfig::default()
     }];
     if let Some(max_attempts) = max_attempts {
         settings.retry.max_attempts = max_attempts;

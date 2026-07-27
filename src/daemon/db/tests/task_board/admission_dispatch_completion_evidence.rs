@@ -186,6 +186,7 @@ pub(super) async fn configure_remote_controller(db: &AsyncDaemonDb) {
         workflows: vec![TaskBoardOrchestratorWorkflow::Review],
         preferred_host_id: Some("executor-a".into()),
         execution_checkout_path: None,
+        ..TaskBoardRepositoryAutomationConfig::default()
     }];
     db.replace_task_board_orchestrator_settings(&settings)
         .await

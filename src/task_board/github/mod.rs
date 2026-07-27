@@ -204,3 +204,6 @@ pub fn build_auto_merge_policy_input(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "config_overrides_tests.rs"]
+mod config_overrides_tests;

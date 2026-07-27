@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
 use crate::task_board::github::{
-    GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
+    GitHubApiAutomationClient, GitHubAutomationClient, GitHubAutomationSettings,
+    GitHubProjectConfig,
 };
 use crate::task_board::{
     PolicyGraph, TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
@@ -101,7 +102,8 @@ pub(crate) async fn run_task_board_github_automation_async(
                 continue;
             }
         };
-        let config = defaults.for_repository(owner, repo, branch);
+        let config = repository_conventions(settings, &defaults, &repository)
+            .for_repository(owner, repo, branch);
         run_task_board_github_automation_with_database_client(
             async_db,
             policy,
@@ -115,6 +117,21 @@ pub(crate) async fn run_task_board_github_automation_async(
         .await?;
     }
     Ok(())
+}
+
+/// The conventions this repository publishes under: the global ones, with any
+/// overrides it carries applied. A board fed from work and personal
+/// repositories needs different reviewers depending on where a change lands.
+pub(super) fn repository_conventions(
+    settings: &TaskBoardOrchestratorSettings,
+    defaults: &GitHubAutomationSettings,
+    repository: &str,
+) -> GitHubAutomationSettings {
+    settings
+        .repositories
+        .iter()
+        .find(|configured| configured.repository == repository)
+        .map_or_else(|| defaults.clone(), |configured| defaults.merged_with(configured))
 }
 
 /// Items reach this loop from every repository the board watches, so each group

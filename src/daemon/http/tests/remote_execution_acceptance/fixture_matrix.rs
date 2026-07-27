@@ -43,6 +43,7 @@ impl AcceptanceFixture {
                 ],
                 preferred_host_id: Some(HOST_ID.into()),
                 execution_checkout_path: None,
+                ..TaskBoardRepositoryAutomationConfig::default()
             })
             .collect();
         db.replace_task_board_orchestrator_settings(&settings)
