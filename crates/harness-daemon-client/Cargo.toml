@@ -1,6 +1,6 @@
 [package]
 name = "harness-daemon-client"
-version = "53.1.0"
+version = "53.1.1"
 edition = "2024"
 rust-version = "1.95"
 publish = false

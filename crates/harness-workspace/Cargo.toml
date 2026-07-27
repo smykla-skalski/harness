@@ -1,6 +1,6 @@
 [package]
 name = "harness-workspace"
-version = "53.1.0"
+version = "53.1.1"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -11,7 +11,7 @@ publish = false
 standalone-worker = []
 
 [dependencies]
-harness-kernel = { path = "../harness-kernel", version = "53.1.0" }
+harness-kernel = { path = "../harness-kernel", version = "53.1.1" }
 base64 = "0.23.0"
 chrono = { version = "0.4.44", features = ["serde"] }
 fs-err = "3.3.0"
