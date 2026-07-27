@@ -2,9 +2,10 @@
 //!
 //! The root crate and `harness-hook` each kept a hand-duplicated copy of this
 //! bookkeeping. Their storage layers and default-session-id fallbacks stay
-//! genuinely different per binary (root uses a fixed per-agent string,
-//! `harness-hook` derives its default from the adapter name) and are passed
-//! in as closures rather than duplicated here.
+//! genuinely different per binary: both mint a timestamped default, but pick
+//! its agent-name prefix differently (root hardcodes a per-agent match,
+//! `harness-hook` derives it from the adapter name), so they are passed in
+//! as closures rather than duplicated here.
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -50,7 +51,9 @@ pub fn resolve_context_cwd(path: &Path) -> Option<PathBuf> {
 }
 
 /// Undo shell backslash-escaping, for example turning `project\@team` back
-/// into `project@team`. Returns `None` when nothing needed unescaping.
+/// into `project@team`. Leaves `\\` and `\/` untouched, since those are
+/// themselves valid escape sequences rather than characters shell-escaped by
+/// mistake. Returns `None` when nothing needed unescaping.
 #[must_use]
 pub fn shell_unescaped_path(path: &Path) -> Option<PathBuf> {
     let raw = path.to_str()?;
