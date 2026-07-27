@@ -5,7 +5,11 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::warn;
 
-use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
+use crate::daemon::db::{
+    AsyncDaemonDb, ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
+    TaskBoardDispatchClaimAction, TaskBoardPreparationRelease,
+};
+use harness_kernel::errors::CliError;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::service::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows;
@@ -70,21 +74,7 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
         if let Err((_, error)) =
             Box::pin(prepare_claimed_task_board_dispatch(db, &preparation)).await
         {
-            // Retries are re-armed a second out, so a preparation that can never
-            // succeed loops forever. Without this line the only trace is the
-            // intent row's `last_error`, which nothing surfaces.
-            warn!(
-                intent_id = %preparation.intent_id,
-                board_item_id = %preparation.preparation.board_item_id,
-                attempt_error = %error,
-                "task board dispatch preparation failed; releasing for retry"
-            );
-            if let Err(release_error) = db
-                .release_task_board_dispatch_preparation(&preparation, &error.to_string())
-                .await
-            {
-                warn!(%release_error, "task board dispatch preparation release failed");
-            }
+            report_failed_preparation(db, &preparation, &error).await;
         }
     }
     if let Err(error) = Box::pin(super::recover_remote_assignments_before_local_work(
@@ -132,6 +122,50 @@ async fn finish_claim(
             %error,
             "task board worker recovery settlement failed; leaving durable state for recovery"
         );
+    }
+}
+
+/// A preparation that can never succeed used to retry every second in silence,
+/// so both outcomes are logged: the retry to show the loop is working through
+/// it, the give-up because that is the point an operator has to intervene.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+async fn report_failed_preparation(
+    db: &AsyncDaemonDb,
+    preparation: &ClaimedTaskBoardDispatchPreparation,
+    error: &CliError,
+) {
+    let board_item_id = preparation.preparation.board_item_id.as_str();
+    match db
+        .release_task_board_dispatch_preparation(preparation, &error.to_string())
+        .await
+    {
+        Ok(TaskBoardPreparationRelease::Retrying { delay_seconds }) => warn!(
+            intent_id = %preparation.intent_id,
+            %board_item_id,
+            delay_seconds,
+            attempt_error = %error,
+            "task board dispatch preparation failed; retrying later"
+        ),
+        Ok(TaskBoardPreparationRelease::GaveUp { attempts }) => warn!(
+            intent_id = %preparation.intent_id,
+            %board_item_id,
+            attempts,
+            attempt_error = %error,
+            "task board dispatch preparation gave up; the item needs attention"
+        ),
+        // Carries the preparation failure too: this branch is the one path
+        // where nothing else records it, and it is the reason the operator
+        // actually needs.
+        Err(release_error) => warn!(
+            intent_id = %preparation.intent_id,
+            %board_item_id,
+            %release_error,
+            attempt_error = %error,
+            "task board dispatch preparation release failed"
+        ),
     }
 }
 

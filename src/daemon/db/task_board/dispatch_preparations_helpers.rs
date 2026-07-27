@@ -16,6 +16,76 @@ use crate::task_board::{
     TaskBoardWorkflowStatus,
 };
 
+/// Claimed attempts a preparation gets before the board stops retrying it.
+pub(crate) const PREPARATION_MAX_ATTEMPTS: i64 = 8;
+
+/// Longest gap between attempts. Bounds the doubling below so a failure that
+/// heals on its own is still picked up in reasonable time.
+const PREPARATION_RETRY_CAP_SECONDS: i64 = 300;
+
+/// Doubles the wait after every failed attempt. A preparation that cannot
+/// succeed otherwise costs a full claim every second for as long as the daemon
+/// runs, which is how one reached 26,000 attempts in 13 hours.
+pub(super) fn preparation_retry_delay_seconds(attempts: i64) -> i64 {
+    let doublings = attempts.max(1) - 1;
+    if doublings >= i64::BITS.into() {
+        return PREPARATION_RETRY_CAP_SECONDS;
+    }
+    u32::try_from(doublings)
+        .ok()
+        .and_then(|doublings| 1i64.checked_shl(doublings))
+        .filter(|delay| delay.is_positive())
+        .unwrap_or(PREPARATION_RETRY_CAP_SECONDS)
+        .min(PREPARATION_RETRY_CAP_SECONDS)
+}
+
+/// Attempts recorded against a claim, or an error when the claim no longer holds.
+pub(super) async fn claimed_attempts_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    claim: &ClaimedTaskBoardDispatchPreparation,
+) -> Result<i64, CliError> {
+    query_as::<_, (i64,)>(
+        "SELECT attempts FROM task_board_dispatch_intents
+         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
+    )
+    .bind(&claim.intent_id)
+    .bind(&claim.claim_token)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load task board preparation attempts: {error}")))?
+    .map(|row| row.0)
+    .ok_or_else(|| {
+        db_error(format!(
+            "task board preparation '{}' is not claimed",
+            claim.intent_id
+        ))
+    })
+}
+
+/// Returns the claim to the queue, invisible until `delay_seconds` have passed.
+pub(super) async fn rearm_preparation_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    claim: &ClaimedTaskBoardDispatchPreparation,
+    reason: &str,
+    delay_seconds: i64,
+) -> Result<(), CliError> {
+    query(
+        "UPDATE task_board_dispatch_intents
+         SET status = 'preparing', claim_token = NULL, claimed_at = NULL,
+             last_error = ?3, available_at = datetime('now', ?4), updated_at = ?5
+         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
+    )
+    .bind(&claim.intent_id)
+    .bind(&claim.claim_token)
+    .bind(reason)
+    .bind(format!("+{delay_seconds} seconds"))
+    .bind(utc_now())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("release task board preparation: {error}")))?;
+    Ok(())
+}
+
 pub(super) fn apply_preparation_to_item(
     item: &mut TaskBoardItem,
     preparation: &TaskBoardDispatchPreparation,
@@ -57,9 +127,13 @@ pub(super) async fn fail_preparation_admission_in_tx(
     reason: &str,
 ) -> Result<(), CliError> {
     let now = utc_now();
+    // Clearing the claim is not optional: a row leaving 'preparing_claimed'
+    // still holding a token violates the table's status/claim CHECK, and this
+    // statement accepts claimed rows.
     query(
         "UPDATE task_board_dispatch_intents
-         SET status = 'failed', last_error = ?2, completed_at = ?3, updated_at = ?3
+         SET status = 'failed', claim_token = NULL, claimed_at = NULL,
+             last_error = ?2, completed_at = ?3, updated_at = ?3
          WHERE intent_id = ?1 AND status IN ('preparing', 'preparing_claimed')",
     )
     .bind(intent_id)

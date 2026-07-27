@@ -252,6 +252,7 @@ pub(crate) use admission_recovery::{
 pub(crate) use dispatch_intents::{ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 pub(crate) use dispatch_preparations::{
     ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
+    TASK_BOARD_PREPARATION_MAX_ATTEMPTS, TaskBoardPreparationRelease,
 };
 #[allow(unused_imports)]
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
