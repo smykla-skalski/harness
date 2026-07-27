@@ -5,8 +5,8 @@ use super::super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::{ControlObservation, ProviderBackoff, SnapshotLedger, nonnegative, stored_instant};
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
-    TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode, TaskBoardAutomationRunInfo,
-    TaskBoardOrchestratorSettings,
+    TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
+    TaskBoardAutomationQueueSummary, TaskBoardAutomationRunInfo, TaskBoardOrchestratorSettings,
 };
 
 const MINIMUM_OFFLINE_AFTER_SECONDS: i64 = 30;
@@ -32,7 +32,7 @@ struct ActivityLedger {
     runs: Vec<TaskBoardAutomationRunInfo>,
     provider_backoff: Option<ProviderBackoff>,
     open_conflict: bool,
-    queue: crate::task_board::TaskBoardAutomationQueueSummary,
+    queue: TaskBoardAutomationQueueSummary,
     wake: super::wake::WakeObservation,
 }
 

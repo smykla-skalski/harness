@@ -1,4 +1,4 @@
-use chrono::Duration;
+use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, Transaction, query};
 use uuid::Uuid;
 
@@ -39,23 +39,10 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board remote assignment claim")
             .await?;
         let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if exact_claim_response(&record, request, authenticated_principal).is_some() {
-            commit_noop(transaction, "replayed claim").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        if record.claim_receipt.is_some() {
-            commit_noop(transaction, "conflicting claim receipt").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        if !mutation_binding_matches(
-            &record,
-            &request.binding,
-            authenticated_principal,
-            &request.lease_id,
-        ) || record.state != TaskBoardRemoteAssignmentState::Offered
-        {
-            commit_noop(transaction, "stale claim").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+        if let Some(outcome) = claim_screen_outcome(&record, request, authenticated_principal) {
+            let (reason, outcome) = outcome.into_reason_and_outcome(record);
+            commit_noop(transaction, reason).await?;
+            return Ok(outcome);
         }
         ensure_before_expiry(&record, claimed_at)?;
         let response = claim_response_for_record(&record, request, claimed_at)?;
@@ -82,27 +69,10 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board remote assignment running")
             .await?;
         let record = require_assignment(&mut transaction, assignment_id).await?;
-        if record.executor_stop_pending.is_some() {
-            commit_noop(transaction, "remote executor is permanently stop-only").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        if canonical_time(running_at, "remote assignment running time")?
-            >= canonical_time(&owner.expires_at, "remote lifecycle owner expiry")?
-        {
-            commit_noop(transaction, "expired remote executor lifecycle owner").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        if record.state == TaskBoardRemoteAssignmentState::Running
-            && record.executor_lifecycle_owner.as_ref() == Some(owner)
-        {
-            commit_noop(transaction, "replayed running").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        if record.state != TaskBoardRemoteAssignmentState::Started
-            || record.executor_lifecycle_owner.as_ref() != Some(owner)
-        {
-            commit_noop(transaction, "stale running").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+        if let Some(outcome) = running_screen_outcome(&record, owner, running_at)? {
+            let (reason, outcome) = outcome.into_reason_and_outcome(record);
+            commit_noop(transaction, reason).await?;
+            return Ok(outcome);
         }
         run_assignment_in_tx(&mut transaction, &record, owner, running_at).await?;
         finish_mutation(transaction, assignment_id, "running").await
@@ -126,42 +96,16 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board remote assignment lease renewal")
             .await?;
         let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if exact_mutation_replay(&record, "renew", &request.request_sha256) {
-            commit_noop(transaction, "replayed renewal").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        let active = matches!(
-            record.state,
-            TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        );
-        if record.executor_start_authority_sha256.is_some()
-            || record.executor_stop_pending.is_some()
-            || !active
-            || !mutation_binding_matches(
-                &record,
-                &request.binding,
-                authenticated_principal,
-                &request.lease_id,
-            )
+        if let Some(outcome) =
+            lease_renewal_replay_or_stale(&record, request, authenticated_principal)
         {
-            commit_noop(transaction, "stale renewal").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+            let (reason, outcome) = outcome.into_reason_and_outcome(record);
+            commit_noop(transaction, reason).await?;
+            return Ok(outcome);
         }
         ensure_before_expiry(&record, renewed_at)?;
         let expires = renewed + Duration::seconds(i64::from(request.extend_seconds));
-        let deadline = record
-            .deadline_at
-            .as_deref()
-            .ok_or_else(|| db_error("remote assignment deadline is missing"))?;
-        let current_expiry = record
-            .lease_expires_at
-            .as_deref()
-            .ok_or_else(|| db_error("remote assignment lease expiry is missing"))?;
-        if expires <= canonical_time(current_expiry, "current lease expiry")?
-            || expires > canonical_time(deadline, "remote assignment deadline")?
-        {
+        if lease_renewal_extension_is_stale(&record, expires)? {
             commit_noop(transaction, "renewal does not extend the current lease").await?;
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
@@ -308,6 +252,133 @@ pub(super) fn ensure_before_expiry(
     } else {
         Err(concurrent("remote assignment lease or deadline expired"))
     }
+}
+
+/// A screen refuses a mutation without touching assignment state; the
+/// transaction still commits so the noop is durable, not rolled back. Kept
+/// synchronous so a shared screen never adds another async frame to the
+/// caller's future: `clippy::large_futures` is zero repo-wide, and one more
+/// nested `.await` on a transaction-carrying future tips distant call sites
+/// (route handlers, adoption loops) over the limit.
+enum RemoteAssignmentScreenOutcome {
+    Replayed(&'static str),
+    Stale(&'static str),
+}
+
+impl RemoteAssignmentScreenOutcome {
+    fn into_reason_and_outcome(
+        self,
+        record: TaskBoardRemoteAssignmentRecord,
+    ) -> (&'static str, TaskBoardRemoteMutationOutcome) {
+        match self {
+            Self::Replayed(reason) => (reason, TaskBoardRemoteMutationOutcome::Replayed(record)),
+            Self::Stale(reason) => (reason, TaskBoardRemoteMutationOutcome::Stale(record)),
+        }
+    }
+}
+
+fn claim_screen_outcome(
+    record: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteClaimRequest,
+    authenticated_principal: &str,
+) -> Option<RemoteAssignmentScreenOutcome> {
+    if exact_claim_response(record, request, authenticated_principal).is_some() {
+        return Some(RemoteAssignmentScreenOutcome::Replayed("replayed claim"));
+    }
+    if record.claim_receipt.is_some() {
+        return Some(RemoteAssignmentScreenOutcome::Stale(
+            "conflicting claim receipt",
+        ));
+    }
+    if !mutation_binding_matches(
+        record,
+        &request.binding,
+        authenticated_principal,
+        &request.lease_id,
+    ) || record.state != TaskBoardRemoteAssignmentState::Offered
+    {
+        return Some(RemoteAssignmentScreenOutcome::Stale("stale claim"));
+    }
+    None
+}
+
+fn running_screen_outcome(
+    record: &TaskBoardRemoteAssignmentRecord,
+    owner: &TaskBoardRemoteExecutorLifecycleOwner,
+    running_at: &str,
+) -> Result<Option<RemoteAssignmentScreenOutcome>, CliError> {
+    if record.executor_stop_pending.is_some() {
+        return Ok(Some(RemoteAssignmentScreenOutcome::Stale(
+            "remote executor is permanently stop-only",
+        )));
+    }
+    if canonical_time(running_at, "remote assignment running time")?
+        >= canonical_time(&owner.expires_at, "remote lifecycle owner expiry")?
+    {
+        return Ok(Some(RemoteAssignmentScreenOutcome::Stale(
+            "expired remote executor lifecycle owner",
+        )));
+    }
+    if record.state == TaskBoardRemoteAssignmentState::Running
+        && record.executor_lifecycle_owner.as_ref() == Some(owner)
+    {
+        return Ok(Some(RemoteAssignmentScreenOutcome::Replayed(
+            "replayed running",
+        )));
+    }
+    if record.state != TaskBoardRemoteAssignmentState::Started
+        || record.executor_lifecycle_owner.as_ref() != Some(owner)
+    {
+        return Ok(Some(RemoteAssignmentScreenOutcome::Stale("stale running")));
+    }
+    Ok(None)
+}
+
+fn lease_renewal_replay_or_stale(
+    record: &TaskBoardRemoteAssignmentRecord,
+    request: &RemoteLeaseRenewRequest,
+    authenticated_principal: &str,
+) -> Option<RemoteAssignmentScreenOutcome> {
+    if exact_mutation_replay(record, "renew", &request.request_sha256) {
+        return Some(RemoteAssignmentScreenOutcome::Replayed("replayed renewal"));
+    }
+    let active = matches!(
+        record.state,
+        TaskBoardRemoteAssignmentState::Claimed
+            | TaskBoardRemoteAssignmentState::Started
+            | TaskBoardRemoteAssignmentState::Running
+    );
+    if record.executor_start_authority_sha256.is_some()
+        || record.executor_stop_pending.is_some()
+        || !active
+        || !mutation_binding_matches(
+            record,
+            &request.binding,
+            authenticated_principal,
+            &request.lease_id,
+        )
+    {
+        return Some(RemoteAssignmentScreenOutcome::Stale("stale renewal"));
+    }
+    None
+}
+
+fn lease_renewal_extension_is_stale(
+    record: &TaskBoardRemoteAssignmentRecord,
+    expires: DateTime<Utc>,
+) -> Result<bool, CliError> {
+    let deadline = record
+        .deadline_at
+        .as_deref()
+        .ok_or_else(|| db_error("remote assignment deadline is missing"))?;
+    let current_expiry = record
+        .lease_expires_at
+        .as_deref()
+        .ok_or_else(|| db_error("remote assignment lease expiry is missing"))?;
+    Ok(
+        expires <= canonical_time(current_expiry, "current lease expiry")?
+            || expires > canonical_time(deadline, "remote assignment deadline")?,
+    )
 }
 
 async fn claim_assignment_in_tx(

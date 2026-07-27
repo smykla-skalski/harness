@@ -9,7 +9,13 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
 #[path = "remote_assignment_controller_scan/sql.rs"]
 mod sql;
-use sql::{SCAN_CYCLE_AFTER, SCAN_CYCLE_FROM_START, SCAN_CYCLE_MAX};
+use sql::SCAN_CYCLE_MAX;
+
+mod cursor;
+use cursor::{
+    clear_cycle, clear_named_cursor, load_named_cursor, load_scan_row, require_pending_cursor,
+    scan_error, select_cycle_page, store_named_cursor,
+};
 
 const CONTROLLER_QUEUE: &str = "task_board_remote_controller";
 const CONTROLLER_CYCLE_END_QUEUE: &str = "task_board_remote_controller_cycle_end";
@@ -55,18 +61,9 @@ impl AsyncDaemonDb {
         now: &str,
     ) -> Result<Option<TaskBoardRemoteControllerScanStep>, CliError> {
         canonical_time(now, "remote controller scan time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("remote controller assignment scan")
-            .await?;
-        let Some(cursor) = next_scan_item_in_tx(&mut transaction, now).await? else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit completed remote controller scan: {error}"))
-            })?;
+        let Some(cursor) = self.claim_next_controller_scan_cursor(now).await? else {
             return Ok(None);
         };
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote controller assignment scan: {error}"))
-        })?;
         match self
             .task_board_remote_assignment(&cursor.assignment_id)
             .await
@@ -97,6 +94,20 @@ impl AsyncDaemonDb {
                 .await
                 .map(Some),
         }
+    }
+
+    async fn claim_next_controller_scan_cursor(
+        &self,
+        now: &str,
+    ) -> Result<Option<ScanRow>, CliError> {
+        let mut transaction = self
+            .begin_immediate_transaction("remote controller assignment scan")
+            .await?;
+        let cursor = next_scan_item_in_tx(&mut transaction, now).await?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit remote controller assignment scan: {error}"))
+        })?;
+        Ok(cursor)
     }
 
     /// Acknowledges one attempted controller generation and advances the durable cycle.
@@ -282,23 +293,14 @@ impl ScanRow {
     }
 }
 
-async fn load_scan_row(
+async fn advance_pending_cursor_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    assignment_id: &str,
-    order_at: &str,
-) -> Result<Option<ScanRow>, CliError> {
-    query_as::<_, ScanRow>(
-        "SELECT assignment_id, offered_at AS order_at, fencing_epoch,
-                state AS assignment_state, updated_at AS assignment_updated_at,
-                request_sha256, lease_id
-         FROM task_board_remote_assignments
-         WHERE assignment_id = ?1 AND offered_at = ?2 AND legacy_migrated = 0",
-    )
-    .bind(assignment_id)
-    .bind(order_at)
-    .fetch_optional(transaction.as_mut())
-    .await
-    .map_err(|error| scan_error(&error))
+    cursor: &ScanRow,
+) -> Result<(), CliError> {
+    require_pending_cursor(transaction, cursor).await?;
+    store_named_cursor(transaction, CONTROLLER_QUEUE, cursor).await?;
+    clear_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?;
+    Ok(())
 }
 
 async fn complete_scan_item_in_tx(
@@ -306,17 +308,8 @@ async fn complete_scan_item_in_tx(
     cursor: &ScanRow,
     now: &str,
 ) -> Result<bool, CliError> {
-    require_pending_cursor(transaction, cursor).await?;
-    store_named_cursor(transaction, CONTROLLER_QUEUE, cursor).await?;
-    clear_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?;
-    let boundary = load_named_cursor(transaction, CONTROLLER_CYCLE_END_QUEUE)
-        .await?
-        .ok_or_else(|| db_error("remote controller scan cycle boundary disappeared"))?;
-    let boundary = ScanRow {
-        order_at: boundary.0,
-        assignment_id: boundary.1,
-        ..ScanRow::cursor_only(String::new(), String::new())
-    };
+    advance_pending_cursor_in_tx(transaction, cursor).await?;
+    let boundary = load_cycle_boundary_in_tx(transaction).await?;
     let acknowledged = (cursor.order_at.clone(), cursor.assignment_id.clone());
     let incomplete = !select_cycle_page(transaction, now, Some(&acknowledged), &boundary, 1)
         .await?
@@ -325,6 +318,19 @@ async fn complete_scan_item_in_tx(
         clear_cycle(transaction).await?;
     }
     Ok(incomplete)
+}
+
+async fn load_cycle_boundary_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<ScanRow, CliError> {
+    let (order_at, assignment_id) = load_named_cursor(transaction, CONTROLLER_CYCLE_END_QUEUE)
+        .await?
+        .ok_or_else(|| db_error("remote controller scan cycle boundary disappeared"))?;
+    Ok(ScanRow {
+        assignment_id,
+        order_at,
+        ..ScanRow::cursor_only(String::new(), String::new())
+    })
 }
 
 async fn next_scan_item_in_tx(
@@ -337,12 +343,29 @@ async fn next_scan_item_in_tx(
     if let Some((order_at, assignment_id)) =
         load_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?
     {
-        return load_scan_row(transaction, &assignment_id, &order_at)
+        return resume_pending_scan_row_in_tx(transaction, order_at, assignment_id)
             .await
-            .map(|row| Some(row.unwrap_or_else(|| ScanRow::cursor_only(assignment_id, order_at))));
+            .map(Some);
     }
+    claim_next_cycle_page_in_tx(transaction, now, &boundary).await
+}
+
+async fn resume_pending_scan_row_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    order_at: String,
+    assignment_id: String,
+) -> Result<ScanRow, CliError> {
+    let row = load_scan_row(transaction, &assignment_id, &order_at).await?;
+    Ok(row.unwrap_or_else(|| ScanRow::cursor_only(assignment_id, order_at)))
+}
+
+async fn claim_next_cycle_page_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    now: &str,
+    boundary: &ScanRow,
+) -> Result<Option<ScanRow>, CliError> {
     let cursor = load_named_cursor(transaction, CONTROLLER_QUEUE).await?;
-    let next = select_cycle_page(transaction, now, cursor.as_ref(), &boundary, 1)
+    let next = select_cycle_page(transaction, now, cursor.as_ref(), boundary, 1)
         .await?
         .into_iter()
         .next();
@@ -385,115 +408,6 @@ async fn load_or_start_new_cycle(
         store_named_cursor(transaction, CONTROLLER_CYCLE_END_QUEUE, boundary).await?;
     }
     Ok(boundary)
-}
-
-async fn load_named_cursor(
-    transaction: &mut Transaction<'_, Sqlite>,
-    queue: &str,
-) -> Result<Option<(String, String)>, CliError> {
-    query_as(
-        "SELECT sort_updated_at, sort_execution_id
-         FROM task_board_reconciliation_cursors WHERE queue = ?1",
-    )
-    .bind(queue)
-    .fetch_optional(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("load remote controller cursor: {error}")))
-}
-
-async fn store_named_cursor(
-    transaction: &mut Transaction<'_, Sqlite>,
-    queue: &str,
-    row: &ScanRow,
-) -> Result<(), CliError> {
-    query(
-        "INSERT INTO task_board_reconciliation_cursors (
-             queue, sort_updated_at, sort_execution_id
-         ) VALUES (?1, ?2, ?3)
-         ON CONFLICT(queue) DO UPDATE SET
-             sort_updated_at = excluded.sort_updated_at,
-             sort_execution_id = excluded.sort_execution_id",
-    )
-    .bind(queue)
-    .bind(&row.order_at)
-    .bind(&row.assignment_id)
-    .execute(transaction.as_mut())
-    .await
-    .map(|_| ())
-    .map_err(|error| db_error(format!("store remote controller cursor: {error}")))
-}
-
-async fn require_pending_cursor(
-    transaction: &mut Transaction<'_, Sqlite>,
-    expected: &ScanRow,
-) -> Result<(), CliError> {
-    let pending = load_named_cursor(transaction, CONTROLLER_PENDING_QUEUE).await?;
-    if pending.as_ref() == Some(&(expected.order_at.clone(), expected.assignment_id.clone())) {
-        Ok(())
-    } else {
-        Err(db_error(
-            "remote controller scan completion lost its pending cursor",
-        ))
-    }
-}
-
-async fn clear_named_cursor(
-    transaction: &mut Transaction<'_, Sqlite>,
-    queue: &str,
-) -> Result<(), CliError> {
-    query("DELETE FROM task_board_reconciliation_cursors WHERE queue = ?1")
-        .bind(queue)
-        .execute(transaction.as_mut())
-        .await
-        .map(|_| ())
-        .map_err(|error| db_error(format!("clear remote controller cursor: {error}")))
-}
-
-async fn clear_cycle(transaction: &mut Transaction<'_, Sqlite>) -> Result<(), CliError> {
-    query(
-        "DELETE FROM task_board_reconciliation_cursors
-         WHERE queue IN (?1, ?2, ?3)",
-    )
-    .bind(CONTROLLER_QUEUE)
-    .bind(CONTROLLER_CYCLE_END_QUEUE)
-    .bind(CONTROLLER_PENDING_QUEUE)
-    .execute(transaction.as_mut())
-    .await
-    .map(|_| ())
-    .map_err(|error| db_error(format!("complete remote controller scan cycle: {error}")))
-}
-
-async fn select_cycle_page(
-    transaction: &mut Transaction<'_, Sqlite>,
-    now: &str,
-    cursor: Option<&(String, String)>,
-    boundary: &ScanRow,
-    limit: i64,
-) -> Result<Vec<ScanRow>, CliError> {
-    match cursor {
-        Some((order_at, assignment_id)) => query_as::<_, ScanRow>(SCAN_CYCLE_AFTER)
-            .bind(now)
-            .bind(order_at)
-            .bind(assignment_id)
-            .bind(&boundary.order_at)
-            .bind(&boundary.assignment_id)
-            .bind(limit)
-            .fetch_all(transaction.as_mut())
-            .await
-            .map_err(|error| scan_error(&error)),
-        None => query_as::<_, ScanRow>(SCAN_CYCLE_FROM_START)
-            .bind(now)
-            .bind(&boundary.order_at)
-            .bind(&boundary.assignment_id)
-            .bind(limit)
-            .fetch_all(transaction.as_mut())
-            .await
-            .map_err(|error| scan_error(&error)),
-    }
-}
-
-fn scan_error(error: &sqlx::Error) -> CliError {
-    db_error(format!("scan remote controller assignments: {error}"))
 }
 
 #[cfg(test)]

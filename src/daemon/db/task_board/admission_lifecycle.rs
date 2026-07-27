@@ -1,6 +1,7 @@
-use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
+use sqlx::{Sqlite, Transaction, query, query_scalar};
 
 mod compensation;
+mod start;
 mod validation;
 
 pub(super) use self::compensation::{
@@ -19,7 +20,7 @@ use super::admission_reservations::{
 };
 use super::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
-use crate::task_board::{TaskBoardItem, TaskBoardLaunchCapability, validate_launch_capability};
+use crate::task_board::{TaskBoardItem, TaskBoardLaunchCapability};
 
 #[derive(Debug)]
 pub(super) enum TaskBoardAdmissionCheck {
@@ -47,17 +48,43 @@ pub(super) async fn revalidate_dispatch_admission_in_tx(
     item_revision: i64,
 ) -> Result<TaskBoardAdmissionCheck, CliError> {
     let settings_revision = current_settings_revision(transaction).await?;
-    if let Some(recorded) = current_allowed_admission(transaction, intent_id).await?
-        && recorded.item_revision == item_revision
-        && recorded.settings_revision == settings_revision
-        && stored_reservation_is_complete(transaction, intent_id, &recorded).await?
-        && stored_reservation_time_is_current(transaction, intent_id, &recorded).await?
+    if let Some(reused) =
+        try_reuse_recorded_admission_in_tx(transaction, intent_id, item_revision, settings_revision)
+            .await?
     {
-        renew_recorded_dispatch_admission_in_tx(transaction, intent_id, &recorded).await?;
-        return Ok(TaskBoardAdmissionCheck::Allowed(parse_launch_profile(
-            recorded.launch_profile.as_deref(),
-        )?));
+        return Ok(reused);
     }
+    evaluate_and_record_dispatch_admission_in_tx(transaction, item, item_revision, intent_id).await
+}
+
+async fn try_reuse_recorded_admission_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    item_revision: i64,
+    settings_revision: i64,
+) -> Result<Option<TaskBoardAdmissionCheck>, CliError> {
+    let Some(recorded) = current_allowed_admission(transaction, intent_id).await? else {
+        return Ok(None);
+    };
+    if recorded.item_revision != item_revision
+        || recorded.settings_revision != settings_revision
+        || !stored_reservation_is_complete(transaction, intent_id, &recorded).await?
+        || !stored_reservation_time_is_current(transaction, intent_id, &recorded).await?
+    {
+        return Ok(None);
+    }
+    renew_recorded_dispatch_admission_in_tx(transaction, intent_id, &recorded).await?;
+    Ok(Some(TaskBoardAdmissionCheck::Allowed(
+        parse_launch_profile(recorded.launch_profile.as_deref())?,
+    )))
+}
+
+async fn evaluate_and_record_dispatch_admission_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: &TaskBoardItem,
+    item_revision: i64,
+    intent_id: &str,
+) -> Result<TaskBoardAdmissionCheck, CliError> {
     let candidate =
         evaluate_dispatch_admission_in_tx(transaction, item, item_revision, Some(intent_id))
             .await?;
@@ -198,23 +225,52 @@ pub(super) async fn commit_dispatch_admission_in_tx(
     managed_worker_id: &str,
 ) -> Result<(), CliError> {
     let recorded = current_allowed_admission(transaction, intent_id).await?;
-    if let Some(recorded) = recorded.as_ref() {
-        ensure_recorded_reservation_is_complete(transaction, intent_id, recorded).await?;
-    } else {
+    ensure_admission_committable_in_tx(transaction, intent_id, recorded.as_ref()).await?;
+    let expected_rows = recorded
+        .map(|recorded| decode_requirements(&recorded.requirements_json).map(|values| values.len()))
+        .transpose()?
+        .unwrap_or(0);
+    let worker_is_terminal =
+        managed_worker_is_terminal_in_tx(transaction, managed_worker_id).await?;
+    let changed = write_dispatch_admission_commit_in_tx(
+        transaction,
+        intent_id,
+        managed_worker_id,
+        worker_is_terminal,
+    )
+    .await?;
+    if usize::try_from(changed).ok() != Some(expected_rows) {
+        return Err(db_error(format!(
+            "task board admission commit changed {changed} ledger rows, expected {expected_rows}"
+        )));
+    }
+    Ok(())
+}
+
+async fn ensure_admission_committable_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    recorded: Option<&CurrentAllowedAdmission>,
+) -> Result<(), CliError> {
+    let Some(recorded) = recorded else {
         let active_rows = active_reserved_row_count(transaction, intent_id).await?;
         if active_rows != 0 || admission_policy_is_configured_in_tx(transaction).await? {
             return Err(db_error(format!(
                 "task board admission commit found {active_rows} reserved ledger rows without a current allowed decision under the configured policy"
             )));
         }
-    }
-    let expected_rows = current_allowed_admission(transaction, intent_id)
-        .await?
-        .map(|recorded| decode_requirements(&recorded.requirements_json).map(|values| values.len()))
-        .transpose()?
-        .unwrap_or(0);
-    let worker_is_terminal =
-        managed_worker_is_terminal_in_tx(transaction, managed_worker_id).await?;
+        return Ok(());
+    };
+    ensure_recorded_reservation_is_complete(transaction, intent_id, recorded).await?;
+    Ok(())
+}
+
+async fn write_dispatch_admission_commit_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+    managed_worker_id: &str,
+    worker_is_terminal: bool,
+) -> Result<u64, CliError> {
     let now = utc_now();
     let changed = query(
         "UPDATE task_board_dispatch_admission_ledger
@@ -237,12 +293,7 @@ pub(super) async fn commit_dispatch_admission_in_tx(
     .await
     .map_err(|error| db_error(format!("commit task board admission ledger: {error}")))?
     .rows_affected();
-    if usize::try_from(changed).ok() != Some(expected_rows) {
-        return Err(db_error(format!(
-            "task board admission commit changed {changed} ledger rows, expected {expected_rows}"
-        )));
-    }
-    Ok(())
+    Ok(changed)
 }
 
 async fn managed_worker_is_terminal_in_tx(
@@ -343,81 +394,6 @@ pub(in crate::daemon::db) async fn release_managed_worker_admission_in_tx(
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn validate_task_board_dispatch_admission_start(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-        actual_capability: Option<TaskBoardLaunchCapability>,
-        expected_read_only_fence: Option<(i64, u64)>,
-    ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board admission start validation")
-            .await?;
-        let (item_id, item_revision, session_id, work_item_id, execution_id) =
-            claimed_item_identity(&mut transaction, intent_id, claim_token).await?;
-        let (item, loaded_revision) = super::items::load_item_in_tx(&mut transaction, &item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        if loaded_revision != item_revision {
-            return Err(db_error(
-                "task board admission item revision changed while loading",
-            ));
-        }
-        validate_worker_start_fence_in_tx(
-            &mut transaction,
-            expected_read_only_fence,
-            loaded_revision,
-        )
-        .await?;
-        super::dispatch_intents::ensure_dispatch_item_startable(
-            &item,
-            &session_id,
-            &work_item_id,
-            Some(&execution_id),
-        )?;
-        let admission = revalidate_dispatch_admission_in_tx(
-            &mut transaction,
-            intent_id,
-            &item,
-            loaded_revision,
-        )
-        .await?;
-        let expected = match admission {
-            TaskBoardAdmissionCheck::Blocked(snapshot) => {
-                let error = CliErrorKind::invalid_transition(snapshot.refusal_message()).into();
-                transaction.commit().await.map_err(|error| {
-                    db_error(format!(
-                        "commit blocked task board admission validation: {error}"
-                    ))
-                })?;
-                return Err(error);
-            }
-            admission => admission.ensure_allowed()?,
-        };
-        if let Some(expected) = expected {
-            let actual_capability = actual_capability.ok_or_else(|| {
-                CliError::from(CliErrorKind::invalid_transition(
-                    "task board admission requires an enforceable launch capability".to_string(),
-                ))
-            })?;
-            validate_launch_capability(item.agent_mode, actual_capability).map_err(|error| {
-                CliError::from(CliErrorKind::invalid_transition(format!(
-                    "task board launch capability refused: {error}"
-                )))
-            })?;
-            if expected != actual_capability {
-                return Err(CliErrorKind::invalid_transition(format!(
-                    "task board launch capability changed from {expected:?} to {actual_capability:?}"
-                ))
-                .into());
-            }
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board admission validation: {error}")))
-    }
-
     pub(crate) async fn release_task_board_admission_for_managed_worker(
         &self,
         managed_worker_id: &str,
@@ -447,42 +423,6 @@ async fn active_reserved_row_count(
     .fetch_one(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("count task board admission reservations: {error}")))
-}
-
-async fn claimed_item_identity(
-    transaction: &mut Transaction<'_, Sqlite>,
-    intent_id: &str,
-    claim_token: &str,
-) -> Result<(String, i64, String, String, String), CliError> {
-    let (item_id, session_id, work_item_id, execution_id) =
-        query_as::<_, (String, String, String, String)>(
-            "SELECT item_id, session_id, work_item_id, workflow_execution_id
-         FROM task_board_dispatch_intents
-         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'",
-        )
-        .bind(intent_id)
-        .bind(claim_token)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load claimed task board admission intent: {error}")))?
-        .ok_or_else(|| {
-            db_error(format!(
-                "task board dispatch intent '{intent_id}' is not claimed"
-            ))
-        })?;
-    let item_revision =
-        query_scalar::<_, i64>("SELECT revision FROM task_board_items WHERE item_id = ?1")
-            .bind(&item_id)
-            .fetch_one(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("load claimed task board item revision: {error}")))?;
-    Ok((
-        item_id,
-        item_revision,
-        session_id,
-        work_item_id,
-        execution_id,
-    ))
 }
 
 fn parse_launch_profile(value: Option<&str>) -> Result<TaskBoardLaunchCapability, CliError> {
