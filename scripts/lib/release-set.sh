@@ -107,6 +107,10 @@ if [[ -n "${HARNESS_INSTALL_TEST_INVENTORY_BINARIES:-}" ]]; then
       HARNESS_RELEASE_BUILD_LEAVES+=("$release_test_leaf")
     fi
   done
+  if (( ${#HARNESS_RELEASE_ALL_BINARIES[@]} == 0 )); then
+    printf 'test release inventory must include an active binary\n' >&2
+    exit 2
+  fi
   unset release_test_binaries release_test_leaves
   unset release_test_darwin_inactive release_test_binary release_test_leaf
   unset release_test_is_inactive release_test_inactive

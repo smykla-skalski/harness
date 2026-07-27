@@ -979,6 +979,10 @@ prepare_candidate() {
       checksum_paths+=("$source")
     fi
   done
+  if (( ${#checksum_paths[@]} == 0 )); then
+    printf 'candidate contains no release binaries\n' >&2
+    return 1
+  fi
   if command -v shasum >/dev/null 2>&1; then
     checksum_mode="shasum"
     checksum_output="$(command shasum -a 256 "${checksum_paths[@]}")"

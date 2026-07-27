@@ -1572,6 +1572,33 @@ scenario_legacy_detector_is_read_only_and_blocks_activation() {
   if (( ok )); then pass; fi
 }
 
+scenario_empty_test_inventory_is_rejected_before_hashing() {
+  start_test "an empty test inventory is rejected before checksum tools read stdin"
+  local sandbox="$SANDBOX/empty-candidate" output status=0
+  seed_installed_release "$sandbox" 47.0.0 active-47
+  output="$(
+    HARNESS_RELEASE_HOST_OS=Darwin \
+      HARNESS_INSTALL_TEST_INVENTORY_BINARIES=harness-systemd \
+      HARNESS_INSTALL_TEST_INVENTORY_LEAVES=systemd \
+      HARNESS_INSTALL_TEST_DARWIN_INACTIVE_BINARIES=harness-systemd \
+      run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all \
+      </dev/null 2>&1
+  )" || status=$?
+
+  local ok=1
+  if (( status == 0 )); then
+    fail "empty test inventory was accepted"
+    ok=0
+  fi
+  assert_contains "test release inventory must include an active binary" \
+    "$output" || ok=0
+  if [[ "$(command readlink "$sandbox/install-root/current")" != active-47 ]]; then
+    fail "rejected empty candidate changed current"
+    ok=0
+  fi
+  if (( ok )); then pass; fi
+}
+
 RELEASE_INSTALL_TEST_SCENARIOS=(
   scenario_release_inventory_is_platform_aware
   scenario_darwin_excludes_systemd_and_migrates_managed_link
@@ -1613,6 +1640,7 @@ RELEASE_INSTALL_TEST_SCENARIOS=(
   scenario_lock_recovers_ownerless_record
   scenario_lock_recovers_reused_pid_record
   scenario_legacy_detector_is_read_only_and_blocks_activation
+  scenario_empty_test_inventory_is_rejected_before_hashing
 )
 
 run_all() {
