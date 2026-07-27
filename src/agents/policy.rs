@@ -60,9 +60,8 @@ impl WriteDecision {
 
 /// Wrapper for the set of denied binary names.
 ///
-/// The set is produced by `all_denied_binaries()` in
-/// `infra/blocks/registry.rs`, which is the single source the ACP protocol
-/// reads.
+/// The set is produced by `crate::infra::blocks::all_denied_binaries()`,
+/// which is the single source the ACP protocol reads.
 #[derive(Debug, Clone)]
 pub struct DeniedBinaries(BTreeSet<String>);
 
