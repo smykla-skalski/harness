@@ -101,6 +101,13 @@ fn leave_session_outside_a_tokio_runtime_uses_the_fake_daemon() {
                 let (mut stream, _) = listener.accept().expect("accept");
                 let request = read_request(&mut stream);
                 let first_line = request.lines().next().unwrap_or_default();
+                assert!(
+                    request.to_ascii_lowercase().contains(&format!(
+                        "authorization: bearer {}",
+                        token.to_ascii_lowercase()
+                    )),
+                    "missing bearer auth: {request}"
+                );
                 if first_line.starts_with("GET /v1/health") {
                     write_response(&mut stream, "ok");
                     continue;
