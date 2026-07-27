@@ -36,6 +36,11 @@ const FILE_STORAGE_SYMBOLS: &[&str] = &[
     "policy-workflow-runs-v1.json",
 ];
 
+const RETIRED_ORCHESTRATOR_RUNNER_SYMBOLS: &[&str] = &[
+    "struct TaskBoardOrchestrator",
+    "impl TaskBoardOrchestrator",
+];
+
 #[test]
 fn task_board_orchestrator_has_one_runner() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -48,11 +53,23 @@ fn task_board_orchestrator_has_one_runner() {
             "orchestrator tests must exercise the shipped AsyncDaemonDb runner"
         );
     }
-    let source = std::fs::read_to_string(root.join("src/task_board/orchestrator.rs"))
-        .expect("read task-board orchestrator module");
+    let mut hits = collect_hits_in_paths(
+        root,
+        &["src/task_board/orchestrator.rs"],
+        RETIRED_ORCHESTRATOR_RUNNER_SYMBOLS,
+        |path, symbol| format!("{path} restores the retired runner via `{symbol}`"),
+    );
+    hits.extend(collect_hits_in_tree(
+        &root.join("src/task_board/orchestrator"),
+        root,
+        None,
+        RETIRED_ORCHESTRATOR_RUNNER_SYMBOLS,
+        |path, symbol| format!("{path} restores the retired runner via `{symbol}`"),
+    ));
     assert!(
-        !source.contains("struct TaskBoardOrchestrator"),
-        "the retired file-backed orchestrator runner must not return"
+        hits.is_empty(),
+        "the retired file-backed orchestrator runner must not return:\n{}",
+        hits.join("\n")
     );
 }
 
