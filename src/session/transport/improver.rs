@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::client::DaemonClient;
-use crate::session::wire::ImproverApplyRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_text;
 use crate::session::service::{self, ImproverApplyOutcome, ImproverTarget};
+use crate::session::wire::ImproverApplyRequest;
 use crate::workspace::utc_now;
+use harness_daemon_client::DaemonClient;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::support::{print_json, resolve_project_dir};
 
@@ -61,7 +61,12 @@ impl Execute for SessionImproverApplyArgs {
                 project_dir: local_project,
                 dry_run: self.dry_run,
             };
-            client.improver_apply(&self.session_id, &request)?
+            let url = format!("/v1/sessions/{}/improver/apply", self.session_id);
+            client.post(&url, &request).map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "daemon improver apply: {error}"
+                )))
+            })?
         } else {
             improver_apply_local(self, &PathBuf::from(&local_project), &new_contents)?
         };

@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 
 use tokio::task;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
@@ -11,6 +10,7 @@ use crate::infra::exec::RUNTIME;
 use crate::session::service as orchestration_service;
 use crate::setup::services::session as session_service;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::storage;
 
@@ -54,19 +54,27 @@ fn signal_managed_terminal_readiness_if_managed() {
     signal_managed_terminal_readiness(&tui_id);
 }
 
+// The connection and the endpoint are the only daemon-shaped things this needs;
+// going through the leaf `harness-daemon-client` (already used by `harness-hook`
+// for the same signal) keeps this domain code from depending on the root
+// crate's typed `daemon::client` facade.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 fn signal_managed_terminal_readiness(tui_id: &str) {
-    use crate::daemon::client::DaemonClient;
+    use harness_daemon_client::DaemonClient;
 
     let Some(client) = DaemonClient::try_connect() else {
         tracing::debug!(tui_id = %tui_id, "no daemon client for managed terminal readiness signal");
         return;
     };
-    match client.signal_managed_terminal_ready(tui_id) {
-        Ok(()) => tracing::info!(tui_id = %tui_id, "managed terminal readiness signaled to daemon"),
+    let result = client.post::<_, serde_json::Value>(
+        &format!("/v1/managed-agents/{tui_id}/ready"),
+        &serde_json::json!({}),
+    );
+    match result {
+        Ok(_) => tracing::info!(tui_id = %tui_id, "managed terminal readiness signaled to daemon"),
         Err(error) => tracing::warn!(
             %error,
             tui_id = %tui_id,

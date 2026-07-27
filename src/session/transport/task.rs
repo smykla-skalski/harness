@@ -1,18 +1,30 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::client::DaemonClient;
-use crate::session::wire::{
-    SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
-    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
-};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service;
 use crate::session::types::{
     ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,
 };
+use crate::session::wire::{
+    SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
+    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+};
+use harness_daemon_client::{ClientError, DaemonClient};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::support::{print_json, resolve_project_dir};
+
+// Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade,
+// so these commands stay free of a daemon-crate dependency.
+fn daemon_client_error(operation: &str, error: &ClientError) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "daemon {operation}: {error}"
+    )))
+}
+
+fn task_action_url(session_id: &str, task_id: &str, action: &str) -> String {
+    format!("/v1/sessions/{session_id}/tasks/{task_id}/{action}")
+}
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskCreateArgs {
@@ -108,8 +120,10 @@ pub struct TaskListArgs {
 impl Execute for TaskListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let items = if let Some(client) = DaemonClient::try_connect() {
-            client
-                .get_session_detail(&self.session_id)?
+            let detail: SessionDetail = client
+                .get(&format!("/v1/sessions/{}", self.session_id), &[])
+                .map_err(|error| daemon_client_error("get session detail", &error))?;
+            detail
                 .tasks
                 .into_iter()
                 .filter(|task| self.status.is_none_or(|status| task.status == status))
@@ -201,15 +215,15 @@ pub struct TaskCheckpointArgs {
 impl Execute for TaskCheckpointArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Some(client) = DaemonClient::try_connect() {
-            let detail = client.checkpoint_task(
-                &self.session_id,
-                &self.task_id,
-                &TaskCheckpointRequest {
-                    actor: self.actor.clone(),
-                    summary: self.summary.clone(),
-                    progress: self.progress,
-                },
-            )?;
+            let request = TaskCheckpointRequest {
+                actor: self.actor.clone(),
+                summary: self.summary.clone(),
+                progress: self.progress,
+            };
+            let url = task_action_url(&self.session_id, &self.task_id, "checkpoint");
+            let detail: SessionDetail = client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("checkpoint task", &error))?;
             print_json(&checkpoint_from_detail(&detail, &self.task_id)?)?;
             return Ok(0);
         }
@@ -276,15 +290,15 @@ pub struct TaskSubmitForReviewArgs {
 impl Execute for TaskSubmitForReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Some(client) = DaemonClient::try_connect() {
-            client.submit_task_for_review(
-                &self.session_id,
-                &self.task_id,
-                &TaskSubmitForReviewRequest {
-                    actor: self.actor.clone(),
-                    summary: self.summary.clone(),
-                    suggested_persona: self.suggested_persona.clone(),
-                },
-            )?;
+            let request = TaskSubmitForReviewRequest {
+                actor: self.actor.clone(),
+                summary: self.summary.clone(),
+                suggested_persona: self.suggested_persona.clone(),
+            };
+            let url = task_action_url(&self.session_id, &self.task_id, "submit-for-review");
+            let _: SessionDetail = client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("submit task for review", &error))?;
             return Ok(0);
         }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
@@ -319,13 +333,13 @@ pub struct TaskClaimReviewArgs {
 impl Execute for TaskClaimReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Some(client) = DaemonClient::try_connect() {
-            client.claim_task_review(
-                &self.session_id,
-                &self.task_id,
-                &TaskClaimReviewRequest {
-                    actor: self.actor.clone(),
-                },
-            )?;
+            let request = TaskClaimReviewRequest {
+                actor: self.actor.clone(),
+            };
+            let url = task_action_url(&self.session_id, &self.task_id, "claim-review");
+            let _: SessionDetail = client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("claim task review", &error))?;
             return Ok(0);
         }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
@@ -363,16 +377,16 @@ impl Execute for TaskSubmitReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let points = parse_review_points(self.points.as_deref())?;
         if let Some(client) = DaemonClient::try_connect() {
-            client.submit_task_review(
-                &self.session_id,
-                &self.task_id,
-                &TaskSubmitReviewRequest {
-                    actor: self.actor.clone(),
-                    verdict: self.verdict,
-                    summary: self.summary.clone(),
-                    points,
-                },
-            )?;
+            let request = TaskSubmitReviewRequest {
+                actor: self.actor.clone(),
+                verdict: self.verdict,
+                summary: self.summary.clone(),
+                points,
+            };
+            let url = task_action_url(&self.session_id, &self.task_id, "submit-review");
+            let _: SessionDetail = client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("submit task review", &error))?;
             return Ok(0);
         }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
@@ -417,16 +431,16 @@ pub struct TaskRespondReviewArgs {
 impl Execute for TaskRespondReviewArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Some(client) = DaemonClient::try_connect() {
-            client.respond_task_review(
-                &self.session_id,
-                &self.task_id,
-                &TaskRespondReviewRequest {
-                    actor: self.actor.clone(),
-                    agreed: self.agreed.clone(),
-                    disputed: self.disputed.clone(),
-                    note: self.note.clone(),
-                },
-            )?;
+            let request = TaskRespondReviewRequest {
+                actor: self.actor.clone(),
+                agreed: self.agreed.clone(),
+                disputed: self.disputed.clone(),
+                note: self.note.clone(),
+            };
+            let url = task_action_url(&self.session_id, &self.task_id, "respond-review");
+            let _: SessionDetail = client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("respond to task review", &error))?;
             return Ok(0);
         }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
@@ -468,15 +482,15 @@ pub struct TaskArbitrateArgs {
 impl Execute for TaskArbitrateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Some(client) = DaemonClient::try_connect() {
-            client.arbitrate_task(
-                &self.session_id,
-                &self.task_id,
-                &TaskArbitrateRequest {
-                    actor: self.actor.clone(),
-                    verdict: self.verdict,
-                    summary: self.summary.clone(),
-                },
-            )?;
+            let request = TaskArbitrateRequest {
+                actor: self.actor.clone(),
+                verdict: self.verdict,
+                summary: self.summary.clone(),
+            };
+            let url = task_action_url(&self.session_id, &self.task_id, "arbitrate");
+            let _: SessionDetail = client
+                .post(&url, &request)
+                .map_err(|error| daemon_client_error("arbitrate task", &error))?;
             return Ok(0);
         }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
