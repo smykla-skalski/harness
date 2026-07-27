@@ -111,6 +111,29 @@ print(tmp)
         self.assertEqual(len(homes), 4)
         self.assertEqual(len(tmpdirs), 4)
 
+    def test_exclusive_tasks_keep_the_top_level_cleanup_token(self) -> None:
+        runner = load_runner()
+        task = runner.Task(
+            label="exclusive",
+            command=(
+                sys.executable,
+                "-c",
+                "import os; print(os.environ['HARNESS_SCRIPT_TEST_RUN_TOKEN'])",
+            ),
+            exclusive=True,
+        )
+
+        summary = runner._run_task_groups(
+            (task,),
+            max_workers=1,
+            timeout_seconds=2,
+        )
+
+        self.assertTrue(summary.succeeded)
+        run_token = summary.results[0].output.strip()
+        self.assertTrue(run_token.startswith("hst."))
+        self.assertNotEqual(run_token, "exclusive")
+
     def test_failure_is_captured_without_hiding_other_results(self) -> None:
         runner = load_runner()
         tasks = [

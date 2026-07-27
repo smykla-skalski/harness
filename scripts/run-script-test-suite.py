@@ -91,7 +91,11 @@ def _job_directory(root: Path, index: int, _label: str) -> Path:
     return root / f"{index:03x}"
 
 
-def _environment(task: Task, job_directory: Path) -> dict[str, str]:
+def _environment(
+    task: Task,
+    job_directory: Path,
+    run_token: str,
+) -> dict[str, str]:
     environment = os.environ.copy()
     for variable in SESSION_VARIABLES:
         environment.pop(variable, None)
@@ -124,7 +128,7 @@ def _environment(task: Task, job_directory: Path) -> dict[str, str]:
         {
             "BASH_ENV": "/dev/null",
             "HARNESS_SCRIPT_TEST_JOB": task.label,
-            "HARNESS_SCRIPT_TEST_RUN_TOKEN": job_directory.parent.name,
+            "HARNESS_SCRIPT_TEST_RUN_TOKEN": run_token,
             "HOME": str(home),
             "PYTHONDONTWRITEBYTECODE": "1",
             "TMPDIR": f"{tmpdir}/",
@@ -241,13 +245,14 @@ def _run_task(
     index: int,
     sandbox_root: Path,
     timeout_seconds: float,
+    run_token: str,
 ) -> TaskResult:
     job_directory = _job_directory(sandbox_root, index, task.label)
     job_directory.mkdir()
     started = time.monotonic()
     process = subprocess.Popen(
         task.command,
-        env=_environment(task, job_directory),
+        env=_environment(task, job_directory, run_token),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -276,6 +281,7 @@ def _run_in_root(
     max_workers: int,
     timeout_seconds: float,
     sandbox_root: Path,
+    run_token: str,
 ) -> RunSummary:
     started = time.monotonic()
     indexed_tasks = sorted(
@@ -317,6 +323,7 @@ def _run_in_root(
                     task_index,
                     sandbox_root,
                     timeout_seconds,
+                    run_token,
                 )
                 active[future] = (task_index, weight)
                 if task.group:
@@ -344,6 +351,7 @@ def run_tasks(
     max_workers: int,
     timeout_seconds: float,
     sandbox_root: Path | None = None,
+    run_token: str | None = None,
 ) -> RunSummary:
     task_tuple = tuple(tasks)
     if max_workers < 1:
@@ -361,6 +369,7 @@ def run_tasks(
             max_workers,
             timeout_seconds,
             sandbox_root,
+            run_token or sandbox_root.name,
         )
     # macOS caps AF_UNIX paths at 104 bytes; nested test sandboxes need a short root.
     with TemporaryDirectory(prefix="hst.", dir="/tmp") as directory:
@@ -369,6 +378,7 @@ def run_tasks(
             max_workers,
             timeout_seconds,
             Path(directory),
+            Path(directory).name,
         )
 
 
@@ -770,12 +780,14 @@ def _run_task_groups(
                 max_workers=max_workers,
                 timeout_seconds=timeout_seconds,
                 sandbox_root=sandbox_root,
+                run_token=sandbox_root.name,
             )
             exclusive_summary = run_tasks(
                 exclusive,
                 max_workers=1,
                 timeout_seconds=timeout_seconds,
                 sandbox_root=sandbox_root / "exclusive",
+                run_token=sandbox_root.name,
             )
         finally:
             _terminate_owned_processes(sandbox_root)

@@ -168,7 +168,7 @@ case "\${1:-}" in
     esac
     ;;
   --help)
-    if [[ "\$name" == harness ]]; then
+    if [ "\$name" = harness ]; then
       printf 'Harness CLI\\n'
     else
       printf '%s\\n' "\$name"
@@ -258,6 +258,18 @@ assert_failed_first_install_is_clean() {
     fail "install transaction left staged paths: $debris"
     return 1
   fi
+}
+
+scenario_shell_release_fixture_is_posix() {
+  start_test "the shell release fixture runs under POSIX sh"
+  local sandbox="$SANDBOX/posix-shell-fixture" output
+  HARNESS_RELEASE_TEST_BINARY_TEMPLATE="" \
+    write_fake_release_binary "$sandbox/target" harness 48.0.0
+  output="$(command /bin/sh "$sandbox/target/release/harness" --help)"
+
+  local ok=1
+  assert_contains "Harness CLI" "$output" || ok=0
+  if (( ok )); then pass; fi
 }
 
 scenario_build_group_allocates_one_budget() {
@@ -1601,6 +1613,7 @@ scenario_empty_test_inventory_is_rejected_before_hashing() {
 
 RELEASE_INSTALL_TEST_SCENARIOS=(
   scenario_release_inventory_is_platform_aware
+  scenario_shell_release_fixture_is_posix
   scenario_darwin_excludes_systemd_and_migrates_managed_link
   scenario_build_group_allocates_one_budget
   scenario_missing_build_artifact_aborts_publication
