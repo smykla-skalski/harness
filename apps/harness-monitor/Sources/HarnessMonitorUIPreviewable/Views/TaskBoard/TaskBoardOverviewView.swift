@@ -43,6 +43,8 @@ public struct TaskBoardOverviewView: View {
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
   var laneAppearancePreferencesRawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
+  @AppStorage(TaskBoardFilterPreferences.storageKey)
+  var filterPreferencesRawValue = TaskBoardFilterPreferences.emptyRawValue
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -170,7 +172,25 @@ public struct TaskBoardOverviewView: View {
       taskBoardItems: taskBoardItems,
       decisionItems: decisionItems,
       scopeSessionID: taskBoardSessionID,
-      taskBoardProjects: store?.globalTaskBoardProjects ?? []
+      taskBoardProjects: store?.globalTaskBoardProjects ?? [],
+      filters: boardFilters
+    )
+  }
+
+  /// The filter belongs to the board proper. A session window embeds a view
+  /// already scoped to that session, so narrowing it again by a filter someone
+  /// set on the dashboard would hide work with no control in sight to undo it.
+  var boardFilters: TaskBoardFilterState {
+    guard taskBoardSessionID == nil else {
+      return .init()
+    }
+    return TaskBoardFilterPreferences.state(from: filterPreferencesRawValue)
+  }
+
+  var boardFiltersBinding: Binding<TaskBoardFilterState> {
+    Binding(
+      get: { boardFilters },
+      set: { filterPreferencesRawValue = TaskBoardFilterPreferences.rawValue(for: $0) }
     )
   }
 
