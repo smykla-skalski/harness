@@ -67,9 +67,9 @@ impl AgentAdapter for OpenCodeAdapter {
             stdout: render_json(&OpenCodeOutput {
                 decision: match result.decision {
                     NormalizedDecision::Allow => "allow",
-                    NormalizedDecision::Deny => "deny",
                     NormalizedDecision::Warn => "warn",
                     NormalizedDecision::Info => "info",
+                    _ => "deny",
                 },
                 reason: result.reason.as_deref(),
                 code: result.code.as_deref(),

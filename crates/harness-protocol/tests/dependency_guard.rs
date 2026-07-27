@@ -15,6 +15,8 @@ fn protocol_package_has_no_harness_runtime_dependency() {
 fn canonical_model_sources_do_not_import_application_layers() {
     let sources = [
         include_str!("../src/agent_models.rs"),
+        include_str!("../src/hook_prompts.rs"),
+        include_str!("../src/hook_session.rs"),
         include_str!("../src/managed_agents/acp/models.rs"),
         include_str!("../src/managed_agents/acp/permission_wire.rs"),
         include_str!("../src/managed_agents/acp/request_wire.rs"),

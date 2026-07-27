@@ -164,6 +164,7 @@ fn hook_outcome_label(result: &NormalizedHookResult) -> &'static str {
         super::protocol::result::NormalizedDecision::Deny => "deny",
         super::protocol::result::NormalizedDecision::Warn => "warn",
         super::protocol::result::NormalizedDecision::Info => "info",
+        _ => "unknown",
     }
 }
 
