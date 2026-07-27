@@ -309,8 +309,6 @@ def seed_lane(
         / f"{target_segment}.lock"
     )
     seed_lock = acquire_lock(seed_lock_path, wait=True, log=log)
-    if seed_lock is None:
-        return RESULT_FAILED
 
     try:
         if target.exists():
