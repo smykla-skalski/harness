@@ -3,7 +3,8 @@ use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
-    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
 };
@@ -11,7 +12,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};
 
 use super::policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
-use super::{daemon_client, print_json};
+use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -90,7 +91,9 @@ impl Execute for TaskBoardPolicyCommand {
 
 impl Execute for TaskBoardPolicyJsonArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.list_policy_approval_grants()?;
+        let response: PolicyApprovalGrantsListResponse = leaf_daemon_client()?
+            .get("/v1/policy-approval-grants", &[])
+            .map_err(|error| leaf_daemon_client_error("list policy approval grants", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -102,12 +105,14 @@ impl Execute for TaskBoardPolicyJsonArgs {
 
 impl Execute for TaskBoardPolicyGrantResolveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response =
-            daemon_client()?.resolve_policy_approval_grant(&PolicyApprovalGrantResolveRequest {
-                grant_id: self.grant_id.clone(),
-                approve: self.approve,
-                actor: self.actor.clone(),
-            })?;
+        let request = PolicyApprovalGrantResolveRequest {
+            grant_id: self.grant_id.clone(),
+            approve: self.approve,
+            actor: self.actor.clone(),
+        };
+        let response: PolicyApprovalGrantResolveResponse = leaf_daemon_client()?
+            .post("/v1/policy-approval-grants/resolve", &request)
+            .map_err(|error| leaf_daemon_client_error("resolve policy approval grant", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -119,11 +124,13 @@ impl Execute for TaskBoardPolicyGrantResolveArgs {
 
 impl Execute for TaskBoardPolicyGrantRevokeArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response =
-            daemon_client()?.revoke_policy_approval_grant(&PolicyApprovalGrantRevokeRequest {
-                grant_id: self.grant_id.clone(),
-                actor: self.actor.clone(),
-            })?;
+        let request = PolicyApprovalGrantRevokeRequest {
+            grant_id: self.grant_id.clone(),
+            actor: self.actor.clone(),
+        };
+        let response: PolicyApprovalGrantRevokeResponse = leaf_daemon_client()?
+            .post("/v1/policy-approval-grants/revoke", &request)
+            .map_err(|error| leaf_daemon_client_error("revoke policy approval grant", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -135,11 +142,17 @@ impl Execute for TaskBoardPolicyGrantRevokeArgs {
 
 impl TaskBoardPolicyToggleArgs {
     fn execute_spawn_requires_live_policy(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let workspace = daemon_client()?.set_policy_canvas_spawn_requires_live_policy(
-            &PolicyCanvasSetSpawnRequiresLivePolicyRequest {
-                enabled: self.enabled,
-            },
-        )?;
+        let request = PolicyCanvasSetSpawnRequiresLivePolicyRequest {
+            enabled: self.enabled,
+        };
+        let workspace: PolicyCanvasWorkspaceResponse = leaf_daemon_client()?
+            .post(
+                "/v1/policy-canvases/spawn-requires-live-policy",
+                &request,
+            )
+            .map_err(|error| {
+                leaf_daemon_client_error("set policy canvas spawn requires live policy", &error)
+            })?;
         print_toggle(
             &workspace,
             self.json,
@@ -149,11 +162,14 @@ impl TaskBoardPolicyToggleArgs {
     }
 
     fn execute_spawn_kill_switch(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let workspace = daemon_client()?.set_policy_canvas_spawn_kill_switch(
-            &PolicyCanvasSetSpawnKillSwitchRequest {
-                enabled: self.enabled,
-            },
-        )?;
+        let request = PolicyCanvasSetSpawnKillSwitchRequest {
+            enabled: self.enabled,
+        };
+        let workspace: PolicyCanvasWorkspaceResponse = leaf_daemon_client()?
+            .post("/v1/policy-canvases/spawn-kill-switch", &request)
+            .map_err(|error| {
+                leaf_daemon_client_error("set policy canvas spawn kill switch", &error)
+            })?;
         print_toggle(
             &workspace,
             self.json,

@@ -3,7 +3,7 @@ use crate::task_board::wire::TaskBoardSyncRequest;
 use harness_kernel::errors::CliError;
 use crate::task_board::summary::TaskBoardSyncSummary;
 
-use super::{TaskBoardSyncArgs, daemon_client, print_json};
+use super::{TaskBoardSyncArgs, leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 impl Execute for TaskBoardSyncArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -14,7 +14,9 @@ impl Execute for TaskBoardSyncArgs {
             conflict_policy: self.conflict_policy,
             dry_run: !self.apply,
         };
-        let payload = daemon_client()?.sync_task_board(&request)?;
+        let payload: TaskBoardSyncSummary = leaf_daemon_client()?
+            .post("/v1/task-board/sync", &request)
+            .map_err(|error| leaf_daemon_client_error("sync task board", &error))?;
         if self.json {
             print_json(&payload)?;
         } else {

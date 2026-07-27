@@ -5,12 +5,12 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
     TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
-    TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
+    TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::dispatch::{DispatchExecutionSummary, DispatchReadiness};
 
-use super::{TaskBoardDispatchArgs, daemon_client, print_json};
+use super::{TaskBoardDispatchArgs, leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardDispatchPickArgs {
@@ -37,7 +37,9 @@ impl Execute for TaskBoardDispatchArgs {
             project_dir: Some(self.dispatch_project_dir()?),
             actor: self.actor.clone(),
         };
-        let summary = daemon_client()?.dispatch_task_board(&request)?;
+        let summary: DispatchExecutionSummary = leaf_daemon_client()?
+            .post("/v1/task-board/dispatch", &request)
+            .map_err(|error| leaf_daemon_client_error("dispatch task board", &error))?;
         if self.json {
             print_json(&summary)?;
         } else {
@@ -49,7 +51,12 @@ impl Execute for TaskBoardDispatchArgs {
 
 impl Execute for TaskBoardDispatchPickArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.pick_task_board_dispatch()?;
+        let response: TaskBoardDispatchPickResponse = leaf_daemon_client()?
+            .post(
+                "/v1/task-board/dispatch/pick",
+                &TaskBoardDispatchPickRequest::default(),
+            )
+            .map_err(|error| leaf_daemon_client_error("pick task-board dispatch", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -61,11 +68,13 @@ impl Execute for TaskBoardDispatchPickArgs {
 
 impl Execute for TaskBoardDispatchDeliverArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response =
-            daemon_client()?.deliver_task_board_dispatch(&TaskBoardDispatchDeliverRequest {
-                item_id: self.item_id.clone(),
-                dry_run: self.dry_run,
-            })?;
+        let request = TaskBoardDispatchDeliverRequest {
+            item_id: self.item_id.clone(),
+            dry_run: self.dry_run,
+        };
+        let response: TaskBoardDispatchDeliverResponse = leaf_daemon_client()?
+            .post("/v1/task-board/dispatch/deliver", &request)
+            .map_err(|error| leaf_daemon_client_error("deliver task-board dispatch", &error))?;
         if self.json {
             print_json(&response)?;
         } else {

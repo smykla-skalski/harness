@@ -1,9 +1,9 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::task_board::wire::TaskBoardEvaluateRequest;
+use crate::task_board::wire::{TaskBoardEvaluateRequest, TaskBoardEvaluationResponse};
 use harness_kernel::errors::CliError;
-use crate::task_board::transport::{daemon_client, print_json};
+use crate::task_board::transport::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 use crate::task_board::types::TaskBoardStatus;
 
 #[derive(Debug, Clone, Args)]
@@ -27,7 +27,9 @@ impl Execute for TaskBoardEvaluateArgs {
             status: self.status,
             dry_run: self.dry_run,
         };
-        let summary = daemon_client()?.evaluate_task_board(&request)?;
+        let summary: TaskBoardEvaluationResponse = leaf_daemon_client()?
+            .post("/v1/task-board/evaluate", &request)
+            .map_err(|error| leaf_daemon_client_error("evaluate task board", &error))?;
         if self.json {
             print_json(&summary)?;
         } else {

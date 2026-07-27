@@ -8,13 +8,14 @@ use serde_json::Value;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
-    POLICY_TRANSFER_FORMAT, POLICY_TRANSFER_VERSION, PolicyTransferBundle,
-    PolicyTransferDumpRequest, PolicyTransferImportRequest, PolicyTransferWorkspaceMetadata,
+    POLICY_TRANSFER_FORMAT, POLICY_TRANSFER_VERSION, PolicyCanvasWorkspaceResponse,
+    PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
+    PolicyTransferWorkspaceMetadata,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph::PolicyCanvasRecord;
 
-use super::{daemon_client, print_json};
+use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardPolicyDumpArgs {
@@ -38,9 +39,12 @@ pub struct TaskBoardPolicyImportArgs {
 
 impl Execute for TaskBoardPolicyDumpArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let bundle = daemon_client()?.dump_policy_transfer(&PolicyTransferDumpRequest {
+        let request = PolicyTransferDumpRequest {
             policy_ids: self.canvas_ids.clone(),
-        })?;
+        };
+        let bundle: PolicyTransferBundle = leaf_daemon_client()?
+            .post("/v1/policies/dump", &request)
+            .map_err(|error| leaf_daemon_client_error("dump policy transfer", &error))?;
         print_json(&bundle)?;
         Ok(0)
     }
@@ -52,10 +56,13 @@ impl Execute for TaskBoardPolicyImportArgs {
         let bundle = decode_policy_inputs(&self.inputs, &mut stdin)?;
         validate_replace_all(self.replace_all, &bundle)?;
         let policy_count = bundle.policies.len();
-        let response = daemon_client()?.import_policy_transfer(&PolicyTransferImportRequest {
+        let request = PolicyTransferImportRequest {
             bundle,
             replace_all: self.replace_all,
-        })?;
+        };
+        let response: PolicyCanvasWorkspaceResponse = leaf_daemon_client()?
+            .post("/v1/policies/import", &request)
+            .map_err(|error| leaf_daemon_client_error("import policy transfer", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
