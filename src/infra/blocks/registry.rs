@@ -1,107 +1,32 @@
 use std::collections::BTreeSet;
-use std::fmt;
 
-use serde::{Deserialize, Serialize};
+/// CLI names of the managed cluster and mesh tools a managed agent may not
+/// create or invoke mid-session.
+///
+/// The suite workflow once declared these as preflight requirements, named
+/// after the tools they gated (Docker, Kubernetes, Helm, Kuma, and so on).
+/// That workflow is retired, and matching or parsing those requirement names
+/// has no remaining reader. Only this union of binary names survives: the
+/// ACP protocol reads it through `all_denied_binaries` below as the set an
+/// agent may not create.
+const DENIED_BINARIES: &[&str] = &[
+    "docker",
+    "helm",
+    "k3d",
+    "kubectl",
+    "kubectl-validate",
+    "kumactl",
+];
 
-use super::error::BlockError;
-
-/// Named block requirements declared by suites and validated at preflight time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-#[non_exhaustive]
-pub enum BlockRequirement {
-    Docker,
-    Compose,
-    Kubernetes,
-    K3d,
-    Helm,
-    Envoy,
-    Kuma,
-    Build,
-}
-
-impl BlockRequirement {
-    pub const ALL: &[Self] = &[
-        Self::Docker,
-        Self::Compose,
-        Self::Kubernetes,
-        Self::K3d,
-        Self::Helm,
-        Self::Envoy,
-        Self::Kuma,
-        Self::Build,
-    ];
-
-    /// The union of `denied_binaries` across every variant: the CLI names that
-    /// drive the tools these requirements stand for, such as `docker`,
-    /// `kubectl` and `kumactl`.
-    ///
-    /// The ACP protocol takes this as the set of binaries an agent may not
-    /// create, and is its only consumer now that the hook guards that also read
-    /// it are retired.
-    #[must_use]
-    pub fn all_denied_binaries() -> BTreeSet<String> {
-        Self::ALL
-            .iter()
-            .flat_map(|requirement| requirement.denied_binaries().iter().copied())
-            .map(ToString::to_string)
-            .collect()
-    }
-
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Docker => "docker",
-            Self::Compose => "compose",
-            Self::Kubernetes => "kubernetes",
-            Self::K3d => "k3d",
-            Self::Helm => "helm",
-            Self::Envoy => "envoy",
-            Self::Kuma => "kuma",
-            Self::Build => "build",
-        }
-    }
-
-    #[must_use]
-    pub fn denied_binaries(self) -> &'static [&'static str] {
-        match self {
-            Self::Docker | Self::Compose => &["docker"],
-            Self::Kubernetes => &["kubectl", "kubectl-validate"],
-            Self::K3d => &["k3d"],
-            Self::Helm => &["helm"],
-            Self::Kuma => &["kumactl"],
-            Self::Envoy | Self::Build => &[],
-        }
-    }
-
-    /// Parse a user- or suite-supplied requirement name.
-    ///
-    /// # Errors
-    ///
-    /// Returns `BlockError` for unknown requirement names.
-    pub fn parse(raw: &str) -> Result<Self, BlockError> {
-        match raw.trim().to_ascii_lowercase().as_str() {
-            "docker" => Ok(Self::Docker),
-            "compose" => Ok(Self::Compose),
-            "kubernetes" => Ok(Self::Kubernetes),
-            "k3d" => Ok(Self::K3d),
-            "helm" => Ok(Self::Helm),
-            "envoy" => Ok(Self::Envoy),
-            "kuma" => Ok(Self::Kuma),
-            "build" => Ok(Self::Build),
-            other => Err(BlockError::message(
-                "registry",
-                "parse requirement",
-                format!("unknown block requirement: {other}"),
-            )),
-        }
-    }
-}
-
-impl fmt::Display for BlockRequirement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
+/// The set of binaries a managed agent may not create or invoke mid-session.
+///
+/// This is the single source the ACP protocol reads to build
+/// `HarnessAcpClient`, which enforces it on both the write surface
+/// (`agents::policy::evaluate_write`) and terminal command creation
+/// (`agents::acp::client::terminal::policy::denied_binary_name`).
+#[must_use]
+pub fn all_denied_binaries() -> BTreeSet<String> {
+    DENIED_BINARIES.iter().copied().map(ToString::to_string).collect()
 }
 
 #[cfg(test)]

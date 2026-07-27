@@ -26,7 +26,7 @@ use crate::agents::acp::permission::PermissionMode;
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::agent_acp::prompt_gate::PromptLease;
-use crate::infra::blocks::BlockRequirement;
+use crate::infra::blocks::all_denied_binaries;
 
 use super::manager::{AcpAgentManagerHandle, AcpAgentStartRequest};
 use super::spawn_credential::{SpawnCredential, release_after_initialization};
@@ -115,7 +115,7 @@ pub(super) fn spawn_protocol_task(
             project_dir.clone(),
             project_dir.clone(),
             None,
-            BlockRequirement::all_denied_binaries(),
+            all_denied_binaries(),
             permission_mode,
         )
         .with_event_sink(Arc::clone(&event_sink)),

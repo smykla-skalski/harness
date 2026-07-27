@@ -9,7 +9,7 @@ pub mod persistence;
 mod registry;
 
 pub mod blocks {
-    pub use super::registry::BlockRequirement;
+    pub use super::registry::all_denied_binaries;
 }
 
 pub mod exec {

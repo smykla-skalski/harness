@@ -10,7 +10,7 @@ pub use clock::{Clock, SystemClock};
 pub use error::BlockError;
 pub use http::{HttpClient, HttpMethod, HttpResponse, ReqwestHttpClient};
 pub use process::{ProcessExecutor, StdProcessExecutor};
-pub use registry::BlockRequirement;
+pub use registry::all_denied_binaries;
 
 #[cfg(test)]
 pub use build::FakeBuildSystem;
