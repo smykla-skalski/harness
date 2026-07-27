@@ -7,13 +7,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::types::AgentRegistrationWire;
 use crate::session::types::{
     AgentRegistration, PendingLeaderTransfer, SessionMetrics, SessionSignalRecord, SessionStatus,
     WorkItem,
 };
+use harness_protocol::hook::AskUserQuestionPrompt;
 use harness_protocol::timeline::TimelineEntry;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

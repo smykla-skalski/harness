@@ -1,10 +1,10 @@
 use clap::{Args, Subcommand};
 use std::io::{Read as _, stdin};
 
-use crate::hooks::SessionStartHookOutput;
 use crate::hooks::adapters::HookAgent;
 use crate::infra::exec::RUNTIME;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::hook::SessionStartHookOutput;
 use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};
 
 use super::service;

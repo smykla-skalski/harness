@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::hooks::context::{NormalizedEvent, NormalizedHookContext};
+use harness_kernel::hooks::result::NormalizedHookResult;
 use crate::hooks::adapters::HookAgent;
-use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
-use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::{harness_data_root, project_context_dir, utc_now};
@@ -405,7 +405,7 @@ fn normalized_event_name(event: &NormalizedEvent) -> &'static str {
         NormalizedEvent::SessionEnd => "session_end",
         NormalizedEvent::AgentStop => "agent_stop",
         NormalizedEvent::BeforeCompaction => "before_compaction",
-        NormalizedEvent::Notification | NormalizedEvent::AgentSpecific(_) => "notification",
+        _ => "notification",
     }
 }
 

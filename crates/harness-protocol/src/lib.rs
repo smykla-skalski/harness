@@ -3,6 +3,8 @@
 mod agent_models;
 #[path = "../../../src/agents/runtime/event.rs"]
 mod conversation_event;
+mod hook_prompts;
+mod hook_session;
 #[path = "../../../src/agents/kind/mod.rs"]
 mod runtime_kind;
 
@@ -15,6 +17,13 @@ pub mod agent {
     };
     pub use crate::conversation_event::{ConversationEvent, ConversationEventKind};
     pub use crate::runtime_kind::{AcpAgentId, DisconnectReason, RuntimeKind};
+}
+
+/// `AskUserQuestion` prompt models and the `SessionStart` hook output
+/// contract, shared by hook adapters and their daemon-facing summaries.
+pub mod hook {
+    pub use crate::hook_prompts::{AskUserQuestionOption, AskUserQuestionPrompt};
+    pub use crate::hook_session::{SessionStartHookOutput, SessionStartHookSpecificOutput};
 }
 
 /// Daemon websocket contracts shared by standalone Harness clients.

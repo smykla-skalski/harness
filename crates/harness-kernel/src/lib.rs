@@ -7,6 +7,7 @@
 #![deny(unsafe_code)]
 
 pub mod errors;
+pub mod hooks;
 pub mod io;
 pub mod kernel;
 pub mod redact;
