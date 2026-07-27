@@ -3,6 +3,7 @@ use std::path::Path;
 use tokio::task::spawn_blocking;
 
 use crate::git::GitRepository;
+use crate::sandbox;
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubProjectConfig, GitHubPullRequestHandle,
 };
@@ -186,6 +187,7 @@ pub(super) async fn local_head_evidence(
 }
 
 fn load_local_head_evidence(worktree: &Path) -> Result<LocalHeadEvidence, CliError> {
+    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree);
     let repository = GitRepository::discover(worktree)
         .map_err(|error| invalid_transition(format!("discover publication repository: {error}")))?;
     let repository = repository

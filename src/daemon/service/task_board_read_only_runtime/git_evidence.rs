@@ -5,6 +5,7 @@ use tokio::task::spawn_blocking;
 
 use harness_kernel::errors::CliError;
 use crate::git::GitRepository;
+use crate::sandbox;
 use crate::task_board::{
     TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,
     validate_task_board_read_only_run_context,
@@ -49,6 +50,9 @@ fn workflow_worktree(execution: &TaskBoardWorkflowExecutionRecord) -> Result<Pat
 }
 
 pub(super) fn local_head(worktree: &Path) -> Result<String, CliError> {
+    // The grant has to be bound here rather than inside `open_repository`: it
+    // must still be alive while the returned repository is read.
+    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree);
     let repository = open_repository(worktree)?;
     repository
         .head_commit()
@@ -60,6 +64,7 @@ fn local_result_descends_from_base(
     worktree: &Path,
     result: &TaskBoardImplementationResult,
 ) -> Result<bool, CliError> {
+    let _origin_grant = sandbox::hold_worktree_origin_grant(worktree);
     let repository = open_repository(worktree)?;
     let head = object_id(&result.head_revision, "implementation head")?;
     let base = object_id(&result.base_head_revision, "implementation base")?;
