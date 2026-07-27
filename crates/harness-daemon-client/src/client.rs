@@ -317,8 +317,13 @@ impl DaemonClient {
         format!("{}{}", self.endpoint, path)
     }
 
-    #[cfg(test)]
-    fn test_client(endpoint: String, token: &str) -> Self {
+    /// Build a client against an arbitrary endpoint, bypassing daemon
+    /// discovery and token loading. `test-support` exists so other crates in
+    /// the workspace can drive this client against a mock HTTP server in
+    /// their own tests, the same way this crate's own tests do.
+    #[cfg(any(test, feature = "test-support"))]
+    #[must_use]
+    pub fn test_client(endpoint: String, token: &str) -> Self {
         Self {
             endpoint,
             token: token.to_string(),
