@@ -72,17 +72,17 @@ cargo clippy --lib
 
 Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/`. Canonical Rust test tasks use nextest process isolation and parallel scheduling. Tests must not require runner-wide serialization; isolate their environment, filesystem paths, ports, and external resource names instead. Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Tests use real filesystem state.
 
-Pre-commit gate: `mise run check`. Add `mise run aff:check` when the task touches `aff` or aff-owned runtime hooks. Before publishing a branch, run `mise run check:full`, which adds the per-crate standalone feature isolation that `check` leaves out.
+Before commit and delivery, run the smallest owning `mise` check task for every component or crate the change touched. Do not add checks for untouched surfaces. `mise run check:full` is an optional full-repository diagnostic, not a delivery requirement.
 
 Validation should match risk:
 
 - Docs-only edits: `git diff --check`.
-- Narrow Rust logic: the focused unit/integration test first, then the smallest relevant `mise` gate.
-- Shared CLI, hook, runtime, or storage behavior: run the focused test and the owning package gate before `mise run check`.
-- Any `src/` file a facade crate pulls in with `#[path]` (`harness-daemon`, `harness-bridge`, `harness-hook`, `harness-mcp`, `harness-protocol`, `harness-telemetry`; see `docs/agent-guides/root-reference.md`): the owning package gate only lints the copy inside its home crate, so a clean run there does not predict the repository check. Run `mise run harness:check:rust`, or the full `mise run check`, before publishing.
+- Narrow Rust logic: run the focused unit/integration test first, then the touched crate's smallest relevant `mise` gate.
+- Shared CLI, hook, runtime, or storage behavior: run the focused test and each touched component's owning `mise` gate.
+- Any `src/` file a facade crate pulls in with `#[path]` (`harness-daemon`, `harness-bridge`, `harness-hook`, `harness-mcp`, `harness-protocol`, `harness-telemetry`; see `docs/agent-guides/root-reference.md`): the owning package gate only lints the copy inside its home crate, so run `mise run harness:check:rust` to cover the touched facade crates.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
-A package gate does not approximate the full one, so a clean focused run is evidence about the code you changed and nothing else. Only the Rust step resembles what an author runs directly; stale state, version consistency, script lint, binary contracts, source size, and feature isolation have no package-level equivalent and fail on work that every targeted command accepted. Read the gate's own exit status too, rather than whatever the shell reported last.
+Treat each focused gate as evidence only for the surfaces it covers. When touched code also affects version consistency, scripts, binary contracts, source size, or feature isolation, run the targeted `mise` task that owns that contract. Read each gate's own exit status rather than whatever the shell reported last.
 
 ## OpenAPI schema
 

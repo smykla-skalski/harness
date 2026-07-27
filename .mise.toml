@@ -368,7 +368,7 @@ description = "Run default harness quality gates; run aff:check manually when ne
 depends = ["harness:check"]
 
 [tasks."check:full"]
-description = "Pre-push gate: everything in check plus per-crate standalone feature isolation"
+description = "Optional full-repository diagnostic: everything in check plus per-crate standalone feature isolation"
 depends = ["harness:check", "harness:check:feature-isolation"]
 
 [tasks."lint:fix"]
