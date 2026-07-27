@@ -5,6 +5,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
+    TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
 };
 use crate::task_board::{
     SpawnGateSwitches, TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy,
@@ -146,10 +147,9 @@ async fn a_preparation_stops_retrying_once_its_budget_is_spent() {
         "the terminal record must carry the failure that caused it, got {:?}",
         row.last_error
     );
-    assert!(
-        row.attempts < RELEASE_LIMIT as i64,
-        "the budget must bound attempts, reached {}",
-        row.attempts
+    assert_eq!(
+        row.attempts, TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
+        "the budget must be spent exactly, not overshot or cut short"
     );
 }
 

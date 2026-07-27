@@ -17,7 +17,7 @@ use crate::task_board::{
 };
 
 /// Claimed attempts a preparation gets before the board stops retrying it.
-pub(super) const PREPARATION_MAX_ATTEMPTS: i64 = 8;
+pub(crate) const PREPARATION_MAX_ATTEMPTS: i64 = 8;
 
 /// Longest gap between attempts. Bounds the doubling below so a failure that
 /// heals on its own is still picked up in reasonable time.

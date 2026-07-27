@@ -34,6 +34,8 @@ use helpers::{
     validate_reservable_item,
 };
 
+pub(crate) use helpers::PREPARATION_MAX_ATTEMPTS as TASK_BOARD_PREPARATION_MAX_ATTEMPTS;
+
 /// What a release did with the preparation it was handed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskBoardPreparationRelease {
