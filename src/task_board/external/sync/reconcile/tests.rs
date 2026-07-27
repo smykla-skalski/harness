@@ -144,7 +144,7 @@ fn locally_edited_item() -> TaskBoardItem {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Old title".into()),
         body: Some("Body".into()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: None,
         updated_at: Some("2026-07-15T10:00:00Z".into()),
         synced_at: Some("2026-07-15T10:00:00Z".into()),
@@ -159,7 +159,7 @@ fn remote_task() -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1"),
         title: "Remote edit".into(),
         body: "Body".into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: None,
         updated_at: Some("2026-07-15T10:05:00Z".into()),
         ..ExternalTask::default()

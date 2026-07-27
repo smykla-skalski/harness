@@ -12,10 +12,10 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
         .await
         .expect("database");
     let mut item = linked_item(
-        "hidden-backlog",
+        "hidden-inbox",
         "Hidden item",
         "Body",
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
     );
     item.tags = vec!["duplicate".into()];
     item.external_refs[0]
@@ -28,7 +28,7 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
         .await
         .expect("create local task");
     db.hide_task_board_item_for_provider_exclusion(
-        "hidden-backlog",
+        "hidden-inbox",
         created.item_revision,
         TaskBoardItemPatch::default(),
         &ProviderExclusionAuditContext {
@@ -49,7 +49,7 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
             "remote-1",
             "Hidden item",
             "Body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     ))];
 
@@ -68,7 +68,7 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
     .expect("sync external tasks");
 
     assert!(
-        !db.task_board_item_snapshot("hidden-backlog")
+        !db.task_board_item_snapshot("hidden-inbox")
             .await
             .expect("load restored item")
             .item

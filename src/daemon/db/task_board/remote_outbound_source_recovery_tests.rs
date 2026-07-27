@@ -136,16 +136,16 @@ async fn assert_source_owned_recovery_defers(db: &AsyncDaemonDb, offer: &RemoteO
 }
 
 #[tokio::test]
-async fn protected_source_backlog_never_starves_later_expiry_after_restart() {
+async fn protected_source_inbox_never_starves_later_expiry_after_restart() {
     let fixture = super::remote_assignment_test_support::executor_fixture(1).await;
     enable_implementation(&fixture.db)
         .await
         .expect("enable source offer capability");
     let mut transaction = fixture
         .db
-        .begin_immediate_transaction("seed protected source recovery backlog")
+        .begin_immediate_transaction("seed protected source recovery inbox")
         .await
-        .expect("begin protected source backlog");
+        .expect("begin protected source inbox");
     let mut first_protected = None;
     for index in 0..129_u64 {
         let (offer, content) = protected_offer(&fixture.request, index);
@@ -175,7 +175,7 @@ async fn protected_source_backlog_never_starves_later_expiry_after_restart() {
     transaction
         .commit()
         .await
-        .expect("commit protected source backlog");
+        .expect("commit protected source inbox");
 
     fixture.db.pool().close().await;
     let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))

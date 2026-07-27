@@ -76,11 +76,11 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
     assert!(requests[2].contains("repo:good/repo"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].reference.external_id, "good/repo#7");
-    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Inbox);
 }
 
 #[tokio::test]
-async fn github_inbox_pull_imports_review_requests_as_backlog() {
+async fn github_inbox_pull_imports_review_requests_as_inbox() {
     let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, requests, handle) = spawn_sequence_mock(vec![
         MockResponse::json(200, viewer_response("octo-user")),
@@ -99,7 +99,7 @@ async fn github_inbox_pull_imports_review_requests_as_backlog() {
     assert_eq!(requests.len(), 3);
     assert!(requests[2].contains("review-requested:octo-user"));
     assert_eq!(tasks.len(), 1);
-    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Inbox);
 }
 
 #[tokio::test]

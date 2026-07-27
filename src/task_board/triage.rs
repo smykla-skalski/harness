@@ -159,7 +159,7 @@ pub fn matched_exclusion_label(tags: &[String]) -> Option<String> {
 
 /// Evaluate the ordered `BuiltInV1` check table against one item's current tags.
 /// Callers are responsible for the eligibility gate (dispatchable kind, not
-/// deleted, not yet linked, canonical status in Backlog/Todo) and for the
+/// deleted, not yet linked, canonical status in Inbox/Todo) and for the
 /// separate provider-exclusion pre-intake filter; this only decides the
 /// verdict for an already-eligible, already-visible item.
 #[must_use]

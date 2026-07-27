@@ -262,7 +262,7 @@ extension PreviewHarnessClient.Fixtures {
     id: "preview-board-only",
     title: "Board-only preview item",
     body: "Board item without a linked session task",
-    status: .backlog,
+    status: .inbox,
     priority: .high,
     tags: ["preview"],
     projectId: "project-6ccf8d0a",

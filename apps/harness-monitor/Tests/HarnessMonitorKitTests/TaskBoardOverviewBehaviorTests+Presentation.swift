@@ -73,7 +73,7 @@ extension TaskBoardOverviewBehaviorTests {
   @Test("Step Mode targets the daemon's first Todo item and never another lane")
   func stepModeTargetIsTopTodoItem() async {
     let worker = TaskBoardOverviewPresentationWorker()
-    let backlog = taskBoardItem(id: "backlog-item", status: .backlog)
+    let inbox = taskBoardItem(id: "inbox-item", status: .inbox)
     let todo = taskBoardItem(id: "ready-low", status: .todo, priority: .low)
     let laterHigherPriority = taskBoardItem(
       id: "later-critical", status: .todo, priority: .critical)
@@ -81,7 +81,7 @@ extension TaskBoardOverviewBehaviorTests {
     let presentation = await worker.compute(
       input: TaskBoardOverviewPresentationInput(
         snapshot: TaskBoardInboxSnapshot(),
-        taskBoardItems: [backlog, todo, laterHigherPriority],
+        taskBoardItems: [inbox, todo, laterHigherPriority],
         decisionItems: [],
         scopeSessionID: nil,
         taskBoardProjects: []
@@ -90,16 +90,16 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(presentation.apiItems(in: .todo).map(\.id) == ["ready-low", "later-critical"])
     #expect(presentation.stepRailTargetItem?.id == "ready-low")
 
-    let backlogOnly = await worker.compute(
+    let inboxOnly = await worker.compute(
       input: TaskBoardOverviewPresentationInput(
         snapshot: TaskBoardInboxSnapshot(),
-        taskBoardItems: [backlog],
+        taskBoardItems: [inbox],
         decisionItems: [],
         scopeSessionID: nil,
         taskBoardProjects: []
       )
     )
-    #expect(backlogOnly.stepRailTargetItem == nil)
+    #expect(inboxOnly.stepRailTargetItem == nil)
   }
 
   @Test("Lane strip sizing keeps the current minimum width until the board can expand")

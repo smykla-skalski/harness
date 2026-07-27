@@ -74,7 +74,7 @@ async fn foreground_recovery_drains_poisoned_incomplete_pages_before_unrelated_c
 }
 
 #[tokio::test]
-async fn startup_tolerates_quarantine_and_bounded_backlog() {
+async fn startup_tolerates_quarantine_and_bounded_inbox() {
     let fixture = poisoned_recovery_fixture(130).await;
     recover_remote_assignments_at_startup(&fixture.db)
         .await

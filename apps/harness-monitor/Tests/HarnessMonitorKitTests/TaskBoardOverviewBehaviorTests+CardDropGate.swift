@@ -6,7 +6,7 @@ import Testing
 extension TaskBoardOverviewBehaviorTests {
   @Test("Drop gate rejects with a busy reason when dropping is disabled")
   func dropGateRejectsWhenDisabled() {
-    let payload = TaskBoardCardDragPayload(item: .api(itemID: "board-1", status: .backlog))
+    let payload = TaskBoardCardDragPayload(item: .api(itemID: "board-1", status: .inbox))
 
     let result = taskBoardCardDropGate(
       payloads: [payload],
@@ -23,7 +23,7 @@ extension TaskBoardOverviewBehaviorTests {
 
   @Test("Drop gate rejects with a lane reason when the lane is not a drop candidate")
   func dropGateRejectsWhenNotDropCandidate() {
-    let payload = TaskBoardCardDragPayload(item: .api(itemID: "board-1", status: .backlog))
+    let payload = TaskBoardCardDragPayload(item: .api(itemID: "board-1", status: .inbox))
 
     let result = taskBoardCardDropGate(
       payloads: [payload],
@@ -59,7 +59,7 @@ extension TaskBoardOverviewBehaviorTests {
 
   @Test("Drop gate proceeds with the resolved plan when enabled and a candidate")
   func dropGateProceedsWhenAllowed() {
-    let payload = TaskBoardCardDragPayload(item: .api(itemID: "board-1", status: .backlog))
+    let payload = TaskBoardCardDragPayload(item: .api(itemID: "board-1", status: .inbox))
 
     let result = taskBoardCardDropGate(
       payloads: [payload],
@@ -72,7 +72,7 @@ extension TaskBoardOverviewBehaviorTests {
       result
         == .proceed(
           TaskBoardCardDropPlan(
-            items: [.api(itemID: "board-1", status: .backlog)],
+            items: [.api(itemID: "board-1", status: .inbox)],
             destination: .todo
           )
         )

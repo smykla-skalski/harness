@@ -5,6 +5,6 @@ extension TaskBoardItem {
     kind == .task
       && deletedAt == nil
       && workItemId == nil
-      && (status.canonicalPersistedStatus == .backlog || status.canonicalPersistedStatus == .todo)
+      && (status.canonicalPersistedStatus == .inbox || status.canonicalPersistedStatus == .todo)
   }
 }

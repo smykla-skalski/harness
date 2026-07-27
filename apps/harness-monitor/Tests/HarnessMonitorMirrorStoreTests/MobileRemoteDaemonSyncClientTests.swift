@@ -130,8 +130,8 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     let legacyItem = try XCTUnwrap(
       snapshot.taskBoardItems.first { $0.id == "board-legacy-umbrella" }
     )
-    XCTAssertEqual(legacyItem.status, "backlog")
-    XCTAssertEqual(legacyItem.statusTitle, "Backlog")
+    XCTAssertEqual(legacyItem.status, "inbox")
+    XCTAssertEqual(legacyItem.statusTitle, "Inbox")
     XCTAssertEqual(snapshot.stations.first?.needsYouCount, 2)
     XCTAssertEqual(snapshot.needsYouCount, 2)
   }

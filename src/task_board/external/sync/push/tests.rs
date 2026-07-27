@@ -180,7 +180,7 @@ fn linked_item() -> TaskBoardItem {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Base title".into()),
         body: Some("Body".into()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: None,
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),

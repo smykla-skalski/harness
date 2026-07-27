@@ -5,6 +5,6 @@ mod github;
 mod github_hierarchy;
 mod support;
 mod sync;
-mod sync_backlog;
+mod sync_inbox;
 mod sync_stale_reviews;
 mod wire;

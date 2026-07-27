@@ -38,7 +38,7 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
                 "remote-1",
                 "Remote title",
                 "Old body",
-                TaskBoardStatus::Backlog,
+                TaskBoardStatus::Inbox,
             )],
         ))];
 

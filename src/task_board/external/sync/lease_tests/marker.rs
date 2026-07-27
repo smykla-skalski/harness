@@ -254,7 +254,7 @@ fn marked_task(item_id: &str, title: &str) -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17"),
         title: title.into(),
         body: format!("Provider body\ncreate-key:create-key-{item_id}"),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some("acme/widgets".into()),
         updated_at: Some("provider-revision-2".into()),
         ..ExternalTask::default()

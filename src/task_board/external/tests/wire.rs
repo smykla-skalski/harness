@@ -30,7 +30,7 @@ fn external_task_omits_a_false_tracks_children_from_the_wire() {
     let mut task = ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#1"),
         title: "Issue".into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         ..ExternalTask::default()
     };
     let value = serde_json::to_value(&task).expect("serialize external task");

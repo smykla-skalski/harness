@@ -54,7 +54,7 @@ async fn push_updates_existing_linked_remote_and_records_changed_fields() {
         .as_ref()
         .expect("sync state");
     assert_eq!(state.title.as_deref(), Some("Local title"));
-    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.status, Some(TaskBoardStatus::Inbox));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-2"));
 }
 
@@ -76,7 +76,7 @@ async fn both_direction_reports_conflict_by_default_without_writing() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     ))];
 
@@ -119,7 +119,7 @@ async fn prefer_remote_applies_remote_conflict_side() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     ))];
 
@@ -164,7 +164,7 @@ async fn prefer_local_updates_remote_conflict_side() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         )],
     );
     let updates = client.updates.clone();
@@ -213,7 +213,7 @@ async fn linked_push_surfaces_conflict_when_precondition_fails() {
         "remote-1",
         "Concurrent remote edit",
         "Old body",
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
     ));
     let updates = client.updates.clone();
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
@@ -292,7 +292,7 @@ async fn scoped_sync_keeps_successful_repository_when_another_repository_fails()
                 reference: ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17"),
                 title: "Imported task".into(),
                 body: String::new(),
-                status: TaskBoardStatus::Backlog,
+                status: TaskBoardStatus::Inbox,
                 project_id: Some("acme/widgets".into()),
                 updated_at: Some("2026-07-15T10:00:00Z".into()),
                 ..ExternalTask::default()
@@ -458,7 +458,7 @@ fn linked_item(id: &str, title: &str, body: &str, status: TaskBoardStatus) -> Ta
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Old title".to_string()),
         body: Some("Old body".to_string()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: None,
         updated_at: Some("2026-05-14T00:00:00Z".to_string()),
         synced_at: Some("2026-05-14T00:00:00Z".to_string()),

@@ -302,6 +302,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     // keeps a repaired database from being stamped current with the old shape.
     super::schema_v54::run(&db.conn)?;
     super::schema_v55::run(&db.conn)?;
+    super::schema_v56::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;

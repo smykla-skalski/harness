@@ -69,7 +69,7 @@ async fn github_pull_preserves_project_identity_while_backfilling_execution_repo
     let mut item = github_review_request_item(
         "github-owner-repo-18",
         "owner/repo#18",
-        TaskBoardStatus::Backlog,
+        TaskBoardStatus::Inbox,
     );
     item.project_id = Some("portfolio-primary".to_owned());
     item.execution_repository = None;
@@ -86,7 +86,7 @@ async fn github_pull_preserves_project_identity_while_backfilling_execution_repo
             .with_url("https://example.test/pull/owner/repo#18"),
         title: "Review requested".to_owned(),
         body: "Please review the pull request.".to_owned(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
         ..ExternalTask::default()
@@ -191,7 +191,7 @@ fn created_github_task(request: &ExternalCreateRequest) -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#17"),
         title: request.title().into(),
         body: request.body().into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some("owner/repo".into()),
         updated_at: Some("provider-revision-1".into()),
         ..ExternalTask::default()

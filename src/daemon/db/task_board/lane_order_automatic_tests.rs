@@ -155,7 +155,7 @@ fn automatic_test_item(id: &str, priority: TaskBoardPriority) -> TaskBoardItem {
 
 fn triage_test_item(id: &str, priority: TaskBoardPriority, created_at: &str) -> TaskBoardItem {
     let mut item = item(id, created_at);
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.priority = priority;
     item.tags = vec!["kind/bug".into()];
     item

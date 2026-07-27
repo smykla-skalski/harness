@@ -8,12 +8,12 @@ use crate::task_board::{
 };
 
 #[tokio::test]
-async fn todo_status_filtered_sync_does_not_import_new_backlog_tasks() {
+async fn todo_status_filtered_sync_does_not_import_new_inbox_tasks() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
         ExternalProvider::GitHub,
-        vec![external_task("remote-backlog", "Unprocessed task")],
+        vec![external_task("remote-inbox", "Unprocessed task")],
     ))];
 
     let operations = sync_external_tasks(
@@ -56,7 +56,7 @@ async fn todo_status_filtered_bidirectional_sync_preserves_legacy_todo_without_s
             .with_url("https://example.test/pull/owner/repo#74"),
         title: "Review requested".to_owned(),
         body: "Please review the pull request.".to_owned(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T04:00:00Z".to_owned()),
         ..ExternalTask::default()
@@ -86,7 +86,7 @@ async fn todo_status_filtered_bidirectional_sync_preserves_legacy_todo_without_s
             .sync_state
             .as_ref()
             .and_then(|state| state.status),
-        Some(TaskBoardStatus::Backlog)
+        Some(TaskBoardStatus::Inbox)
     );
 
     let repeated = sync_external_tasks(&board, options, &clients)
@@ -112,7 +112,7 @@ async fn todo_status_filtered_bidirectional_sync_preserves_open_workflow_lane_wi
             .with_url("https://example.test/pull/owner/repo#75"),
         title: "Review requested".to_owned(),
         body: "Please review the pull request.".to_owned(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
         ..ExternalTask::default()
@@ -154,7 +154,7 @@ async fn todo_status_filtered_sync_reconciles_terminal_truth_for_every_existing_
         (
             "github-owner-repo-76",
             "owner/repo#76",
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         ),
         (
             "github-owner-repo-77",
@@ -190,15 +190,15 @@ async fn todo_status_filtered_sync_reconciles_terminal_truth_for_every_existing_
     .expect("sync terminal reviews");
 
     assert_eq!(operations.len(), 2);
-    let backlog = board
+    let inbox = board
         .get("github-owner-repo-76")
-        .expect("load backlog review");
+        .expect("load inbox review");
     let in_progress = board
         .get("github-owner-repo-77")
         .expect("load in-progress review");
-    assert_eq!(backlog.status, TaskBoardStatus::Done);
+    assert_eq!(inbox.status, TaskBoardStatus::Done);
     assert_eq!(in_progress.status, TaskBoardStatus::InProgress);
-    for item in [&backlog, &in_progress] {
+    for item in [&inbox, &in_progress] {
         assert_eq!(
             item.external_refs[0]
                 .sync_state

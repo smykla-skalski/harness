@@ -408,7 +408,7 @@ mod tests {
         baseline.sync_state = Some(ExternalRefSyncState {
             title: Some("Create title".into()),
             body: Some("Create body".into()),
-            status: Some(TaskBoardStatus::Backlog),
+            status: Some(TaskBoardStatus::Inbox),
             project_id: Some("acme/widgets".into()),
             updated_at: None,
             synced_at: Some("2026-07-16T10:00:00Z".into()),

@@ -20,19 +20,19 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item_no_labels(id: &str) -> TaskBoardItem {
+fn inbox_item_no_labels(id: &str) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Vague title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item
 }
 
 async fn seed_running_escalation(db: &AsyncDaemonDb, item_id: &str) -> (String, String, String) {
-    db.create_task_board_item_with_triage(backlog_item_no_labels(item_id))
+    db.create_task_board_item_with_triage(inbox_item_no_labels(item_id))
         .await
         .expect("create item");
     let claimed = db
@@ -90,7 +90,7 @@ async fn a_valid_todo_verdict_lands_and_stamps_the_agent_producer() {
 }
 
 #[tokio::test]
-async fn an_undecided_verdict_leaves_the_item_in_backlog() {
+async fn an_undecided_verdict_leaves_the_item_in_inbox() {
     let (_directory, db) = connect().await;
     let (escalation_id, token, fingerprint) = seed_running_escalation(&db, "item-1").await;
 
@@ -107,7 +107,7 @@ async fn an_undecided_verdict_leaves_the_item_in_backlog() {
 
     assert_eq!(outcome, TaskBoardTriageEscalationVerdictOutcome::Accepted);
     let item = db.task_board_item("item-1").await.expect("load item");
-    assert_eq!(item.status, TaskBoardStatus::Backlog);
+    assert_eq!(item.status, TaskBoardStatus::Inbox);
 }
 
 /// C3: `placement_matches_verdict`'s producer congruence check must
@@ -234,7 +234,7 @@ async fn stale_evidence_is_rejected_and_reenqueues_for_the_current_fingerprint()
         TaskBoardTriageEscalationVerdictOutcome::Rejected(_)
     ));
     let item = db.task_board_item("item-1").await.expect("load item");
-    assert_eq!(item.status, TaskBoardStatus::Backlog, "stale verdict never lands");
+    assert_eq!(item.status, TaskBoardStatus::Inbox, "stale verdict never lands");
     let fresh_pending: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM task_board_triage_escalations
          WHERE item_id = 'item-1' AND status = 'pending'",

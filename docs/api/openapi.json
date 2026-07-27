@@ -32202,7 +32202,7 @@
       "TaskBoardStatus": {
         "type": "string",
         "enum": [
-          "backlog",
+          "inbox",
           "todo",
           "planning",
           "in_progress",
@@ -33927,7 +33927,7 @@
             }
           }
         ],
-        "description": "The closed, typed condition vocabulary over stable Task Board facts.\nEvery eligible item is already a dispatchable `Task` in Backlog or Todo\n(see `triage_eligible`), so `kind` carries no discriminating power here\nand is deliberately not part of this vocabulary. Title and body are free\ntext and deliberately excluded too -- conditions are closed and typed,\nnever a regex or arbitrary expression over prose."
+        "description": "The closed, typed condition vocabulary over stable Task Board facts.\nEvery eligible item is already a dispatchable `Task` in Inbox or Todo\n(see `triage_eligible`), so `kind` carries no discriminating power here\nand is deliberately not part of this vocabulary. Title and body are free\ntext and deliberately excluded too -- conditions are closed and typed,\nnever a regex or arbitrary expression over prose."
       },
       "TriageRuleOutcome": {
         "type": "object",
@@ -34115,7 +34115,7 @@
       },
       "TriageRuleSetPreviewResult": {
         "type": "object",
-        "description": "Non-mutating evaluation of a candidate against one frozen read of the\ncurrent backlog -- never persists anything, whether or not the candidate\nis valid.",
+        "description": "Non-mutating evaluation of a candidate against one frozen read of the\ncurrent inbox -- never persists anything, whether or not the candidate\nis valid.",
         "required": [
           "validation"
         ],

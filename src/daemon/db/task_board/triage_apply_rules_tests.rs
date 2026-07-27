@@ -15,14 +15,14 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+fn inbox_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-24T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = tags;
     item
 }
@@ -115,7 +115,7 @@ async fn items_change_seq(db: &AsyncDaemonDb) -> i64 {
 #[tokio::test]
 async fn without_an_active_rule_set_item_creation_still_uses_builtin_v1() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item("plain", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("plain", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     let (identity, _version) = decision_evaluator(&db, "plain").await;
@@ -132,7 +132,7 @@ async fn with_an_active_rule_set_item_creation_uses_it_including_priority_action
         .expect("activate");
     assert_eq!(activation.revision, Some(1));
 
-    db.create_task_board_item_with_triage(backlog_item("bug-item", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("bug-item", vec!["kind/bug".into()]))
         .await
         .expect("create item");
 
@@ -144,17 +144,17 @@ async fn with_an_active_rule_set_item_creation_uses_it_including_priority_action
 }
 
 #[tokio::test]
-async fn an_item_created_under_an_active_rule_set_default_outcome_stays_in_backlog() {
+async fn an_item_created_under_an_active_rule_set_default_outcome_stays_in_inbox() {
     let (_directory, db) = connect().await;
     db.activate_task_board_triage_rules(Some(bug_rule_set()), "owner".into(), None)
         .await
         .expect("activate");
 
-    db.create_task_board_item_with_triage(backlog_item("plain-item", Vec::new()))
+    db.create_task_board_item_with_triage(inbox_item("plain-item", Vec::new()))
         .await
         .expect("create item");
 
-    assert_eq!(item_status(&db, "plain-item").await, "backlog");
+    assert_eq!(item_status(&db, "plain-item").await, "inbox");
     let (identity, _version) = decision_evaluator(&db, "plain-item").await;
     assert_eq!(identity, RUNTIME_RULES_EVALUATOR_IDENTITY);
 }
@@ -166,7 +166,7 @@ async fn a_rules_promoted_item_is_stamped_with_the_rules_evaluator_as_lane_produ
         .await
         .expect("activate");
 
-    db.create_task_board_item_with_triage(backlog_item("bug-producer", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("bug-producer", vec!["kind/bug".into()]))
         .await
         .expect("create item");
 
@@ -189,7 +189,7 @@ async fn a_second_unchanged_touch_of_a_rules_promoted_item_causes_no_placement_c
     db.activate_task_board_triage_rules(Some(bug_rule_set()), "owner".into(), None)
         .await
         .expect("activate");
-    db.create_task_board_item_with_triage(backlog_item("bug-stable", vec!["kind/bug".into()]))
+    db.create_task_board_item_with_triage(inbox_item("bug-stable", vec!["kind/bug".into()]))
         .await
         .expect("create item");
     assert_eq!(item_status(&db, "bug-stable").await, "todo");
@@ -232,7 +232,7 @@ async fn a_second_unchanged_touch_of_a_rules_promoted_item_causes_no_placement_c
 #[tokio::test]
 async fn an_active_override_still_wins_placement_over_an_active_rule_set_on_update() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item_with_triage(backlog_item("overridden", Vec::new()))
+    db.create_task_board_item_with_triage(inbox_item("overridden", Vec::new()))
         .await
         .expect("create item");
     db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {

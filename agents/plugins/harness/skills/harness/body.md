@@ -172,7 +172,7 @@ Use capability tags, name, persona, model, effort, and project-dir flags when th
 
 ## task-board
 
-Use `task-board` for backlog state, session dispatch, linked-work evaluation, orchestrator ticks, and policy-pipeline visibility.
+Use `task-board` for inbox state, session dispatch, linked-work evaluation, orchestrator ticks, and policy-pipeline visibility.
 
 Key routes:
 

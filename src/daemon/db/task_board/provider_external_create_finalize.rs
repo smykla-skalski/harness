@@ -292,7 +292,7 @@ fn canonical_provider_status(status: TaskBoardStatus) -> TaskBoardStatus {
     if status.canonical_persisted_status() == TaskBoardStatus::Done {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::Backlog
+        TaskBoardStatus::Inbox
     }
 }
 

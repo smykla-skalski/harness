@@ -52,7 +52,7 @@ struct CurrentDecisionRow {
     evidence_fingerprint: String,
 }
 
-/// Load every live Backlog/Todo item -- the full domain `triage_eligible`
+/// Load every live Inbox/Todo item -- the full domain `triage_eligible`
 /// callers further filter (dispatchable kind, unlinked) -- in a fixed number
 /// of bulk queries (items, their external refs, and their current decisions)
 /// regardless of how many items match. Used by rule-set activation's bulk
@@ -63,7 +63,7 @@ pub(super) async fn load_triage_bulk_entries_in_tx(
 ) -> Result<Vec<TriageBulkEntry>, CliError> {
     let rows = query_as::<_, ItemRow>(
         "SELECT * FROM task_board_items
-         WHERE deleted_at IS NULL AND status IN ('backlog', 'todo')",
+         WHERE deleted_at IS NULL AND status IN ('inbox', 'todo')",
     )
     .fetch_all(transaction.as_mut())
     .await
@@ -73,7 +73,7 @@ pub(super) async fn load_triage_bulk_entries_in_tx(
                 refs.sync_state_json
          FROM task_board_external_refs AS refs
          INNER JOIN task_board_items AS items ON items.item_id = refs.item_id
-         WHERE items.deleted_at IS NULL AND items.status IN ('backlog', 'todo')
+         WHERE items.deleted_at IS NULL AND items.status IN ('inbox', 'todo')
          ORDER BY refs.item_id, refs.position",
     )
     .fetch_all(transaction.as_mut())
@@ -92,7 +92,7 @@ pub(super) async fn load_triage_bulk_entries_in_tx(
          FROM task_board_triage_decisions AS decisions
          INNER JOIN task_board_items AS items ON items.item_id = decisions.item_id
          WHERE decisions.is_current = 1
-           AND items.deleted_at IS NULL AND items.status IN ('backlog', 'todo')",
+           AND items.deleted_at IS NULL AND items.status IN ('inbox', 'todo')",
     )
     .fetch_all(transaction.as_mut())
     .await

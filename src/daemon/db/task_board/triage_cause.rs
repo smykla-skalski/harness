@@ -46,7 +46,7 @@ pub(super) fn triage_cause<T: DecidedEvaluatorFingerprint>(
         // never applies to it. Without this arm, every ordinary ingress
         // touch after an agent verdict would see a bare identity mismatch
         // against `BuiltInV1`/rules and re-decide, demoting the agent's
-        // placement back to Backlog and re-enqueuing a fresh (paid)
+        // placement back to Inbox and re-enqueuing a fresh (paid)
         // escalation for evidence that has not actually changed.
         Some(existing) if existing.evaluator_identity() == AGENT_V1_EVALUATOR_IDENTITY => {
             if existing.evidence_fingerprint() == fingerprint {

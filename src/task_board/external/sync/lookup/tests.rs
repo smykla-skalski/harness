@@ -25,7 +25,7 @@ fn resolve_parent_item_id_matches_a_legacy_cross_repo_parent_by_its_own_repo() {
     let task = ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, "child-owner/child-repo#7"),
         title: "Child issue".into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: Some("child-owner/child-repo".into()),
         parent_reference: Some(ExternalTaskRef::new(
             ExternalProvider::GitHub,

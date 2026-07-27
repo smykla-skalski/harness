@@ -131,41 +131,51 @@ extension MobileMirrorModelsCommandTests {
     XCTAssertEqual(command.payload["workItemID"], "work-1")
   }
 
-  func testTaskBoardSummaryCanonicalizesLegacyUmbrellaAcrossCodableRoundTrip() throws {
-    let payload = """
-      {
-        "id": "task-legacy",
-        "stationID": "station",
-        "title": "Legacy task",
-        "bodyPreview": "",
-        "status": "umbrella",
-        "statusTitle": "Umbrella",
-        "priority": "medium",
-        "priorityTitle": "Medium",
-        "tags": [],
-        "agentMode": "headless",
-        "needsYou": false,
-        "updatedAt": 1700000000
-      }
-      """
+  func testTaskBoardSummaryCanonicalizesLegacyLaneStatusesAcrossCodableRoundTrip() throws {
+    for (legacyStatus, legacyTitle) in [
+      ("umbrella", "Umbrella"),
+      ("backlog", "Backlog"),
+      ("inbox", "Backlog"),
+    ] {
+      let payload = """
+        {
+          "id": "task-legacy",
+          "stationID": "station",
+          "title": "Legacy task",
+          "bodyPreview": "",
+          "status": "\(legacyStatus)",
+          "statusTitle": "\(legacyTitle)",
+          "priority": "medium",
+          "priorityTitle": "Medium",
+          "tags": [],
+          "agentMode": "headless",
+          "needsYou": false,
+          "updatedAt": 1700000000
+        }
+        """
 
-    let item = try JSONDecoder().decode(MobileTaskBoardSummary.self, from: Data(payload.utf8))
+      let item = try JSONDecoder().decode(MobileTaskBoardSummary.self, from: Data(payload.utf8))
 
-    XCTAssertEqual(item.status, "backlog")
-    XCTAssertEqual(item.statusTitle, "Backlog")
-    XCTAssertEqual(item.commandPayload["status"], "backlog")
+      XCTAssertEqual(item.status, "inbox")
+      XCTAssertEqual(item.statusTitle, "Inbox")
+      XCTAssertEqual(item.commandPayload["status"], "inbox")
 
-    var staleItem = item
-    staleItem.status = "umbrella"
-    staleItem.statusTitle = "Umbrella"
-    XCTAssertEqual(staleItem.commandPayload["status"], "backlog")
+      var staleItem = item
+      staleItem.status = legacyStatus
+      staleItem.statusTitle = legacyTitle
+      XCTAssertEqual(staleItem.commandPayload["status"], "inbox")
 
-    let encoded = try JSONEncoder().encode(staleItem)
-    let object = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: encoded) as? [String: Any]
-    )
-    XCTAssertEqual(object["status"] as? String, "backlog")
-    XCTAssertEqual(object["statusTitle"] as? String, "Backlog")
-    XCTAssertFalse(String(decoding: encoded, as: UTF8.self).lowercased().contains("umbrella"))
+      let encoded = try JSONEncoder().encode(staleItem)
+      let object = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+      )
+      XCTAssertEqual(object["status"] as? String, "inbox")
+      XCTAssertEqual(object["statusTitle"] as? String, "Inbox")
+      XCTAssertFalse(
+        try XCTUnwrap(String(data: encoded, encoding: .utf8))
+          .lowercased()
+          .contains(legacyTitle.lowercased())
+      )
+    }
   }
 }

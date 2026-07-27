@@ -14,9 +14,9 @@ use crate::task_board::{
 };
 
 #[tokio::test]
-async fn set_todo_promotes_a_backlog_item_with_ranked_placement() {
+async fn set_todo_promotes_a_inbox_item_with_ranked_placement() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -46,7 +46,7 @@ async fn set_todo_promotes_a_backlog_item_with_ranked_placement() {
 }
 
 #[tokio::test]
-async fn set_undecided_demotes_an_automatically_placed_todo_item_to_backlog() {
+async fn set_undecided_demotes_an_automatically_placed_todo_item_to_inbox() {
     let (_directory, db) = connect().await;
     seed_decided_todo(&db, "item-1").await;
     let expected_item_revision = revision(&db, "item-1").await;
@@ -64,7 +64,7 @@ async fn set_undecided_demotes_an_automatically_placed_todo_item_to_backlog() {
         .await
         .expect("set override");
 
-    assert_eq!(result.item.status, TaskBoardStatus::Backlog);
+    assert_eq!(result.item.status, TaskBoardStatus::Inbox);
     assert_eq!(result.item.lane_position, None);
     assert_eq!(result.item.lane_origin, None);
 }
@@ -72,7 +72,7 @@ async fn set_undecided_demotes_an_automatically_placed_todo_item_to_backlog() {
 #[tokio::test]
 async fn automatic_evaluation_keeps_deciding_but_never_moves_placement_while_overridden() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -186,13 +186,13 @@ async fn clear_reconciles_the_latest_automatic_decision_without_new_decision_his
 }
 
 /// An override is authoritative for lane outcome even over a manual anchor:
-/// a manually anchored Todo item still demotes to Backlog when the override
+/// a manually anchored Todo item still demotes to Inbox when the override
 /// says Undecided, not stuck at Todo just because a human placed it there.
 /// The anchor itself survives the move -- only the lane it lives in changes.
 #[tokio::test]
-async fn set_undecided_override_moves_a_manually_anchored_todo_item_to_backlog() {
+async fn set_undecided_override_moves_a_manually_anchored_todo_item_to_inbox() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     anchor_manually(&db, "item-1", 0).await;
@@ -211,7 +211,7 @@ async fn set_undecided_override_moves_a_manually_anchored_todo_item_to_backlog()
         .await
         .expect("override outranks a manual anchor for lane outcome");
 
-    assert_eq!(result.item.status, TaskBoardStatus::Backlog);
+    assert_eq!(result.item.status, TaskBoardStatus::Inbox);
     assert_eq!(result.item.lane_position, Some(0));
     match &result.item.lane_origin {
         Some(TaskBoardLaneOrigin::Manual { actor }) => assert_eq!(actor, "human-1"),
@@ -219,23 +219,23 @@ async fn set_undecided_override_moves_a_manually_anchored_todo_item_to_backlog()
     }
 }
 
-/// The symmetric direction: a manually anchored Backlog item still promotes
-/// to Todo when the override says Todo, not stuck in Backlog.
+/// The symmetric direction: a manually anchored Inbox item still promotes
+/// to Todo when the override says Todo, not stuck in Inbox.
 #[tokio::test]
-async fn set_todo_override_moves_a_manually_anchored_backlog_item_to_todo() {
+async fn set_todo_override_moves_a_manually_anchored_inbox_item_to_todo() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     query(
         "UPDATE task_board_items SET
-             status = 'backlog', lane_position = 0, lane_origin = 'manual',
+             status = 'inbox', lane_position = 0, lane_origin = 'manual',
              lane_actor = 'human-1', lane_set_at = '2026-07-23T00:00:00Z'
          WHERE item_id = 'item-1'",
     )
     .execute(db.pool())
     .await
-    .expect("anchor item manually in backlog");
+    .expect("anchor item manually in inbox");
     let expected_item_revision = revision(&db, "item-1").await;
     let expected_items_change_seq = seq(&db).await;
 
@@ -280,12 +280,12 @@ async fn clear_reconciles_a_manually_anchored_item_to_the_latest_decision() {
     .expect("set override");
 
     // A human anchors the item while the override is still active, in
-    // whatever lane it currently sits (Backlog, per the override).
+    // whatever lane it currently sits (Inbox, per the override).
     let expected_item_revision = revision(&db, "item-1").await;
     let expected_items_change_seq = seq(&db).await;
     db.set_task_board_lane_position(TaskBoardLanePositionInput {
         item_id: "item-1".into(),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         lane_position: 0,
         actor: "human-1".into(),
         expected_item_revision,
@@ -321,7 +321,7 @@ async fn clear_reconciles_a_manually_anchored_item_to_the_latest_decision() {
 #[tokio::test]
 async fn a_later_manual_position_change_does_not_clear_the_override() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -415,7 +415,7 @@ async fn set_agreeing_with_an_existing_builtin_placement_preserves_its_producer(
 #[tokio::test]
 async fn clear_replaces_an_override_attributed_producer_with_builtin() {
     let (_directory, db) = connect().await;
-    let mut item = backlog_item("item-1");
+    let mut item = inbox_item("item-1");
     item.tags = vec!["kind/bug".into()];
     db.create_task_board_item(item).await.expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;

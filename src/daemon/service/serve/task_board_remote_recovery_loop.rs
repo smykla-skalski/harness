@@ -126,7 +126,7 @@ pub(crate) async fn recover_remote_assignments_at_startup(
     }
     tracing::warn!(
         pages = MAXIMUM_STARTUP_PAGES,
-        "remote assignment startup recovery left a fenced backlog for the background loop"
+        "remote assignment startup recovery left a fenced inbox for the background loop"
     );
     prune_startup_evidence(db, &utc_now()).await;
     Ok(())
@@ -155,7 +155,7 @@ pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
     }
     tracing::warn!(
         pages = MAXIMUM_STARTUP_PAGES,
-        "remote assignment startup recovery left a fenced backlog for the background loop"
+        "remote assignment startup recovery left a fenced inbox for the background loop"
     );
     prune_startup_evidence(db, &utc_now()).await;
     Ok(())

@@ -53,7 +53,7 @@ async fn clear_audit_identifies_a_fresh_automatic_decision_generation() {
         .await
         .expect("clear override");
 
-    assert_eq!(result.item.status, TaskBoardStatus::Backlog);
+    assert_eq!(result.item.status, TaskBoardStatus::Inbox);
     assert_eq!(
         db.task_board_triage_history("item-1", None, 10)
             .await

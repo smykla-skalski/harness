@@ -1,6 +1,6 @@
 use super::super::TriageOutcome;
 use super::{
-    apply_builtin_v1_triage_in_tx, backlog_item, connect, load_item_in_tx, replace_item_in_tx,
+    apply_builtin_v1_triage_in_tx, inbox_item, connect, load_item_in_tx, replace_item_in_tx,
     seed_decided_todo_item,
 };
 use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, TaskBoardStatus};
@@ -78,10 +78,10 @@ async fn same_evidence_with_wrong_automatic_producer_reapplies_and_reports_retai
 }
 
 #[tokio::test]
-async fn same_evidence_with_stale_backlog_placement_reports_retained_effect() {
+async fn same_evidence_with_stale_inbox_placement_reports_retained_effect() {
     let (_directory, db) = connect().await;
     // No meaningful labels -> the fresh decision is genuinely Undecided.
-    db.create_task_board_item(backlog_item("item-1", Vec::new()))
+    db.create_task_board_item(inbox_item("item-1", Vec::new()))
         .await
         .expect("seed item");
     let mut first_transaction = db
@@ -109,9 +109,9 @@ async fn same_evidence_with_stale_backlog_placement_reports_retained_effect() {
     first_transaction.commit().await.expect("commit first");
 
     // Simulate a leftover placement artifact on an item whose decision and
-    // status both already say Backlog/Undecided.
+    // status both already say Inbox/Undecided.
     let mut transaction = db
-        .begin_immediate_transaction("test stale backlog placement")
+        .begin_immediate_transaction("test stale inbox placement")
         .await
         .expect("begin transaction");
     let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
@@ -119,7 +119,7 @@ async fn same_evidence_with_stale_backlog_placement_reports_retained_effect() {
         .expect("load item")
         .expect("item exists");
     // A complete, otherwise-valid Automatic Todo tuple `validate_item` would
-    // accept, just stale relative to the item's actual Backlog/Undecided
+    // accept, just stale relative to the item's actual Inbox/Undecided
     // status and decision -- not a partial position-only tuple.
     item.lane_position = Some(3);
     item.lane_origin = Some(TaskBoardLaneOrigin::Automatic {
@@ -155,10 +155,10 @@ async fn human_suppressed_status_move_produces_no_retained_effect_audit() {
         .expect("load item")
         .expect("item exists");
     // Models the real items.rs update path: a direct human status move to
-    // Backlog already clears the complete placement tuple (see
+    // Inbox already clears the complete placement tuple (see
     // `clear_stale_automatic_placement_on_human_status_move`) before triage
     // ever runs.
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.lane_position = None;
     item.lane_origin = None;
     item.lane_set_at = None;
@@ -182,7 +182,7 @@ async fn human_suppressed_status_move_produces_no_retained_effect_audit() {
 #[tokio::test]
 async fn manual_anchor_produces_no_retained_effect_audit_on_a_later_pass() {
     let (_directory, db) = connect().await;
-    let mut manual = backlog_item("item-1", Vec::new());
+    let mut manual = inbox_item("item-1", Vec::new());
     manual.status = TaskBoardStatus::Todo;
     manual.lane_position = Some(0);
     manual.lane_origin = Some(TaskBoardLaneOrigin::Manual {

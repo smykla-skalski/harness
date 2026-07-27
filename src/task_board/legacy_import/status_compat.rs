@@ -33,8 +33,10 @@ fn normalize_status_fields(value: &mut Value) {
         }
         Value::Object(fields) => {
             for (key, value) in fields {
-                if is_task_board_status_key(key) && value.as_str() == Some("umbrella") {
-                    *value = Value::String("backlog".to_string());
+                if is_task_board_status_key(key)
+                    && matches!(value.as_str(), Some("umbrella" | "backlog"))
+                {
+                    *value = Value::String("inbox".to_string());
                 } else {
                     normalize_status_fields(value);
                 }
@@ -55,7 +57,7 @@ mod tests {
     #[test]
     fn legacy_state_normalizes_task_board_status_fields_only() {
         let mut document = serde_json::json!({
-            "status": "umbrella",
+            "status": "backlog",
             "records": [{
                 "board_status": "umbrella",
                 "label": "umbrella"
@@ -64,8 +66,8 @@ mod tests {
 
         normalize_status_fields(&mut document);
 
-        assert_eq!(document["status"], "backlog");
-        assert_eq!(document["records"][0]["board_status"], "backlog");
+        assert_eq!(document["status"], "inbox");
+        assert_eq!(document["records"][0]["board_status"], "inbox");
         assert_eq!(document["records"][0]["label"], "umbrella");
     }
 }

@@ -375,13 +375,13 @@ pub(crate) fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
     let label = path.display().to_string();
     let parsed = io::parse_frontmatter::<serde_json::Value>(&text, &label)?;
     let mut document = parsed.frontmatter;
-    normalize_legacy_umbrella_statuses(&mut document);
+    normalize_legacy_statuses(&mut document);
     let frontmatter: TaskBoardFrontmatter = serde_json::from_value(document)
         .map_err(|error| CliErrorKind::workflow_parse(format!("{label} frontmatter: {error}")))?;
     Ok(frontmatter.into_item(parsed.body))
 }
 
-fn normalize_legacy_umbrella_statuses(document: &mut serde_json::Value) {
+fn normalize_legacy_statuses(document: &mut serde_json::Value) {
     let Some(frontmatter) = document.as_object_mut() else {
         return;
     };
@@ -409,8 +409,8 @@ fn normalize_legacy_umbrella_statuses(document: &mut serde_json::Value) {
 }
 
 fn normalize_legacy_status(value: &mut serde_json::Value) {
-    if value.as_str() == Some("umbrella") {
-        *value = serde_json::Value::String("backlog".to_string());
+    if matches!(value.as_str(), Some("umbrella" | "backlog")) {
+        *value = serde_json::Value::String("inbox".to_string());
     }
 }
 

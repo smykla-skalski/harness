@@ -171,7 +171,7 @@ fn linked_item(id: &str, deleted: bool) -> TaskBoardItem {
     core_reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Previous title".into()),
         body: Some(String::new()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: Some("acme/widgets".into()),
         updated_at: Some("provider-revision-1".into()),
         synced_at: Some("2026-07-16T10:00:00Z".into()),

@@ -21,14 +21,14 @@ pub(super) async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
 /// seed time, so the generic, non-triaging `db.create_task_board_item` seed
 /// does not pre-empt the explicit `apply_builtin_v1_triage_in_tx` call each
 /// test exercises. Tests clear it after loading, before applying.
-pub(super) fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
+pub(super) fn inbox_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-22T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = tags;
     item.work_item_id = Some("seed-placeholder".into());
     item
@@ -38,7 +38,7 @@ pub(super) fn backlog_item(id: &str, tags: Vec<String>) -> TaskBoardItem {
 /// (fresh decision, real placement written back to the row), so a later
 /// reload sees a truly congruent starting point. Returns the item id.
 pub(super) async fn seed_decided_todo_item(db: &AsyncDaemonDb) -> &'static str {
-    db.create_task_board_item(backlog_item("item-1", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("item-1", vec!["kind/bug".into()]))
         .await
         .expect("seed item");
 
@@ -69,9 +69,9 @@ pub(super) async fn seed_decided_todo_item(db: &AsyncDaemonDb) -> &'static str {
 }
 
 #[tokio::test]
-async fn eligible_backlog_item_with_a_label_promotes_to_todo_with_automatic_placement() {
+async fn eligible_inbox_item_with_a_label_promotes_to_todo_with_automatic_placement() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1", vec!["kind/bug".into()]))
+    db.create_task_board_item(inbox_item("item-1", vec!["kind/bug".into()]))
         .await
         .expect("seed item");
 
@@ -112,9 +112,9 @@ async fn eligible_backlog_item_with_a_label_promotes_to_todo_with_automatic_plac
 }
 
 #[tokio::test]
-async fn eligible_backlog_item_with_no_labels_stays_in_backlog_as_undecided() {
+async fn eligible_inbox_item_with_no_labels_stays_in_inbox_as_undecided() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1", Vec::new()))
+    db.create_task_board_item(inbox_item("item-1", Vec::new()))
         .await
         .expect("seed item");
 
@@ -142,7 +142,7 @@ async fn eligible_backlog_item_with_no_labels_stays_in_backlog_as_undecided() {
     let decision = outcome.decision();
     assert_eq!(decision.verdict, TriageVerdict::Undecided);
     assert_eq!(decision.reason_code, TriageReasonCode::NoMeaningfulLabels);
-    assert_eq!(item.status, TaskBoardStatus::Backlog);
+    assert_eq!(item.status, TaskBoardStatus::Inbox);
     assert_eq!(item.lane_position, None);
 }
 
@@ -157,7 +157,7 @@ async fn active_dispatch_reservations_suppress_triage_decisions_and_placement() 
         "starting",
     ] {
         let (_directory, db) = connect().await;
-        db.create_task_board_item(backlog_item("item-1", vec!["kind/bug".into()]))
+        db.create_task_board_item(inbox_item("item-1", vec!["kind/bug".into()]))
             .await
             .expect("seed item");
         let claim_token = matches!(status, "preparing_claimed" | "starting").then_some("claim");
@@ -201,7 +201,7 @@ async fn active_dispatch_reservations_suppress_triage_decisions_and_placement() 
         transaction.commit().await.expect("commit");
 
         assert!(outcome.is_none(), "{status} must suppress triage");
-        assert_eq!(item.status, TaskBoardStatus::Backlog);
+        assert_eq!(item.status, TaskBoardStatus::Inbox);
         assert_eq!(item.lane_position, None);
         assert_eq!(item.lane_origin, None);
         let decisions: i64 = query_scalar(
@@ -217,7 +217,7 @@ async fn active_dispatch_reservations_suppress_triage_decisions_and_placement() 
 #[tokio::test]
 async fn needs_info_label_stays_undecided_even_with_other_labels() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item(
+    db.create_task_board_item(inbox_item(
         "item-1",
         vec!["kind/bug".into(), "triage/needs-info".into()],
     ))
@@ -248,7 +248,7 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
     let decision = outcome.decision();
     assert_eq!(decision.verdict, TriageVerdict::Undecided);
     assert_eq!(decision.reason_code, TriageReasonCode::NeedsInfoLabel);
-    assert_eq!(item.status, TaskBoardStatus::Backlog);
+    assert_eq!(item.status, TaskBoardStatus::Inbox);
 }
 
 #[tokio::test]
@@ -297,7 +297,7 @@ async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
 #[tokio::test]
 async fn manual_placement_suppresses_status_and_placement_but_not_decision_history() {
     let (_directory, db) = connect().await;
-    let mut manual = backlog_item("item-1", Vec::new());
+    let mut manual = inbox_item("item-1", Vec::new());
     manual.status = TaskBoardStatus::Todo;
     manual.lane_position = Some(0);
     manual.lane_origin = Some(TaskBoardLaneOrigin::Manual {
@@ -317,7 +317,7 @@ async fn manual_placement_suppresses_status_and_placement_but_not_decision_histo
         .expect("load item")
         .expect("item exists");
     item.work_item_id = None;
-    // No labels at all -> BuiltInV1 would normally demote to Backlog/Undecided,
+    // No labels at all -> BuiltInV1 would normally demote to Inbox/Undecided,
     // but a manual anchor must suppress the status/placement effect.
     let outcome = apply_builtin_v1_triage_in_tx(
         &mut transaction,
@@ -343,12 +343,12 @@ async fn manual_placement_suppresses_status_and_placement_but_not_decision_histo
 }
 
 #[tokio::test]
-async fn fresh_evidence_demotes_a_prior_automatic_todo_verdict_back_to_backlog() {
+async fn fresh_evidence_demotes_a_prior_automatic_todo_verdict_back_to_inbox() {
     // Exercised end-to-end through the public API (rather than a manual
     // transaction) so the promotion is actually persisted before the
     // follow-up update reloads and re-evaluates it.
     let (_directory, db) = connect().await;
-    let mut item = backlog_item("item-1", vec!["kind/bug".into()]);
+    let mut item = inbox_item("item-1", vec!["kind/bug".into()]);
     item.work_item_id = None;
     let created = db
         .create_task_board_item_with_triage(item)
@@ -372,7 +372,7 @@ async fn fresh_evidence_demotes_a_prior_automatic_todo_verdict_back_to_backlog()
         .expect("update item")
         .expect("update mutates");
 
-    assert_eq!(mutation.item.status, TaskBoardStatus::Backlog);
+    assert_eq!(mutation.item.status, TaskBoardStatus::Inbox);
     assert_eq!(mutation.item.lane_position, None);
     assert_eq!(mutation.item.lane_origin, None);
 }
@@ -380,7 +380,7 @@ async fn fresh_evidence_demotes_a_prior_automatic_todo_verdict_back_to_backlog()
 #[tokio::test]
 async fn ineligible_umbrella_item_is_never_evaluated() {
     let (_directory, db) = connect().await;
-    let mut umbrella = backlog_item("item-1", vec!["kind/bug".into()]);
+    let mut umbrella = inbox_item("item-1", vec!["kind/bug".into()]);
     umbrella.kind = crate::task_board::types::TaskBoardItemKind::Umbrella;
     db.create_task_board_item(umbrella)
         .await
@@ -407,7 +407,7 @@ async fn ineligible_umbrella_item_is_never_evaluated() {
     transaction.commit().await.expect("commit");
 
     assert!(decision.is_none());
-    assert_eq!(item.status, TaskBoardStatus::Backlog);
+    assert_eq!(item.status, TaskBoardStatus::Inbox);
 }
 
 #[test]

@@ -78,7 +78,7 @@ pub struct TriageRuleSetActivationResult {
 }
 
 /// Non-mutating evaluation of a candidate against one frozen read of the
-/// current backlog -- never persists anything, whether or not the candidate
+/// current inbox -- never persists anything, whether or not the candidate
 /// is valid.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]

@@ -287,7 +287,7 @@ fn ensure_expected_revision(item_id: &str, actual: i64, expected: i64) -> Result
     .into())
 }
 
-/// A manual position write between Backlog and Todo that conflicts with an
+/// A manual position write between Inbox and Todo that conflicts with an
 /// active override is rejected atomically. Lifecycle exits remain allowed
 /// because the override becomes dormant outside those triage lanes.
 fn reject_if_destination_conflicts_with_active_override(
@@ -298,7 +298,7 @@ fn reject_if_destination_conflicts_with_active_override(
     if requested_status == current_status
         || !matches!(
             requested_status,
-            TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+            TaskBoardStatus::Inbox | TaskBoardStatus::Todo
         )
     {
         return Ok(());

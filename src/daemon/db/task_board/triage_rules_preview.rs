@@ -9,7 +9,7 @@ use crate::task_board::{
 };
 
 impl AsyncDaemonDb {
-    /// Evaluate `candidate` against one frozen read of the current backlog
+    /// Evaluate `candidate` against one frozen read of the current inbox
     /// without persisting anything, whether or not the candidate is valid --
     /// an author previews in-progress work before ever saving or activating
     /// it. The whole read happens in one transaction that is always rolled

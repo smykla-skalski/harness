@@ -10,7 +10,7 @@ use crate::task_board::{TaskBoardTriageEffectiveSource, TriageVerdict};
 #[tokio::test]
 async fn clear_without_an_active_override_is_rejected() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -31,7 +31,7 @@ async fn clear_without_an_active_override_is_rejected() {
 #[tokio::test]
 async fn set_rejects_a_deleted_item_without_partial_writes() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     query("UPDATE task_board_items SET deleted_at = '2026-07-23T00:00:00Z' WHERE item_id = ?1")
@@ -61,7 +61,7 @@ async fn set_rejects_a_deleted_item_without_partial_writes() {
 #[tokio::test]
 async fn set_rejects_an_ineligible_item_without_partial_writes() {
     let (_directory, db) = connect().await;
-    let mut item = backlog_item("item-1");
+    let mut item = inbox_item("item-1");
     item.work_item_id = Some("dispatch-1".into());
     db.create_task_board_item(item).await.expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -86,7 +86,7 @@ async fn set_rejects_an_ineligible_item_without_partial_writes() {
 #[tokio::test]
 async fn stale_item_revision_is_rejected_without_partial_writes() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_items_change_seq = seq(&db).await;
@@ -110,7 +110,7 @@ async fn stale_item_revision_is_rejected_without_partial_writes() {
 #[tokio::test]
 async fn stale_items_change_seq_is_rejected_without_partial_writes() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let expected_item_revision = revision(&db, "item-1").await;
@@ -134,7 +134,7 @@ async fn stale_items_change_seq_is_rejected_without_partial_writes() {
 #[tokio::test]
 async fn set_rejects_item_revision_overflow_without_partial_writes() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     query("UPDATE task_board_items SET revision = ?1 WHERE item_id = ?2")
@@ -165,7 +165,7 @@ async fn set_rejects_item_revision_overflow_without_partial_writes() {
 #[tokio::test]
 async fn each_mutation_bumps_the_items_change_sequence_exactly_once() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let before_seq = seq(&db).await;
@@ -202,7 +202,7 @@ async fn each_mutation_bumps_the_items_change_sequence_exactly_once() {
 #[tokio::test]
 async fn set_and_clear_each_record_exactly_one_typed_audit_event() {
     let (_directory, db) = connect().await;
-    db.create_task_board_item(backlog_item("item-1"))
+    db.create_task_board_item(inbox_item("item-1"))
         .await
         .expect("seed item");
     let before_audit_count = audit_count(&db).await;

@@ -33,7 +33,7 @@ final class EntityDisplayImageTests: XCTestCase {
 
   func testTaskBoardImageMapsEachStatusToDistinctSymbol() {
     let cases: [(TaskBoardStatusEnum, String)] = [
-      (.backlog, "tray"),
+      (.inbox, "tray"),
       (.todo, "tray.and.arrow.down"),
       (.planning, "list.clipboard"),
       (.inProgress, "arrow.triangle.2.circlepath"),
@@ -61,7 +61,7 @@ final class EntityDisplayImageTests: XCTestCase {
 
   func testTaskBoardImageCoversEveryEnumCase() {
     let statuses: [TaskBoardStatusEnum] = [
-      .backlog, .todo, .planning, .inProgress, .agenticReview, .testing,
+      .inbox, .todo, .planning, .inProgress, .agenticReview, .testing,
       .inReview, .toReview, .humanRequired, .failed, .done,
     ]
 

@@ -70,7 +70,7 @@ async fn a_requested_status_creates_the_item_in_that_lane() {
 /// explicit status, which suppresses it), so an older client that never
 /// learned the field still creates a usable item -- one placed by the same
 /// BuiltInV1 rules as any other label-less create, which demote it to
-/// Backlog.
+/// Inbox.
 #[tokio::test]
 async fn an_omitted_status_still_lands_in_the_default_lane() {
     let directory = tempdir().expect("tempdir");
@@ -83,19 +83,19 @@ async fn an_omitted_status_still_lands_in_the_default_lane() {
         .await
         .expect("create item");
 
-    assert_eq!(created.status, TaskBoardStatus::Backlog);
+    assert_eq!(created.status, TaskBoardStatus::Inbox);
 }
 
-/// Automatic triage promotes a labelled Backlog item to Todo. A caller that
-/// asked for Backlog owns that placement, so triage records its decision
+/// Automatic triage promotes a labelled Inbox item to Todo. A caller that
+/// asked for Inbox owns that placement, so triage records its decision
 /// without moving the item back out of the lane the request chose.
 #[tokio::test]
 async fn a_requested_status_survives_automatic_triage() {
     let directory = tempdir().expect("tempdir");
     let db = connect(&directory).await;
     let create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
-        "title": "Stay in the backlog",
-        "status": "backlog",
+        "title": "Stay in the inbox",
+        "status": "inbox",
         "tags": ["kind/bug"],
     }))
     .expect("create request");
@@ -104,7 +104,7 @@ async fn a_requested_status_survives_automatic_triage() {
         .await
         .expect("create item");
 
-    assert_eq!(created.status, TaskBoardStatus::Backlog);
+    assert_eq!(created.status, TaskBoardStatus::Inbox);
 }
 
 /// The same labelled item with no requested lane is still triage's to place,
@@ -115,8 +115,8 @@ async fn an_omitted_status_leaves_placement_to_triage() {
     let directory = tempdir().expect("tempdir");
     let db = connect(&directory).await;
     let mut create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
-        "title": "Stay in the backlog",
-        "status": "backlog",
+        "title": "Stay in the inbox",
+        "status": "inbox",
         "tags": ["kind/bug"],
     }))
     .expect("create request");

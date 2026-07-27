@@ -166,8 +166,8 @@ struct ToolCallTimelineViewTests {
     )
   }
 
-  @Test("Announcement helper suppresses backlog hydration and session replacement")
-  func announcementHelperSuppressesBacklogHydrationAndSessionReplacement() throws {
+  @Test("Announcement helper suppresses inbox hydration and session replacement")
+  func announcementHelperSuppressesInboxHydrationAndSessionReplacement() throws {
     let terminalRow = try #require(
       ToolCallTimelineRow(
         entry: makeAnnotatedToolCallEntry(

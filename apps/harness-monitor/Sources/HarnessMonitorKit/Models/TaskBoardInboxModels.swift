@@ -3,11 +3,11 @@ import Foundation
 @frozen
 public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   /// Raw value deliberately isn't the bare string "umbrella": that string is
-  /// the migration sentinel for the lane once named Umbrella, now `.backlog`.
+  /// the migration sentinel for the lane once named Umbrella, now `.inbox`.
   /// Reusing it here would make the collapse/appearance preference decoders
   /// silently swallow this lane's persisted overrides.
   case umbrella = "umbrella_items"
-  case backlog
+  case inbox
   case todo
   case planning
   case inProgress = "in_progress"
@@ -20,7 +20,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
 
   private static let orderedCases: [Self] = [
     .umbrella,
-    .backlog,
+    .inbox,
     .todo,
     .planning,
     .inProgress,
@@ -33,7 +33,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   ]
 
   private static let laneByTaskBoardStatus: [TaskBoardStatus: Self] = [
-    .backlog: .backlog,
+    .inbox: .inbox,
     .todo: .todo,
     .planning: .planning,
     .inProgress: .inProgress,
@@ -54,7 +54,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   }
 
   public static var active: Self { .inProgress }
-  public static var open: Self { .backlog }
+  public static var open: Self { .inbox }
 
   public var id: String { rawValue }
 
@@ -62,8 +62,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .umbrella:
       "Umbrella"
-    case .backlog:
-      "Backlog"
+    case .inbox:
+      "Inbox"
     case .todo:
       "Todo"
     case .planning:
@@ -89,7 +89,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .umbrella:
       "umbrella.fill"
-    case .backlog:
+    case .inbox:
       "tray"
     case .todo:
       "tray.and.arrow.down"
@@ -123,7 +123,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .inProgress:
       self = .inProgress
     case .open:
-      self = task.assignedTo != nil || task.queuedAt != nil ? .todo : .backlog
+      self = task.assignedTo != nil || task.queuedAt != nil ? .todo : .inbox
     case .done:
       return nil
     }
@@ -140,7 +140,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .inProgress:
       self = .inProgress
     case .open:
-      self = .backlog
+      self = .inbox
     case .done:
       return nil
     }

@@ -9,7 +9,7 @@ use crate::task_board::{TaskBoardStatus, TriageVerdict};
 /// hidden for a provider exclusion must come back out of restore still in
 /// the override's lane -- not wherever the refreshed machine decision alone
 /// would place it (here, an empty-tags restore patch means the automatic
-/// verdict is genuinely Undecided/Backlog). Restoring must never recreate
+/// verdict is genuinely Undecided/Inbox). Restoring must never recreate
 /// the effective-vs-item contradiction the override exists to prevent.
 #[tokio::test]
 async fn restore_reasserts_an_active_override_over_the_refreshed_automatic_decision() {

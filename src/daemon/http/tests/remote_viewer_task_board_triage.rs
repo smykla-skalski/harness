@@ -18,7 +18,7 @@ pub(super) async fn seed_triage_item(state: &crate::daemon::http::DaemonHttpStat
         "Verify triage redaction.".into(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = vec!["triage/needs-info".to_string()];
     let db = state.async_db.get().expect("async db");
     db.create_task_board_item_with_triage(item)

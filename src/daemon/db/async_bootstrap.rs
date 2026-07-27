@@ -180,6 +180,9 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         // v55 is one replayable statement pair: the scope backfill for roles
         // that gained `pair_manage`.
         54 => 55,
+        // v56 renames the task-board inbox lane. The synchronous path also
+        // canonicalizes nested JSON status fields before it seeds this row.
+        55 => 56,
         _ => u64::MAX,
     }
 }

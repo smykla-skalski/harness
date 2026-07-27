@@ -253,7 +253,7 @@ mod tests {
         TaskBoardTriageOverride {
             verdict: TriageVerdict::Undecided,
             actor: "operator-1".to_string(),
-            reason: Some("looks fine as backlog".to_string()),
+            reason: Some("looks fine as inbox".to_string()),
             set_at: "2026-07-23T00:00:00Z".to_string(),
         }
     }
@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(triage_override.actor, "operator-1");
         assert_eq!(
             triage_override.reason.as_deref(),
-            Some("looks fine as backlog")
+            Some("looks fine as inbox")
         );
     }
 

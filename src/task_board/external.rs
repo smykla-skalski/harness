@@ -228,13 +228,13 @@ pub(super) fn canonical_external_status(status: TaskBoardStatus) -> TaskBoardSta
     if status.canonical_persisted_status() == TaskBoardStatus::Done {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::Backlog
+        TaskBoardStatus::Inbox
     }
 }
 
 pub(super) fn local_external_status(status: TaskBoardStatus) -> Option<TaskBoardStatus> {
     match status.canonical_persisted_status() {
-        TaskBoardStatus::Backlog | TaskBoardStatus::Todo => Some(TaskBoardStatus::Backlog),
+        TaskBoardStatus::Inbox | TaskBoardStatus::Todo => Some(TaskBoardStatus::Inbox),
         TaskBoardStatus::Done => Some(TaskBoardStatus::Done),
         _ => None,
     }

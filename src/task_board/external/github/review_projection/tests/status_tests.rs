@@ -5,20 +5,20 @@ fn external_status_reconciliation_preserves_workflow_and_tracks_provider_termina
     assert_eq!(
         reconciled_external_status(
             TaskBoardStatus::InProgress,
-            Some(TaskBoardStatus::Backlog),
-            TaskBoardStatus::Backlog,
+            Some(TaskBoardStatus::Inbox),
+            TaskBoardStatus::Inbox,
         ),
         TaskBoardStatus::InProgress
     );
     assert_eq!(
         reconciled_external_status(
-            TaskBoardStatus::Backlog,
-            Some(TaskBoardStatus::Backlog),
+            TaskBoardStatus::Inbox,
+            Some(TaskBoardStatus::Inbox),
             TaskBoardStatus::Done,
         ),
         TaskBoardStatus::Done
     );
-    for observed in [TaskBoardStatus::Backlog, TaskBoardStatus::Done] {
+    for observed in [TaskBoardStatus::Inbox, TaskBoardStatus::Done] {
         assert_eq!(
             reconciled_external_status(
                 TaskBoardStatus::InProgress,
@@ -32,21 +32,21 @@ fn external_status_reconciliation_preserves_workflow_and_tracks_provider_termina
         reconciled_external_status(
             TaskBoardStatus::Done,
             Some(TaskBoardStatus::Done),
-            TaskBoardStatus::Backlog,
+            TaskBoardStatus::Inbox,
         ),
-        TaskBoardStatus::Backlog
+        TaskBoardStatus::Inbox
     );
-    for last_synced in [TaskBoardStatus::Todo, TaskBoardStatus::Backlog] {
+    for last_synced in [TaskBoardStatus::Todo, TaskBoardStatus::Inbox] {
         assert_eq!(
             reconciled_external_status(
                 TaskBoardStatus::Todo,
                 Some(last_synced),
-                TaskBoardStatus::Backlog,
+                TaskBoardStatus::Inbox,
             ),
             TaskBoardStatus::Todo
         );
     }
-    for current in [TaskBoardStatus::Todo, TaskBoardStatus::Backlog] {
+    for current in [TaskBoardStatus::Todo, TaskBoardStatus::Inbox] {
         assert_eq!(
             reconciled_external_status(current, None, TaskBoardStatus::Done),
             TaskBoardStatus::Done
@@ -63,13 +63,13 @@ fn external_status_reconciliation_preserves_workflow_and_tracks_provider_termina
     assert_eq!(
         reconciled_external_status(
             TaskBoardStatus::Done,
-            Some(TaskBoardStatus::Backlog),
-            TaskBoardStatus::Backlog,
+            Some(TaskBoardStatus::Inbox),
+            TaskBoardStatus::Inbox,
         ),
         TaskBoardStatus::Done
     );
     assert_eq!(
-        reconciled_external_status(TaskBoardStatus::Done, None, TaskBoardStatus::Backlog),
+        reconciled_external_status(TaskBoardStatus::Done, None, TaskBoardStatus::Inbox),
         TaskBoardStatus::Done
     );
 }

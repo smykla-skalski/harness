@@ -2,7 +2,7 @@ import HarnessMonitorKit
 
 enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   case all
-  case backlog
+  case inbox
   case todo
   case planning
   case inProgress
@@ -20,7 +20,7 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   static let stableAllCases: [Self] = Self.allCases
 
   private static let statusChoices: [TaskBoardStatus: Self] = [
-    .backlog: .backlog,
+    .inbox: .inbox,
     .todo: .todo,
     .planning: .planning,
     .inProgress: .inProgress,
@@ -46,8 +46,8 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .all:
       nil
-    case .backlog:
-      .backlog
+    case .inbox:
+      .inbox
     case .todo:
       .todo
     case .planning:

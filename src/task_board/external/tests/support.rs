@@ -151,7 +151,7 @@ fn task_from_create_request(
         ),
         title: request.title().into(),
         body: request.body().into(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: None,
         updated_at: None,
         ..ExternalTask::default()
@@ -163,7 +163,7 @@ pub(super) fn external_task(external_id: &str, title: &str) -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: title.to_owned(),
         body: String::new(),
-        status: TaskBoardStatus::Backlog,
+        status: TaskBoardStatus::Inbox,
         project_id: None,
         updated_at: None,
         ..ExternalTask::default()
@@ -175,7 +175,7 @@ pub(super) fn github_external_task(
     title: &str,
     project_id: &str,
 ) -> ExternalTask {
-    github_external_task_with_status(external_id, title, project_id, TaskBoardStatus::Backlog)
+    github_external_task_with_status(external_id, title, project_id, TaskBoardStatus::Inbox)
 }
 
 pub(super) fn github_external_task_with_status(
@@ -261,7 +261,7 @@ fn github_review_request_ref(external_id: &str) -> ExternalRef {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Review requested".to_owned()),
         body: Some("Please review the pull request.".to_owned()),
-        status: Some(TaskBoardStatus::Backlog),
+        status: Some(TaskBoardStatus::Inbox),
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
         synced_at: Some("2026-05-14T03:00:00Z".to_owned()),

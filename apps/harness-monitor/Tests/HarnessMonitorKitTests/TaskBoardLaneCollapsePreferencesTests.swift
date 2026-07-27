@@ -72,18 +72,29 @@ struct TaskBoardLaneCollapsePreferencesTests {
     )
   }
 
-  @Test("Legacy Umbrella override loads as Backlog and writes canonically")
-  func legacyUmbrellaOverrideLoadsAsBacklogAndWritesCanonically() {
+  @Test("Legacy Umbrella override loads as Inbox and writes canonically")
+  func legacyUmbrellaOverrideLoadsAsInboxAndWritesCanonically() {
     let overrides = TaskBoardLaneCollapsePreferences.overrides(
       from: #"{"umbrella":false}"#
     )
     let canonicalRawValue = TaskBoardLaneCollapsePreferences.rawValue(for: overrides)
 
-    #expect(overrides[.backlog] == false)
-    #expect(canonicalRawValue == #"{"backlog":false}"#)
+    #expect(overrides[.inbox] == false)
+    #expect(canonicalRawValue == #"{"inbox":false}"#)
   }
 
-  @Test("Umbrella lane override persists independently of the legacy backlog sentinel")
+  @Test("Legacy Backlog override loads as Inbox and writes canonically")
+  func legacyBacklogOverrideLoadsAsInboxAndWritesCanonically() {
+    let overrides = TaskBoardLaneCollapsePreferences.overrides(
+      from: #"{"backlog":false}"#
+    )
+    let canonicalRawValue = TaskBoardLaneCollapsePreferences.rawValue(for: overrides)
+
+    #expect(overrides[.inbox] == false)
+    #expect(canonicalRawValue == #"{"inbox":false}"#)
+  }
+
+  @Test("Umbrella lane override persists independently of the legacy inbox sentinel")
   func umbrellaLaneOverridePersistsIndependentlyOfLegacySentinel() {
     let rawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
       lane: .umbrella,
@@ -93,7 +104,7 @@ struct TaskBoardLaneCollapsePreferencesTests {
     let overrides = TaskBoardLaneCollapsePreferences.overrides(from: rawValue)
 
     #expect(overrides[.umbrella] == false)
-    #expect(overrides[.backlog] == nil)
+    #expect(overrides[.inbox] == nil)
   }
 
   @Test("Repeated parses of the same raw value return equal results")

@@ -468,7 +468,7 @@ mod tests {
         baseline.sync_state = Some(ExternalRefSyncState {
             title: Some(intent.snapshot.title.clone()),
             body: Some(intent.snapshot.body.clone()),
-            status: Some(TaskBoardStatus::Backlog),
+            status: Some(TaskBoardStatus::Inbox),
             project_id: Some("acme/widgets".into()),
             updated_at: Some("provider-revision".into()),
             synced_at: Some("2026-07-16T15:01:00Z".into()),

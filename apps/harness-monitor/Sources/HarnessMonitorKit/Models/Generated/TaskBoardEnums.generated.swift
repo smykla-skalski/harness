@@ -5,7 +5,7 @@
 import Foundation
 
 public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
-  case backlog
+  case inbox
   case todo
   case planning
   case inProgress
@@ -22,11 +22,11 @@ public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case blocked
   case unknown(String)
 
-  public static let allCases: [Self] = [.backlog, .todo, .planning, .inProgress, .agenticReview, .testing, .inReview, .toReview, .humanRequired, .failed, .done, .new, .planReview, .needsYou, .blocked]
+  public static let allCases: [Self] = [.inbox, .todo, .planning, .inProgress, .agenticReview, .testing, .inReview, .toReview, .humanRequired, .failed, .done, .new, .planReview, .needsYou, .blocked]
 
   public var rawValue: String {
     switch self {
-    case .backlog: "backlog"
+    case .inbox: "inbox"
     case .todo: "todo"
     case .planning: "planning"
     case .inProgress: "in_progress"
@@ -47,7 +47,7 @@ public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
 
   public init(rawValue: String) {
     switch rawValue {
-    case "backlog": self = .backlog
+    case "inbox": self = .inbox
     case "todo": self = .todo
     case "planning": self = .planning
     case "in_progress": self = .inProgress

@@ -131,7 +131,7 @@ extension PreviewHarnessClientState {
     _ verdict: TriageVerdict, to item: TaskBoardItem, producer: String,
     preserveAnyAutomaticProducer: Bool
   ) -> [TaskBoardShiftedItemRevision] {
-    let destinationStatus: TaskBoardStatus = verdict == .todo ? .todo : .backlog
+    let destinationStatus: TaskBoardStatus = verdict == .todo ? .todo : .inbox
     let manuallyPlaced: Bool
     if case .manual = item.laneOrigin {
       manuallyPlaced = true
@@ -193,7 +193,7 @@ extension PreviewHarnessClientState {
       replacePosition(
         item,
         PreviewLanePlacement(
-          status: .backlog,
+          status: .inbox,
           lanePosition: nil,
           laneOrigin: nil,
           laneSetAt: nil

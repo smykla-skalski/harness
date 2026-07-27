@@ -6,7 +6,7 @@ use crate::task_board::{
 };
 
 async fn seed_with_override(db: &AsyncDaemonDb, item_id: &str) {
-    db.create_task_board_item(backlog_item(item_id))
+    db.create_task_board_item(inbox_item(item_id))
         .await
         .expect("seed item");
     db.set_task_board_triage_override(TaskBoardTriageOverrideSetInput {
@@ -51,7 +51,7 @@ async fn clear_dispatch_reservation(db: &AsyncDaemonDb, item_id: &str) {
 #[tokio::test]
 async fn active_dispatch_reservation_suppresses_override_rerank_until_it_clears() {
     let (_directory, db) = connect().await;
-    let mut sibling = backlog_item("sibling");
+    let mut sibling = inbox_item("sibling");
     sibling.status = TaskBoardStatus::Todo;
     sibling.priority = TaskBoardPriority::High;
     sibling.lane_position = Some(0);

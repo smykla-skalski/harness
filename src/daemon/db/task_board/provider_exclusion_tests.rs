@@ -29,7 +29,7 @@ fn pre_dispatch_item(id: &str) -> TaskBoardItem {
         String::new(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item.tags = vec!["duplicate".into()];
     item.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
@@ -230,7 +230,7 @@ async fn refuses_to_hide_an_item_past_pre_dispatch_status() {
 
     assert!(
         mutation.is_none(),
-        "an item past pre-dispatch (Backlog/Todo) must never be silently hidden"
+        "an item past pre-dispatch (Inbox/Todo) must never be silently hidden"
     );
 }
 

@@ -103,7 +103,7 @@ struct TaskBoardOverviewBehaviorTests {
       sessionID: "session-1",
       taskID: "task-1",
       status: .open,
-      sourceLaneRawValue: TaskBoardInboxLane.backlog.rawValue
+      sourceLaneRawValue: TaskBoardInboxLane.inbox.rawValue
     )
 
     #expect(!plainTask.accepts(destination: .umbrella))

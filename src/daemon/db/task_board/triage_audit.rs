@@ -157,7 +157,7 @@ fn provider_exclusion_context_value(context: &ProviderExclusionAuditContext) -> 
 }
 
 /// One semantic audit event for a provider-exclusion hide, even when the
-/// item had no lane anchor to change (a default Backlog item, for example):
+/// item had no lane anchor to change (a default Inbox item, for example):
 /// the exclusion itself is the consequential change, not just whatever
 /// placement side effect it happened to also produce. No human actor is
 /// recorded -- the transport has not authenticated one for a provider sync.

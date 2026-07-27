@@ -24,14 +24,14 @@ async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-fn backlog_item(id: &str) -> TaskBoardItem {
+fn inbox_item(id: &str) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.into(),
         "Title".into(),
         String::new(),
         "2026-07-23T00:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::Backlog;
+    item.status = TaskBoardStatus::Inbox;
     item
 }
 
@@ -88,7 +88,7 @@ async fn seed_decided_todo(db: &AsyncDaemonDb, item_id: &str) {
     use super::super::items::{load_item_in_tx, replace_item_in_tx};
     use super::super::triage_apply::apply_builtin_v1_triage_in_tx;
 
-    db.create_task_board_item(backlog_item(item_id))
+    db.create_task_board_item(inbox_item(item_id))
         .await
         .expect("seed item");
     let mut transaction = db

@@ -118,7 +118,7 @@ enum TaskBoardStepStageResolver {
 
   private static func boardColumn(_ status: TaskBoardStatus) -> TaskBoardStepColumn? {
     switch status {
-    case .todo, .backlog, .planning, .new, .planReview: .todo
+    case .todo, .inbox, .planning, .new, .planReview: .todo
     case .inProgress, .testing: .inProgress
     case .toReview, .agenticReview, .humanRequired, .needsYou: .toReview
     case .inReview: .inReview
