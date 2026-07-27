@@ -1,14 +1,15 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 use std::fs::OpenOptions;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
+use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session_wire::{ActiveRegistry, ProjectOriginRecord};
 use crate::infra::io::{read_json_typed, validate_safe_segment};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
@@ -18,18 +19,6 @@ use crate::workspace::{harness_data_root, ids, project_context_dir, utc_now};
 
 #[path = "../../../../src/session/storage/migrations.rs"]
 mod migrations;
-
-#[derive(Debug, Clone, Deserialize, Default)]
-pub(super) struct ActiveRegistry {
-    #[serde(default)]
-    pub(super) sessions: BTreeMap<String, String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct ProjectOriginRecord {
-    #[serde(default)]
-    adopted_session_roots: BTreeMap<String, String>,
-}
 
 pub(super) fn layout_from_project_dir(
     project_dir: &Path,

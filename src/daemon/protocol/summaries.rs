@@ -5,7 +5,6 @@ use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
 use crate::github_api::{GitHubApiStatus, GitHubRateResource};
-use crate::session::service::ResolvedRuntimeSessionAgent;
 #[cfg(not(any(feature = "bridge-runtime", feature = "daemon-runtime")))]
 use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
@@ -68,17 +67,7 @@ pub struct ReadinessResponse {
     pub daemon_epoch: String,
 }
 
-/// Wire-level outcome of a runtime-session lookup.
-///
-/// Returned by `GET /v1/runtime-sessions/resolve`. `resolved` is `None` when
-/// no live agent matches; `Some` carries the single unambiguous match. The
-/// daemon surfaces ambiguity as a `session_ambiguous` error instead of
-/// populating this response with multiple entries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct RuntimeSessionResolutionResponse {
-    pub resolved: Option<ResolvedRuntimeSessionAgent>,
-}
+pub use harness_protocol::session_wire::RuntimeSessionResolutionResponse;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]

@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
-
 use harness_kernel::errors::CliError;
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
@@ -13,25 +11,10 @@ use crate::workspace::{harness_data_root, resolve_git_checkout_identity};
 use super::files;
 
 // ---------------------------------------------------------------------------
-// New registry types (Task 7)
-// ---------------------------------------------------------------------------
-
-/// Per-project active-session registry.
-///
-/// Stored at `<sessions_root>/<project_name>/.active.json`.
-/// The map key is the session id; the value is the creation timestamp.
-///
-/// Fields `is_worktree`, `worktree_name`, and `recorded_from_dir` have been
-/// dropped: the daemon always creates worktrees so they are redundant.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct ActiveRegistry {
-    #[serde(default)]
-    pub(crate) sessions: BTreeMap<String, String>,
-}
-
-// ---------------------------------------------------------------------------
 // Registry operations on SessionLayout
 // ---------------------------------------------------------------------------
+
+pub(crate) use harness_protocol::session_wire::ActiveRegistry;
 
 /// Register a session id in the per-project active-session registry.
 ///
@@ -120,15 +103,7 @@ pub(crate) fn load_active_registry_for_context_root(context_root: &Path) -> Acti
 // TODO(b-task-8): remove once daemon/index/contexts.rs is migrated.
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct ProjectOriginRecord {
-    pub(crate) recorded_from_dir: String,
-    pub(crate) repository_root: Option<String>,
-    pub(crate) checkout_root: Option<String>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub(crate) adopted_session_roots: BTreeMap<String, String>,
-    pub(crate) recorded_at: String,
-}
+pub(crate) use harness_protocol::session_wire::ProjectOriginRecord;
 
 const PROJECT_ORIGIN_FILE: &str = "project-origin.json";
 

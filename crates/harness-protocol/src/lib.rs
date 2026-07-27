@@ -23,6 +23,9 @@ pub mod daemon;
 pub mod timeline;
 /// Managed-agent request and response contracts shared by daemon clients.
 pub mod managed_agents;
+/// Session request/response and on-disk registry contracts shared by daemon
+/// clients that talk to a session directly.
+pub mod session_wire;
 
 // Compatibility namespaces for the canonical session model sources. They
 // intentionally expose only protocol models, never application/runtime code.

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::agents::runtime::signal::AckResult;
 use crate::session::service::ImproverTarget;
 use crate::session::types::{
     ReviewPoint, ReviewVerdict, SessionRole, SessionState, TaskQueuePolicy, TaskSeverity,
@@ -108,11 +107,7 @@ pub struct SessionArchiveRequest {
     pub actor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct SessionLeaveRequest {
-    pub agent_id: String,
-}
+pub use harness_protocol::session_wire::SessionLeaveRequest;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
@@ -168,14 +163,7 @@ pub struct SessionJoinRequest {
     pub persona: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct SignalAckRequest {
-    pub agent_id: String,
-    pub signal_id: String,
-    pub result: AckResult,
-    pub project_dir: String,
-}
+pub use harness_protocol::session_wire::SignalAckRequest;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
@@ -265,14 +253,7 @@ pub struct AdoptSessionRequest {
     pub session_root: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct AgentRuntimeSessionRegistrationRequest {
-    pub managed_agent_id: String,
-    pub runtime: String,
-    pub runtime_session_id: String,
-    pub project_dir: String,
-}
+pub use harness_protocol::session_wire::AgentRuntimeSessionRegistrationRequest;
 
 #[cfg(test)]
 mod tests {
@@ -294,8 +275,4 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct AgentRuntimeSessionRegistrationResponse {
-    pub registered: bool,
-}
+pub use harness_protocol::session_wire::AgentRuntimeSessionRegistrationResponse;
