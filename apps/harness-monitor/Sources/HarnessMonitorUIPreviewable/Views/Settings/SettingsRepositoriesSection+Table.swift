@@ -27,12 +27,17 @@ struct RepositoriesMonitoredSection: View {
   /// An expanded row outgrows a fixed row height, so the table only reserves
   /// space for collapsed ones and lets the expanded panels push it taller.
   /// Counted against the rows that still exist rather than against the expanded
-  /// set, which keeps the id of a repository deleted while it was open.
+  /// set, which keeps the id of a repository deleted while it was open. Both
+  /// heights track `fontScale`, because the text inside them does.
   private var repositoriesTableRowsHeight: CGFloat {
     let visibleRows = min(draft.rows.count, 12)
     let expanded = min(draft.rows.count(where: { expandedRows.contains($0.id) }), visibleRows)
-    return CGFloat(visibleRows) * 44 + CGFloat(expanded) * 320
+    return CGFloat(visibleRows) * collapsedRowHeight + CGFloat(expanded) * expandedPanelHeight
   }
+
+  private var collapsedRowHeight: CGFloat { 44 * fontScale }
+
+  private var expandedPanelHeight: CGFloat { 320 * fontScale }
 
   private var tableBackground: some ShapeStyle {
     Color(nsColor: .controlBackgroundColor).opacity(0.42)
