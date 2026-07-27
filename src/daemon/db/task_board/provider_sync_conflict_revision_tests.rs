@@ -2,9 +2,109 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    ExternalProvider, ExternalRefProvider, TaskBoardConflictState, TaskBoardItem,
-    TaskBoardSyncConflict,
+    ExternalProvider, ExternalRefProvider, ExternalSyncField, TaskBoardConflictState,
+    TaskBoardItem, TaskBoardSyncConflict,
 };
+
+#[tokio::test]
+async fn stale_empty_conflict_replacement_is_a_noop() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    db.create_task_board_item(TaskBoardItem::new(
+        "task-revision-fence".into(),
+        "Original title".into(),
+        String::new(),
+        "2026-07-16T10:00:00Z".into(),
+    ))
+    .await
+    .expect("create item");
+    advance_item_revision(&db).await;
+
+    db.replace_open_task_board_sync_conflicts(
+        "task-revision-fence",
+        ExternalProvider::GitHub,
+        "acme/widgets#17",
+        1,
+        &[],
+    )
+    .await
+    .expect("an empty replacement cannot persist stale conflict data");
+}
+
+#[tokio::test]
+async fn stale_conflict_supersession_without_open_conflicts_is_a_noop() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    db.create_task_board_item(TaskBoardItem::new(
+        "task-revision-fence".into(),
+        "Original title".into(),
+        String::new(),
+        "2026-07-16T10:00:00Z".into(),
+    ))
+    .await
+    .expect("create item");
+    advance_item_revision(&db).await;
+
+    db.supersede_open_task_board_sync_conflicts(
+        "task-revision-fence",
+        ExternalProvider::GitHub,
+        "acme/widgets#17",
+        1,
+        &[ExternalSyncField::Title],
+    )
+    .await
+    .expect("missing open conflicts make stale supersession a no-op");
+}
+
+#[tokio::test]
+async fn stale_conflict_supersession_cannot_resolve_an_open_conflict() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    db.create_task_board_item(TaskBoardItem::new(
+        "task-revision-fence".into(),
+        "Original title".into(),
+        String::new(),
+        "2026-07-16T10:00:00Z".into(),
+    ))
+    .await
+    .expect("create item");
+    db.replace_open_task_board_sync_conflicts(
+        "task-revision-fence",
+        ExternalProvider::GitHub,
+        "acme/widgets#17",
+        1,
+        &[conflict_at_revision(1)],
+    )
+    .await
+    .expect("record conflict");
+    advance_item_revision(&db).await;
+
+    let error = db
+        .supersede_open_task_board_sync_conflicts(
+            "task-revision-fence",
+            ExternalProvider::GitHub,
+            "acme/widgets#17",
+            1,
+            &[ExternalSyncField::Title],
+        )
+        .await
+        .expect_err("stale supersession must not resolve an open conflict");
+
+    assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
+    assert_eq!(
+        db.open_task_board_sync_conflicts()
+            .await
+            .expect("open conflicts")
+            .len(),
+        1
+    );
+}
 
 #[tokio::test]
 async fn stale_conflict_snapshot_cannot_replace_newer_item_revision() {
@@ -20,12 +120,7 @@ async fn stale_conflict_snapshot_cannot_replace_newer_item_revision() {
     );
     db.create_task_board_item(item).await.expect("create item");
     let conflict = conflict_at_revision(1);
-    db.update_task_board_item("task-revision-fence", |item| {
-        item.title = "Concurrent title".into();
-        Ok(true)
-    })
-    .await
-    .expect("concurrent edit");
+    advance_item_revision(&db).await;
 
     let error = db
         .replace_open_task_board_sync_conflicts(
@@ -118,6 +213,15 @@ async fn conflict_payload_must_match_the_declared_external_ref() {
             .expect("open conflicts")
             .is_empty()
     );
+}
+
+async fn advance_item_revision(db: &AsyncDaemonDb) {
+    db.update_task_board_item("task-revision-fence", |item| {
+        item.title = "Concurrent title".into();
+        Ok(true)
+    })
+    .await
+    .expect("concurrent edit");
 }
 
 fn conflict_at_revision(item_revision: i64) -> TaskBoardSyncConflict {
