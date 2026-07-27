@@ -411,19 +411,55 @@ scenario_set_leaves_an_independent_member_alone() {
   fi
 }
 
-scenario_seeded_sandbox_starts_in_sync
-scenario_check_rejects_a_stale_openapi_document
-scenario_check_names_an_unreadable_openapi_version
-scenario_set_stamps_the_openapi_document
-scenario_check_rejects_a_stale_member_crate
-scenario_check_rejects_a_member_added_after_the_tooling
-scenario_check_rejects_a_stale_member_requirement
-scenario_check_rejects_an_unreadable_member_requirement
-scenario_check_accepts_a_path_only_member_requirement
-scenario_set_moves_every_shared_workspace_member
-scenario_check_ignores_an_independent_member_version
-scenario_check_rejects_an_independent_member_lock_drift
-scenario_set_leaves_an_independent_member_alone
+scenarios=(
+  scenario_seeded_sandbox_starts_in_sync
+  scenario_check_rejects_a_stale_openapi_document
+  scenario_check_names_an_unreadable_openapi_version
+  scenario_set_stamps_the_openapi_document
+  scenario_check_rejects_a_stale_member_crate
+  scenario_check_rejects_a_member_added_after_the_tooling
+  scenario_check_rejects_a_stale_member_requirement
+  scenario_check_rejects_an_unreadable_member_requirement
+  scenario_check_accepts_a_path_only_member_requirement
+  scenario_set_moves_every_shared_workspace_member
+  scenario_check_ignores_an_independent_member_version
+  scenario_check_rejects_an_independent_member_lock_drift
+  scenario_set_leaves_an_independent_member_alone
+)
+
+case "${1:-}" in
+  --list)
+    printf '%s\n' "${scenarios[@]}"
+    exit 0
+    ;;
+  --scenario)
+    [[ "$#" -eq 2 ]] || {
+      printf 'usage: %s [--list|--scenario NAME]\n' "$0" >&2
+      exit 2
+    }
+    selected="$2"
+    for scenario in "${scenarios[@]}"; do
+      if [[ "$scenario" == "$selected" ]]; then
+        "$scenario"
+        selected=""
+        break
+      fi
+    done
+    [[ -z "$selected" ]] || {
+      printf 'error: unknown version scenario: %s\n' "$2" >&2
+      exit 2
+    }
+    ;;
+  "")
+    for scenario in "${scenarios[@]}"; do
+      "$scenario"
+    done
+    ;;
+  *)
+    printf 'usage: %s [--list|--scenario NAME]\n' "$0" >&2
+    exit 2
+    ;;
+esac
 
 log "version tests: $PASS_COUNT passed, $FAIL_COUNT failed"
 if ((FAIL_COUNT > 0)); then

@@ -5,6 +5,14 @@ unalias -a 2>/dev/null || true
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
+if [[ -n "${HARNESS_RELEASE_BUILD_TEST_CARGO_WRAPPER:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_RELEASE_BUILD_TEST_CARGO_WRAPPER
+fi
+if [[ -n "${HARNESS_RELEASE_BUILD_TEST_WAIT_FOR_FILE:-}" ]]; then
+  release_require_script_test_override \
+    HARNESS_RELEASE_BUILD_TEST_WAIT_FOR_FILE
+fi
 if (( $# > 0 )); then
   selectors=("$@")
 else
@@ -41,6 +49,7 @@ if [[ -z "$target_dir" ]]; then
 fi
 target_dir="$(release_normalize_target_dir "$target_dir")"
 export CARGO_TARGET_DIR="$target_dir"
+cargo_driver="${HARNESS_RELEASE_BUILD_TEST_CARGO_WRAPPER:-$ROOT/scripts/cargo-local.sh}"
 
 job_cap="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-1}}"
 if [[ ! "$job_cap" =~ ^[0-9]+$ ]] || (( job_cap < 1 )); then
@@ -125,46 +134,46 @@ start_leaf() {
     export HARNESS_RELEASE_OUTPUT_TARGET_DIR="$target_dir"
     case "$name" in
       harness)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness --bin harness
         ;;
       daemon)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness-daemon --bin harness-daemon \
           --features tokio-console
         ;;
       systemd)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness-systemd --bin harness-systemd
         ;;
       bridge)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness-bridge --bin harness-bridge
         ;;
       mcp)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness-mcp --bin harness-mcp
         ;;
       hook)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness-hook --bin harness-hook
         ;;
       codex)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked \
           --manifest-path crates/harness-codex-acp/Cargo.toml
         ;;
       openrouter)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked \
           --manifest-path crates/harness-openrouter-agent/Cargo.toml
         ;;
       panel)
-        exec "$ROOT/scripts/cargo-local.sh" \
+        exec "$cargo_driver" \
           build --release --locked -p harness-panel --bin harness-panel
         ;;
       aff)
-        exec "$ROOT/scripts/cargo-local.sh" build --release --locked -p aff --bin aff
+        exec "$cargo_driver" build --release --locked -p aff --bin aff
         ;;
     esac
   ) >"$log_path" 2>&1 &
@@ -274,6 +283,12 @@ while (( next_leaf < leaf_count || active_count > 0 )); do
     start_leaf "$next_leaf"
     next_leaf=$((next_leaf + 1))
     if [[ "${HARNESS_RELEASE_BUILD_TEST_EXIT_AFTER_STARTS:-}" == "$next_leaf" ]]; then
+      if [[ -n "${HARNESS_RELEASE_BUILD_TEST_WAIT_FOR_FILE:-}" ]]; then
+        for _ in {1..400}; do
+          [[ -s "$HARNESS_RELEASE_BUILD_TEST_WAIT_FOR_FILE" ]] && break
+          sleep 0.025
+        done
+      fi
       sleep "${HARNESS_RELEASE_BUILD_TEST_EXIT_DELAY_SECONDS:-0}"
       printf 'injected release coordinator exit\n' >&2
       exit 91

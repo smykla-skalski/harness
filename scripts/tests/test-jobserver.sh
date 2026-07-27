@@ -25,6 +25,7 @@ chmod +x "$PROBE_SCRIPT" "$PROBE_HOLDER"
 passed=0
 failed=0
 started_pools=()
+TEST_RUN_TOKEN="${HARNESS_SCRIPT_TEST_RUN_TOKEN:-manual}"
 
 pass() {
   printf 'PASS: %s\n' "$1"
@@ -39,7 +40,7 @@ fail() {
 # Each scenario gets its own synthetic repo root, and the pool path is a hash of
 # that root, so scenarios never share a supervisor.
 fake_root() {
-  printf '/synthetic/%s/%s' "$$" "$1"
+  printf '/synthetic/%s/%s/%s' "$TEST_RUN_TOKEN" "$$" "$1"
 }
 
 pool_dir_for() {
@@ -76,15 +77,22 @@ kill_supervisor() {
 }
 
 stop_pool_at_dir() {
-  kill_supervisor "$(head -1 "$1/lock" 2>/dev/null || true)"
+  local dir="$1" pid
+  for _ in {1..50}; do
+    pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
+    if is_supervisor_pid "$pid"; then
+      kill_supervisor "$pid"
+      return
+    fi
+    sleep 0.01
+  done
 }
 
 cleanup() {
-  local dir pid
+  local dir
   for dir in "${started_pools[@]:-}"; do
     [[ -n "$dir" ]] || continue
-    pid="$(head -1 "$dir/lock" 2>/dev/null || true)"
-    kill_supervisor "$pid"
+    stop_pool_at_dir "$dir"
     rm -rf "$dir" 2>/dev/null || true
   done
   rm -rf "$PROBE_DIR" 2>/dev/null || true
@@ -999,37 +1007,71 @@ scenario_run_propagates_exit_status() {
   pass "$name"
 }
 
-scenario_ensure_starts_pool_and_prints_makeflags
-scenario_ensure_is_idempotent
-scenario_run_exports_granted_width
-scenario_grant_is_capped_by_budget
-scenario_second_client_gets_the_remainder
-scenario_sigkilled_client_returns_its_tokens
-scenario_foreign_owned_pool_dir_is_refused
-scenario_missing_pool_still_runs_the_command
-scenario_run_preserves_argument_separators
-scenario_lock_file_holds_only_the_current_pid
-scenario_ensure_reports_the_running_budget
-scenario_pool_location_ignores_the_user_variable
-scenario_a_non_fifo_at_the_pool_path_is_replaced
-scenario_acquire_surfaces_a_real_read_error
-scenario_idle_exit_leaves_no_tokens_behind
-scenario_partial_pool_keeps_its_tokens
-scenario_signal_death_reports_a_shell_signal_status
-scenario_split_request_is_still_granted
-scenario_a_wiped_pool_does_not_wedge_its_successor
-scenario_ensure_refuses_a_replaced_fifo
-scenario_junk_at_either_runtime_path_is_cleared
-scenario_restart_does_not_mint_a_second_budget
-scenario_oversized_request_cannot_kill_the_pool
-scenario_nonsense_widths_are_refused
-scenario_cleanup_only_signals_a_supervisor
-scenario_a_client_that_never_reads_cannot_wedge_the_pool
-scenario_pipelined_requests_are_all_answered
-scenario_symlinked_pool_parent_is_refused
-scenario_pool_dir_mode_is_repaired_both_ways
-scenario_stalled_supervisor_does_not_hang_the_command
-scenario_run_propagates_exit_status
+JOBSERVER_TEST_SCENARIOS=(
+  scenario_ensure_starts_pool_and_prints_makeflags
+  scenario_ensure_is_idempotent
+  scenario_run_exports_granted_width
+  scenario_grant_is_capped_by_budget
+  scenario_second_client_gets_the_remainder
+  scenario_sigkilled_client_returns_its_tokens
+  scenario_foreign_owned_pool_dir_is_refused
+  scenario_missing_pool_still_runs_the_command
+  scenario_run_preserves_argument_separators
+  scenario_lock_file_holds_only_the_current_pid
+  scenario_ensure_reports_the_running_budget
+  scenario_pool_location_ignores_the_user_variable
+  scenario_a_non_fifo_at_the_pool_path_is_replaced
+  scenario_acquire_surfaces_a_real_read_error
+  scenario_idle_exit_leaves_no_tokens_behind
+  scenario_partial_pool_keeps_its_tokens
+  scenario_signal_death_reports_a_shell_signal_status
+  scenario_split_request_is_still_granted
+  scenario_a_wiped_pool_does_not_wedge_its_successor
+  scenario_ensure_refuses_a_replaced_fifo
+  scenario_junk_at_either_runtime_path_is_cleared
+  scenario_restart_does_not_mint_a_second_budget
+  scenario_oversized_request_cannot_kill_the_pool
+  scenario_nonsense_widths_are_refused
+  scenario_cleanup_only_signals_a_supervisor
+  scenario_a_client_that_never_reads_cannot_wedge_the_pool
+  scenario_pipelined_requests_are_all_answered
+  scenario_symlinked_pool_parent_is_refused
+  scenario_pool_dir_mode_is_repaired_both_ways
+  scenario_stalled_supervisor_does_not_hang_the_command
+  scenario_run_propagates_exit_status
+)
+
+run_all() {
+  local scenario
+  for scenario in "${JOBSERVER_TEST_SCENARIOS[@]}"; do
+    "$scenario"
+  done
+}
+
+case "${1:-}" in
+  --list)
+    printf '%s\n' "${JOBSERVER_TEST_SCENARIOS[@]}"
+    exit 0
+    ;;
+  --scenario)
+    (( $# == 2 )) || {
+      printf 'usage: %s [--list|--scenario NAME]\n' "${0##*/}" >&2
+      exit 2
+    }
+    if [[ "$2" != scenario_* ]] || ! declare -F "$2" >/dev/null; then
+      printf 'unknown jobserver test scenario: %s\n' "$2" >&2
+      exit 2
+    fi
+    "$2"
+    ;;
+  "")
+    run_all
+    ;;
+  *)
+    printf 'usage: %s [--list|--scenario NAME]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
 
 printf 'jobserver tests: %d passed, %d failed\n' "$passed" "$failed"
 (( failed == 0 ))

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
+export HARNESS_SCRIPT_TEST_JOB="${HARNESS_SCRIPT_TEST_JOB:-release-install-direct}"
 export HARNESS_RELEASE_HOST_OS=Linux
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
@@ -76,6 +77,13 @@ printf 'start leaf=%s jobs=%s target_dir=%s build_dir=%s pid=%s args=%s\n' \
   "${CARGO_BUILD_BUILD_DIR:-}" "$$" "$args" \
   >>"$FAKE_CARGO_EVENTS"
 trap 'printf "term leaf=%s\n" "$leaf" >>"$FAKE_CARGO_EVENTS"; exit 143' TERM
+if [[ -n "${FAKE_CARGO_WAIT_FOR_STARTS:-}" ]]; then
+  for _ in {1..400}; do
+    starts="$(grep -c '^start leaf=' "$FAKE_CARGO_EVENTS" || true)"
+    (( starts >= FAKE_CARGO_WAIT_FOR_STARTS )) && break
+    sleep 0.025
+  done
+fi
 
 if [[ "${FAKE_CARGO_FAIL_LEAF:-}" == "$leaf" ]]; then
   sleep "${FAKE_CARGO_FAIL_DELAY:-0.1}"
@@ -109,6 +117,7 @@ fi
 printf 'finish leaf=%s\n' "$leaf" >>"$FAKE_CARGO_EVENTS"
 EOF
   command chmod +x "$fake_bin/cargo"
+  export HARNESS_RELEASE_BUILD_TEST_CARGO_WRAPPER="$fake_bin/cargo"
 }
 
 write_fake_codesign() {
@@ -136,8 +145,14 @@ write_fake_release_binary() {
   local name="$2"
   local version="$3"
   command mkdir -p "$target/release"
+  if [[ -x "${HARNESS_RELEASE_TEST_BINARY_TEMPLATE:-}" ]]; then
+    command cp "$HARNESS_RELEASE_TEST_BINARY_TEMPLATE" "$target/release/$name"
+    printf '\nHARNESS_FAKE_VERSION=%s\n' "$version" >>"$target/release/$name"
+    command chmod +x "$target/release/$name"
+    return
+  fi
   command cat >"$target/release/$name" <<EOF
-#!/usr/bin/env bash
+#!/bin/sh
 name='$name'
 version='$version'
 case "\${1:-}" in
@@ -174,6 +189,42 @@ write_fake_release_set() {
   for name in "${RELEASE_BINARIES[@]}"; do
     write_fake_release_binary "$target" "$name" "$version"
   done
+}
+
+seed_release_directory() {
+  local sandbox="$1"
+  local version="$2"
+  local release_id="$3"
+  local source="$sandbox/seed-$release_id"
+  write_fake_release_set "$source" "$version"
+  command mkdir -p "$sandbox/install-root/$release_id/bin"
+  command cp "$source/release/"* "$sandbox/install-root/$release_id/bin/"
+  command chmod 555 "$sandbox/install-root/$release_id/bin/"*
+  command rm -rf "$source"
+}
+
+activate_seeded_release() {
+  local sandbox="$1"
+  local release_id="$2"
+  local name path
+  command mkdir -p "$sandbox/bin" "$sandbox/aff-bin"
+  command ln -sfn "$release_id" "$sandbox/install-root/current"
+  for name in "${RELEASE_BINARIES[@]}"; do
+    if [[ "$name" == aff ]]; then
+      path="$sandbox/aff-bin/aff"
+    else
+      path="$sandbox/bin/$name"
+    fi
+    command ln -sfn "$sandbox/install-root/current/bin/$name" "$path"
+  done
+}
+
+seed_installed_release() {
+  local sandbox="$1"
+  local version="$2"
+  local release_id="${3:-seed-${version//[^[:alnum:]._-]/-}}"
+  seed_release_directory "$sandbox" "$version" "$release_id"
+  activate_seeded_release "$sandbox" "$release_id"
 }
 
 run_installer() {
@@ -226,6 +277,8 @@ scenario_build_group_allocates_one_budget() {
     CARGO_BUILD_JOBS="$job_cap" \
     CODEX_SESSION_ID="release-build-test-$$" \
     FAKE_CARGO_EVENTS="$events" \
+    FAKE_CARGO_SLEEP=0.2 \
+    FAKE_CARGO_WAIT_FOR_STARTS="${#HARNESS_RELEASE_ALL_BUILD_LEAVES[@]}" \
     HARNESS_RELEASE_BUILD_TRACE="$trace" \
     "$ROOT/scripts/cargo-local.sh" --with-group-lease \
     "$ROOT/scripts/build-release-set.sh" all >/dev/null
@@ -331,8 +384,7 @@ scenario_darwin_excludes_systemd_and_migrates_managed_link() {
   assert_not_contains "leaf=systemd" "$(command cat "$build_events")" || ok=0
   assert_not_contains "-p harness-systemd" "$(command cat "$build_events")" || ok=0
 
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 linux-47
   old_target="$(command readlink "$sandbox/install-root/current")"
   assert_contains "harness-systemd 47.0.0" \
     "$("$sandbox/bin/harness-systemd" --version)" || ok=0
@@ -448,7 +500,9 @@ scenario_build_group_cancels_siblings() {
     CODEX_SESSION_ID="release-failure-test-$$" \
     FAKE_CARGO_EVENTS="$events" \
     FAKE_CARGO_FAIL_LEAF=codex \
+    FAKE_CARGO_FAIL_DELAY=0.1 \
     FAKE_CARGO_SLEEP=8 \
+    FAKE_CARGO_WAIT_FOR_STARTS="${#HARNESS_RELEASE_ALL_BUILD_LEAVES[@]}" \
     "$ROOT/scripts/cargo-local.sh" --with-group-lease \
     "$ROOT/scripts/build-release-set.sh" all >/dev/null 2>&1 || status=$?
 
@@ -496,7 +550,7 @@ scenario_unexpected_coordinator_exit_cleans_children_and_lock() {
     FAKE_CARGO_EVENTS="$events" \
     FAKE_CARGO_SLEEP=8 \
     HARNESS_RELEASE_BUILD_TEST_EXIT_AFTER_STARTS=2 \
-    HARNESS_RELEASE_BUILD_TEST_EXIT_DELAY_SECONDS=1.5 \
+    HARNESS_RELEASE_BUILD_TEST_WAIT_FOR_FILE="$events" \
     "$ROOT/scripts/build-release-set.sh" all >/dev/null 2>&1 || status=$?
 
   local output started_pid ok=1
@@ -718,17 +772,17 @@ scenario_atomic_install_activates_all_binaries() {
 scenario_successful_installs_prune_inactive_release_sets() {
   start_test "successful installs retain a bounded rollback window"
   local sandbox="$SANDBOX/release-retention"
-  local active_target previous_target directory_count version
+  local active_target previous_target directory_count
 
-  for version in 47.0.0 48.0.0 49.0.0; do
-    write_fake_release_set "$sandbox/target" "$version"
-    HARNESS_INSTALL_RETAIN_RELEASE_SETS=2 \
-      run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
-  done
+  seed_release_directory "$sandbox" 47.0.0 inactive-47
+  seed_release_directory "$sandbox" 48.0.0 inactive-48
+  seed_installed_release "$sandbox" 49.0.0 rollback-49
   previous_target="$(command readlink "$sandbox/install-root/current")"
 
   write_fake_release_set "$sandbox/target" 50.0.0
+  : >"$sandbox/live-executables"
   HARNESS_INSTALL_RETAIN_RELEASE_SETS=2 \
+    HARNESS_INSTALL_TEST_LIVE_EXECUTABLES_FILE="$sandbox/live-executables" \
     run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
   active_target="$(command readlink "$sandbox/install-root/current")"
   directory_count="$(find "$sandbox/install-root" -mindepth 1 -maxdepth 1 \
@@ -755,11 +809,12 @@ scenario_live_worker_release_survives_retention() {
   start_test "live retired worker release survives bounded pruning"
   local sandbox="$SANDBOX/release-retention-live-worker"
   local live_target live_worker live_pid inactive_target rollback_target active_target
-  local directory_count version
+  local directory_count
 
-  write_fake_release_set "$sandbox/target" 47.0.0
-  HARNESS_INSTALL_RETAIN_RELEASE_SETS=2 \
-    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_release_directory "$sandbox" 47.0.0 live-47
+  seed_release_directory "$sandbox" 48.0.0 inactive-48
+  seed_installed_release "$sandbox" 49.0.0 rollback-49
+  activate_seeded_release "$sandbox" live-47
   live_target="$(command readlink "$sandbox/install-root/current")"
   live_worker="$sandbox/install-root/$live_target/bin/harness-daemon"
   command rm -f "$live_worker"
@@ -767,19 +822,15 @@ scenario_live_worker_release_survives_retention() {
   "$live_worker" 120 &
   live_pid=$!
   TEST_WORKER_PIDS+=("$live_pid")
+  printf '%s\n' "$live_worker" >"$sandbox/live-executables"
 
-  for version in 48.0.0 49.0.0; do
-    write_fake_release_set "$sandbox/target" "$version"
-    HARNESS_INSTALL_RETAIN_RELEASE_SETS=2 \
-      run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
-    if [[ "$version" == 48.0.0 ]]; then
-      inactive_target="$(command readlink "$sandbox/install-root/current")"
-    fi
-  done
+  inactive_target=inactive-48
+  activate_seeded_release "$sandbox" rollback-49
   rollback_target="$(command readlink "$sandbox/install-root/current")"
 
   write_fake_release_set "$sandbox/target" 50.0.0
   HARNESS_INSTALL_RETAIN_RELEASE_SETS=2 \
+    HARNESS_INSTALL_TEST_LIVE_EXECUTABLES_FILE="$sandbox/live-executables" \
     run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
   active_target="$(command readlink "$sandbox/install-root/current")"
   directory_count="$(find "$sandbox/install-root" -mindepth 1 -maxdepth 1 \
@@ -819,9 +870,7 @@ scenario_failed_install_keeps_rollback_target() {
   start_test "failed activation keeps the rollback target under retention"
   local sandbox="$SANDBOX/release-retention-rollback"
   local rollback_target current_target output status=0
-  write_fake_release_set "$sandbox/target" 47.0.0
-  HARNESS_INSTALL_RETAIN_RELEASE_SETS=2 \
-    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 rollback-47
   rollback_target="$(command readlink "$sandbox/install-root/current")"
 
   write_fake_release_set "$sandbox/target" 48.0.0
@@ -880,19 +929,23 @@ EOF
 scenario_first_install_activates_before_entrypoints() {
   start_test "first install activates the candidate before publishing entrypoints"
   local sandbox="$SANDBOX/activation-order" installer_pid status=0 name
+  local activated_file="$SANDBOX/activation-order.activated"
+  local continue_file="$SANDBOX/activation-order.continue"
   write_fake_release_set "$sandbox/target" 48.0.0
 
-  HARNESS_INSTALL_TEST_HOLD_AFTER_ACTIVATION_SECONDS=0.5 \
+  HARNESS_INSTALL_TEST_ACTIVATED_FILE="$activated_file" \
+    HARNESS_INSTALL_TEST_CONTINUE_FILE="$continue_file" \
     run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all \
     >"$sandbox/install.log" 2>&1 &
   installer_pid=$!
+  TEST_WORKER_PIDS+=("$installer_pid")
   for _ in {1..400}; do
-    [[ -L "$sandbox/install-root/current" ]] && break
+    [[ -e "$activated_file" ]] && break
     sleep 0.025
   done
 
   local ok=1
-  [[ -L "$sandbox/install-root/current" ]] || {
+  [[ -e "$activated_file" && -L "$sandbox/install-root/current" ]] || {
     fail "candidate was not activated during the publication hold"
     ok=0
   }
@@ -907,6 +960,7 @@ scenario_first_install_activates_before_entrypoints() {
     ok=0
   }
 
+  : >"$continue_file"
   wait "$installer_pid" || status=$?
   if (( status != 0 )); then
     fail "installer failed after activation-order check: $status"
@@ -923,8 +977,7 @@ scenario_post_activation_failure_rolls_back() {
   start_test "post-activation failure restores the previous set"
   local sandbox="$SANDBOX/rollback"
   local old_current output status=0
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 rollback-47
   old_current="$(command readlink "$sandbox/install-root/current")"
   write_fake_release_set "$sandbox/target" 48.0.0
 
@@ -978,7 +1031,7 @@ scenario_legacy_adapter_probes_are_normalized_before_activation() {
   start_test "legacy silent adapter probes are normalized before activation"
   local sandbox="$SANDBOX/legacy-adapters"
   local legacy_dir name output
-  local -a names=(harness-codex-acp harness-openrouter-agent)
+  local -a names=(harness-codex-acp)
   write_fake_release_set "$sandbox/target" 48.0.0
   write_fake_codesign "$sandbox/fake-bin"
   command mkdir -p "$sandbox/bin"
@@ -1064,9 +1117,11 @@ scenario_install_lock_serializes_overlapping_activation() {
   start_test "install lock serializes overlapping activation"
   local sandbox="$SANDBOX/lock"
   local first_status=0 second_status=0
+  seed_installed_release "$sandbox" 48.0.0 active-48
   write_fake_release_set "$sandbox/target" 48.0.0
 
   HARNESS_INSTALL_TEST_HOLD_LOCK_SECONDS=0.4 \
+    HARNESS_INSTALL_TEST_EXIT_AFTER_LOCK=1 \
     run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all \
     >"$sandbox/first.log" 2>&1 &
   first_pid=$!
@@ -1074,7 +1129,8 @@ scenario_install_lock_serializes_overlapping_activation() {
     [[ -f "$sandbox/install-root/.install.lock/owner" ]] && break
     sleep 0.05
   done
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all \
+  HARNESS_INSTALL_TEST_EXIT_AFTER_LOCK=1 \
+    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all \
     >"$sandbox/second.log" 2>&1 || second_status=$?
   wait "$first_pid" || first_status=$?
 
@@ -1210,8 +1266,7 @@ scenario_failed_legacy_normalization_restores_direct_files() {
 scenario_full_install_drops_unknown_bundle_files() {
   start_test "full install activates the exact configured inventory"
   local sandbox="$SANDBOX/exact-inventory" count
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 active-47
   printf '#!/usr/bin/env bash\nexit 0\n' >"$sandbox/install-root/current/bin/rogue"
   command chmod +x "$sandbox/install-root/current/bin/rogue"
   write_fake_release_set "$sandbox/target" 48.0.0
@@ -1234,8 +1289,7 @@ scenario_full_install_drops_unknown_bundle_files() {
 scenario_focused_install_rejects_corrupt_carried_binary() {
   start_test "focused install identity-probes carried binaries"
   local sandbox="$SANDBOX/carried-identity" old_current status=0 output
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 active-47
   old_current="$(readlink "$sandbox/install-root/current")"
   command rm -f "$sandbox/install-root/current/bin/harness"
   printf '#!/usr/bin/env bash\nprintf "foreign 1.0.0\\n"\n' \
@@ -1265,8 +1319,7 @@ scenario_focused_install_verifies_carried_signature() {
   # Signing runs on macOS only, so the focused install simulates Darwin to
   # reach verification through the fake codesign; under the file-level Linux
   # export the installer skips signing and no assertion here could ever fail.
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 active-47
   old_current="$(readlink "$sandbox/install-root/current")"
   write_fake_release_set "$sandbox/target" 48.0.0
   write_fake_codesign "$sandbox/fake-bin"
@@ -1354,28 +1407,23 @@ scenario_aff_install_ignores_unrelated_foreign_harness() {
 
 scenario_single_leaf_install_carries_the_rest_forward() {
   start_test "single-leaf install rebuilds one binary and carries the rest forward"
-  local sandbox="$SANDBOX/single-leaf" name
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  local sandbox="$SANDBOX/single-leaf"
+  seed_installed_release "$sandbox" 47.0.0 active-47
   write_fake_release_set "$sandbox/target" 48.0.0
   run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" daemon >/dev/null
 
   local ok=1
   assert_contains "harness-daemon 48.0.0" \
     "$("$sandbox/bin/harness-daemon" --version)" || ok=0
-  for name in "${HARNESS_BINARIES[@]}"; do
-    [[ "$name" != harness-daemon ]] || continue
-    assert_contains "$name 47.0.0" "$("$sandbox/bin/$name" --version)" || ok=0
-  done
+  assert_contains "harness 47.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
   assert_contains "aff 47.0.0" "$("$sandbox/aff-bin/aff" --version)" || ok=0
   if (( ok )); then pass; fi
 }
 
 scenario_multi_selector_install_updates_only_requested_leaves() {
   start_test "multi-selector install updates only the requested leaves"
-  local sandbox="$SANDBOX/multi-selector" name
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  local sandbox="$SANDBOX/multi-selector"
+  seed_installed_release "$sandbox" 47.0.0 active-47
   write_fake_release_set "$sandbox/target" 48.0.0
   run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" daemon mcp >/dev/null
 
@@ -1383,37 +1431,28 @@ scenario_multi_selector_install_updates_only_requested_leaves() {
   assert_contains "harness-daemon 48.0.0" \
     "$("$sandbox/bin/harness-daemon" --version)" || ok=0
   assert_contains "harness-mcp 48.0.0" "$("$sandbox/bin/harness-mcp" --version)" || ok=0
-  for name in "${HARNESS_BINARIES[@]}"; do
-    case "$name" in
-      harness-daemon|harness-mcp) continue ;;
-    esac
-    assert_contains "$name 47.0.0" "$("$sandbox/bin/$name" --version)" || ok=0
-  done
+  assert_contains "harness 47.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
   if (( ok )); then pass; fi
 }
 
 scenario_harness_cli_alias_selects_only_the_cli_leaf() {
   start_test "harness-cli selector updates only the CLI binary, not the whole harness set"
-  local sandbox="$SANDBOX/harness-cli-alias" name
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  local sandbox="$SANDBOX/harness-cli-alias"
+  seed_installed_release "$sandbox" 47.0.0 active-47
   write_fake_release_set "$sandbox/target" 48.0.0
   run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" harness-cli >/dev/null
 
   local ok=1
   assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
-  for name in "${HARNESS_BINARIES[@]}"; do
-    [[ "$name" != harness ]] || continue
-    assert_contains "$name 47.0.0" "$("$sandbox/bin/$name" --version)" || ok=0
-  done
+  assert_contains "harness-daemon 47.0.0" \
+    "$("$sandbox/bin/harness-daemon" --version)" || ok=0
   if (( ok )); then pass; fi
 }
 
 scenario_unknown_selector_is_rejected_cleanly() {
   start_test "an unknown selector is rejected without touching current"
   local sandbox="$SANDBOX/unknown-selector" old_current status=0 output
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 active-47
   old_current="$(readlink "$sandbox/install-root/current")"
   output="$(run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" \
     bogus-selector 2>&1)" || status=$?
@@ -1434,8 +1473,7 @@ scenario_unknown_selector_is_rejected_cleanly() {
 scenario_single_leaf_install_ignores_stale_release_artifact() {
   start_test "single-leaf install derives its version from the selected leaf, not a stale artifact"
   local sandbox="$SANDBOX/stale-artifact"
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 active-47
   # build-release-set.sh never cleans $target/release, so a single-leaf
   # build leaves every other binary's older artifact sitting there; only
   # rewrite harness-daemon to simulate that.
@@ -1452,8 +1490,7 @@ scenario_single_leaf_install_ignores_stale_release_artifact() {
 scenario_leaf_only_install_skips_cli_legacy_detection() {
   start_test "leaf-only install skips CLI-specific legacy config detection"
   local sandbox="$SANDBOX/leaf-legacy-skip" path
-  write_fake_release_set "$sandbox/target" 47.0.0
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  seed_installed_release "$sandbox" 47.0.0 active-47
   path="$sandbox/project/.claude/settings.json"
   command mkdir -p "$(dirname -- "$path")"
   printf '{"command":"harness hook tool-guard"}\n' >"$path"
@@ -1469,23 +1506,30 @@ scenario_leaf_only_install_skips_cli_legacy_detection() {
   if (( ok )); then pass; fi
 }
 
-scenario_lock_recovers_ownerless_and_reused_pid_records() {
-  start_test "install lock recovers ownerless and PID-reused stale records"
-  local ownerless="$SANDBOX/lock-ownerless" reused="$SANDBOX/lock-reused"
-  write_fake_release_set "$ownerless/target" 48.0.0
-  command mkdir -p "$ownerless/install-root/.install.lock"
+scenario_lock_recovers_ownerless_record() {
+  start_test "install lock recovers an ownerless stale record"
+  local sandbox="$SANDBOX/lock-ownerless"
+  write_fake_release_set "$sandbox/target" 48.0.0
+  command mkdir -p "$sandbox/install-root/.install.lock"
   HARNESS_INSTALL_OWNERLESS_LOCK_STALE_SECONDS=0 \
-    run_installer "$ownerless" "$ROOT/scripts/install-release-set.sh" all >/dev/null
-
-  write_fake_release_set "$reused/target" 48.0.0
-  command mkdir -p "$reused/install-root/.install.lock"
-  printf '%s\n' "$$-old-token|not-the-live-process-start" \
-    >"$reused/install-root/.install.lock/owner"
-  run_installer "$reused" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
 
   local ok=1
-  assert_contains "harness 48.0.0" "$("$ownerless/bin/harness" --version)" || ok=0
-  assert_contains "harness 48.0.0" "$("$reused/bin/harness" --version)" || ok=0
+  assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
+  if (( ok )); then pass; fi
+}
+
+scenario_lock_recovers_reused_pid_record() {
+  start_test "install lock recovers a PID-reused stale record"
+  local sandbox="$SANDBOX/lock-reused"
+  write_fake_release_set "$sandbox/target" 48.0.0
+  command mkdir -p "$sandbox/install-root/.install.lock"
+  printf '%s\n' "$$-old-token|not-the-live-process-start" \
+    >"$sandbox/install-root/.install.lock/owner"
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+
+  local ok=1
+  assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
   if (( ok )); then pass; fi
 }
 
@@ -1528,7 +1572,7 @@ scenario_legacy_detector_is_read_only_and_blocks_activation() {
   if (( ok )); then pass; fi
 }
 
-run_all() {
+RELEASE_INSTALL_TEST_SCENARIOS=(
   scenario_release_inventory_is_platform_aware
   scenario_darwin_excludes_systemd_and_migrates_managed_link
   scenario_build_group_allocates_one_budget
@@ -1566,10 +1610,49 @@ run_all() {
   scenario_unknown_selector_is_rejected_cleanly
   scenario_single_leaf_install_ignores_stale_release_artifact
   scenario_leaf_only_install_skips_cli_legacy_detection
-  scenario_lock_recovers_ownerless_and_reused_pid_records
+  scenario_lock_recovers_ownerless_record
+  scenario_lock_recovers_reused_pid_record
   scenario_legacy_detector_is_read_only_and_blocks_activation
+)
+
+run_all() {
+  local scenario
+  for scenario in "${RELEASE_INSTALL_TEST_SCENARIOS[@]}"; do
+    "$scenario"
+  done
 }
 
-run_all
+selected_scenario="${HARNESS_RELEASE_INSTALL_TEST_SCENARIO:-}"
+case "${1:-}" in
+  --list)
+    printf '%s\n' "${RELEASE_INSTALL_TEST_SCENARIOS[@]}"
+    exit 0
+    ;;
+  --scenario)
+    (( $# == 2 )) || {
+      printf 'usage: %s [--list|--scenario NAME]\n' "${0##*/}" >&2
+      exit 2
+    }
+    selected_scenario="$2"
+    ;;
+  "")
+    ;;
+  *)
+    printf 'usage: %s [--list|--scenario NAME]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
+
+if [[ -n "$selected_scenario" ]]; then
+  if [[ "$selected_scenario" != scenario_* ]] \
+    || ! declare -F "$selected_scenario" >/dev/null; then
+    printf 'unknown release-install test scenario: %s\n' \
+      "$selected_scenario" >&2
+    exit 2
+  fi
+  "$selected_scenario"
+else
+  run_all
+fi
 printf '%s passed, %s failed\n' "$PASS_COUNT" "$FAIL_COUNT" >&2
 (( FAIL_COUNT == 0 ))

@@ -84,7 +84,9 @@ while (($#)); do
 done
 file="{spool}/lsof-$pid.txt"
 if [ -f "$file" ]; then
-  cat "$file"
+  while IFS= read -r line || [ -n "$line" ]; do
+    printf '%s\\n' "$line"
+  done < "$file"
 fi
 """,
             )
@@ -113,7 +115,8 @@ while (($#)); do
 done
 file="{spool}/ps-etime-$pid.txt"
 if [ -f "$file" ]; then
-  cat "$file"
+  IFS= read -r etime < "$file"
+  printf '%s\\n' "$etime"
 fi
 """,
             )
@@ -139,6 +142,12 @@ for pid in "${{pids[@]}}"; do
 done
 """,
             )
+            if fixture := os.environ.get(
+                "HARNESS_FSMONITOR_SCRIPT_TEST_TOOL_FIXTURE"
+            ):
+                for name in ("lsof", "pgrep", "ps"):
+                    (fake_bin / name).unlink()
+                    (fake_bin / name).symlink_to(fixture)
 
             # Copy script and rewrite absolute paths to use PATH lookup
             script_text = SCRIPT_PATH.read_text()
@@ -154,6 +163,8 @@ done
 
             env = os.environ.copy()
             env["PATH"] = f"{fake_bin}:{env.get('PATH', '/usr/bin:/bin')}"
+            env["HARNESS_FSMONITOR_TEST_PIDS"] = "\n".join(fake_pgrep_pids)
+            env["HARNESS_FSMONITOR_TEST_SPOOL"] = str(spool)
             completed = subprocess.run(
                 ["bash", str(patched_script), *args],
                 check=False,

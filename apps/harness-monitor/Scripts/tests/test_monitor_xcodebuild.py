@@ -34,6 +34,12 @@ def build_concurrency_override_env(cap: int) -> dict[str, str]:
     }
 
 
+def fast_script_test_env() -> dict[str, str]:
+    if os.environ.get("HARNESS_MONITOR_SCRIPT_TEST_FAST_XCODEBUILD") != "1":
+        return {}
+    return build_concurrency_override_env(0)
+
+
 class MonitorXcodebuildTests(unittest.TestCase):
     def run_script(
         self,
@@ -50,6 +56,9 @@ class MonitorXcodebuildTests(unittest.TestCase):
             fake_bin.mkdir()
             derived_data_path = temp_root / "derived"
             tool_log = temp_root / "tool.log"
+            tool_fixture = os.environ.get(
+                "HARNESS_MONITOR_SCRIPT_TEST_TOOL_FIXTURE"
+            )
 
             if preexisting_lock_pid is not None:
                 lock_dir = derived_data_path / ".harness-monitor-xcodebuild.lock"
@@ -58,9 +67,12 @@ class MonitorXcodebuildTests(unittest.TestCase):
                     f"pid={preexisting_lock_pid}\nstarted_at=2026-01-01T00:00:00Z\n"
                 )
 
-            write_executable(
-                fake_bin / "xcodebuild",
-                f"""#!/bin/bash
+            if tool_fixture:
+                os.symlink(tool_fixture, fake_bin / "xcodebuild")
+            else:
+                write_executable(
+                    fake_bin / "xcodebuild",
+                    f"""#!/bin/bash
 set -euo pipefail
 printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
 if [[ "${{FAKE_XCODEBUILD_FAIL:-0}}" == "1" ]]; then
@@ -68,11 +80,14 @@ if [[ "${{FAKE_XCODEBUILD_FAIL:-0}}" == "1" ]]; then
   exit 65
 fi
 """,
-            )
+                )
             if include_tuist:
-                write_executable(
-                    fake_bin / "tuist",
-                    f"""#!/bin/bash
+                if tool_fixture:
+                    os.symlink(tool_fixture, fake_bin / "tuist")
+                else:
+                    write_executable(
+                        fake_bin / "tuist",
+                        f"""#!/bin/bash
 set -euo pipefail
 printf 'TUIST_PWD=%s\\nTUIST=%s\\n' "$PWD" "$*" >> "{tool_log}"
 if [[ "${{1:-}}" != "xcodebuild" ]]; then
@@ -82,7 +97,7 @@ fi
 shift
 "{fake_bin / "xcodebuild"}" "$@"
 """,
-                )
+                    )
 
             env = os.environ.copy()
             for key in (
@@ -96,6 +111,7 @@ shift
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "BASH_ENV": "/dev/null",
                     "HARNESS_SKIP_STALE_CHECK": "1",
+                    "HARNESS_MONITOR_TEST_TOOL_LOG": str(tool_log),
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
                     "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(
@@ -103,6 +119,7 @@ shift
                     ),
                 }
             )
+            env.update(fast_script_test_env())
             env.update(extra_env or {})
 
             command = ["bash", str(SCRIPT_PATH)]
@@ -256,6 +273,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 ),
             }
         )
+        env.update(fast_script_test_env())
         env.update(extra_env or {})
         proc = subprocess.Popen(
             [
@@ -272,7 +290,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             if marker_path.exists():
                 return proc, derived_data_path
@@ -918,7 +936,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             try:
                 # The helper wires its own temp semaphore at temp_root/global-semaphore
                 semaphore_dir = temp_root / "global-semaphore"
-                deadline = time.monotonic() + 5
+                deadline = time.monotonic() + 10
                 slot_path: Path | None = None
                 while time.monotonic() < deadline:
                     if semaphore_dir.exists():
@@ -931,7 +949,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                     slot_path, "slot directory never appeared under semaphore"
                 )
                 heartbeat = slot_path / "heartbeat"
-                deadline2 = time.monotonic() + 5
+                deadline2 = time.monotonic() + 10
                 while time.monotonic() < deadline2 and not heartbeat.exists():
                     time.sleep(0.05)
                 self.assertTrue(

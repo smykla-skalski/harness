@@ -205,6 +205,14 @@ print_log_tail_compact() {
 
 descendant_process_pids() {
   local root_pid="$1"
+  if [[ -n "${_HARNESS_INTERNAL_TEST_ONLY_DESCENDANT_PIDS_FILE:-}" ]]; then
+    if [[ -z "${HARNESS_SCRIPT_TEST_JOB:-}" ]]; then
+      printf 'error: deterministic descendant snapshot is test-only\n' >&2
+      return 2
+    fi
+    /bin/cat "$_HARNESS_INTERNAL_TEST_ONLY_DESCENDANT_PIDS_FILE"
+    return
+  fi
   /bin/ps -Ao pid=,ppid= \
     | /usr/bin/awk -v root_pid="$root_pid" '
         {

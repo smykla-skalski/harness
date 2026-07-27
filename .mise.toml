@@ -149,15 +149,23 @@ run = "./scripts/check-scripts.sh --lint"
 
 [tasks."test:scripts"]
 description = "Run repo-local helper script regression tests"
-run = "HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 ./scripts/check-scripts.sh --tests"
+run = "./scripts/check-scripts.sh --tests"
 
 [tasks."test:scripts:cargo-local"]
 description = "Run cargo-local lane isolation and cache regression tests"
-run = "./scripts/tests/test-cargo-local.sh"
+run = "python3 scripts/run-script-test-suite.py --suite cargo-local"
+
+[tasks."test:scripts:parallel-runner"]
+description = "Run process-isolation and concurrency tests for the script-test runner"
+run = "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts/tests/test_parallel_script_tests.py"
 
 [tasks."test:scripts:release-install"]
 description = "Run the release build coordinator and atomic installer shell tests"
-run = "./scripts/tests/test-release-install.sh"
+run = "python3 scripts/run-script-test-suite.py --suite release-install"
+
+[tasks."test:scripts:support"]
+description = "Run script regression tests outside the Cargo and release-install suites"
+run = "python3 scripts/run-script-test-suite.py --suite support"
 
 [tasks."test:scripts:panel-frontend"]
 description = "Run the panel frontend dependency installer regression tests"
