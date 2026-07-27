@@ -257,7 +257,7 @@ pub(super) fn ensure_before_expiry(
 /// A screen refuses a mutation without touching assignment state; the
 /// transaction still commits so the noop is durable, not rolled back. Kept
 /// synchronous so a shared screen never adds another async frame to the
-/// caller's future: `clippy::large_futures` is zero repo-wide, and one more
+/// caller's future: `clippy::large_futures` is denied here, and one more
 /// nested `.await` on a transaction-carrying future tips distant call sites
 /// (route handlers, adoption loops) over the limit.
 enum RemoteAssignmentScreenOutcome {
