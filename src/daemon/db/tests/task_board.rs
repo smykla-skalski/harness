@@ -22,6 +22,7 @@ pub(crate) use admission_dispatch::{
 mod admission_evidence;
 mod admission_lifecycle_tests;
 mod dispatch;
+mod dispatch_claim_reason;
 mod dispatch_claims;
 mod dispatch_retry_budget;
 mod imports;

@@ -7,6 +7,7 @@ use tokio::time::sleep;
 
 use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
+    TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,
 };
 use crate::daemon::index::{self, DiscoveredProject};
 use crate::daemon::protocol::{SessionStartRequest, TaskBoardDispatchRequest, TaskCreateRequest};
@@ -55,18 +56,21 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
             preparation,
         } => (intent_id, preparation),
     };
-    let claim = db
-        .claim_task_board_dispatch_preparation(&intent_id)
+    let claim = match db
+        .attempt_task_board_dispatch_preparation_claim(&intent_id)
         .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?
-        .ok_or_else(|| {
-            (
+    {
+        TaskBoardPreparationClaim::Claimed(claim) => *claim,
+        TaskBoardPreparationClaim::Unavailable(reason) => {
+            return Err((
                 DispatchFailureKind::LinkItem,
-                CliError::from(CliErrorKind::workflow_io(format!(
-                    "task-board dispatch preparation '{intent_id}' is already in progress"
+                CliError::from(CliErrorKind::workflow_io(unavailable_preparation_message(
+                    &intent_id, &reason,
                 ))),
-            )
-        })?;
+            ));
+        }
+    };
     let result = Box::pin(prepare_claimed_task_board_dispatch(db, &claim)).await;
     if let Err((_, error)) = &result {
         let _ = db
@@ -74,6 +78,37 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
             .await;
     }
     result
+}
+
+/// Names what actually stopped the dispatch. Only a live claim is contention;
+/// a preparation waiting out a backoff has a failure behind it, and reporting
+/// all of these as "already in progress" hid that failure entirely.
+fn unavailable_preparation_message(
+    intent_id: &str,
+    reason: &TaskBoardPreparationUnavailable,
+) -> String {
+    match reason {
+        TaskBoardPreparationUnavailable::Missing => {
+            format!("task-board dispatch preparation '{intent_id}' no longer exists")
+        }
+        TaskBoardPreparationUnavailable::HeldByWorker => {
+            format!("task-board dispatch preparation '{intent_id}' is already in progress")
+        }
+        TaskBoardPreparationUnavailable::WaitingToRetry {
+            seconds_remaining,
+            last_error: Some(last_error),
+        } => format!(
+            "task-board dispatch preparation '{intent_id}' failed and retries in {seconds_remaining}s: {last_error}"
+        ),
+        TaskBoardPreparationUnavailable::WaitingToRetry {
+            seconds_remaining, ..
+        } => format!(
+            "task-board dispatch preparation '{intent_id}' retries in {seconds_remaining}s"
+        ),
+        TaskBoardPreparationUnavailable::Settled { status } => format!(
+            "task-board dispatch preparation '{intent_id}' already left preparation with status '{status}'"
+        ),
+    }
 }
 
 pub(crate) async fn prepare_claimed_task_board_dispatch(
@@ -388,4 +423,58 @@ fn dispatch_project_dir(
         )
         .into()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TaskBoardPreparationUnavailable, unavailable_preparation_message};
+
+    const INTENT: &str = "dispatch-intent-8024d942";
+
+    #[test]
+    fn a_retrying_preparation_reports_its_failure_not_contention() {
+        let message = unavailable_preparation_message(
+            INTENT,
+            &TaskBoardPreparationUnavailable::WaitingToRetry {
+                seconds_remaining: 16,
+                last_error: Some("worktree is unreadable".to_string()),
+            },
+        );
+
+        assert!(
+            message.contains("worktree is unreadable") && message.contains("16s"),
+            "the wait and the failure behind it both have to reach the operator, got {message}"
+        );
+        assert!(
+            !message.contains("in progress"),
+            "a preparation nobody holds must not read as contention, got {message}"
+        );
+    }
+
+    #[test]
+    fn each_unavailable_reason_reads_differently() {
+        let messages = [
+            TaskBoardPreparationUnavailable::Missing,
+            TaskBoardPreparationUnavailable::HeldByWorker,
+            TaskBoardPreparationUnavailable::WaitingToRetry {
+                seconds_remaining: 4,
+                last_error: None,
+            },
+            TaskBoardPreparationUnavailable::Settled {
+                status: "pending".to_string(),
+            },
+        ]
+        .map(|reason| unavailable_preparation_message(INTENT, &reason));
+        let distinct: std::collections::BTreeSet<&String> = messages.iter().collect();
+
+        assert_eq!(
+            distinct.len(),
+            messages.len(),
+            "every reason needs its own message or the operator cannot tell them apart, got {messages:?}"
+        );
+        assert!(
+            messages.iter().all(|message| message.contains(INTENT)),
+            "every message must name the intent it is about, got {messages:?}"
+        );
+    }
 }

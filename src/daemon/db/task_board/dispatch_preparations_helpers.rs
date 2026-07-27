@@ -4,6 +4,9 @@ use uuid::Uuid;
 use super::super::admission_lifecycle::{
     TaskBoardAdmissionCheck, release_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
 };
+use super::super::dispatch_preparation_claim::{
+    TaskBoardPreparationUnavailable, classify_unavailable_preparation_in_tx,
+};
 use super::super::items::load_item_in_tx;
 use super::{
     ClaimedTaskBoardDispatchPreparation, PREPARATION_LEASE_SECONDS, ReservedTaskBoardDispatch,
@@ -287,14 +290,15 @@ const fn dispatch_severity(priority: TaskBoardPriority) -> TaskSeverity {
     }
 }
 
-/// What the preparation-claim screen decided. `Settled` names the commit's
-/// error context, and carries a refusal message when the claim was rejected
-/// rather than merely absent.
+/// What the preparation-claim screen decided. Both settled variants name the
+/// commit's error context; `Refused` is the one the caller turns into an error,
+/// because the screen recorded the preparation as failed on its way out.
 pub(super) enum PreparationClaim {
     Ready(Box<TaskBoardDispatchPreparation>),
-    Settled {
+    Unavailable(TaskBoardPreparationUnavailable),
+    Refused {
         context: &'static str,
-        refusal: Option<String>,
+        reason: String,
     },
 }
 
@@ -307,10 +311,9 @@ pub(super) async fn screen_preparation_claim_in_tx(
 ) -> Result<PreparationClaim, CliError> {
     release_expired_preparations(transaction).await?;
     let Some(payload) = load_preparing_payload_in_tx(transaction, intent_id).await? else {
-        return Ok(PreparationClaim::Settled {
-            context: "empty task board preparation claim",
-            refusal: None,
-        });
+        return Ok(PreparationClaim::Unavailable(
+            classify_unavailable_preparation_in_tx(transaction, intent_id).await?,
+        ));
     };
     let preparation = decode_preparation(&payload)?;
     let (item, item_revision) = load_item_in_tx(transaction, &preparation.board_item_id)
@@ -368,10 +371,7 @@ async fn refuse_preparation_in_tx(
     reason: String,
 ) -> Result<PreparationClaim, CliError> {
     fail_preparation_admission_in_tx(transaction, intent_id, &reason).await?;
-    Ok(PreparationClaim::Settled {
-        context,
-        refusal: Some(reason),
-    })
+    Ok(PreparationClaim::Refused { context, reason })
 }
 
 /// Takes the lease on a screened preparation and reports the claim token. The
