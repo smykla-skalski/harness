@@ -261,23 +261,34 @@ async fn fail_stage(
     Ok(())
 }
 
+/// A pull from GitHub is a whole-board operation, so a run narrowed to one item
+/// or to a lane other than Todo skips it rather than dragging the entire board
+/// through a network round trip for work it will not dispatch.
+fn should_sync_github_tasks(
+    input: &TaskBoardOrchestratorDispatchInput,
+    settings: &TaskBoardOrchestratorSettings,
+) -> bool {
+    if input.item_id.is_some()
+        || input
+            .status
+            .is_some_and(|status| status != TaskBoardStatus::Todo)
+    {
+        return false;
+    }
+    settings
+        .github_project
+        .enabled_automations
+        .enables(GitHubAutomation::SyncTaskBoard)
+        || !settings.github_inbox.repositories.is_empty()
+}
+
 async fn sync_github_tasks(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &mut TaskBoardOrchestratorPreparedRun,
     session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<(), CliError> {
-    if prepared.input.item_id.is_some()
-        || prepared
-            .input
-            .status
-            .is_some_and(|status| status != TaskBoardStatus::Todo)
-        || (!settings
-            .github_project
-            .enabled_automations
-            .enables(GitHubAutomation::SyncTaskBoard)
-            && settings.github_inbox.repositories.is_empty())
-    {
+    if !should_sync_github_tasks(&prepared.input, settings) {
         return Ok(());
     }
     let config = active_external_sync_config_db(db).await?;
@@ -481,3 +492,7 @@ async fn save_run_summary(
     db.replace_task_board_orchestrator_state(&state).await?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "task_board_orchestrator_db_tests.rs"]
+mod tests;
