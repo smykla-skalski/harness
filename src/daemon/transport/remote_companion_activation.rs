@@ -2,7 +2,9 @@
 
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
+#[cfg(any(target_os = "linux", test))]
+use std::net::SocketAddr;
 use std::process;
 
 use axum::http::{Uri, uri::Authority};
@@ -103,6 +105,12 @@ impl ExpectedListener {
         Ok(Self { host, port })
     }
 
+    // Socket activation is a systemd concept, so the only caller outside the
+    // tests is Linux-only. Without this the lib is dead-code-clean under
+    // cfg(test) but not as a plain dependency, which is exactly how the
+    // integration targets build it: `mise run test:integration` stopped
+    // compiling on macOS.
+    #[cfg(any(target_os = "linux", test))]
     fn matches(self, actual: SocketAddr) -> bool {
         self.port == actual.port()
             && match self.host {

@@ -40,6 +40,24 @@ const FILE_STORAGE_SYMBOLS: &[&str] = &[
     "policy-workflow-runs-v1.json",
 ];
 
+/// A second, file-backed orchestrator runner used to live here under
+/// `cfg(test)`. It drifted from the one the daemon runs, so a fix had to be
+/// applied twice and tests could pass while shipped behavior stayed broken.
+/// Orchestrator tests belong on the `AsyncDaemonDb` path.
+#[test]
+fn task_board_orchestrator_has_one_runner() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for retired in [
+        "src/daemon/service/task_board_orchestrator.rs",
+        "src/daemon/service/task_board_orchestrator",
+    ] {
+        assert!(
+            !root.join(retired).exists(),
+            "{retired} is the retired file-backed runner; orchestrator tests must exercise the shipped AsyncDaemonDb runner"
+        );
+    }
+}
+
 #[test]
 fn task_board_cli_transport_is_daemon_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
