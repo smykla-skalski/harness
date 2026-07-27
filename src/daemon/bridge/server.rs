@@ -269,7 +269,10 @@ impl BridgeServer {
             }
             "input" => {
                 let request: BridgeInputRequest = parse_bridge_payload(payload)?;
-                request.request.validate()?;
+                request
+                    .request
+                    .validate()
+                    .map_err(CliErrorKind::workflow_parse)?;
                 let active = self.active_tui(&request.tui_id)?;
                 match (request.request.input(), request.request.sequence()) {
                     (Some(input), None) => active.input_worker.send_input(input)?,

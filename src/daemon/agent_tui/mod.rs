@@ -8,8 +8,6 @@ use std::time::Duration;
 
 #[cfg(feature = "daemon-runtime")]
 mod effort;
-mod input;
-mod input_request;
 #[cfg(feature = "daemon-runtime")]
 mod manager;
 #[cfg(feature = "daemon-runtime")]
@@ -48,12 +46,10 @@ pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub use harness_protocol::managed_agents::tui::{
-    AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,
-    AgentTuiStartRequest, AgentTuiStatus, TerminalScreenSnapshot,
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiInputRequestSchema, AgentTuiInputSequence,
+    AgentTuiInputSequenceStep, AgentTuiKey, AgentTuiListResponse, AgentTuiResizeRequest,
+    AgentTuiSize, AgentTuiSnapshot, AgentTuiStartRequest, AgentTuiStatus, TerminalScreenSnapshot,
 };
-pub use input::{AgentTuiInput, AgentTuiKey};
-pub use input_request::{AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep};
-pub use input_request::AgentTuiInputRequestSchema;
 #[cfg(feature = "daemon-runtime")]
 pub use manager::AgentTuiManagerHandle;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]

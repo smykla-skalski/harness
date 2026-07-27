@@ -1,11 +1,32 @@
 use clap::{Args, ValueEnum};
 
-use crate::daemon::agent_tui::{AgentTuiInput, AgentTuiInputRequest, AgentTuiKey};
+use harness_daemon_client::{ClientError, DaemonClient};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_protocol::managed_agents::tui::AgentTuiResizeRequest;
+use harness_protocol::managed_agents::tui::{
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest,
+};
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::{daemon_client, print_json};
+use crate::session::transport::support::print_json;
+use crate::session::wire::ManagedAgentSnapshot;
+
+// Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade
+// `support::daemon_client()` returns, so these managed-terminal commands stay
+// free of a daemon-crate dependency.
+fn daemon_client() -> Result<DaemonClient, CliError> {
+    DaemonClient::try_connect().ok_or_else(|| {
+        CliErrorKind::workflow_io(
+            "harness daemon is not running; start the daemon before using managed TUIs",
+        )
+        .into()
+    })
+}
+
+fn daemon_client_error(operation: &str, error: &ClientError) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "daemon {operation}: {error}"
+    )))
+}
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum TuiKeyArg {
@@ -57,10 +78,11 @@ pub struct ManagedTerminalInputArgs {
 
 impl Execute for ManagedTerminalInputArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = daemon_client()?.send_managed_terminal_input(
-            &self.agent_id,
-            &AgentTuiInputRequest::from_input(self.input()?),
-        )?;
+        let request = AgentTuiInputRequest::from_input(self.input()?);
+        let url = format!("/v1/managed-agents/{}/input", self.agent_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("send managed terminal input", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
@@ -111,13 +133,14 @@ pub struct ManagedTerminalResizeArgs {
 
 impl Execute for ManagedTerminalResizeArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = daemon_client()?.resize_managed_terminal(
-            &self.agent_id,
-            &AgentTuiResizeRequest {
-                rows: self.rows,
-                cols: self.cols,
-            },
-        )?;
+        let request = AgentTuiResizeRequest {
+            rows: self.rows,
+            cols: self.cols,
+        };
+        let url = format!("/v1/managed-agents/{}/resize", self.agent_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("resize managed terminal", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
@@ -131,7 +154,10 @@ pub struct ManagedTerminalStopArgs {
 
 impl Execute for ManagedTerminalStopArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = daemon_client()?.stop_managed_terminal(&self.agent_id)?;
+        let url = format!("/v1/managed-agents/{}/stop", self.agent_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &serde_json::json!({}))
+            .map_err(|error| daemon_client_error("stop managed terminal", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }

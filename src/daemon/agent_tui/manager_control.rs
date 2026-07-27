@@ -7,7 +7,6 @@ use crate::daemon::ordering::sort_agent_tui_snapshots;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::input_request::AgentTuiInputRequest;
 use super::manager::AgentTuiManagerHandle;
 use super::model::{
     AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiResizeRequestExt, AgentTuiSnapshot,
@@ -16,7 +15,7 @@ use super::model::{
 use super::process::{AgentTuiSnapshotContext, snapshot_from_process};
 use super::readiness::signal_readiness_ready;
 use super::support::lock_db;
-use super::{AgentTuiInput, AgentTuiKey, AgentTuiResizeRequest};
+use super::{AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest};
 
 impl AgentTuiManagerHandle {
     /// List managed TUI snapshots for a session.
@@ -109,7 +108,7 @@ impl AgentTuiManagerHandle {
         tui_id: &str,
         request: &AgentTuiInputRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
-        request.validate()?;
+        request.validate().map_err(CliErrorKind::workflow_parse)?;
         if self.state.sandboxed {
             let snapshot = self.normalize_snapshot(
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?

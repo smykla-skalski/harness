@@ -16,12 +16,12 @@ use crate::workspace::{dirs_home, host_home_dir};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::READINESS_TIMEOUT;
-use super::input::{AgentTuiInput, AgentTuiKey};
 use super::model::{
     AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSpawnSpec,
     PortablePtyAgentTuiBackend,
 };
 use super::process::AgentTuiProcess;
+use super::{AgentTuiInput, AgentTuiKey};
 
 pub(crate) fn spawn_agent_tui_process(
     session_id: &str,

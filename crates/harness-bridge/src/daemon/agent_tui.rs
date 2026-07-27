@@ -1,9 +1,5 @@
 use std::time::Duration;
 
-#[path = "../../../../src/daemon/agent_tui/input.rs"]
-mod input;
-#[path = "../../../../src/daemon/agent_tui/input_request.rs"]
-mod input_request;
 #[path = "../../../../src/daemon/agent_tui/model.rs"]
 mod model;
 #[path = "../../../../src/daemon/agent_tui/process.rs"]
@@ -19,11 +15,10 @@ mod support;
 pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub use harness_protocol::managed_agents::tui::{
-    AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
+    AgentTuiKey, AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,
     AgentTuiStartRequest, AgentTuiStatus, TerminalScreenSnapshot,
 };
-pub use input::{AgentTuiInput, AgentTuiKey};
-pub use input_request::{AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep};
 pub(crate) use model::AgentTuiResizeRequestExt;
 pub use model::{
     AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiSpawnSpec, PortablePtyAgentTuiBackend,

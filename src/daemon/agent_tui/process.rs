@@ -12,8 +12,7 @@ use tokio::sync::broadcast;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::input::AgentTuiInput;
-use super::input_request::AgentTuiInputSequence;
+use super::{AgentTuiInput, AgentTuiInputSequence};
 use super::model::{
     AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSizeExt, AgentTuiSnapshot, AgentTuiSpawnSpec,
     AgentTuiStatus,
@@ -340,7 +339,7 @@ impl AgentTuiProcess {
     /// # Errors
     /// Returns a workflow parse or I/O error when mapping or writing input fails.
     pub fn send_input(&self, input: &AgentTuiInput) -> Result<(), CliError> {
-        self.write_bytes(&input.to_bytes()?)
+        self.write_bytes(&input.to_bytes().map_err(CliErrorKind::workflow_parse)?)
     }
 
     /// Send raw bytes to the PTY.
