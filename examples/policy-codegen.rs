@@ -2505,7 +2505,8 @@ const AGENT_TUI_EMIT_ONLY: &[&str] = &[
     "AgentTuiListResponse",
     "AgentTuiSnapshot",
 ];
-const AGENT_TUI_INPUT_SOURCE: &str = include_str!("../src/daemon/agent_tui/input_request.rs");
+const AGENT_TUI_INPUT_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/managed_agents/tui_input.rs");
 const AGENT_TUI_INPUT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiInputRequestWireTypes.generated.swift";
 // The agent-tui input request body (sendManagedAgentInput). The public AgentTuiInputRequest has
 // #[serde(try_from = "RawAgentTuiInputRequest")], so the generator targets the private

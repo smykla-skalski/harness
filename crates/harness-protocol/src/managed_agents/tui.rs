@@ -2,6 +2,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::session::SessionRole;
 
+pub use super::tui_input::{
+    AgentTuiInput, AgentTuiInputRequest, AgentTuiInputRequestSchema, AgentTuiInputSequence,
+    AgentTuiInputSequenceStep, AgentTuiKey,
+};
+
 pub const DEFAULT_AGENT_TUI_ROWS: u16 = 30;
 pub const DEFAULT_AGENT_TUI_COLS: u16 = 120;
 
