@@ -256,8 +256,14 @@ signing_identity_for() {
 atomic_replace_symlink() {
   local target="$1"
   local destination="$2"
+  local destination_parent="${destination%/*}"
   local staged_link="${destination}.next-${lock_token}"
-  command mkdir -p "${destination%/*}"
+  if [[ "$destination_parent" == "$destination" ]]; then
+    destination_parent=.
+  elif [[ -z "$destination_parent" ]]; then
+    destination_parent=/
+  fi
+  command mkdir -p "$destination_parent"
   command rm -f "$staged_link"
   staged_link_paths+=("$staged_link")
   command ln -s "$target" "$staged_link"
