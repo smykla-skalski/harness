@@ -5,7 +5,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 
 use super::locks::daemon_lock_is_held_at;
-use super::ownership::DaemonOwnership;
+use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};
 use super::paths::{base_daemon_dir, daemon_root_for_ownership};
 use super::{DAEMON_LOCK_FILE, DaemonManifest, MANIFEST_LOCK_FILE};
 
@@ -62,7 +62,7 @@ pub struct LegacyDaemonRootMigration {
 /// [`MigrationDecision`] variants embedded in the success result.
 pub fn migrate_legacy_daemon_root_for_current_process()
 -> Result<LegacyDaemonRootMigration, CliError> {
-    migrate_legacy_daemon_root(DaemonOwnership::from_env_or_default())
+    migrate_legacy_daemon_root(daemon_ownership_from_env_or_default())
 }
 
 pub(crate) fn migrate_legacy_daemon_root(

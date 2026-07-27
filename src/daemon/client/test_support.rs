@@ -20,7 +20,7 @@ pub(crate) fn install_fake_running_xdg_daemon(
     let daemon_root = xdg_root
         .join("harness")
         .join("daemon")
-        .join(state::DaemonOwnership::from_env_or_default().as_str());
+        .join(state::daemon_ownership_from_env_or_default().as_str());
     std::fs::create_dir_all(&daemon_root).expect("create daemon root");
     let lock_file = OpenOptions::new()
         .create(true)

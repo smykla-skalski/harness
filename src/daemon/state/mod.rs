@@ -1,11 +1,8 @@
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 #[cfg(test)]
 use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
 
 mod audit;
 mod config;
@@ -21,6 +18,11 @@ mod paths;
 mod tests;
 
 pub use crate::infra::persistence::flock::FlockGuard;
+pub use harness_protocol::daemon::{
+    DaemonAuditEvent, DaemonBinaryStamp, DaemonDiagnostics, DaemonManifest, HostBridgeCapabilityManifest,
+    HostBridgeManifest,
+};
+
 pub use audit::{
     append_event, append_event_best_effort, append_event_entry, diagnostics, ensure_auth_token,
     read_recent_events,
@@ -57,7 +59,7 @@ pub use migration::{
     LegacyDaemonRootMigration, MigrationDecision, migrate_legacy_daemon_root_at,
     migrate_legacy_daemon_root_for_current_process,
 };
-pub use ownership::{DaemonOwnership, ScopedOwnershipOverride};
+pub use ownership::{DaemonOwnership, ScopedOwnershipOverride, daemon_ownership_from_env_or_default};
 pub use paths::{
     ScopedDaemonRootOverride, auth_token_path, base_daemon_dir, config_path, daemon_root,
     daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path, identity_path,
@@ -85,90 +87,6 @@ type ManifestWriteHook = dyn Fn() + Send + Sync + 'static;
 
 #[cfg(test)]
 static MANIFEST_WRITE_HOOK: Mutex<Option<Arc<ManifestWriteHook>>> = Mutex::new(None);
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
-pub struct HostBridgeCapabilityManifest {
-    #[serde(default = "default_host_bridge_enabled")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub healthy: bool,
-    pub transport: String,
-    #[serde(default)]
-    pub endpoint: Option<String>,
-    #[serde(default)]
-    pub metadata: BTreeMap<String, String>,
-}
-
-fn default_host_bridge_enabled() -> bool {
-    true
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
-pub struct HostBridgeManifest {
-    #[serde(default)]
-    pub running: bool,
-    #[serde(default)]
-    pub socket_path: Option<String>,
-    #[serde(default)]
-    pub capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct DaemonBinaryStamp {
-    pub helper_path: String,
-    pub device_identifier: u64,
-    pub inode: u64,
-    pub file_size: u64,
-    pub modification_time_interval_since_1970: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct DaemonManifest {
-    pub version: String,
-    pub pid: u32,
-    pub endpoint: String,
-    pub started_at: String,
-    pub token_path: String,
-    #[serde(default)]
-    pub sandboxed: bool,
-    #[serde(default)]
-    pub host_bridge: HostBridgeManifest,
-    #[serde(default)]
-    pub revision: u64,
-    #[serde(default)]
-    pub updated_at: String,
-    #[serde(default)]
-    pub binary_stamp: Option<DaemonBinaryStamp>,
-    /// Which entry point launched this daemon. Defaults to `Managed` for
-    /// pre-coexistence manifests so legacy installs deserialize cleanly.
-    #[serde(default)]
-    pub ownership: DaemonOwnership,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct DaemonAuditEvent {
-    pub recorded_at: String,
-    pub level: String,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct DaemonDiagnostics {
-    pub daemon_root: String,
-    pub manifest_path: String,
-    pub auth_token_path: String,
-    pub auth_token_present: bool,
-    pub events_path: String,
-    pub database_path: String,
-    pub database_size_bytes: u64,
-    pub last_event: Option<DaemonAuditEvent>,
-}
 
 pub type DaemonLockGuard = FlockGuard;
 

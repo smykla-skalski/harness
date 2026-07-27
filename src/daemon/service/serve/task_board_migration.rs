@@ -5,7 +5,9 @@ use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardImportMarker};
-use crate::daemon::state::{self, DaemonManifest, DaemonOwnership, FlockGuard};
+use crate::daemon::state::{
+    self, DaemonManifest, DaemonOwnership, FlockGuard, daemon_ownership_from_env_or_default,
+};
 use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::read_json_typed;
 use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
@@ -37,7 +39,7 @@ pub(super) async fn migrate_task_board(db: &AsyncDaemonDb) -> Result<(), CliErro
     let database_config = raw_config.without_secret_metadata();
     let secret_digest = state::task_board_git_runtime_secret_handoff_digest(&raw_config)?;
 
-    if DaemonOwnership::from_env_or_default() == DaemonOwnership::External {
+    if daemon_ownership_from_env_or_default() == DaemonOwnership::External {
         db.initialize_empty_task_board(&database_config, secret_digest.as_deref())
             .await?;
         state::remove_migrated_task_board_config_if_safe()?;

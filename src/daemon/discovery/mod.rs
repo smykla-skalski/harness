@@ -154,7 +154,7 @@ pub enum AdoptionOutcome {
 #[must_use]
 pub fn candidate_daemon_locations() -> Vec<DaemonLocation> {
     let mut candidates: Vec<DaemonLocation> = Vec::with_capacity(3);
-    let ownership = state::DaemonOwnership::from_env_or_default();
+    let ownership = state::daemon_ownership_from_env_or_default();
 
     candidates.push(DaemonLocation {
         root: state::default_daemon_root(),
