@@ -8,7 +8,7 @@ use crate::task_board::github::{
 };
 use crate::task_board::{
     PolicyGraph, TaskBoardItem, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
-    task_board_read_only_execution_repository,
+    normalize_repository_slug, task_board_read_only_execution_repository,
 };
 use harness_kernel::errors::CliError;
 
@@ -122,15 +122,26 @@ pub(crate) async fn run_task_board_github_automation_async(
 /// The conventions this repository publishes under: the global ones, with any
 /// overrides it carries applied. A board fed from work and personal
 /// repositories needs different reviewers depending on where a change lands.
+///
+/// Both slugs are normalized before matching. Publication reaches this function
+/// with the repository the item names and canonicalizes it only later, when it
+/// builds the client, so a case difference would otherwise drop a repository's
+/// overrides and publish under the global answer instead.
 pub(super) fn repository_conventions(
     settings: &TaskBoardOrchestratorSettings,
     defaults: &GitHubAutomationSettings,
     repository: &str,
 ) -> GitHubAutomationSettings {
+    let Some(requested) = normalize_repository_slug(Some(repository)) else {
+        return defaults.clone();
+    };
     settings
         .repositories
         .iter()
-        .find(|configured| configured.repository == repository)
+        .find(|configured| {
+            normalize_repository_slug(Some(&configured.repository))
+                .is_some_and(|configured| configured == requested)
+        })
         .map_or_else(|| defaults.clone(), |configured| defaults.merged_with(configured))
 }
 
@@ -194,6 +205,9 @@ async fn run_task_board_github_automation_with_database_client(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "task_board_github/repository_conventions_tests.rs"]
+mod repository_conventions_tests;
 #[cfg(test)]
 #[path = "task_board_github/write_publication_tests.rs"]
 mod write_publication_tests;
