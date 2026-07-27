@@ -3,43 +3,21 @@ use std::path::Path;
 use harness_daemon_client::{ClientError, DaemonClient};
 use harness_protocol::agent::AckResult;
 use harness_protocol::session::AgentRegistration;
-use serde::{Deserialize, Serialize};
+use harness_protocol::session_wire::{
+    AgentRuntimeSessionRegistrationRequest, AgentRuntimeSessionRegistrationResponse,
+    RuntimeSessionResolutionResponse, SessionLeaveRequest, SignalAckRequest,
+};
+use serde::Deserialize;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::service::ResolvedRuntimeSessionAgent;
 
-#[derive(Debug, Deserialize)]
-struct RuntimeSessionResolutionResponse {
-    resolved: Option<ResolvedRuntimeSessionAgent>,
-}
-
-#[derive(Debug, Serialize)]
-struct SignalAckRequest<'a> {
-    agent_id: &'a str,
-    signal_id: &'a str,
-    result: AckResult,
-    project_dir: String,
-}
-
-#[derive(Debug, Serialize)]
-struct SessionLeaveRequest<'a> {
-    agent_id: &'a str,
-}
-
-#[derive(Debug, Serialize)]
-struct RuntimeSessionRegistrationRequest<'a> {
-    managed_agent_id: &'a str,
-    runtime: &'a str,
-    runtime_session_id: &'a str,
-    project_dir: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct RuntimeSessionRegistrationResponse {
-    registered: bool,
-}
-
+// `SessionDetail` (the daemon's full `GET /v1/sessions/{id}` response) carries
+// several fields this binary never reads. Naming just the one required field
+// is a safe partial view rather than a mirror: a rename on the daemon side
+// fails deserialization loudly instead of silently dropping data, so unlike
+// the request/response envelopes above this doesn't need the shared type.
 #[derive(Debug, Deserialize)]
 struct SessionAgentResponse {
     agents: Vec<AgentRegistration>,
@@ -81,8 +59,8 @@ pub(super) fn record_signal_ack(
 ) -> Option<Result<(), CliError>> {
     let client = DaemonClient::try_connect()?;
     let request = SignalAckRequest {
-        agent_id,
-        signal_id,
+        agent_id: agent_id.to_string(),
+        signal_id: signal_id.to_string(),
         result,
         project_dir: project_dir.to_string_lossy().into_owned(),
     };
@@ -103,7 +81,9 @@ pub(super) fn leave_session(session_id: &str, agent_id: &str) -> Option<Result<(
         client
             .post::<_, serde_json::Value>(
                 &format!("/v1/sessions/{session_id}/leave"),
-                &SessionLeaveRequest { agent_id },
+                &SessionLeaveRequest {
+                    agent_id: agent_id.to_string(),
+                },
             )
             .map(|_| ())
             .map_err(|error| map_error("leave session", &error)),
@@ -118,15 +98,15 @@ pub(super) fn register_runtime_session(
     project_dir: &Path,
 ) -> Option<Result<bool, CliError>> {
     let client = DaemonClient::try_connect()?;
-    let request = RuntimeSessionRegistrationRequest {
-        managed_agent_id,
-        runtime: runtime_name,
-        runtime_session_id,
+    let request = AgentRuntimeSessionRegistrationRequest {
+        managed_agent_id: managed_agent_id.to_string(),
+        runtime: runtime_name.to_string(),
+        runtime_session_id: runtime_session_id.to_string(),
         project_dir: project_dir.to_string_lossy().into_owned(),
     };
     Some(
         client
-            .post::<_, RuntimeSessionRegistrationResponse>(
+            .post::<_, AgentRuntimeSessionRegistrationResponse>(
                 &format!("/v1/sessions/{session_id}/runtime-session"),
                 &request,
             )

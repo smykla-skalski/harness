@@ -16,11 +16,7 @@ use super::storage;
 
 const START_TASK_SIGNAL_COMMAND: &str = "request_action";
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ResolvedRuntimeSessionAgent {
-    pub orchestration_session_id: String,
-    pub session_agent_id: String,
-}
+pub use harness_protocol::session_wire::ResolvedRuntimeSessionAgent;
 
 /// Resolve the live orchestration agent for a runtime session.
 ///

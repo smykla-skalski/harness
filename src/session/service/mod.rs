@@ -51,12 +51,7 @@ pub struct TaskSpec<'a> {
     pub observe_issue_id: Option<&'a str>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[derive(utoipa::ToSchema)]
-pub struct ResolvedRuntimeSessionAgent {
-    pub orchestration_session_id: String,
-    pub session_agent_id: String,
-}
+pub use harness_protocol::session_wire::ResolvedRuntimeSessionAgent;
 
 #[derive(Debug, Clone)]
 pub(crate) struct LeaveSignalRecord {
