@@ -107,7 +107,6 @@ flowchart LR
 
 These are real roots in the repo, but they are not part of the main public domain map:
 
-- `src/platform/` is crate-internal adapter code for runtime-specific behavior.
 - `src/manifests/` is crate-internal manifest plumbing.
 - `src/suite_defaults/` is crate-internal suite scaffolding and defaults.
 - `src/codec/` is test-only support code and is not part of the public library surface.
@@ -117,10 +116,10 @@ These are real roots in the repo, but they are not part of the main public domai
 The current `src/lib.rs` surface is:
 
 - public: `agents`, `app`, `create`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `session`, `setup`, `workspace`
-- crate-internal: `platform`, `manifests`, `suite_defaults`
+- crate-internal: `manifests`, `suite_defaults`
 - test-only: `codec`
 
-That means `platform` is intentionally not a stable library API even though it is a first-class internal root.
+That means `manifests` and `suite_defaults` are intentionally not stable library APIs even though they are first-class internal roots.
 
 ## Source-of-truth model
 
