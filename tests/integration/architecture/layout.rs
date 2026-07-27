@@ -145,7 +145,7 @@ fn internal_code_uses_kernel_command_intent_instead_of_legacy_shell_parse() {
 #[test]
 fn app_context_stays_app_wiring_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let contents = read_repo_file(root, "src/app/command_context.rs");
+    let contents = read_repo_file(root, "crates/harness-workspace/src/command_context.rs");
 
     for needle in [
         "RunAggregate",
@@ -159,7 +159,7 @@ fn app_context_stays_app_wiring_only() {
     ] {
         assert!(
             !contents.contains(needle),
-            "src/app/command_context.rs should not own run resolution via `{needle}`"
+            "crates/harness-workspace/src/command_context.rs should not own run resolution via `{needle}`"
         );
     }
 }

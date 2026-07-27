@@ -176,7 +176,7 @@ daemon-runtime = [
   "dep:utoipa-axum",
   "dep:x509-parser",
 ]
-standalone-daemon = []
+standalone-daemon = ["harness-workspace/standalone-daemon"]
 standalone-worker = ["harness-kernel/standalone-worker"]
 full-runtime = ["daemon-runtime", "mcp-runtime"]
 mcp-runtime = ["dep:harness-mcp"]
