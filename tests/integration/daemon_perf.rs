@@ -107,6 +107,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         companion: None,
         remote_pairing_limiter: default_remote_pairing_limiter(),
         remote_pairing_status_limiter: default_remote_pairing_status_limiter(),
+        remote_pairing_events: broadcast::channel(8).0,
         sender: sender.clone(),
         manifest,
         daemon_epoch: harness::workspace::utc_now(),
