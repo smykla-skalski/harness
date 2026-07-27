@@ -6,10 +6,6 @@ const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[
     ("src/task_board/store.rs", "pub struct TaskBoardStore"),
     ("src/task_board/machines.rs", "pub struct MachineRegistry"),
     (
-        "src/task_board/orchestrator.rs",
-        "pub struct TaskBoardOrchestrator",
-    ),
-    (
         "src/task_board/policy_runtime/repository.rs",
         "pub struct PolicyRuntimeRepository",
     ),
@@ -39,6 +35,23 @@ const FILE_STORAGE_SYMBOLS: &[&str] = &[
     "orchestrator-settings.json",
     "policy-workflow-runs-v1.json",
 ];
+
+#[test]
+fn task_board_orchestrator_has_one_runner() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    assert!(
+        !root
+            .join("src/daemon/service/task_board_orchestrator")
+            .exists(),
+        "orchestrator tests must exercise the shipped AsyncDaemonDb runner"
+    );
+    let source = std::fs::read_to_string(root.join("src/task_board/orchestrator.rs"))
+        .expect("read task-board orchestrator module");
+    assert!(
+        !source.contains("pub struct TaskBoardOrchestrator"),
+        "the retired file-backed orchestrator runner must not return"
+    );
+}
 
 #[test]
 fn task_board_cli_transport_is_daemon_only() {

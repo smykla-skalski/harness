@@ -106,8 +106,6 @@ pub use lane::{
 pub use machines::Machine;
 #[cfg(test)]
 pub use machines::MachineRegistry;
-#[cfg(test)]
-pub use orchestrator::TaskBoardOrchestrator;
 pub use orchestrator::{
     TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardHeldDispatchItem,
     TaskBoardHeldDispatchSummary, TaskBoardOrchestratorDispatchInput,

@@ -25,7 +25,7 @@ use harness_kernel::errors::CliErrorKind;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 #[cfg(test)]
 use crate::task_board::{
-    ExternalSyncConfig, ExternalSyncOperation, TaskBoardItem, TaskBoardOrchestrator,
+    ExternalSyncConfig, ExternalSyncOperation, TaskBoardItem,
     TaskBoardStore, build_audit_summary, build_machine_summaries, build_progress_rollups,
     configured_sync_clients, default_board_root, sync_external_tasks,
 };
@@ -428,20 +428,7 @@ fn run_task_board_sync_blocking(
 
 #[cfg(test)]
 fn active_external_sync_config() -> ExternalSyncConfig {
-    let settings = TaskBoardOrchestrator::new(default_board_root())
-        .settings()
-        .ok();
-    let (inbox_repositories, github_labels) = settings.map_or_else(
-        || (Vec::new(), Vec::new()),
-        |settings| {
-            (
-                settings.github_inbox.repositories.clone(),
-                settings.github_inbox.label_filter.clone(),
-            )
-        },
-    );
-    external_sync_config_for_repository(None, &inbox_repositories)
-        .with_github_import_labels_override(&github_labels)
+    external_sync_config_for_repository(None, &[])
 }
 
 #[cfg(test)]
