@@ -39,7 +39,7 @@ const POLICY_DECISION_PRUNE_INTERVAL: u32 = 256;
 /// unbounded channel and never blocks on the database. Recording failures are
 /// logged, never propagated, so a write fault can never block a real mutation.
 ///
-/// The drain also bounds the feed: it trims once at boot (clearing any inbox
+/// The drain also bounds the feed: it trims once at boot (clearing any backlog
 /// from before retention existed) and again every `POLICY_DECISION_PRUNE_INTERVAL`
 /// records, keeping the table near `POLICY_DECISION_RETENTION` rows.
 fn install_decision_recording(async_db: &AsyncDaemonDb) {

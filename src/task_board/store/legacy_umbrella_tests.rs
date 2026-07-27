@@ -16,7 +16,7 @@ fn legacy_markdown_statuses_read_and_rewrite_as_inbox() {
 schema_version: 1
 id: legacy-umbrella
 title: Legacy lane
-status: backlog
+status: umbrella
 priority: medium
 agent_mode: headless
 external_refs:
