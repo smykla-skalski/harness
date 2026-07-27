@@ -25,12 +25,15 @@ struct TaskBoardStepFlowSnapshot: Codable, Equatable, Sendable {
   }
 }
 
+@MainActor
 enum TaskBoardStepFlowStore {
   static let storageKey = "harness.task-board.step-flow.v1"
+  private static let decoder = JSONDecoder()
+  private static let encoder = JSONEncoder()
 
   static func load(from userDefaults: UserDefaults = .standard) -> TaskBoardStepFlowSnapshot? {
     guard let data = userDefaults.data(forKey: storageKey) else { return nil }
-    return try? JSONDecoder().decode(TaskBoardStepFlowSnapshot.self, from: data)
+    return try? decoder.decode(TaskBoardStepFlowSnapshot.self, from: data)
   }
 
   /// Saving `nil` forgets the stored flow, so ending one and never starting one
@@ -39,7 +42,7 @@ enum TaskBoardStepFlowStore {
     _ snapshot: TaskBoardStepFlowSnapshot?,
     in userDefaults: UserDefaults = .standard
   ) {
-    guard let snapshot, let data = try? JSONEncoder().encode(snapshot) else {
+    guard let snapshot, let data = try? encoder.encode(snapshot) else {
       userDefaults.removeObject(forKey: storageKey)
       return
     }

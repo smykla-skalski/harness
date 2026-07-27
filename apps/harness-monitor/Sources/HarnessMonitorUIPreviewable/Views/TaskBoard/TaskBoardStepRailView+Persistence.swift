@@ -4,7 +4,8 @@ import HarnessMonitorKit
 /// the view, so without this a restart mid-process reopens on the first step.
 extension TaskBoardStepRailView {
   /// What the next launch needs to reopen on this step: the pinned item and the
-  /// plan Pick loaded for it.
+  /// plan Pick loaded for it. Built only when the flow actually changed, never
+  /// on the body path.
   var stepFlowSnapshot: TaskBoardStepFlowSnapshot? {
     guard let lockedItemID = stepRailState.lockedItemID else { return nil }
     let picked = stepRailState.pickedSelection
@@ -16,31 +17,34 @@ extension TaskBoardStepRailView {
     )
   }
 
-  /// Bumps when the board items or the orchestrator status change, which is
-  /// when a stored flow that had nothing to resolve against can resolve.
+  /// Bumps when the board items or the orchestrator status change, which is when
+  /// a stored flow that had nothing to resolve against can resolve. Cheaper than
+  /// `.task(id:)`, which would spawn and cancel a task per board snapshot.
   var stepFlowRestorationRevision: UInt64 {
     store.contentUI.dashboard.taskBoardSnapshotRevision
   }
 
   func restoreStepFlowIfNeeded() {
     let state = stepRailState
-    guard !state.hasRestoredPersistedFlow else { return }
-    // A flow started in this session outranks a stored one; nothing to restore.
+    if !state.hasLoadedPersistedFlow {
+      state.hasLoadedPersistedFlow = true
+      state.pendingRestoredFlow = TaskBoardStepFlowStore.load(from: flowDefaults)
+    }
+    guard let pending = state.pendingRestoredFlow else { return }
+    // A flow started in this session outranks a stored one.
     guard state.lockedItemID == nil else {
-      state.hasRestoredPersistedFlow = true
+      state.pendingRestoredFlow = nil
       return
     }
     guard
       let restored = TaskBoardStepFlowRestoration.restoredFlow(
-        snapshot: TaskBoardStepFlowStore.load(from: flowDefaults),
+        snapshot: pending,
         items: taskBoardItems
       )
     else {
       return
     }
-    state.hasRestoredPersistedFlow = true
-    state.lockedItemID = restored.itemID
-    state.pickedSelection = restored.pickedSelection
+    state.adoptRestoredFlow(itemID: restored.itemID, pickedSelection: restored.pickedSelection)
   }
 
   func persistStepFlow() {
@@ -50,6 +54,6 @@ extension TaskBoardStepRailView {
   /// Step mode ended, so there is no flow left to resume.
   func endStepFlow() {
     stepRailState.reset()
-    TaskBoardStepFlowStore.save(nil, in: flowDefaults)
+    persistStepFlow()
   }
 }

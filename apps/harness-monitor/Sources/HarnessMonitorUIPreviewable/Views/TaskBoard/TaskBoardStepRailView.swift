@@ -93,7 +93,7 @@ struct TaskBoardStepRailView: View {
     }
     // Deliberately without `initial`: the panel mounts before restoration runs,
     // and writing the empty flow then would forget the stored one.
-    .onChange(of: stepFlowSnapshot) { _, _ in
+    .onChange(of: state.flowRevision) { _, _ in
       persistStepFlow()
     }
     .onChange(of: stagePlan.stage) { _, newStage in

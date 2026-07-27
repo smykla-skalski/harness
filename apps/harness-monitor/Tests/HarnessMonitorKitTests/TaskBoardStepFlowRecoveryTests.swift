@@ -16,9 +16,8 @@ struct TaskBoardStepFlowRecoveryTests {
       renderedPrompt: "durable prompt"
     )
     let state = TaskBoardStepRailState()
-    state.pickedSelection = selection
+    state.applyPick(selection)
     state.delivery = delivery
-    state.lockedItemID = item.id
     let initialRefreshGeneration = state.approvalRefreshGeneration
 
     #expect(state.beginExternalSync(itemID: item.id))

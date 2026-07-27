@@ -119,39 +119,74 @@ final class TaskBoardStepFlowPersistenceTests {
     #expect(view.activeSelection?.plan.renderedPrompt == "durable prompt")
   }
 
-  @Test("A rail restores once and leaves the flow the user moved on to alone")
-  func railRestoresOnce() async {
-    let target = item(id: "active", status: .todo)
+  @Test("A flow the user already started outranks the stored one")
+  func liveFlowOutranksStoredFlow() async {
+    let stored = item(id: "active", status: .todo)
     let other = item(id: "other", status: .todo)
     TaskBoardStepFlowStore.save(
-      TaskBoardStepFlowSnapshot(lockedItemID: target.id),
+      TaskBoardStepFlowSnapshot(lockedItemID: stored.id),
       in: defaults
     )
-    let view = await railView(targetItem: target, taskBoardItems: [target, other])
+    let view = await railView(targetItem: stored, taskBoardItems: [stored, other])
 
-    view.restoreStepFlowIfNeeded()
-    view.stepRailState.lockedItemID = other.id
+    view.stepRailState.applyPick(
+      TaskBoardDispatchSelection(item: other, plan: dispatchPlan(for: other))
+    )
     view.restoreStepFlowIfNeeded()
 
     #expect(view.stepRailState.lockedItemID == other.id)
+    #expect(view.stepRailState.pendingRestoredFlow == nil)
+  }
+
+  @Test("Restoring a flow does not rewrite what is stored")
+  func restoringDoesNotRewriteStoredFlow() async {
+    let picked = item(id: "active", status: .todo, updatedAt: "2026-07-19T12:00:00Z")
+    let live = item(id: "active", status: .todo, updatedAt: "2026-07-19T12:30:00Z")
+    let snapshot = TaskBoardStepFlowSnapshot(
+      lockedItemID: picked.id,
+      pickedPlan: dispatchPlan(for: picked),
+      pickedItemUpdatedAt: picked.updatedAt
+    )
+    TaskBoardStepFlowStore.save(snapshot, in: defaults)
+    let view = await railView(targetItem: live, taskBoardItems: [live])
+    let revisionBeforeRestore = view.stepRailState.flowRevision
+
+    view.restoreStepFlowIfNeeded()
+
+    #expect(view.stepRailState.lockedItemID == live.id)
+    #expect(view.stepRailState.flowRevision == revisionBeforeRestore)
+    #expect(TaskBoardStepFlowStore.load(from: defaults) == snapshot)
   }
 
   @Test("Picking an item stores it for the next launch")
   func pickingStoresFlow() async {
     let target = item(id: "active", status: .todo)
     let view = await railView(targetItem: target, taskBoardItems: [target])
+    let revisionBeforePick = view.stepRailState.flowRevision
 
-    view.stepRailState.pickedSelection = TaskBoardDispatchSelection(
-      item: target,
-      plan: dispatchPlan(for: target)
+    view.stepRailState.applyPick(
+      TaskBoardDispatchSelection(item: target, plan: dispatchPlan(for: target))
     )
-    view.stepRailState.lockedItemID = target.id
+    #expect(view.stepRailState.flowRevision == revisionBeforePick &+ 1)
     view.persistStepFlow()
 
     let stored = TaskBoardStepFlowStore.load(from: defaults)
     #expect(stored?.lockedItemID == target.id)
     #expect(stored?.pickedPlan?.renderedPrompt == "durable prompt")
     #expect(stored?.pickedItemUpdatedAt == target.updatedAt)
+  }
+
+  @Test("Pinning a target before Pick stores it too")
+  func pinningTargetStoresFlow() async {
+    let target = item(id: "active", status: .todo)
+    let view = await railView(targetItem: target, taskBoardItems: [target])
+
+    view.stepRailState.preserveFlowIdentity(itemID: target.id)
+    view.persistStepFlow()
+
+    let stored = TaskBoardStepFlowStore.load(from: defaults)
+    #expect(stored?.lockedItemID == target.id)
+    #expect(stored?.pickedPlan == nil)
   }
 
   @Test("Ending the flow forgets the stored step")
