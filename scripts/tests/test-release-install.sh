@@ -1031,7 +1031,7 @@ scenario_legacy_adapter_probes_are_normalized_before_activation() {
   start_test "legacy silent adapter probes are normalized before activation"
   local sandbox="$SANDBOX/legacy-adapters"
   local legacy_dir name output
-  local -a names=(harness-codex-acp)
+  local -a names=(harness-codex-acp harness-openrouter-agent)
   write_fake_release_set "$sandbox/target" 48.0.0
   write_fake_codesign "$sandbox/fake-bin"
   command mkdir -p "$sandbox/bin"

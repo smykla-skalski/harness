@@ -934,8 +934,8 @@ def _prepare_tasks(tasks: tuple[Task, ...], sandbox_root: Path) -> tuple[Task, .
             "harness daemon",
         ),
         "legacy_adapter_probes_are_normalized_before_activation": (
-            "harness harness-codex-acp",
-            "harness codex",
+            "harness harness-codex-acp harness-openrouter-agent",
+            "harness codex openrouter",
         ),
         "legacy_binaries_are_normalized_before_activation": (
             "harness aff",
@@ -1041,11 +1041,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--jobs",
         type=_positive_int,
-        default=(
-            int(os.environ["HARNESS_SCRIPT_TEST_JOBS"])
-            if "HARNESS_SCRIPT_TEST_JOBS" in os.environ
-            else None
-        ),
+        default=os.environ.get("HARNESS_SCRIPT_TEST_JOBS"),
     )
     parser.add_argument(
         "--budget-seconds",
@@ -1056,9 +1052,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--task-timeout-seconds",
         type=_positive_float,
-        default=float(
-            os.environ.get("HARNESS_SCRIPT_TEST_TASK_TIMEOUT_SECONDS", "60")
-        ),
+        default=os.environ.get("HARNESS_SCRIPT_TEST_TASK_TIMEOUT_SECONDS", "60"),
     )
     parser.add_argument(
         "--filter",

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import os
 import subprocess
 import sys
@@ -44,6 +46,27 @@ class ParallelScriptTestRunnerTests(unittest.TestCase):
         ):
             arguments = runner._arguments()
         self.assertEqual(arguments.budget_seconds, 15)
+
+    def test_invalid_environment_defaults_use_argparse_errors(self) -> None:
+        runner = load_runner()
+        variables = (
+            "HARNESS_SCRIPT_TEST_JOBS",
+            "HARNESS_SCRIPT_TEST_TASK_TIMEOUT_SECONDS",
+        )
+        for variable in variables:
+            with self.subTest(variable=variable):
+                stderr = io.StringIO()
+                with (
+                    patch.dict(os.environ, {variable: "invalid"}, clear=True),
+                    patch.object(sys, "argv", ["run-script-test-suite.py"]),
+                    contextlib.redirect_stderr(stderr),
+                    self.assertRaises(SystemExit) as raised,
+                ):
+                    runner._arguments()
+
+                self.assertEqual(raised.exception.code, 2)
+                self.assertIn("invalid", stderr.getvalue())
+                self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_jobs_overlap_and_receive_private_home_and_tmpdir(self) -> None:
         runner = load_runner()
