@@ -180,15 +180,15 @@ public struct MobileTaskBoardSummary: Codable, Equatable, Identifiable, Sendable
   }
 
   private static func canonicalStatus(_ status: String) -> String {
-    status == "umbrella" ? "inbox" : status
+    ["umbrella", "backlog"].contains(status) ? "inbox" : status
   }
 
   private static func canonicalStatusTitle(
     sourceStatus: String,
     statusTitle: String
   ) -> String {
-    if sourceStatus == "umbrella"
-      || (sourceStatus == "inbox" && statusTitle == "Umbrella")
+    if ["umbrella", "backlog"].contains(sourceStatus)
+      || (sourceStatus == "inbox" && ["Umbrella", "Backlog"].contains(statusTitle))
     {
       return "Inbox"
     }

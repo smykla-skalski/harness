@@ -103,7 +103,7 @@ fn repair_dispatch_status_filter(document: &mut Value) -> bool {
     else {
         return false;
     };
-    if status_value.as_str() == Some("umbrella") {
+    if matches!(status_value.as_str(), Some("umbrella" | "backlog")) {
         document["dispatch_status_filter"] = Value::String("inbox".to_string());
         return true;
     }

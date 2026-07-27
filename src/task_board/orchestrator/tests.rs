@@ -275,30 +275,32 @@ fn settings_read_repairs_legacy_dispatch_status_filter_on_disk() {
 }
 
 #[test]
-fn settings_read_repairs_umbrella_filter_to_inbox_on_disk() {
+fn settings_read_repairs_legacy_lane_filters_to_inbox_on_disk() {
     let temp = tempdir().expect("tempdir");
-    let root = temp.path().join("board");
-    fs::create_dir_all(&root).expect("create board root");
-    let settings_path = root.join(SETTINGS_FILE);
-    fs::write(
-        &settings_path,
-        serde_json::to_vec_pretty(&serde_json::json!({
-            "dispatch_status_filter": "umbrella"
-        }))
-        .expect("serialize settings"),
-    )
-    .expect("write settings");
-    let orchestrator = TaskBoardOrchestrator::new(root);
+    for legacy_status in ["umbrella", "backlog"] {
+        let root = temp.path().join(legacy_status);
+        fs::create_dir_all(&root).expect("create board root");
+        let settings_path = root.join(SETTINGS_FILE);
+        fs::write(
+            &settings_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "dispatch_status_filter": legacy_status
+            }))
+            .expect("serialize settings"),
+        )
+        .expect("write settings");
+        let orchestrator = TaskBoardOrchestrator::new(root);
 
-    let settings = orchestrator.settings().expect("load settings");
+        let settings = orchestrator.settings().expect("load settings");
 
-    assert_eq!(
-        settings.dispatch_status_filter,
-        Some(TaskBoardStatus::Inbox)
-    );
-    let contents = fs::read_to_string(settings_path).expect("read repaired settings");
-    assert!(contents.contains("\"dispatch_status_filter\": \"inbox\""));
-    assert!(!contents.contains("\"dispatch_status_filter\": \"umbrella\""));
+        assert_eq!(
+            settings.dispatch_status_filter,
+            Some(TaskBoardStatus::Inbox)
+        );
+        let contents = fs::read_to_string(settings_path).expect("read repaired settings");
+        assert!(contents.contains("\"dispatch_status_filter\": \"inbox\""));
+        assert!(!contents.contains(legacy_status));
+    }
 }
 
 #[test]
