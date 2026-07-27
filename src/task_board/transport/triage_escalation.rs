@@ -1,9 +1,11 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::task_board::wire::TaskBoardTriageEscalationVerdictRequest;
+use crate::task_board::wire::{
+    TaskBoardTriageEscalationVerdictRequest, TaskBoardTriageEscalationVerdictResponse,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::task_board::transport::{daemon_client, print_json};
+use crate::task_board::transport::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 use crate::task_board::{TriageVerdict, is_canonical_reason_detail};
 
 /// The daemon-spawned escalation worker's only way to report its judgment
@@ -67,8 +69,12 @@ impl Execute for TaskBoardTriageEscalationReportArgs {
             verdict,
             rationale: self.rationale.clone(),
         };
-        let response = daemon_client()?
-            .report_task_board_triage_escalation_verdict(&self.escalation_id, &request)?;
+        let url = triage_escalation_verdict_path(&self.escalation_id);
+        let response: TaskBoardTriageEscalationVerdictResponse = leaf_daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| {
+                leaf_daemon_client_error("report task-board triage escalation verdict", &error)
+            })?;
         if self.json {
             print_json(&response)?;
         } else if response.accepted {
@@ -82,4 +88,14 @@ impl Execute for TaskBoardTriageEscalationReportArgs {
         }
         Ok(i32::from(!response.accepted))
     }
+}
+
+fn triage_escalation_verdict_path(escalation_id: &str) -> String {
+    let mut base = reqwest::Url::parse("http://localhost/").expect("static URL should parse");
+    base.path_segments_mut()
+        .expect("static URL should accept path segments")
+        .pop_if_empty()
+        .push(escalation_id);
+    let encoded_escalation_id = base.path().trim_start_matches('/');
+    format!("/v1/task-board/triage/escalations/{encoded_escalation_id}/verdict")
 }

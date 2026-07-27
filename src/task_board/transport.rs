@@ -3,11 +3,13 @@ use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::DaemonClient;
+use harness_daemon_client::{ClientError, DaemonClient as LeafDaemonClient};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
 };
 use crate::task_board::types::{AgentMode, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus};
+use crate::task_board::wire::{TASK_BOARD_STORAGE_DATABASE, TaskBoardCapabilitiesResponse};
 
 mod catalog;
 mod dispatch;
@@ -331,6 +333,45 @@ pub(super) fn daemon_client() -> Result<DaemonClient, CliError> {
     })?;
     client.require_database_task_board()?;
     Ok(client)
+}
+
+/// Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade
+/// `daemon_client()` returns above, so command surfaces already converted off
+/// the facade stay free of a daemon-crate dependency. `daemon_client()` stays
+/// for the surfaces that still call typed facade methods this leaf client
+/// does not (yet) expose.
+pub(super) fn leaf_daemon_client() -> Result<LeafDaemonClient, CliError> {
+    let client = LeafDaemonClient::try_connect().ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "task-board commands require a running daemon; start Harness Monitor or run `harness-daemon dev`",
+        ))
+    })?;
+    require_database_task_board(&client)?;
+    Ok(client)
+}
+
+fn require_database_task_board(client: &LeafDaemonClient) -> Result<(), CliError> {
+    let capability = client
+        .get_optional::<TaskBoardCapabilitiesResponse>("/v1/task-board/capabilities", &[])
+        .map_err(|error| leaf_daemon_client_error("check task-board capability", &error))?
+        .ok_or_else(task_board_upgrade_required)?;
+    if capability.storage != TASK_BOARD_STORAGE_DATABASE {
+        return Err(task_board_upgrade_required());
+    }
+    Ok(())
+}
+
+fn task_board_upgrade_required() -> CliError {
+    CliErrorKind::workflow_io(
+        "the running daemon does not provide database-backed Task Board storage; upgrade and restart the daemon",
+    )
+    .into()
+}
+
+pub(super) fn leaf_daemon_client_error(operation: &str, error: &ClientError) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "daemon {operation}: {error}"
+    )))
 }
 
 pub(super) fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {

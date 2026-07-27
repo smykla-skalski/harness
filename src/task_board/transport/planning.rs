@@ -3,11 +3,11 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
 };
 use harness_kernel::errors::CliError;
 
-use super::{daemon_client, print_json};
+use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardPlanBeginArgs {
@@ -39,9 +39,12 @@ pub struct TaskBoardPlanRevokeArgs {
 
 impl Execute for TaskBoardPlanBeginArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.begin_task_board_planning(&TaskBoardPlanBeginRequest {
+        let request = TaskBoardPlanBeginRequest {
             id: self.id.clone(),
-        })?;
+        };
+        let response: TaskBoardPlanningResponse = leaf_daemon_client()?
+            .post(&planning_action_path(&self.id, "begin"), &request)
+            .map_err(|error| leaf_daemon_client_error("begin task-board planning", &error))?;
         print_json(&response)?;
         Ok(0)
     }
@@ -49,10 +52,13 @@ impl Execute for TaskBoardPlanBeginArgs {
 
 impl Execute for TaskBoardPlanSubmitArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.submit_task_board_plan(&TaskBoardPlanSubmitRequest {
+        let request = TaskBoardPlanSubmitRequest {
             id: self.id.clone(),
             summary: self.summary.clone(),
-        })?;
+        };
+        let response: TaskBoardPlanningResponse = leaf_daemon_client()?
+            .post(&planning_action_path(&self.id, "submit"), &request)
+            .map_err(|error| leaf_daemon_client_error("submit task-board plan", &error))?;
         print_json(&response)?;
         Ok(0)
     }
@@ -60,11 +66,14 @@ impl Execute for TaskBoardPlanSubmitArgs {
 
 impl Execute for TaskBoardPlanApproveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.approve_task_board_plan(&TaskBoardPlanApproveRequest {
+        let request = TaskBoardPlanApproveRequest {
             id: self.id.clone(),
             approved_by: self.approved_by.clone(),
             approved_at: self.approved_at.clone(),
-        })?;
+        };
+        let response: TaskBoardPlanningResponse = leaf_daemon_client()?
+            .post(&planning_action_path(&self.id, "approve"), &request)
+            .map_err(|error| leaf_daemon_client_error("approve task-board plan", &error))?;
         print_json(&response)?;
         Ok(0)
     }
@@ -72,11 +81,18 @@ impl Execute for TaskBoardPlanApproveArgs {
 
 impl Execute for TaskBoardPlanRevokeArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.revoke_task_board_plan(&TaskBoardPlanRevokeRequest {
+        let request = TaskBoardPlanRevokeRequest {
             id: self.id.clone(),
             actor: self.actor.clone(),
-        })?;
+        };
+        let response: TaskBoardPlanningResponse = leaf_daemon_client()?
+            .post(&planning_action_path(&self.id, "revoke"), &request)
+            .map_err(|error| leaf_daemon_client_error("revoke task-board plan", &error))?;
         print_json(&response)?;
         Ok(0)
     }
+}
+
+fn planning_action_path(item_id: &str, action: &str) -> String {
+    format!("/v1/task-board/items/{item_id}/planning/{action}")
 }
