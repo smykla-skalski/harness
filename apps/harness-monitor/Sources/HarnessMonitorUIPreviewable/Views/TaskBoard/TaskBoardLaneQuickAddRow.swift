@@ -148,8 +148,11 @@ struct TaskBoardLaneQuickAddRow: View {
     .onChange(of: isFieldFocused) { _, focused in
       // An empty field someone has clicked away from is clutter; one they left
       // text in is unfinished work, and closing it would throw the text away.
+      // Through `dismiss` rather than straight to the model: blank here means
+      // whitespace too, and leaving that in `title` reopens the field holding
+      // spaces, with the placeholder hidden and Return doing nothing.
       if !focused, title.isBlank {
-        selectionModel.endQuickAdd(in: lane)
+        dismiss()
       }
     }
   }
