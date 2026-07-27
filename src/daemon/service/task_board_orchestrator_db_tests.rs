@@ -49,6 +49,17 @@ fn a_whole_board_run_pulls_from_github() {
 }
 
 #[test]
+fn an_unfiltered_run_pulls_from_github() {
+    let mut input = whole_board_run();
+    input.status = None;
+
+    assert!(
+        should_sync_github_tasks(&input, &syncing_settings()),
+        "no lane filter means the whole board, which is what the pull fills"
+    );
+}
+
+#[test]
 fn an_item_scoped_run_skips_the_pull() {
     let mut input = whole_board_run();
     input.item_id = Some("task-1".to_string());

@@ -262,8 +262,10 @@ async fn fail_stage(
 }
 
 /// A pull from GitHub is a whole-board operation, so a run narrowed to one item
-/// or to a lane other than Todo skips it rather than dragging the entire board
-/// through a network round trip for work it will not dispatch.
+/// skips it rather than dragging the entire board through a network round trip
+/// for work it will not dispatch. A filter naming a lane other than Todo skips
+/// for the same reason, but an unfiltered run still pulls: no filter means the
+/// whole board, which is exactly what the pull fills.
 fn should_sync_github_tasks(
     input: &TaskBoardOrchestratorDispatchInput,
     settings: &TaskBoardOrchestratorSettings,
