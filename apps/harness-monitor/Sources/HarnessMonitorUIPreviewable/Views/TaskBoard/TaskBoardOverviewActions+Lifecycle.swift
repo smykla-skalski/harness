@@ -5,17 +5,24 @@ import SwiftUI
 extension TaskBoardOverviewActions {
   // MARK: - Item lifecycle
 
+  /// Both callers pass an `outcome` and read opposite halves of it: the full
+  /// form dismisses on `succeeded`, and a lane's quick add stays open, taking
+  /// `failedTitle` to put back the text it cleared when it submitted.
   func createTaskBoardItem(
     _ request: TaskBoardCreateItemRequest,
-    outcome: TaskBoardItemCreationOutcome
+    outcome: TaskBoardItemCreationOutcome? = nil
   ) {
     guard canCreateItem, let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Creating task board item") {
         let success = await store.createTaskBoardItem(request: request)
-        guard success else { return }
+        guard let outcome else { return }
         await MainActor.run {
-          outcome.succeeded = true
+          if success {
+            outcome.succeeded = true
+          } else {
+            outcome.failedTitle = request.title
+          }
         }
       }
     )
