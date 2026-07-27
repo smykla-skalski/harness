@@ -109,11 +109,13 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
     );
     assert!(hits.is_empty(), "{}", hits.join("\n"));
 
-    let protocol = read_repo_file(root, "src/hooks/protocol/context.rs");
+    let normalized_context = read_repo_file(root, "crates/harness-kernel/src/hooks/context.rs");
     assert!(
-        protocol.contains("pub cwd: Option<PathBuf>"),
-        "src/hooks/protocol/context.rs should preserve missing cwd in normalized transport context"
+        normalized_context.contains("pub cwd: Option<PathBuf>"),
+        "crates/harness-kernel/src/hooks/context.rs should preserve missing cwd in normalized transport context"
     );
+
+    let protocol = read_repo_file(root, "src/hooks/protocol/context.rs");
     assert_file_lacks_needles(
         &protocol,
         "src/hooks/protocol/context.rs should stay transport-only instead of owning",
