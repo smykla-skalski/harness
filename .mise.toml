@@ -163,6 +163,10 @@ run = "./scripts/tests/test-panel-frontend-install.sh"
 description = "Run unit tests (pass nextest args after -- to forward them to every package group, e.g. -E 'test(=path::to::test)')"
 run = "./scripts/run-unit-tests.sh"
 
+[tasks."test:unit:harness"]
+description = "Run one root Harness unit-test process with native libtest for fast iteration (e.g. -- dispatch_retry_budget, or -- full::test::name -- --exact)"
+run = "./scripts/cargo-local.sh test -p harness --lib --features full-runtime"
+
 [tasks."test:integration"]
 description = "Run fast integration tests in parallel with process isolation"
 run = [
@@ -434,6 +438,10 @@ run = "./scripts/cargo-local.sh"
 [tasks."cargo:env"]
 description = "Print the local cargo wrapper environment used by mise tasks"
 run = "./scripts/cargo-local.sh --print-env"
+
+[tasks."cargo:cache:canary"]
+description = "Prove that an isolated fresh checkout lane reuses Cargo artifacts through copy-on-write seeding"
+run = "./scripts/rust-build-cache-canary.sh"
 
 [tasks."monitor:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"

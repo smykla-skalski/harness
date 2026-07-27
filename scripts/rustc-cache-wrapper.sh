@@ -8,8 +8,9 @@ unalias -a 2>/dev/null || true
 #
 # `SCCACHE_BIN` is resolved once by cargo-local. Plain Cargo and Xcode builds
 # retain fixed Homebrew fallbacks. Versions older than 0.14 are skipped because
-# they cannot provide the socket isolation and multi-worktree path normalization
-# used by the repository.
+# they cannot provide the socket isolation used by the repository. Rust cache
+# keys remain checkout-specific because sccache hashes rustc's working directory
+# and source arguments; fresh worktree reuse comes from Cargo lane seeding.
 
 sccache_version_supported() {
   local version="${1#v}" major minor patch

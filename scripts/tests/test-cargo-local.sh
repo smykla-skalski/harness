@@ -21,6 +21,10 @@ SOCKET_TMPDIR="$(mktemp -d /tmp/cl-socket.XXXXXX)"
 TEST_USER="${SOCKET_TMPDIR##*/}"
 PASS_COUNT=0
 FAIL_COUNT=0
+# The suite injects command shims through PATH. A host BASH_ENV can run shell
+# activation hooks in every child Bash and replace that controlled PATH before
+# cargo-local sees it, silently turning a fake-python scenario into a real one.
+export BASH_ENV=
 
 # Every socket under a root that still answers a connect. Used both to assert
 # this suite leaves nothing running and to clean up if it ever does.
@@ -1733,6 +1737,15 @@ scenario_suite_leaves_no_sccache_server_behind() {
   fi
 }
 
+scenario_wrapper_parses_with_system_bash() {
+  if BASH_ENV=/dev/null /bin/bash -n "$ROOT/scripts/cargo-local.sh"; then
+    pass "cargo-local parses with the system Bash used by release builds"
+  else
+    fail "cargo-local requires syntax newer than the system Bash"
+  fi
+}
+
+scenario_wrapper_parses_with_system_bash
 scenario_jobserver_pool_takes_over_build_sizing
 scenario_jobserver_absent_falls_back_to_the_reserve
 scenario_reserve_drops_an_inherited_jobserver

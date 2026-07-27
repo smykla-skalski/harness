@@ -61,6 +61,10 @@ mise run lint:fix
 mise run install
 ```
 
+For a single root Harness unit test during development, use native libtest through `mise run test:unit:harness -- <filter>`; append `-- --exact` after the full test name for exact selection. The canonical `mise run test:unit` gate remains nextest-based and deliberately covers all unit-test package groups.
+
+Keep compilation and test progress visible during diagnosis by running the selected `mise` task directly. If output must be persisted, pipe it through `tee`; do not end the live pipeline in `head`, `tail`, or `grep`, because those hide the build phase that dominates a cold run.
+
 Targeted Rust diagnosis examples, only when no `mise` task is precise enough:
 
 ```bash

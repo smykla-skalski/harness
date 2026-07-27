@@ -111,6 +111,7 @@ python_scripts=(
 )
 portable_root_python_tests=(
   "$ROOT"/scripts/tests/test_disable_fsmonitor_dormant.py
+  "$ROOT"/scripts/tests/test_seed_rust_build_lane.py
 )
 macos_root_python_tests=(
   "$ROOT"/scripts/tests/test_clean_stale_fsmonitor.py
@@ -209,6 +210,7 @@ fi
 if [[ "$mode" != "--lint" ]]; then
   run_quiet_step "check-scripts shell tests" "$ROOT/scripts/tests/test-check-scripts.sh"
   run_quiet_step "cargo-local shell tests" "$ROOT/scripts/tests/test-cargo-local.sh"
+  run_quiet_step "Rust build-lane cache canary" "$ROOT/scripts/rust-build-cache-canary.sh"
   run_quiet_step "jobserver shell tests" "$ROOT/scripts/tests/test-jobserver.sh"
   run_quiet_step \
     "panel frontend install shell tests" \
