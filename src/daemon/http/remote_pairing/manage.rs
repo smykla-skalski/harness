@@ -22,7 +22,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use crate::daemon::db::{RemotePairingOwner, RemotePairingRevokeOutcome as Outcome};
+use crate::daemon::db::{RemotePairingOwner, RemotePairingRevokeOutcome as Outcome, db_error};
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
@@ -33,8 +33,8 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
 use super::super::openapi::DaemonErrorBody;
-use super::super::response::{extract_request_id, timed_response};
 use super::super::remote_ws::publish_pairing_change;
+use super::super::response::{extract_request_id, timed_response};
 use super::super::{DaemonHttpState, authenticated_remote_client, require_async_db};
 
 pub(in crate::daemon::http) fn remote_pairing_manage_routes() -> OpenApiRouter<DaemonHttpState> {
@@ -84,10 +84,7 @@ fn sees_every_pairing(client: Option<&RemoteStoredClient>) -> bool {
         (status = 200, description = "Pairings the caller may see", body = RemotePairingListResponse),
     ),
 )]
-async fn get_remote_pairings(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
+async fn get_remote_pairings(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
     let response = match list_pairings(&headers, &state) {
@@ -259,18 +256,44 @@ fn record_refused_revoke(
     pairing_id: &str,
     request_id: &str,
 ) {
-    let recorded_at = utc_now();
-    let Ok(audit) = revoke_audit(client, pairing_id, request_id, recorded_at.as_str()) else {
+    let Some(audit) = refused_revoke_audit(client, pairing_id, request_id) else {
         return;
     };
-    let audit = audit
-        .with_outcome(RemoteAuditOutcome::Failure)
-        .with_scope_decision(RemoteAuditScopeDecision::Denied);
+    write_refused_revoke_audit(state, &audit);
+}
+
+/// Build the audit record for a refused revoke, `None` when the record itself
+/// could not be built.
+fn refused_revoke_audit(
+    client: Option<&RemoteStoredClient>,
+    pairing_id: &str,
+    request_id: &str,
+) -> Option<RemoteAuditEvent> {
+    let recorded_at = utc_now();
+    let audit = revoke_audit(client, pairing_id, request_id, recorded_at.as_str()).ok()?;
+    Some(
+        audit
+            .with_outcome(RemoteAuditOutcome::Failure)
+            .with_scope_decision(RemoteAuditScopeDecision::Denied),
+    )
+}
+
+/// Write a refused-revoke audit record, doing nothing when the store is
+/// unavailable. Best effort, same as the caller.
+fn write_refused_revoke_audit(state: &DaemonHttpState, audit: &RemoteAuditEvent) {
     let Some(db) = state.db.get() else { return };
     let Ok(db) = db.lock() else { return };
-    if let Err(error) = db.record_remote_audit_event(&audit) {
-        tracing::warn!(%error, "could not record a refused pairing revoke");
+    if let Err(error) = db.record_remote_audit_event(audit) {
+        log_refused_revoke_write_failure(&error);
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_refused_revoke_write_failure(error: &CliError) {
+    tracing::warn!(%error, "could not record a refused pairing revoke");
 }
 
 fn revoke_audit(
@@ -281,9 +304,7 @@ fn revoke_audit(
 ) -> Result<RemoteAuditEvent, CliError> {
     let event_id = format!("remote-pairing-revoke-{}", Uuid::new_v4());
     let metadata = serde_json::to_string(&serde_json::json!({ "pairing_id": pairing_id }))
-        .map_err(|error| {
-            crate::daemon::db::db_error(format!("encode remote pairing revoke metadata: {error}"))
-        })?;
+        .map_err(|error| db_error(format!("encode remote pairing revoke metadata: {error}")))?;
     Ok(RemoteAuditEvent::new(
         event_id.as_str(),
         recorded_at,
@@ -311,11 +332,7 @@ impl IntoResponse for RemotePairingManageError {
     fn into_response(self) -> Response {
         match self {
             Self::Authentication(response) => *response,
-            Self::StoreUnavailable => manage_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "REMOTE_PAIRING_STORE",
-                "pairing store is unavailable",
-            ),
+            Self::StoreUnavailable => store_unavailable_response(),
             // One answer covers a pairing minted by somebody else and an id
             // that matches nothing, so it must not assert either. Saying the
             // pairing was minted by another client would be a lie for an id
@@ -335,16 +352,30 @@ impl IntoResponse for RemotePairingManageError {
             // store is configured and the other that a call into it failed,
             // and which of the two it was is the daemon's business. They part
             // company in the log, which is where an operator looks.
-            Self::Store(error) => {
-                tracing::error!(%error, "remote pairing management failed");
-                manage_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "REMOTE_PAIRING_STORE",
-                    "pairing store is unavailable",
-                )
-            }
+            Self::Store(error) => log_store_error_and_respond(&error),
         }
     }
+}
+
+fn store_unavailable_response() -> Response {
+    manage_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "REMOTE_PAIRING_STORE",
+        "pairing store is unavailable",
+    )
+}
+
+fn log_store_error_and_respond(error: &CliError) -> Response {
+    log_pairing_store_error(error);
+    store_unavailable_response()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_pairing_store_error(error: &CliError) {
+    tracing::error!(%error, "remote pairing management failed");
 }
 
 fn manage_error(status: StatusCode, code: &str, message: &str) -> Response {

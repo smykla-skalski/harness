@@ -12,6 +12,7 @@ use tracing::{error, info, warn};
 use crate::feature_flags::{
     task_board_prompt_overrides_enabled_from_env, task_board_prompts_file_from_env,
 };
+use harness_kernel::errors::CliError;
 
 use super::prompt_catalog::PromptCatalog;
 
@@ -66,37 +67,76 @@ pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
         return PromptCatalog::builtin();
     }
     let Some(path) = task_board_prompts_file_from_env() else {
-        info!(
-            target: "harness::task_board",
-            "prompt overrides enabled without a configured file; using builtin prompts",
-        );
+        log_prompt_overrides_without_file();
         return PromptCatalog::builtin();
     };
-    let bytes = match read_bounded(&path) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            warn!(
-                target: "harness::task_board",
-                %path, %error,
-                "cannot read the prompt configuration; using builtin prompts",
-            );
-            return PromptCatalog::builtin();
-        }
+    let Some(bytes) = load_configured_prompt_bytes(&path) else {
+        return PromptCatalog::builtin();
     };
-    match PromptCatalog::from_json(&bytes) {
+    parse_configured_prompt_catalog(&path, &bytes)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macros expand into chains clippy reads as branchy"
+)]
+fn log_prompt_overrides_without_file() {
+    info!(
+        target: "harness::task_board",
+        "prompt overrides enabled without a configured file; using builtin prompts",
+    );
+}
+
+/// Read the configured prompt file, `None` when it cannot be read. A daemon
+/// that cannot read its prompt configuration still has to start, so this
+/// falls back rather than failing.
+fn load_configured_prompt_bytes(path: &str) -> Option<Vec<u8>> {
+    match read_bounded(path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) => {
+            log_prompt_configuration_unreadable(path, &error);
+            None
+        }
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macros expand into chains clippy reads as branchy"
+)]
+fn log_prompt_configuration_unreadable(path: &str, error: &str) {
+    warn!(
+        target: "harness::task_board",
+        %path, %error,
+        "cannot read the prompt configuration; using builtin prompts",
+    );
+}
+
+/// Parse the configured bytes, falling back to the builtin catalog rather
+/// than failing the daemon on a configuration that does not parse.
+fn parse_configured_prompt_catalog(path: &str, bytes: &[u8]) -> PromptCatalog {
+    match PromptCatalog::from_json(bytes) {
         Ok(catalog) => {
-            report_loaded_catalog(&path, &catalog);
+            report_loaded_catalog(path, &catalog);
             catalog
         }
         Err(error) => {
-            error!(
-                target: "harness::task_board",
-                %path, %error,
-                "prompt configuration is invalid; using builtin prompts",
-            );
+            log_invalid_prompt_configuration(path, &error);
             PromptCatalog::builtin()
         }
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macros expand into chains clippy reads as branchy"
+)]
+fn log_invalid_prompt_configuration(path: &str, error: &CliError) {
+    error!(
+        target: "harness::task_board",
+        %path, %error,
+        "prompt configuration is invalid; using builtin prompts",
+    );
 }
 
 /// A file that parsed but customized nothing is worth saying out loud: it

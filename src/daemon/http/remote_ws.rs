@@ -22,7 +22,11 @@ use tokio::sync::broadcast::error::RecvError;
 use crate::daemon::db::RemotePairingOwner;
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::RemoteStoredClient;
-use crate::daemon::remote_pairing::{RemotePairingChange, RemotePairingEvent};
+use crate::daemon::remote_pairing::{
+    RemotePairingChange, RemotePairingEvent, RemotePairingInventoryEntry,
+};
+use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::{DaemonHttpState, authenticated_remote_client, prepare_remote_websocket_upgrade};
 
@@ -69,24 +73,9 @@ pub(crate) fn publish_pairing_change(
     if state.remote_pairing_events.receiver_count() == 0 {
         return;
     }
-    let Some(db) = state.db.get() else { return };
-    let Ok(db) = db.lock() else { return };
-    let now = crate::workspace::utc_now();
-    let read = db
-        .remote_pairing_inventory_entry(pairing_id, now.as_str())
-        .and_then(|entry| Ok((entry, db.remote_pairing_minted_by(pairing_id)?)));
-    drop(db);
-
-    match read {
-        Ok((Some(pairing), owner)) => {
-            let event = RemotePairingEvent {
-                change,
-                pairing,
-                minted_by: match owner {
-                    RemotePairingOwner::Client(client_id) => Some(client_id),
-                    RemotePairingOwner::Host | RemotePairingOwner::Unknown => None,
-                },
-            };
+    match read_pairing_to_announce(state, pairing_id) {
+        Ok(Some((pairing, owner))) => {
+            let event = pairing_change_event(change, pairing, owner);
             // Fails only when the last receiver went away between the count
             // above and here, which is the same as nobody listening.
             let _ = state.remote_pairing_events.send(Arc::new(event));
@@ -94,10 +83,51 @@ pub(crate) fn publish_pairing_change(
         // The row is gone already. A pairing can be deleted between the change
         // and this read, and an event about a row nobody can look up is worse
         // than none.
-        Ok((None, _)) => {}
-        Err(error) => {
-            tracing::warn!(%error, %pairing_id, "could not read a pairing to announce its change");
-        }
+        Ok(None) => {}
+        Err(error) => log_pairing_change_read_failure(pairing_id, &error),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_pairing_change_read_failure(pairing_id: &str, error: &CliError) {
+    tracing::warn!(%error, %pairing_id, "could not read a pairing to announce its change");
+}
+
+/// Read the pairing and its owner to announce a change, `Ok(None)` when the
+/// store is unavailable or the row is already gone.
+fn read_pairing_to_announce(
+    state: &DaemonHttpState,
+    pairing_id: &str,
+) -> Result<Option<(RemotePairingInventoryEntry, RemotePairingOwner)>, CliError> {
+    let Some(db) = state.db.get() else {
+        return Ok(None);
+    };
+    let Ok(db) = db.lock() else {
+        return Ok(None);
+    };
+    let now = utc_now();
+    let Some(pairing) = db.remote_pairing_inventory_entry(pairing_id, now.as_str())? else {
+        return Ok(None);
+    };
+    let owner = db.remote_pairing_minted_by(pairing_id)?;
+    Ok(Some((pairing, owner)))
+}
+
+fn pairing_change_event(
+    change: RemotePairingChange,
+    pairing: RemotePairingInventoryEntry,
+    owner: RemotePairingOwner,
+) -> RemotePairingEvent {
+    RemotePairingEvent {
+        change,
+        pairing,
+        minted_by: match owner {
+            RemotePairingOwner::Client(client_id) => Some(client_id),
+            RemotePairingOwner::Host | RemotePairingOwner::Unknown => None,
+        },
     }
 }
 
@@ -109,20 +139,36 @@ pub(crate) fn publish_pairing_claim(state: &DaemonHttpState, client_id: &str) {
     if state.remote_pairing_events.receiver_count() == 0 {
         return;
     }
-    let Some(db) = state.db.get() else { return };
-    let Ok(db) = db.lock() else { return };
-    let claimed = db.remote_pairing_claimed_by(client_id);
-    drop(db);
-
-    match claimed {
+    match claimed_pairing_id(state, client_id) {
         Ok(Some(pairing_id)) => {
             publish_pairing_change(state, RemotePairingChange::Claimed, pairing_id.as_str());
         }
         Ok(None) => {}
-        Err(error) => {
-            tracing::warn!(%error, %client_id, "could not resolve the pairing a device claimed");
-        }
+        Err(error) => log_pairing_claim_resolution_failure(client_id, &error),
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_pairing_claim_resolution_failure(client_id: &str, error: &CliError) {
+    tracing::warn!(%error, %client_id, "could not resolve the pairing a device claimed");
+}
+
+/// Which pairing a device just claimed, `Ok(None)` when the store is
+/// unavailable or the device claimed nothing.
+fn claimed_pairing_id(
+    state: &DaemonHttpState,
+    client_id: &str,
+) -> Result<Option<String>, CliError> {
+    let Some(db) = state.db.get() else {
+        return Ok(None);
+    };
+    let Ok(db) = db.lock() else {
+        return Ok(None);
+    };
+    db.remote_pairing_claimed_by(client_id)
 }
 
 /// Which pairings this credential may be told about.
@@ -149,40 +195,76 @@ async fn serve_remote_events(
             // Drains what the peer sends so a close frame ends the connection
             // promptly. The daemon answers nothing here: this socket is one
             // way, and a client with something to ask has the HTTP routes.
-            incoming = socket.recv() => match incoming {
-                None | Some(Err(_) | Ok(Message::Close(_))) => return,
-                Some(Ok(_)) => {}
-            },
-            event = events.recv() => match event {
-                Ok(event) => {
-                    if !event.visible_to(audience.as_deref()) {
-                        continue;
-                    }
-                    let Ok(payload) = serde_json::to_string(event.as_ref()) else {
-                        // An event that cannot be encoded is this daemon's bug,
-                        // not this connection's. Dropping the frame keeps the
-                        // socket carrying the ones that follow.
-                        tracing::error!(
-                            pairing_id = %event.pairing.pairing_id,
-                            "could not encode a remote pairing event"
-                        );
-                        continue;
-                    };
-                    if socket.send(Message::Text(payload.into())).await.is_err() {
-                        return;
-                    }
-                }
-                // The subscriber fell behind and the channel dropped events it
-                // never saw. Closing says so plainly: the client reconnects and
-                // re-reads the inventory, which is correct, where carrying on
-                // would leave it quietly missing a change it will never be told
-                // about.
-                Err(RecvError::Lagged(missed)) => {
-                    tracing::warn!(missed, "remote event subscriber lagged; closing the socket");
+            incoming = socket.recv() => {
+                if incoming_closed_the_socket(incoming.as_ref()) {
                     return;
                 }
-                Err(RecvError::Closed) => return,
-            },
+            }
+            event = events.recv() => {
+                if deliver_remote_event(&mut socket, event, audience.as_deref()).await {
+                    return;
+                }
+            }
         }
     }
+}
+
+/// Whether the connection is over: the stream ran out, `recv` errored, or the
+/// peer sent an explicit close frame. Anything else is drained and ignored,
+/// since this socket is one way and a client with something to ask has the
+/// HTTP routes.
+fn incoming_closed_the_socket(incoming: Option<&Result<Message, axum::Error>>) -> bool {
+    match incoming {
+        None | Some(Err(_) | Ok(Message::Close(_))) => true,
+        Some(Ok(_)) => false,
+    }
+}
+
+/// Deliver one pairing event to the socket, doing nothing for an event
+/// outside `audience` or one that could not be encoded. Returns whether the
+/// caller should close the socket.
+async fn deliver_remote_event(
+    socket: &mut WebSocket,
+    event: Result<Arc<RemotePairingEvent>, RecvError>,
+    audience: Option<&str>,
+) -> bool {
+    let event = match event {
+        Ok(event) => event,
+        // The subscriber fell behind and the channel dropped events it never
+        // saw. Closing says so plainly: the client reconnects and re-reads
+        // the inventory, which is correct, where carrying on would leave it
+        // quietly missing a change it will never be told about.
+        Err(RecvError::Lagged(missed)) => {
+            log_remote_event_subscriber_lagged(missed);
+            return true;
+        }
+        Err(RecvError::Closed) => return true,
+    };
+    if !event.visible_to(audience) {
+        return false;
+    }
+    let Ok(payload) = serde_json::to_string(event.as_ref()) else {
+        // An event that cannot be encoded is this daemon's bug, not this
+        // connection's. Dropping the frame keeps the socket carrying the ones
+        // that follow.
+        log_remote_event_encode_failure(event.pairing.pairing_id.as_str());
+        return false;
+    };
+    socket.send(Message::Text(payload.into())).await.is_err()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_remote_event_subscriber_lagged(missed: u64) {
+    tracing::warn!(missed, "remote event subscriber lagged; closing the socket");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_remote_event_encode_failure(pairing_id: &str) {
+    tracing::error!(%pairing_id, "could not encode a remote pairing event");
 }
