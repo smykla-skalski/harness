@@ -39,12 +39,15 @@ const FILE_STORAGE_SYMBOLS: &[&str] = &[
 #[test]
 fn task_board_orchestrator_has_one_runner() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    assert!(
-        !root
-            .join("src/daemon/service/task_board_orchestrator")
-            .exists(),
-        "orchestrator tests must exercise the shipped AsyncDaemonDb runner"
-    );
+    for retired_service_module in [
+        "src/daemon/service/task_board_orchestrator.rs",
+        "src/daemon/service/task_board_orchestrator",
+    ] {
+        assert!(
+            !root.join(retired_service_module).exists(),
+            "orchestrator tests must exercise the shipped AsyncDaemonDb runner"
+        );
+    }
     let source = std::fs::read_to_string(root.join("src/task_board/orchestrator.rs"))
         .expect("read task-board orchestrator module");
     assert!(
