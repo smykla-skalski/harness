@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use harness_kernel::kernel::skills::{SKILL_CREATE, SKILL_OBSERVE, SKILL_RUN};
 use harness_kernel::kernel::tooling::ToolContext;
 use serde_json::Value;
 
@@ -64,21 +63,11 @@ pub struct AgentContext {
     pub response: Option<String>,
 }
 
-/// Which skill is active, if any.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SkillKind {
-    None,
-    Runner,
-    Create,
-    Observe,
-}
-
 /// Skill metadata carried through the hook engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillContext {
     pub active: bool,
     pub name: Option<String>,
-    pub kind: SkillKind,
 }
 
 impl SkillContext {
@@ -87,38 +76,15 @@ impl SkillContext {
         Self {
             active: false,
             name: None,
-            kind: SkillKind::None,
         }
     }
 
     #[must_use]
     pub fn from_skill_name(skill: &str) -> Self {
-        let kind = match skill {
-            SKILL_RUN => SkillKind::Runner,
-            SKILL_CREATE => SkillKind::Create,
-            SKILL_OBSERVE => SkillKind::Observe,
-            _ => SkillKind::None,
-        };
         Self {
             active: !skill.is_empty(),
             name: (!skill.is_empty()).then(|| skill.to_string()),
-            kind,
         }
-    }
-
-    #[must_use]
-    pub fn is_runner(&self) -> bool {
-        self.kind == SkillKind::Runner
-    }
-
-    #[must_use]
-    pub fn is_create(&self) -> bool {
-        self.kind == SkillKind::Create
-    }
-
-    #[must_use]
-    pub fn is_observe(&self) -> bool {
-        self.kind == SkillKind::Observe
     }
 }
 
