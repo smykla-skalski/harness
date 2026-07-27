@@ -30,7 +30,7 @@ struct TaskBoardSearchQuery: Equatable, Sendable {
     guard !terms.isEmpty else {
       return true
     }
-    let haystack = Self.normalized(fields.searchableText)
+    let haystack = fields.normalizedSearchText ?? Self.normalized(fields.searchableText)
     return terms.allSatisfy(haystack.contains)
   }
 

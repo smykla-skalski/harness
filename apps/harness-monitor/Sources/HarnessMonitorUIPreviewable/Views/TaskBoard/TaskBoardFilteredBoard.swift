@@ -32,11 +32,14 @@ struct TaskBoardFilteredBoard {
     search: TaskBoardSearchQuery = .none
   ) {
     let matcher = TaskBoardFilterMatcher(filters: filters, search: search)
+    // Folded up front, and only when there is a search, because everything
+    // below asks each card whether it matches several times over.
+    let prepare = Self.searchPreparation(for: search)
     let itemFields = visibleItems.map {
-      TaskBoardFilterFields(item: $0, projectLabelResolver: projectLabelResolver)
+      prepare(TaskBoardFilterFields(item: $0, projectLabelResolver: projectLabelResolver))
     }
-    let inboxFields = inboxItems.map(TaskBoardFilterFields.init(inboxItem:))
-    let decisionFields = decisions.map(TaskBoardFilterFields.init(decision:))
+    let inboxFields = inboxItems.map { prepare(TaskBoardFilterFields(inboxItem: $0)) }
+    let decisionFields = decisions.map { prepare(TaskBoardFilterFields(decision: $0)) }
     let population = itemFields + inboxFields + decisionFields
 
     inventory = TaskBoardFilterInventory(fields: population, matcher: matcher)
@@ -71,13 +74,28 @@ struct TaskBoardFilteredBoard {
       item.deletedAt == nil
         && item.status == .done
         && matcher.matches(
-          TaskBoardFilterFields(item: item, projectLabelResolver: projectLabelResolver)
+          prepare(TaskBoardFilterFields(item: item, projectLabelResolver: projectLabelResolver))
         )
     }
     responsibleCauses =
       items.isEmpty && self.inboxItems.isEmpty && decisionIDs.isEmpty
       ? TaskBoardFilterMatcher.responsibleCauses(in: population, matcher: matcher)
       : []
+  }
+
+  /// Folding costs nothing to skip and is the expensive half of matching, so a
+  /// board nobody is searching never pays for it.
+  private static func searchPreparation(
+    for search: TaskBoardSearchQuery
+  ) -> (TaskBoardFilterFields) -> TaskBoardFilterFields {
+    guard !search.isEmpty else {
+      return { $0 }
+    }
+    return { fields in
+      var prepared = fields
+      prepared.prepareForSearch()
+      return prepared
+    }
   }
 
   private static func searchCandidates(

@@ -36,9 +36,26 @@ struct TaskBoardFilterFields: Equatable, Sendable {
   }
 
   /// The text a search reads, with the fields kept apart so no term can match
-  /// across the seam between the end of one and the start of the next.
+  /// across the seam between the end of one and the start of the next. A card
+  /// carrying no body contributes no separator for one.
   var searchableText: String {
-    ([title, body] + tags).joined(separator: "\n")
+    ([title, body] + tags)
+      .filter { !$0.isEmpty }
+      .joined(separator: "\n")
+  }
+
+  /// Folded once, by `prepareForSearch()`.
+  private(set) var normalizedSearchText: String?
+
+  /// Fold this card's text ahead of matching it.
+  ///
+  /// One pass over the board asks whether a card matches five or six times -
+  /// once to keep it, and once more per facet, because every facet counts what
+  /// it would leave with the search still applied. Folding a card's whole body
+  /// on each of those is what the search actually costs, so it happens here
+  /// instead, once, and only when there is a search to run.
+  mutating func prepareForSearch() {
+    normalizedSearchText = TaskBoardSearchQuery.normalized(searchableText)
   }
 }
 

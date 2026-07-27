@@ -44,7 +44,10 @@ struct TaskBoardFilterTests {
 
   @Test("Status is not a facet: the lanes already are the statuses")
   func statusIsNotAFacet() {
-    #expect(TaskBoardFilterFacet.allCases.map(\.rawValue) == ["project", "priority", "tag", "source"])
+    #expect(
+      TaskBoardFilterFacet.allCases.map(\.rawValue)
+        == ["project", "priority", "tag", "source"]
+    )
     #expect(TaskBoardFilterFacet.dedicated == [.project, .priority])
     #expect(TaskBoardFilterFacet.general == [.tag, .source])
   }

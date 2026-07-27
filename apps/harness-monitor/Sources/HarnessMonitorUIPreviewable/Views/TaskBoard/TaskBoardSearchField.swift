@@ -97,7 +97,8 @@ struct TaskBoardSearchField: View {
       TaskBoardSearchSuggestionList(
         suggestions: visibleSuggestions,
         width: max(fieldSize.width, 300 * controlScale),
-        onSelect: accept
+        text: $text,
+        suppressedText: $suppressedText
       )
       // Hangs below the field instead of pushing the board down: the row it
       // sits in is chrome, and reflowing the lanes on every keystroke would
@@ -124,23 +125,22 @@ struct TaskBoardSearchField: View {
     max(1, min(fontScale, 1.4))
   }
 
+  /// Carries the whole candidate set rather than a count of it. Switching a
+  /// facet can leave a different set of the same size, and a key that cannot
+  /// see that difference leaves the rows under the field describing the board
+  /// someone was looking at a moment ago.
   private struct SuggestionRequest: Equatable {
     let query: String
     let isSuggesting: Bool
-    let candidateCount: Int
+    let candidates: [TaskBoardSearchCandidate]
   }
 
   private var suggestionRequest: SuggestionRequest {
     SuggestionRequest(
       query: text,
       isSuggesting: isSuggesting,
-      candidateCount: candidates.count
+      candidates: candidates
     )
-  }
-
-  private func accept(_ suggestion: TaskBoardSearchSuggestion) {
-    text = suggestion.title
-    suppressedText = suggestion.title
   }
 
   @MainActor
@@ -167,20 +167,28 @@ struct TaskBoardSearchField: View {
 }
 
 /// The rows under the field, each one a card someone can point at.
+///
+/// Takes the text it writes rather than a closure to call: a closure stored on a
+/// view struct is the one thing SwiftUI cannot compare, so it would rebuild
+/// these rows on every pass the field makes.
 private struct TaskBoardSearchSuggestionList: View {
   let suggestions: [TaskBoardSearchSuggestion]
   let width: CGFloat
-  let onSelect: (TaskBoardSearchSuggestion) -> Void
+  @Binding var text: String
+  @Binding var suppressedText: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(suggestions) { suggestion in
         Button {
-          onSelect(suggestion)
+          text = suggestion.title
+          // Picking a row is an answer, so the list closes rather than
+          // suggesting against the title it just filled in.
+          suppressedText = suggestion.title
         } label: {
           TaskBoardSearchSuggestionRow(suggestion: suggestion)
         }
-        .harnessPlainButtonStyle()
+        .harnessInteractiveCardButtonStyle(cornerRadius: HarnessMonitorTheme.spacingSM)
         .accessibilityLabel("Search for \(suggestion.title)")
       }
     }
@@ -199,9 +207,10 @@ private struct TaskBoardSearchSuggestionList: View {
   }
 }
 
+/// Presentation only: hover, press, and the hit region belong to the button
+/// style the row is mounted in.
 private struct TaskBoardSearchSuggestionRow: View {
   let suggestion: TaskBoardSearchSuggestion
-  @State private var isHovering = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -223,11 +232,5 @@ private struct TaskBoardSearchSuggestionRow: View {
     .padding(.horizontal, HarnessMonitorTheme.spacingSM)
     .padding(.vertical, HarnessMonitorTheme.spacingXS + 1)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      isHovering ? HarnessMonitorTheme.accent.opacity(0.18) : .clear,
-      in: .rect(cornerRadius: HarnessMonitorTheme.spacingSM)
-    )
-    .contentShape(.rect)
-    .onHover { isHovering = $0 }
   }
 }

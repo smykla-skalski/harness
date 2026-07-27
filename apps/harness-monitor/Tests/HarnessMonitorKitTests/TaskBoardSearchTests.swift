@@ -118,6 +118,20 @@ struct TaskBoardSearchTests {
     )
   }
 
+  @Test("A card is folded once for the search, not once per question asked of it")
+  func cardIsFoldedOnceForTheSearch() {
+    var card = fields(title: "Retry ZONE sync")
+
+    #expect(card.normalizedSearchText == nil)
+
+    card.prepareForSearch()
+
+    #expect(card.normalizedSearchText == "retry zone sync")
+    // Same verdict either way; the prepared card just does not fold again.
+    #expect(TaskBoardSearchQuery("zone").matches(card))
+    #expect(!TaskBoardSearchQuery("ingress").matches(card))
+  }
+
   @Test("Facet counts keep applying the search")
   func facetCountsKeepApplyingTheSearch() {
     let matcher = TaskBoardFilterMatcher(
