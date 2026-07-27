@@ -11,12 +11,15 @@
 //! about would turn a scoped companion prefix into a general tunnel off the
 //! public listener.
 
+use std::io::Error as IoError;
 use std::net::SocketAddr;
 
 use axum::body::Body;
 use axum::http::header::{CONNECTION, UPGRADE};
 use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode};
 use axum::response::Response;
+use hyper::upgrade::{OnUpgrade, on};
+use hyper_util::client::legacy::Error as ClientError;
 use hyper_util::rt::TokioIo;
 use tokio::io::copy_bidirectional;
 use tokio::sync::OwnedSemaphorePermit;
@@ -66,7 +69,7 @@ pub(super) async fn relay_websocket(
 ) -> Response {
     // Taken before the request is rebuilt: the upgrade rides in its extensions,
     // and forwarding the request takes them with it.
-    let caller = hyper::upgrade::on(&mut request);
+    let caller = on(&mut request);
 
     let mut upstream_request = match build_upstream_request(config, peer_addr, request) {
         Ok(request) => request,
@@ -96,7 +99,7 @@ pub(super) async fn relay_websocket(
         return upstream_response(response, deadline, config.upstream_origin());
     }
 
-    let upstream = hyper::upgrade::on(&mut response);
+    let upstream = on(&mut response);
     tokio::spawn(async move {
         let _permit = permit;
         pump(caller, upstream).await;
@@ -112,7 +115,7 @@ pub(super) async fn relay_websocket(
     Response::from_parts(parts, Body::empty())
 }
 
-async fn pump(caller: hyper::upgrade::OnUpgrade, upstream: hyper::upgrade::OnUpgrade) {
+async fn pump(caller: OnUpgrade, upstream: OnUpgrade) {
     let (caller, upstream) = match tokio::try_join!(caller, upstream) {
         Ok(halves) => halves,
         Err(error) => {
@@ -142,14 +145,11 @@ fn report_incomplete_upgrade(error: &hyper::Error) {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-fn report_relay_end(error: &std::io::Error) {
+fn report_relay_end(error: &IoError) {
     tracing::debug!(%error, "companion websocket relay ended");
 }
 
-fn upstream_unreachable(
-    config: &CompanionRouteConfig,
-    error: &hyper_util::client::legacy::Error,
-) -> Response {
+fn upstream_unreachable(config: &CompanionRouteConfig, error: &ClientError) -> Response {
     report_upstream_failure(config.upstream_origin(), error);
     upstream_unreachable_response()
 }
@@ -158,7 +158,7 @@ fn upstream_unreachable(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-fn report_upstream_failure(upstream_origin: &str, error: &hyper_util::client::legacy::Error) {
+fn report_upstream_failure(upstream_origin: &str, error: &ClientError) {
     tracing::warn!(
         upstream = upstream_origin,
         %error,
