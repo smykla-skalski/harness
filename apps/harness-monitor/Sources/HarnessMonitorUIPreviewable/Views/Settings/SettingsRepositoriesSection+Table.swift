@@ -186,6 +186,9 @@ struct RepositoriesMonitoredSection: View {
         HarnessMonitorAccessibility.settingsRepositoriesTaskBoardToggle(index)
       )
       Button(role: .destructive) {
+        // Forget the disclosure too, or re-adding the repository brings it back
+        // already expanded.
+        expandedRows.remove(row.id)
         draft.remove(rowID: row.id)
       } label: {
         Image(systemName: "trash")
