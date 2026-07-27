@@ -16,7 +16,11 @@ use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 /// predates the removal still serves it out of an unmigrated database, and the
 /// app's decoder rejects an unknown provider outright, so the skew has to be
 /// caught at connect rather than surfacing as a failed decode.
-pub const DAEMON_WIRE_VERSION: u32 = 4;
+///
+/// v5 renamed the task-board `backlog` status to `inbox`. The status is a
+/// closed wire enum, so clients and daemons on opposite sides of the rename
+/// cannot exchange task-board data safely.
+pub const DAEMON_WIRE_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]

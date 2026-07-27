@@ -45,7 +45,11 @@ extension HarnessMonitorStore {
   /// `ExternalRefProviderWire` throws on a provider it does not know, so a
   /// daemon still serving one out of an unmigrated database has to be reported
   /// as skewed instead of failing every board decode.
-  nonisolated public static let minimumDaemonWireVersion: Int = 4
+  ///
+  /// v5 renamed the task-board `backlog` status to `inbox`. The task-board
+  /// decoder rejects unknown status values, so app and daemon must agree on
+  /// that enum before exchanging board data.
+  nonisolated public static let minimumDaemonWireVersion: Int = 5
 
   /// True when the connected daemon's `wire_version` predates the
   /// [`Self.minimumDaemonWireVersion`] this app expects.
