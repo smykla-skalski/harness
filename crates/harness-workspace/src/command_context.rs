@@ -21,7 +21,7 @@ pub trait Execute {
 
 /// Shared runtime context for command execution.
 ///
-/// This remains a thin app-layer handle. Domain commands should route through
+/// This remains a thin handle. Domain commands should route through
 /// application boundaries instead of reaching into concrete adapters here.
 #[derive(Clone, Debug, Default)]
 pub struct AppContext;
@@ -36,7 +36,7 @@ impl AppContext {
 /// Resolve a project directory from an optional CLI argument, falling back to
 /// the current working directory.
 #[cfg(not(feature = "standalone-daemon"))]
-pub(crate) fn resolve_project_dir(raw: Option<&str>) -> PathBuf {
+pub fn resolve_project_dir(raw: Option<&str>) -> PathBuf {
     let path = raw.filter(|s| !s.is_empty()).map_or_else(
         || env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         PathBuf::from,

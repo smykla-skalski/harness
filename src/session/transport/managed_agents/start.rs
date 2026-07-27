@@ -2,13 +2,13 @@ use std::collections::BTreeMap;
 
 use clap::{Args, Subcommand};
 
-use crate::app::command_context::{AppContext, Execute};
-use harness_protocol::managed_agents::acp::{AcpAgentStartRequest, AcpEndpoint};
-use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
-use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::managed_agents::acp::{AcpAgentStartRequest, AcpEndpoint};
+use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
+use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
+use harness_workspace::command_context::{AppContext, Execute};
 
 use crate::session::transport::support::{
     agent_to_str, capability_args, daemon_client, print_json, resolve_project_dir,

@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-use crate::app::command_context::resolve_project_dir as resolve_project_path;
 use crate::daemon::client::DaemonClient;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::resolve_project_dir as resolve_project_path;
 
 pub(super) fn resolve_project_dir(hint: Option<&str>) -> String {
     let path = hint.filter(|value| !value.trim().is_empty()).map_or_else(

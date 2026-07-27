@@ -4,13 +4,13 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use tracing::field::{Empty, display};
 
-use crate::app::command_context::{AppContext, Execute};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::ObserveArgs;
 use crate::session::transport::SessionCommand;
 use crate::setup::{BootstrapArgs, CapabilitiesArgs, SecretsArgs};
 use crate::task_board::transport::TaskBoardCommand;
 use crate::telemetry::{current_trace_id, runtime_service_from_current_process};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::worker_routes::{BridgeRoute, DaemonRoute};
 

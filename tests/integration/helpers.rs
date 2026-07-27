@@ -7,11 +7,11 @@ use std::process::{Child, Command as ProcessCommand, ExitStatus, Output};
 use std::sync::Mutex;
 
 use harness::app::cli::{self, Command, SetupCommand};
-use harness::app::{AppContext, Execute};
 use harness::errors::CliError;
 use harness::setup::{
     CapabilitiesArgs, PreCompactArgs, SessionStartArgs, SessionStopArgs,
 };
+use harness_workspace::command_context::{AppContext, Execute};
 use sha2::{Digest, Sha256};
 
 mod hook;

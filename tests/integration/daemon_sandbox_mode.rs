@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use harness::app::{AppContext, Execute};
 use harness::daemon::transport::{
     DaemonCommand, DaemonInstallLaunchAgentArgs, DaemonRemoveLaunchAgentArgs,
 };
+use harness_workspace::command_context::{AppContext, Execute};
 use tempfile::tempdir;
 
 #[test]

@@ -2,13 +2,13 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::infra::io::read_text;
 use crate::session::service::{self, ImproverApplyOutcome, ImproverTarget};
 use crate::session::wire::ImproverApplyRequest;
 use crate::workspace::utc_now;
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::support::{print_json, resolve_project_dir};
 

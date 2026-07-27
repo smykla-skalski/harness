@@ -1,9 +1,9 @@
 use clap::{Args, ValueEnum};
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::agent_tui::{AgentTuiInput, AgentTuiInputRequest, AgentTuiKey};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::managed_agents::tui::AgentTuiResizeRequest;
+use harness_workspace::command_context::{AppContext, Execute};
 
 use crate::session::transport::support::{daemon_client, print_json};
 

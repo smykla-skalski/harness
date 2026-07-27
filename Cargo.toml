@@ -176,8 +176,8 @@ daemon-runtime = [
   "dep:utoipa-axum",
   "dep:x509-parser",
 ]
-standalone-daemon = []
-standalone-worker = ["harness-kernel/standalone-worker"]
+standalone-daemon = ["harness-workspace/standalone-daemon"]
+standalone-worker = ["harness-kernel/standalone-worker", "harness-workspace/standalone-worker"]
 full-runtime = ["daemon-runtime", "mcp-runtime"]
 mcp-runtime = ["dep:harness-mcp"]
 remote-systemd-e2e-faults = []

@@ -63,8 +63,8 @@ fn helper_modules_do_not_leak_publicly() {
     for (path, public_needle, crate_needle) in [
         (
             "src/app/mod.rs",
-            "pub mod command_context;",
-            "pub(crate) mod command_context;",
+            "pub use harness_workspace::command_context;",
+            "pub(crate) use harness_workspace::command_context;",
         ),
         (
             "src/setup/mod.rs",

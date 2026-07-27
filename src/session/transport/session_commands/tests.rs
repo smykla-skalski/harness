@@ -9,13 +9,13 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use super::*;
-use crate::app::command_context::AppContext;
 use crate::daemon::client::test_support::{
     install_fake_running_xdg_daemon, read_http_request, write_http_response,
 };
 use crate::session::service::build_new_session_with_policy;
 use crate::workspace::utc_now;
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
+use harness_workspace::command_context::AppContext;
 
 #[test]
 fn session_title_execute_updates_active_session_via_daemon_client() {
