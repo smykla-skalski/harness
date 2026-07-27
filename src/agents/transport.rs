@@ -1,7 +1,7 @@
 use clap::{Args, Subcommand};
 use std::io::{Read as _, stdin};
 
-use crate::hooks::adapters::HookAgent;
+use crate::hooks::adapters::{HookAgent, adapter_for};
 use crate::infra::exec::RUNTIME;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::hook::SessionStartHookOutput;
@@ -103,11 +103,12 @@ impl Execute for AgentPromptSubmitArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let project_dir = resolve_project_dir(self.project_dir.as_deref());
         let payload = read_stdin_bytes()?;
+        let context = adapter_for(self.agent).parse_input(&payload)?;
         RUNTIME.block_on(service::prompt_submit(
             self.agent,
             project_dir,
             self.session_id.clone(),
-            payload,
+            context,
         ))?;
         Ok(0)
     }

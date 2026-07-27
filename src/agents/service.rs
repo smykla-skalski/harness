@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use tokio::task;
 
-use crate::hooks::adapters::{HookAgent, adapter_for};
+use crate::hooks::adapters::HookAgent;
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::infra::exec::RUNTIME;
@@ -114,17 +114,20 @@ pub async fn session_stop(
 
 /// Record a prompt-submission event through the harness-owned agent ledger.
 ///
+/// The caller parses the raw hook payload into `context`; that framing is a
+/// hooks concern, so this function only normalizes the session id and appends
+/// the ledger entry.
+///
 /// # Errors
-/// Returns `CliError` when the inbound agent payload is malformed or the shared
-/// agent storage cannot be updated.
+/// Returns `CliError` when the shared agent storage cannot be updated.
 pub async fn prompt_submit(
     agent: HookAgent,
     project_dir: PathBuf,
     session_id_hint: Option<String>,
-    raw_payload: Vec<u8>,
+    context: NormalizedHookContext,
 ) -> Result<(), CliError> {
     task::spawn_blocking(move || {
-        let mut context = adapter_for(agent).parse_input(&raw_payload)?;
+        let mut context = context;
         context.event = NormalizedEvent::UserPromptSubmit;
         if context.session.cwd.is_none() {
             context.session.cwd = Some(project_dir.clone());
@@ -260,7 +263,7 @@ fn reconcile_managed_runtime_session(
     };
     let _ = orchestration_service::register_agent_runtime_session(
         &orchestration_session_id,
-        adapter_for(agent).name(),
+        agent_name(agent),
         &tui_id,
         runtime_session_id,
         project_dir,
@@ -281,7 +284,7 @@ fn disconnect_managed_runtime_session_if_ended(
     };
     let Some(resolved) = orchestration_service::resolve_session_agent_for_runtime_session(
         project_dir,
-        adapter_for(agent).name(),
+        agent_name(agent),
         runtime_session_id,
     )?
     else {
@@ -384,19 +387,22 @@ fn session_id_from_env(agent: HookAgent) -> Option<String> {
         .find_map(|name| env::var(name).ok().filter(|value| !value.trim().is_empty()))
 }
 
+// `AgentAdapter::name` returns this same string, but going through the hook
+// adapter dispatch just to name a `HookAgent` variant would pull the hooks
+// parsing layer into the ledger for data the enum already carries.
+fn agent_name(agent: HookAgent) -> &'static str {
+    match agent {
+        HookAgent::Claude => "claude",
+        HookAgent::Codex => "codex",
+        HookAgent::Gemini => "gemini",
+        HookAgent::Copilot => "copilot",
+        HookAgent::Vibe => "vibe",
+        HookAgent::OpenCode => "opencode",
+    }
+}
+
 fn default_session_id(agent: HookAgent) -> String {
-    format!(
-        "{}-{}",
-        match agent {
-            HookAgent::Claude => "claude",
-            HookAgent::Codex => "codex",
-            HookAgent::Gemini => "gemini",
-            HookAgent::Copilot => "copilot",
-            HookAgent::Vibe => "vibe",
-            HookAgent::OpenCode => "opencode",
-        },
-        utc_now().replace([':', '-'], "")
-    )
+    format!("{}-{}", agent_name(agent), utc_now().replace([':', '-'], ""))
 }
 
 #[cfg(test)]
