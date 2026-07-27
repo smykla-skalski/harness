@@ -209,9 +209,10 @@ async fn serve_remote_events(
     }
 }
 
-/// Whether the peer's frame ends the connection: everything but a close frame
-/// is drained and ignored, since this socket is one way and a client with
-/// something to ask has the HTTP routes.
+/// Whether the connection is over: the stream ran out, `recv` errored, or the
+/// peer sent an explicit close frame. Anything else is drained and ignored,
+/// since this socket is one way and a client with something to ask has the
+/// HTTP routes.
 fn incoming_closed_the_socket(incoming: Option<&Result<Message, axum::Error>>) -> bool {
     match incoming {
         None | Some(Err(_) | Ok(Message::Close(_))) => true,
