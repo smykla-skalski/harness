@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use crate::task_board::github::{
+    GitHubAutomationLabels, GitHubAutomationToggles, GitHubRequestedReviewers, ProtectedPathRule,
+};
 use crate::task_board::{
     AgentMode, TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile,
 };
@@ -116,6 +119,17 @@ pub struct TaskBoardRepositoryAutomationConfig {
     pub preferred_host_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_checkout_path: Option<String>,
+    // Publication conventions this repository does not share with the rest.
+    // `None` inherits the global value; `Some` replaces it whole, so a
+    // repository can drop a reviewer set rather than only add to one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_reviewers: Option<GitHubRequestedReviewers>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protected_paths: Option<Vec<ProtectedPathRule>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<GitHubAutomationLabels>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled_automations: Option<GitHubAutomationToggles>,
 }
 
 impl Default for TaskBoardRepositoryAutomationConfig {
@@ -126,6 +140,10 @@ impl Default for TaskBoardRepositoryAutomationConfig {
             workflows: Vec::new(),
             preferred_host_id: None,
             execution_checkout_path: None,
+            requested_reviewers: None,
+            protected_paths: None,
+            labels: None,
+            enabled_automations: None,
         }
     }
 }

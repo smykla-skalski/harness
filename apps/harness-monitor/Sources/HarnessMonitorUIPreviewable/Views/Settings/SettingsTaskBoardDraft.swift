@@ -38,6 +38,10 @@ struct TaskBoardGitSettingsDraft: Equatable {
   var globalToken: TaskBoardSecretField = .notConfigured
   var openRouterToken: TaskBoardSecretField = .notConfigured
   var repositoryOverrides: [TaskBoardRepositoryOverrideDraft] = []
+  /// Carried whole rather than field by field: the daemon replaces the list on
+  /// save, so a repository configured elsewhere must survive a round trip
+  /// through a screen that only edits its publication overrides.
+  var automationRepositories: [TaskBoardRepositoryAutomationConfig] = []
   var policyVersion = ""
   var identityDefaults = TaskBoardGitIdentityDefaults()
   /// Snapshot of the configured secret material loaded with the draft. Save
@@ -68,6 +72,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
     requestedReviewersText = project.requestedReviewers.reviewers.joined(separator: "\n")
     requestedTeamReviewersText = project.requestedReviewers.teamReviewers.joined(separator: "\n")
     enabledAutomations = Set(project.enabledAutomations.enabled)
+    automationRepositories = orchestrator.repositories
     authorName = runtime.global.authorName ?? ""
     authorEmail = runtime.global.authorEmail ?? ""
     sshKeyPath = runtime.global.sshKeyPath ?? ""
@@ -172,6 +177,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
           repositories: githubInboxRepositoryEntries,
           labelFilter: githubInboxLabelEntries
         ),
+        repositories: automationRepositories,
         policyVersion: policyVersion
       ),
       runtimeConfig: TaskBoardGitRuntimeConfig(

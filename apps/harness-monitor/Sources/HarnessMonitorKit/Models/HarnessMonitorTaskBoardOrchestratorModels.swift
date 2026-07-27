@@ -48,6 +48,9 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public let scheduling: TaskBoardAutomationSchedulingSettings
   public let retry: TaskBoardAutomationRetrySettings
   public let reviewers: TaskBoardReviewerSettings
+  /// Per-repository automation configs, including the publication overrides a
+  /// repository does not share with the global conventions above.
+  public let repositories: [TaskBoardRepositoryAutomationConfig]
   public let policyVersion: String
 
   public init(
@@ -61,6 +64,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     scheduling: TaskBoardAutomationSchedulingSettings? = nil,
     retry: TaskBoardAutomationRetrySettings? = nil,
     reviewers: TaskBoardReviewerSettings? = nil,
+    repositories: [TaskBoardRepositoryAutomationConfig] = [],
     policyVersion: String
   ) {
     self.stepMode = stepMode
@@ -73,6 +77,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     self.scheduling = scheduling ?? Self.defaultScheduling
     self.retry = retry ?? Self.defaultRetry
     self.reviewers = reviewers ?? Self.defaultReviewers
+    self.repositories = repositories
     self.policyVersion = policyVersion
   }
 
@@ -87,6 +92,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     case scheduling
     case retry
     case reviewers
+    case repositories
     case policyVersion
   }
 
@@ -124,6 +130,10 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
         TaskBoardReviewerSettings.self,
         forKey: .reviewers
       ),
+      repositories: try container.decodeIfPresent(
+        [TaskBoardRepositoryAutomationConfig].self,
+        forKey: .repositories
+      ) ?? [],
       policyVersion: try container.decode(String.self, forKey: .policyVersion)
     )
   }
@@ -167,6 +177,10 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
   public let clearProjectDir: Bool
   public let githubProject: TaskBoardGitHubProjectConfig?
   public let githubInbox: TaskBoardGitHubInboxConfig?
+  /// Omitted rather than empty when the caller has nothing to say: the daemon
+  /// replaces the whole list, so sending `[]` from a client that never loaded
+  /// the settings would delete every repository config.
+  public let repositories: [TaskBoardRepositoryAutomationConfig]?
   public let policyVersion: String?
 
   public init(
@@ -179,6 +193,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     clearProjectDir: Bool = false,
     githubProject: TaskBoardGitHubProjectConfig? = nil,
     githubInbox: TaskBoardGitHubInboxConfig? = nil,
+    repositories: [TaskBoardRepositoryAutomationConfig]? = nil,
     policyVersion: String? = nil
   ) {
     self.stepMode = stepMode
@@ -190,6 +205,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     self.clearProjectDir = clearProjectDir
     self.githubProject = githubProject
     self.githubInbox = githubInbox
+    self.repositories = repositories
     self.policyVersion = policyVersion
   }
 }

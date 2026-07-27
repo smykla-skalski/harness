@@ -9,6 +9,7 @@ use crate::task_board::{
     TaskBoardOrchestratorSettings, TaskBoardWorkflowKind, normalize_repository_slug,
 };
 
+use super::super::repository_conventions;
 use super::super::support::{automation_config, github_token_for_repository};
 use super::preparation::validate_publication_automations;
 
@@ -47,6 +48,10 @@ pub(super) async fn publication_client_for_repository(
         )
         .into());
     };
+    // Overrides are applied before the automation check, so a repository that
+    // turns an automation off is refused here rather than publishing under the
+    // global answer.
+    let config = repository_conventions(settings, &config, requested);
     validate_publication_automations(&config.enabled_automations, workflow_kind)?;
     stamp_repository(db, config, requested).await
 }

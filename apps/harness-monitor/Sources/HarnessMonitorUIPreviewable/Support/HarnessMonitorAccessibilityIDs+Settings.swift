@@ -322,6 +322,18 @@ extension HarnessMonitorAccessibility {
     "harness.settings.repositories.\(index).remove"
   }
 
+  public static func settingsRepositoriesOverridesDisclosure(_ index: Int) -> String {
+    "harness.settings.repositories.\(index).overrides"
+  }
+
+  public static func settingsRepositoriesOverrideToggle(_ index: Int, _ kind: String) -> String {
+    "harness.settings.repositories.\(index).overrides.\(kind)"
+  }
+
+  public static func settingsRepositoriesOverrideField(_ index: Int, _ field: String) -> String {
+    "harness.settings.repositories.\(index).overrides.field.\(field)"
+  }
+
   public static func settingsReviewsGeneratedPatternRow(_ index: Int) -> String {
     "harness.settings.reviews.generated-patterns.\(index).row"
   }

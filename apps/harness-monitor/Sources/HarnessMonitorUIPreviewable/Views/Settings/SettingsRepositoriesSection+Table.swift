@@ -3,6 +3,8 @@ import SwiftUI
 
 struct RepositoriesMonitoredSection: View {
   @Binding var draft: SettingsSharedRepositoriesDraft
+  @Binding var taskBoardDraft: TaskBoardGitSettingsDraft
+  @State private var expandedRows: Set<String> = []
   @Environment(\.fontScale)
   private var fontScale
 
@@ -10,14 +12,32 @@ struct RepositoriesMonitoredSection: View {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
 
+  private var captionFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+
   private var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
+  /// Shared by the disclosure button and the header spacer above it, so the
+  /// columns stay aligned when either one moves.
+  private let disclosureColumnWidth: CGFloat = 24
+
+  /// An expanded row outgrows a fixed row height, so the table only reserves
+  /// space for collapsed ones and lets the expanded panels push it taller.
+  /// Counted against the rows that still exist rather than against the expanded
+  /// set, which keeps the id of a repository deleted while it was open. Both
+  /// heights track `fontScale`, because the text inside them does.
   private var repositoriesTableRowsHeight: CGFloat {
     let visibleRows = min(draft.rows.count, 12)
-    return CGFloat(visibleRows) * 44
+    let expanded = min(draft.rows.count(where: { expandedRows.contains($0.id) }), visibleRows)
+    return CGFloat(visibleRows) * collapsedRowHeight + CGFloat(expanded) * expandedPanelHeight
   }
+
+  private var collapsedRowHeight: CGFloat { 44 * fontScale }
+
+  private var expandedPanelHeight: CGFloat { 320 * fontScale }
 
   private var tableBackground: some ShapeStyle {
     Color(nsColor: .controlBackgroundColor).opacity(0.42)
@@ -34,7 +54,9 @@ struct RepositoriesMonitoredSection: View {
       Text(
         """
         Manage the shared repository scope for Reviews and Task Board here. Use the switches \
-        to control each feature independently, or the delete button to remove a repository.
+        to control each feature independently, or the delete button to remove a repository. \
+        Expand a row to override the publication conventions it inherits from Task Board \
+        automation defaults.
         """
       )
     }
@@ -68,19 +90,32 @@ struct RepositoriesMonitoredSection: View {
   }
 
   private func repositoryTableRow(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
-    repositoryRow(row, index: index)
-      .overlay(alignment: .top) {
-        Divider()
-          .opacity(index == 0 ? 0 : 1)
+    VStack(spacing: 0) {
+      repositoryRow(row, index: index)
+      if expandedRows.contains(row.id) {
+        SettingsRepositoryAutomationOverridesPanel(
+          repository: row.repositoryPath,
+          index: index,
+          draft: $taskBoardDraft
+        )
       }
+    }
+    .overlay(alignment: .top) {
+      Divider()
+        .opacity(index == 0 ? 0 : 1)
+    }
   }
 
   private var repositoriesTableHeader: some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Color.clear
+        .frame(width: disclosureColumnWidth, height: 1)
       Text("Owner")
         .frame(maxWidth: .infinity, alignment: .leading)
       Text("Repository")
         .frame(maxWidth: .infinity, alignment: .leading)
+      Text("Publishing")
+        .frame(width: 104, alignment: .leading)
       Text("Reviews")
         .frame(width: 116, alignment: .center)
       Text("Task Board")
@@ -106,6 +141,7 @@ struct RepositoriesMonitoredSection: View {
 
   private func repositoryRow(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      disclosureButton(row, index: index)
       Text(row.owner)
         .font(bodyFont)
         .textSelection(.enabled)
@@ -114,6 +150,13 @@ struct RepositoriesMonitoredSection: View {
         .font(bodyFont)
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
+      Text(publishingSummary(row))
+        .font(captionFont)
+        .foregroundStyle(
+          taskBoardDraft.overriddenKinds(for: row.repositoryPath).isEmpty
+            ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.accent
+        )
+        .frame(width: 104, alignment: .leading)
       Toggle(
         "Reviews",
         isOn: Binding(
@@ -143,6 +186,9 @@ struct RepositoriesMonitoredSection: View {
         HarnessMonitorAccessibility.settingsRepositoriesTaskBoardToggle(index)
       )
       Button(role: .destructive) {
+        // Forget the disclosure too, or re-adding the repository brings it back
+        // already expanded.
+        expandedRows.remove(row.id)
         draft.remove(rowID: row.id)
       } label: {
         Image(systemName: "trash")
@@ -158,6 +204,42 @@ struct RepositoriesMonitoredSection: View {
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRow(index))
+  }
+
+  private func disclosureButton(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
+    let isExpanded = expandedRows.contains(row.id)
+    return Button {
+      if isExpanded {
+        expandedRows.remove(row.id)
+      } else {
+        expandedRows.insert(row.id)
+      }
+    } label: {
+      Image(systemName: "chevron.right")
+        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+        // The glyph is small, but the target must not be: 24pt is the macOS
+        // minimum, and the shape makes the padding around the chevron clickable
+        // rather than leaving a hole the pointer can land in.
+        .frame(width: disclosureColumnWidth, height: disclosureColumnWidth)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.borderless)
+    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    .help("Publication overrides for \(row.repositoryPath)")
+    .accessibilityLabel("Publication overrides for \(row.repositoryPath)")
+    .accessibilityValue(isExpanded ? "expanded" : "collapsed")
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.settingsRepositoriesOverridesDisclosure(index)
+    )
+  }
+
+  private func publishingSummary(_ row: SettingsSharedRepositoryRow) -> String {
+    let count = taskBoardDraft.overriddenKinds(for: row.repositoryPath).count
+    switch count {
+    case 0: return "Inherited"
+    case 1: return "1 override"
+    default: return "\(count) overrides"
+    }
   }
 
   private var manualAddRow: some View {

@@ -190,6 +190,7 @@ async fn outbound_resolution_ignores_executor_self_rows() {
             workflows: vec![crate::task_board::TaskBoardOrchestratorWorkflow::Review],
             preferred_host_id: Some("controller-a".into()),
             execution_checkout_path: None,
+            ..TaskBoardRepositoryAutomationConfig::default()
         });
     db.replace_task_board_orchestrator_settings(&settings)
         .await
