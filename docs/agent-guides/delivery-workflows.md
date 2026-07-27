@@ -15,7 +15,7 @@ Choose one delivery mode before creating the editing worktree, then keep that mo
 
 1. Use one dedicated session worktree and one reused build, test, and runtime lane. Keep both available until session end or explicit cleanup.
 2. Inspect current state and real call sites before editing. Work in small test, implement, and verify chunks.
-3. Run the smallest validation that proves each affected surface. Docs, helper scripts, and files outside an app or codebase need no unrelated app build.
+3. Run focused tests and the smallest owning `mise` check task for every component or crate the change touched. Do not require `mise run check:full` or validate untouched surfaces. Docs, helper scripts, and files outside an app or codebase need no unrelated app build.
 4. Allow unrelated dirty files temporarily only when they remain outside the task's explicit paths. Require a clean worktree before rebase or delivery, and deliver committed state only.
 5. Commit explicit paths with `git commit -sS -- <paths>`. For new files, first use `git add -N -- <new-paths>`; never use broad staging, `git commit -a`, or interactive commit selection.
 6. Verify every commit with `git log --show-signature -1` and require the exact `Signed-off-by: Bart Smykla <bartek@smykla.com>` trailer.
