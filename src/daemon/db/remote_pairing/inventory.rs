@@ -1,5 +1,7 @@
 //! Enumerating pairings and the devices they became.
 
+use std::sync::LazyLock;
+
 use rusqlite::Row;
 
 use super::{DaemonDb, OptionalExtension, db_error, decode_remote_pairing_metadata, pairing_is_expired};
@@ -8,19 +10,14 @@ use crate::daemon::remote_pairing::{
 };
 use harness_kernel::errors::CliError;
 
-/// The columns and joins both reads share.
-///
-/// A macro rather than a `const`, because `concat!` takes literals only, and
-/// the two statements below have to be built from one spelling of this. Two
-/// hand-kept copies would let a column added to the listing go missing from the
-/// single-row read, and `read_inventory_columns` reads both by position.
+/// The columns and joins both reads share. One spelling, because
+/// `read_inventory_columns` reads them by position: a column added to the
+/// listing but missed in the single-row read would come back shifted.
 ///
 /// The join is a LEFT one because an unclaimed link has no device yet, and an
 /// inner join would silently drop exactly the pending and expired rows the
 /// caller most wants to see.
-macro_rules! inventory_select {
-    () => {
-        "
+const INVENTORY_SELECT_SQL: &str = "
 SELECT p.pairing_id,
        p.role,
        p.created_at,
@@ -34,20 +31,19 @@ SELECT p.pairing_id,
        c.revoked_at
 FROM remote_pairing_codes p
 LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
-"
-    };
-}
+";
 
-const SELECT_REMOTE_PAIRING_INVENTORY_SQL: &str = concat!(
-    inventory_select!(),
-    "WHERE ?1 IS NULL OR json_extract(p.metadata_json, '$.minted_by') = ?1
+static SELECT_REMOTE_PAIRING_INVENTORY_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{INVENTORY_SELECT_SQL}WHERE ?1 IS NULL OR json_extract(p.metadata_json, '$.minted_by') = ?1
 ORDER BY p.created_at DESC, p.pairing_id DESC"
-);
+    )
+});
 
 /// One pairing, for an event that has just changed it. Reading the whole
 /// inventory to answer about a single row is what this exists to avoid.
-const SELECT_REMOTE_PAIRING_ENTRY_SQL: &str =
-    concat!(inventory_select!(), "WHERE p.pairing_id = ?1");
+static SELECT_REMOTE_PAIRING_ENTRY_SQL: LazyLock<String> =
+    LazyLock::new(|| format!("{INVENTORY_SELECT_SQL}WHERE p.pairing_id = ?1"));
 
 /// Who a pairing belongs to.
 ///
@@ -106,7 +102,7 @@ impl DaemonDb {
     ) -> Result<Vec<RemotePairingInventoryEntry>, CliError> {
         let mut statement = self
             .conn
-            .prepare(SELECT_REMOTE_PAIRING_INVENTORY_SQL)
+            .prepare(&SELECT_REMOTE_PAIRING_INVENTORY_SQL)
             .map_err(|error| db_error(format!("prepare remote pairing inventory: {error}")))?;
         let rows = statement
             .query_map([minted_by], |row| Ok(read_inventory_columns(row)))
@@ -160,7 +156,7 @@ impl DaemonDb {
     ) -> Result<Option<RemotePairingInventoryEntry>, CliError> {
         let columns = self
             .conn
-            .query_row(SELECT_REMOTE_PAIRING_ENTRY_SQL, [pairing_id], |row| {
+            .query_row(&SELECT_REMOTE_PAIRING_ENTRY_SQL, [pairing_id], |row| {
                 Ok(read_inventory_columns(row))
             })
             .optional()

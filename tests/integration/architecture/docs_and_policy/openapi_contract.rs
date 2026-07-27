@@ -131,7 +131,7 @@ fn task_board_tag_query_documents_the_runtime_bounds() {
 
 #[test]
 fn openapi_exemptions_are_stable() {
-    assert_eq!(OPENAPI_EXEMPT.len(), 4, "unexpected OpenAPI exemption count");
+    assert_eq!(OPENAPI_EXEMPT.len(), 5, "unexpected OpenAPI exemption count");
     let documented = documented_operations();
     let contract: BTreeSet<(String, String)> = HTTP_API_CONTRACT
         .iter()

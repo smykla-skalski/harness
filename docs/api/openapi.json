@@ -4096,16 +4096,6 @@
               }
             }
           },
-          "503": {
-            "description": "Pairing store unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
-          },
           "401": {
             "$ref": "#/components/responses/RemoteAuthRequired"
           },
@@ -4117,6 +4107,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
           },
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
@@ -4173,16 +4166,6 @@
               }
             }
           },
-          "503": {
-            "description": "Pairing store unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
-          },
           "401": {
             "$ref": "#/components/responses/RemoteAuthRequired"
           },
@@ -4194,6 +4177,9 @@
           },
           "429": {
             "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
           },
           "504": {
             "$ref": "#/components/responses/RemoteRequestTimedOut"
