@@ -1,6 +1,5 @@
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::session::service;
 use crate::session::types::{
     ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,
@@ -11,6 +10,7 @@ use crate::session::wire::{
 };
 use harness_daemon_client::{ClientError, DaemonClient};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::support::{print_json, resolve_project_dir};
 

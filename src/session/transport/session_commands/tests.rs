@@ -9,7 +9,7 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use super::*;
-use crate::app::command_context::AppContext;
+use harness_workspace::command_context::AppContext;
 use crate::daemon::client::test_support::{
     install_fake_running_xdg_daemon, read_http_request, write_http_response,
 };

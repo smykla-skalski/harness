@@ -1,4 +1,4 @@
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use crate::task_board::wire::TaskBoardSyncRequest;
 use harness_kernel::errors::CliError;
 use crate::task_board::summary::TaskBoardSyncSummary;

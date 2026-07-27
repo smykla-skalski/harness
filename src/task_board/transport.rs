@@ -1,7 +1,7 @@
 use clap::{Args, Subcommand};
 use serde::Serialize;
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use crate::daemon::client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{

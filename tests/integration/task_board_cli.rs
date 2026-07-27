@@ -5,7 +5,7 @@ use std::thread;
 
 use clap::Parser;
 use harness::app::cli::{self, Command};
-use harness::app::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use harness::daemon::protocol::{
     PolicyApprovalGrantResolveResponse, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasWorkspaceResponse,

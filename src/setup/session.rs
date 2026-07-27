@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
+use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};
 use crate::hooks::SessionStartHookOutput;
 use crate::setup::services::session as session_service;
 use harness_kernel::errors::CliError;

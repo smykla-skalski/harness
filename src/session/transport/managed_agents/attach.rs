@@ -10,7 +10,7 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::session::transport::support::daemon_client;

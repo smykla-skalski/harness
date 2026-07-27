@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use harness_protocol::managed_agents::codex::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexSteerRequest,
 };

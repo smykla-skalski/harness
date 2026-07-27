@@ -20,7 +20,7 @@ use security_framework::passwords::{
 #[cfg(any(target_os = "macos", test))]
 use sha1::{Digest, Sha1};
 
-use crate::app::command_context::AppContext;
+use harness_workspace::command_context::AppContext;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[cfg(any(target_os = "macos", test))]

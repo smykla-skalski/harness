@@ -1,4 +1,4 @@
-#[path = "../../../src/app/command_context.rs"]
+#[path = "../../harness-workspace/src/command_context.rs"]
 pub(crate) mod command_context;
 
 pub use command_context::{AppContext, Execute};

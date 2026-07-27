@@ -9,6 +9,10 @@ publish = false
 # Forwarded from the root crate so the test modules gated on it stay gated the
 # same way once these sources compile here instead of there.
 standalone-worker = []
+# Forwarded from the root crate so `command_context`'s cfg-gated
+# `resolve_project_dir` stays gated the same way once it compiles here instead
+# of in `src/app`.
+standalone-daemon = []
 
 [dependencies]
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }

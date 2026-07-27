@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use crate::task_board::wire::TaskBoardHostSetProjectTypesRequest;
 use harness_kernel::errors::CliError;
 

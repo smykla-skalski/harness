@@ -4,7 +4,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use tracing::field::{Empty, display};
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::ObserveArgs;
 use crate::session::transport::SessionCommand;

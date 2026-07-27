@@ -2,7 +2,7 @@ use std::env;
 
 use clap::{ArgAction, Args, Subcommand, ValueEnum};
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
     TaskBoardAutomationPolicy, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,

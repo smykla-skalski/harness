@@ -1,7 +1,7 @@
 use clap::{ArgAction, Args, Subcommand};
 use serde::Serialize;
 
-use crate::app::command_context::{AppContext, Execute};
+use harness_workspace::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,

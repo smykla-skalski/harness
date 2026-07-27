@@ -1,7 +1,7 @@
 use clap::{Args, Subcommand};
 use std::io::{Read as _, stdin};
 
-use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
+use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::SessionStartHookOutput;
 use crate::hooks::adapters::HookAgent;

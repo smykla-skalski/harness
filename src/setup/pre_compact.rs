@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute, resolve_project_dir};
+use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};
 use harness_kernel::errors::CliError;
 use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 
