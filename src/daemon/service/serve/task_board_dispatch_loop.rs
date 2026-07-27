@@ -156,10 +156,14 @@ async fn report_failed_preparation(
             attempt_error = %error,
             "task board dispatch preparation gave up; the item needs attention"
         ),
+        // Carries the preparation failure too: this branch is the one path
+        // where nothing else records it, and it is the reason the operator
+        // actually needs.
         Err(release_error) => warn!(
             intent_id = %preparation.intent_id,
             %board_item_id,
             %release_error,
+            attempt_error = %error,
             "task board dispatch preparation release failed"
         ),
     }
