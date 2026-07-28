@@ -35,6 +35,8 @@ pub mod managed_agents;
 /// Session request/response and on-disk registry contracts shared by daemon
 /// clients that talk to a session directly.
 pub mod session_wire;
+/// Session-id resolution shared by every binary that hosts a `HookAgent`.
+pub mod session_resolution;
 
 // Compatibility namespaces for the canonical session model sources. They
 // intentionally expose only protocol models, never application/runtime code.

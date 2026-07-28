@@ -3855,8 +3855,10 @@ version = "54.0.0"
 dependencies = [
  "base64 0.23.0",
  "clap",
+ "harness-kernel",
  "serde",
  "serde_json",
+ "temp-env",
  "tracing",
  "utoipa",
 ]
