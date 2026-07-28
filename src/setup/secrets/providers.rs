@@ -17,7 +17,7 @@ use crate::task_board::{
 
 use super::{
     SERVICE_GITHUB, SERVICE_OPENROUTER, SecretKindArg, SecretScopeArgs, is_not_found,
-    keychain_error, sha1_hex,
+    keychain_error, normalize_repository_slug, sha1_hex,
 };
 
 pub(super) fn set_provider_secret(args: &SecretScopeArgs, secret: &str) -> Result<i32, CliError> {
@@ -118,7 +118,10 @@ pub(super) fn provider_configured(
     account: &str,
 ) -> Result<bool, CliError> {
     match kind {
-        SecretKindArg::Github => Ok(load_github_snapshot(account)?.token_configured(repository)),
+        SecretKindArg::Github => {
+            let repository = normalized_repository_scope(repository)?;
+            Ok(load_github_snapshot(account)?.token_configured(repository.as_deref()))
+        }
         SecretKindArg::OpenRouter => {
             if repository.is_some() {
                 return Err(provider_parse_error(
@@ -129,6 +132,10 @@ pub(super) fn provider_configured(
         }
         _ => unreachable!("provider credential kind required"),
     }
+}
+
+fn normalized_repository_scope(repository: Option<&str>) -> Result<Option<String>, CliError> {
+    repository.map(normalize_repository_slug).transpose()
 }
 
 pub(super) fn provider_any_configured(
@@ -355,6 +362,15 @@ mod tests {
         assert_eq!(
             scoped_provider_account(&database).expect("database account"),
             "db494d457064c8f758be3fb586cae947b918468bf7-global"
+        );
+    }
+
+    #[test]
+    fn repository_scope_rejects_invalid_slug() {
+        assert!(normalized_repository_scope(Some("invalid")).is_err());
+        assert_eq!(
+            normalized_repository_scope(Some("OWNER/REPO")).expect("repository"),
+            Some("owner/repo".into())
         );
     }
 }
