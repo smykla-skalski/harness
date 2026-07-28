@@ -117,9 +117,10 @@ pub fn store_database_gate_policy_entry(entry: Option<CachedGatePolicy>) {
     store_gate_policy_entry(database_policy_key(), entry);
 }
 
-/// Resolve the active gating policy for `root`: the warm process cache when
-/// present, otherwise a cold read from the durable store. The cold read does
-/// not populate the cache; the policy write path keeps the cache current.
+/// Resolve the active gating policy for `root` from the warm process cache.
+/// Test-only alias for [`cached_gate_policy`]: there is no durable-store
+/// fallback here, so a cold root still returns `None` until a write or the
+/// startup warm populates it.
 #[cfg(any(test, feature = "test-support"))]
 #[must_use]
 pub fn resolve_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
