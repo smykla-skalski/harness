@@ -23,6 +23,7 @@ fn protocol_package_has_no_harness_runtime_dependency() {
 fn canonical_model_sources_do_not_import_application_layers() {
     let sources = [
         include_str!("../src/agent_models.rs"),
+        include_str!("../src/conversation_event.rs"),
         include_str!("../src/hook_prompts.rs"),
         include_str!("../src/hook_session.rs"),
         include_str!("../src/managed_agents/acp/models.rs"),
@@ -32,9 +33,8 @@ fn canonical_model_sources_do_not_import_application_layers() {
         include_str!("../src/managed_agents/acp/wire.rs"),
         include_str!("../src/managed_agents/runtime_models.rs"),
         include_str!("../src/managed_agents/tui.rs"),
-        include_str!("../../../src/agents/kind/mod.rs"),
-        include_str!("../../../src/agents/kind/disconnect.rs"),
-        include_str!("../../../src/agents/runtime/event.rs"),
+        include_str!("../src/runtime_kind.rs"),
+        include_str!("../src/runtime_kind/disconnect.rs"),
         include_str!("../../../src/session/types/mod.rs"),
         include_str!("../../../src/session/types/agents.rs"),
         include_str!("../../../src/session/types/events.rs"),

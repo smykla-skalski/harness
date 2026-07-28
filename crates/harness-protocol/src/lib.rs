@@ -1,7 +1,6 @@
 #![deny(unsafe_code)]
 
 mod agent_models;
-#[path = "../../../src/agents/runtime/event.rs"]
 mod conversation_event;
 mod hook_prompts;
 mod hook_session;
@@ -9,7 +8,6 @@ mod observe_classification;
 mod observe_issue_code;
 mod observe_state;
 mod observe_tracking;
-#[path = "../../../src/agents/kind/mod.rs"]
 mod runtime_kind;
 
 /// Canonical agent identities and transport-neutral wire models.

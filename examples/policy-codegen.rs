@@ -3074,7 +3074,8 @@ const GIT_SIGNING_VERIFY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMon
 // single-field struct variant (failed: message); the generator emits a Swift associated-value enum.
 const GIT_SIGNING_VERIFY_EMIT_ONLY: &[&str] = &["TaskBoardGitSigningVerifyResponse"];
 const ACP_EVENT_FRAME_SOURCE: &str = include_str!("../src/daemon/agent_acp/event_frame.rs");
-const ACP_CONVERSATION_EVENT_SOURCE: &str = include_str!("../src/agents/runtime/event.rs");
+const ACP_CONVERSATION_EVENT_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/conversation_event.rs");
 const ACP_EVENT_BATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpEventBatchWireTypes.generated.swift";
 // The acp_events broadcast push frame + its conversation event. The frame's managed_agent_family is
 // the bare ManagedAgentKind (the map validates it is acp); ConversationEvent.kind is the richly
