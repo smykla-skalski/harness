@@ -2,6 +2,7 @@
 members = [
   ".",
   "aff",
+  "crates/harness-agents",
   "crates/harness-bridge",
   "crates/harness-command",
   "crates/harness-daemon-client",
@@ -43,6 +44,7 @@ include = [
 ]
 
 [dependencies]
+harness-agents = { path = "crates/harness-agents", version = "54.0.0" }
 harness-command = { path = "crates/harness-command", version = "54.0.0" }
 harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0.0" }
 harness-infra = { path = "crates/harness-infra", version = "54.0.0" }

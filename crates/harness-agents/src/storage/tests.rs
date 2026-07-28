@@ -43,6 +43,43 @@ fn read_session_lines(project_dir: &Path, agent: HookAgent, session_id: &str) ->
         .collect()
 }
 
+/// Run `per_agent` concurrently for each `(agent, session_id)` pair, one
+/// thread per agent. Factored out because both concurrency tests below share
+/// this exact fan-out shape.
+fn spawn_for_each_agent<F>(agents: [(HookAgent, &'static str); 4], per_agent: F)
+where
+    F: Fn(HookAgent, &'static str) + Sync,
+{
+    let per_agent = &per_agent;
+    thread::scope(|scope| {
+        for (agent, session_id) in agents {
+            scope.spawn(move || per_agent(agent, session_id));
+        }
+    });
+}
+
+fn assert_each_agent_wrote_n_lines(
+    project_dir: &Path,
+    agents: [(HookAgent, &'static str); 4],
+    expected: usize,
+) {
+    for (agent, session_id) in agents {
+        assert_eq!(
+            read_session_lines(project_dir, agent, session_id).len(),
+            expected
+        );
+    }
+}
+
+fn assert_current_session_ids(project_dir: &Path, expected: &[(HookAgent, Option<&str>)]) {
+    for (agent, expected_id) in expected {
+        assert_eq!(
+            current_session_id(project_dir, *agent).unwrap().as_deref(),
+            *expected_id
+        );
+    }
+}
+
 #[test]
 fn append_hook_event_transcript_uses_assistant_response_not_prompt_body() {
     with_agent_storage_env(|project_dir| {
@@ -111,21 +148,19 @@ fn append_session_marker_bootstraps_sequence_state_from_existing_ledger() {
 #[test]
 fn concurrent_multi_agent_writes_assign_unique_sequences() {
     with_agent_storage_env(|project_dir| {
-        thread::scope(|scope| {
-            for (agent, session_id) in [
+        spawn_for_each_agent(
+            [
                 (HookAgent::Claude, "claude-a"),
                 (HookAgent::Codex, "codex-a"),
                 (HookAgent::Gemini, "gemini-a"),
                 (HookAgent::Copilot, "copilot-a"),
-            ] {
-                scope.spawn(move || {
-                    for _ in 0..8 {
-                        append_session_marker(project_dir, agent, session_id, "session_start")
-                            .unwrap();
-                    }
-                });
-            }
-        });
+            ],
+            |agent, session_id| {
+                for _ in 0..8 {
+                    append_session_marker(project_dir, agent, session_id, "session_start").unwrap();
+                }
+            },
+        );
 
         let events = read_ledger_events(project_dir);
         assert_eq!(events.len(), 32);
@@ -136,75 +171,53 @@ fn concurrent_multi_agent_writes_assign_unique_sequences() {
         assert_eq!(sequences.last().copied(), Some(32));
         assert_eq!(read_sequence_state(project_dir).last_sequence, 32);
 
-        for (agent, session_id) in [
-            (HookAgent::Claude, "claude-a"),
-            (HookAgent::Codex, "codex-a"),
-            (HookAgent::Gemini, "gemini-a"),
-            (HookAgent::Copilot, "copilot-a"),
-        ] {
-            assert_eq!(read_session_lines(project_dir, agent, session_id).len(), 8);
-        }
+        assert_each_agent_wrote_n_lines(
+            project_dir,
+            [
+                (HookAgent::Claude, "claude-a"),
+                (HookAgent::Codex, "codex-a"),
+                (HookAgent::Gemini, "gemini-a"),
+                (HookAgent::Copilot, "copilot-a"),
+            ],
+            8,
+        );
     });
 }
 
 #[test]
 fn session_registry_keeps_agent_pointers_independent() {
     with_agent_storage_env(|project_dir| {
-        thread::scope(|scope| {
-            for (agent, session_id) in [
+        spawn_for_each_agent(
+            [
                 (HookAgent::Claude, "claude-current"),
                 (HookAgent::Codex, "codex-current"),
                 (HookAgent::Gemini, "gemini-current"),
                 (HookAgent::Copilot, "copilot-current"),
-            ] {
-                scope.spawn(move || {
-                    set_current_session_id(project_dir, agent, session_id).unwrap();
-                });
-            }
-        });
+            ],
+            |agent, session_id| {
+                set_current_session_id(project_dir, agent, session_id).unwrap();
+            },
+        );
 
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Claude)
-                .unwrap()
-                .as_deref(),
-            Some("claude-current")
-        );
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Codex)
-                .unwrap()
-                .as_deref(),
-            Some("codex-current")
-        );
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Gemini)
-                .unwrap()
-                .as_deref(),
-            Some("gemini-current")
-        );
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Copilot)
-                .unwrap()
-                .as_deref(),
-            Some("copilot-current")
+        assert_current_session_ids(
+            project_dir,
+            &[
+                (HookAgent::Claude, Some("claude-current")),
+                (HookAgent::Codex, Some("codex-current")),
+                (HookAgent::Gemini, Some("gemini-current")),
+                (HookAgent::Copilot, Some("copilot-current")),
+            ],
         );
 
         clear_current_session_id(project_dir, HookAgent::Codex).unwrap();
 
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Codex).unwrap(),
-            None
-        );
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Claude)
-                .unwrap()
-                .as_deref(),
-            Some("claude-current")
-        );
-        assert_eq!(
-            current_session_id(project_dir, HookAgent::Copilot)
-                .unwrap()
-                .as_deref(),
-            Some("copilot-current")
+        assert_current_session_ids(
+            project_dir,
+            &[
+                (HookAgent::Codex, None),
+                (HookAgent::Claude, Some("claude-current")),
+                (HookAgent::Copilot, Some("copilot-current")),
+            ],
         );
     });
 }

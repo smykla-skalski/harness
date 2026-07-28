@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::CliError;
-use crate::workspace::project_context_dir;
+use harness_workspace::workspace::project_context_dir;
 
 use super::event::{ConversationEvent, ConversationEventKind};
 use super::signal::{Signal, SignalAck};
@@ -112,7 +112,7 @@ impl AgentRuntime for ClaudeRuntime {
 }
 
 /// Parse a JSONL line using the common transcript format shared by all runtimes.
-pub(crate) fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<ConversationEvent> {
+pub fn parse_common_jsonl(raw_line: &str, agent: &str) -> Option<ConversationEvent> {
     let obj: serde_json::Value = serde_json::from_str(raw_line.trim()).ok()?;
     let message = obj.get("message")?;
     let role = message.get("role")?.as_str()?;

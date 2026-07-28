@@ -76,7 +76,7 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
     let hits = collect_hits_in_paths(
         root,
         &[
-            "src/agents/service.rs",
+            "crates/harness-agents/src/service.rs",
             "src/session/service/mod.rs",
             "src/session/service/conversions.rs",
             "src/session/service/lifecycle.rs",

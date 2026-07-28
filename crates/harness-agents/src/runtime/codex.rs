@@ -1,45 +1,30 @@
 use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::CliError;
-use crate::workspace::project_context_dir;
+use harness_workspace::workspace::project_context_dir;
 
 use super::claude::{last_activity_from_log, parse_common_jsonl};
 use super::event::ConversationEvent;
 use super::signal::{Signal, SignalAck};
 use super::{AgentRuntime, HookIntegrationPoint};
 
-pub struct GeminiRuntime;
+pub struct CodexRuntime;
 
 const HOOK_POINTS: &[HookIntegrationPoint] = &[HookIntegrationPoint {
-    name: "BeforeTool",
+    name: "PreToolUse",
     typical_latency_seconds: 5,
     supports_context_injection: true,
 }];
 
-impl AgentRuntime for GeminiRuntime {
+impl AgentRuntime for CodexRuntime {
     fn name(&self) -> &'static str {
-        "gemini"
+        "codex"
     }
 
-    fn effort_env(&self, level: &str) -> Vec<(String, String)> {
-        // Gemini exposes thinking via `thinking_config.thinking_budget` in
-        // the API; the `gemini` CLI does not yet take a flag, so mirror
-        // Claude's pattern and publish harness-prefixed env vars for wrapper
-        // scripts. Budget caps: 0 disables, 2.5-Flash tops out ~8192, Pro ~24576.
-        let tokens = match level {
-            "off" => 0,
-            "low" => 4_096,
-            "medium" => 16_384,
-            "high" => 24_576,
-            _ => return Vec::new(),
-        };
-        vec![
-            ("HARNESS_GEMINI_THINKING_LEVEL".into(), level.into()),
-            (
-                "HARNESS_GEMINI_THINKING_BUDGET_TOKENS".into(),
-                tokens.to_string(),
-            ),
-        ]
+    fn effort_args(&self, effort: &str) -> Vec<String> {
+        // Codex does not expose a `--reasoning-effort` flag; effort is
+        // injected as a config override: `-c model_reasoning_effort=<value>`.
+        vec!["-c".to_string(), format!("model_reasoning_effort={effort}")]
     }
 
     fn discover_native_log(
@@ -48,19 +33,19 @@ impl AgentRuntime for GeminiRuntime {
         project_dir: &Path,
     ) -> Result<Option<PathBuf>, CliError> {
         let path = project_context_dir(project_dir)
-            .join("agents/sessions/gemini")
+            .join("agents/sessions/codex")
             .join(session_id)
             .join("raw.jsonl");
         Ok(path.is_file().then_some(path))
     }
 
     fn parse_log_entry(&self, raw_line: &str) -> Option<ConversationEvent> {
-        parse_common_jsonl(raw_line, "gemini")
+        parse_common_jsonl(raw_line, "codex")
     }
 
     fn signal_dir(&self, project_dir: &Path, session_id: &str) -> PathBuf {
         project_context_dir(project_dir)
-            .join("agents/signals/gemini")
+            .join("agents/signals/codex")
             .join(session_id)
     }
 
@@ -94,6 +79,6 @@ impl AgentRuntime for GeminiRuntime {
     }
 
     fn initial_prompt_delivery(&self) -> super::InitialPromptDelivery {
-        super::InitialPromptDelivery::CliFlag("--prompt-interactive")
+        super::InitialPromptDelivery::PtySend
     }
 }

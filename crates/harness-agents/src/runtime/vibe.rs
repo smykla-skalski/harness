@@ -1,30 +1,24 @@
 use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::CliError;
-use crate::workspace::project_context_dir;
+use harness_workspace::workspace::project_context_dir;
 
 use super::claude::{last_activity_from_log, parse_common_jsonl};
 use super::event::ConversationEvent;
 use super::signal::{Signal, SignalAck};
 use super::{AgentRuntime, HookIntegrationPoint};
 
-pub struct CodexRuntime;
+pub struct VibeRuntime;
 
 const HOOK_POINTS: &[HookIntegrationPoint] = &[HookIntegrationPoint {
-    name: "PreToolUse",
+    name: "tool.execute.before",
     typical_latency_seconds: 5,
     supports_context_injection: true,
 }];
 
-impl AgentRuntime for CodexRuntime {
+impl AgentRuntime for VibeRuntime {
     fn name(&self) -> &'static str {
-        "codex"
-    }
-
-    fn effort_args(&self, effort: &str) -> Vec<String> {
-        // Codex does not expose a `--reasoning-effort` flag; effort is
-        // injected as a config override: `-c model_reasoning_effort=<value>`.
-        vec!["-c".to_string(), format!("model_reasoning_effort={effort}")]
+        "vibe"
     }
 
     fn discover_native_log(
@@ -33,19 +27,19 @@ impl AgentRuntime for CodexRuntime {
         project_dir: &Path,
     ) -> Result<Option<PathBuf>, CliError> {
         let path = project_context_dir(project_dir)
-            .join("agents/sessions/codex")
+            .join("agents/sessions/vibe")
             .join(session_id)
             .join("raw.jsonl");
         Ok(path.is_file().then_some(path))
     }
 
     fn parse_log_entry(&self, raw_line: &str) -> Option<ConversationEvent> {
-        parse_common_jsonl(raw_line, "codex")
+        parse_common_jsonl(raw_line, "vibe")
     }
 
     fn signal_dir(&self, project_dir: &Path, session_id: &str) -> PathBuf {
         project_context_dir(project_dir)
-            .join("agents/signals/codex")
+            .join("agents/signals/vibe")
             .join(session_id)
     }
 
@@ -78,7 +72,11 @@ impl AgentRuntime for CodexRuntime {
         HOOK_POINTS
     }
 
+    fn supports_readiness_hook(&self) -> bool {
+        false
+    }
+
     fn initial_prompt_delivery(&self) -> super::InitialPromptDelivery {
-        super::InitialPromptDelivery::PtySend
+        super::InitialPromptDelivery::CliPositional
     }
 }
