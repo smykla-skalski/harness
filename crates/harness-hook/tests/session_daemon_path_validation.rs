@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use fs2::FileExt as _;
-use harness_daemon_client::state;
+use harness_daemon_client::state::{self, DaemonManifest};
 use harness_hook::session::service;
 
 /// Writes the manifest, auth token, and singleton lock a real daemon would
@@ -36,12 +36,13 @@ fn install_fake_running_daemon(endpoint: &str, token: &str) -> std::fs::File {
         .expect("hold daemon singleton lock");
     let token_path = daemon_root.join("auth-token");
     std::fs::write(&token_path, token).expect("write token");
+    let manifest = DaemonManifest {
+        endpoint: endpoint.to_string(),
+        token_path: token_path.display().to_string(),
+    };
     std::fs::write(
         daemon_root.join("manifest.json"),
-        format!(
-            "{{\"endpoint\":\"{endpoint}\",\"token_path\":\"{}\"}}",
-            token_path.display()
-        ),
+        serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
     )
     .expect("write manifest");
     lock_file
