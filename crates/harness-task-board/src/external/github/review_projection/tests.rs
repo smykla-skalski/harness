@@ -1,7 +1,7 @@
 use tempfile::tempdir;
 
 use super::*;
-use crate::task_board::types::{ExternalRefSyncState, PlanningState, TaskBoardItem};
+use crate::types::{ExternalRefSyncState, PlanningState, TaskBoardItem};
 
 mod status_tests;
 

@@ -6,7 +6,7 @@ use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStat
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
-use super::super::github::reconciled_external_status;
+use super::super::reconciled_external_status;
 use super::merge::{external_ref_matches, matching_ref};
 use super::{
     ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, TaskBoardSyncStore,

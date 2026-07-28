@@ -1,0 +1,128 @@
+use super::*;
+
+#[test]
+fn external_status_reconciliation_preserves_workflow_and_tracks_provider_terminality() {
+    let cases = [
+        (
+            TaskBoardStatus::InProgress,
+            Some(TaskBoardStatus::Inbox),
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::InProgress,
+        ),
+        (
+            TaskBoardStatus::Inbox,
+            Some(TaskBoardStatus::Inbox),
+            TaskBoardStatus::Done,
+            TaskBoardStatus::Done,
+        ),
+        (
+            TaskBoardStatus::InProgress,
+            Some(TaskBoardStatus::InProgress),
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::InProgress,
+        ),
+        (
+            TaskBoardStatus::InProgress,
+            Some(TaskBoardStatus::InProgress),
+            TaskBoardStatus::Done,
+            TaskBoardStatus::InProgress,
+        ),
+        (
+            TaskBoardStatus::Done,
+            Some(TaskBoardStatus::Done),
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::Inbox,
+        ),
+        (
+            TaskBoardStatus::Todo,
+            Some(TaskBoardStatus::Todo),
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::Todo,
+        ),
+        (
+            TaskBoardStatus::Todo,
+            Some(TaskBoardStatus::Inbox),
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::Todo,
+        ),
+        (
+            TaskBoardStatus::Todo,
+            None,
+            TaskBoardStatus::Done,
+            TaskBoardStatus::Done,
+        ),
+        (
+            TaskBoardStatus::Inbox,
+            None,
+            TaskBoardStatus::Done,
+            TaskBoardStatus::Done,
+        ),
+        (
+            TaskBoardStatus::Todo,
+            Some(TaskBoardStatus::Done),
+            TaskBoardStatus::Done,
+            TaskBoardStatus::Todo,
+        ),
+        (
+            TaskBoardStatus::Inbox,
+            Some(TaskBoardStatus::Done),
+            TaskBoardStatus::Done,
+            TaskBoardStatus::Inbox,
+        ),
+        (
+            TaskBoardStatus::InProgress,
+            None,
+            TaskBoardStatus::Done,
+            TaskBoardStatus::InProgress,
+        ),
+        (
+            TaskBoardStatus::Done,
+            Some(TaskBoardStatus::Inbox),
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::Done,
+        ),
+        (
+            TaskBoardStatus::Done,
+            None,
+            TaskBoardStatus::Inbox,
+            TaskBoardStatus::Done,
+        ),
+    ];
+    for (current, last_synced, observed, expected) in cases {
+        assert_eq!(
+            reconciled_external_status(current, last_synced, observed),
+            expected
+        );
+    }
+}
+
+#[test]
+fn external_status_reconciliation_canonicalizes_legacy_shared_truth() {
+    for (current, last_synced, expected) in [
+        (
+            TaskBoardStatus::Todo,
+            TaskBoardStatus::New,
+            TaskBoardStatus::Done,
+        ),
+        (
+            TaskBoardStatus::AgenticReview,
+            TaskBoardStatus::PlanReview,
+            TaskBoardStatus::AgenticReview,
+        ),
+        (
+            TaskBoardStatus::HumanRequired,
+            TaskBoardStatus::NeedsYou,
+            TaskBoardStatus::HumanRequired,
+        ),
+        (
+            TaskBoardStatus::Failed,
+            TaskBoardStatus::Blocked,
+            TaskBoardStatus::Failed,
+        ),
+    ] {
+        assert_eq!(
+            reconciled_external_status(current, Some(last_synced), TaskBoardStatus::Done),
+            expected
+        );
+    }
+}

@@ -5,10 +5,10 @@ use reqwest::header::{HeaderMap, LINK};
 use reqwest::{Method, Url};
 use serde::Deserialize;
 
-use crate::github_api::{
+use crate::normalize_repository_slug;
+use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor, retry_stable_read,
 };
-use crate::task_board::normalize_repository_slug;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{

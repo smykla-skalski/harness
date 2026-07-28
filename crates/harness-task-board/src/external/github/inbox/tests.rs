@@ -6,7 +6,7 @@ use std::thread;
 use serde_json::json;
 
 use super::*;
-use crate::github_api::acquire_global_budget_test_lock;
+use harness_github_api::acquire_global_budget_test_lock;
 
 #[test]
 fn github_inbox_search_queries_use_github_all_state_issue_form() {
@@ -65,7 +65,7 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
         ),
         MockResponse::json(200, empty_search_response()),
     ]);
-    let client = inbox_client_with_base_uri(endpoint, &["bad/repo", "good/repo"]);
+    let client = inbox_client_with_base_uri(&endpoint, &["bad/repo", "good/repo"]);
 
     let tasks = client.pull_tasks().await.expect("partial inbox pull");
 
@@ -90,7 +90,7 @@ async fn github_inbox_pull_imports_review_requests_as_inbox() {
             search_response_with_issue("https://example.test/good/pull/7"),
         ),
     ]);
-    let client = inbox_client_with_base_uri(endpoint, &["good/repo"]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
     let tasks = client.pull_tasks().await.expect("inbox pull");
 
@@ -113,7 +113,7 @@ async fn github_inbox_review_request_tasks_parse_the_same_tracking_convention_as
             search_response_with_issue_body("https://example.test/good/pull/7", "Part of #5"),
         ),
     ]);
-    let client = inbox_client_with_base_uri(endpoint, &["good/repo"]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
     let tasks = client.pull_tasks().await.expect("inbox pull");
 
@@ -139,7 +139,7 @@ async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
         ),
         MockResponse::json(200, empty_search_response()),
     ]);
-    let client = inbox_client_with_base_uri(endpoint, &["good/repo"]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
     let tasks = client.pull_tasks().await.expect("inbox pull");
 
@@ -168,7 +168,7 @@ async fn github_inbox_pull_fails_when_no_repository_can_be_pulled() {
             }),
         ),
     ]);
-    let client = inbox_client_with_base_uri(endpoint, &["bad/repo"]);
+    let client = inbox_client_with_base_uri(&endpoint, &["bad/repo"]);
 
     let error = client
         .pull_tasks()
@@ -189,8 +189,8 @@ async fn github_inbox_pull_fails_when_no_repository_can_be_pulled() {
     );
 }
 
-fn inbox_client_with_base_uri(base_uri: String, repositories: &[&str]) -> GitHubInboxSyncClient {
-    let client = crate::github_api::GitHubProtectedClient::with_base_url("token", &base_uri)
+fn inbox_client_with_base_uri(base_uri: &str, repositories: &[&str]) -> GitHubInboxSyncClient {
+    let client = harness_github_api::GitHubProtectedClient::with_base_url("token", base_uri)
         .expect("protected client");
     let repositories = repositories
         .iter()
@@ -300,7 +300,7 @@ fn spawn_sequence_mock(
             let (mut stream, _) = listener.accept().expect("accept");
             let request = read_http_request(&mut stream);
             captured.lock().expect("captured requests").push(request);
-            write_http_response(&mut stream, response);
+            write_http_response(&mut stream, &response);
         }
     });
     (endpoint, requests, handle)
@@ -340,7 +340,7 @@ fn headers_and_body_complete(request: &[u8]) -> bool {
     body.len() >= content_length
 }
 
-fn write_http_response(stream: &mut TcpStream, response: MockResponse) {
+fn write_http_response(stream: &mut TcpStream, response: &MockResponse) {
     let reason = if response.status == 200 {
         "OK"
     } else {

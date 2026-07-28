@@ -4,9 +4,9 @@ use reqwest::header::{HeaderValue, LINK};
 use serde_json::json;
 
 use super::*;
-use crate::github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
-use crate::task_board::TaskBoardStatus;
-use crate::task_board::external::ExternalSyncClient;
+use harness_github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
+use crate::TaskBoardStatus;
+use crate::external::ExternalSyncClient;
 
 use super::super::test_support::{MockResponse, spawn_sequence_mock};
 
@@ -428,6 +428,10 @@ fn issue_json(number: u64, body: &str, pull_request: bool) -> String {
     issue.to_string()
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "assert_eq! expansion inflates the score; the body is one straight-line sequence"
+)]
 fn assert_task(task: &ExternalTask, number: u64, body: &str) {
     assert_eq!(task.reference.external_id, format!("acme/widgets#{number}"));
     assert_eq!(

@@ -1,8 +1,11 @@
-use crate::task_board::{ExternalRefProvider, TaskBoardItem, normalize_repository_slug};
+use crate::{ExternalRefProvider, TaskBoardItem, normalize_repository_slug};
 
 use super::{ExternalProvider, ExternalTask};
 
-pub(super) fn execution_repository_for_task(task: &ExternalTask) -> Option<String> {
+// `pub`: root's `task_board::external::sync` (a different crate now) still
+// calls into this.
+#[must_use]
+pub fn execution_repository_for_task(task: &ExternalTask) -> Option<String> {
     (task.reference.provider == ExternalProvider::GitHub)
         .then(|| normalize_repository_slug(task.project_id.as_deref()))
         .flatten()
@@ -20,7 +23,8 @@ pub(super) fn github_repository_for_item(item: &TaskBoardItem) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use crate::task_board::{ExternalTaskRef, TaskBoardStatus};
+    use crate::TaskBoardStatus;
+    use crate::external::ExternalTaskRef;
 
     use super::*;
 

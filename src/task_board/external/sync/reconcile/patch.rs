@@ -1,11 +1,10 @@
-use crate::task_board::external::targeting::execution_repository_for_task;
-use crate::task_board::external::{ExternalTask, ExternalTaskRef};
+use crate::task_board::external::{ExternalTask, ExternalTaskRef, execution_repository_for_task};
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{
     ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardItemKind, TaskBoardStatus,
 };
 
-use super::super::super::github::reconciled_external_status;
+use super::super::super::reconciled_external_status;
 use super::super::merge::{
     external_ref_matches, matching_ref, reconcile_provider_labels, sync_state_from_task,
     task_signals_umbrella,

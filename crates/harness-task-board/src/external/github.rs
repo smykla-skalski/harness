@@ -4,9 +4,9 @@ use std::fmt;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::github_api::{GitHubProtectedClient, retry_stable_read};
-use crate::task_board::normalize_repository_slug;
-use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use crate::normalize_repository_slug;
+use crate::types::{TaskBoardItem, TaskBoardStatus};
+use harness_github_api::{GitHubProtectedClient, retry_stable_read};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::targeting::github_repository_for_item;
@@ -32,7 +32,9 @@ mod write;
 
 use errors::warn_github_message;
 pub use inbox::GitHubInboxSyncClient;
-pub(crate) use review_projection::{
+// `pub`, not `pub(crate)`: root's `task_board::external::sync` (a different
+// crate now) still calls into these.
+pub use review_projection::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
     reconciled_external_status,
 };

@@ -2,10 +2,11 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use super::super::*;
 use super::GitHubIssueResponse;
-use crate::github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
+use harness_github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
 
 #[derive(Debug, Default)]
 struct CapturedRequest {
@@ -290,7 +291,7 @@ fn capture_request(request: &str) -> CapturedRequest {
 
 fn read_http_request(stream: &mut TcpStream) -> String {
     stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+        .set_read_timeout(Some(Duration::from_secs(1)))
         .expect("read timeout");
     let mut buffer = Vec::new();
     loop {
@@ -312,8 +313,7 @@ fn read_http_request_body(stream: &mut TcpStream, buffer: &mut Vec<u8>) {
     let header_end = buffer
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
-        .map(|position| position + 4)
-        .unwrap_or(buffer.len());
+        .map_or(buffer.len(), |position| position + 4);
     let headers = String::from_utf8(buffer[..header_end].to_vec()).expect("utf8 headers");
     let content_length = headers
         .lines()

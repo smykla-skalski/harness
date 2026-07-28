@@ -20,11 +20,13 @@ test-support = []
 daemon-runtime = []
 
 [dependencies]
+harness-github-api = { path = "../harness-github-api", version = "54.0.0" }
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
 arc-swap = "1.9.1"
+async-trait = "0.1.83"
 base64 = "0.23.0"
 caseless = "0.2.2"
 chrono = { version = "0.4.44", features = ["serde"] }
@@ -40,6 +42,8 @@ gix = { version = "0.86.0", features = [
 hex = "0.4.3"
 libc = "0.2"
 rayon = "1.11.0"
+regex = "1.11.1"
+reqwest = { version = "0.13.2", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yml = "0.0.13"
@@ -51,6 +55,11 @@ utoipa = "5.5.0"
 uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
+harness-github-api = { path = "../harness-github-api", version = "54.0.0", features = ["test-support"] }
+# Unconditional, unlike root's optional `dep:nix` under `bridge-runtime`: the
+# only user is this crate's own `#[cfg(unix)]` github test-support helper,
+# with no unrelated feature to piggyback on for gating the dependency itself.
+nix = { version = "0.31", features = ["fs"] }
 tempfile = "3.27.0"
 temp-env = "=0.3.6"
 

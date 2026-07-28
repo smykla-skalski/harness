@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use super::*;
-use crate::github_api::begin_external_mutation;
+use harness_github_api::begin_external_mutation;
 
 #[tokio::test]
 async fn post_error_with_duplicate_matches_returns_concurrent_evidence() {

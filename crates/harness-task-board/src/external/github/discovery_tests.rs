@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use super::test_support::{MockResponse, spawn_sequence_mock};
 use super::*;
-use crate::github_api::acquire_global_budget_test_lock;
+use harness_github_api::acquire_global_budget_test_lock;
 
 const REPOSITORY: &str = "octocat/harness";
 

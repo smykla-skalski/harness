@@ -10,7 +10,7 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
-use super::targeting::execution_repository_for_task;
+use super::execution_repository_for_task;
 use super::{
     ExternalProvider, ExternalRevisionUpdate, ExternalSyncClient, ExternalSyncConfig,
     ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
