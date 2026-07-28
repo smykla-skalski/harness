@@ -3,10 +3,10 @@ use std::mem;
 
 use chrono::{DateTime, Utc};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewAuthorAssociation;
 use crate::reviews::backports::BackportDetector;
 use crate::task_board::github::GitHubProjectConfig;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::types::{
     CommitConnection, LabelNode, PageInfo, RepositoryLabelConnection, RepositoryLabelNode,

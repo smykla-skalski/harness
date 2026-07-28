@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// An option in an `AskUserQuestion` prompt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AskUserQuestionOption {
     pub label: String,
     #[serde(default)]
@@ -10,8 +9,7 @@ pub struct AskUserQuestionOption {
 }
 
 /// An `AskUserQuestion` prompt with header, options, multi-select.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AskUserQuestionPrompt {
     pub question: String,
     #[serde(default)]

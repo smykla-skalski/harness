@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(any(test, feature = "test-support"))]
 use std::sync::MutexGuard;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
@@ -240,9 +240,7 @@ pub async fn refresh_read_generation() {
     global_state().refresh_read_generation().await;
 }
 
-pub async fn stable_data_revision_guard(
-    expected_revision: u64,
-) -> Option<OwnedMutexGuard<()>> {
+pub async fn stable_data_revision_guard(expected_revision: u64) -> Option<OwnedMutexGuard<()>> {
     let state = global_state();
     let guard = Arc::clone(&state.mutation_barrier).lock_owned().await;
     (state.data_revision() == expected_revision).then_some(guard)

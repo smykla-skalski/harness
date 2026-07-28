@@ -6,8 +6,8 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest, RemoteStatusResponse,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
+use harness_kernel::errors::CliErrorKind;
 
 mod chronology;
 mod controller_operation;

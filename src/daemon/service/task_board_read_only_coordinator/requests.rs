@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::prompt_catalog::{PromptId, render_prompt};
 use crate::task_board::{
@@ -12,6 +11,7 @@ use crate::task_board::{
     TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     validate_task_board_read_only_run_context,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// What a durable workflow attempt's Codex run is, apart from its prompt.
 ///

@@ -1,9 +1,9 @@
 use serde_json::json;
 
 use crate::daemon::protocol::CodexRunSnapshot;
-use harness_kernel::errors::CliError;
 use crate::git::GitRepository;
 use crate::session::types::{SessionState, TaskStatus};
+use harness_kernel::errors::CliError;
 
 use super::handle::{CodexControllerHandle, lock_db, record_snapshot_event};
 

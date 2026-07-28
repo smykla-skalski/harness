@@ -19,8 +19,8 @@ mod tests;
 
 pub use crate::infra::persistence::flock::FlockGuard;
 pub use harness_protocol::daemon::{
-    DaemonAuditEvent, DaemonBinaryStamp, DaemonDiagnostics, DaemonManifest, HostBridgeCapabilityManifest,
-    HostBridgeManifest,
+    DaemonAuditEvent, DaemonBinaryStamp, DaemonDiagnostics, DaemonManifest,
+    HostBridgeCapabilityManifest, HostBridgeManifest,
 };
 
 pub use audit::{
@@ -59,7 +59,9 @@ pub use migration::{
     LegacyDaemonRootMigration, MigrationDecision, migrate_legacy_daemon_root_at,
     migrate_legacy_daemon_root_for_current_process,
 };
-pub use ownership::{DaemonOwnership, ScopedOwnershipOverride, daemon_ownership_from_env_or_default};
+pub use ownership::{
+    DaemonOwnership, ScopedOwnershipOverride, daemon_ownership_from_env_or_default,
+};
 pub use paths::{
     ScopedDaemonRootOverride, auth_token_path, base_daemon_dir, config_path, daemon_root,
     daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path, identity_path,

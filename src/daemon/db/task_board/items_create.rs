@@ -5,9 +5,9 @@ use super::super::lane_order::{
     LaneTransitionKind, LaneTransitionWrite, insert_with_lane_transition_in_tx,
     replace_with_lane_transition_in_tx,
 };
+use super::super::projects::resolve_item_project_in_tx;
 use super::super::triage_apply::TriageOutcome;
 use super::super::triage_apply_rules::apply_active_triage_in_tx;
-use super::super::projects::resolve_item_project_in_tx;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, bump_change_in_tx,
     load_item_in_tx, record_triage_or_lane_audit_in_tx, validate_item,

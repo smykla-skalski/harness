@@ -7,7 +7,6 @@ use sqlx::{query, query_as};
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
@@ -16,6 +15,7 @@ use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection,
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[tokio::test]
 async fn concurrent_scope_claims_admit_exactly_one_attempt() {

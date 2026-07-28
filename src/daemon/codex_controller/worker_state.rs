@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::state;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::record_snapshot_event;
 use super::worker::CodexRunWorker;

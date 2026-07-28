@@ -1,8 +1,8 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::republish_current_data_change;
 use crate::task_board::external::ExternalProviderScopeAttempt;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::conflicts::build_sync_conflicts;
 use super::create_recovery::create_item_durably;

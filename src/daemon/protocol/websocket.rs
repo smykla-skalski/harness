@@ -35,8 +35,7 @@ pub struct WsChunkFrame {
 /// upgrade. The Swift client must receive and process this before any other
 /// traffic so personas and per-runtime model catalogs are available before the
 /// user can start an agent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WsConfigPayload {
     pub personas: Vec<AgentPersona>,
     pub runtime_models: Vec<RuntimeModelCatalog>,

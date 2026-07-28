@@ -259,18 +259,18 @@ fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
     assert!(save_response.persisted, "wait graph should persist");
     ws.scenarios.clear();
     ws.scenarios.push(PolicyScenario {
-            id: "scenario-reviews-auto".to_owned(),
-            name: "reviews auto".to_owned(),
-            input: PolicyInput {
-                workflow: Some("reviews_auto".to_owned()),
-                action: PolicyAction::MergePr,
-                subject: PolicySubject::default(),
-                evidence: PolicyEvidence::default(),
-                evaluated_at: None,
-                approvals: Vec::new(),
-            },
-            seeded: false,
-        });
+        id: "scenario-reviews-auto".to_owned(),
+        name: "reviews auto".to_owned(),
+        input: PolicyInput {
+            workflow: Some("reviews_auto".to_owned()),
+            action: PolicyAction::MergePr,
+            subject: PolicySubject::default(),
+            evidence: PolicyEvidence::default(),
+            evaluated_at: None,
+            approvals: Vec::new(),
+        },
+        seeded: false,
+    });
 
     let simulation = apply_simulate(&mut ws, Some(save_response.document.clone()), None)
         .expect("simulate wait graph");

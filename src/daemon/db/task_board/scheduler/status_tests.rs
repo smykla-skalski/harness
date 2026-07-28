@@ -447,12 +447,7 @@ async fn seed_open_conflict(db: &AsyncDaemonDb) {
     .expect("seed open conflict");
 }
 
-async fn seed_queue_execution(
-    db: &AsyncDaemonDb,
-    id: &str,
-    phase: &str,
-    state: &str,
-) {
+async fn seed_queue_execution(db: &AsyncDaemonDb, id: &str, phase: &str, state: &str) {
     let item_id = format!("queue-item-{id}");
     db.create_task_board_item(TaskBoardItem::new(
         item_id.clone(),

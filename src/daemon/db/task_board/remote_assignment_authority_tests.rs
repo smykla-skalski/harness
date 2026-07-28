@@ -3,13 +3,13 @@ use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE,
     TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE, TaskBoardExecutionState,
     TaskBoardRemoteAssignmentState, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
 };
+use harness_kernel::errors::CliError;
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_atomic_settlement() {

@@ -258,7 +258,11 @@ async fn missing_held_delivery_states_the_real_reason_not_a_session_conflict() {
         preview_error.message()
     );
     assert!(preview_error.message().contains(&item_id));
-    assert!(preview_error.message().contains("no held delivery to claim"));
+    assert!(
+        preview_error
+            .message()
+            .contains("no held delivery to claim")
+    );
 
     // Real claim path.
     let claim_error = db
@@ -400,7 +404,11 @@ async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
         .claim_held_task_board_dispatch(&fixture.item_id)
         .await
         .expect_err("the item has no project, so the claim cannot render");
-    assert!(error.message().contains("project_id"), "{}", error.message());
+    assert!(
+        error.message().contains("project_id"),
+        "{}",
+        error.message()
+    );
 
     assert_eq!(
         fixture

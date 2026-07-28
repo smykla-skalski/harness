@@ -1,5 +1,5 @@
 use super::render_triage_escalation_prompt;
-use crate::prompt_catalog::{prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog};
+use crate::prompt_catalog::{PromptCatalog, prompt_catalog_test_lock, scoped_prompt_catalog};
 use crate::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardPriority};
 
 fn item(title: &str, body: &str, tags: Vec<String>) -> TaskBoardItem {
@@ -98,9 +98,10 @@ fn a_prompt_naming_an_unknown_variable_fails_before_the_agent_starts() {
 #[test]
 fn a_prompt_naming_a_fact_this_item_lacks_fails_before_the_agent_starts() {
     let _lock = prompt_catalog_test_lock();
-    let catalog =
-        PromptCatalog::from_json(br#"{"triage_escalation": "Judge {{ title }} in {{ project_id }}"}"#)
-            .expect("parse overrides");
+    let catalog = PromptCatalog::from_json(
+        br#"{"triage_escalation": "Judge {{ title }} in {{ project_id }}"}"#,
+    )
+    .expect("parse overrides");
     let _installed = scoped_prompt_catalog(catalog);
     let mut candidate = item("Vague thing", "some notes", Vec::new());
 

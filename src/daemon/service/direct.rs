@@ -8,8 +8,8 @@ use super::{
     CliError, Path, SessionState, agents_service, build_log_entry, record_signal_ack,
     resolve_hook_agent, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::session::types::ManagedAgentRef;
+use harness_kernel::errors::CliErrorKind;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 /// Creates a per-session linked checkout and records the state file under the

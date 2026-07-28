@@ -3,13 +3,13 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use super::*;
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     TaskBoardSyncItemSnapshot,
 };
 use crate::task_board::store::apply_patch;
 use crate::task_board::{ExternalRefSyncState, TaskBoardSyncConflict};
+use harness_kernel::errors::CliErrorKind;
 
 #[tokio::test]
 async fn linked_push_is_not_applied_when_required_local_persistence_fails() {

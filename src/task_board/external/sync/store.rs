@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState,
@@ -12,6 +11,7 @@ use crate::task_board::{
     TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent, TaskBoardItem,
     TaskBoardStatus, TaskBoardSyncConflict,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardSyncItemSnapshot {

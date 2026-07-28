@@ -102,7 +102,10 @@ fn seed_one_decision(db: &DaemonDb) {
 }
 
 fn assert_seeded_decision_round_tripped(db: &DaemonDb) {
-    #[expect(clippy::type_complexity, reason = "one full decision row, positionally")]
+    #[expect(
+        clippy::type_complexity,
+        reason = "one full decision row, positionally"
+    )]
     let row: (
         String,
         String,

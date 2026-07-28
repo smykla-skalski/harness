@@ -27,7 +27,9 @@ fn execution_update_bindings(
         expected_phase: phase_label(expected.phase)?,
         expected_state: label(expected.state, "execution state")?,
         expected_configuration_revision: i64::try_from(expected.revisions.configuration_revision)
-            .map_err(|_| db_error("workflow configuration revision is out of range"))?,
+            .map_err(|_| {
+            db_error("workflow configuration revision is out of range")
+        })?,
     })
 }
 

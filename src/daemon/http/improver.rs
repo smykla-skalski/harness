@@ -1,15 +1,15 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{ImproverApplyRequest, http_paths};
 use crate::daemon::service;
-use harness_kernel::errors::CliError;
 use crate::session::service::ImproverApplyOutcome;
+use harness_kernel::errors::CliError;
 
 use super::DaemonHttpState;
 use super::auth::authorize_control_request;

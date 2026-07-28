@@ -1,6 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::refresh_read_generation;
 use crate::task_board::external::{
     ExternalSyncBatch, TaskBoardExternalCreateStore, assign_external_create_recovery,
@@ -12,6 +11,7 @@ use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncDirection,
     ExternalSyncOptions, configured_sync_clients_without_review_requests,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::TaskBoardSyncRunContext;
 use super::provider_sync_context_store::ProviderSyncRunStore;

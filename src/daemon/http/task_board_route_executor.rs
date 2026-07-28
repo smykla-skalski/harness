@@ -9,13 +9,13 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 #[cfg(test)]
 use crate::task_board::DispatchFailureKind;
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, TaskBoardAutomationRunTrigger,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::task::spawn_blocking;
 
 use super::{DaemonHttpState, require_async_db};

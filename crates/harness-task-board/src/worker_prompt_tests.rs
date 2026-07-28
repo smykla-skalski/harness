@@ -1,6 +1,6 @@
 use super::{WorkerPromptContext, optional_facts, plan_worker_prompt, render_worker_prompt};
-use crate::prompt_catalog::{prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog};
 use crate::item_fields::{ExternalRef, ExternalRefProvider};
+use crate::prompt_catalog::{PromptCatalog, prompt_catalog_test_lock, scoped_prompt_catalog};
 use crate::types::{TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 /// Byte-for-byte what `render_worker_prompt` produced for an item with none of

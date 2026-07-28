@@ -1,6 +1,4 @@
-use super::{
-    HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind, http_paths,
-};
+use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind, http_paths};
 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {

@@ -7,9 +7,9 @@ use crate::daemon::protocol::{
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardEvaluateRequest,
     TaskBoardGitSigningVerifyRequest, TaskBoardHostSetProjectTypesRequest,
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
-    TaskBoardPlanSubmitRequest, TaskBoardProjectUpdateRequest,
-    TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardPlanSubmitRequest, TaskBoardProjectUpdateRequest, TaskBoardResetItemPositionRequest,
+    TaskBoardSetItemPositionRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use harness_kernel::errors::CliError;
 use serde::de::DeserializeOwned;
@@ -99,9 +99,12 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_DISPATCH => {
             Some(Box::pin(dispatch::dispatch_task_board_dispatch(request, state)).await)
         }
-        ws_methods::TASK_BOARD_DISPATCH_DELIVER => {
-            Some(Box::pin(dispatch::dispatch_task_board_dispatch_deliver(request, state)).await)
-        }
+        ws_methods::TASK_BOARD_DISPATCH_DELIVER => Some(
+            Box::pin(dispatch::dispatch_task_board_dispatch_deliver(
+                request, state,
+            ))
+            .await,
+        ),
         ws_methods::TASK_BOARD_DISPATCH_PICK => {
             Some(dispatch::dispatch_task_board_dispatch_pick(request, state).await)
         }

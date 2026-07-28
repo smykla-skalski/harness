@@ -1,6 +1,6 @@
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardItemSnapshot};
-use crate::task_board::progress_rollup::build_progress_rollups_from;
 use crate::task_board::TaskBoardProgressRollup;
+use crate::task_board::progress_rollup::build_progress_rollups_from;
 use harness_kernel::errors::CliError;
 use std::collections::HashMap;
 

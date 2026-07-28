@@ -1,12 +1,12 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::task_board::transport::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 use crate::task_board::wire::{
     TaskBoardTriageEscalationVerdictRequest, TaskBoardTriageEscalationVerdictResponse,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::task_board::transport::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 use crate::task_board::{TriageVerdict, is_canonical_reason_detail};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// The daemon-spawned escalation worker's only way to report its judgment
 /// back. Never used interactively -- the escalation prompt
@@ -47,7 +47,11 @@ impl Execute for TaskBoardTriageEscalationReportArgs {
             ))
             .into());
         }
-        if let Some(quote) = self.rationale.chars().find(|c| matches!(c, '\'' | '"' | '`')) {
+        if let Some(quote) = self
+            .rationale
+            .chars()
+            .find(|c| matches!(c, '\'' | '"' | '`'))
+        {
             return Err(CliErrorKind::workflow_io(format!(
                 "--rationale must be plain text with no quote characters (found {quote:?})"
             ))

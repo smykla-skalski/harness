@@ -5,8 +5,7 @@ use super::AgentRegistration;
 use crate::agents::kind::RuntimeKind;
 use crate::agents::runtime::RuntimeCapabilities;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentRegistrationWire {
     session_agent_id: String,
     name: String,

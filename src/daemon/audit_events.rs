@@ -7,8 +7,8 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
 use crate::daemon::service::observe_sender;
 use crate::daemon::state;
-use harness_kernel::errors::CliError;
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 pub(crate) struct AuditEventDraft {
     pub source: &'static str,

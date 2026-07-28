@@ -6,10 +6,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
-use harness_kernel::errors::CliError;
-#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::utc_now;
+#[cfg(test)]
+use harness_kernel::errors::CliError;
 
 pub const POLICY_HANDOFF_OUTBOX_SCHEMA_VERSION: u32 = 1;
 

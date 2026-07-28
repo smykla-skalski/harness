@@ -2,13 +2,13 @@
 
 use std::collections::BTreeMap;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::{
     ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
     ReviewFilesViewedTarget, ReviewsFilesListRequest, ReviewsFilesViewedRequest,
     ReviewsFilesViewedResponse, ReviewsGitHubClient, ViewedMutation, classify_outcome,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::reviews_github_policy::{
     ReviewsGitHubMutation, enforce_review_pull_request_policy,

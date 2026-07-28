@@ -6,9 +6,9 @@ use clap::{Args, Subcommand};
 use tokio::runtime::Runtime;
 
 use crate::app::command_context::{AppContext, Execute};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 use crate::workspace::{host_home_dir, normalized_env_value};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::launchd;
 use super::super::service::{self, DaemonServeConfig};

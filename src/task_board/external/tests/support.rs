@@ -2,7 +2,6 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use harness_kernel::errors::CliError;
 use crate::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
 };
@@ -10,6 +9,7 @@ use crate::task_board::{
     ExternalProvider, ExternalRef, ExternalRefProvider, ExternalRefSyncState, ExternalSyncClient,
     ExternalTask, ExternalTaskRef, PlanningState, TaskBoardItem, TaskBoardStatus,
 };
+use harness_kernel::errors::CliError;
 
 pub(super) struct FakeSyncClient {
     provider: ExternalProvider,

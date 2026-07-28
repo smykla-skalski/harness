@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum VoiceProcessingSink {
     LocalDaemon,
@@ -9,8 +8,7 @@ pub enum VoiceProcessingSink {
     AgentBridge,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum VoiceRouteTargetKind {
     CodexPrompt,
@@ -19,8 +17,7 @@ pub enum VoiceRouteTargetKind {
     SystemFocusedField,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceRouteTarget {
     pub kind: VoiceRouteTargetKind,
     pub run_id: Option<String>,
@@ -29,8 +26,7 @@ pub struct VoiceRouteTarget {
     pub action_hint: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceAudioFormatDescriptor {
     pub sample_rate: f64,
     pub channel_count: usize,
@@ -38,8 +34,7 @@ pub struct VoiceAudioFormatDescriptor {
     pub interleaved: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceTranscriptSegment {
     pub sequence: u64,
     pub text: String,
@@ -49,8 +44,7 @@ pub struct VoiceTranscriptSegment {
     pub confidence: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceSessionStartRequest {
     pub actor: String,
     pub locale_identifier: String,
@@ -60,16 +54,14 @@ pub struct VoiceSessionStartRequest {
     pub remote_processor_url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceSessionStartResponse {
     pub voice_session_id: String,
     pub accepted_sinks: Vec<VoiceProcessingSink>,
     pub status: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceAudioChunkRequest {
     pub actor: String,
     pub sequence: u64,
@@ -82,31 +74,27 @@ pub struct VoiceAudioChunkRequest {
     pub audio_base64: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceTranscriptUpdateRequest {
     pub actor: String,
     pub segment: VoiceTranscriptSegment,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum VoiceSessionFinishReason {
     Completed,
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceSessionFinishRequest {
     pub actor: String,
     pub reason: VoiceSessionFinishReason,
     pub confirmed_text: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoiceSessionMutationResponse {
     pub voice_session_id: String,
     pub status: String,

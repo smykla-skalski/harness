@@ -32,10 +32,14 @@ fn bug_rule_set() -> TriageRuleSetV1 {
         schema_version: crate::task_board::TRIAGE_RULE_SET_SCHEMA_VERSION,
         rules: vec![TriageRule {
             id: "bug".into(),
-            when: vec![TriageRuleCondition::LabelsHasAny { labels: vec!["kind/bug".into()] }],
+            when: vec![TriageRuleCondition::LabelsHasAny {
+                labels: vec!["kind/bug".into()],
+            }],
             outcome: TriageRuleOutcome {
                 verdict: TriageVerdict::Todo,
-                priority_action: TriagePriorityAction::SetTo { priority: TaskBoardPriority::Critical },
+                priority_action: TriagePriorityAction::SetTo {
+                    priority: TaskBoardPriority::Critical,
+                },
             },
         }],
         default_outcome: TriageRuleOutcome {
@@ -90,7 +94,11 @@ async fn an_item_with_an_active_dispatch_reservation_is_skipped_entirely() {
         .await
         .expect("activate");
     assert_eq!(result.reevaluated_item_count, 0);
-    assert_eq!(item_status(&db, "reserved").await, "inbox", "reserved item is untouched");
+    assert_eq!(
+        item_status(&db, "reserved").await,
+        "inbox",
+        "reserved item is untouched"
+    );
 }
 
 /// Regression test: `activate(candidate=None, expected=None)` when nothing
@@ -106,7 +114,10 @@ async fn deactivating_when_nothing_is_active_records_zero_decisions() {
         .await
         .expect("create item");
     let count_before = decision_generation_count(&db, "plain").await;
-    assert_eq!(count_before, 1, "creation records exactly one BuiltInV1 decision");
+    assert_eq!(
+        count_before, 1,
+        "creation records exactly one BuiltInV1 decision"
+    );
 
     let result = db
         .activate_task_board_triage_rules(None, "owner".into(), None)
@@ -158,14 +169,16 @@ async fn an_item_under_an_active_override_keeps_its_override_placement_but_gets_
     db.create_task_board_item(inbox_item("overridden", Vec::new()))
         .await
         .expect("create item");
-    db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
-        item_id: "overridden".into(),
-        verdict: TriageVerdict::Todo,
-        actor: "human".into(),
-        reason: None,
-        expected_item_revision: 1,
-        expected_items_change_seq: 1,
-    })
+    db.set_task_board_triage_override(
+        crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
+            item_id: "overridden".into(),
+            verdict: TriageVerdict::Todo,
+            actor: "human".into(),
+            reason: None,
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+        },
+    )
     .await
     .expect("set override");
 
@@ -178,10 +191,11 @@ async fn an_item_under_an_active_override_keeps_its_override_placement_but_gets_
     // The override still wins placement (Todo), even though the new rule
     // set's default outcome for an unlabeled item is Undecided/Inbox.
     assert_eq!(item_status(&db, "overridden").await, "todo");
-    let producer: String = query_scalar("SELECT lane_producer FROM task_board_items WHERE item_id = ?1")
-        .bind("overridden")
-        .fetch_one(db.pool())
-        .await
-        .expect("read lane origin producer");
+    let producer: String =
+        query_scalar("SELECT lane_producer FROM task_board_items WHERE item_id = ?1")
+            .bind("overridden")
+            .fetch_one(db.pool())
+            .await
+            .expect("read lane origin producer");
     assert_eq!(producer, OVERRIDE_PLACEMENT_PRODUCER);
 }

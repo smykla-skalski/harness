@@ -11,8 +11,8 @@ use tempfile::TempDir;
 use crate::daemon::protocol::AdoptSessionRequest;
 #[cfg(target_os = "macos")]
 use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
-use crate::session::types::CURRENT_VERSION;
 use crate::session::adopter::AdoptionError;
+use crate::session::types::CURRENT_VERSION;
 
 use super::{adoption_error_response, post_session_adopt};
 use crate::daemon::http::tests::{auth_headers, response_json, test_http_state_with_db};

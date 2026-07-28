@@ -216,11 +216,11 @@ fn credential_permissions_are_safe(
     let private_to_owner = mode.trailing_zeros() >= 6;
     let safe_systemd_acl = owner_uid == 0
         && mode.trailing_zeros() >= 5
-            && credential_directory.is_some_and(|directory| {
-                directory.is_absolute()
-                    && path.parent() == Some(directory)
-                    && path.file_name().is_some()
-            });
+        && credential_directory.is_some_and(|directory| {
+            directory.is_absolute()
+                && path.parent() == Some(directory)
+                && path.file_name().is_some()
+        });
     private_to_owner || safe_systemd_acl
 }
 

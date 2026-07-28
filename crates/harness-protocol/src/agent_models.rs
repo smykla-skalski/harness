@@ -50,8 +50,7 @@ pub struct RuntimeCapabilities {
 }
 
 /// One user-visible hook interception point for signal pickup.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HookIntegrationDescriptor {
     pub name: String,
     pub typical_latency_seconds: u64,
@@ -59,8 +58,7 @@ pub struct HookIntegrationDescriptor {
 }
 
 /// A signal sent to an agent session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Signal {
     pub signal_id: String,
     pub version: u32,
@@ -83,8 +81,7 @@ pub enum SignalPriority {
     Urgent,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SignalPayload {
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -95,8 +92,7 @@ pub struct SignalPayload {
     pub metadata: Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DeliveryConfig {
     pub max_retries: u32,
     #[serde(default)]
@@ -105,8 +101,7 @@ pub struct DeliveryConfig {
     pub idempotency_key: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SignalAck {
     pub signal_id: String,
     pub acknowledged_at: String,

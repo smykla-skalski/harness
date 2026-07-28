@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use harness_agents::runtime::RuntimeCapabilities;
 use crate::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionPolicy, SessionRole,
     SessionState, SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
+use harness_agents::runtime::RuntimeCapabilities;
 
 pub(super) fn sample_state(session_id: &str) -> SessionState {
     SessionState {

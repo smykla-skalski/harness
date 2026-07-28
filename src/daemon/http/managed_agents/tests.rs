@@ -80,8 +80,8 @@ async fn spawn_managed_agent_server(
             listener,
             managed_agent_routes().split_for_parts().0.with_state(state),
         )
-            .await
-            .expect("serve managed agent routes");
+        .await
+        .expect("serve managed agent routes");
     });
     (format!("http://{addr}"), server)
 }

@@ -1,12 +1,12 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use harness_kernel::errors::CliError;
 use crate::hooks::adapters::{
     AgentAdapter, HookRegistration, RenderedHookResponse, parse_process_payload, payload_context,
 };
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::{NormalizedDecision, NormalizedHookResult};
+use harness_kernel::errors::CliError;
 use harness_kernel::kernel::tooling::ToolCategory;
 
 pub struct VibeAdapter;

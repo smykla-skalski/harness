@@ -1,7 +1,7 @@
 //! GitHub-token resolution for reviews-files endpoints.
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::ExternalProvider;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_runtime::external_sync_config_for_repository;
 

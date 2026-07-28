@@ -58,7 +58,10 @@ fn first_matching_rule_in_authored_order_wins() {
     };
     let item = item_with(&["bug"], TaskBoardPriority::Critical);
     let evaluation = evaluate_triage_rule_set(&rule_set, &item);
-    assert_eq!(evaluation.matched, TriageRuleMatch::Rule("urgent".to_string()));
+    assert_eq!(
+        evaluation.matched,
+        TriageRuleMatch::Rule("urgent".to_string())
+    );
     assert_eq!(evaluation.verdict, TriageVerdict::Todo);
 }
 
@@ -146,7 +149,10 @@ fn optional_fact_conditions_match_presence_and_equality() {
     let mut item = blank_item();
     item.execution_repository = Some("owner/repo".to_string());
     let evaluation = evaluate_triage_rule_set(&rule_set, &item);
-    assert_eq!(evaluation.matched, TriageRuleMatch::Rule("repo".to_string()));
+    assert_eq!(
+        evaluation.matched,
+        TriageRuleMatch::Rule("repo".to_string())
+    );
 
     item.project_id = Some("some-project".to_string());
     let evaluation = evaluate_triage_rule_set(&rule_set, &item);

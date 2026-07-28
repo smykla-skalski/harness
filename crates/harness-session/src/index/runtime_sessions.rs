@@ -1,5 +1,5 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::types::RuntimeSessionId;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DiscoveredProject;
 use super::sessions::{list_active_session_ids_for_project, load_session_state_for_project};

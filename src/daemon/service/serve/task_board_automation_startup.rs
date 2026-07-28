@@ -3,11 +3,11 @@ use std::sync::{Arc, OnceLock};
 use chrono::{DateTime, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::{
     TaskBoardAutomationDesiredMode, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn initialize_control_before_serving(
     async_db_slot: &Arc<OnceLock<Arc<AsyncDaemonDb>>>,

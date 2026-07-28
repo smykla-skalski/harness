@@ -26,7 +26,11 @@ const DENIED_BINARIES: &[&str] = &[
 /// (`agents::acp::client::terminal::policy::denied_binary_name`).
 #[must_use]
 pub fn all_denied_binaries() -> BTreeSet<String> {
-    DENIED_BINARIES.iter().copied().map(ToString::to_string).collect()
+    DENIED_BINARIES
+        .iter()
+        .copied()
+        .map(ToString::to_string)
+        .collect()
 }
 
 #[cfg(test)]

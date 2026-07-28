@@ -1,7 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::TaskStatus;
 use crate::task_board::TaskBoardStatus;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn validate_linked_task_completion(
     db: &AsyncDaemonDb,

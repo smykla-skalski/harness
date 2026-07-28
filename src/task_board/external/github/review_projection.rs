@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-#[cfg(test)]
-use harness_kernel::errors::CliError;
 use crate::github_api::GitHubPullRequestSnapshot;
 use crate::task_board::store::TaskBoardItemPatch;
 #[cfg(test)]
 use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
+#[cfg(test)]
+use harness_kernel::errors::CliError;
 
 use super::super::{canonical_external_status, local_external_status};
 
@@ -209,8 +209,7 @@ pub(crate) fn reconciled_external_status(
         return current;
     };
     let Some(last_external) = last_synced.map(canonical_external_status) else {
-        return if current_external == TaskBoardStatus::Inbox && observed == TaskBoardStatus::Done
-        {
+        return if current_external == TaskBoardStatus::Inbox && observed == TaskBoardStatus::Done {
             TaskBoardStatus::Done
         } else {
             current

@@ -201,10 +201,7 @@ impl Store {
     ///
     /// # Errors
     /// Returns [`sqlx::Error`] when the query fails.
-    pub async fn pair_link_account(
-        &self,
-        pairing_id: &str,
-    ) -> Result<Option<String>, sqlx::Error> {
+    pub async fn pair_link_account(&self, pairing_id: &str) -> Result<Option<String>, sqlx::Error> {
         // A reservation id is refused rather than looked up. One can only be
         // supplied by a caller that guessed the panel's internal spelling, and
         // a hit would let it act on a slot rather than on a pairing.

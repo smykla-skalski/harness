@@ -21,8 +21,7 @@ use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 /// cannot exchange task-board data safely.
 pub const DAEMON_WIRE_VERSION: u32 = 5;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
@@ -48,8 +47,7 @@ fn default_wire_version() -> u32 {
     1
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonControlResponse {
     pub status: String,
 }
@@ -60,8 +58,7 @@ pub struct DaemonControlResponse {
 /// caller is authenticated, and the backing storage slot is wired up - but
 /// intentionally avoids any database query so short-lived CLI invocations can
 /// verify readiness cheaply.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReadinessResponse {
     pub ready: bool,
     pub daemon_epoch: String,
@@ -69,21 +66,18 @@ pub struct ReadinessResponse {
 
 pub use harness_protocol::session_wire::RuntimeSessionResolutionResponse;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LogLevelResponse {
     pub level: String,
     pub filter: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SetLogLevelRequest {
     pub level: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HostBridgeReconfigureRequest {
     #[serde(default)]
     pub enable: Vec<String>,
@@ -109,8 +103,7 @@ impl DaemonTelemetryKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonTelemetryRequest {
     pub kind: DaemonTelemetryKind,
     pub source: String,
@@ -119,14 +112,12 @@ pub struct DaemonTelemetryRequest {
     pub sample: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonTelemetryResponse {
     pub recorded_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonDiagnosticsReport {
     pub health: Option<HealthResponse>,
     pub manifest: Option<DaemonManifest>,
@@ -138,8 +129,7 @@ pub struct DaemonDiagnosticsReport {
     pub recent_events: Vec<DaemonAuditEvent>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubApiDiagnostics {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_revision: Option<u64>,
@@ -154,8 +144,7 @@ pub struct GitHubApiDiagnostics {
     pub top_operations: Vec<GitHubOperationSpendDiagnostics>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubRateBucketDiagnostics {
     pub resource: String,
     pub remaining: u32,
@@ -164,16 +153,14 @@ pub struct GitHubRateBucketDiagnostics {
     pub reset_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubCooldownDiagnostics {
     pub resource: String,
     pub reason: String,
     pub until_seconds_from_now: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubOperationSpendDiagnostics {
     pub operation: String,
     pub network_requests: u64,
@@ -230,11 +217,9 @@ fn github_resource_name(resource: GitHubRateResource) -> String {
         .unwrap_or_else(|| format!("{resource:?}"))
 }
 
-
 pub use harness_protocol::timeline::TimelineEntry;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 pub struct TimelineCursor {
     pub recorded_at: String,
     pub entry_id: String,
@@ -254,8 +239,7 @@ pub struct TimelineWindowRequest {
     pub known_revision: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TimelineWindowResponse {
     pub revision: i64,
     pub total_count: usize,
@@ -272,8 +256,7 @@ pub struct TimelineWindowResponse {
     pub unchanged: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AcpTranscriptResponse {
     pub entries: Vec<TimelineEntry>,
 }
@@ -282,6 +265,5 @@ pub struct AcpTranscriptResponse {
 pub struct ReadyEventPayload {
     pub ok: bool,
 }
-
 
 pub use harness_protocol::daemon::StreamEvent;

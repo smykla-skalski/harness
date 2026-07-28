@@ -53,11 +53,14 @@ fn a_pairing_id_the_panel_would_have_to_log_is_refused() {
     for (id, why) in [
         ("", "is blank"),
         ("   ", "is blank"),
-        ("pair-1\npanel minted a pairing link", "carries control characters"),
+        (
+            "pair-1\npanel minted a pairing link",
+            "carries control characters",
+        ),
         ("reservation:7", "reservations"),
     ] {
-        let error = checked_pairing_id(id.to_owned())
-            .expect_err(&format!("{id:?} must be refused"));
+        let error =
+            checked_pairing_id(id.to_owned()).expect_err(&format!("{id:?} must be refused"));
 
         assert!(error.to_string().contains(why), "{id:?}: {error}");
     }

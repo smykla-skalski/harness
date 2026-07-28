@@ -183,9 +183,7 @@ pub(crate) fn new_trace_id() -> String {
 }
 
 pub(crate) fn simulation_inputs() -> Vec<PolicyInput> {
-    use crate::policy::{
-        DEFAULT_AUTO_MERGE_RISK_THRESHOLD, PolicyEvidence, PolicySubject,
-    };
+    use crate::policy::{DEFAULT_AUTO_MERGE_RISK_THRESHOLD, PolicyEvidence, PolicySubject};
 
     let default_subject = PolicySubject::default();
     let merge_evidence = PolicyEvidence {

@@ -8,11 +8,11 @@ use crate::daemon::db::{
     TaskBoardRemoteAssignmentRecord, detached_terminal_assignment, remote_controller_fixture,
     restore_parent_to_targetless_preparing,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
+use harness_kernel::errors::CliError;
 
 #[tokio::test]
 async fn detached_completed_or_failed_return_before_any_terminal_client_operation() {

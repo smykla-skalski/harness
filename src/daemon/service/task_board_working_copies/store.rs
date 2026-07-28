@@ -3,12 +3,12 @@
 use std::fs;
 
 use crate::daemon::state::daemon_root;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::working_copy::runtime::is_reusable_checkout;
 use crate::task_board::working_copy::{
     WorkingCopyKey, WorkingCopyListEntry, WorkingCopyRegistry, WorkingCopyRegistryEntry,
     WorkingCopyRoot,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::WORKING_COPIES_SUBDIR;
 
@@ -22,7 +22,9 @@ pub(super) fn load_registry(root: &WorkingCopyRoot) -> Result<WorkingCopyRegistr
         return Ok(WorkingCopyRegistry::default());
     }
     let raw = fs::read_to_string(&path).map_err(|error| {
-        CliErrorKind::workflow_io(format!("task-board working-copy registry read failed: {error}"))
+        CliErrorKind::workflow_io(format!(
+            "task-board working-copy registry read failed: {error}"
+        ))
     })?;
     serde_json::from_str::<WorkingCopyRegistry>(&raw).map_err(|error| {
         CliErrorKind::workflow_parse(format!(
@@ -162,7 +164,11 @@ mod tests {
     use super::*;
     use crate::task_board::working_copy::runtime::completion_marker;
 
-    fn seed_row(registry: &mut WorkingCopyRegistry, key: &WorkingCopyKey, path: std::path::PathBuf) {
+    fn seed_row(
+        registry: &mut WorkingCopyRegistry,
+        key: &WorkingCopyKey,
+        path: std::path::PathBuf,
+    ) {
         registry.insert_or_update(
             key.clone(),
             WorkingCopyRegistryEntry {

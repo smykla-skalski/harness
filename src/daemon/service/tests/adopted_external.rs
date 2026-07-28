@@ -82,8 +82,8 @@ fn discover_sessions_finds_adopted_external_session_root() {
         .expect("update adopted state");
 
         let project = index::discovered_project_for_checkout(&project_dir);
-        let discovered = index::discover_sessions_for(std::slice::from_ref(&project), true)
-            .expect("discover");
+        let discovered =
+            index::discover_sessions_for(std::slice::from_ref(&project), true).expect("discover");
         assert_eq!(discovered.len(), 1);
         assert_eq!(discovered[0].state.session_id, session_id);
         assert_eq!(discovered[0].state.context, "updated adopted context");

@@ -1,6 +1,5 @@
 use std::mem;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeIdentity, ExternalSyncBatch, ExternalSyncClient, ExternalSyncScopeOutcome,
 };
@@ -8,6 +7,7 @@ use crate::task_board::{
     ExternalProvider, ExternalSyncOperation, ExternalSyncOptions, TaskBoardExternalCreateIntent,
     TaskBoardExternalCreateIntentState,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::TaskBoardSyncStore;
 

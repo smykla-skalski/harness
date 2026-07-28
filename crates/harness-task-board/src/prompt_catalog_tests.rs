@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::{
-    prompt_catalog_test_lock, PromptCatalog, PromptId, active_prompt_catalog,
-    render_prompt, scoped_prompt_catalog,
+    PromptCatalog, PromptId, active_prompt_catalog, prompt_catalog_test_lock, render_prompt,
+    scoped_prompt_catalog,
 };
 
 fn vars(pairs: &[(&'static str, &str)]) -> BTreeMap<&'static str, String> {

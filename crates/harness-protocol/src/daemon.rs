@@ -142,8 +142,7 @@ impl Display for DaemonOwnership {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct HostBridgeCapabilityManifest {
     #[serde(default = "default_host_bridge_enabled")]
     pub enabled: bool,
@@ -160,8 +159,7 @@ fn default_host_bridge_enabled() -> bool {
     true
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct HostBridgeManifest {
     #[serde(default)]
     pub running: bool,
@@ -171,8 +169,7 @@ pub struct HostBridgeManifest {
     pub capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonBinaryStamp {
     pub helper_path: String,
     pub device_identifier: u64,
@@ -181,8 +178,7 @@ pub struct DaemonBinaryStamp {
     pub modification_time_interval_since_1970: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonManifest {
     pub version: String,
     pub pid: u32,
@@ -205,16 +201,14 @@ pub struct DaemonManifest {
     pub ownership: DaemonOwnership,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonAuditEvent {
     pub recorded_at: String,
     pub level: String,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DaemonDiagnostics {
     pub daemon_root: String,
     pub manifest_path: String,

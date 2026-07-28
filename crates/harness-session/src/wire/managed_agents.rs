@@ -82,8 +82,7 @@ impl ManagedAgentSnapshot {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ManagedAgentListResponse {
     #[schema(value_type = Vec<ManagedAgentSnapshotSchema>)]
     pub agents: Vec<ManagedAgentSnapshot>,

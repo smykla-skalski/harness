@@ -125,7 +125,9 @@ mod tests {
 
         assert_eq!(encoded["change"], "claimed");
         assert!(
-            encoded.as_object().is_some_and(|event| !event.contains_key("minted_by")),
+            encoded
+                .as_object()
+                .is_some_and(|event| !event.contains_key("minted_by")),
             "the routing copy is redundant with the entry's own: {encoded}"
         );
         assert_eq!(

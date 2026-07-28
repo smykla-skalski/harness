@@ -1,6 +1,6 @@
-use harness_kernel::errors::CliError;
-use crate::session::{service as session_service, storage as session_storage};
 use crate::session::adopter::AdoptionOutcome;
+use crate::session::{service as session_service, storage as session_storage};
+use harness_kernel::errors::CliError;
 
 use super::{build_log_entry, index};
 

@@ -5,11 +5,11 @@ use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use crate::task_board::TaskBoardGitRuntimeConfig;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};

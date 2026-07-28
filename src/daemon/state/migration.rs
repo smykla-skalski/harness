@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::locks::daemon_lock_is_held_at;
 use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};

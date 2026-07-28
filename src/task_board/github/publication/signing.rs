@@ -7,9 +7,9 @@ use pgp::crypto::hash::HashAlgorithm;
 use pgp::types::{KeyDetails, Password};
 use rand_core06::OsRng;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::task_board::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningMode};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::snapshot_error;
 use super::types::{

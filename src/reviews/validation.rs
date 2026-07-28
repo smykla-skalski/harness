@@ -1,5 +1,5 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::backports::BackportDetector;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,

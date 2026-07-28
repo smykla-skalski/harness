@@ -123,7 +123,9 @@ fn validated_port(authority: &Authority) -> Result<u16, CliError> {
     let suffix = authority
         .as_str()
         .strip_prefix(authority.host())
-        .ok_or_else(|| activation_error("companion upstream authority contains user information"))?;
+        .ok_or_else(|| {
+            activation_error("companion upstream authority contains user information")
+        })?;
     if suffix.is_empty() {
         return Ok(80);
     }

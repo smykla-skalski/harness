@@ -5,7 +5,7 @@
 
 use crate::task_board::AgentMode;
 use crate::task_board::prompt_catalog::{
-    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
+    PromptCatalog, prompt_catalog_test_lock, scoped_prompt_catalog,
 };
 
 use super::super::test_support::applied_task;
@@ -42,8 +42,11 @@ fn the_write_implementation_prompt_renders_the_shipped_bytes() {
 
 #[test]
 fn the_worker_prompt_renders_the_shipped_bytes_on_both_transports() {
-    let codex = codex_worker_request(&applied_task(AgentMode::Headless), "codex-dispatch-intent-1")
-        .expect("render codex worker request");
+    let codex = codex_worker_request(
+        &applied_task(AgentMode::Headless),
+        "codex-dispatch-intent-1",
+    )
+    .expect("render codex worker request");
     assert_eq!(codex.prompt, WORKER_GOLDEN);
 
     let terminal = terminal_worker_request(
@@ -105,8 +108,11 @@ fn a_configured_worker_prompt_replaces_the_shipped_one_on_both_transports() {
             .expect("parse overrides"),
     );
 
-    let codex = codex_worker_request(&applied_task(AgentMode::Headless), "codex-dispatch-intent-1")
-        .expect("render codex worker request");
+    let codex = codex_worker_request(
+        &applied_task(AgentMode::Headless),
+        "codex-dispatch-intent-1",
+    )
+    .expect("render codex worker request");
     assert_eq!(codex.prompt, "Do board-1 in /tmp/task-worktree");
 
     let terminal = terminal_worker_request(
@@ -148,14 +154,25 @@ fn a_worker_prompt_naming_an_absent_fact_refuses_the_spawn() {
             .expect("parse overrides"),
     );
 
-    let error = codex_worker_request(&applied_task(AgentMode::Headless), "codex-dispatch-intent-1")
-        .expect_err("absent project refuses the spawn");
-    assert!(error.message().contains("project_id"), "{}", error.message());
+    let error = codex_worker_request(
+        &applied_task(AgentMode::Headless),
+        "codex-dispatch-intent-1",
+    )
+    .expect_err("absent project refuses the spawn");
+    assert!(
+        error.message().contains("project_id"),
+        "{}",
+        error.message()
+    );
 
     let error = terminal_worker_request(
         &applied_task(AgentMode::Interactive),
         "agent-tui-dispatch-intent-1",
     )
     .expect_err("absent project refuses the terminal spawn");
-    assert!(error.message().contains("project_id"), "{}", error.message());
+    assert!(
+        error.message().contains("project_id"),
+        "{}",
+        error.message()
+    );
 }

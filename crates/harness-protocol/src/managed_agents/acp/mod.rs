@@ -9,10 +9,6 @@ mod snapshot_wire;
 mod wire;
 
 pub use mcp::{AcpMcpEnvVariable, AcpMcpHttpHeader, AcpMcpServer};
-pub use schema::{
-    AcpAgentInspectSnapshotSchema, AcpAgentSnapshotSchema, AcpAgentStartRequestSchema,
-    AcpPermissionBatchSchema,
-};
 pub use models::{
     AcpAgentDescriptor, AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot,
     AcpAgentSessionState, AcpAgentSnapshot, AcpAgentStartRequest, AcpAuthState, AcpEndpoint,
@@ -21,4 +17,8 @@ pub use models::{
     AcpSessionConfigOptionBinding, AcpSessionConfigOptionState, AcpSessionConfiguration,
     AcpSessionEffortTransport, AcpSessionListPage, AcpSessionModelTransport, AcpSessionSummary,
     AcpSpawnConfiguration, BridgeAcpStartRequest, CapabilityTag, DoctorProbe,
+};
+pub use schema::{
+    AcpAgentInspectSnapshotSchema, AcpAgentSnapshotSchema, AcpAgentStartRequestSchema,
+    AcpPermissionBatchSchema,
 };

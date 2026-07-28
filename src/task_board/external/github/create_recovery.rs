@@ -5,11 +5,11 @@ use reqwest::header::{HeaderMap, LINK};
 use reqwest::{Method, Url};
 use serde::Deserialize;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor, retry_stable_read,
 };
 use crate::task_board::normalize_repository_slug;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,

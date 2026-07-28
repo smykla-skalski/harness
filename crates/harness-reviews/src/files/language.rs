@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Compact enum of source languages the diff renderer recognizes. Kept narrow
 /// on purpose: tokenizers only exist for these; anything else falls through to
 /// the diff-only renderer (no syntax highlighting).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HarnessCodeLanguage {
     Codeowners,

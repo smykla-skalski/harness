@@ -4,7 +4,9 @@ use std::sync::LazyLock;
 
 use rusqlite::Row;
 
-use super::{DaemonDb, OptionalExtension, db_error, decode_remote_pairing_metadata, pairing_is_expired};
+use super::{
+    DaemonDb, OptionalExtension, db_error, decode_remote_pairing_metadata, pairing_is_expired,
+};
 use crate::daemon::remote_pairing::{
     RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation, RemotePairingState,
 };
@@ -110,8 +112,8 @@ impl DaemonDb {
 
         let mut entries = Vec::new();
         for row in rows {
-            let columns = row
-                .map_err(|error| db_error(format!("read remote pairing inventory: {error}")))??;
+            let columns =
+                row.map_err(|error| db_error(format!("read remote pairing inventory: {error}")))??;
             entries.push(entry_from_columns(columns, now)?);
         }
         Ok(entries)

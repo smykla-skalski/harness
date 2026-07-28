@@ -10,10 +10,9 @@ use crate::daemon::protocol::{
     TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
     TaskBoardPlanningResponse, TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardUpdateItemRequest,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalSyncConfig, Machine, SpawnGateSwitches, TaskBoardItem, approve_plan, begin_planning,
@@ -21,6 +20,7 @@ use crate::task_board::{
     submit_plan,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board::load_live_spawn_grants;
 
@@ -44,13 +44,12 @@ mod triage_reads;
 mod triage_rules_reads;
 mod update_request;
 
-use request_validation::{validate_create_title, validate_estimate, validate_update_estimates};
-use update_request::{apply_update_request, replacement_external_refs};
 pub(crate) use list_items::{TaskBoardListSource, read_task_board_items_db};
 pub(crate) use positions::{
     get_task_board_item_position_snapshot_db, reset_task_board_item_position_db,
     set_task_board_item_position_db,
 };
+use request_validation::{validate_create_title, validate_estimate, validate_update_estimates};
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
@@ -68,6 +67,7 @@ pub(crate) use triage_rules_reads::{
     get_task_board_triage_rules_draft_db, get_task_board_triage_rules_revisions_db,
     preview_task_board_triage_rules_db, save_task_board_triage_rules_draft_db,
 };
+use update_request::{apply_update_request, replacement_external_refs};
 
 pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,

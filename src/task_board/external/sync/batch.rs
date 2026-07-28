@@ -1,4 +1,3 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::task_board::external::{
     ExternalProvider, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
@@ -6,6 +5,7 @@ use crate::task_board::external::{
     ExternalSyncClient, ExternalSyncScopeOutcome,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::create_recovery::{
     ExternalCreateRecoveryPlan, ExternalCreateScopeRecovery, recover_scope_intents,

@@ -35,7 +35,8 @@ async fn run_broken_edit_during_hold(sandbox: &std::path::Path) {
     let _lock = prompt_catalog_test_lock();
     let project_dir = sandbox.join("deliver-broken-project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
-    let (state, base_url, server, client) = held_step_mode_item(&project_dir, "board-deliver-broken").await;
+    let (state, base_url, server, client) =
+        held_step_mode_item(&project_dir, "board-deliver-broken").await;
 
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Work on {{ task_body }}"}"#)
@@ -114,7 +115,8 @@ async fn run_edit_during_hold_reports_started_prompt(sandbox: &std::path::Path) 
     let _lock = prompt_catalog_test_lock();
     let project_dir = sandbox.join("deliver-edited-project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
-    let (state, base_url, server, client) = held_step_mode_item(&project_dir, "board-deliver-edited").await;
+    let (state, base_url, server, client) =
+        held_step_mode_item(&project_dir, "board-deliver-edited").await;
 
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Work on {{ title }}"}"#).expect("parse overrides"),
@@ -184,12 +186,8 @@ async fn held_step_mode_item(
 }
 
 async fn held_dispatch_count(client: &reqwest::Client, base_url: &str) -> Option<u64> {
-    get_json(
-        client,
-        base_url,
-        http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
-    )
-    .await["held_dispatches"]["count"]
+    get_json(client, base_url, http_paths::TASK_BOARD_ORCHESTRATOR_STATUS).await["held_dispatches"]
+        ["count"]
         .as_u64()
 }
 

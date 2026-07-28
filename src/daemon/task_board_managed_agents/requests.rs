@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use harness_kernel::errors::CliError;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::prompt_catalog::{PromptId, render_prompt};
 use crate::task_board::{
@@ -12,6 +11,7 @@ use crate::task_board::{
     TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWriteWorkflowLaunch,
     WorkerPromptContext, render_worker_prompt,
 };
+use harness_kernel::errors::CliError;
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 
@@ -248,10 +248,7 @@ fn read_only_review_prompt(
         ("board_item_id", applied.board_item_id.clone()),
         ("title", launch.run_context.title.clone()),
         ("context", launch.run_context.body.clone()),
-        (
-            "exact_head_revision",
-            launch.exact_head_revision.clone(),
-        ),
+        ("exact_head_revision", launch.exact_head_revision.clone()),
         (
             "pull_request_line",
             pull_request

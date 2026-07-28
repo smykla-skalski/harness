@@ -14,17 +14,17 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_item};
 use crate::daemon::remote_viewer::is_remote_viewer;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     AgentMode, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
     TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardPriority, TaskBoardStatus,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
+use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
-use super::super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::{
     TASK_BOARD_LIST_INVALID_PARAMS, TaskBoardCapabilitiesResponse, TaskBoardListItemsResponse,
     TaskBoardPlanningResponse,
@@ -32,8 +32,7 @@ use crate::daemon::protocol::{
 use crate::task_board::TaskBoardItem;
 
 /// Status-only query string, shared by the board's summary reads.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[derive(utoipa::IntoParams)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(super) struct TaskBoardStatusQuery {
     pub status: Option<TaskBoardStatus>,
@@ -44,8 +43,7 @@ pub(super) struct TaskBoardStatusQuery {
 /// `tag` repeats instead of taking a list, so it is collected from the raw
 /// query string: `serde_urlencoded`, which backs axum's `Query`, cannot
 /// deserialize a repeated key into a `Vec`.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[derive(utoipa::IntoParams)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(super) struct TaskBoardListQuery {
     pub status: Option<TaskBoardStatus>,
@@ -70,21 +68,18 @@ const _: () = assert!(TASK_BOARD_LIST_MAX_QUERY_CHARS == 512);
 const _: () = assert!(TASK_BOARD_LIST_MAX_CURSOR_CHARS == 512);
 const _: () = assert!(TASK_BOARD_LIST_MAX_TAGS == 16);
 
-#[derive(Debug, Clone, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub(super) struct TaskBoardPlanSubmitBody {
     pub summary: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub(super) struct TaskBoardPlanApproveBody {
     pub approved_by: String,
     pub approved_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::ToSchema)]
 pub(super) struct TaskBoardPlanRevokeBody {
     #[serde(default)]
     pub actor: Option<String>,

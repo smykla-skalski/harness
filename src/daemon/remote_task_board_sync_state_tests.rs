@@ -54,9 +54,9 @@ fn projected(viewer: bool) -> TaskBoardReadListResponse {
 
 fn projected_sync_state(viewer: bool) -> Option<ExternalRefSyncState> {
     match projected(viewer) {
-        TaskBoardReadListResponse::Full(response) => response.items[0].external_refs[0]
-            .sync_state
-            .clone(),
+        TaskBoardReadListResponse::Full(response) => {
+            response.items[0].external_refs[0].sync_state.clone()
+        }
         TaskBoardReadListResponse::Viewer(_) => None,
     }
 }

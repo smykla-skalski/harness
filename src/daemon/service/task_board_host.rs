@@ -2,8 +2,8 @@ use crate::daemon::protocol::{
     TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
     TaskBoardHostSetProjectTypesResponse,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::{MachineRegistry, default_board_root};
+use harness_kernel::errors::CliError;
 
 /// Return the local host registry record, creating one on first call.
 ///

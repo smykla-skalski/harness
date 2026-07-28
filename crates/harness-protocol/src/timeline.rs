@@ -6,8 +6,7 @@ use serde_json::Value;
 /// Lives here rather than beside the daemon summaries it is served with,
 /// because the managed-agent run contracts in this crate carry it and a leaf
 /// crate cannot reach back into the daemon for a type.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TimelineEntry {
     pub entry_id: String,
     pub recorded_at: String,

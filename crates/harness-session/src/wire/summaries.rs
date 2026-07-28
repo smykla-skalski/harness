@@ -16,8 +16,7 @@ use harness_protocol::hook::AskUserQuestionPrompt;
 use harness_protocol::observe::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use harness_protocol::timeline::TimelineEntry;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WorktreeSummary {
     pub checkout_id: String,
     pub name: String,
@@ -27,8 +26,7 @@ pub struct WorktreeSummary {
     pub total_session_count: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ProjectSummary {
     pub project_id: String,
     pub name: String,
@@ -39,8 +37,7 @@ pub struct ProjectSummary {
     pub worktrees: Vec<WorktreeSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionSummary {
     pub project_id: String,
     pub project_name: String,
@@ -67,8 +64,7 @@ pub struct SessionSummary {
     pub metrics: SessionMetrics,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ObserverSummary {
     pub observe_id: String,
     pub last_scan_time: String,
@@ -82,8 +78,7 @@ pub struct ObserverSummary {
     pub agent_sessions: Vec<ObserverAgentSessionSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ObserverOpenIssue {
     pub issue_id: String,
     pub code: IssueCode,
@@ -98,8 +93,7 @@ pub struct ObserverOpenIssue {
     pub evidence_excerpt: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ObserverActiveWorker {
     pub issue_id: String,
     pub target_file: String,
@@ -108,8 +102,7 @@ pub struct ObserverActiveWorker {
     pub runtime: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ObserverAgentSessionSummary {
     pub agent_id: String,
     pub runtime: String,
@@ -118,8 +111,7 @@ pub struct ObserverAgentSessionSummary {
     pub last_activity: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 pub struct AgentPendingUserPrompt {
     pub tool_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -132,8 +124,7 @@ pub struct AgentPendingUserPrompt {
     pub message: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentToolActivitySummary {
     pub agent_id: String,
     pub runtime: String,
@@ -147,8 +138,7 @@ pub struct AgentToolActivitySummary {
     pub pending_user_prompt: Option<AgentPendingUserPrompt>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionDetail {
     pub session: SessionSummary,
     #[schema(value_type = Vec<AgentRegistrationWire>)]

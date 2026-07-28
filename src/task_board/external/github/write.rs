@@ -1,9 +1,9 @@
 use reqwest::Method;
 use serde::Deserialize;
 
-use harness_kernel::errors::CliError;
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use crate::task_board::types::TaskBoardItem;
+use harness_kernel::errors::CliError;
 
 use super::errors::github_sync_error_with_context;
 use super::{

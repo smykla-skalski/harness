@@ -8,12 +8,14 @@ use fs_err as fs;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::validate_safe_segment;
-use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_workspace::workspace::harness_data_root;
 use harness_workspace::workspace::ids;
-use harness_workspace::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
+use harness_workspace::workspace::layout::{
+    SessionLayout, sessions_root as workspace_sessions_root,
+};
 use harness_workspace::workspace::project_context_dir;
 
 /// Validate a persisted session directory name.

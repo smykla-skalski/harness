@@ -1,10 +1,10 @@
 use serde_json::Value;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::kernel::command_intent::{ObservedCommand, ParsedCommand};
 use harness_kernel::kernel::tooling::legacy_tool_context;
 

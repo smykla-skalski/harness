@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::types::SessionMetrics;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 // v10 onward lives in its own file: the agent-record fixups they run (legacy
 // runtime/status shapes, managed-agent identity flattening) are a distinct,

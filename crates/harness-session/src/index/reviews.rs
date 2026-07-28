@@ -3,9 +3,9 @@
 //! Split out from `sessions.rs` so the file-review surface has a stable home
 //! and so `sessions.rs` stays under the repo-wide file-length budget.
 
-use harness_kernel::errors::CliError;
 use crate::storage;
 use crate::types::Review;
+use harness_kernel::errors::CliError;
 
 use super::DiscoveredProject;
 use super::io::read_json_lines;

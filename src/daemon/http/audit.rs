@@ -16,8 +16,7 @@ use super::{DaemonHttpState, require_async_db};
 use super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::HarnessMonitorAuditEventsResponse;
 
-#[derive(Debug, Default, serde::Deserialize)]
-#[derive(utoipa::IntoParams)]
+#[derive(Debug, Default, serde::Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct AuditEventsQuery {
     limit: Option<u32>,

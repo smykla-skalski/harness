@@ -5,7 +5,6 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardOrchestratorStatusResponse,
 };
-use harness_kernel::errors::CliError;
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
@@ -13,6 +12,7 @@ use crate::task_board::{
     TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
     TaskBoardWorkflowExecutionCount, TaskBoardWorkflowStatus,
 };
+use harness_kernel::errors::CliError;
 
 use super::task_board_db::task_board_host_local_db;
 use super::task_board_orchestrator_settings::{apply_settings_update, normalize_github_inbox};

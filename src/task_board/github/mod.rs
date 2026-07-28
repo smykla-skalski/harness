@@ -2,8 +2,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy::PolicyInput;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 mod client;
 mod client_graphql;
@@ -203,7 +203,7 @@ pub fn build_auto_merge_policy_input(
 }
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 #[path = "config_overrides_tests.rs"]
 mod config_overrides_tests;
+#[cfg(test)]
+mod tests;

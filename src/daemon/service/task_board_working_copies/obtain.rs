@@ -1,9 +1,9 @@
 //! Obtain (clone-or-reuse) a task-board working copy.
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProvider;
 use crate::task_board::runtime_config::normalize_repository_slug;
 use crate::task_board::working_copy::{WorkingCopyKey, WorkingCopyListEntry};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_runtime::external_sync_config_for_repository;
 use super::{progress_sink, store, working_copy_runtime};
@@ -39,7 +39,12 @@ pub async fn obtain_task_board_working_copy(
     let runtime = working_copy_runtime();
     let sink = progress_sink();
     let obtained = runtime
-        .obtain(&repository, token.as_deref().unwrap_or(""), allow_clone, sink)
+        .obtain(
+            &repository,
+            token.as_deref().unwrap_or(""),
+            allow_clone,
+            sink,
+        )
         .await
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("task-board working-copy obtain failed: {error}"))

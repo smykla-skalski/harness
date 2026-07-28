@@ -17,9 +17,9 @@ use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::service::{WakeEventLevel, record_wake_event};
-use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(feature = "daemon-runtime")]
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Wake-prompt invocation context. Bundles the protocol coordinates and the
 /// signal-side identity needed to synthesise an `Accept` ack on success.

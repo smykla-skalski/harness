@@ -167,7 +167,12 @@ fn an_item_imported_from_todoist_is_deleted_with_its_provider_rows() {
     let connection = migrated.connection();
 
     assert!(
-        !exists(connection, "task_board_items", "item_id", "imported-todoist"),
+        !exists(
+            connection,
+            "task_board_items",
+            "item_id",
+            "imported-todoist"
+        ),
         "the imported item is gone"
     );
     assert!(
@@ -319,13 +324,19 @@ fn migration_is_idempotent_across_restarts() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
     let migrated = migrated_from_v51(&path, SEED_TODOIST_SQL);
-    let before = count(migrated.connection(), "SELECT COUNT(*) FROM task_board_items");
+    let before = count(
+        migrated.connection(),
+        "SELECT COUNT(*) FROM task_board_items",
+    );
     drop(migrated);
 
     let reopened = DaemonDb::open(&path).expect("reopen migrated database");
 
     assert_eq!(
-        count(reopened.connection(), "SELECT COUNT(*) FROM task_board_items"),
+        count(
+            reopened.connection(),
+            "SELECT COUNT(*) FROM task_board_items"
+        ),
         before
     );
     assert_eq!(

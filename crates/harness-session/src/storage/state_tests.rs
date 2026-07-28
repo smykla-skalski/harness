@@ -3,8 +3,8 @@ use std::path::Path;
 use fs_err as fs;
 use serde_json::{Value, json, to_value};
 
-use harness_kernel::io::{read_json_typed, write_json_pretty};
 use crate::types::{AgentStatus, CURRENT_VERSION, ManagedAgentKind};
+use harness_kernel::io::{read_json_typed, write_json_pretty};
 use harness_workspace::workspace::layout::SessionLayout;
 
 use super::state_store::{create_state, load_state};

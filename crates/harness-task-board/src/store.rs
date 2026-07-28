@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_infra::io;
 #[cfg(any(test, feature = "test-support"))]
 use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::harness_data_root;
 #[cfg(any(test, feature = "test-support"))]
 use harness_workspace::workspace::utc_now;

@@ -26,12 +26,12 @@ pub(crate) use crate::daemon::protocol::{
     CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineCursor, TimelineEntry,
     TimelineWindowRequest, TimelineWindowResponse,
 };
-pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 pub(crate) use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
     SessionStatus, TaskCheckpoint, WorkItem,
 };
 pub(crate) use crate::workspace::{project_context_dir, project_context_id, utc_now};
+pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) use super::{
     index as daemon_index, launchd as daemon_launchd, protocol as daemon_protocol,
@@ -61,8 +61,8 @@ mod remote_acme_cas;
 mod remote_identity;
 mod remote_identity_async;
 mod remote_pairing_revoke;
-pub(crate) use remote_pairing_revoke::RemotePairingRevokeOutcome;
 pub(crate) use remote_pairing::inventory::RemotePairingOwner;
+pub(crate) use remote_pairing_revoke::RemotePairingRevokeOutcome;
 mod remote_pairing;
 mod remote_pairing_expiry;
 mod review_writes;
@@ -152,28 +152,27 @@ pub(crate) use task_board::write_workflow_fixture::{
 #[allow(unused_imports)]
 pub(crate) use task_board::{
     ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
-    REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
-    REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
-    REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
+    ClaimedTaskBoardTriageEscalation, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE,
+    REMOTE_IMPLEMENTATION_BUNDLE_PATH, REMOTE_RESULT_ARTIFACT_MEDIA_TYPE,
+    REMOTE_RESULT_ARTIFACT_PATH, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
     REMOTE_START_PREFLIGHT_FAILURE_CLASS, ReservedTaskBoardDispatch,
     TASK_BOARD_PREPARATION_MAX_ATTEMPTS, TaskBoardAdmissionMissingRunRecovery,
     TaskBoardAdmissionWorkerRecovery, TaskBoardAutomationControlRecord,
-    TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence, TaskBoardPreparationClaim,
-    TaskBoardPreparationRelease, TaskBoardPreparationUnavailable,
-    TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction,
-    TaskBoardImportMarker, TaskBoardItemSnapshot, TaskBoardItemsSnapshot,
-    TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
-    TaskBoardLaneShift, TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput,
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken,
-    TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
-    TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorScan,
-    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
-    TaskBoardRemoteExecutorStartIoPermitOutcome, TaskBoardRemoteExecutorStopAuthority,
-    TaskBoardRemoteExecutorStopPending, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence, TaskBoardRemoteIoAuthority,
-    TaskBoardRemoteLifecycleTrustSnapshot, TaskBoardRemoteMutationOutcome,
-    TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
+    TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence, TaskBoardAutomationRunLease,
+    TaskBoardAutomationRunStage, TaskBoardDispatchClaimAction, TaskBoardImportMarker,
+    TaskBoardItemSnapshot, TaskBoardItemsSnapshot, TaskBoardLaneMutationResult,
+    TaskBoardLanePositionInput, TaskBoardLaneResetInput, TaskBoardLaneShift,
+    TaskBoardPreparationClaim, TaskBoardPreparationRelease, TaskBoardPreparationUnavailable,
+    TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteAssignmentRecord,
+    TaskBoardRemoteControllerOperationToken, TaskBoardRemoteControllerScanItem,
+    TaskBoardRemoteControllerScanStep, TaskBoardRemoteExecutorIdentity,
+    TaskBoardRemoteExecutorScan, TaskBoardRemoteExecutorStartAuthority,
+    TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
+    TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopPending,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
+    TaskBoardRemoteIoAuthority, TaskBoardRemoteLifecycleTrustSnapshot,
+    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
     TaskBoardRemoteOfferReceiptDisposition, TaskBoardRemoteOfferWindow,
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     TaskBoardRemotePriorPhaseBundle, TaskBoardRemoteRecoveryBatch, TaskBoardRemoteRecoveryFailure,
@@ -183,19 +182,18 @@ pub(crate) use task_board::{
     TaskBoardRemoteSourceOfferReassignment, TaskBoardRemoteTerminalArtifact,
     TaskBoardRunAcquireRequest, TaskBoardTriageCurrentRead, TaskBoardTriageOverrideClearInput,
     TaskBoardTriageOverrideMutationResult, TaskBoardTriageOverrideSetInput,
-    ClaimedTaskBoardTriageEscalation,
     executor_start_authority, executor_start_io_permit, remote_executor_identity,
     remote_executor_identity_from_parts, stop_pending_snapshot_matches,
+};
+pub(crate) use task_board::{
+    ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
+    parent_points_to_assignment,
 };
 #[cfg(test)]
 pub(crate) use task_board::{
     accept_controller as accept_remote_controller, claim_controller as claim_remote_controller,
     running_status as remote_controller_running_status,
     status_request as remote_controller_status_request,
-};
-pub(crate) use task_board::{
-    ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
-    parent_points_to_assignment,
 };
 mod session_data;
 mod signals;

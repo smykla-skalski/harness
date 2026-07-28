@@ -23,11 +23,11 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::state::task_board_openrouter_token;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 #[cfg(all(test, feature = "daemon-runtime"))]
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) const PERMISSION_RESPONSE_DEADLINE: Duration = Duration::from_mins(5);
 const PROCESS_KEY_BACKOFF: Duration = Duration::from_secs(1);

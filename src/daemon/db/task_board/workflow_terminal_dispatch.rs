@@ -42,8 +42,8 @@ pub(in crate::daemon::db::task_board) async fn settle_prepared_dispatch_in_tx(
         release_dispatch_admission_in_tx(transaction, &intent_id).await?;
     }
     mark_prepared_dispatch_settled_in_tx(transaction, &intent_id, execution, started).await?;
-    let directly_released = started
-        && admission_released_directly_in_tx(transaction, &intent_id, execution).await?;
+    let directly_released =
+        started && admission_released_directly_in_tx(transaction, &intent_id, execution).await?;
     Ok(PreparedDispatchSettlement {
         changed: true,
         admission_released: !started || directly_released,

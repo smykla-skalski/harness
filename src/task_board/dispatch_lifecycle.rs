@@ -5,16 +5,14 @@ use crate::task_board::types::AgentMode;
 
 use super::{EvaluatorIntent, ReviewerIntent, WorkerIntent};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchLifecycle {
     pub worker: DispatchLifecycleStep,
     pub reviewer: DispatchLifecycleStep,
     pub evaluator: DispatchLifecycleStep,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchLifecycleStep {
     pub phase: DispatchLifecyclePhase,
     pub status: DispatchLifecycleStatus,
@@ -47,8 +45,7 @@ pub enum DispatchLifecycleStatus {
     WaitingForReviewCompletion,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchNativeSignal {
     pub command: String,
     pub trigger_step: String,

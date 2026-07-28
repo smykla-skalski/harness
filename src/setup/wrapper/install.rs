@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::WRAPPER;
 

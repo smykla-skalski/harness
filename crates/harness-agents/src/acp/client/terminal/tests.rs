@@ -265,12 +265,7 @@ fn terminal_wait_on_same_terminal_does_not_block_output_or_kill() {
     };
     ok(wait_result, "wait terminal");
     ok(
-        manager.handle_release(
-            &ReleaseTerminalRequest::new(
-                "session-1",
-                terminal_id,
-            ),
-        ),
+        manager.handle_release(&ReleaseTerminalRequest::new("session-1", terminal_id)),
         "release terminal",
     );
 }

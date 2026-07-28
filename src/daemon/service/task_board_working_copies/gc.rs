@@ -9,18 +9,18 @@
 
 use std::fs;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::working_copy::{
     WORKING_COPY_DISK_BUDGET_MB, WORKING_COPY_MAX_AGE_DAYS, WorkingCopyKey, WorkingCopyRegistry,
     WorkingCopyRegistryEntry,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 // The injectable-root GC helper and the loaders it drives are test-only;
 // production GC routes registry writes through the runtime lock.
 #[cfg(test)]
-use crate::task_board::working_copy::WorkingCopyRoot;
-#[cfg(test)]
 use super::store::{load_registry, save_registry};
+#[cfg(test)]
+use crate::task_board::working_copy::WorkingCopyRoot;
 
 /// One-shot GC pass over the working-copy registry, using the plan defaults.
 ///
@@ -78,7 +78,10 @@ fn gc_registry_in_place(
     apply_targets(registry, &targets)
 }
 
-fn apply_targets(registry: &mut WorkingCopyRegistry, targets: &[WorkingCopyKey]) -> WorkingCopyGcReport {
+fn apply_targets(
+    registry: &mut WorkingCopyRegistry,
+    targets: &[WorkingCopyKey],
+) -> WorkingCopyGcReport {
     let mut report = WorkingCopyGcReport {
         targets: targets.len(),
         removed: 0,
@@ -140,7 +143,12 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    fn seed(root: &WorkingCopyRoot, key: &WorkingCopyKey, age_days: i64, now: chrono::DateTime<chrono::Utc>) {
+    fn seed(
+        root: &WorkingCopyRoot,
+        key: &WorkingCopyKey,
+        age_days: i64,
+        now: chrono::DateTime<chrono::Utc>,
+    ) {
         let checkout = key.checkout_path(&root.path);
         std::fs::create_dir_all(&checkout).expect("create checkout dir");
         std::fs::write(checkout.join("marker"), b"x").expect("write marker");
@@ -198,6 +206,10 @@ mod tests {
         )
         .expect("gc");
         assert_eq!(report, WorkingCopyGcReport::default());
-        assert!(!PathBuf::from(root.registry_path()).to_string_lossy().is_empty());
+        assert!(
+            !PathBuf::from(root.registry_path())
+                .to_string_lossy()
+                .is_empty()
+        );
     }
 }

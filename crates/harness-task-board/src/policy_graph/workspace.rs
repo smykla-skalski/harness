@@ -23,8 +23,7 @@ const REVIEW_SCREENSHOT_OCR_ID: &str = "automation:review-screenshot:ocr";
 const REVIEW_SCREENSHOT_RESOLVE_ID: &str = "automation:review-screenshot:resolve";
 const REVIEW_SCREENSHOT_COPY_ID: &str = "automation:review-screenshot:copy";
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyCanvasRecord {
     pub id: String,
     pub title: String,

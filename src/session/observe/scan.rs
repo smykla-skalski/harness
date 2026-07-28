@@ -6,11 +6,11 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 
 use crate::agents::runtime;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::classifier::classify_line;
 use crate::observe::types::{Issue, ScanState};
 use crate::session::service;
 use crate::session::types::SessionState;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Debug)]
 pub(crate) struct AgentLogTailState {

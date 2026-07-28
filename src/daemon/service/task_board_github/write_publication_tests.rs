@@ -47,20 +47,38 @@ fn publication_url_parsing_is_canonical() {
 fn write_launch_requires_kind_specific_publication_automations() {
     let mut config = GitHubProjectConfig::default();
     config.enabled_automations.enabled = vec![GitHubAutomation::WatchChecks];
-    assert!(validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::DefaultTask).is_err());
-    assert!(validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix).is_err());
+    assert!(
+        validate_publication_automations(
+            &config.enabled_automations,
+            TaskBoardWorkflowKind::DefaultTask
+        )
+        .is_err()
+    );
+    assert!(
+        validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix)
+            .is_err()
+    );
 
     config.enabled_automations.enabled = vec![GitHubAutomation::CreateBranch];
     validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix)
         .expect("PrFix CreateBranch admission");
-    assert!(validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::DefaultTask).is_err());
+    assert!(
+        validate_publication_automations(
+            &config.enabled_automations,
+            TaskBoardWorkflowKind::DefaultTask
+        )
+        .is_err()
+    );
 
     config
         .enabled_automations
         .enabled
         .push(GitHubAutomation::OpenPullRequest);
-    validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::DefaultTask)
-        .expect("DefaultTask publication admission");
+    validate_publication_automations(
+        &config.enabled_automations,
+        TaskBoardWorkflowKind::DefaultTask,
+    )
+    .expect("DefaultTask publication admission");
 }
 
 #[test]

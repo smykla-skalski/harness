@@ -11,11 +11,11 @@ use crate::daemon::db::{
     TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
 };
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorSettings,
     TaskBoardRemoteAssignmentState, validate_local_execution_host_config,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn assignment_route<'a>(
     headers: &HeaderMap,

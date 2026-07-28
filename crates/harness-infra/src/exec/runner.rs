@@ -10,8 +10,8 @@ use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tracing::info;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::environment::merge_env;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{CommandResult, RUNTIME, filter_progress_line};
 

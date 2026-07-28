@@ -1,9 +1,9 @@
 use serde_json::json;
 
-use harness_kernel::errors::CliError;
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
+use harness_kernel::errors::CliError;
 
 use super::{GraphqlPullRequestHandle, PULL_REQUEST_HANDLE_QUERY, PullRequestHandleResponse};
 use crate::task_board::github::{GitHubProjectConfig, GitHubPullRequestHandle};

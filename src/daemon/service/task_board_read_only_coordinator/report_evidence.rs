@@ -1,11 +1,11 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunSnapshot;
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardFailureClass,
     TaskBoardLocalAttemptResult, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
     task_board_local_attempt_result_expectation, validate_task_board_local_attempt_result,
 };
+use harness_kernel::errors::CliError;
 
 use super::attempts::invalid_transition;
 use super::attempts::require_human;

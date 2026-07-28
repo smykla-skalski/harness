@@ -6,12 +6,12 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteControllerScanStep, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionHostAdvertisement,
     TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
 };
+use harness_kernel::errors::CliErrorKind;
 
 #[path = "task_board_remote_controller_tests/active_poll.rs"]
 mod active_poll;

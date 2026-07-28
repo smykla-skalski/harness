@@ -1,9 +1,9 @@
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Serialize;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -14,8 +14,8 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision,
 };
-use harness_kernel::errors::CliError;
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::response::{extract_request_id, timed_response};
 use super::{DaemonHttpState, authenticated_remote_client, require_async_db};
@@ -26,8 +26,7 @@ pub(super) fn remote_client_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new().routes(routes!(post_remote_client_self_revoke))
 }
 
-#[derive(Debug, Serialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 struct RemoteClientSelfRevokeResponse {
     client_id: String,
     revoked_at: String,

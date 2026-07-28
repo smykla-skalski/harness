@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use chrono::SecondsFormat;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::github_api::stable_data_revision_guard;
 use crate::github_api::{GitHubProtectedClient, GitHubPullRequestSnapshot};
 use crate::reviews::{
@@ -13,6 +12,7 @@ use crate::reviews::{
 use crate::task_board::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
+use harness_kernel::errors::CliError;
 
 use super::super::task_board_db::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,

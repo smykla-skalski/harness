@@ -104,8 +104,7 @@ pub(crate) const UNSAFE_HIGH_RISK_ACTIONS: [PolicyAction; 3] = [
     PolicyAction::DestructiveFs,
 ];
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraph {
     pub schema_version: u16,
     pub revision: u64,
@@ -128,8 +127,7 @@ pub enum PolicyGraphMode {
     Enforced,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphNode {
     pub id: PolicyGraphNodeId,
     pub label: String,
@@ -235,8 +233,7 @@ pub enum PolicyEvidencePredicate {
     IsMissing,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyEvidenceCheck {
     pub field: PolicyEvidenceField,
     pub pass: PolicyEvidencePredicate,
@@ -244,29 +241,25 @@ pub struct PolicyEvidenceCheck {
     pub missing_reason_code: PolicyReasonCode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyIfThenElseCondition {
     pub field: PolicyEvidenceField,
     pub predicate: PolicyEvidencePredicate,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicySwitchNode {
     pub arms: Vec<PolicySwitchArm>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicySwitchArm {
     pub port: PolicyGraphPortId,
     pub field: PolicyEvidenceField,
     pub predicate: PolicyEvidencePredicate,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphEdge {
     pub id: PolicyGraphEdgeId,
     pub from_node: PolicyGraphNodeId,
@@ -303,8 +296,7 @@ pub enum PolicyGraphEdgeCondition {
     RiskMissing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphGroup {
     pub id: PolicyGraphGroupId,
     pub label: String,
@@ -316,8 +308,7 @@ pub struct PolicyGraphGroup {
     pub node_ids: Vec<PolicyGraphNodeId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphLayout {
     #[serde(
         default = "defaults::default_policy_graph_zoom",
@@ -343,8 +334,7 @@ impl Default for PolicyGraphLayout {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphNodeLayout {
     pub node_id: PolicyGraphNodeId,
     pub x: i32,
@@ -361,8 +351,7 @@ pub enum PolicyGraphNodeLayoutSource {
     Manual,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphValidationReport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub issues: Vec<PolicyGraphValidationIssue>,
@@ -458,15 +447,13 @@ pub struct PolicyPipelinePort {
     pub label: String,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyCanvasPoint {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyCanvasRect {
     pub x: i32,
     pub y: i32,

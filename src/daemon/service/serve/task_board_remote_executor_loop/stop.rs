@@ -7,8 +7,8 @@ use crate::daemon::db::{
 };
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunSnapshot;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::runtime::stop_codex_run;
 

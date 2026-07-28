@@ -31,10 +31,14 @@ fn bug_rule_set() -> TriageRuleSetV1 {
         schema_version: crate::task_board::TRIAGE_RULE_SET_SCHEMA_VERSION,
         rules: vec![TriageRule {
             id: "bug".into(),
-            when: vec![TriageRuleCondition::LabelsHasAny { labels: vec!["kind/bug".into()] }],
+            when: vec![TriageRuleCondition::LabelsHasAny {
+                labels: vec!["kind/bug".into()],
+            }],
             outcome: TriageRuleOutcome {
                 verdict: TriageVerdict::Todo,
-                priority_action: TriagePriorityAction::SetTo { priority: TaskBoardPriority::Critical },
+                priority_action: TriagePriorityAction::SetTo {
+                    priority: TaskBoardPriority::Critical,
+                },
             },
         }],
         default_outcome: TriageRuleOutcome {
@@ -98,20 +102,28 @@ async fn preview_never_writes_anything() {
     assert_eq!(result.diff.len(), 1);
     assert_eq!(result.diff[0].item_id, "bug-item");
     assert_eq!(result.diff[0].candidate_verdict, TriageVerdict::Todo);
-    assert_eq!(result.diff[0].candidate_matched_rule_id, Some("bug".to_string()));
-    assert!(result.diff[0].live_effective_verdict.is_none(), "item was never triaged before preview");
+    assert_eq!(
+        result.diff[0].candidate_matched_rule_id,
+        Some("bug".to_string())
+    );
+    assert!(
+        result.diff[0].live_effective_verdict.is_none(),
+        "item was never triaged before preview"
+    );
     assert!(result.diff[0].governs_placement_change);
 
     // No revisions, no decisions, no item mutation -- purely a read.
-    assert!(db
-        .list_task_board_triage_rules_revisions(10)
-        .await
-        .expect("list revisions")
-        .is_empty());
-    let status: String = sqlx::query_scalar("SELECT status FROM task_board_items WHERE item_id = 'bug-item'")
-        .fetch_one(db.pool())
-        .await
-        .expect("read status");
+    assert!(
+        db.list_task_board_triage_rules_revisions(10)
+            .await
+            .expect("list revisions")
+            .is_empty()
+    );
+    let status: String =
+        sqlx::query_scalar("SELECT status FROM task_board_items WHERE item_id = 'bug-item'")
+            .fetch_one(db.pool())
+            .await
+            .expect("read status");
     assert_eq!(status, "inbox");
 }
 
@@ -124,7 +136,10 @@ async fn invalid_candidate_preview_reports_no_diff() {
     let mut invalid = bug_rule_set();
     invalid.schema_version = 99;
 
-    let result = db.preview_task_board_triage_rules(invalid).await.expect("preview");
+    let result = db
+        .preview_task_board_triage_rules(invalid)
+        .await
+        .expect("preview");
     assert!(!result.validation.is_valid());
     assert!(result.diff.is_empty());
 }
@@ -135,14 +150,16 @@ async fn an_active_override_never_reports_a_governing_placement_change() {
     db.create_task_board_item(inbox_item("overridden", Vec::new()))
         .await
         .expect("create item");
-    db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
-        item_id: "overridden".into(),
-        verdict: TriageVerdict::Todo,
-        actor: "human".into(),
-        reason: None,
-        expected_item_revision: 1,
-        expected_items_change_seq: 1,
-    })
+    db.set_task_board_triage_override(
+        crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
+            item_id: "overridden".into(),
+            verdict: TriageVerdict::Todo,
+            actor: "human".into(),
+            reason: None,
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+        },
+    )
     .await
     .expect("set override");
 
@@ -156,9 +173,15 @@ async fn an_active_override_never_reports_a_governing_placement_change() {
         .find(|entry| entry.item_id == "overridden")
         .expect("entry present");
     assert_eq!(entry.live_effective_verdict, Some(TriageVerdict::Todo));
-    assert_eq!(entry.live_effective_source, Some(TaskBoardTriageEffectiveSource::Override));
+    assert_eq!(
+        entry.live_effective_source,
+        Some(TaskBoardTriageEffectiveSource::Override)
+    );
     assert_eq!(entry.candidate_verdict, TriageVerdict::Undecided);
-    assert!(!entry.governs_placement_change, "override still wins regardless of the candidate");
+    assert!(
+        !entry.governs_placement_change,
+        "override still wins regardless of the candidate"
+    );
 }
 
 /// A manually anchored item is skipped for placement by both the single-item

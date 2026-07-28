@@ -14,52 +14,45 @@ use super::super::logic::{
 use super::super::timeline;
 use super::ReviewItem;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsApproveRequest {
     pub targets: Vec<ReviewTarget>,
     pub source: ReviewsApproveRequestSource,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsApproveRequestSource {
     Direct,
     ReviewTextPaste,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsMergeRequest {
     pub targets: Vec<ReviewTarget>,
     #[serde(default)]
     pub method: GitHubMergeMethod,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRerunChecksRequest {
     pub targets: Vec<ReviewTarget>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsLabelRequest {
     pub targets: Vec<ReviewTarget>,
     pub label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsAutoRequest {
     pub targets: Vec<ReviewTarget>,
     #[serde(default)]
     pub method: GitHubMergeMethod,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsCommentRequest {
     pub targets: Vec<ReviewTarget>,
     pub body: String,
@@ -70,16 +63,14 @@ pub struct ReviewsCommentRequest {
 /// reviewer has already submitted a review (approved, dismissed, or
 /// requested changes), this drops them back into the requested-reviewers
 /// list so they get notified to look again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRequestReviewRequest {
     pub targets: Vec<ReviewTarget>,
     pub reviewer_login: String,
 }
 
 /// Action-related feature flags for [`ReviewsCapabilitiesResponse`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct ReviewsActionCapabilities {
     #[serde(default)]
     pub supports_action_preview: bool,
@@ -89,8 +80,7 @@ pub struct ReviewsActionCapabilities {
     pub supports_repository_sync_health: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsCapabilitiesResponse {
     pub schema_version: u32,
     #[serde(flatten)]
@@ -99,8 +89,7 @@ pub struct ReviewsCapabilitiesResponse {
     pub supports_persistent_action_diagnostics: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsActionPreviewRequest {
     pub action: ReviewActionPreviewKind,
     pub targets: Vec<ReviewTarget>,
@@ -108,8 +97,7 @@ pub struct ReviewsActionPreviewRequest {
     pub method: GitHubMergeMethod,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsActionPreviewResponse {
     pub action: ReviewActionPreviewKind,
     pub capabilities: ReviewsCapabilitiesResponse,
@@ -122,8 +110,7 @@ pub struct ReviewsActionPreviewResponse {
     pub targets: Vec<ReviewActionPreviewTarget>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewActionPreviewTarget {
     pub pull_request_id: String,
     pub repository: String,
@@ -135,22 +122,19 @@ pub struct ReviewActionPreviewTarget {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsActionResponse {
     pub summary: String,
     #[serde(default)]
     pub results: Vec<ReviewActionResult>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsCacheClearResponse {
     pub cleared_entries: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRefreshRequest {
     #[serde(default)]
     pub targets: Vec<ReviewTarget>,
@@ -163,8 +147,7 @@ pub struct ReviewsRefreshRequest {
     pub backport_patterns: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRefreshResponse {
     pub fetched_at: String,
     #[serde(default)]
@@ -173,8 +156,7 @@ pub struct ReviewsRefreshResponse {
     pub missing_pull_request_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsBodyRequest {
     pub pull_request_id: String,
     #[serde(default)]
@@ -183,8 +165,7 @@ pub struct ReviewsBodyRequest {
     pub cache_max_age_seconds: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsBodyResponse {
     pub pull_request_id: String,
     pub body: String,
@@ -195,8 +176,7 @@ pub struct ReviewsBodyResponse {
 }
 
 /// State flags embedded in [`ReviewTarget`] (at most 3 booleans).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct ReviewTargetFlags {
     #[serde(default)]
     pub is_draft: bool,
@@ -206,8 +186,7 @@ pub struct ReviewTargetFlags {
     pub viewer_can_update: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewTarget {
     pub pull_request_id: String,
     pub repository_id: String,
@@ -238,8 +217,7 @@ pub struct ReviewTarget {
     pub approval_requirement_satisfied_after_viewer_approval: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewActionResult {
     pub repository: String,
     pub number: u64,

@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::mapping::{
     InnerCursor, NodeContinuation, append_check_contexts, append_pull_request_labels,

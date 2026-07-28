@@ -121,9 +121,7 @@ impl GitHubClient {
             .await
             .map_err(|error| PanelError::github(format!("reading the token response: {error}")))?;
         if !status.is_success() {
-            return Err(
-                PanelError::github(format!("the token endpoint answered {status}")).into(),
-            );
+            return Err(PanelError::github(format!("the token endpoint answered {status}")).into());
         }
         parse_token_response(&body)
     }

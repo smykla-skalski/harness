@@ -14,19 +14,43 @@ use crate::types::ExternalRefProvider;
 #[serde(tag = "issue", rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]
 pub enum TriageRuleSetValidationIssue {
-    UnsupportedSchemaVersion { expected: u16, actual: u16 },
-    TooManyRules { max: usize, actual: usize },
-    MalformedRuleId { index: usize },
-    DuplicateRuleId { rule_id: String },
-    TooManyConditions { rule_id: String, max: usize, actual: usize },
-    MalformedCondition { rule_id: String, condition_index: usize },
-    DuplicateSelector { rule_id: String, duplicate_of: String },
-    SelfContradictoryRule { rule_id: String },
-    ShadowedRule { rule_id: String, shadowed_by: String },
+    UnsupportedSchemaVersion {
+        expected: u16,
+        actual: u16,
+    },
+    TooManyRules {
+        max: usize,
+        actual: usize,
+    },
+    MalformedRuleId {
+        index: usize,
+    },
+    DuplicateRuleId {
+        rule_id: String,
+    },
+    TooManyConditions {
+        rule_id: String,
+        max: usize,
+        actual: usize,
+    },
+    MalformedCondition {
+        rule_id: String,
+        condition_index: usize,
+    },
+    DuplicateSelector {
+        rule_id: String,
+        duplicate_of: String,
+    },
+    SelfContradictoryRule {
+        rule_id: String,
+    },
+    ShadowedRule {
+        rule_id: String,
+        shadowed_by: String,
+    },
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetValidationReport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub issues: Vec<TriageRuleSetValidationIssue>,
@@ -82,7 +106,9 @@ fn validate_single_rule(
         return Some(TriageRuleSetValidationIssue::MalformedRuleId { index });
     }
     if !seen_ids.insert(rule.id.clone()) {
-        return Some(TriageRuleSetValidationIssue::DuplicateRuleId { rule_id: rule.id.clone() });
+        return Some(TriageRuleSetValidationIssue::DuplicateRuleId {
+            rule_id: rule.id.clone(),
+        });
     }
     if rule.when.len() > MAX_CONDITIONS_PER_RULE {
         return Some(TriageRuleSetValidationIssue::TooManyConditions {
@@ -109,8 +135,9 @@ fn validate_single_rule(
             duplicate_of: earlier_id.clone(),
         });
     }
-    if let Some((earlier_id, _)) =
-        accepted.iter().find(|(_, earlier)| is_subset(earlier, &canonical))
+    if let Some((earlier_id, _)) = accepted
+        .iter()
+        .find(|(_, earlier)| is_subset(earlier, &canonical))
     {
         return Some(TriageRuleSetValidationIssue::ShadowedRule {
             rule_id: rule.id.clone(),
@@ -122,7 +149,8 @@ fn validate_single_rule(
 }
 
 fn first_malformed_condition(when: &[TriageRuleCondition]) -> Option<usize> {
-    when.iter().position(|condition| !condition_is_well_formed(condition))
+    when.iter()
+        .position(|condition| !condition_is_well_formed(condition))
 }
 
 fn condition_is_well_formed(condition: &TriageRuleCondition) -> bool {
@@ -181,9 +209,15 @@ fn is_self_contradictory(when: &[TriageRuleCondition]) -> bool {
             TriageRuleCondition::ExecutionRepositoryEquals { value } => {
                 execution_repository.merge_equals(value.clone())
             }
-            TriageRuleCondition::ExecutionRepositoryIsPresent => execution_repository.merge_present(),
-            TriageRuleCondition::ExecutionRepositoryIsMissing => execution_repository.merge_missing(),
-            TriageRuleCondition::ProjectIdEquals { value } => project_id.merge_equals(value.clone()),
+            TriageRuleCondition::ExecutionRepositoryIsPresent => {
+                execution_repository.merge_present()
+            }
+            TriageRuleCondition::ExecutionRepositoryIsMissing => {
+                execution_repository.merge_missing()
+            }
+            TriageRuleCondition::ProjectIdEquals { value } => {
+                project_id.merge_equals(value.clone())
+            }
             TriageRuleCondition::ProjectIdIsPresent => project_id.merge_present(),
             TriageRuleCondition::ProjectIdIsMissing => project_id.merge_missing(),
             TriageRuleCondition::ImportedFromProviderEquals { provider: value } => {
@@ -276,8 +310,10 @@ impl<T: PartialEq + Clone> PresenceConstraint<T> {
 /// two rules' selectors for identity or subset (shadowing) purposes,
 /// independent of authoring order within the condition list itself.
 fn canonical_when(when: &[TriageRuleCondition]) -> Vec<TriageRuleCondition> {
-    let mut canonical: Vec<TriageRuleCondition> =
-        when.iter().map(TriageRuleCondition::canonicalized).collect();
+    let mut canonical: Vec<TriageRuleCondition> = when
+        .iter()
+        .map(TriageRuleCondition::canonicalized)
+        .collect();
     canonical.sort_by_key(condition_sort_key);
     canonical.dedup();
     canonical

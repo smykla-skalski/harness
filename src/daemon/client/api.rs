@@ -14,9 +14,9 @@ use crate::daemon::protocol::{
     TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest, TaskUpdateRequest,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service::{ImproverApplyOutcome, ResolvedRuntimeSessionAgent};
 use crate::session::types::SessionState;
+use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(not(any(feature = "bridge-runtime", feature = "daemon-runtime")))]
 use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 

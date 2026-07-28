@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 use std::time::Instant;
 
+use axum::Json;
 use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -20,9 +20,9 @@ use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingClaimedClient, RemotePairingCodeHash,
     RemotePairingError,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::response::{extract_request_id, timed_json, timed_response};
 use super::{DaemonConnectInfo, DaemonHttpState};
@@ -41,8 +41,7 @@ pub(super) fn remote_pairing_routes() -> OpenApiRouter<DaemonHttpState> {
         .merge(manage::remote_pairing_manage_routes())
 }
 
-#[derive(Debug, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub(crate) struct RemotePairClaimHttpRequest {
     code: String,
     domain: String,
@@ -51,8 +50,7 @@ pub(crate) struct RemotePairClaimHttpRequest {
     platform: String,
 }
 
-#[derive(Debug, Serialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub(crate) struct RemotePairClaimHttpResponse {
     client_id: String,
     display_name: String,

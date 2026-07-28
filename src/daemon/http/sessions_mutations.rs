@@ -12,8 +12,8 @@ use crate::daemon::protocol::{
     SessionMutationResponse, SessionStartRequest, SessionTitleRequest, http_paths,
 };
 use crate::daemon::service;
-use harness_kernel::errors::CliError;
 use crate::session::types::SessionState;
+use harness_kernel::errors::CliError;
 
 use super::auth::{authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};

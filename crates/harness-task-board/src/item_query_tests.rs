@@ -23,7 +23,11 @@ fn ids(items: &[TaskBoardItem]) -> Vec<&str> {
 #[test]
 fn an_empty_query_matches_every_item() {
     let item = item("task-1", "Ship the thing", "with a body");
-    assert!(TaskBoardItemQuery::default().prepared().matches(&item.query_fields()));
+    assert!(
+        TaskBoardItemQuery::default()
+            .prepared()
+            .matches(&item.query_fields())
+    );
 }
 
 #[test]

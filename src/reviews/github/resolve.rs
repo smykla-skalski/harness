@@ -4,9 +4,9 @@ use std::time::Duration;
 use serde::Deserialize;
 use serde_json::json;
 
-use harness_kernel::errors::CliError;
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use crate::reviews::backports::BackportDetector;
+use harness_kernel::errors::CliError;
 
 use super::client::{ReviewsFetchByIds, ReviewsGitHubClient};
 use super::coverage::log_check_details_url_coverage;

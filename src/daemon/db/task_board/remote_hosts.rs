@@ -6,7 +6,6 @@ use super::items::bump_change_in_tx;
 use super::mapper::{parse_json, to_json};
 use super::remote_assignment_cleanup::active_remote_assignments_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::TaskBoardRepositoryAutomationConfig;
 use crate::task_board::{
     TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TaskBoardExecutionHostAdvertisement,
@@ -16,6 +15,7 @@ use crate::task_board::{
     remote_capability_for_phase, validate_execution_host_advertisement,
     validate_execution_host_observation,
 };
+use harness_kernel::errors::CliErrorKind;
 
 #[path = "remote_host_sync.rs"]
 mod sync;

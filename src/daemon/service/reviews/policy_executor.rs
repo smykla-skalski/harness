@@ -8,7 +8,6 @@ use serde_json::json;
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::reviews::token::{github_token, missing_token_error};
-use harness_kernel::errors::CliError;
 use crate::reviews::policy::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
 use crate::reviews::{ReviewTarget, ReviewsGitHubClient};
 use crate::task_board::github::GitHubMergeMethod;
@@ -16,6 +15,7 @@ use crate::task_board::policy_runtime::handoff::HandoffPolicyProvider;
 use crate::task_board::policy_runtime::notification::NotificationPolicyProvider;
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::task_creation::TaskCreationPolicyProvider;
+use harness_kernel::errors::CliError;
 
 pub(crate) struct DaemonReviewsPolicyExecutor {
     client: ReviewsGitHubClient,

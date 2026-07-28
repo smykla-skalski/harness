@@ -32,10 +32,14 @@ fn bug_rule_set() -> TriageRuleSetV1 {
         schema_version: crate::task_board::TRIAGE_RULE_SET_SCHEMA_VERSION,
         rules: vec![TriageRule {
             id: "bug".into(),
-            when: vec![TriageRuleCondition::LabelsHasAny { labels: vec!["kind/bug".into()] }],
+            when: vec![TriageRuleCondition::LabelsHasAny {
+                labels: vec!["kind/bug".into()],
+            }],
             outcome: TriageRuleOutcome {
                 verdict: TriageVerdict::Todo,
-                priority_action: TriagePriorityAction::SetTo { priority: TaskBoardPriority::Critical },
+                priority_action: TriagePriorityAction::SetTo {
+                    priority: TaskBoardPriority::Critical,
+                },
             },
         }],
         default_outcome: TriageRuleOutcome {
@@ -83,23 +87,31 @@ async fn invalid_candidate_is_rejected_and_never_reaches_the_revision_table() {
         .expect("activation call succeeds even when the candidate is rejected");
     assert!(!result.activated);
     assert!(!result.validation.is_valid());
-    assert!(db
-        .list_task_board_triage_rules_revisions(10)
+    assert!(
+        db.list_task_board_triage_rules_revisions(10)
+            .await
+            .expect("list revisions")
+            .is_empty()
+    );
+    let audit = db
+        .list_task_board_triage_rules_audit(10)
         .await
-        .expect("list revisions")
-        .is_empty());
-    let audit = db.list_task_board_triage_rules_audit(10).await.expect("list audit");
+        .expect("list audit");
     assert_eq!(audit.len(), 1);
-    assert_eq!(audit[0].kind, crate::task_board::TriageRuleSetAuditKind::ActivationRejected);
+    assert_eq!(
+        audit[0].kind,
+        crate::task_board::TriageRuleSetAuditKind::ActivationRejected
+    );
 
     // The rejection audit row is the only durable record a malformed
     // candidate ever existed, so its validation report must be persisted.
-    let validation_json: Option<String> =
-        query_scalar("SELECT validation_json FROM task_board_triage_rule_set_audit WHERE audit_id = ?1")
-            .bind(&audit[0].audit_id)
-            .fetch_one(db.pool())
-            .await
-            .expect("read persisted validation json");
+    let validation_json: Option<String> = query_scalar(
+        "SELECT validation_json FROM task_board_triage_rule_set_audit WHERE audit_id = ?1",
+    )
+    .bind(&audit[0].audit_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("read persisted validation json");
     let validation_json = validation_json.expect("validation json persisted on rejection");
     assert!(validation_json.contains("unsupported_schema_version"));
 }
@@ -130,9 +142,15 @@ async fn activating_a_valid_candidate_reevaluates_eligible_items_and_records_the
     assert_eq!(identity, RUNTIME_RULES_EVALUATOR_IDENTITY);
     assert_eq!(version, 1);
 
-    let revisions = db.list_task_board_triage_rules_revisions(10).await.expect("list revisions");
+    let revisions = db
+        .list_task_board_triage_rules_revisions(10)
+        .await
+        .expect("list revisions");
     assert_eq!(revisions.len(), 1);
-    assert_eq!(revisions[0].status, crate::task_board::TriageRuleSetRevisionStatus::Active);
+    assert_eq!(
+        revisions[0].status,
+        crate::task_board::TriageRuleSetRevisionStatus::Active
+    );
 }
 
 #[tokio::test]
@@ -148,7 +166,10 @@ async fn stale_expected_active_revision_is_rejected_atomically() {
         .expect_err("stale expected revision must fail");
     assert!(format!("{error}").contains("revision changed"));
 
-    let revisions = db.list_task_board_triage_rules_revisions(10).await.expect("list revisions");
+    let revisions = db
+        .list_task_board_triage_rules_revisions(10)
+        .await
+        .expect("list revisions");
     assert_eq!(revisions.len(), 1, "no second revision was written");
 }
 
@@ -165,11 +186,16 @@ async fn activating_a_second_revision_supersedes_the_first() {
         .expect("second activation");
     assert_eq!(second.revision, Some(2));
 
-    let revisions = db.list_task_board_triage_rules_revisions(10).await.expect("list revisions");
+    let revisions = db
+        .list_task_board_triage_rules_revisions(10)
+        .await
+        .expect("list revisions");
     assert_eq!(revisions.len(), 2);
     let active_count = revisions
         .iter()
-        .filter(|revision| revision.status == crate::task_board::TriageRuleSetRevisionStatus::Active)
+        .filter(|revision| {
+            revision.status == crate::task_board::TriageRuleSetRevisionStatus::Active
+        })
         .count();
     assert_eq!(active_count, 1);
 }
@@ -195,7 +221,11 @@ async fn deactivating_reverts_eligible_items_to_the_builtin_v1_default() {
 
     let (identity, _version) = current_decision_evaluator(&db, "bug-item").await;
     assert_eq!(identity, BUILTIN_V1_EVALUATOR_IDENTITY);
-    assert_eq!(item_status(&db, "bug-item").await, "todo", "BuiltInV1 also promotes a labeled item");
+    assert_eq!(
+        item_status(&db, "bug-item").await,
+        "todo",
+        "BuiltInV1 also promotes a labeled item"
+    );
 }
 
 /// Regression proof for atomicity: an activation that fails after it has
@@ -233,7 +263,11 @@ async fn activation_failing_after_supersede_and_insert_rolls_back_completely() {
     .execute(db.pool())
     .await
     .expect("seed overflowing revision row");
-    let audit_count_before = db.list_task_board_triage_rules_audit(10).await.expect("list audit").len();
+    let audit_count_before = db
+        .list_task_board_triage_rules_audit(10)
+        .await
+        .expect("list audit")
+        .len();
 
     let error = db
         .activate_task_board_triage_rules(Some(bug_rule_set()), "owner".into(), Some(1))
@@ -241,8 +275,15 @@ async fn activation_failing_after_supersede_and_insert_rolls_back_completely() {
         .expect_err("u32 overflow while computing the new evaluator version must fail");
     assert!(format!("{error}").contains("out of range"));
 
-    let revisions = db.list_task_board_triage_rules_revisions(10).await.expect("list revisions");
-    assert_eq!(revisions.len(), 2, "no new revision row beyond the original two");
+    let revisions = db
+        .list_task_board_triage_rules_revisions(10)
+        .await
+        .expect("list revisions");
+    assert_eq!(
+        revisions.len(),
+        2,
+        "no new revision row beyond the original two"
+    );
     let revision_one = revisions
         .iter()
         .find(|revision| revision.revision == 1)
@@ -252,7 +293,11 @@ async fn activation_failing_after_supersede_and_insert_rolls_back_completely() {
         crate::task_board::TriageRuleSetRevisionStatus::Active,
         "the supersede must have rolled back with the rest of the failed activation"
     );
-    let audit_count_after = db.list_task_board_triage_rules_audit(10).await.expect("list audit").len();
+    let audit_count_after = db
+        .list_task_board_triage_rules_audit(10)
+        .await
+        .expect("list audit")
+        .len();
     assert_eq!(
         audit_count_after, audit_count_before,
         "no audit row from a fully rolled-back activation"
@@ -277,7 +322,10 @@ async fn concurrent_item_creation_and_activation_serialize_without_anomaly() {
     let (_directory, db) = connect().await;
 
     let (create_result, activate_result) = tokio::join!(
-        db.create_task_board_item_with_triage(inbox_item("concurrent-item", vec!["kind/bug".into()])),
+        db.create_task_board_item_with_triage(inbox_item(
+            "concurrent-item",
+            vec!["kind/bug".into()]
+        )),
         db.activate_task_board_triage_rules(Some(bug_rule_set()), "owner".into(), None)
     );
 

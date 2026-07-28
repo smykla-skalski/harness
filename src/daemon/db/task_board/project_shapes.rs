@@ -42,7 +42,9 @@ pub(crate) async fn assign_shapes_in_tx(
             .execute(transaction.as_mut())
             .await
             .map_err(|error| {
-                db_error(format!("assign task board project shape '{project_id}': {error}"))
+                db_error(format!(
+                    "assign task board project shape '{project_id}': {error}"
+                ))
             })?;
     }
     Ok(())
@@ -56,7 +58,9 @@ fn existing_organization_shapes(
     let mut by_organization = BTreeMap::new();
     for (_, slug, shape) in rows {
         if let Some(shape) = shape.as_deref().and_then(TaskBoardProjectShape::parse) {
-            by_organization.entry(organization_of(slug)).or_insert(shape);
+            by_organization
+                .entry(organization_of(slug))
+                .or_insert(shape);
         }
     }
     by_organization

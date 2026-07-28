@@ -82,8 +82,7 @@ pub struct TaskBoardTriageDecision {
     pub decided_at: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageDecisionRecord {
     pub decision_id: String,
     pub item_id: String,

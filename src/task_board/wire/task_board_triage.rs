@@ -1,8 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::task_board::{
-    TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome, TaskBoardTriageEscalationStatus,
-    TaskBoardTriageOverride, TriageVerdict,
+    TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome,
+    TaskBoardTriageEscalationStatus, TaskBoardTriageOverride, TriageVerdict,
 };
 
 use super::{TaskBoardItemPositionSnapshot, TaskBoardShiftedItemRevision};
@@ -19,8 +19,7 @@ pub const TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS: &str =
 /// Response for `GET /v1/task-board/items/{item_id}/triage`. Extended with
 /// the active override (if any) and the single effective outcome those two
 /// resolve to; existing readers that only look at `current` are unaffected.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageCurrentResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current: Option<TaskBoardTriageDecisionRecord>,
@@ -37,8 +36,7 @@ pub struct TaskBoardTriageCurrentResponse {
 }
 
 /// Request for `PUT /v1/task-board/items/{item_id}/triage/override`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardSetTriageOverrideRequest {
     pub verdict: TriageVerdict,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -51,8 +49,7 @@ pub struct TaskBoardSetTriageOverrideRequest {
 }
 
 /// Request for `POST /v1/task-board/items/{item_id}/triage/override/clear`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardClearTriageOverrideRequest {
     pub expected_item_revision: i64,
     pub expected_items_change_seq: i64,
@@ -65,8 +62,7 @@ pub struct TaskBoardClearTriageOverrideRequest {
 /// item-list sequence CAS. Mirrors [`TaskBoardItemPositionMutationResponse`]'s
 /// snapshot/shifted shape so a client can update lane placement from the
 /// mutation response alone.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageOverrideMutationResponse {
     pub snapshot: TaskBoardItemPositionSnapshot,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -133,8 +129,7 @@ impl TaskBoardTriageHistoryRequest {
 /// Response for `GET /v1/task-board/items/{item_id}/triage/history`. Descending
 /// by `generation`; `next_before_generation` is the keyset cursor for the next
 /// page, `None` once the oldest decision has been returned.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageHistoryResponse {
     pub decisions: Vec<TaskBoardTriageDecisionRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

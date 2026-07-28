@@ -7,7 +7,6 @@ use crate::daemon::protocol::{
     TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardSyncRequest,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
@@ -20,6 +19,7 @@ use crate::task_board::{
     build_sync_summary,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::TaskBoardAutomationRunSession;
 use super::task_board::{dispatch_task_board_async, load_live_spawn_grants};

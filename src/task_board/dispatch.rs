@@ -38,8 +38,7 @@ pub use lifecycle::{
 const REVIEWER_PERSONA: &str = "code-reviewer";
 const REVIEWER_CONSENSUS: u8 = 2;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchPlan {
     pub board_item_id: String,
     #[serde(default)]
@@ -66,8 +65,7 @@ pub struct DispatchPlan {
     pub consumed_approval_grant_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchExecutionSummary {
     pub plans: Vec<DispatchPlan>,
     pub applied: Vec<DispatchAppliedTask>,
@@ -75,8 +73,7 @@ pub struct DispatchExecutionSummary {
     pub failures: Vec<DispatchFailure>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchAppliedTask {
     pub board_item_id: String,
     pub session_id: String,
@@ -89,8 +86,7 @@ pub struct DispatchAppliedTask {
     pub write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardReadOnlyWorkflowLaunch {
     pub workflow_kind: TaskBoardWorkflowKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -109,8 +105,7 @@ pub struct TaskBoardReadOnlyWorkflowLaunch {
     pub exact_head_revision: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWriteWorkflowLaunch {
     pub workflow_kind: TaskBoardWorkflowKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -133,8 +128,7 @@ pub struct TaskBoardWriteWorkflowLaunch {
     pub plan_approval: TaskBoardPlanApprovalBinding,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchFailure {
     pub board_item_id: String,
     pub kind: DispatchFailureKind,
@@ -199,8 +193,7 @@ pub enum SessionIntent {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskCreationIntent {
     pub title: String,
     pub context: Option<String>,
@@ -211,22 +204,19 @@ pub struct TaskCreationIntent {
     pub external_refs: Vec<ExternalRef>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WorkerIntent {
     pub mode: AgentMode,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewerIntent {
     pub phase: FollowUpPhase,
     pub suggested_persona: String,
     pub required_consensus: u8,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct EvaluatorIntent {
     pub phase: FollowUpPhase,
     pub mode: AgentMode,

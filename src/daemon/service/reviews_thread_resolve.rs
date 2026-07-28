@@ -9,13 +9,13 @@
 //! [`crate::daemon::service::reviews::comment_on_reviews`].
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::review_thread_resolve::{
     ReviewsReviewThreadResolveRequest, ReviewsReviewThreadResolveResponse,
     execute_review_thread_resolve_mutation,
 };
 use crate::reviews::timeline;
 use crate::task_board::external::ExternalProvider;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::reviews_github_policy::{ReviewsGitHubMutation, enforce_review_pull_request_policy};
 

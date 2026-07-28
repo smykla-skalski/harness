@@ -479,10 +479,7 @@ impl PolicyActionProvider for TestActionProvider {
             .as_ref()
             .is_some_and(|fail_action| fail_action == &action.action_key)
         {
-            return Err(CliErrorKind::workflow_parse(
-                "simulated action failure".to_owned(),
-            )
-            .into());
+            return Err(CliErrorKind::workflow_parse("simulated action failure".to_owned()).into());
         }
         if let Some(recorded_actions) = &self.recorded_actions {
             recorded_actions

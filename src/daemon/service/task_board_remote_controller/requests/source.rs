@@ -3,8 +3,8 @@ use sha2::{Digest, Sha256};
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceMaterial,
 };
-use harness_kernel::errors::CliError;
 use crate::git::source_bundle_export::GitSourceBundleExport;
+use harness_kernel::errors::CliError;
 
 #[derive(Debug, Clone)]
 pub(crate) struct PreparedRemoteSource {

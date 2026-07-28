@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde_json::{Map, Value, to_value};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{SessionLogEntry, SessionState, SessionTransition, TaskCheckpoint};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::index;
 use super::protocol::TimelineEntry;

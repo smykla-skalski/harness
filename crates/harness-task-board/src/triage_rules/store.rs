@@ -4,8 +4,7 @@ use super::{TriageRuleSetV1, TriageRuleSetValidationReport};
 use crate::triage::TriageVerdict;
 use crate::triage_override::TaskBoardTriageEffectiveSource;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetDraft {
     pub rules: TriageRuleSetV1,
     pub revision: i64,
@@ -13,8 +12,7 @@ pub struct TriageRuleSetDraft {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetDraftSaveResult {
     pub validation: TriageRuleSetValidationReport,
     pub persisted: bool,
@@ -22,8 +20,7 @@ pub struct TriageRuleSetDraftSaveResult {
     pub revision: Option<i64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetRevisionSummary {
     pub revision: i64,
     pub schema_version: u16,
@@ -43,8 +40,7 @@ pub enum TriageRuleSetRevisionStatus {
     Superseded,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetAuditEntry {
     pub audit_id: String,
     pub kind: TriageRuleSetAuditKind,
@@ -67,8 +63,7 @@ pub enum TriageRuleSetAuditKind {
     Deactivated,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetActivationResult {
     pub validation: TriageRuleSetValidationReport,
     pub activated: bool,
@@ -80,16 +75,14 @@ pub struct TriageRuleSetActivationResult {
 /// Non-mutating evaluation of a candidate against one frozen read of the
 /// current inbox -- never persists anything, whether or not the candidate
 /// is valid.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetPreviewResult {
     pub validation: TriageRuleSetValidationReport,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diff: Vec<TriageRuleSetPreviewDiffEntry>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetPreviewDiffEntry {
     pub item_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

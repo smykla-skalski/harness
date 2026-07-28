@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 #[cfg(test)]
 use std::time::Duration;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::GitHubProtectedClient;
 use crate::task_board::github::GitHubApiAutomationClient;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{ReviewItem, ReviewRepositoryLabel};
 

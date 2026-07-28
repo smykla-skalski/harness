@@ -19,10 +19,10 @@ use super::{
     i64_from_u64, normalize_change_scope, session_status_db_label, stored_timeline_entry,
     u64_from_i64, utc_now,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
 use crate::session::storage;
 use crate::session::types::ManagedAgentKind;
+use harness_kernel::errors::CliErrorKind;
 
 const LOAD_SESSION_FOR_MUTATION_SQL: &str =
     "SELECT state_json, project_id FROM sessions WHERE session_id = ?1";

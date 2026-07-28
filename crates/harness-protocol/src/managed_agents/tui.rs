@@ -10,8 +10,7 @@ pub use super::tui_input::{
 pub const DEFAULT_AGENT_TUI_ROWS: u16 = 30;
 pub const DEFAULT_AGENT_TUI_COLS: u16 = 120;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiSize {
     pub rows: u16,
     pub cols: u16,
@@ -65,8 +64,7 @@ impl AgentTuiStatus {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TerminalScreenSnapshot {
     pub rows: u16,
     pub cols: u16,
@@ -85,8 +83,7 @@ impl TerminalScreenSnapshot {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiStartRequest {
     pub runtime: String,
     #[serde(default = "default_agent_tui_role")]
@@ -123,8 +120,7 @@ pub struct AgentTuiStartRequest {
     pub allow_custom_model: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiResizeRequest {
     pub rows: u16,
     pub cols: u16,
@@ -135,8 +131,7 @@ pub struct AgentTuiListResponse {
     pub tuis: Vec<AgentTuiSnapshot>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiSnapshot {
     pub tui_id: String,
     pub session_id: String,

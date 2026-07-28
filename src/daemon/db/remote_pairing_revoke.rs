@@ -110,9 +110,9 @@ async fn decide_pairing_revoke_outcome_in_tx(
     let withdrawn_at: Option<String> = row
         .try_get("withdrawn_at")
         .map_err(|error| db_error(format!("read revocation for {pairing_id}: {error}")))?;
-    let device_revoked_at: Option<String> = row.try_get("device_revoked_at").map_err(|error| {
-        db_error(format!("read device revocation for {pairing_id}: {error}"))
-    })?;
+    let device_revoked_at: Option<String> = row
+        .try_get("device_revoked_at")
+        .map_err(|error| db_error(format!("read device revocation for {pairing_id}: {error}")))?;
     // Either end can already carry it, and whichever does is the moment
     // that matters rather than the moment this request arrived.
     let already = withdrawn_at.or(device_revoked_at);

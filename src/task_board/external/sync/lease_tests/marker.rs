@@ -182,11 +182,8 @@ async fn marker_preview_suppresses_pending_create_without_durable_writes() {
     let mut item = unlinked_item("task-marker-preview");
     item.project_id = Some("acme/widgets".into());
     let store = successful_store(item);
-    let client = DurableCreateClient::new(
-        ExternalProvider::GitHub,
-        "acme/widgets",
-        Arc::clone(&calls),
-    );
+    let client =
+        DurableCreateClient::new(ExternalProvider::GitHub, "acme/widgets", Arc::clone(&calls));
     let scope = ExternalProviderScopeIdentity::for_client(&client);
     let decision = store
         .begin_external_create_intent(
@@ -233,11 +230,8 @@ async fn attached_marker_fixture(
     let mut item = unlinked_item(item_id);
     item.project_id = Some("acme/widgets".into());
     let store = successful_store(item);
-    let client = DurableCreateClient::new(
-        ExternalProvider::GitHub,
-        "acme/widgets",
-        Arc::clone(calls),
-    );
+    let client =
+        DurableCreateClient::new(ExternalProvider::GitHub, "acme/widgets", Arc::clone(calls));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
         ExternalProvider::GitHub,
         "acme/widgets",

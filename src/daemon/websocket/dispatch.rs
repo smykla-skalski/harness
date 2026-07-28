@@ -16,11 +16,11 @@ use crate::daemon::remote_request_audit::{
     RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
 };
 use crate::daemon::remote_viewer::is_remote_viewer;
-use harness_kernel::errors::CliError;
 use crate::telemetry::{
     TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
 };
 use axum::extract::ws::Message;
+use harness_kernel::errors::CliError;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;

@@ -3,7 +3,6 @@ use tempfile::tempdir;
 
 use super::super::support::{FakeSyncClient, github_review_request_item};
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
 };
@@ -12,6 +11,7 @@ use crate::task_board::{
     ExternalSyncDirection, ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem,
     TaskBoardStatus, TaskBoardStore, sync_external_tasks,
 };
+use harness_kernel::errors::CliError;
 
 #[tokio::test]
 async fn github_create_persists_repository_without_replacing_project_identity() {

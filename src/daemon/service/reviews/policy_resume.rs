@@ -17,7 +17,6 @@ use crate::daemon::service::reviews::policy_executor::{
 };
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
 use crate::daemon::service::reviews::policy_plan::enforced_database_reviews_policy_active;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewsPolicyRunResponse, ReviewsPolicySubject};
 #[cfg(test)]
@@ -28,6 +27,7 @@ use crate::task_board::policy_runtime::models::{
 };
 #[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy::{background_reviews_policy_runs_enabled, require_policy_runtime_db};
 

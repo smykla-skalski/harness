@@ -52,7 +52,6 @@ impl AsyncDaemonDb {
         })?;
         Ok(released)
     }
-
 }
 
 /// Releases this owner's committed admission only when it names a
@@ -62,7 +61,9 @@ async fn recover_orphaned_admission_owner_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     owner: &str,
 ) -> Result<bool, CliError> {
-    let Some(execution_id) = owner.strip_prefix("workflow-").filter(|value| !value.is_empty())
+    let Some(execution_id) = owner
+        .strip_prefix("workflow-")
+        .filter(|value| !value.is_empty())
     else {
         return Ok(false);
     };

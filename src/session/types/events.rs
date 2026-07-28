@@ -30,8 +30,7 @@ impl SessionSignalStatus {
 }
 
 /// A signal visible within a multi-agent session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionSignalRecord {
     pub runtime: String,
     pub agent_id: String,

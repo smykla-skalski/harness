@@ -4,7 +4,6 @@ use tokio::time::timeout;
 
 use crate::daemon::agent_tui::AgentTuiStatus;
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::SessionRole;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
@@ -13,6 +12,7 @@ use crate::task_board::{
     TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, bind_plan_approval,
     build_planning_result,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::test_support::{
     applied_task, codex_snapshot, seed_session, terminal_snapshot, test_http_state,

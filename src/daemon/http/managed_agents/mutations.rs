@@ -6,13 +6,13 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 
-use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
 use crate::daemon::agent_tui::AgentTuiInputRequestSchema;
+use crate::daemon::agent_tui::{AgentTuiInputRequest, AgentTuiResizeRequest, AgentTuiStartRequest};
+use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 use crate::daemon::protocol::{
     CodexApprovalDecisionRequest, CodexRunRequest, CodexSteerRequest, ManagedAgentSnapshot,
     http_paths,
 };
-use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;

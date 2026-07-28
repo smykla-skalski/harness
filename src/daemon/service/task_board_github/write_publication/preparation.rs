@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{GitHubAutomation, GitHubAutomationToggles};
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowState,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::evidence::publication_number;
 use super::invalid_transition;

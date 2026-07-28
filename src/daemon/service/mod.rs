@@ -13,7 +13,6 @@ use crate::agents::runtime::signal::{
     AckResult, SignalAck, acknowledge_signal as write_signal_ack,
 };
 use crate::agents::service as agents_service;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::hooks::adapters::HookAgent;
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
@@ -22,6 +21,7 @@ use crate::session::{
     observe as session_observe, service as session_service, storage as session_storage,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;
@@ -300,7 +300,6 @@ mod task_board_sync_tests;
 mod task_board_workflow_execution;
 #[cfg(test)]
 mod task_board_workflow_execution_tests;
-mod task_board_working_copies;
 #[cfg(test)]
 mod task_board_workflow_repository_tests;
 mod task_board_workflow_review;
@@ -308,6 +307,7 @@ mod task_board_workflow_review;
 mod task_board_workflow_review_tests;
 #[cfg(test)]
 mod task_board_workflow_test_support;
+mod task_board_working_copies;
 mod wake_route;
 
 pub use crate::reviews::fetch_review_avatar;
@@ -318,9 +318,9 @@ pub use direct::{
     register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
 };
 pub(crate) use direct::{
-    delete_session_direct_async, disconnect_agent_direct_async,
-    join_session_direct_async, register_agent_runtime_session_direct_async,
-    start_session_direct_async, update_session_title_direct_async,
+    delete_session_direct_async, disconnect_agent_direct_async, join_session_direct_async,
+    register_agent_runtime_session_direct_async, start_session_direct_async,
+    update_session_title_direct_async,
 };
 pub use improver_apply::improver_apply;
 pub(crate) use improver_apply::improver_apply_async;

@@ -8,7 +8,6 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::TaskBoardSyncRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::stable_data_revision_guard;
 use crate::reviews::{ReviewItem, ReviewPullRequestState, ReviewsQueryRequest};
 use crate::task_board::{
@@ -16,6 +15,7 @@ use crate::task_board::{
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
     normalize_repository_slug, sync_external_tasks,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) struct SharedReviewRequestClient {
     repository: String,
@@ -181,7 +181,11 @@ fn shared_review_request_clients_from_settings(
     normalized_repositories(repositories)
         .into_iter()
         .map(|repository| SharedReviewRequestClient {
-            tasks: Some(review_external_tasks(slice::from_ref(&repository), labels, items)),
+            tasks: Some(review_external_tasks(
+                slice::from_ref(&repository),
+                labels,
+                items,
+            )),
             query: None,
             repository,
             authoritative_review_inbox,

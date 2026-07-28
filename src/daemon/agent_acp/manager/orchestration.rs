@@ -9,10 +9,10 @@ use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as orchestration_service;
 use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::port::{
     AcpManagerPort, AcpRegistrationRequest, AcpRuntimeBinding, AcpWakeAcceptRequest,

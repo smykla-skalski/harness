@@ -24,10 +24,10 @@ use crate::daemon::service;
 use crate::daemon::voice::{
     append_audio_chunk, append_transcript_async, finish_session_async, start_session_async,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
 use crate::sandbox;
 use crate::session::adopter::AdoptionOutcome;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::frames::{error_response, error_response_with_payload};
 use super::mutations::{cli_error_response, dispatch_query_result};

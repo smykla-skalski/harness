@@ -33,16 +33,14 @@ pub const MAX_STRING_CONDITION_BYTES: usize = 256;
 /// evaluation order (first matching rule wins) and is itself part of the
 /// candidate's canonical, persisted identity -- reordering two rules is a
 /// real change, not a no-op.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleSetV1 {
     pub schema_version: u16,
     pub rules: Vec<TriageRule>,
     pub default_outcome: TriageRuleOutcome,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRule {
     pub id: String,
     /// Conjunction (AND) of closed, typed predicates. Empty matches every
@@ -52,8 +50,7 @@ pub struct TriageRule {
     pub outcome: TriageRuleOutcome,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriageRuleOutcome {
     pub verdict: TriageVerdict,
     #[serde(default)]
@@ -162,7 +159,10 @@ pub struct TriageRuleEvaluation {
 /// `MAX_LABEL_CONDITION_ITEMS`) and reevaluation only runs over eligible
 /// items, so this has not shown up as a real cost; revisit if it does.
 #[must_use]
-pub fn evaluate_triage_rule_set(rule_set: &TriageRuleSetV1, item: &TaskBoardItem) -> TriageRuleEvaluation {
+pub fn evaluate_triage_rule_set(
+    rule_set: &TriageRuleSetV1,
+    item: &TaskBoardItem,
+) -> TriageRuleEvaluation {
     let facts = ItemFacts::from_item(item);
     for rule in &rule_set.rules {
         if rule.when.iter().all(|condition| facts.satisfies(condition)) {
@@ -203,17 +203,19 @@ impl ItemFacts {
 
     fn satisfies(&self, condition: &TriageRuleCondition) -> bool {
         match condition {
-            TriageRuleCondition::LabelsHasAny { labels } => {
-                has_any(&self.labels, labels)
-            }
+            TriageRuleCondition::LabelsHasAny { labels } => has_any(&self.labels, labels),
             TriageRuleCondition::LabelsHasAll { labels } => has_all(&self.labels, labels),
             TriageRuleCondition::LabelsHasNone { labels } => !has_any(&self.labels, labels),
             TriageRuleCondition::PriorityEquals { priority } => self.priority == *priority,
             TriageRuleCondition::ExecutionRepositoryEquals { value } => {
                 self.execution_repository.as_deref() == Some(value.as_str())
             }
-            TriageRuleCondition::ExecutionRepositoryIsPresent => self.execution_repository.is_some(),
-            TriageRuleCondition::ExecutionRepositoryIsMissing => self.execution_repository.is_none(),
+            TriageRuleCondition::ExecutionRepositoryIsPresent => {
+                self.execution_repository.is_some()
+            }
+            TriageRuleCondition::ExecutionRepositoryIsMissing => {
+                self.execution_repository.is_none()
+            }
             TriageRuleCondition::ProjectIdEquals { value } => {
                 self.project_id.as_deref() == Some(value.as_str())
             }

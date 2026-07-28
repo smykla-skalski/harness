@@ -68,8 +68,7 @@ impl TaskBoardProjectSource {
 
 /// A named source of board work. `project_id` is assigned once and never
 /// changes, so renaming a project leaves every item still attached to it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardProject {
     pub project_id: String,
     pub source: TaskBoardProjectSource,
@@ -118,7 +117,9 @@ pub fn is_project_id(value: &str) -> bool {
         return false;
     };
     body.len() == PROJECT_ID_BODY_LEN
-        && body.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        && body
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// What a write path must do about an item's project attribution.
@@ -137,11 +138,7 @@ pub enum ItemProjectAttribution {
 /// one migrated then land on the same project.
 #[must_use]
 pub fn item_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttribution {
-    if item
-        .source_project_id
-        .as_deref()
-        .is_some_and(is_project_id)
-    {
+    if item.source_project_id.as_deref().is_some_and(is_project_id) {
         return ItemProjectAttribution::Assigned;
     }
     // `project_id` is the provider's own project value, a repository slug on
@@ -166,10 +163,11 @@ pub fn item_attribution(item: &super::types::TaskBoardItem) -> ItemProjectAttrib
         return ItemProjectAttribution::Register(TaskBoardProjectSource::GitHub, slug);
     }
     let source = TaskBoardProjectSource::Manual;
-    source.normalize_slug(raw).map_or(
-        ItemProjectAttribution::Unattributed,
-        |slug| ItemProjectAttribution::Register(source, slug),
-    )
+    source
+        .normalize_slug(raw)
+        .map_or(ItemProjectAttribution::Unattributed, |slug| {
+            ItemProjectAttribution::Register(source, slug)
+        })
 }
 
 /// The repository named by the first GitHub ref that carries one.

@@ -2362,8 +2362,7 @@ fn emit_enum_item(
 }
 
 const POLICY_SOURCE: &str = include_str!("../crates/harness-task-board/src/policy.rs");
-const POLICY_GRAPH_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/policy_graph.rs");
+const POLICY_GRAPH_SOURCE: &str = include_str!("../crates/harness-task-board/src/policy_graph.rs");
 const POLICY_MODELS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/models.rs");
 const POLICY_IDS_SOURCE: &str =
@@ -2548,8 +2547,10 @@ const REVIEWS_ENUMS_SOURCE: &str = include_str!("../crates/harness-reviews/src/e
 // carries a DateTime (-> String) and the open ReviewsBodyUpdateOutcome.
 const REVIEWS_AVATAR_SOURCE: &str = include_str!("../crates/harness-reviews/src/avatar.rs");
 const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_update.rs");
-const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../crates/harness-reviews/src/file_comment.rs");
-const REVIEWS_THREAD_RESOLVE_SOURCE: &str = include_str!("../crates/harness-reviews/src/review_thread_resolve.rs");
+const REVIEWS_FILE_COMMENT_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/file_comment.rs");
+const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/review_thread_resolve.rs");
 // reviews files-core: the file list/patch/preview/blob/viewed surface plus the
 // two cross-wire facade types from service.rs/local_clone.rs. preview.rs carries
 // no types (the preview structs live in mod.rs) but supplies the
@@ -2558,16 +2559,22 @@ const REVIEWS_THREAD_RESOLVE_SOURCE: &str = include_str!("../crates/harness-revi
 // daemon-internal serde types are SKIP_TYPES.
 const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/mod.rs");
 const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/blob.rs");
-const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/viewed.rs");
-const REVIEWS_FILES_PREVIEW_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/preview.rs");
-const REVIEWS_FILES_SERVICE_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/service.rs");
-const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/local_clone.rs");
+const REVIEWS_FILES_VIEWED_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/files/viewed.rs");
+const REVIEWS_FILES_PREVIEW_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/files/preview.rs");
+const REVIEWS_FILES_SERVICE_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/files/service.rs");
+const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/files/local_clone.rs");
 // reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
 // tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
 // the payload alongside the tag); the entries carry chrono DateTime, a boxed
 // SimpleActorEventEntry, and a JsonValue raw payload - all handled.
-const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../crates/harness-reviews/src/timeline/types.rs");
-const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../crates/harness-reviews/src/timeline/mod.rs");
+const REVIEWS_TIMELINE_TYPES_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/timeline/types.rs");
+const REVIEWS_TIMELINE_MOD_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/timeline/mod.rs");
 // reviews types core: the query/item/check/action/policy request-response
 // surface. The public umbrella re-exports the split action and policy modules,
 // so generation needs all three files. The custom default fns it references live
@@ -2602,8 +2609,7 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/task_board/wire/task_board.rs");
-const TASK_BOARD_TYPES_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/types.rs");
+const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../crates/harness-task-board/src/types.rs");
 const TASK_BOARD_ITEM_FIELDS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/item_fields.rs");
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../crates/harness-task-board/src/lane.rs");
@@ -2622,8 +2628,7 @@ const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowKind",
 ];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
-const TASK_BOARD_PROJECT_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/project.rs");
+const TASK_BOARD_PROJECT_SOURCE: &str = include_str!("../crates/harness-task-board/src/project.rs");
 const TASK_BOARD_PROJECT_COLOR_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/project_color.rs");
 const TASK_BOARD_PROJECT_SHAPE_SOURCE: &str =
@@ -2670,8 +2675,7 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardShiftedItemRevision",
     "TaskBoardItemPositionMutationResponse",
 ];
-const TASK_BOARD_TRIAGE_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/triage.rs");
+const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../crates/harness-task-board/src/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/triage_override.rs");
 const TASK_BOARD_TRIAGE_ESCALATION_SOURCE: &str =
@@ -3298,8 +3302,7 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_SUMMARY_OUTPUT,
-            description:
-                "the Rust task-board audit, project and machine summaries plus the project edit",
+            description: "the Rust task-board audit, project and machine summaries plus the project edit",
             defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
             sources: &[
                 TASK_BOARD_SUMMARY_SOURCE,
@@ -3490,7 +3493,10 @@ fn modules() -> Vec<GeneratedModule> {
             // The settings source is a defaults source too, not just a symbol
             // one: the repository config's `enabled` resolves `default_true`
             // from there.
-            defaults: &[ORCHESTRATOR_TYPES_SOURCE, TASK_BOARD_AUTOMATION_SETTINGS_SOURCE],
+            defaults: &[
+                ORCHESTRATOR_TYPES_SOURCE,
+                TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
+            ],
             sources: &[
                 ORCHESTRATOR_TYPES_SOURCE,
                 POLICY_SOURCE,

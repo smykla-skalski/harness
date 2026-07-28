@@ -6,11 +6,11 @@ use tokio::sync::mpsc;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::NewApprovalGrant;
-use harness_kernel::errors::CliError;
 use crate::task_board::policy_graph::{
     PolicyCanvasWorkspace, PolicyPendingGrantRequest, RecordedPolicyDecision,
     install_decision_sink, install_pending_grant_sink,
 };
+use harness_kernel::errors::CliError;
 
 /// Wire policy storage at daemon boot and seed the database-backed workspace.
 ///

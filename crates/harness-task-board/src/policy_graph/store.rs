@@ -27,8 +27,7 @@ impl PolicyGate for GraphPolicyGate {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineSaveResponse {
     pub document: PolicyGraph,
     pub validation: PolicyGraphValidationReport,
@@ -36,8 +35,7 @@ pub struct PolicyPipelineSaveResponse {
     pub persisted: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelinePromoteRequest {
     pub revision: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -46,15 +44,13 @@ pub struct PolicyPipelinePromoteRequest {
     pub canvas_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelinePromoteResponse {
     pub document: PolicyGraph,
     pub trace_id: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineMakeLiveRequest {
     pub revision: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -70,8 +66,7 @@ pub struct PolicyPipelineMakeLiveResponse {
     pub global_policy_enforcement_enabled: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineGoLiveDiffEntry {
     pub scenario_id: String,
     pub scenario_name: String,
@@ -82,8 +77,7 @@ pub struct PolicyPipelineGoLiveDiffEntry {
     pub changed: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineGoLiveDiff {
     pub has_live_policy: bool,
     pub changed_count: usize,
@@ -91,8 +85,7 @@ pub struct PolicyPipelineGoLiveDiff {
     pub diffs: Vec<PolicyPipelineGoLiveDiffEntry>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineSimulatedDecision {
     #[serde(default)]
     pub scenario_id: String,
@@ -108,8 +101,7 @@ pub struct PolicyPipelineSimulatedDecision {
     pub boundaries: Vec<super::PolicyRuntimeBoundary>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineSimulationResult {
     pub revision: u64,
     pub trace_id: String,
@@ -124,8 +116,7 @@ pub struct PolicyPipelineSimulationResult {
     pub has_runtime_boundaries: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineAuditSummary {
     pub active_revision: u64,
     pub mode: PolicyGraphMode,

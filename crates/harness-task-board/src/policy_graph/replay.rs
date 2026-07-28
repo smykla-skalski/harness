@@ -24,8 +24,7 @@ use super::{
 
 /// One replayed decision: what history recorded versus what the draft decides
 /// now for the same input.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineReplayDecision {
     pub id: String,
     pub recorded_at: String,
@@ -39,8 +38,7 @@ pub struct PolicyPipelineReplayDecision {
 }
 
 /// The result of replaying the draft against a window of recorded decisions.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyPipelineReplayResult {
     pub sample_size: usize,
     pub changed_count: usize,

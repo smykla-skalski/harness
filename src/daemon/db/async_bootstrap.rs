@@ -338,7 +338,11 @@ async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
     query("PRAGMA foreign_keys = OFF")
         .execute(&mut *conn)
         .await
-        .map_err(|error| db_error(format!("suspend foreign keys for async migrations: {error}")))?;
+        .map_err(|error| {
+            db_error(format!(
+                "suspend foreign keys for async migrations: {error}"
+            ))
+        })?;
     query("PRAGMA legacy_alter_table = ON")
         .execute(&mut *conn)
         .await
@@ -355,10 +359,11 @@ async fn run_daemon_migrator(pool: &SqlitePool) -> Result<(), CliError> {
 /// statement leaves that one connection with enforcement off while every other
 /// connection in the pool has it on. Each pragma is its own statement because
 /// `SQLite` prepares one statement at a time.
-async fn restore_migration_pragmas(
-    conn: &mut sqlx::SqliteConnection,
-) -> Result<(), CliError> {
-    for pragma in ["PRAGMA legacy_alter_table = OFF", "PRAGMA foreign_keys = ON"] {
+async fn restore_migration_pragmas(conn: &mut sqlx::SqliteConnection) -> Result<(), CliError> {
+    for pragma in [
+        "PRAGMA legacy_alter_table = OFF",
+        "PRAGMA foreign_keys = ON",
+    ] {
         query(pragma).execute(&mut *conn).await.map_err(|error| {
             db_error(format!("restore pragmas after async migrations: {error}"))
         })?;
@@ -382,7 +387,10 @@ mod pragma_tests {
             .await
             .expect("open async db");
         let mut conn = db.pool().acquire().await.expect("acquire connection");
-        for pragma in ["PRAGMA foreign_keys = OFF", "PRAGMA legacy_alter_table = ON"] {
+        for pragma in [
+            "PRAGMA foreign_keys = OFF",
+            "PRAGMA legacy_alter_table = ON",
+        ] {
             query(pragma)
                 .execute(&mut *conn)
                 .await

@@ -112,16 +112,14 @@ where
         .serialize(serializer)
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AcpMcpEnvVariable {
     pub name: String,
     #[serde(default)]
     pub value: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AcpMcpHttpHeader {
     pub name: String,
     #[serde(default)]

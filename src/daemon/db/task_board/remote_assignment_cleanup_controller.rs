@@ -32,19 +32,16 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board remote cleanup observation")
             .await?;
-        let assignment = match screen_cleanup_observation_claim_in_tx(
-            &mut transaction,
-            request,
-            principal,
-        )
-        .await?
-        {
-            CleanupObservationClaimScreen::Replayed(response) => {
-                commit_noop(transaction, "replayed remote cleanup observation").await?;
-                return Ok(Some(*response));
-            }
-            CleanupObservationClaimScreen::Ready(assignment) => assignment,
-        };
+        let assignment =
+            match screen_cleanup_observation_claim_in_tx(&mut transaction, request, principal)
+                .await?
+            {
+                CleanupObservationClaimScreen::Replayed(response) => {
+                    commit_noop(transaction, "replayed remote cleanup observation").await?;
+                    return Ok(Some(*response));
+                }
+                CleanupObservationClaimScreen::Ready(assignment) => assignment,
+            };
         claim_cleanup_observation_authority_in_tx(&mut transaction, &assignment, request, trust)
             .await?;
         transaction.commit().await.map_err(|error| {
@@ -155,7 +152,8 @@ async fn screen_cleanup_observation_record_in_tx(
 ) -> Result<(TaskBoardRemoteSettlementReceipt, bool), CliError> {
     let receipt = exact_settlement(transaction, request, principal).await?;
     require_exact_terminal_assignment(assignment, &receipt.request, principal)?;
-    let replayed = replay_cleanup_response_in_tx(transaction, assignment, request, response).await?;
+    let replayed =
+        replay_cleanup_response_in_tx(transaction, assignment, request, response).await?;
     Ok((receipt, replayed))
 }
 
@@ -184,8 +182,14 @@ async fn settle_cleanup_observation_in_tx(
         trust,
     )
     .await?;
-    persist_cleanup_completion_in_tx(transaction, assignment, &receipt.request, principal, completed_at)
-        .await?;
+    persist_cleanup_completion_in_tx(
+        transaction,
+        assignment,
+        &receipt.request,
+        principal,
+        completed_at,
+    )
+    .await?;
     Ok(())
 }
 

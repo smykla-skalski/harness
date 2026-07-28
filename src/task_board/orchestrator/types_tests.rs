@@ -46,8 +46,7 @@ fn a_retired_provider_in_the_last_run_does_not_fail_the_state() {
 fn a_readable_last_run_is_still_kept() {
     let readable = STATE_WITH_RETIRED_PROVIDER.replace("\"todoist\"", "\"github\"");
 
-    let state: TaskBoardOrchestratorState =
-        serde_json::from_str(&readable).expect("state parses");
+    let state: TaskBoardOrchestratorState = serde_json::from_str(&readable).expect("state parses");
 
     let last_run = state.last_run.expect("a readable run record is preserved");
     assert_eq!(last_run.run_id, "task-board-run-1");

@@ -30,23 +30,25 @@ async fn settings_stored_with_a_publication_repository_still_load() {
     db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
         .await
         .expect("seed settings row");
-    sqlx::query("UPDATE task_board_orchestrator_settings SET settings_json = ?1 WHERE singleton = 1")
-        .bind(
-            serde_json::json!({
-                "github_project": {
-                    "owner": "legacy-owner",
-                    "repo": "hidden-repository-735",
-                    "checkout_path": "/legacy/checkout",
-                    "default_branch": "legacy-trunk",
-                    "branch_prefix": "legacy/",
-                },
-                "github_inbox": { "repositories": ["visible-owner/monitored-repository"] },
-            })
-            .to_string(),
-        )
-        .execute(db.pool())
-        .await
-        .expect("store legacy settings");
+    sqlx::query(
+        "UPDATE task_board_orchestrator_settings SET settings_json = ?1 WHERE singleton = 1",
+    )
+    .bind(
+        serde_json::json!({
+            "github_project": {
+                "owner": "legacy-owner",
+                "repo": "hidden-repository-735",
+                "checkout_path": "/legacy/checkout",
+                "default_branch": "legacy-trunk",
+                "branch_prefix": "legacy/",
+            },
+            "github_inbox": { "repositories": ["visible-owner/monitored-repository"] },
+        })
+        .to_string(),
+    )
+    .execute(db.pool())
+    .await
+    .expect("store legacy settings");
 
     let settings = db
         .task_board_orchestrator_settings()
@@ -171,7 +173,10 @@ async fn a_blank_title_is_refused_and_persists_nothing() {
     assert!(error.message().contains("title"), "unexpected: {error}");
 
     let listed = read_task_board_items_db(&db).await.expect("list items");
-    assert!(listed.items.is_empty(), "a refused create persisted an item");
+    assert!(
+        listed.items.is_empty(),
+        "a refused create persisted an item"
+    );
 }
 
 /// Moving an item to another project has to re-resolve its attribution.

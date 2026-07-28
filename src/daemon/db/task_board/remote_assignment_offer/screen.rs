@@ -1,9 +1,13 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::super::remote_assignment_archival_fence::require_no_archival_collision_in_tx;
-use super::super::remote_assignment_model::{TaskBoardRemoteOfferOutcome, load_offer_collision_in_tx};
+use super::super::remote_assignment_model::{
+    TaskBoardRemoteOfferOutcome, load_offer_collision_in_tx,
+};
 use super::types::{OfferPreparation, OfferTimes};
-use super::{PreparedRemoteOffer, commit_noop, prepare_remote_offer_in_tx, resolve_offer_collision};
+use super::{
+    PreparedRemoteOffer, commit_noop, prepare_remote_offer_in_tx, resolve_offer_collision,
+};
 use crate::daemon::db::CliError;
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};

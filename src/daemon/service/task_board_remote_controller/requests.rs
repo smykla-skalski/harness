@@ -12,12 +12,12 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::daemon::task_board_remote_transport::wire_cleanup::RemoteCleanupObservationRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardImplementationResult, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowKind,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_read_only_coordinator::requests::remote_codex_attempt_request;
 

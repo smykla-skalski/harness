@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::remote_spki_pin;
 use crate::task_board::{
     TaskBoardExecutionHostConfig, TaskBoardExecutionPhase, TaskBoardPhaseCapabilityProfile,
     normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub const TASK_BOARD_REMOTE_PROTOCOL_VERSION: u32 = 1;
 pub const TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS: i64 = 300;

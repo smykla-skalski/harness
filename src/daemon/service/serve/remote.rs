@@ -19,10 +19,10 @@ use crate::daemon::remote_tls::{RemoteTlsConfigError, RemoteTlsConfigHandle, Rem
 use crate::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use crate::daemon::voice::cleanup_abandoned_sessions;
 use crate::daemon::websocket::ReplayBuffer;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonObserveRuntime, DaemonServeConfig, OBSERVE_RUNTIME, SHUTDOWN_SIGNAL};
 use super::background_tasks::{self, spawn_background_tasks};

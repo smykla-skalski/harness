@@ -5,7 +5,6 @@ use std::sync::Arc;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
-use harness_kernel::errors::CliError;
 use crate::reviews::{
     ReviewsPolicyHistoryRequest, ReviewsPolicyHistoryResponse, ReviewsPolicyRunMetrics,
     ReviewsPolicyTimelineEntry,
@@ -16,6 +15,7 @@ use crate::task_board::policy_runtime::models::{
 };
 #[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
+use harness_kernel::errors::CliError;
 
 use super::policy::require_policy_runtime_db;
 

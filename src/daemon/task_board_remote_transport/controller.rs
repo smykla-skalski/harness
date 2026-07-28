@@ -15,8 +15,8 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Authenticated, pinned controller-side connection to one configured executor.
 ///

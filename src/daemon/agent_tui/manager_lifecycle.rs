@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::{

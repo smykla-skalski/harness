@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
     ExternalProviderScopeIdentity,
@@ -17,6 +16,7 @@ use crate::task_board::{
     ExternalUpdateOutcome, TaskBoardExternalCreateIntentState, TaskBoardItem, TaskBoardStatus,
     sync_external_tasks,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[tokio::test]
 async fn newly_created_done_item_is_linked_then_closed() {

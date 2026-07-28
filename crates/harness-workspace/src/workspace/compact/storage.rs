@@ -3,9 +3,9 @@ use std::path::Path;
 
 use rayon::prelude::*;
 
+use crate::workspace::{session_scope_key, utc_now};
 use harness_kernel::errors::{CliError, io_for};
 use harness_kernel::io::{read_text, write_json_pretty};
-use crate::workspace::{session_scope_key, utc_now};
 
 use super::{
     CompactHandoff, HANDOFF_VERSION, HandoffStatus, compact_history_dir, compact_latest_path,

@@ -12,9 +12,9 @@ use crate::agents::runtime::event::ConversationEvent;
 #[cfg(feature = "daemon-runtime")]
 use crate::agents::runtime::signal::AckResult;
 use crate::daemon::protocol::StreamEvent;
-use harness_kernel::errors::CliError;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::{AcpAgentManagerHandle, AcpAgentSnapshot, AcpAgentStartRequest};
 

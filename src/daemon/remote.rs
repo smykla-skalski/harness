@@ -113,9 +113,9 @@ pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [Remo
         //
         // It is deliberately not a subscription on `/v1/ws`, which is gated on
         // the `read` that the broker role does not hold and must not gain.
-        http_paths::REMOTE_PAIRINGS
-        | http_paths::REMOTE_PAIRING_REVOKE
-        | http_paths::REMOTE_WS => Some(PAIR_MANAGE_SCOPES),
+        http_paths::REMOTE_PAIRINGS | http_paths::REMOTE_PAIRING_REVOKE | http_paths::REMOTE_WS => {
+            Some(PAIR_MANAGE_SCOPES)
+        }
         // The ACP logout and agent-session routes now carry websocket methods,
         // so their HTTP scope derives from the mirrored method like any RPC route.
         _ => route.parity.ws_method().and_then(remote_ws_scopes),

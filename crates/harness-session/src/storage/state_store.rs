@@ -1,6 +1,6 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::types::{CURRENT_VERSION, SessionState};
+use harness_infra::persistence::versioned_json::VersionedJsonRepository;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::layout::SessionLayout;
 use harness_workspace::workspace::utc_now;
 

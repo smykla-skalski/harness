@@ -9,10 +9,10 @@ use std::path::Path;
 
 use crate::daemon::index as daemon_index;
 use crate::daemon::protocol::ImproverApplyRequest;
-use harness_kernel::errors::CliError;
 use crate::session::roles::SessionAction;
 use crate::session::service::{self as session_service, ImproverApplyOutcome};
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::{effective_project_dir, index, session_not_found};
 

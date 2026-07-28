@@ -9,9 +9,9 @@ use crate::daemon::db::{
 };
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::sync::watch;

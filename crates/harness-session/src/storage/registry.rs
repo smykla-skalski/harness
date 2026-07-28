@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::CliError;
 use harness_kernel::io::{read_json_typed, write_json_pretty};
-use harness_workspace::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
+use harness_workspace::workspace::layout::{
+    SessionLayout, sessions_root as workspace_sessions_root,
+};
 use harness_workspace::workspace::project_context_dir;
 use harness_workspace::workspace::utc_now;
 use harness_workspace::workspace::{harness_data_root, resolve_git_checkout_identity};

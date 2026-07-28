@@ -88,13 +88,22 @@ fn every_overridable_value_can_be_overridden() {
         needs_human: "nh".to_owned(),
         protected_path: "pp".to_owned(),
     });
-    over.enabled_automations = Some(GitHubAutomationToggles { enabled: Vec::new() });
+    over.enabled_automations = Some(GitHubAutomationToggles {
+        enabled: Vec::new(),
+    });
 
     let merged = global().merged_with(&over);
 
-    assert_eq!(merged.requested_reviewers, GitHubRequestedReviewers::default());
     assert_eq!(
-        merged.protected_paths.iter().map(|rule| rule.pattern.as_str()).collect::<Vec<_>>(),
+        merged.requested_reviewers,
+        GitHubRequestedReviewers::default()
+    );
+    assert_eq!(
+        merged
+            .protected_paths
+            .iter()
+            .map(|rule| rule.pattern.as_str())
+            .collect::<Vec<_>>(),
         ["src/**"]
     );
     assert_eq!(merged.labels.managed, "m");

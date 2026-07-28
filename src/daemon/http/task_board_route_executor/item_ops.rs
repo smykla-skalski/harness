@@ -15,8 +15,8 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_list};
 use crate::daemon::service;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardItem;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonHttpState, require_async_db};
 

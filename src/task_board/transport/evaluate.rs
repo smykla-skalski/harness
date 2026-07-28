@@ -1,10 +1,10 @@
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::task_board::wire::{TaskBoardEvaluateRequest, TaskBoardEvaluationResponse};
-use harness_kernel::errors::CliError;
 use crate::task_board::transport::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 use crate::task_board::types::TaskBoardStatus;
+use crate::task_board::wire::{TaskBoardEvaluateRequest, TaskBoardEvaluationResponse};
+use harness_kernel::errors::CliError;
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardEvaluateArgs {

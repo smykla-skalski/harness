@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::storage;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::layout::sessions_root as workspace_sessions_root;
 use harness_workspace::workspace::{
     canonical_checkout_root, harness_data_root, project_context_dir, resolve_git_checkout_identity,

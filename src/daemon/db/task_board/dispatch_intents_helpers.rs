@@ -23,8 +23,13 @@ pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
     consumed_approval_grant_id: Option<&str>,
     reason: &str,
 ) -> Result<(), CliError> {
-    prepare_pending_admission_refusal_in_tx(transaction, applied, consumed_approval_grant_id, reason)
-        .await?;
+    prepare_pending_admission_refusal_in_tx(
+        transaction,
+        applied,
+        consumed_approval_grant_id,
+        reason,
+    )
+    .await?;
     let now = utc_now();
     query(
         "UPDATE task_board_dispatch_intents

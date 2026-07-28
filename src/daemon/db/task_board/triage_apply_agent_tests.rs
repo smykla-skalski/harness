@@ -170,7 +170,10 @@ async fn a_wrong_token_is_rejected_without_any_write() {
     .fetch_one(db.pool())
     .await
     .expect("escalation status unchanged");
-    assert_eq!(status, "running", "a wrong token must not even mark the row rejected");
+    assert_eq!(
+        status, "running",
+        "a wrong token must not even mark the row rejected"
+    );
 }
 
 #[tokio::test]
@@ -203,7 +206,11 @@ async fn an_already_terminal_escalation_is_rejected() {
         TaskBoardTriageEscalationVerdictOutcome::Rejected(_)
     ));
     let item = db.task_board_item("item-1").await.expect("load item");
-    assert_eq!(item.status, TaskBoardStatus::Todo, "the first verdict still stands");
+    assert_eq!(
+        item.status,
+        TaskBoardStatus::Todo,
+        "the first verdict still stands"
+    );
 }
 
 #[tokio::test]
@@ -234,7 +241,11 @@ async fn stale_evidence_is_rejected_and_reenqueues_for_the_current_fingerprint()
         TaskBoardTriageEscalationVerdictOutcome::Rejected(_)
     ));
     let item = db.task_board_item("item-1").await.expect("load item");
-    assert_eq!(item.status, TaskBoardStatus::Inbox, "stale verdict never lands");
+    assert_eq!(
+        item.status,
+        TaskBoardStatus::Inbox,
+        "stale verdict never lands"
+    );
     let fresh_pending: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM task_board_triage_escalations
          WHERE item_id = 'item-1' AND status = 'pending'",
@@ -242,7 +253,10 @@ async fn stale_evidence_is_rejected_and_reenqueues_for_the_current_fingerprint()
     .fetch_one(db.pool())
     .await
     .expect("count pending escalations");
-    assert_eq!(fresh_pending, 1, "a fresh escalation was enqueued for the new evidence");
+    assert_eq!(
+        fresh_pending, 1,
+        "a fresh escalation was enqueued for the new evidence"
+    );
 }
 
 #[tokio::test]
@@ -250,14 +264,16 @@ async fn an_override_set_while_running_causes_rejection() {
     let (_directory, db) = connect().await;
     let (escalation_id, token, fingerprint) = seed_running_escalation(&db, "item-1").await;
 
-    db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
-        item_id: "item-1".into(),
-        verdict: TriageVerdict::Todo,
-        actor: "human".into(),
-        reason: None,
-        expected_item_revision: 1,
-        expected_items_change_seq: 1,
-    })
+    db.set_task_board_triage_override(
+        crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
+            item_id: "item-1".into(),
+            verdict: TriageVerdict::Todo,
+            actor: "human".into(),
+            reason: None,
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+        },
+    )
     .await
     .expect("set override while escalation running");
 

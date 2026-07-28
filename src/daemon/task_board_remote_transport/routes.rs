@@ -1,7 +1,7 @@
+use axum::Json;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::Response;
-use axum::Json;
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
@@ -15,19 +15,19 @@ use super::wire::{
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
     RemoteSourceBundleUploadRequest, RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
+use super::wire::{
+    RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
+    RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
+};
 use super::wire_conversion::host_wire_advertisement;
 use super::wire_limits::{
     MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_OFFER_JSON_BYTES,
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
 };
 use crate::daemon::db::utc_now;
-use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
 use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
 use harness_kernel::errors::CliErrorKind;
-use super::wire::{
-    RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
-    RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
-};
 
 pub(crate) const ADVERTISE_PATH: &str = "/v1/task-board-execution/advertise";
 pub(crate) const OFFER_PATH: &str = "/v1/task-board-execution/offers";

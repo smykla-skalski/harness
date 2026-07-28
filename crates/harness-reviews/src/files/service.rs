@@ -16,8 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// User-facing toggle in Settings. Picked from the `SwiftUI` Picker;
 /// serialized through to the daemon on each request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FilesLargeDiffStrategy {
     /// For PRs above the threshold, use the local bare clone.

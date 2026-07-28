@@ -12,10 +12,10 @@ use crate::daemon::task_board_remote_transport::wire::{
 use crate::daemon::task_board_remote_transport::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const HOST: &str = "executor-a";
 const STATUS_AT: &str = "2026-07-19T10:02:01Z";

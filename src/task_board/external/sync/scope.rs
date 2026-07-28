@@ -1,8 +1,8 @@
-use harness_kernel::errors::CliError;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, TaskBoardSyncCoordinatorFenceDecision,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::TaskBoardSyncStore;
 

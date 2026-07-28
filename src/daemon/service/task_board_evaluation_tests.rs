@@ -1,8 +1,8 @@
 use tempfile::tempdir;
 
-use harness_kernel::errors::CliErrorKind;
 use crate::session::types::{TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus};
 use crate::task_board::{TaskBoardEvaluationOutcome, TaskBoardWorkflowStatus};
+use harness_kernel::errors::CliErrorKind;
 
 use super::*;
 

@@ -2,8 +2,8 @@ use std::path::Path;
 
 use fs_err as fs;
 
-use harness_kernel::errors::CliError;
 use crate::types::{Review, SessionLogEntry, SessionTransition, TaskCheckpoint};
+use harness_kernel::errors::CliError;
 use harness_workspace::workspace::layout::SessionLayout;
 use harness_workspace::workspace::utc_now;
 

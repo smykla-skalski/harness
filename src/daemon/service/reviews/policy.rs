@@ -22,7 +22,6 @@ use crate::daemon::service::reviews::policy_plan::{
     authored_database_reviews_policy_plan, preview_database_reviews_policy,
     preview_database_reviews_policy_plan,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 #[cfg(test)]
 use crate::reviews::policy::authored_reviews_policy_plan;
@@ -41,6 +40,7 @@ use crate::task_board::policy_runtime::models::{
 };
 #[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[cfg(test)]
 pub(crate) use super::policy_resume::{

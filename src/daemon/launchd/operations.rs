@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::state;
 use super::support::{

@@ -1,12 +1,12 @@
 //! Image-preview blob fetch endpoint.
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::files::blob::BlobTextProjection;
 use crate::reviews::{
     ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse, ReviewsGitHubClient,
     image_mime_for_path,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::token::{github_token, missing_token_error};
 

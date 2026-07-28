@@ -156,11 +156,7 @@ fn an_unbounded_phase_reports_no_total() {
 #[test]
 fn a_halted_phase_is_reported_as_blocked() {
     let mut halted = task("Receiving objects", 3, Some(100));
-    halted
-        .progress
-        .as_mut()
-        .expect("progress")
-        .state = State::Halted("waiting on remote", None);
+    halted.progress.as_mut().expect("progress").state = State::Halted("waiting on remote", None);
     let tasks = vec![(key_at(&[1]), halted)];
 
     let event = advanced_event(&tasks, "owner/repo").expect("event");
@@ -183,8 +179,10 @@ fn the_repo_name_rides_along_so_the_ui_can_route_the_event() {
 #[test]
 fn the_reporter_stops_sampling_once_finished() {
     let sink = Arc::new(RecordingSink::default());
-    let reporter =
-        CloneProgressReporter::start(Arc::clone(&sink) as Arc<dyn WorkingCopyProgressSink>, "owner/repo".into());
+    let reporter = CloneProgressReporter::start(
+        Arc::clone(&sink) as Arc<dyn WorkingCopyProgressSink>,
+        "owner/repo".into(),
+    );
     let progress = reporter.progress();
     progress.set(3);
 

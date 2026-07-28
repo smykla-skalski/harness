@@ -9,7 +9,6 @@ use crate::daemon::protocol::{
     TaskBoardDispatchPickResponse, TaskBoardDispatchPickSelection, TaskBoardDispatchRequest,
     TaskBoardDispatchResponse,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::policy_graph::PolicyGraph;
@@ -28,6 +27,7 @@ use crate::task_board::{
     machine_mismatch_plan_with_policy_root,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_db::task_board_host_local_db;
 #[cfg(test)]

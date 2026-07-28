@@ -6,9 +6,9 @@ use tracing::field::{Empty, display};
 use uuid::Uuid;
 
 use super::{DaemonClient, MUTATION_TIMEOUT, SESSION_START_TIMEOUT, TASK_BOARD_OPERATION_TIMEOUT};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 use crate::telemetry::{current_trace_headers, current_trace_id, record_daemon_client_metrics};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 impl DaemonClient {
     pub(super) fn get<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {

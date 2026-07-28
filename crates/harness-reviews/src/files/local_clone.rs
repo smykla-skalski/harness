@@ -236,8 +236,7 @@ pub fn pat_clone_url(repo_full_name: &str, token: &Sensitive) -> Sensitive {
 }
 
 /// One row in the Settings-panel projection of the clones registry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LocalCloneListEntry {
     pub repo_full_name: String,
     pub repo_key_segment: String,

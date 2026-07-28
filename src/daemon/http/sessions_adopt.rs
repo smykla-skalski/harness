@@ -10,12 +10,12 @@ use axum::response::{IntoResponse, Response};
 use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::{AdoptSessionRequest, SessionMutationResponse};
 use crate::daemon::service;
-use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(target_os = "macos")]
 use crate::sandbox;
 use crate::session::adopter::{AdoptionError, AdoptionOutcome, SessionAdopter};
 use crate::workspace::harness_data_root;
 use crate::workspace::layout::sessions_root;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DaemonHttpState;
 use super::auth::require_auth;

@@ -14,8 +14,9 @@ use crate::types::{
 // existing `session::service::ImproverTarget` caller keeps resolving.
 //
 /// Canonical writeable targets for improver patches.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
-#[derive(utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[value(rename_all = "snake_case")]
 pub enum ImproverTarget {
@@ -35,30 +36,26 @@ impl ImproverTarget {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RoleChangeRequest {
     pub actor: String,
     pub role: SessionRole,
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentRemoveRequest {
     pub actor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LeaderTransferRequest {
     pub actor: String,
     pub new_leader_id: String,
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskCreateRequest {
     pub actor: String,
     pub title: String,
@@ -67,21 +64,18 @@ pub struct TaskCreateRequest {
     pub suggested_fix: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskDeleteRequest {
     pub actor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskAssignRequest {
     pub actor: String,
     pub agent_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskDropRequest {
     pub actor: String,
     pub target: TaskDropTarget,
@@ -91,30 +85,26 @@ pub struct TaskDropRequest {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "target_type", rename_all = "snake_case")]
 pub enum TaskDropTarget {
     Agent { agent_id: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskQueuePolicyRequest {
     pub actor: String,
     pub queue_policy: TaskQueuePolicy,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskUpdateRequest {
     pub actor: String,
     pub status: TaskStatus,
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskCheckpointRequest {
     pub actor: String,
     pub summary: String,
@@ -124,28 +114,24 @@ pub struct TaskCheckpointRequest {
     pub progress: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionEndRequest {
     pub actor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionArchiveRequest {
     pub actor: String,
 }
 
 pub use harness_protocol::session_wire::SessionLeaveRequest;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionTitleRequest {
     pub title: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SignalSendRequest {
     pub actor: String,
     pub agent_id: String,
@@ -154,14 +140,12 @@ pub struct SignalSendRequest {
     pub action_hint: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ObserveSessionRequest {
     pub actor: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionStartRequest {
     #[serde(default)]
     pub title: String,
@@ -175,8 +159,7 @@ pub struct SessionStartRequest {
     pub base_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionJoinRequest {
     pub runtime: String,
     pub role: SessionRole,
@@ -194,16 +177,14 @@ pub struct SessionJoinRequest {
 
 pub use harness_protocol::session_wire::SignalAckRequest;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SignalCancelRequest {
     pub actor: String,
     pub agent_id: String,
     pub signal_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskSubmitForReviewRequest {
     pub actor: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -212,14 +193,12 @@ pub struct TaskSubmitForReviewRequest {
     pub suggested_persona: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskClaimReviewRequest {
     pub actor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskSubmitReviewRequest {
     pub actor: String,
     pub verdict: ReviewVerdict,
@@ -228,8 +207,7 @@ pub struct TaskSubmitReviewRequest {
     pub points: Vec<ReviewPoint>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskRespondReviewRequest {
     pub actor: String,
     #[serde(default)]
@@ -240,16 +218,14 @@ pub struct TaskRespondReviewRequest {
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskArbitrateRequest {
     pub actor: String,
     pub verdict: ReviewVerdict,
     pub summary: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ImproverApplyRequest {
     pub actor: String,
     pub issue_id: String,
@@ -261,21 +237,18 @@ pub struct ImproverApplyRequest {
     pub dry_run: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionMutationResponse {
     pub state: SessionState,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionArchiveResponse {
     pub session_id: String,
     pub archived_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AdoptSessionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bookmark_id: Option<String>,

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
 };
@@ -9,6 +8,7 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::task_board::{
     ExternalProvider, ExternalSyncField, TaskBoardExternalCreateIntent, TaskBoardSyncConflict,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
 

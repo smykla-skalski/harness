@@ -352,7 +352,6 @@ impl DaemonDb {
         Ok(())
     }
 
-
     fn migrate_v7_to_v8(&self) -> Result<(), CliError> {
         // v7 databases created before the backfill shipped have empty ledger
         // rows even when the legacy source tables still hold conversation

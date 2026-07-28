@@ -5,10 +5,10 @@ use super::{
     SignalPayload, SignalPriority, TaskCheckpoint, TaskCheckpointSummary, TaskDropEffect, TaskNote,
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
-    generate_signal_id, next_task_id, wire, rank_workers_for_task, refresh_session,
-    require_active, require_managed_run_mutation, require_permission, require_task_creation_state,
+    generate_signal_id, next_task_id, rank_workers_for_task, refresh_session, require_active,
+    require_managed_run_mutation, require_permission, require_task_creation_state,
     start_next_locked_task_for_worker, start_task_for_agent, task_not_found, task_status_label,
-    touch_agent,
+    touch_agent, wire,
 };
 
 /// Create a work item. Returns the new `WorkItem`.

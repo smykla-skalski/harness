@@ -1,7 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::{
     TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptResultArtifact,
@@ -10,6 +9,7 @@ use crate::task_board::{
     TaskBoardLifecycleOutcome, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowKind,
 };
+use harness_kernel::errors::CliError;
 
 #[path = "lifecycle/verification_retry.rs"]
 mod verification_retry;

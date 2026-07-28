@@ -5,12 +5,12 @@ use async_trait::async_trait;
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection,
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem,
 };
+use harness_kernel::errors::CliError;
 
 #[tokio::test]
 async fn malformed_persisted_backoff_fails_closed_without_calling_provider() {

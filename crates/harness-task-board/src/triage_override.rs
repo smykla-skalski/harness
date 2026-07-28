@@ -8,8 +8,7 @@ const MAX_OVERRIDE_REASON_BYTES: usize = 256;
 /// A durable, first-class human decision that overrides `BuiltInV1` -- or any
 /// later evaluator sharing [`effective_triage_outcome`] -- for one item,
 /// persisted independently of `lane_origin` provenance.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageOverride {
     pub verdict: TriageVerdict,
     pub actor: String,
@@ -46,8 +45,7 @@ pub enum TaskBoardTriageEffectiveSource {
 
 /// The verdict that actually governs an item's placement right now, and
 /// which side decided it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageEffectiveOutcome {
     pub verdict: TriageVerdict,
     pub source: TaskBoardTriageEffectiveSource,

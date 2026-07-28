@@ -8,10 +8,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Resolve a `PullRequestReviewThread` by its node ID. Returns the
 /// updated thread's `isResolved` flag so the daemon can echo the
@@ -34,8 +34,7 @@ mutation UnresolveReviewReviewThread($threadId: ID!) {
 }
 ";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsReviewThreadResolveRequest {
     pub thread_id: String,
     pub resolved: bool,
@@ -45,8 +44,7 @@ pub struct ReviewsReviewThreadResolveRequest {
     pub pull_request_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsReviewThreadResolveResponse {
     pub thread_id: String,
     pub resolved: bool,

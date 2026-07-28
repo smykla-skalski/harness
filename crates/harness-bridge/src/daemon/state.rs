@@ -14,8 +14,8 @@ mod paths;
 
 pub use crate::infra::persistence::flock::FlockGuard;
 pub use harness_protocol::daemon::{
-    DaemonAuditEvent, DaemonBinaryStamp, DaemonDiagnostics, DaemonManifest, HostBridgeCapabilityManifest,
-    HostBridgeManifest,
+    DaemonAuditEvent, DaemonBinaryStamp, DaemonDiagnostics, DaemonManifest,
+    HostBridgeCapabilityManifest, HostBridgeManifest,
 };
 
 pub use audit::*;

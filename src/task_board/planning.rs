@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{PlanningState, TaskBoardItem, TaskBoardStatus};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PlanningTransition {
     pub board_item_id: String,
     pub from_status: TaskBoardStatus,

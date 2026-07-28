@@ -1,4 +1,6 @@
-use harness_protocol::observe::{Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity};
+use harness_protocol::observe::{
+    Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity,
+};
 
 use super::super::emitter::{Guidance, IssueBlueprint};
 use super::super::{EXIT_CODE_REGEX, TextCheckContext};

@@ -18,8 +18,7 @@ pub enum EffortKind {
     ReasoningEffort,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RuntimeModel {
     pub id: String,
     pub display_name: String,
@@ -37,8 +36,7 @@ impl RuntimeModel {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RuntimeModelCatalog {
     pub runtime: String,
     pub models: Vec<RuntimeModel>,

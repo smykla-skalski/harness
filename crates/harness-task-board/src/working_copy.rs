@@ -299,7 +299,10 @@ mod tests {
         registry.insert_or_update(key.clone(), make_entry(then, 100));
         let now = Utc::now();
         registry.touch(&key, now);
-        assert_eq!(registry.entries.get(&key).expect("present").last_used_at, now);
+        assert_eq!(
+            registry.entries.get(&key).expect("present").last_used_at,
+            now
+        );
     }
 
     #[test]

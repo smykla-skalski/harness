@@ -56,8 +56,7 @@ pub use types::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsTimelineRequest {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -71,16 +70,26 @@ pub struct ReviewsTimelineRequest {
     pub pull_request_updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum TimelinePageDirection {
     Older,
     Newer,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsTimelineResponse {
     pub pull_request_id: String,
     pub entries: Vec<ReviewTimelineEntry>,
@@ -90,8 +99,7 @@ pub struct ReviewsTimelineResponse {
     pub fetched_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TimelinePageInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_cursor: Option<String>,

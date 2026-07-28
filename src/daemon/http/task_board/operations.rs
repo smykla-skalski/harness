@@ -16,12 +16,10 @@ use crate::task_board::{
 
 use super::super::DaemonHttpState;
 use super::super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::{TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse};
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
-use super::items::{
-    TaskBoardStatusQuery, authenticated_request, authorized_control_request_parts,
-};
+use super::items::{TaskBoardStatusQuery, authenticated_request, authorized_control_request_parts};
+use crate::daemon::protocol::{TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse};
 
 #[utoipa::path(
     post,

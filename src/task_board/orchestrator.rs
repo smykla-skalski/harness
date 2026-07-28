@@ -2,11 +2,11 @@
 use std::path::PathBuf;
 
 #[cfg(test)]
-use harness_kernel::errors::{CliError, CliErrorKind};
-#[cfg(test)]
 use crate::infra::io::write_json_pretty;
 #[cfg(test)]
 use crate::workspace::utc_now;
+#[cfg(test)]
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[cfg(test)]
 use super::dispatch::DispatchExecutionSummary;
@@ -81,9 +81,7 @@ impl TaskBoardOrchestrator {
         update: &TaskBoardOrchestratorSettingsUpdateRequest,
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
         update.validate_admission_policy().map_err(|error| {
-            CliErrorKind::workflow_parse(format!(
-                "invalid task-board admission policy: {error}"
-            ))
+            CliErrorKind::workflow_parse(format!("invalid task-board admission policy: {error}"))
         })?;
         let mut settings = self.settings()?;
         apply_settings_update(&mut settings, update);

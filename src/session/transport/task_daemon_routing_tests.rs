@@ -239,7 +239,9 @@ where
 fn request_fake_daemon_shutdown(endpoint: &str) {
     let addr = endpoint.trim_start_matches("http://");
     if let Ok(mut stream) = TcpStream::connect(addr) {
-        let _ = stream.write_all(b"GET /v1/test-shutdown HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n");
+        let _ = stream.write_all(
+            b"GET /v1/test-shutdown HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n",
+        );
         let _ = stream.flush();
     }
 }

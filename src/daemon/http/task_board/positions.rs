@@ -10,12 +10,12 @@ use crate::daemon::remote_task_board::project_task_board_position_snapshot;
 
 use super::super::DaemonHttpState;
 use super::super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::{
-    TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
-};
 use super::super::response::timed_json;
 use super::super::task_board_route_executor;
 use super::items::{authenticated_task_board_read, authorized_control_request_parts};
+use crate::daemon::protocol::{
+    TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
+};
 
 #[utoipa::path(
     get,

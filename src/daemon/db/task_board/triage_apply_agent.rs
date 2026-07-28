@@ -3,7 +3,9 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::ITEMS_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::items::{bump_change_in_tx, load_item_with_triage_override_in_tx};
-use super::lane_order::{LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx};
+use super::lane_order::{
+    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
+};
 use super::triage_apply::{apply_placement_effect_in_tx, triage_eligible};
 use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
@@ -47,7 +49,8 @@ pub(crate) async fn apply_agent_triage_verdict_in_tx(
     decided_at: &str,
     config: &TaskBoardTriageEscalationConfig,
 ) -> Result<TaskBoardTriageEscalationVerdictOutcome, CliError> {
-    let Some(running) = claim_running_escalation_in_tx(transaction, escalation_id, verdict_token).await?
+    let Some(running) =
+        claim_running_escalation_in_tx(transaction, escalation_id, verdict_token).await?
     else {
         return Ok(TaskBoardTriageEscalationVerdictOutcome::Rejected(
             TaskBoardTriageEscalationRejectReason::UnknownRunningEscalation,
@@ -192,8 +195,15 @@ async fn reject_if_stale_evidence_in_tx(
     )
     .await?;
     if let Some(current) = current_triage_decision_in_tx(transaction, &item.id).await? {
-        maybe_enqueue_triage_escalation_in_tx(transaction, &item.id, &current, false, config, decided_at)
-            .await?;
+        maybe_enqueue_triage_escalation_in_tx(
+            transaction,
+            &item.id,
+            &current,
+            false,
+            config,
+            decided_at,
+        )
+        .await?;
     }
     Ok(StaleEvidenceCheck::Rejected(
         TaskBoardTriageEscalationVerdictOutcome::Rejected(

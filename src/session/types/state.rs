@@ -60,8 +60,7 @@ pub fn is_control_plane_actor_id(actor_id: &str) -> bool {
 }
 
 /// Main versioned state document for a multi-agent orchestration session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionState {
     pub schema_version: u32,
     /// Monotonically increasing counter for optimistic concurrency.
@@ -232,8 +231,7 @@ impl SessionStatus {
 }
 
 /// Lightweight rollup metrics for session summaries.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionMetrics {
     #[serde(default)]
     pub agent_count: u32,
