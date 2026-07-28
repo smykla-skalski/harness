@@ -78,13 +78,8 @@ fn helper_modules_do_not_leak_publicly() {
         ),
         (
             "src/observe/mod.rs",
-            "pub mod session;",
-            "pub(crate) mod session;",
-        ),
-        (
-            "src/observe/mod.rs",
             "pub mod types;",
-            "pub(crate) mod types;",
+            "pub(crate) mod types {",
         ),
         (
             "src/hooks/mod.rs",

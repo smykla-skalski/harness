@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 
 use harness_kernel::errors::CliError;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 use super::scan::scan_range;
 use super::session;

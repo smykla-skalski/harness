@@ -1,9 +1,9 @@
+use crate::application::maintenance::{load_observer_state, save_observer_state};
+use crate::types::IssueCode;
 use harness_kernel::errors::CliError;
-use crate::hooks::adapters::HookAgent;
-use crate::observe::application::maintenance::{load_observer_state, save_observer_state};
-use crate::observe::types::IssueCode;
+use harness_protocol::agent::HookAgent;
 
-pub(in crate::observe::application) fn execute_mute(
+pub(in crate::application) fn execute_mute(
     session_id: &str,
     codes: &str,
     project_hint: Option<&str>,
@@ -19,7 +19,7 @@ pub(in crate::observe::application) fn execute_mute(
     Ok(0)
 }
 
-pub(in crate::observe::application) fn execute_unmute(
+pub(in crate::application) fn execute_unmute(
     session_id: &str,
     codes: &str,
     project_hint: Option<&str>,

@@ -115,7 +115,7 @@ Core areas:
 - `src/session/` owns multi-agent orchestration state, roles, service logic, transport, storage, and observation.
 - `crates/harness-agents/src/runtime/` owns runtime adapters for Claude, Codex, Gemini, Copilot, Vibe, and OpenCode.
 - `src/daemon/` owns the local daemon: HTTP routes, storage, and the task-board service.
-- `src/observe/` owns session log scanning and issue classification.
+- `src/observe/` owns doctor diagnostics and the CLI dispatcher for `observe`; session log scanning, classification, and maintenance live in `crates/harness-observe/`.
 - Harness Monitor UI-triggered real work must leave the main thread through the global generic async work queue. Use `HarnessMonitorAsyncWorkQueue.shared` instead of route-local or action-specific queues; workers scale to the active CPU count, and UI state/toasts should hop back to the MainActor only for completion updates.
 
 Detailed module and data-directory notes live in `docs/agent-guides/root-reference.md`.

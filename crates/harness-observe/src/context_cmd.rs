@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 use super::dump::{format_dump_block, timestamp_suffix};
 use super::session;

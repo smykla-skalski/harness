@@ -49,35 +49,57 @@ fn observe_transport_stays_transport_only() {
         "src/observe/application/request.rs should own",
         &[
             "pub(crate) enum ObserveRequest",
-            "pub(crate) struct ObserveScanRequest",
+            "pub(crate) struct ObserveDoctorRequest",
         ],
     );
     assert_file_lacks_needles(
         &request,
         "src/observe/application/request.rs should stay request-only instead of owning",
-        &["fn execute(", "fn resolve_scan_action("],
+        &[
+            "fn execute(",
+            "fn resolve_scan_action(",
+            "struct ObserveScanRequest",
+        ],
+    );
+
+    let observe_request = read_repo_file(root, "crates/harness-observe/src/application/request.rs");
+    assert_file_contains_needles(
+        &observe_request,
+        "crates/harness-observe/src/application/request.rs should own",
+        &["pub struct ObserveScanRequest"],
     );
 
     let execute = read_repo_file(root, "src/observe/application/execute.rs");
     assert_file_contains_needles(
         &execute,
         "src/observe/application/execute.rs should own",
-        &[
-            "pub(crate) fn execute(",
-            "fn resolve_scan_action(",
-            "enum ObserveScanAction",
-        ],
+        &["pub(crate) fn execute("],
     );
     assert_file_lacks_needles(
         &execute,
-        "src/observe/application/execute.rs should not depend on transport enum",
+        "src/observe/application/execute.rs should stay a thin dispatcher instead of owning",
+        &["fn resolve_scan_action(", "enum ObserveScanAction"],
+    );
+
+    let observe_execute = read_repo_file(root, "crates/harness-observe/src/application/execute.rs");
+    assert_file_contains_needles(
+        &observe_execute,
+        "crates/harness-observe/src/application/execute.rs should own",
+        &["fn resolve_scan_action(", "enum ObserveScanAction"],
+    );
+    assert_file_lacks_needles(
+        &observe_execute,
+        "crates/harness-observe/src/application/execute.rs should not depend on transport enum",
         &["ObserveMode", "ObserveScanActionKind"],
     );
 
-    let maintenance = read_repo_file(root, "src/observe/application/maintenance.rs");
+    let maintenance = read_repo_file(
+        root,
+        "crates/harness-observe/src/application/maintenance.rs",
+    );
     assert_file_lacks_needles(
         &maintenance,
-        "src/observe/application/maintenance.rs should stay a facade instead of owning",
+        "crates/harness-observe/src/application/maintenance.rs should stay a facade instead of owning",
         &[
             "fn load_observer_state(",
             "fn execute_cycle(",
@@ -86,8 +108,14 @@ fn observe_transport_stays_transport_only() {
     );
     assert_docs_contain_needles(
         &[
-            &read_repo_file(root, "src/observe/application/maintenance/storage.rs"),
-            &read_repo_file(root, "src/observe/application/maintenance/scan.rs"),
+            &read_repo_file(
+                root,
+                "crates/harness-observe/src/application/maintenance/storage.rs",
+            ),
+            &read_repo_file(
+                root,
+                "crates/harness-observe/src/application/maintenance/scan.rs",
+            ),
         ],
         "observe maintenance split modules should own",
         &["fn load_observer_state(", "fn execute_cycle("],
@@ -231,10 +259,10 @@ fn assert_transport_outputs_avoid_manual_json(root: &Path) {
         "src/hooks/adapters/gemini.rs",
         "src/hooks/adapters/codex.rs",
         "src/hooks/adapters/opencode/mod.rs",
-        "src/observe/watch.rs",
-        "src/observe/scan.rs",
-        "src/observe/compare.rs",
-        "src/observe/application/maintenance.rs",
+        "crates/harness-observe/src/watch.rs",
+        "crates/harness-observe/src/scan.rs",
+        "crates/harness-observe/src/compare.rs",
+        "crates/harness-observe/src/application/maintenance.rs",
         "src/setup/wrapper/mod.rs",
         "src/setup/wrapper/registrations.rs",
     ] {
@@ -306,10 +334,13 @@ fn codex_adapter_root_stays_prod_only() {
 }
 
 fn assert_observe_outputs_use_typed_serialization(root: &Path) {
-    let maintenance_render = read_repo_file(root, "src/observe/application/maintenance/render.rs");
+    let maintenance_render = read_repo_file(
+        root,
+        "crates/harness-observe/src/application/maintenance/render.rs",
+    );
     assert_file_contains_needles(
         &maintenance_render,
-        "src/observe/application/maintenance/render.rs should provide typed serialization helpers via",
+        "crates/harness-observe/src/application/maintenance/render.rs should provide typed serialization helpers via",
         &[
             "use serde::Serialize;",
             "fn render_json<T: Serialize>(",
@@ -317,33 +348,38 @@ fn assert_observe_outputs_use_typed_serialization(root: &Path) {
         ],
     );
 
-    let maintenance_inspection =
-        read_repo_file(root, "src/observe/application/maintenance/inspection.rs");
-    let maintenance_status = read_repo_file(root, "src/observe/application/maintenance/status.rs");
+    let maintenance_inspection = read_repo_file(
+        root,
+        "crates/harness-observe/src/application/maintenance/inspection.rs",
+    );
+    let maintenance_status = read_repo_file(
+        root,
+        "crates/harness-observe/src/application/maintenance/status.rs",
+    );
     assert_docs_contain_needles(
         &[&maintenance_inspection, &maintenance_status],
         "observe maintenance split modules should render typed maintenance output via",
         &["#[derive(Serialize)]"],
     );
 
-    let watch = read_repo_file(root, "src/observe/watch.rs");
+    let watch = read_repo_file(root, "crates/harness-observe/src/watch.rs");
     assert_file_contains_needles(
         &watch,
-        "src/observe/watch.rs should emit typed watch status JSON via",
+        "crates/harness-observe/src/watch.rs should emit typed watch status JSON via",
         &["#[derive(Serialize)]", "struct WatchStarted"],
     );
 
-    let scan = read_repo_file(root, "src/observe/scan/execute.rs");
+    let scan = read_repo_file(root, "crates/harness-observe/src/scan/execute.rs");
     assert_file_contains_needles(
         &scan,
-        "src/observe/scan/execute.rs should emit typed scan status JSON via",
+        "crates/harness-observe/src/scan/execute.rs should emit typed scan status JSON via",
         &["#[derive(Serialize)]", "struct ScanStarted"],
     );
 
-    let compare = read_repo_file(root, "src/observe/compare.rs");
+    let compare = read_repo_file(root, "crates/harness-observe/src/compare.rs");
     assert_file_contains_needles(
         &compare,
-        "src/observe/compare.rs should render typed compare output via",
+        "crates/harness-observe/src/compare.rs should render typed compare output via",
         &["#[derive(Serialize)]", "struct CompareResult"],
     );
 }
@@ -373,11 +409,11 @@ fn transport_outputs_use_typed_serialization_helpers() {
 #[test]
 fn observe_scan_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let scan = read_repo_file(root, "src/observe/scan.rs");
+    let scan = read_repo_file(root, "crates/harness-observe/src/scan.rs");
 
     assert_file_lacks_needles(
         &scan,
-        "src/observe/scan.rs should stay focused on facade exports instead of owning",
+        "crates/harness-observe/src/scan.rs should stay focused on facade exports instead of owning",
         &[
             "fn scan_with_limit(",
             "fn apply_category_filter(",
@@ -389,11 +425,11 @@ fn observe_scan_root_stays_prod_only() {
     );
 
     for path in [
-        "src/observe/scan/execute.rs",
-        "src/observe/scan/filters.rs",
-        "src/observe/scan/from.rs",
-        "src/observe/scan/io.rs",
-        "src/observe/scan/render.rs",
+        "crates/harness-observe/src/scan/execute.rs",
+        "crates/harness-observe/src/scan/filters.rs",
+        "crates/harness-observe/src/scan/from.rs",
+        "crates/harness-observe/src/scan/io.rs",
+        "crates/harness-observe/src/scan/render.rs",
     ] {
         assert!(
             root.join(path).exists(),

@@ -1,8 +1,8 @@
+use crate::application::maintenance::{load_observer_state, render_json};
+use crate::scan;
+use crate::session;
 use harness_kernel::errors::CliError;
-use crate::hooks::adapters::HookAgent;
-use crate::observe::application::maintenance::{load_observer_state, render_json};
-use crate::observe::scan;
-use crate::observe::session;
+use harness_protocol::agent::HookAgent;
 
 #[derive(serde::Serialize)]
 struct IssueVerification {
@@ -17,7 +17,7 @@ struct ResolveStartResult {
     method: &'static str,
 }
 
-pub(in crate::observe::application) fn execute_verify(
+pub(in crate::application) fn execute_verify(
     session_id: &str,
     issue_id: &str,
     since_line: Option<usize>,
@@ -73,7 +73,7 @@ pub(in crate::observe::application) fn execute_verify(
     Ok(0)
 }
 
-pub(in crate::observe::application) fn execute_resolve_start(
+pub(in crate::application) fn execute_resolve_start(
     session_id: &str,
     value: &str,
     project_hint: Option<&str>,

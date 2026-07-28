@@ -1,13 +1,13 @@
+use crate::application::ObserveFilter;
+use crate::application::maintenance::{load_observer_state, save_observer_state};
+use crate::output;
+use crate::scan;
+use crate::session;
+use crate::types::{self, IssueSeverity};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::HookAgent;
-use crate::observe::application::ObserveFilter;
-use crate::observe::application::maintenance::{load_observer_state, save_observer_state};
-use crate::observe::output;
-use crate::observe::scan;
-use crate::observe::session;
-use crate::observe::types::{self, IssueSeverity};
+use harness_protocol::agent::HookAgent;
 
-pub(in crate::observe::application) fn execute_cycle(
+pub(in crate::application) fn execute_cycle(
     session_id: &str,
     project_hint: Option<&str>,
     observe_id: &str,
@@ -92,7 +92,7 @@ pub(in crate::observe::application) fn execute_cycle(
     )))
 }
 
-pub(in crate::observe::application) fn execute_resume(
+pub(in crate::application) fn execute_resume(
     session_id: &str,
     filter: &ObserveFilter,
 ) -> Result<i32, CliError> {

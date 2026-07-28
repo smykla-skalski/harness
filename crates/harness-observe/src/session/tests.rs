@@ -1,7 +1,7 @@
 use std::fs;
 
-use crate::hooks::adapters::HookAgent;
-use crate::workspace::project_context_dir;
+use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::project_context_dir;
 
 use super::{find_session, find_session_for_agent};
 

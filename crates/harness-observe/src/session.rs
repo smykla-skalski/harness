@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use walkdir::WalkDir;
 
-use crate::agents::storage::find_canonical_session;
+use harness_agents::storage::find_canonical_session;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::HookAgent;
-use crate::workspace::dirs_home;
+use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::dirs_home;
 
 /// Locate a session JSONL file, preferring the canonical harness agent ledger.
 ///
