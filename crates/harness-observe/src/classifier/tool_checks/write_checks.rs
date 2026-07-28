@@ -2,12 +2,13 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::observe::classifier::SKILL_NAME_REGEX;
-use crate::observe::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
-use crate::observe::patterns;
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,
 };
+
+use crate::classifier::SKILL_NAME_REGEX;
+use crate::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
+use crate::patterns;
 
 /// Source code file extensions that require a commit before continuing.
 pub(super) const SOURCE_CODE_EXTENSIONS: &[&str] = &[

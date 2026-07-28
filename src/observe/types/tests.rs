@@ -335,3 +335,20 @@ fn focus_presets_static() {
     assert_eq!(FOCUS_PRESETS[1].name, "skills");
     assert_eq!(FOCUS_PRESETS[2].name, "all");
 }
+
+#[test]
+fn focus_preset_filtering() {
+    let harness_cats = FocusPreset::Harness.categories().unwrap();
+    let skills_cats = FocusPreset::Skills.categories().unwrap();
+
+    // BuildError is in harness, not skills
+    assert!(harness_cats.contains(&IssueCategory::BuildError));
+    assert!(!skills_cats.contains(&IssueCategory::BuildError));
+
+    // SkillBehavior is in skills, not harness
+    assert!(skills_cats.contains(&IssueCategory::SkillBehavior));
+    assert!(!harness_cats.contains(&IssueCategory::SkillBehavior));
+
+    // All returns None (no filter)
+    assert!(FocusPreset::All.categories().is_none());
+}

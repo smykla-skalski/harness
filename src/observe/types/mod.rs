@@ -8,7 +8,8 @@ mod tracking;
 pub use classification::{
     Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole, SourceTool,
 };
-pub use issue_code::{IssueCode, compute_issue_id};
+pub use harness_observe::compute_issue_id;
+pub use issue_code::IssueCode;
 #[cfg(not(feature = "standalone-daemon"))]
 pub use presets::{FOCUS_PRESETS, FocusPreset};
 #[cfg(test)]

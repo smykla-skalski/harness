@@ -151,23 +151,6 @@ fn dedup_tracking_occurrence_count() {
 }
 
 #[test]
-fn focus_preset_filtering() {
-    let harness_cats = FocusPreset::Harness.categories().unwrap();
-    let skills_cats = FocusPreset::Skills.categories().unwrap();
-
-    // BuildError is in harness, not skills
-    assert!(harness_cats.contains(&IssueCategory::BuildError));
-    assert!(!skills_cats.contains(&IssueCategory::BuildError));
-
-    // SkillBehavior is in skills, not harness
-    assert!(skills_cats.contains(&IssueCategory::SkillBehavior));
-    assert!(!harness_cats.contains(&IssueCategory::SkillBehavior));
-
-    // All returns None (no filter)
-    assert!(FocusPreset::All.categories().is_none());
-}
-
-#[test]
 fn source_tool_in_json_output() {
     let mut state = make_state();
     let issues = check_text_for_issues(
@@ -229,7 +212,7 @@ fn tool_correlation_window_pruning() {
 fn fix_target_paths_look_valid() {
     // Collect all fix_target strings from TEXT_RULES and verify they
     // look like relative paths (not stale like "cli.rs" without src/)
-    use crate::observe::classifier::rules::TEXT_RULES;
+    use crate::classifier::rules::TEXT_RULES;
     for rule in TEXT_RULES {
         if let super::rules::RuleGuidance::Fix {
             target: Some(target),
@@ -249,7 +232,7 @@ fn fix_target_paths_look_valid() {
 #[test]
 fn registry_and_all_codes_aligned() {
     // Every code in IssueCode::ALL should have a registry entry
-    use crate::observe::classifier::registry::issue_code_meta;
+    use crate::classifier::registry::issue_code_meta;
     for code in IssueCode::ALL {
         assert!(
             issue_code_meta(*code).is_some(),

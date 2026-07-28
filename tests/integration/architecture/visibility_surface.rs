@@ -74,12 +74,7 @@ fn helper_modules_do_not_leak_publicly() {
         (
             "src/observe/mod.rs",
             "pub mod classifier;",
-            "pub(crate) mod classifier;",
-        ),
-        (
-            "src/observe/mod.rs",
-            "pub mod patterns;",
-            "pub(crate) mod patterns {",
+            "pub(crate) mod classifier {",
         ),
         (
             "src/observe/mod.rs",

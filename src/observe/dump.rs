@@ -2,7 +2,7 @@ mod execute;
 mod format;
 
 pub(crate) use execute::execute_dump;
-pub(crate) use format::{format_dump_block, timestamp_suffix, tool_result_text};
+pub(crate) use format::{format_dump_block, timestamp_suffix};
 
 pub(super) struct DumpOptions<'a> {
     pub from_line: usize,

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity};
+use harness_protocol::observe::{Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity};
 
 mod data;
 

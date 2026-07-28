@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
+use harness_protocol::observe::{Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool};
+
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::registry::issue_code_meta;
-use crate::observe::types::{Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool};
 
 #[path = "rules/data.rs"]
 mod data;

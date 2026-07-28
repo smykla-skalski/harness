@@ -1,4 +1,5 @@
 use harness_kernel::kernel::tooling::{ToolInput, legacy_tool_context};
+use harness_observe::dump::tool_result_text;
 
 use super::super::truncate_at;
 
@@ -6,28 +7,6 @@ use super::super::truncate_at;
 pub(crate) struct DumpBlock {
     pub label: String,
     pub text: String,
-}
-
-/// Extract text from a `tool_result` content block.
-pub(crate) fn tool_result_text(block: &serde_json::Value) -> String {
-    let content = &block["content"];
-    if let Some(arr) = content.as_array() {
-        let parts: Vec<&str> = arr
-            .iter()
-            .filter_map(|item| {
-                if item["type"].as_str() == Some("text") {
-                    item["text"].as_str()
-                } else {
-                    None
-                }
-            })
-            .collect();
-        parts.join("\n")
-    } else if let Some(s) = content.as_str() {
-        s.to_string()
-    } else {
-        String::new()
-    }
 }
 
 /// Format a content block for dump output.

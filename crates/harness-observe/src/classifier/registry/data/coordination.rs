@@ -1,5 +1,6 @@
-use crate::observe::classifier::registry::{IssueCodeMeta, IssueOwner};
-use crate::observe::types::{Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity};
+use harness_protocol::observe::{Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity};
+
+use crate::classifier::registry::{IssueCodeMeta, IssueOwner};
 
 pub(super) static ISSUE_CODE_METAS: &[IssueCodeMeta] = &[
     IssueCodeMeta {

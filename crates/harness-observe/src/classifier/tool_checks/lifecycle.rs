@@ -3,10 +3,11 @@ use std::path::Path;
 use serde_json::Value;
 
 use harness_kernel::kernel::command_intent::ObservedCommand;
-use crate::observe::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,
 };
+
+use crate::classifier::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 
 /// Track resource create/delete lifecycle across a test group.
 ///

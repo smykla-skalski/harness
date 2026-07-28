@@ -38,7 +38,7 @@ fn rate_limit_not_triggered_for_normal_output() {
 
 #[test]
 fn coordination_codes_in_registry() {
-    use crate::observe::classifier::registry::issue_code_meta;
+    use crate::classifier::registry::issue_code_meta;
     let codes = [
         IssueCode::AgentStalledProgress,
         IssueCode::AgentRepeatedError,

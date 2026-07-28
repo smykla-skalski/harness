@@ -2,14 +2,14 @@ use std::path::Path;
 
 use harness_kernel::kernel::command_intent::ObservedCommand;
 use harness_kernel::kernel::tooling::ToolInput;
-use crate::observe::patterns;
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,
 };
 
 use super::super::RM_RECURSIVE_REGEX;
 use super::super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::lifecycle::{track_capture_between_groups, track_resource_lifecycle};
+use crate::patterns;
 
 /// Verification keywords that indicate a command whose output should not
 /// be truncated. Matched case-insensitively against the command text.

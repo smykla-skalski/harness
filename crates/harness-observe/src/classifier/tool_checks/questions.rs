@@ -1,11 +1,11 @@
 use serde_json::Value;
 
-use crate::observe::patterns;
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, Issue, IssueCode, MessageRole, ScanState, SourceTool,
 };
 
 use super::super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
+use crate::patterns;
 
 pub(super) fn check_ask_user_question(
     line_num: usize,
