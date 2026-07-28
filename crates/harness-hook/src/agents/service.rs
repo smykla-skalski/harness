@@ -159,7 +159,11 @@ pub fn record_hook_event(
     Ok(())
 }
 
-fn project_dir_for_context(context: &NormalizedHookContext) -> Result<PathBuf, CliError> {
+// `crate::hooks::runtime::observation` shares this resolution step for its
+// own `record_hook_event`, so this needs to reach outside `agents::service`.
+pub(crate) fn project_dir_for_context(
+    context: &NormalizedHookContext,
+) -> Result<PathBuf, CliError> {
     context
         .session
         .cwd

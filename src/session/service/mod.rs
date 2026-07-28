@@ -125,7 +125,7 @@ pub use lifecycle::{
 pub use liveness::{LivenessSyncResult, sync_agent_liveness};
 pub use queries::{
     build_recovery_tui_request, list_sessions, list_sessions_global, resolve_session_project_dir,
-    session_status,
+    session_agent_is_alive, session_status,
 };
 pub use review_tasks::{
     arbitrate, claim_review, respond_review, submit_for_review, submit_for_review_with_persona,

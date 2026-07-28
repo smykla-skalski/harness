@@ -21,7 +21,6 @@
 )]
 
 mod integration {
-    mod agent_transcripts;
     mod architecture;
     mod cluster;
     mod commands;
