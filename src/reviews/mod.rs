@@ -2,9 +2,15 @@
 // `github`, `logic`, `policy`, `types`, and `validation` moved into
 // `harness_reviews` in this slice, completing the extraction the earlier
 // `avatar`/`enums`/`file_comment`/`files`/`review_thread_resolve`/`timeline`
-// slice started. Each wrapper below restores its outside callers exactly
-// the way root's own `task_board/mod.rs` restores task_board's extracted
-// domains through its own `pub use harness_task_board::*;`.
+// slice started. `body_update`, `github`, `policy`, and `types` get wrapper
+// modules below because this file still needs to reach them by name
+// (`pub use body_update::{...}`, `github::ReviewsGitHubClient`, and so on);
+// `backports`, `logic`, and `validation` have no such call site here (their
+// exported items are inherent impls on `types`'s structs, reachable through
+// those structs without a module-qualified path) and so need no wrapper.
+// Each wrapper restores its outside callers exactly the way root's own
+// `task_board/mod.rs` restores task_board's extracted domains through its
+// own `pub use harness_task_board::*;`.
 mod avatar {
     pub use harness_reviews::avatar::*;
 }

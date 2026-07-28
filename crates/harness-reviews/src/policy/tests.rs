@@ -1,4 +1,3 @@
-use std::mem;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -379,9 +378,7 @@ fn write_enforced_reviews_auto_policy(root: &Path) {
 }
 
 fn test_runtime_repository() -> PolicyRuntimeRepository {
-    let temp = tempdir().expect("create tempdir");
-    let root = temp.path().to_path_buf();
-    mem::forget(temp);
+    let root = tempdir().expect("create tempdir").keep();
     PolicyRuntimeRepository::new(root)
 }
 
