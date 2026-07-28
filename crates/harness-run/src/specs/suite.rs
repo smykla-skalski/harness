@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::io;
+use harness_kernel::io;
 
 use super::frontmatter::{SuiteFrontmatter, SuiteFrontmatterUnchecked};
 

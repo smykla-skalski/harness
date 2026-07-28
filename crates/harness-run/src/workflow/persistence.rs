@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::io::{read_text, write_json_pretty};
-use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+use harness_kernel::io::{read_text, write_json_pretty};
 use harness_kernel::kernel::skills::dirs as skill_dirs;
 
 use super::types::{PreflightState, PreflightStatus, RunnerPhase, RunnerWorkflowState};

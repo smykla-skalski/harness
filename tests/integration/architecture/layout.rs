@@ -9,13 +9,13 @@ fn new_domain_roots_exist() {
     for path in [
         "ARCHITECTURE.md",
         "src/app",
-        "src/run",
         "src/observe",
         "src/setup",
         "crates/harness-workspace/src/workspace",
         "crates/harness-kernel/src/kernel",
         "crates/harness-infra/src",
         "crates/harness-observe/src",
+        "crates/harness-run/src",
         "src/hooks",
     ] {
         assert!(root.join(path).exists(), "missing expected path: {path}");
@@ -64,7 +64,7 @@ fn cluster_topology_is_owned_by_kernel() {
 
     let mut hits = Vec::new();
     for path in [
-        "src/run/context/aggregate.rs",
+        "crates/harness-run/src/context/aggregate.rs",
         "tests/integration/cluster/mod.rs",
         "tests/integration/universal.rs",
     ] {
@@ -88,7 +88,7 @@ fn cluster_topology_is_owned_by_kernel() {
 #[test]
 fn run_specs_root_is_thin() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let specs_mod = read_repo_file(root, "src/run/specs/mod.rs");
+    let specs_mod = read_repo_file(root, "crates/harness-run/src/specs/mod.rs");
 
     for needle in [
         "fn effective_requires(",
@@ -98,12 +98,12 @@ fn run_specs_root_is_thin() {
     ] {
         assert!(
             !specs_mod.contains(needle),
-            "src/run/specs/mod.rs should stay focused on public exports instead of owning `{needle}`"
+            "crates/harness-run/src/specs/mod.rs should stay focused on public exports instead of owning `{needle}`"
         );
     }
 
     assert!(
-        repo_path_exists(root, "src/run/specs/tests.rs"),
+        repo_path_exists(root, "crates/harness-run/src/specs/tests.rs"),
         "run specs split test module should exist"
     );
 }

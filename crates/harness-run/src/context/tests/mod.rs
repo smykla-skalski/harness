@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::{RunCounts, RunStatus, Verdict};
 use harness_kernel::kernel::topology::{ClusterSpec, Platform};
-use crate::run::{RunCounts, RunStatus, Verdict};
 
 use super::{ArtifactSnapshot, CommandEnv, PreflightArtifact, RunContext, RunLayout, RunMetadata};
 

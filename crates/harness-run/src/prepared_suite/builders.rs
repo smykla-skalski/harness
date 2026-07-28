@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
+use crate::context::RunLayout;
+use crate::{GroupSpec, SuiteSpec};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::io::ensure_dir;
-use crate::run::context::RunLayout;
-use crate::run::{GroupSpec, SuiteSpec};
+use harness_kernel::io::ensure_dir;
 
 use super::digest::{file_sha256, source_digest, text_sha256};
 use super::extraction::{configure_section, yaml_blocks};

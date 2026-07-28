@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use harness_testkit::{GroupBuilder, SuiteBuilder, default_suite};
 
-use crate::run::{GroupSpec, SuiteSpec};
+use crate::{GroupSpec, SuiteSpec};
 
 fn write_temp_file(dir: &Path, name: &str, content: &str) -> PathBuf {
     let path = dir.join(name);

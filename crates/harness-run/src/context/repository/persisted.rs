@@ -3,9 +3,9 @@ use std::thread;
 
 use serde::de::DeserializeOwned;
 
+use crate::RunStatus;
 use harness_kernel::errors::CliError;
-use crate::infra::io::read_json_typed;
-use crate::run::RunStatus;
+use harness_kernel::io::read_json_typed;
 
 use super::super::aggregate::RunAggregate;
 use super::super::{RunLayout, RunMetadata};

@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::io;
+use harness_kernel::io;
 
 use super::{GroupVerdict, Verdict};
 
