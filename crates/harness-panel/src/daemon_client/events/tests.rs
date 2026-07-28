@@ -125,6 +125,10 @@ struct Seen {
 }
 
 /// A daemon that accepts one socket, sends `frames`, and closes.
+#[expect(
+    clippy::result_large_err,
+    reason = "tungstenite's Callback trait fixes this Result signature; the handshake here never returns Err"
+)]
 async fn stub_daemon(frames: Vec<String>) -> (String, Arc<Mutex<Seen>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let address = listener.local_addr().expect("local address");
