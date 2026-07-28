@@ -1,8 +1,10 @@
+use std::path::{Path, PathBuf};
+
 use tempfile::tempdir;
 
 use super::parse_cache::ParseCache;
-use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{
+use crate::store::{TaskBoardItemPatch, TaskBoardStore};
+use crate::types::{
     AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
     TaskBoardWorkflowStatus,
 };
@@ -274,7 +276,7 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
     );
 }
 
-fn seed_raw_item(store: &TaskBoardStore, id: &str, status: &str) -> std::path::PathBuf {
+fn seed_raw_item(store: &TaskBoardStore, id: &str, status: &str) -> PathBuf {
     seed_raw_item_with_frontmatter_id(store, id, id, status)
 }
 
@@ -283,14 +285,14 @@ fn seed_raw_item_with_frontmatter_id(
     filename_id: &str,
     frontmatter_id: &str,
     status: &str,
-) -> std::path::PathBuf {
+) -> PathBuf {
     let path = store.tasks_dir().join(format!("{filename_id}.md"));
     fs::create_dir_all(store.tasks_dir()).expect("create tasks dir");
     write_raw_item(&path, frontmatter_id, "Legacy status", status);
     path
 }
 
-fn write_raw_item(path: &std::path::Path, frontmatter_id: &str, title: &str, status: &str) {
+fn write_raw_item(path: &Path, frontmatter_id: &str, title: &str, status: &str) {
     fs::write(
         path,
         format!(
@@ -311,6 +313,10 @@ fn write_raw_item(path: &std::path::Path, frontmatter_id: &str, title: &str, sta
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "a flat run of independent assertions across a full lifecycle, not real branching complexity"
+)]
 fn create_get_list_update_delete_round_trips_markdown() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));

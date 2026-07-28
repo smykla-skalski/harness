@@ -7,7 +7,6 @@ use utoipa::openapi::schema::{Schema, Type};
 use utoipa::openapi::{ObjectBuilder, RefOr};
 use utoipa::{PartialSchema, ToSchema};
 
-use super::automation::TaskBoardWorkflowKind;
 pub use super::item_fields::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,
 };
@@ -15,6 +14,34 @@ use super::lane::TaskBoardLaneOrigin;
 
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
 pub const MAX_TASK_BOARD_ESTIMATE: u64 = i64::MAX as u64;
+
+// Defined here rather than in `automation` (the root crate's own task-board
+// business logic, which stays behind for now): `TaskBoardItem` embeds this
+// enum directly, so it has to live wherever `TaskBoardItem` does. Everything
+// outside this crate already reaches it through the flat
+// `crate::task_board::TaskBoardWorkflowKind` facade rather than a
+// module-qualified path, so relocating the definition needs no caller
+// updates.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[derive(utoipa::ToSchema)]
+pub enum TaskBoardWorkflowKind {
+    Unknown,
+    #[default]
+    DefaultTask,
+    PrFix,
+    PrReview,
+    Review,
+}
+
+impl TaskBoardWorkflowKind {
+    /// Write workflows perform publishing side effects, so they require Headless
+    /// dispatch and configured publication automation; other kinds are read-only.
+    #[must_use]
+    pub const fn is_write(self) -> bool {
+        matches!(self, Self::DefaultTask | Self::PrFix)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]

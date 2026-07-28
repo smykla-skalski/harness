@@ -1,29 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{ExternalRefProvider, TaskBoardReviewerProfile};
+use crate::task_board::{ExternalRefProvider, TaskBoardReviewerProfile, TaskBoardWorkflowKind};
 
 pub const TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION: u32 = 1;
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardWorkflowKind {
-    Unknown,
-    #[default]
-    DefaultTask,
-    PrFix,
-    PrReview,
-    Review,
-}
-
-impl TaskBoardWorkflowKind {
-    /// Write workflows perform publishing side effects, so they require Headless
-    /// dispatch and configured publication automation; other kinds are read-only.
-    #[must_use]
-    pub const fn is_write(self) -> bool {
-        matches!(self, Self::DefaultTask | Self::PrFix)
-    }
-}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

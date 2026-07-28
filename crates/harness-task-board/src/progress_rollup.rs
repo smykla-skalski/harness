@@ -29,7 +29,10 @@ pub fn build_progress_rollups(items: &[TaskBoardItem]) -> HashMap<String, TaskBo
     build_progress_rollups_from(items)
 }
 
-pub(crate) fn build_progress_rollups_from<'a>(
+// `pub` rather than `pub(crate)`: `daemon::service::task_board_db::list_items`
+// in the root crate calls this directly today, the minimum this crate
+// boundary requires.
+pub fn build_progress_rollups_from<'a>(
     items: impl IntoIterator<Item = &'a TaskBoardItem>,
 ) -> HashMap<String, TaskBoardProgressRollup> {
     let live_by_id: HashMap<&str, &TaskBoardItem> = items
@@ -123,7 +126,7 @@ fn count_by_status(rollup: &mut TaskBoardProgressRollup, status: TaskBoardStatus
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::types::TaskBoardStatus;
+    use crate::types::TaskBoardStatus;
 
     fn item(
         id: &str,

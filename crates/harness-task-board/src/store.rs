@@ -1,24 +1,24 @@
 use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::io;
-#[cfg(test)]
-use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::workspace::harness_data_root;
-#[cfg(test)]
-use crate::workspace::utc_now;
+use harness_infra::io;
+#[cfg(any(test, feature = "test-support"))]
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+use harness_workspace::workspace::harness_data_root;
+#[cfg(any(test, feature = "test-support"))]
+use harness_workspace::workspace::utc_now;
 
 mod frontmatter;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 mod loading;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 mod parse_cache;
 use frontmatter::TaskBoardFrontmatter;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use parse_cache::BOARD_PARSE_CACHE;
 
 use super::TaskBoardWorkflowKind;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::types::CURRENT_TASK_BOARD_ITEM_VERSION;
 use super::types::{
     AgentMode, ExternalRef, PlanningState, TaskBoardItem, TaskBoardItemKind, TaskBoardPriority,
@@ -26,7 +26,7 @@ use super::types::{
 };
 
 #[derive(Debug, Clone)]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub struct TaskBoardStore {
     root: PathBuf,
 }
@@ -68,12 +68,14 @@ pub enum OptionalFieldPatch<T> {
     Clear,
 }
 
+// `pub` rather than `pub(crate)`: the root crate's daemon service files call
+// this directly today, the minimum this crate boundary requires.
 #[must_use]
-pub(crate) fn default_board_root() -> PathBuf {
+pub fn default_board_root() -> PathBuf {
     harness_data_root().join("task-board")
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl TaskBoardStore {
     #[must_use]
     pub fn new(root: PathBuf) -> Self {
@@ -150,8 +152,12 @@ impl TaskBoardStore {
     ///
     /// # Errors
     /// Returns `CliError` if the item cannot be loaded, locked, or saved.
-    #[cfg(test)]
-    pub(crate) fn update_if(
+    ///
+    /// `pub` rather than `pub(crate)`: the root crate's `task_board::external`
+    /// test-only sync fixtures call this directly today, the minimum this
+    /// crate boundary requires.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn update_if(
         &self,
         id: &str,
         patch_for: impl FnOnce(&TaskBoardItem) -> Option<TaskBoardItemPatch>,
@@ -266,7 +272,15 @@ impl TaskBoardStore {
     }
 }
 
-pub(crate) fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result<(), CliError> {
+// The four functions below are `pub` rather than `pub(crate)`: the root
+// crate's `task_board::legacy_import` and `daemon::db::task_board` call these
+// directly today, the minimum this crate boundary requires.
+
+/// Confirm a loaded item's id matches the id it was loaded by.
+///
+/// # Errors
+/// Returns `CliError` when `item`'s id does not match `expected`.
+pub fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result<(), CliError> {
     if item.id == expected {
         return Ok(());
     }
@@ -277,7 +291,7 @@ pub(crate) fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result
     .into())
 }
 
-pub(crate) fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool {
+pub fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool {
     let status = item.status.canonical_persisted_status();
     if item.status == status {
         return false;
@@ -286,7 +300,7 @@ pub(crate) fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool
     true
 }
 
-pub(crate) fn apply_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
+pub fn apply_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
     apply_core_patch(item, &patch);
     apply_link_patch(item, patch);
 }
@@ -370,7 +384,12 @@ fn apply_optional_patch<T>(target: &mut Option<T>, patch: OptionalFieldPatch<T>)
     }
 }
 
-pub(crate) fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
+/// Read and parse one board item's markdown/frontmatter file directly.
+///
+/// # Errors
+/// Returns `CliError` if the file cannot be read or its frontmatter cannot be
+/// parsed.
+pub fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
     let text = io::read_text(path)?;
     let label = path.display().to_string();
     let parsed = io::parse_frontmatter::<serde_json::Value>(&text, &label)?;
@@ -414,7 +433,7 @@ fn normalize_legacy_status(value: &mut serde_json::Value) {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn sort_items(items: &mut [TaskBoardItem]) {
     super::lane::sort_task_board_items(items);
 }

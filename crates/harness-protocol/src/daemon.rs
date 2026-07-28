@@ -13,9 +13,10 @@ pub mod http_paths {
 /// Canonical websocket method names shared with the daemon router.
 pub mod ws_methods;
 
-/// Bounds the daemon holds every task-board list read to. Shared as one source
-/// file so a standalone client advertises the same numbers the daemon enforces.
-#[path = "../../../src/task_board/item_query_bounds.rs"]
+/// Bounds the daemon holds every task-board list read to. Lives directly in
+/// this crate (rather than a root-crate `#[path]` include) so a standalone
+/// client and `harness-task-board`'s own query code share the one definition
+/// instead of each carrying a copy.
 pub mod task_board_list_bounds;
 
 pub use task_board_list_bounds::{

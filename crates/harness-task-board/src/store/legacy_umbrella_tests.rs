@@ -1,8 +1,8 @@
 use fs_err as fs;
 use tempfile::tempdir;
 
-use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::TaskBoardStatus;
+use crate::store::{TaskBoardItemPatch, TaskBoardStore};
+use crate::types::TaskBoardStatus;
 
 #[test]
 fn legacy_markdown_statuses_read_and_rewrite_as_inbox() {
@@ -12,7 +12,7 @@ fn legacy_markdown_statuses_read_and_rewrite_as_inbox() {
     fs::create_dir_all(store.tasks_dir()).expect("create tasks dir");
     fs::write(
         &path,
-        r#"---
+        r"---
 schema_version: 1
 id: legacy-umbrella
 title: Legacy lane
@@ -29,7 +29,7 @@ updated_at: 2026-05-14T00:00:00Z
 ---
 
 body
-"#,
+",
     )
     .expect("write legacy item");
 

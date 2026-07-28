@@ -1,7 +1,7 @@
 //! Unit tests for the built-in policy gate and additive wire types.
 
 use super::*;
-use crate::task_board::types::{AgentMode, TaskBoardPriority};
+use crate::types::{AgentMode, TaskBoardPriority};
 
 fn gate() -> BuiltInPolicyGate {
     BuiltInPolicyGate::new(40)
@@ -46,6 +46,10 @@ fn subject_and_input_enrichment_fields_are_present_and_optional() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "a flat run of independent assertions, not real branching complexity"
+)]
 fn old_recorded_input_without_enrichment_still_deserializes() {
     // A decision recorded before WP3 enrichment: no tags/priority/agent_mode/
     // target_project_types on the subject and no evaluated_at on the input.

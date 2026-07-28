@@ -191,7 +191,7 @@ fn legacy_within_lane_order(left: &TaskBoardItem, right: &TaskBoardItem) -> Orde
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::{TaskBoardItem, TaskBoardPriority};
+    use crate::{TaskBoardItem, TaskBoardPriority};
 
     fn item(id: &str) -> TaskBoardItem {
         TaskBoardItem::new(

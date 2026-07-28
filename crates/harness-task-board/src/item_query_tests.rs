@@ -3,7 +3,7 @@ use super::{
     TaskBoardItemQuery, TaskBoardListCursor, TaskBoardQueryTarget, normalize_query_text,
     select_page, validated_limit,
 };
-use crate::task_board::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
+use crate::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
@@ -16,7 +16,7 @@ fn item(id: &str, title: &str, body: &str) -> TaskBoardItem {
     )
 }
 
-fn ids<'a>(items: &'a [TaskBoardItem]) -> Vec<&'a str> {
+fn ids(items: &[TaskBoardItem]) -> Vec<&str> {
     items.iter().map(|item| item.id.as_str()).collect()
 }
 

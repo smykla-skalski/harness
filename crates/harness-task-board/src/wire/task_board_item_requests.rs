@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{
+use crate::{
     AgentMode, ExternalRef, PlanningState, TASK_BOARD_LIST_MAX_QUERY_CHARS,
     TASK_BOARD_LIST_MAX_TAGS, TaskBoardItemQuery, TaskBoardListCursor, TaskBoardPriority,
     TaskBoardStatus, TaskBoardWorkflowKind, normalize_query_text,
@@ -254,7 +254,7 @@ pub struct TaskBoardDeleteItemRequest {
 mod tests {
     use super::{TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
         TaskBoardListItemsRequest};
-    use crate::task_board::{TASK_BOARD_LIST_DEFAULT_LIMIT, TaskBoardListCursor};
+    use crate::{TASK_BOARD_LIST_DEFAULT_LIMIT, TaskBoardListCursor};
 
     #[test]
     fn an_empty_request_selects_the_whole_board_at_the_default_page_size() {
@@ -264,7 +264,7 @@ mod tests {
 
         assert_eq!(selection.limit, TASK_BOARD_LIST_DEFAULT_LIMIT);
         assert_eq!(selection.cursor, None);
-        assert_eq!(selection.query, crate::task_board::TaskBoardItemQuery::default());
+        assert_eq!(selection.query, crate::TaskBoardItemQuery::default());
     }
 
     #[test]

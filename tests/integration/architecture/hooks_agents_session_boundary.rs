@@ -75,6 +75,13 @@ fn agents_and_session_stay_off_the_hooks_module() {
         &["crate::hooks::"],
         |path, needle| format!("{path} reaches back into hooks via `{needle}`"),
     ));
+    hits.extend(collect_hits_in_tree(
+        &root.join("crates/harness-task-board/src"),
+        root,
+        None,
+        &["crate::hooks::"],
+        |path, needle| format!("{path} reaches back into hooks via `{needle}`"),
+    ));
 
     hits.retain(|hit| !known_exceptions.iter().any(|known| hit.starts_with(known)));
 

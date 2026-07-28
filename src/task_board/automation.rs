@@ -1,5 +1,14 @@
 //! Shared contracts for durable Task Board automation.
 
+// `TaskBoardWorkflowKind` moved to `harness-task-board` with `TaskBoardItem`,
+// the struct that embeds it (see `workflow.rs`'s own import). This module's
+// `#[cfg(test)]` children reach it through `super::*`, which only sees this
+// module's own (re-)exports, not a sibling file's private import, so it needs
+// restating here even though nothing in this file's own non-test code uses it
+// directly.
+#[cfg(test)]
+use crate::task_board::TaskBoardWorkflowKind;
+
 mod admission;
 mod attempt_result_validation;
 mod interfaces;
