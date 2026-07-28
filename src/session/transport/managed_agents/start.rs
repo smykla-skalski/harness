@@ -2,6 +2,9 @@ use std::collections::BTreeMap;
 
 use clap::{Args, Subcommand};
 
+use crate::daemon::protocol::{
+    DAEMON_WIRE_VERSION, HeadlessReadinessReport, HeadlessReadinessRequest,
+};
 use crate::infra::io;
 use crate::session::types::SessionRole;
 use crate::session::wire::ManagedAgentSnapshot;
@@ -28,6 +31,8 @@ use super::acp_sessions::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessions
     reason = "Clap command variants keep their derived subcommand payloads by value"
 )]
 pub enum SessionAgentsCommand {
+    /// Check every prerequisite for a headless agent run.
+    Readiness(HeadlessReadinessArgs),
     /// Start a managed terminal session or Codex thread.
     Start {
         #[command(subcommand)]
@@ -61,6 +66,7 @@ pub enum SessionAgentsCommand {
 impl Execute for SessionAgentsCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
+            Self::Readiness(args) => args.execute(context),
             Self::Start { command } => command.execute(context),
             Self::Attach(args) => args.execute(context),
             Self::List(args) => args.execute(context),
@@ -73,6 +79,36 @@ impl Execute for SessionAgentsCommand {
             Self::Approve(args) => args.execute(context),
             Self::Acp { command } => command.execute(context),
         }
+    }
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct HeadlessReadinessArgs {
+    /// Runtime to execute.
+    #[arg(long)]
+    pub runtime: String,
+    /// Model to request from the runtime.
+    #[arg(long)]
+    pub model: String,
+    /// Execution lane. Defaults to codex for Codex and acp otherwise.
+    #[arg(long, value_parser = ["codex", "acp", "agent-tui"])]
+    pub lane: Option<String>,
+}
+
+impl Execute for HeadlessReadinessArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let request = HeadlessReadinessRequest {
+            client_version: env!("CARGO_PKG_VERSION").to_string(),
+            client_wire_version: DAEMON_WIRE_VERSION,
+            runtime: self.runtime.clone(),
+            model: self.model.clone(),
+            lane: self.lane.clone(),
+        };
+        let report: HeadlessReadinessReport = daemon_client()?
+            .post("/v1/headless/readiness", &request)
+            .map_err(|error| daemon_client_error("check headless readiness", &error))?;
+        print_json(&report)?;
+        Ok(i32::from(!report.ready))
     }
 }
 

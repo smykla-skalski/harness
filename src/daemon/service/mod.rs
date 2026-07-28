@@ -255,6 +255,7 @@ mod serve;
 pub(crate) use serve::test_support::{
     install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
+mod headless_readiness;
 mod session_setup;
 mod session_teardown;
 mod sessions;
@@ -461,6 +462,7 @@ pub use task_board_working_copies::{
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 
+pub(crate) use headless_readiness::{HeadlessReadinessInputs, build_headless_readiness_report};
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
 pub(crate) use observe_persistence::{

@@ -1,5 +1,6 @@
 pub const HEALTH: &str = "/v1/health";
 pub const READY: &str = "/v1/ready";
+pub const HEADLESS_READINESS: &str = "/v1/headless/readiness";
 pub const DIAGNOSTICS: &str = "/v1/diagnostics";
 pub const GITHUB_STATUS: &str = "/v1/github/status";
 pub const AUDIT_EVENTS: &str = "/v1/audit/events";

@@ -14,8 +14,9 @@ use crate::daemon::acp_probe::probe_acp_agents_cached;
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::protocol::{
-    DaemonTelemetryRequest, HostBridgeReconfigureRequest, ReadinessResponse,
-    RuntimeSessionResolutionResponse, SetLogLevelRequest, http_paths,
+    DaemonTelemetryRequest, HeadlessReadinessReport, HeadlessReadinessRequest,
+    HostBridgeReconfigureRequest, ReadinessResponse, RuntimeSessionResolutionResponse,
+    SetLogLevelRequest, http_paths,
 };
 use crate::daemon::remote_diagnostics::project_diagnostics_report;
 use crate::daemon::remote_viewer::is_remote_viewer;
@@ -48,6 +49,7 @@ fn health_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
         .routes(routes!(get_health))
         .routes(routes!(get_ready))
+        .routes(routes!(post_headless_readiness))
         .routes(routes!(get_diagnostics))
         .routes(routes!(get_github_status))
 }
@@ -138,6 +140,59 @@ pub(super) async fn get_ready(
         daemon_epoch: state.daemon_epoch.clone(),
     });
     timed_json("GET", http_paths::READY, &request_id, start, result)
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/headless/readiness",
+    tag = "daemon",
+    description = "Report every prerequisite for a requested headless agent run without exposing credential values",
+    request_body = HeadlessReadinessRequest,
+    responses(
+        (status = 200, description = "Headless execution readiness report", body = HeadlessReadinessReport),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn post_headless_readiness(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<HeadlessReadinessRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = async {
+        let db = require_async_db(&state, "headless readiness")?;
+        let (bridge, orchestrator) = tokio::join!(
+            tokio::task::spawn_blocking(crate::daemon::bridge::status_report),
+            service::task_board_orchestrator_status_db(db),
+        );
+        let bridge = bridge.map_err(|error| {
+            CliErrorKind::workflow_io(format!("headless readiness bridge task failed: {error}"))
+        })??;
+        let orchestrator = orchestrator?;
+        Ok(service::build_headless_readiness_report(
+            &service::HeadlessReadinessInputs {
+                request: &request,
+                daemon_version: &state.manifest.version,
+                bridge: &bridge,
+                runtime_probe: &probe_acp_agents_cached(),
+                openrouter_configured: crate::daemon::state::task_board_openrouter_token()
+                    .is_some(),
+                orchestrator_active: orchestrator.enabled && orchestrator.running,
+            },
+        ))
+    }
+    .await;
+    timed_json(
+        "POST",
+        http_paths::HEADLESS_READINESS,
+        &request_id,
+        start,
+        result,
+    )
 }
 
 #[utoipa::path(
