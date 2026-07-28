@@ -18,7 +18,8 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
     }
 
     pub(super) async fn tick(&self, now: &str) {
-        self.reconcile(&self.fixture.test.db, now).await;
+        let db = self.restart(now).await;
+        db.pool().close().await;
     }
 
     pub(super) async fn drive_to_phase(
