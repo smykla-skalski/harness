@@ -6,9 +6,7 @@ use super::{
     TaskStatus, agent_status_label, build_signal, fmt, generate_session_id, is_permitted,
     refresh_session, runtime, storage,
 };
-use crate::types::{
-    AgentRegistration, SessionPolicy, SessionRole, is_control_plane_actor_id,
-};
+use crate::types::{AgentRegistration, SessionPolicy, SessionRole, is_control_plane_actor_id};
 
 /// # Errors
 /// Returns [`CliError`] when an explicit `session_id` is invalid or already
@@ -151,10 +149,7 @@ pub fn ensure_session_can_end(state: &SessionState) -> Result<(), CliError> {
 /// # Errors
 /// Returns [`CliError`] when `agent_id` is the current leader or is not
 /// registered in the session.
-pub fn require_removable_agent(
-    state: &SessionState,
-    agent_id: &str,
-) -> Result<(), CliError> {
+pub fn require_removable_agent(state: &SessionState, agent_id: &str) -> Result<(), CliError> {
     if state.leader_id.as_deref() == Some(agent_id) {
         return Err(CliErrorKind::session_agent_conflict(format!(
             "cannot remove current leader '{agent_id}'; transfer leadership first"
@@ -326,10 +321,7 @@ fn policy_for_preset(_policy_preset: Option<&str>) -> SessionPolicy {
 
 /// # Errors
 /// Returns [`CliError`] when `agent_id` does not exist or is not alive.
-pub fn require_active_target_agent(
-    state: &SessionState,
-    agent_id: &str,
-) -> Result<(), CliError> {
+pub fn require_active_target_agent(state: &SessionState, agent_id: &str) -> Result<(), CliError> {
     let agent = state.agents.get(agent_id).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
             "agent '{agent_id}' not found"

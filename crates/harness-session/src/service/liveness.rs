@@ -5,8 +5,8 @@ use super::{
     refresh_session, require_active, runtime, signal_context_root,
     signal_dirs_for_agent_in_context_root, signal_matches_session, storage, utc_now,
 };
-use harness_agents::kind::DisconnectReason;
 use crate::types::ManagedAgentKind;
+use harness_agents::kind::DisconnectReason;
 
 /// Result of a liveness synchronization pass.
 #[derive(Debug, Clone, Default)]
@@ -304,11 +304,7 @@ pub fn apply_single_transition(
     }
 }
 
-pub fn apply_agent_disconnected(
-    state: &mut SessionState,
-    agent_id: &str,
-    now: &str,
-) -> bool {
+pub fn apply_agent_disconnected(state: &mut SessionState, agent_id: &str, now: &str) -> bool {
     apply_agent_disconnected_with_reason(state, agent_id, DisconnectReason::default(), None, now)
 }
 
@@ -396,11 +392,11 @@ pub fn cleanup_dead_agent_signals(
 #[cfg(test)]
 mod inline_tests {
     use super::*;
-    use harness_agents::runtime::RuntimeCapabilities;
-    use harness_agents::runtime::liveness::LivenessConfig;
     use crate::types::{
         AgentRegistration, SessionMetrics, SessionPolicy, SessionRole, SessionState, SessionStatus,
     };
+    use harness_agents::runtime::RuntimeCapabilities;
+    use harness_agents::runtime::liveness::LivenessConfig;
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 

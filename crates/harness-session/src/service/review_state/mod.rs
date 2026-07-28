@@ -7,4 +7,6 @@ mod submit;
 pub use rounds::{apply_arbitrate, apply_respond_review};
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub use submit::apply_submit_for_review_for_managed_run;
-pub use submit::{apply_claim_review, apply_submit_for_review, apply_submit_review, validate_submit_review};
+pub use submit::{
+    apply_claim_review, apply_submit_for_review, apply_submit_review, validate_submit_review,
+};

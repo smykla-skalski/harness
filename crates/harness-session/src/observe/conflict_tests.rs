@@ -1,6 +1,6 @@
-use harness_observe::types::IssueCode;
 use crate::service;
 use crate::types::SessionRole;
+use harness_observe::types::IssueCode;
 use harness_protocol::agent::HookAgent;
 
 use super::scan::scan_all_agents;

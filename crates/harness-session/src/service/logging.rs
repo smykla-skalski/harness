@@ -12,11 +12,7 @@ pub fn log_session_started(title: &str, context: &str) -> SessionTransition {
 }
 
 #[must_use]
-pub fn log_agent_joined(
-    agent_id: &str,
-    role: SessionRole,
-    runtime: &str,
-) -> SessionTransition {
+pub fn log_agent_joined(agent_id: &str, role: SessionRole, runtime: &str) -> SessionTransition {
     SessionTransition::AgentJoined {
         agent_id: agent_id.to_string(),
         role,
@@ -42,11 +38,7 @@ pub fn log_session_adopted(session_id: &str) -> SessionTransition {
 }
 
 #[must_use]
-pub fn log_role_changed(
-    agent_id: &str,
-    from: SessionRole,
-    to: SessionRole,
-) -> SessionTransition {
+pub fn log_role_changed(agent_id: &str, from: SessionRole, to: SessionRole) -> SessionTransition {
     SessionTransition::RoleChanged {
         agent_id: agent_id.to_string(),
         from,

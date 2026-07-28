@@ -1,10 +1,10 @@
 use super::*;
-use harness_agents::kind::RuntimeKind;
-use harness_agents::runtime::RuntimeCapabilities;
 use crate::types::{
     AgentPersona, AgentStatus, PersonaSymbol, SessionMetrics, SessionPolicy, SessionRole,
     SessionStatus, TaskSeverity, TaskSource,
 };
+use harness_agents::kind::RuntimeKind;
+use harness_agents::runtime::RuntimeCapabilities;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

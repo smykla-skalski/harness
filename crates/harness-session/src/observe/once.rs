@@ -1,8 +1,8 @@
 use std::path::Path;
 
+use crate::service;
 use harness_kernel::errors::CliError;
 use harness_observe::types::Issue;
-use crate::service;
 
 use super::scan::scan_all_agents;
 use super::support::{create_work_items_for_issues, emit_results, persist_observer_snapshot};

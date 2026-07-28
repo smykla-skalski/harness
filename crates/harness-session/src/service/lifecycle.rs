@@ -12,8 +12,8 @@ use super::{
     resolve_session_project_dir, slice, storage, utc_now, validate_explicit_session_id,
     validate_policy_preset, wire, write_prepared_leave_signals,
 };
-use harness_kernel::io::validate_safe_segment;
 use harness_daemon_client::DaemonClient;
+use harness_kernel::io::validate_safe_segment;
 use tokio::runtime::Handle;
 
 /// Start a new leaderless orchestration session.

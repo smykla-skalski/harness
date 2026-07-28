@@ -4,10 +4,10 @@ use super::{
     detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals, session_index,
     storage, summary_to_session_state, validate_policy_preset, wire,
 };
-use harness_kernel::io::validate_safe_segment;
-use harness_workspace::workspace::utc_now;
 use harness_daemon_client::DaemonClient;
+use harness_kernel::io::validate_safe_segment;
 use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
+use harness_workspace::workspace::utc_now;
 
 /// Load the current session state.
 ///

@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::service::{self, TaskSpec};
+use crate::types::{SessionState, TaskSeverity, TaskSource};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_observe::application::maintenance::{
     is_observer_conflict, load_observer_state, save_observer_state,
 };
 use harness_observe::types::{Issue, IssueCode, IssueSeverity, ObserverState, OpenIssue};
 use harness_workspace::workspace::{project_context_dir, utc_now};
-use crate::service::{self, TaskSpec};
-use crate::types::{SessionState, TaskSeverity, TaskSource};
 
 pub(super) fn emit_watch_issues(issues: &[Issue], json: bool) {
     for issue in issues {

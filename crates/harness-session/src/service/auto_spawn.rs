@@ -58,13 +58,13 @@ pub fn maybe_emit_spawn_reviewer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness_agents::kind::RuntimeKind;
-    use harness_agents::runtime::RuntimeCapabilities;
     use crate::types::{
         AgentRegistration, AgentStatus, AwaitingReview, SessionMetrics, SessionPolicy, SessionRole,
         SessionState, SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus,
         WorkItem,
     };
+    use harness_agents::kind::RuntimeKind;
+    use harness_agents::runtime::RuntimeCapabilities;
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 

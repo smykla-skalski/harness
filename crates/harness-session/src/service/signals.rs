@@ -8,8 +8,8 @@ use super::{
     signal_context_root, signal_dirs_for_agent_in_context_root, signal_records_for_dirs, storage,
     utc_now, wire, write_signal_ack,
 };
-use harness_kernel::io::validate_safe_segment;
 use harness_daemon_client::DaemonClient;
+use harness_kernel::io::validate_safe_segment;
 use tokio::runtime::Handle;
 
 /// Send a file-backed signal to a running agent session.

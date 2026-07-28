@@ -1,12 +1,12 @@
 use std::slice;
 
-use harness_observe::application::maintenance::load_observer_state;
-use harness_observe::types::IssueCode;
 use crate::service;
 use crate::storage;
 use crate::types::{SessionRole, TaskSeverity};
-use harness_workspace::workspace::project_context_dir;
+use harness_observe::application::maintenance::load_observer_state;
+use harness_observe::types::IssueCode;
 use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::project_context_dir;
 
 use super::once::execute_session_observe;
 use super::scan::scan_all_agents;
@@ -94,8 +94,7 @@ fn observe_scans_logs_via_legacy_session_fallback() {
             .find(|agent| agent.runtime == "codex")
             .expect("codex worker should be registered");
         let worker_id = worker.agent_id.clone();
-        let layout = storage::layout_from_project_dir(project, &state.session_id)
-            .expect("layout");
+        let layout = storage::layout_from_project_dir(project, &state.session_id).expect("layout");
         storage::update_state(&layout, |state| {
             state
                 .agents

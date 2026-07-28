@@ -46,8 +46,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
         storage::update_state(&layout, |state| {
             let task = state.tasks.get_mut(&task.task_id).expect("task");
             task.status = TaskStatus::Blocked;
-            task.blocked_reason =
-                Some(ARBITRATION_BLOCKED_REASON.to_string());
+            task.blocked_reason = Some(ARBITRATION_BLOCKED_REASON.to_string());
             Ok(())
         })
         .expect("block for arbitration");

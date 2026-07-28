@@ -1,5 +1,5 @@
-use harness_agents::kind::{DisconnectReason, RuntimeKind};
 use crate::types::{ManagedAgentId, ManagedAgentRef, RuntimeSessionId, SessionAgentId};
+use harness_agents::kind::{DisconnectReason, RuntimeKind};
 
 use super::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, CliError, CliErrorKind,
@@ -237,11 +237,7 @@ pub fn apply_record_runtime_session_title(
 /// This is used for daemon-managed agent start failures that happen after the
 /// orchestration join was persisted but before the runtime session finished
 /// binding into the session ledger.
-pub fn apply_rollback_joined_agent(
-    state: &mut SessionState,
-    agent_id: &str,
-    now: &str,
-) -> bool {
+pub fn apply_rollback_joined_agent(state: &mut SessionState, agent_id: &str, now: &str) -> bool {
     let was_leader = state.leader_id.as_deref() == Some(agent_id);
     if state.agents.remove(agent_id).is_none() {
         return false;

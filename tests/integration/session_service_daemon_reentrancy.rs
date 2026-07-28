@@ -150,18 +150,19 @@ fn leave_session_inside_a_tokio_runtime_skips_the_daemon_round_trip() {
         let state = temp_env::with_var("CLAUDE_SESSION_ID", Some("reentrancy-leader"), || {
             start_session("goal", "T", &project, Some(session_id)).expect("start")
         });
-        let joined_leader = temp_env::with_var("CLAUDE_SESSION_ID", Some("reentrancy-leader"), || {
-            join_session(
-                &state.session_id,
-                SessionRole::Leader,
-                "claude",
-                &[],
-                Some("test leader"),
-                &project,
-                None,
-            )
-            .expect("join leader")
-        });
+        let joined_leader =
+            temp_env::with_var("CLAUDE_SESSION_ID", Some("reentrancy-leader"), || {
+                join_session(
+                    &state.session_id,
+                    SessionRole::Leader,
+                    "claude",
+                    &[],
+                    Some("test leader"),
+                    &project,
+                    None,
+                )
+                .expect("join leader")
+            });
         let leader_id = joined_leader.leader_id.expect("leader id");
         let joined = temp_env::with_var("CODEX_SESSION_ID", Some("reentrancy-worker"), || {
             join_session(

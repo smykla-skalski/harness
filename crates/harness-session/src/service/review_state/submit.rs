@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
+#[cfg(any(test, feature = "daemon-runtime"))]
+use super::super::require_managed_run_mutation;
 use super::super::{
     AgentStatus, AwaitingReview, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
     clear_agent_current_task, ensure_task_not_deleted, refresh_session, require_active,
     require_permission, task_not_found, task_status_label, touch_agent,
 };
-#[cfg(any(test, feature = "daemon-runtime"))]
-use super::super::require_managed_run_mutation;
 use crate::types::{
     Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry, WorkItem,
 };

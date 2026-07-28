@@ -242,8 +242,7 @@ fn sync_liveness_skips_disconnect_for_acp_managed_gemini_agents() {
                 .expect("layout");
         storage::update_state(&layout, |state| {
             let worker = state.agents.get_mut(&worker_id).expect("worker");
-            worker.managed_agent =
-                Some(ManagedAgentRef::acp("acp-gemini-1"));
+            worker.managed_agent = Some(ManagedAgentRef::acp("acp-gemini-1"));
             worker.agent_session_id = Some("acp-runtime-session-1".into());
             Ok(())
         })
@@ -307,8 +306,7 @@ fn sync_liveness_skips_disconnect_for_codex_managed_agents() {
                 .expect("layout");
         storage::update_state(&layout, |state| {
             let worker = state.agents.get_mut(&worker_id).expect("worker");
-            worker.managed_agent =
-                Some(ManagedAgentRef::codex("codex-run-1"));
+            worker.managed_agent = Some(ManagedAgentRef::codex("codex-run-1"));
             worker.agent_session_id = None;
             Ok(())
         })

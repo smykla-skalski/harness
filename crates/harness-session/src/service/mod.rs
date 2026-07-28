@@ -7,6 +7,8 @@ use std::slice;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 
+use crate::ordering::sort_session_tasks;
+use crate::wire;
 use harness_agents::runtime;
 use harness_agents::runtime::liveness::LivenessConfig;
 use harness_agents::runtime::signal::{
@@ -15,12 +17,10 @@ use harness_agents::runtime::signal::{
     read_pending_signals, signal_matches_session,
 };
 use harness_agents::service as agents_service;
-use crate::ordering::sort_session_tasks;
-use crate::wire;
-use harness_workspace::workspace::{project_context_dir, utc_now};
 use harness_daemon_client::ClientError;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::{project_context_dir, utc_now};
 
 use super::index as session_index;
 use super::roles::{SessionAction, is_permitted};

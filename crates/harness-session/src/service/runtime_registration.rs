@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use harness_kernel::io::validate_safe_segment;
 use crate::types::{HarnessSessionId, ManagedAgentId, ManagedAgentRef, RuntimeSessionId};
 use crate::wire;
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::validate_safe_segment;
 use tokio::runtime::Handle;
 
 use super::{apply_register_agent_runtime_session, ensure_known_runtime, storage, utc_now};

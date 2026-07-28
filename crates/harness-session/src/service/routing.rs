@@ -10,10 +10,7 @@ use crate::types::{AgentRegistration, WorkItem};
 /// The caller is expected to have already filtered workers for liveness
 /// and assignability.
 #[must_use]
-pub fn rank_workers_for_task(
-    task: &WorkItem,
-    workers: &[&AgentRegistration],
-) -> Vec<String> {
+pub fn rank_workers_for_task(task: &WorkItem, workers: &[&AgentRegistration]) -> Vec<String> {
     let mut ranked: Vec<(u8, &str)> = workers
         .iter()
         .map(|agent| {
@@ -38,12 +35,12 @@ fn persona_distance(suggested: Option<&str>, agent: &AgentRegistration) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness_agents::kind::RuntimeKind;
-    use harness_agents::runtime::RuntimeCapabilities;
     use crate::types::{
         AgentPersona, AgentStatus, PersonaSymbol, SessionRole, TaskQueuePolicy, TaskSeverity,
         TaskSource, TaskStatus, WorkItem,
     };
+    use harness_agents::kind::RuntimeKind;
+    use harness_agents::runtime::RuntimeCapabilities;
 
     fn persona(identifier: &str) -> AgentPersona {
         AgentPersona {

@@ -52,8 +52,7 @@ fn archived_session_is_hidden_from_local_queries_even_with_include_all() {
             Some("00000000-0000-4002-8000-000000000002"),
         )
         .expect("start");
-        let layout = storage::layout_from_project_dir(project, &state.session_id)
-            .expect("layout");
+        let layout = storage::layout_from_project_dir(project, &state.session_id).expect("layout");
         storage::update_state(&layout, |state| {
             state.archived_at = Some("2026-05-02T00:00:00Z".into());
             Ok(())

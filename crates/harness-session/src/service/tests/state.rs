@@ -169,9 +169,7 @@ fn register_runtime_session_preserves_identity_classes() {
     assert!(changed);
     assert_eq!(
         find_agent_by_managed_agent(&state, &managed_agent),
-        Some(SessionAgentId::from(
-            agent_id.as_str()
-        ))
+        Some(SessionAgentId::from(agent_id.as_str()))
     );
     assert_eq!(
         state.agents[&agent_id].runtime_session_id(),

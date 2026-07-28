@@ -9,8 +9,8 @@ use super::{
     sort_session_tasks, started_task_signals, storage, utc_now, wire,
     write_prepared_task_start_signals,
 };
-use harness_kernel::io::validate_safe_segment;
 use harness_daemon_client::DaemonClient;
+use harness_kernel::io::validate_safe_segment;
 use tokio::runtime::Handle;
 
 /// Build the `/v1/sessions/{id}/tasks/{id}/{action}` URL shared by

@@ -10,8 +10,8 @@ use super::{
     log_signal_sent, log_task_status_changed, maybe_emit_spawn_reviewer, storage, utc_now,
     validate_submit_review,
 };
-use harness_agents::runtime::runtime_for_name;
 use crate::types::{Review, ReviewPoint, ReviewVerdict};
+use harness_agents::runtime::runtime_for_name;
 /// Submit a task for review.
 ///
 /// Transitions the task from `InProgress` to `AwaitingReview`, unassigns it,

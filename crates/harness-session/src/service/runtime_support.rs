@@ -21,10 +21,7 @@ pub fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
 
 /// # Errors
 /// Returns [`CliError`] when `runtime_name` is not a registered runtime.
-pub fn ensure_known_runtime(
-    runtime_name: &str,
-    message_prefix: &str,
-) -> Result<(), CliError> {
+pub fn ensure_known_runtime(runtime_name: &str, message_prefix: &str) -> Result<(), CliError> {
     if resolve_registered_runtime(runtime_name).is_some() {
         Ok(())
     } else {
@@ -37,10 +34,7 @@ pub fn ensure_known_runtime(
 /// # Errors
 /// Returns [`CliError`] when the session layout cannot be resolved or the
 /// session does not exist.
-pub fn load_state_or_err(
-    session_id: &str,
-    project_dir: &Path,
-) -> Result<SessionState, CliError> {
+pub fn load_state_or_err(session_id: &str, project_dir: &Path) -> Result<SessionState, CliError> {
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
     storage::load_state(&layout)?.ok_or_else(|| {
         CliErrorKind::session_not_active(format!("harness session '{session_id}' not found")).into()

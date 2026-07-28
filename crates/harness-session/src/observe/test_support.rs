@@ -4,14 +4,14 @@ use std::path::Path;
 use fs_err as fs;
 use harness_testkit::with_isolated_harness_env;
 
+use crate::service;
+use crate::types::{SessionRole, SessionState};
 use harness_agents::runtime;
 use harness_observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
 };
-use crate::service;
-use crate::types::{SessionRole, SessionState};
-use harness_workspace::workspace::project_context_dir;
 use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::project_context_dir;
 
 pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempfile::tempdir().expect("tempdir");

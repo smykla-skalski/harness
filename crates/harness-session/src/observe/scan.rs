@@ -5,12 +5,12 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
+use crate::service;
+use crate::types::SessionState;
 use harness_agents::runtime;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_observe::classifier::classify_line;
 use harness_observe::types::{Issue, ScanState};
-use crate::service;
-use crate::types::SessionState;
 
 // `pub`, not `pub(crate)`: the root crate's `daemon::service::observe_async`
 // reads this field directly to detect whether a scan advanced.

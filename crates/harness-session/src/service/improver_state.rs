@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use similar::TextDiff;
 
+use crate::roles::SessionAction;
 use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use harness_kernel::io::write_text;
-use crate::roles::SessionAction;
 // `ImproverTarget` lives beside the wire request that carries it
 // (`harness-session`) now, since the wire layer moved into its own crate
 // and can't reach back into this domain's service layer; re-exported so

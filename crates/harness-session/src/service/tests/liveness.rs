@@ -85,8 +85,8 @@ fn sync_liveness_updates_last_activity_from_runtime() {
         .expect("start");
 
         // Write a fresh log for the leader
-        let leader_log = project_context_dir(project)
-            .join("agents/sessions/claude/test-service/raw.jsonl");
+        let leader_log =
+            project_context_dir(project).join("agents/sessions/claude/test-service/raw.jsonl");
         fs_err::create_dir_all(leader_log.parent().unwrap()).expect("dirs");
         fs_err::write(&leader_log, "{}\n").expect("write log");
 
@@ -483,8 +483,8 @@ fn sync_liveness_skips_rewrite_when_state_is_unchanged() {
             Some("00000000-0000-4002-8000-000000000033"),
         )
         .expect("start");
-        let leader_log = project_context_dir(project)
-            .join("agents/sessions/claude/test-service/raw.jsonl");
+        let leader_log =
+            project_context_dir(project).join("agents/sessions/claude/test-service/raw.jsonl");
         fs_err::create_dir_all(leader_log.parent().unwrap()).expect("dirs");
         fs_err::write(&leader_log, "{}\n").expect("write log");
 
