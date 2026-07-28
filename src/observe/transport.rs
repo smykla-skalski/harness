@@ -159,9 +159,5 @@ fn build_request(
             project_dir,
             agent,
         }),
-        // `ObserveMode` is `#[non_exhaustive]` from this crate's perspective
-        // now that it lives in `harness-observe`; the four variants above are
-        // its complete set today.
-        _ => unreachable!("ObserveMode has no variants beyond Scan/Watch/Dump/Doctor"),
     }
 }

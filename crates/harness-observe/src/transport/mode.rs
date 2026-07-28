@@ -3,8 +3,12 @@ use clap::{Subcommand, ValueEnum};
 use super::args::ObserveFilterArgs;
 
 /// Observe subcommands.
+///
+/// Deliberately not `#[non_exhaustive]`: `src/observe/transport.rs`'s
+/// `build_request` is the only place that matches on this, and it is in the
+/// same workspace, so a new variant should fail that match at compile time
+/// rather than hit a wildcard arm at runtime.
 #[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
 pub enum ObserveMode {
     /// One-shot scan of a session log, plus observer maintenance actions.
     Scan {
