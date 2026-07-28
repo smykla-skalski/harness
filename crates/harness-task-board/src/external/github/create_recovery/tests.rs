@@ -4,9 +4,9 @@ use reqwest::header::{HeaderValue, LINK};
 use serde_json::json;
 
 use super::*;
-use harness_github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
 use crate::TaskBoardStatus;
 use crate::external::ExternalSyncClient;
+use harness_github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
 
 use super::super::test_support::{MockResponse, spawn_sequence_mock};
 

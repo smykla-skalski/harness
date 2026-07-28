@@ -5,9 +5,9 @@ use crate::store::TaskBoardItemPatch;
 use crate::store::TaskBoardStore;
 use crate::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use harness_github_api::GitHubPullRequestSnapshot;
-use harness_workspace::workspace::utc_now;
 #[cfg(test)]
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 use super::super::{canonical_external_status, local_external_status};
 

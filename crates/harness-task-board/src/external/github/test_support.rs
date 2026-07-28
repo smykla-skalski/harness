@@ -163,13 +163,14 @@ fn write_response(stream: &mut TcpStream, response: MockResponse) {
     } else {
         "Server Error"
     };
-    let extra_headers = response.headers.into_iter().fold(
-        String::new(),
-        |mut extra_headers, (name, value)| {
-            let _ = writeln!(extra_headers, "{name}: {value}\r");
-            extra_headers
-        },
-    );
+    let extra_headers =
+        response
+            .headers
+            .into_iter()
+            .fold(String::new(), |mut extra_headers, (name, value)| {
+                let _ = writeln!(extra_headers, "{name}: {value}\r");
+                extra_headers
+            });
     let raw = format!(
         "HTTP/1.1 {} {reason}\r\nContent-Type: application/json\r\n{extra_headers}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
         response.status,
