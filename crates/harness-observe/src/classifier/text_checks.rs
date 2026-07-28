@@ -6,10 +6,11 @@ pub(crate) use self::bash::{
     check_runner_state_event_error, check_runner_state_machine_stale,
 };
 
+use harness_protocol::observe::{Confidence, FixSafety, Issue, IssueCode};
+
 use super::emitter::{Guidance, IssueBlueprint};
 use super::{AGENT_NAME_REGEX, TextCheckContext};
-use crate::observe::patterns;
-use crate::observe::types::{Confidence, FixSafety, Issue, IssueCode};
+use crate::patterns;
 
 /// Check for subagent save failures in assistant text.
 /// Caller guarantees: role == Assistant, `source_tool` == None.

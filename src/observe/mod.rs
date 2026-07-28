@@ -1,14 +1,17 @@
 pub(crate) mod application;
-pub(crate) mod classifier;
+// `classifier` lives in `harness-observe` now, alongside the `patterns` and
+// text helpers it depends on; this facade keeps `crate::observe::classifier`
+// resolving for watch.rs/scan/io.rs, same shape as `crate::infra`.
+pub(crate) mod classifier {
+    pub use harness_observe::classifier::*;
+}
 mod compare;
 mod context_cmd;
 mod doctor;
 mod dump;
 pub mod output;
-pub(crate) mod patterns;
 mod scan;
 pub(crate) mod session;
-mod text;
 pub(crate) mod transport;
 pub(crate) mod types;
 mod watch;
@@ -26,6 +29,8 @@ pub use types::{
 pub(crate) use application::maintenance::{
     is_observer_conflict, load_observer_state, save_observer_state,
 };
-pub(crate) use text::{
-    DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, redact_details, truncate_at, truncate_details,
-};
+pub(crate) use harness_observe::{DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, truncate_at};
+// classifier (now in harness-observe) was the only production caller;
+// `redact_details` itself is still exercised by this crate's own tests below.
+#[cfg(test)]
+pub(crate) use harness_observe::redact_details;

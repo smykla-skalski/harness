@@ -10,40 +10,14 @@ use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::utc_now;
 
-#[path = "../../../src/observe/application/session_event.rs"]
-mod session_event;
-pub mod application {
-    pub mod session_event {
-        pub use super::super::session_event::*;
-    }
-}
-
-#[path = "../../../src/observe/classifier/mod.rs"]
-pub(crate) mod classifier;
-#[path = "../../../src/observe/patterns.rs"]
-pub(crate) mod patterns;
-#[path = "../../../src/observe/text.rs"]
-mod text;
+pub(crate) use harness_observe::classifier;
+// classifier's own copy of these re-exports is unreachable from here now
+// that classifier is a real dependency instead of a second `#[path]` include,
+// but this module stays a straight mirror of the root source rather than a
+// daemon-specific trim.
+#[allow(unused_imports)]
 #[path = "../../../src/observe/types/mod.rs"]
 pub(crate) mod types;
-
-pub(crate) use text::{redact_details, truncate_details};
-
-pub mod dump {
-    pub(crate) fn tool_result_text(block: &serde_json::Value) -> String {
-        let content = &block["content"];
-        if let Some(items) = content.as_array() {
-            items
-                .iter()
-                .filter(|item| item["type"].as_str() == Some("text"))
-                .filter_map(|item| item["text"].as_str())
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            content.as_str().unwrap_or_default().to_string()
-        }
-    }
-}
 
 fn observe_root(project_context_root: &Path, observe_id: &str) -> PathBuf {
     project_context_root

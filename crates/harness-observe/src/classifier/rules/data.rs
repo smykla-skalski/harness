@@ -1,5 +1,6 @@
-use crate::observe::patterns;
-use crate::observe::types::{IssueCategory, IssueCode, MessageRole, SourceTool};
+use harness_protocol::observe::{IssueCategory, IssueCode, MessageRole, SourceTool};
+
+use crate::patterns;
 
 use super::{
     FingerprintMode, Guard, MatchMode, RoleFilter, RuleGuidance, SummaryTemplate, TextRule,

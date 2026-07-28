@@ -1,14 +1,15 @@
+use harness_protocol::observe::{
+    Confidence, FixSafety, IssueCategory, IssueCode, IssueSeverity, MessageRole, ScanState,
+    SourceTool, ToolUseRecord,
+};
+
 use super::*;
 use harness_kernel::kernel::tooling::legacy_tool_context;
-use crate::observe::output;
-use crate::observe::types::{
-    Confidence, FixSafety, FocusPreset, IssueCategory, IssueCode, IssueSeverity, MessageRole,
-    ScanState, SourceTool, ToolUseRecord,
-};
 
 mod assistant_diagnostics;
 mod coordination;
 mod query_tracking;
+mod render_support;
 mod resource_tracking;
 mod state_and_registry;
 mod text_and_line;
@@ -16,6 +17,8 @@ mod tool_guard_patterns;
 mod tool_use_patterns;
 mod verification;
 mod workflow_rules;
+
+use self::render_support as output;
 
 fn make_state() -> ScanState {
     ScanState::default()

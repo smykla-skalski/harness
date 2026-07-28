@@ -3524,6 +3524,7 @@ dependencies = [
  "harness-infra",
  "harness-kernel",
  "harness-mcp",
+ "harness-observe",
  "harness-protocol",
  "harness-systemd-protocol",
  "harness-telemetry",
@@ -3697,6 +3698,7 @@ dependencies = [
  "harness-hook",
  "harness-infra",
  "harness-kernel",
+ "harness-observe",
  "harness-protocol",
  "harness-systemd-protocol",
  "harness-telemetry",
@@ -3859,6 +3861,19 @@ dependencies = [
  "tokio-tungstenite 0.30.0",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "harness-observe"
+version = "54.0.0"
+dependencies = [
+ "harness-kernel",
+ "harness-protocol",
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
 ]
 
 [[package]]

@@ -15,6 +15,7 @@ fn new_domain_roots_exist() {
         "crates/harness-workspace/src/workspace",
         "crates/harness-kernel/src/kernel",
         "crates/harness-infra/src",
+        "crates/harness-observe/src",
         "src/hooks",
     ] {
         assert!(root.join(path).exists(), "missing expected path: {path}");

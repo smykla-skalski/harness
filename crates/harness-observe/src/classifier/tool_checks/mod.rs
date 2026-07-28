@@ -12,7 +12,7 @@ use self::write_checks::{
     check_managed_file_writes, check_manifest_created_during_run, check_write_edit_tool_use,
 };
 use harness_kernel::kernel::tooling::{ToolContext, legacy_tool_context};
-use crate::observe::types::{Issue, ScanState, ToolUseRecord};
+use harness_protocol::observe::{Issue, ScanState, ToolUseRecord};
 
 /// Check a `tool_use` block for issues.
 pub fn check_tool_use_for_issues(

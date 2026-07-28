@@ -1,9 +1,10 @@
-use super::registry::issue_code_meta;
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
-    OccurrenceTracker, ScanState, SourceTool, compute_issue_id,
+    OccurrenceTracker, ScanState, SourceTool,
 };
-use crate::observe::{redact_details, truncate_details};
+
+use super::registry::issue_code_meta;
+use crate::{compute_issue_id, redact_details, truncate_details};
 
 /// Internal guidance shape for classifier authors.
 #[derive(Debug, Clone)]
