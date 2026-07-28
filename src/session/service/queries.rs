@@ -4,6 +4,7 @@ use super::{
     detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals,
     session_index, storage, summary_to_session_state, validate_policy_preset, wire,
 };
+use crate::infra::io::validate_safe_segment;
 use crate::workspace::utc_now;
 use harness_daemon_client::DaemonClient;
 use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
@@ -16,6 +17,7 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
     // No daemon-side caller reaches this directly, so it needs no
     // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
+        validate_safe_segment(session_id)?;
         let detail: wire::SessionDetail = client
             .get(&format!("/v1/sessions/{session_id}"), &[])
             .map_err(|error| daemon_client_error("get session detail", &error))?;
@@ -201,6 +203,7 @@ pub fn resolve_session_project_dir(
     // No daemon-side caller reaches this directly, so it needs no
     // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
+        validate_safe_segment(session_id)?;
         let detail: wire::SessionDetail = client
             .get(&format!("/v1/sessions/{session_id}"), &[])
             .map_err(|error| daemon_client_error("get session detail", &error))?;

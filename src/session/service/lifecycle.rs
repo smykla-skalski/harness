@@ -12,6 +12,7 @@ use super::{
     resolve_session_project_dir, slice, storage, utc_now, validate_explicit_session_id,
     validate_policy_preset, wire, write_prepared_leave_signals,
 };
+use crate::infra::io::validate_safe_segment;
 use harness_daemon_client::DaemonClient;
 use tokio::runtime::Handle;
 
@@ -130,6 +131,7 @@ pub fn join_session_with_fallback(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::SessionJoinRequest {
             runtime: runtime_name.to_string(),
             role,
@@ -201,6 +203,7 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::SessionEndRequest {
             actor: actor_id.to_string(),
         };
@@ -245,6 +248,8 @@ pub fn assign_role(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
+        validate_safe_segment(agent_id)?;
         let request = wire::RoleChangeRequest {
             actor: actor_id.to_string(),
             role,
@@ -292,6 +297,8 @@ pub fn remove_agent(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
+        validate_safe_segment(agent_id)?;
         let request = wire::AgentRemoveRequest {
             actor: actor_id.to_string(),
         };
@@ -339,6 +346,7 @@ pub fn transfer_leader(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::LeaderTransferRequest {
             actor: actor_id.to_string(),
             new_leader_id: new_leader_id.to_string(),
@@ -410,6 +418,7 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::SessionLeaveRequest {
             agent_id: agent_id.to_string(),
         };
@@ -447,6 +456,7 @@ pub fn update_session_title(
     // No daemon-side caller reaches this directly (unlike its siblings above),
     // so it needs no tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
+        validate_safe_segment(session_id)?;
         let request = wire::SessionTitleRequest {
             title: title.to_string(),
         };
