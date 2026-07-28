@@ -2,11 +2,11 @@ use std::path::{Path, PathBuf};
 
 use fs_err;
 
-use crate::hooks::adapters::adapter_for;
-use crate::infra::io::write_text;
-use crate::workspace::dirs_home;
+use crate::adapters::adapter_for;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::write_text;
 use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::dirs_home;
 
 mod install;
 mod registrations;
@@ -17,7 +17,7 @@ mod tests;
 pub use install::{choose_install_dir_with_home, install_wrapper};
 
 use install::path_candidates;
-pub(crate) use registrations::process_agent_registrations;
+pub use registrations::process_agent_registrations;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
@@ -195,7 +195,8 @@ fn remove_skipped_runtime_hook_config(
     Ok(())
 }
 
-pub(crate) fn planned_agent_bootstrap_files(
+#[must_use]
+pub fn planned_agent_bootstrap_files(
     project_dir: &Path,
     agent: HookAgent,
     skip_runtime_hooks: &[HookAgent],

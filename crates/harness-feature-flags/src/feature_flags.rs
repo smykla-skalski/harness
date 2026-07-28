@@ -26,9 +26,10 @@
 //!
 //! Removal trigger: drop this whole module, the CLI arg on `BootstrapArgs`,
 //! and the `flags` parameter threaded through
-//! `src/setup/wrapper/registrations.rs` once the gated family is useful by
-//! default. Project rule: a new hook lands with its handler doing observable
-//! work, or behind a dated flag in this module with a tracking issue. See
+//! `crates/harness-hooks/src/wrapper/registrations.rs` once the gated family
+//! is useful by default. Project rule: a new hook lands with its handler
+//! doing observable work, or behind a dated flag in this module with a
+//! tracking issue. See
 //! AGENTS.md / CLAUDE.md for the convention statement.
 
 use std::sync::{Mutex, MutexGuard};

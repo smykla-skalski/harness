@@ -263,8 +263,8 @@ fn assert_transport_outputs_avoid_manual_json(root: &Path) {
         "crates/harness-observe/src/scan.rs",
         "crates/harness-observe/src/compare.rs",
         "crates/harness-observe/src/application/maintenance.rs",
-        "src/setup/wrapper/mod.rs",
-        "src/setup/wrapper/registrations.rs",
+        "crates/harness-hooks/src/wrapper/mod.rs",
+        "crates/harness-hooks/src/wrapper/registrations.rs",
     ] {
         let contents = read_repo_file(root, path);
         assert_file_lacks_needles(

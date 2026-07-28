@@ -4,8 +4,10 @@ use crate::app::resolve_project_dir;
 use crate::workspace::compact::{build_compact_handoff, save_compact_handoff};
 use harness_kernel::errors::CliError;
 
-#[path = "../../../src/setup/wrapper/mod.rs"]
-pub mod wrapper;
+// Real dependency now, not a root-source path mirror: `wrapper` lives in
+// `harness-hooks`, which this crate already depends on for its hook types.
+// `harness-bridge` and `harness-daemon` reach it through this re-export.
+pub use harness_hooks::wrapper;
 
 #[derive(Debug, Clone, Args)]
 pub struct PreCompactArgs {
