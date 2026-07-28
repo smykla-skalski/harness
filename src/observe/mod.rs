@@ -9,11 +9,21 @@ mod compare;
 mod context_cmd;
 mod doctor;
 mod dump;
-pub mod output;
+// `output`'s renderers moved to `harness-observe` alongside `types`, the only
+// other thing they depended on; this facade keeps `crate::observe::output`
+// resolving for scan/render.rs, watch.rs, and application/maintenance/scan.rs.
+pub mod output {
+    pub use harness_observe::output::*;
+}
 mod scan;
 pub(crate) mod session;
+// `ObserveFilterArgs`/`ObserveMode`/`ObserveScanActionKind` moved to
+// `harness-observe`; `ObserveArgs` and the CLI-args-to-request glue stay here
+// since they build this crate's own `application::ObserveRequest`.
 pub(crate) mod transport;
-pub(crate) mod types;
+pub(crate) mod types {
+    pub use harness_observe::types::*;
+}
 mod watch;
 
 #[cfg(test)]

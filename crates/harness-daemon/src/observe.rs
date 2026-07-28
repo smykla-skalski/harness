@@ -5,19 +5,12 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 use harness_protocol::observe::ObserverStateEvent;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
-pub(crate) use harness_observe::classifier;
-// classifier's own copy of these re-exports is unreachable from here now
-// that classifier is a real dependency instead of a second `#[path]` include,
-// but this module stays a straight mirror of the root source rather than a
-// daemon-specific trim.
-#[allow(unused_imports)]
-#[path = "../../../src/observe/types/mod.rs"]
-pub(crate) mod types;
+pub(crate) use harness_observe::{classifier, types};
 
 fn observe_root(project_context_root: &Path, observe_id: &str) -> PathBuf {
     project_context_root

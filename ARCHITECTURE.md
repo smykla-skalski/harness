@@ -82,7 +82,7 @@ flowchart LR
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `crates/harness-run/src/` | tracked run domain: run models, state, and workflow                       |
 | `src/observe/`   | live session inspection, doctor diagnostics, dump/scan/watch flows, and fix routing for improving skills and suites |
-| `crates/harness-observe/src/` | session-log issue classification (the classifier), plus its `patterns`/text-redaction helpers |
+| `crates/harness-observe/src/` | session-log issue classification (the classifier), its `patterns`/text-redaction helpers, shared observe types, CLI argument shapes, and renderers (JSON/markdown/SARIF) |
 | `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |

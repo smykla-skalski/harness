@@ -1,6 +1,7 @@
 use std::fmt::Write as _;
 
-use super::types::{Issue, IssueSeverity};
+use harness_kernel::io::format_markdown_table;
+use harness_protocol::observe::{Issue, IssueSeverity};
 
 #[path = "output/rendering.rs"]
 mod rendering;
@@ -9,7 +10,6 @@ use self::rendering::{
     RenderedIssue, RenderedSummary, RenderedTopCauses, SarifProperties, render_json_pretty_string,
     render_json_string, render_property_bag,
 };
-use crate::infra::io::format_markdown_table;
 
 /// Render an issue as a human-readable line.
 #[must_use]

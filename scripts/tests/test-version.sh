@@ -64,7 +64,7 @@ seed_sandbox() {
     "$ROOT/testkit/Cargo.toml"
     "$ROOT/aff/Cargo.toml"
     "$ROOT/docs/api/openapi.json"
-    "$ROOT/src/observe/output.rs"
+    "$ROOT/crates/harness-observe/src/output.rs"
     "$ROOT"/crates/*/Cargo.toml
     "$ROOT"/tools/*/Cargo.toml
   )

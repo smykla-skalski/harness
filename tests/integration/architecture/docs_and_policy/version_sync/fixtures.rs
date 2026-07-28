@@ -222,7 +222,13 @@ pub(super) const MIXED_MONITOR_PBXPROJ_VERSION_FIXTURE: &str = "\
 /// recur.
 fn workspace_member_manifests(root: &Path) -> Vec<String> {
     let output = Command::new(env!("CARGO"))
-        .args(["metadata", "--format-version", "1", "--no-deps", "--offline"])
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--no-deps",
+            "--offline",
+        ])
         .current_dir(root)
         .output()
         .expect("invoke cargo metadata");
@@ -266,7 +272,7 @@ pub(super) fn setup_version_script_fixture_with_pbxproj(
         "Cargo.toml",
         "Cargo.lock",
         "docs/api/openapi.json",
-        "src/observe/output.rs",
+        "crates/harness-observe/src/output.rs",
         "scripts/version.sh",
         "apps/harness-monitor/Scripts/lib/swift-tool-env.sh",
         "apps/harness-monitor/Scripts/lib/xcode-version.sh",

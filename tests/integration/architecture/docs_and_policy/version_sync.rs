@@ -24,7 +24,7 @@ fn repo_version_surfaces_stay_in_sync() {
         root,
         "apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist",
     );
-    let observe_output = read_repo_file(root, "src/observe/output.rs");
+    let observe_output = read_repo_file(root, "crates/harness-observe/src/output.rs");
 
     let version_line = cargo_toml
         .lines()
@@ -75,7 +75,7 @@ fn repo_version_surfaces_stay_in_sync() {
     );
     assert!(
         observe_output.contains("env!(\"CARGO_PKG_VERSION\")"),
-        "src/observe/output.rs should source SARIF driver.version from env!(\"CARGO_PKG_VERSION\")"
+        "crates/harness-observe/src/output.rs should source SARIF driver.version from env!(\"CARGO_PKG_VERSION\")"
     );
 }
 

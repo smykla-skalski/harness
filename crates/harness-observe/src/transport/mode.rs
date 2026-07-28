@@ -1,16 +1,14 @@
 use clap::{Subcommand, ValueEnum};
 
-use crate::hooks::adapters::HookAgent;
-
-use super::super::application::{
-    ObserveActionKind, ObserveDoctorRequest, ObserveDumpRequest, ObserveRequest,
-    ObserveScanRequest, ObserveWatchRequest,
-};
 use super::args::ObserveFilterArgs;
 
 /// Observe subcommands.
+///
+/// Deliberately not `#[non_exhaustive]`: `src/observe/transport.rs`'s
+/// `build_request` is the only place that matches on this, and it is in the
+/// same workspace, so a new variant should fail that match at compile time
+/// rather than hit a wildcard arm at runtime.
 #[derive(Debug, Clone, Subcommand)]
-#[non_exhaustive]
 pub enum ObserveMode {
     /// One-shot scan of a session log, plus observer maintenance actions.
     Scan {
@@ -98,78 +96,6 @@ pub enum ObserveMode {
     },
 }
 
-impl ObserveMode {
-    pub(crate) fn into_request(
-        self,
-        agent: Option<HookAgent>,
-        observe_id: String,
-    ) -> ObserveRequest {
-        match self {
-            Self::Scan {
-                session_id,
-                action,
-                issue_id,
-                since_line,
-                value,
-                range_a,
-                range_b,
-                codes,
-                filter,
-            } => ObserveRequest::Scan(ObserveScanRequest {
-                session_id,
-                action: action.map(Into::into),
-                issue_id,
-                since_line,
-                value,
-                range_a,
-                range_b,
-                codes,
-                filter: filter.into_filter(agent, observe_id),
-            }),
-            Self::Watch {
-                session_id,
-                poll_interval,
-                timeout,
-                filter,
-            } => ObserveRequest::Watch(ObserveWatchRequest {
-                session_id,
-                poll_interval,
-                timeout,
-                filter: filter.into_filter(agent, observe_id),
-            }),
-            Self::Dump {
-                session_id,
-                context_line,
-                context_window,
-                from_line,
-                to_line,
-                filter,
-                role,
-                tool_name,
-                raw_json,
-                project_hint,
-            } => ObserveRequest::Dump(ObserveDumpRequest {
-                session_id,
-                context_line,
-                context_window,
-                from_line,
-                to_line,
-                filter,
-                role,
-                tool_name,
-                raw_json,
-                project_hint,
-                agent,
-            }),
-            Self::Doctor { json, project_dir } => ObserveRequest::Doctor(ObserveDoctorRequest {
-                json,
-                project_dir,
-                agent,
-            }),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ObserveScanActionKind {
     Cycle,
@@ -182,21 +108,4 @@ pub enum ObserveScanActionKind {
     ListFocusPresets,
     Mute,
     Unmute,
-}
-
-impl From<ObserveScanActionKind> for ObserveActionKind {
-    fn from(value: ObserveScanActionKind) -> Self {
-        match value {
-            ObserveScanActionKind::Cycle => Self::Cycle,
-            ObserveScanActionKind::Status => Self::Status,
-            ObserveScanActionKind::Resume => Self::Resume,
-            ObserveScanActionKind::Verify => Self::Verify,
-            ObserveScanActionKind::ResolveFrom => Self::ResolveFrom,
-            ObserveScanActionKind::Compare => Self::Compare,
-            ObserveScanActionKind::ListCategories => Self::ListCategories,
-            ObserveScanActionKind::ListFocusPresets => Self::ListFocusPresets,
-            ObserveScanActionKind::Mute => Self::Mute,
-            ObserveScanActionKind::Unmute => Self::Unmute,
-        }
-    }
 }

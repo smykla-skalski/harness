@@ -2456,8 +2456,10 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     "SessionUpdatedPayload",
     "SessionExtensionsPayload",
 ];
-const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
-const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
+const OBSERVE_CLASSIFICATION_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/observe_classification.rs");
+const OBSERVE_ISSUE_CODE_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/observe_issue_code.rs");
 const OBSERVE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ObserveWireTypes.generated.swift";
 /// observe::types classification leaf: the foundation enums the summaries issue
 /// cluster references. Only the four DECODE enums the app reuses are emitted -

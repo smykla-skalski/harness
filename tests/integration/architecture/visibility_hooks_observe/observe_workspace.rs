@@ -6,10 +6,9 @@ use super::assert_split_modules_exist;
 #[test]
 fn observe_tool_checks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let tool_checks_mod = fs::read_to_string(
-        root.join("crates/harness-observe/src/classifier/tool_checks/mod.rs"),
-    )
-    .unwrap();
+    let tool_checks_mod =
+        fs::read_to_string(root.join("crates/harness-observe/src/classifier/tool_checks/mod.rs"))
+            .unwrap();
 
     for needle in [
         "fn check_bash_tool_use(",
@@ -145,8 +144,7 @@ fn workspace_compact_storage_root_stays_prod_only() {
 #[test]
 fn infra_exec_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let exec_mod =
-        fs::read_to_string(root.join("crates/harness-infra/src/exec/mod.rs")).unwrap();
+    let exec_mod = fs::read_to_string(root.join("crates/harness-infra/src/exec/mod.rs")).unwrap();
 
     for needle in [
         "pub(crate) fn run_command(",
@@ -243,8 +241,7 @@ fn observe_classifier_tests_stay_split_by_scenario() {
 #[test]
 fn observe_patterns_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let patterns =
-        fs::read_to_string(root.join("crates/harness-observe/src/patterns.rs")).unwrap();
+    let patterns = fs::read_to_string(root.join("crates/harness-observe/src/patterns.rs")).unwrap();
 
     for needle in [
         "fn ksa_codes_count(",
@@ -343,7 +340,7 @@ fn observe_dump_root_stays_a_facade() {
 #[test]
 fn observe_output_root_stays_focused_on_render_entrypoints() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let output = fs::read_to_string(root.join("src/observe/output.rs")).unwrap();
+    let output = fs::read_to_string(root.join("crates/harness-observe/src/output.rs")).unwrap();
 
     for needle in [
         "struct RenderedIssue<'a>",
@@ -355,12 +352,13 @@ fn observe_output_root_stays_focused_on_render_entrypoints() {
     ] {
         assert!(
             !output.contains(needle),
-            "src/observe/output.rs should stay focused on renderer entrypoints instead of owning `{needle}`"
+            "crates/harness-observe/src/output.rs should stay focused on renderer entrypoints instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/observe/output/rendering.rs").exists(),
+        root.join("crates/harness-observe/src/output/rendering.rs")
+            .exists(),
         "observe output rendering split module should exist"
     );
 }

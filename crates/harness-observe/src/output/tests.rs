@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use super::rendering::DETAIL_TRUNCATE_LENGTH;
 use super::*;
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, IssueCategory, IssueCode, MessageRole, SourceTool,
 };
 

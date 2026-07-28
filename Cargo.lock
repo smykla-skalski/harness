@@ -3870,11 +3870,13 @@ dependencies = [
 name = "harness-observe"
 version = "54.0.0"
 dependencies = [
+ "clap",
  "harness-kernel",
  "harness-protocol",
  "hex",
  "regex",
  "serde",
+ "serde-sarif",
  "serde_json",
  "sha2 0.11.0",
 ]

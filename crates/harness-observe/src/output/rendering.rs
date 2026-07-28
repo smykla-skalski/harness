@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use serde::Serialize;
 use serde_sarif::sarif::PropertyBag;
 
-use crate::observe::types::{
+use harness_protocol::observe::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole, SourceTool,
 };
 

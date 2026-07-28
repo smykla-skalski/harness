@@ -4,6 +4,4 @@
 /// `harness_protocol::observe`, which also carries the rest of this chain
 /// (`OpenIssue`, `IssueAttempt`, `ActiveWorker`, `AgentObserveRecord`) that
 /// this file never named directly even before the move.
-pub use harness_protocol::observe::{Issue, ObserverState, OpenIssue};
-#[cfg(test)]
-pub use harness_protocol::observe::ActiveWorker;
+pub use harness_protocol::observe::{ActiveWorker, Issue, ObserverState, OpenIssue};

@@ -4,6 +4,4 @@
 /// include from the daemon facade. `OccurrenceTracker`, `ToolUseRecord`, and
 /// `ToolUseWindow` move there too since they're part of the same tracking
 /// chain. See `harness_protocol::observe`.
-pub use harness_protocol::observe::{OccurrenceTracker, ScanState, ToolUseRecord};
-#[cfg(test)]
-pub use harness_protocol::observe::ToolUseWindow;
+pub use harness_protocol::observe::{OccurrenceTracker, ScanState, ToolUseRecord, ToolUseWindow};
