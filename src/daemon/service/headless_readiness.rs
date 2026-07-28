@@ -31,6 +31,7 @@ pub(crate) struct HeadlessReadinessInputs<'a> {
 struct ReadinessEvaluation<'a> {
     selected_lane: &'a str,
     compatible: bool,
+    lane_known: bool,
     lane_available: bool,
     credential_ready: bool,
     runtime_available: bool,
@@ -62,6 +63,7 @@ pub(crate) fn build_headless_readiness_report(
     let evaluation = ReadinessEvaluation {
         selected_lane,
         compatible,
+        lane_known: LANES.contains(&selected_lane),
         lane_available,
         credential_ready: !credential.required || credential.configured == Some(true),
         runtime_available,
@@ -119,12 +121,12 @@ fn collect_unmet_requirements(
     );
     push_failure(
         &mut reasons,
-        LANES.contains(&evaluation.selected_lane),
+        evaluation.lane_known,
         format!("unknown execution lane '{}'", evaluation.selected_lane),
     );
     push_failure(
         &mut reasons,
-        evaluation.lane_available,
+        !evaluation.lane_known || evaluation.lane_available,
         format!(
             "execution lane '{}' is unavailable",
             evaluation.selected_lane
@@ -143,7 +145,7 @@ fn collect_unmet_requirements(
     );
     push_failure(
         &mut reasons,
-        evaluation.runtime_available,
+        !evaluation.lane_known || evaluation.runtime_available,
         format!(
             "runtime '{}' is unavailable on lane '{}'",
             inputs.request.runtime, evaluation.selected_lane
@@ -398,5 +400,27 @@ mod tests {
 
         assert!(!status.available);
         assert_eq!(status.reason.as_deref(), Some("capability is disabled"));
+    }
+
+    #[test]
+    fn unknown_lane_does_not_cascade_into_unavailable_failures() {
+        let mut request = request("codex", "gpt-5.4-mini");
+        request.lane = Some("unknown".to_string());
+        let bridge = ready_bridge();
+        let runtime_probe = probe("codex", true);
+
+        let report = build_headless_readiness_report(&HeadlessReadinessInputs {
+            request: &request,
+            daemon_version: "test",
+            bridge: &bridge,
+            runtime_probe: &runtime_probe,
+            openrouter_configured: false,
+            orchestrator_active: true,
+        });
+
+        assert_eq!(
+            report.unmet_requirements,
+            vec!["unknown execution lane 'unknown'"]
+        );
     }
 }

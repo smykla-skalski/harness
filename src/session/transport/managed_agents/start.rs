@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use clap::{Args, Subcommand};
 
 use crate::daemon::protocol::{
-    DAEMON_WIRE_VERSION, HeadlessReadinessReport, HeadlessReadinessRequest,
+    DAEMON_WIRE_VERSION, HeadlessReadinessReport, HeadlessReadinessRequest, http_paths,
 };
 use crate::infra::io;
 use crate::session::types::SessionRole;
@@ -105,7 +105,7 @@ impl Execute for HeadlessReadinessArgs {
             lane: self.lane.clone(),
         };
         let report: HeadlessReadinessReport = daemon_client()?
-            .post("/v1/headless/readiness", &request)
+            .post(http_paths::HEADLESS_READINESS, &request)
             .map_err(|error| daemon_client_error("check headless readiness", &error))?;
         print_json(&report)?;
         Ok(i32::from(!report.ready))
