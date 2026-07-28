@@ -117,7 +117,7 @@ impl TaskBoardOpenRouterCredentialSnapshot {
 fn normalized_token(token: &str) -> Result<String, String> {
     let token = token.trim().to_owned();
     if token.is_empty() {
-        Err("refusing to store an empty secret; use `clear` to remove instead".to_string())
+        Err("refusing to store an empty secret; clear the secret instead".to_string())
     } else {
         Ok(token)
     }

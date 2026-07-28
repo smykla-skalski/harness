@@ -6,7 +6,9 @@ use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
 
-use crate::task_board::wire::TaskBoardCapabilitiesResponse;
+use crate::task_board::wire::{
+    TASK_BOARD_STORAGE_DATABASE, TaskBoardCapabilitiesResponse,
+};
 use crate::task_board::{
     TaskBoardGitHubCredentialSnapshot, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardOpenRouterCredentialSnapshot,
@@ -85,9 +87,29 @@ pub(super) fn provider_account(client: Option<&DaemonClient>) -> Result<String, 
         return Ok("default".to_string());
     };
     let capabilities = client
-        .get::<TaskBoardCapabilitiesResponse>("/v1/task-board/capabilities", &[])
-        .map_err(|error| daemon_sync_error("read task-board identity", &error))?;
-    Ok(format!("db{}-global", sha1_hex(&capabilities.instance_id)))
+        .get_optional::<TaskBoardCapabilitiesResponse>("/v1/task-board/capabilities", &[])
+        .map_err(|error| daemon_sync_error("read task-board identity", &error))?
+        .ok_or_else(provider_upgrade_required)?;
+    scoped_provider_account(&capabilities)
+}
+
+fn scoped_provider_account(
+    capabilities: &TaskBoardCapabilitiesResponse,
+) -> Result<String, CliError> {
+    if capabilities.storage != TASK_BOARD_STORAGE_DATABASE {
+        return Err(provider_upgrade_required());
+    }
+    Ok(format!(
+        "db{}-global",
+        sha1_hex(&capabilities.instance_id)
+    ))
+}
+
+fn provider_upgrade_required() -> CliError {
+    CliErrorKind::workflow_io(
+        "the running daemon does not provide database-backed Task Board storage; upgrade and restart the daemon",
+    )
+    .into()
 }
 
 pub(super) fn provider_configured(
@@ -257,7 +279,12 @@ fn sync_github(
             },
         )
         .map(|_| ())
-        .map_err(|error| daemon_sync_error("refresh GitHub credentials", &error))
+        .map_err(|error| {
+            daemon_sync_error(
+                "refresh GitHub credentials after Keychain was updated",
+                &error,
+            )
+        })
 }
 
 fn sync_openrouter(
@@ -275,7 +302,12 @@ fn sync_openrouter(
             },
         )
         .map(|_| ())
-        .map_err(|error| daemon_sync_error("refresh OpenRouter credentials", &error))
+        .map_err(|error| {
+            daemon_sync_error(
+                "refresh OpenRouter credentials after Keychain was updated",
+                &error,
+            )
+        })
 }
 
 fn provider_parse_error(message: String) -> CliError {
@@ -288,7 +320,7 @@ fn daemon_sync_error(operation: &str, error: &ClientError) -> CliError {
 
 #[cfg(test)]
 mod tests {
-    use super::legacy_raw_token;
+    use super::*;
 
     #[test]
     fn legacy_raw_token_trims_without_exposing_the_value() {
@@ -303,6 +335,26 @@ mod tests {
         assert_eq!(
             legacy_raw_token(&[0xff]).expect_err("invalid token"),
             "legacy credential is invalid UTF-8"
+        );
+    }
+
+    #[test]
+    fn scoped_account_requires_database_backed_task_board() {
+        let unsupported = TaskBoardCapabilitiesResponse {
+            storage: "legacy".into(),
+            revision: 0,
+            instance_id: "instance-a".into(),
+        };
+        assert!(scoped_provider_account(&unsupported).is_err());
+
+        let database = TaskBoardCapabilitiesResponse {
+            storage: TASK_BOARD_STORAGE_DATABASE.into(),
+            revision: 0,
+            instance_id: "instance-a".into(),
+        };
+        assert_eq!(
+            scoped_provider_account(&database).expect("database account"),
+            "db494d457064c8f758be3fb586cae947b918468bf7-global"
         );
     }
 }
