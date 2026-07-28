@@ -1,0 +1,471 @@
+use std::mem;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+
+use async_trait::async_trait;
+use serde_json::json;
+use tempfile::tempdir;
+
+use super::actions::{
+    ReviewsPolicyActionExecutor, ReviewsPolicyProvider, authored_reviews_policy_plan,
+};
+use super::evidence::review_target_policy_evidence;
+use super::workflow::ensure_reviews_auto_workflow;
+use crate::{
+    ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
+    ReviewTargetFlags,
+};
+use harness_kernel::errors::CliError;
+use harness_task_board::github::GitHubMergeMethod;
+use harness_task_board::policy_graph::{
+    PolicyGraph, PolicyGraphMode, PolicyWaitCondition, store_gate_policy,
+};
+use harness_task_board::policy_runtime::executor::PolicyRuntimeExecutor;
+use harness_task_board::policy_runtime::models::{
+    PolicyActionDescriptor, PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject,
+    PolicyRunTrigger,
+};
+use harness_task_board::policy_runtime::providers::PolicyProviderRegistry;
+use harness_task_board::policy_runtime::repository::PolicyRuntimeRepository;
+use harness_task_board::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
+
+fn draft_conflicted_review_target() -> ReviewTarget {
+    let mut target = review_target_fixture();
+    target.flags.is_draft = true;
+    target.review_status = ReviewReviewStatus::ReviewRequired;
+    target.mergeable = ReviewMergeableState::Conflicting;
+    target.flags.policy_blocked = true;
+    target.has_conflict_markers = Some(true);
+    target.viewer_has_active_approval = Some(false);
+    target.auto_merge_enabled = Some(false);
+    target.approval_requirement_satisfied_after_viewer_approval = Some(true);
+    target
+}
+
+#[test]
+fn review_target_maps_draft_and_conflict_flags_into_policy_evidence() {
+    let evidence = review_target_policy_evidence(&draft_conflicted_review_target());
+
+    assert_eq!(evidence.review_is_open, Some(true));
+    assert_eq!(evidence.review_is_draft, Some(true));
+    assert_eq!(evidence.review_review_required, Some(true));
+    assert_eq!(evidence.review_has_no_decision, Some(false));
+    assert_eq!(evidence.review_has_merge_conflicts, Some(true));
+    assert_eq!(evidence.review_policy_blocked, Some(true));
+}
+
+#[test]
+fn review_target_maps_approval_and_merge_flags_into_policy_evidence() {
+    let evidence = review_target_policy_evidence(&draft_conflicted_review_target());
+
+    assert_eq!(evidence.review_viewer_can_update, Some(true));
+    assert_eq!(evidence.review_has_conflict_markers, Some(true));
+    assert_eq!(evidence.review_viewer_has_active_approval, Some(false));
+    assert_eq!(evidence.review_auto_merge_enabled, Some(false));
+    assert_eq!(
+        evidence.review_required_approvals_satisfied_after_viewer_approval,
+        Some(true)
+    );
+}
+
+#[tokio::test]
+async fn reviews_provider_approves_then_waits_for_checks_before_merge() {
+    let repository = test_runtime_repository();
+    let executed_actions = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = PolicyProviderRegistry::default();
+    registry.register(ReviewsPolicyProvider::new(TestReviewsActionExecutor {
+        executed_actions: Arc::clone(&executed_actions),
+    }));
+    let runtime = PolicyRuntimeExecutor::new(repository, registry);
+
+    let run = runtime
+        .start(
+            PolicyRunTrigger::Manual,
+            reviews_policy_run_request(
+                &review_target_fixture(),
+                GitHubMergeMethod::Squash,
+                PolicyWaitCondition::Event {
+                    event_key: "reviews.checks_passed".to_owned(),
+                },
+            ),
+        )
+        .await
+        .expect("execute reviews workflow");
+
+    assert_eq!(run.steps[0].action_key.as_deref(), Some("reviews.approve"));
+    assert_eq!(run.steps[1].waiting_on, run.waiting_on);
+    assert_eq!(run.status, PolicyRunStatus::Waiting);
+    assert_eq!(
+        *executed_actions.lock().expect("lock executed actions"),
+        vec!["reviews.approve".to_owned()],
+    );
+    assert_eq!(
+        run.waiting_on,
+        Some(PolicyWaitCondition::Event {
+            event_key: "reviews.checks_passed".to_owned(),
+        }),
+    );
+}
+
+#[test]
+fn run_start_request_reads_merge_method_from_method_key() {
+    // The Swift client snake-cases its field names, so the merge method must
+    // arrive under `method` (matching the existing merge/auto requests). This
+    // is the wire contract the Monitor app has to satisfy.
+    let body = json!({
+        "workflow_id": "reviews_auto",
+        "target": review_target_fixture(),
+        "method": "merge",
+        "trigger": "manual",
+    });
+    let request: crate::ReviewsPolicyRunStartRequest =
+        serde_json::from_value(body).expect("deserialize start request");
+    assert_eq!(request.method, GitHubMergeMethod::Merge);
+}
+
+#[test]
+fn run_start_request_ignores_legacy_merge_method_key() {
+    // A payload that misnames the field as `merge_method` must fall back to
+    // the default instead of silently honoring it, so the drift cannot be
+    // mistaken for a working contract.
+    let body = json!({
+        "workflow_id": "reviews_auto",
+        "target": review_target_fixture(),
+        "merge_method": "merge",
+        "trigger": "manual",
+    });
+    let request: crate::ReviewsPolicyRunStartRequest =
+        serde_json::from_value(body).expect("deserialize start request");
+    assert_eq!(request.method, GitHubMergeMethod::default());
+}
+
+#[test]
+fn preview_request_reads_merge_method_from_method_key() {
+    let body = json!({
+        "workflow_id": "reviews_auto",
+        "target": review_target_fixture(),
+        "method": "rebase",
+    });
+    let request: crate::ReviewsPolicyPreviewRequest =
+        serde_json::from_value(body).expect("deserialize preview request");
+    assert_eq!(request.method, GitHubMergeMethod::Rebase);
+}
+
+#[test]
+fn authored_plan_is_disabled_without_enforced_policy() {
+    let temp = tempdir().expect("create tempdir");
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Merge,
+    )
+    .expect("plan reviews auto");
+
+    assert!(!plan.actionable, "no enforced policy must fail closed");
+    assert_eq!(
+        plan.reason.as_deref(),
+        Some("reviews policy workflow is disabled because no enforced policy canvas is active")
+    );
+    assert!(
+        plan.steps.is_empty(),
+        "disabled policy must not produce actions"
+    );
+}
+
+#[test]
+fn authored_plan_does_not_synthesize_missing_reviews_auto_workflow() {
+    let temp = tempdir().expect("create tempdir");
+    store_gate_policy(
+        temp.path(),
+        Some(PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced)),
+    );
+
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Merge,
+    )
+    .expect("plan reviews auto");
+
+    assert!(!plan.actionable, "missing workflow must fail closed");
+    assert_eq!(
+        plan.reason.as_deref(),
+        Some("active policy canvas does not define a 'reviews_auto' workflow")
+    );
+    assert!(
+        plan.steps.is_empty(),
+        "missing workflow must not produce actions"
+    );
+}
+
+#[test]
+fn reviews_auto_workflow_does_not_handle_plain_review_approval() {
+    let mut graph = PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced);
+    ensure_reviews_auto_workflow(&mut graph);
+
+    let simulation = graph.simulate(&PolicyInput {
+        workflow: None,
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+        evaluated_at: None,
+        approvals: Vec::new(),
+    });
+
+    assert_eq!(
+        simulation.trace.entry_node_id.as_deref(),
+        Some("action:router"),
+        "direct review approvals must use the generic gate, not the reviews_auto workflow entry",
+    );
+    assert!(
+        simulation
+            .visited_node_ids
+            .iter()
+            .all(|node_id| !node_id.starts_with("reviews-auto-")),
+        "plain review approval unexpectedly visited Reviews Auto nodes: {:?}",
+        simulation.visited_node_ids
+    );
+}
+
+#[test]
+fn seeded_reviews_auto_compiles_to_expected_step_shape() {
+    // Compilation regression guard: the seeded `reviews_auto` workflow must
+    // preserve the existing approve -> checks wait -> merge sequence.
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Merge,
+    )
+    .expect("plan reviews auto");
+
+    assert!(
+        plan.actionable,
+        "expected actionable plan, reason: {:?}",
+        plan.reason
+    );
+
+    let step_kinds = plan
+        .steps
+        .iter()
+        .map(|step| match step {
+            PolicyRunStep::Action(action) => format!("action:{}", action.action_key),
+            PolicyRunStep::Wait(PolicyWaitCondition::Event { event_key }) => {
+                format!("wait_event:{event_key}")
+            }
+            PolicyRunStep::Wait(PolicyWaitCondition::Timer { duration_seconds }) => {
+                format!("wait_timer:{duration_seconds}")
+            }
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        step_kinds,
+        vec![
+            "action:reviews.approve".to_owned(),
+            "wait_event:reviews.checks_passed".to_owned(),
+            "action:reviews.merge".to_owned(),
+        ],
+    );
+}
+
+#[test]
+fn seeded_reviews_auto_notifies_when_conflicts_are_detected() {
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let mut target = review_target_fixture();
+    target.has_conflict_markers = Some(true);
+
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &target,
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(plan.actionable, "conflict branch must emit notification");
+    assert_eq!(plan.steps.len(), 1);
+    let PolicyRunStep::Action(action) = &plan.steps[0] else {
+        panic!("expected notification action");
+    };
+    assert_eq!(action.provider, "notification");
+    assert_eq!(action.action_key, "notification.emit");
+}
+
+#[test]
+fn seeded_reviews_auto_skips_redundant_approval() {
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let mut target = review_target_fixture();
+    target.viewer_has_active_approval = Some(true);
+
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &target,
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(plan.actionable);
+    let step_kinds = plan
+        .steps
+        .iter()
+        .map(|step| match step {
+            PolicyRunStep::Action(action) => format!("action:{}", action.action_key),
+            PolicyRunStep::Wait(PolicyWaitCondition::Event { event_key }) => {
+                format!("wait_event:{event_key}")
+            }
+            PolicyRunStep::Wait(PolicyWaitCondition::Timer { duration_seconds }) => {
+                format!("wait_timer:{duration_seconds}")
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        step_kinds,
+        vec![
+            "wait_event:reviews.checks_passed".to_owned(),
+            "action:reviews.merge".to_owned(),
+        ],
+    );
+}
+
+#[test]
+fn authored_plan_blocks_when_viewer_cannot_update() {
+    let mut target = review_target_fixture();
+    target.flags.viewer_can_update = false;
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &target,
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(!plan.actionable, "ineligible target must not be actionable");
+    assert!(plan.reason.is_some());
+}
+
+#[test]
+fn authored_plan_resolves_mixed_case_workflow_id() {
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "Reviews_Auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(
+        plan.actionable,
+        "mixed-case id should resolve, reason: {:?}",
+        plan.reason
+    );
+}
+
+fn write_enforced_reviews_auto_policy(root: &Path) {
+    let mut graph = PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced);
+    ensure_reviews_auto_workflow(&mut graph);
+    store_gate_policy(root, Some(graph));
+}
+
+fn test_runtime_repository() -> PolicyRuntimeRepository {
+    let temp = tempdir().expect("create tempdir");
+    let root = temp.path().to_path_buf();
+    mem::forget(temp);
+    PolicyRuntimeRepository::new(root)
+}
+
+fn review_target_fixture() -> ReviewTarget {
+    ReviewTarget {
+        pull_request_id: "pr_1272".to_owned(),
+        repository_id: "repo_1".to_owned(),
+        repository: "Kong/mink-vcp-manager".to_owned(),
+        number: 1272,
+        url: "https://github.com/Kong/mink-vcp-manager/pull/1272".to_owned(),
+        state: ReviewPullRequestState::Open,
+        head_sha: "abc123".to_owned(),
+        mergeable: ReviewMergeableState::Mergeable,
+        review_status: ReviewReviewStatus::ReviewRequired,
+        check_status: crate::ReviewCheckStatus::Success,
+        flags: ReviewTargetFlags {
+            is_draft: false,
+            policy_blocked: false,
+            viewer_can_update: true,
+        },
+        viewer_can_merge_as_admin: false,
+        required_failed_check_names: Vec::new(),
+        check_suite_ids: vec!["check-suite-1".to_owned()],
+        has_conflict_markers: Some(false),
+        viewer_has_active_approval: Some(false),
+        auto_merge_enabled: Some(false),
+        approval_requirement_satisfied_after_viewer_approval: Some(true),
+    }
+}
+
+fn reviews_policy_run_request(
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+    wait: PolicyWaitCondition,
+) -> PolicyRunRequest {
+    PolicyRunRequest {
+        workflow_id: "reviews_auto".to_owned(),
+        subject: PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number)),
+        subject_fingerprint: Some(target.head_sha.clone()),
+        steps: vec![
+            PolicyRunStep::Action(PolicyActionDescriptor {
+                provider: "reviews".to_owned(),
+                action_key: "reviews.approve".to_owned(),
+                payload: Some(json!({
+                    "target": target,
+                    "merge_method": null,
+                })),
+            }),
+            PolicyRunStep::Wait(wait),
+            PolicyRunStep::Action(PolicyActionDescriptor {
+                provider: "reviews".to_owned(),
+                action_key: "reviews.merge".to_owned(),
+                payload: Some(json!({
+                    "target": target,
+                    "merge_method": method,
+                })),
+            }),
+        ],
+    }
+}
+
+struct TestReviewsActionExecutor {
+    executed_actions: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl ReviewsPolicyActionExecutor for TestReviewsActionExecutor {
+    async fn approve(&self, _target: &ReviewTarget) -> Result<(), CliError> {
+        self.executed_actions
+            .lock()
+            .expect("lock executed actions")
+            .push("reviews.approve".to_owned());
+        Ok(())
+    }
+
+    async fn merge(
+        &self,
+        _target: &ReviewTarget,
+        _method: GitHubMergeMethod,
+    ) -> Result<(), CliError> {
+        self.executed_actions
+            .lock()
+            .expect("lock executed actions")
+            .push("reviews.merge".to_owned());
+        Ok(())
+    }
+}

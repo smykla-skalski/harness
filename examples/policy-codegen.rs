@@ -2553,7 +2553,8 @@ const REVIEWS_ENUMS_SOURCE: &str = include_str!("../crates/harness-reviews/src/e
 // files, so this is additive, not direct adoption. body_update's response
 // carries a DateTime (-> String) and the open ReviewsBodyUpdateOutcome.
 const REVIEWS_AVATAR_SOURCE: &str = include_str!("../crates/harness-reviews/src/avatar.rs");
-const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_update.rs");
+const REVIEWS_BODY_UPDATE_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/body_update.rs");
 const REVIEWS_FILE_COMMENT_SOURCE: &str =
     include_str!("../crates/harness-reviews/src/file_comment.rs");
 const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
@@ -2585,13 +2586,15 @@ const REVIEWS_TIMELINE_MOD_SOURCE: &str =
 // reviews types core: the query/item/check/action/policy request-response
 // surface. The public umbrella re-exports the split action and policy modules,
 // so generation needs all three files. The custom default fns it references live
-// in src/reviews/logic.rs (the defaults source). GitHubMergeMethod is
-// referenced-not-defined (renamed to the hand type); ReviewAuthorAssociation
+// in crates/harness-reviews/src/logic.rs (the defaults source). GitHubMergeMethod
+// is referenced-not-defined (renamed to the hand type); ReviewAuthorAssociation
 // references the adopted closed enum.
-const REVIEWS_TYPES_SOURCE: &str = include_str!("../src/reviews/types.rs");
-const REVIEWS_TYPES_ACTIONS_SOURCE: &str = include_str!("../src/reviews/types/actions.rs");
-const REVIEWS_TYPES_POLICY_SOURCE: &str = include_str!("../src/reviews/types/policy.rs");
-const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
+const REVIEWS_TYPES_SOURCE: &str = include_str!("../crates/harness-reviews/src/types.rs");
+const REVIEWS_TYPES_ACTIONS_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/types/actions.rs");
+const REVIEWS_TYPES_POLICY_SOURCE: &str =
+    include_str!("../crates/harness-reviews/src/types/policy.rs");
+const REVIEWS_LOGIC_SOURCE: &str = include_str!("../crates/harness-reviews/src/logic.rs");
 // websocket: the JSON-RPC-ish transport envelope. The five self-contained frame
 // types (request/response/error/push/chunk) generate; the three config/probe/
 // inspect payloads reference unmigrated persona/runtime/acp types and are SKIP'd
