@@ -1,8 +1,7 @@
 pub use harness_session::adopter;
 pub use harness_session::canonicalize;
 pub use harness_session::index;
-#[path = "../../../src/session/observe/mod.rs"]
-pub mod observe;
+pub use harness_session::observe;
 pub use harness_session::ordering;
 pub use harness_session::persona;
 pub use harness_session::roles;

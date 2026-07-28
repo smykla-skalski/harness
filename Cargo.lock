@@ -4024,6 +4024,7 @@ dependencies = [
  "harness-daemon-client",
  "harness-infra",
  "harness-kernel",
+ "harness-observe",
  "harness-protocol",
  "harness-testkit",
  "harness-workspace",

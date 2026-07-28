@@ -15,12 +15,14 @@
 //! daemon-owned async loop runs while [`should_tick_liveness`] holds and
 //! only performs observation work when [`should_observe`] also holds.
 
-use crate::session::types::SessionStatus;
+use crate::types::SessionStatus;
 
 /// Whether the observe loop should keep ticking for liveness sync.
 ///
 /// Mirrors the set of statuses the daemon supervisor treats as
-/// joinable / liveness-eligible.
+/// joinable / liveness-eligible. Only the daemon-owned async loop calls this
+/// today, so it needs the same `daemon-runtime` gate as its re-export below.
+#[cfg(any(test, feature = "daemon-runtime"))]
 #[must_use]
 pub const fn should_tick_liveness(status: SessionStatus) -> bool {
     status.is_liveness_eligible()

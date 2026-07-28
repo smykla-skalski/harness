@@ -1,8 +1,11 @@
-use crate::observe::load_observer_state;
-use crate::observe::types::IssueCode;
-use crate::session::service;
-use crate::session::types::{SessionRole, TaskSeverity};
-use crate::workspace::project_context_dir;
+use std::slice;
+
+use harness_observe::application::maintenance::load_observer_state;
+use harness_observe::types::IssueCode;
+use crate::service;
+use crate::storage;
+use crate::types::{SessionRole, TaskSeverity};
+use harness_workspace::workspace::project_context_dir;
 use harness_protocol::agent::HookAgent;
 
 use super::once::execute_session_observe;
@@ -91,9 +94,9 @@ fn observe_scans_logs_via_legacy_session_fallback() {
             .find(|agent| agent.runtime == "codex")
             .expect("codex worker should be registered");
         let worker_id = worker.agent_id.clone();
-        let layout = crate::session::storage::layout_from_project_dir(project, &state.session_id)
+        let layout = storage::layout_from_project_dir(project, &state.session_id)
             .expect("layout");
-        crate::session::storage::update_state(&layout, |state| {
+        storage::update_state(&layout, |state| {
             state
                 .agents
                 .get_mut(&worker_id)
@@ -267,7 +270,7 @@ fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
         let issue = infrastructure_issue("fingerprint-a");
 
         create_work_items_for_issues(
-            std::slice::from_ref(&issue),
+            slice::from_ref(&issue),
             "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
             &state,
             project,
@@ -281,7 +284,7 @@ fn observe_deduplicates_existing_issue_id_even_when_title_changes() {
         updated_issue.summary = "Harness infrastructure issue renamed after retry".to_string();
 
         create_work_items_for_issues(
-            std::slice::from_ref(&updated_issue),
+            slice::from_ref(&updated_issue),
             "fbbde0b1-87ab-53c2-b7f0-9b9a3ecccb49",
             &reloaded,
             project,

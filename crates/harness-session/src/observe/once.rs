@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use crate::observe::types::Issue;
-use crate::session::service;
 use harness_kernel::errors::CliError;
+use harness_observe::types::Issue;
+use crate::service;
 
 use super::scan::scan_all_agents;
 use super::support::{create_work_items_for_issues, emit_results, persist_observer_snapshot};
@@ -29,7 +29,7 @@ pub fn execute_session_observe(
 ///
 /// # Errors
 /// Returns `CliError` if the session is not found or on I/O failures.
-pub(crate) fn run_session_observe(
+pub fn run_session_observe(
     session_id: &str,
     project_dir: &Path,
     actor_id: Option<&str>,

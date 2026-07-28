@@ -14,13 +14,15 @@ mod observe_tests;
 mod test_support;
 
 pub use once::execute_session_observe;
+// `pub`, not `pub(crate)`: the root crate's `daemon::service::observe_*`
+// modules call all of these directly across the crate boundary.
 #[cfg(feature = "daemon-runtime")]
-pub(crate) use once::run_session_observe;
+pub use once::run_session_observe;
 #[cfg(feature = "daemon-runtime")]
-pub(crate) use predicates::{should_observe, should_tick_liveness};
+pub use predicates::{should_observe, should_tick_liveness};
 #[cfg(feature = "daemon-runtime")]
-pub(crate) use scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
+pub use scan::{AgentLogTailState, scan_all_agents, scan_all_agents_incremental};
 #[cfg(feature = "daemon-runtime")]
-pub(crate) use support::persist_observer_snapshot;
+pub use support::persist_observer_snapshot;
 pub use support::task_severity_for_issue;
 pub use watch::{execute_session_watch, execute_session_watch_async};

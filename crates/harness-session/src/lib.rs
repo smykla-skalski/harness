@@ -1,18 +1,20 @@
 //! Multi-agent session foundation: role permissions, task ordering, persona
 //! resolution, external-session adoption, the on-disk session index, session
-//! storage/journal persistence, and the session orchestration service.
+//! storage/journal persistence, the session orchestration service, and
+//! file-backed session observation.
 //!
-//! `observe` and `transport` stay in the root crate for now: they are
-//! separate, larger extractions tracked as their own follow-ups. Their
-//! remaining cross-references into this crate resolve through the root
-//! crate's `pub use harness_session::*;` facade the same way every other
-//! external consumer's `crate::session::` path does.
+//! `transport` stays in the root crate for now: it is a separate, larger
+//! extraction tracked as its own follow-up. Its remaining cross-references
+//! into this crate resolve through the root crate's
+//! `pub use harness_session::*;` facade the same way every other external
+//! consumer's `crate::session::` path does.
 
 #![deny(unsafe_code)]
 
 pub mod adopter;
 pub mod canonicalize;
 pub mod index;
+pub mod observe;
 pub mod ordering;
 pub mod persona;
 pub mod roles;

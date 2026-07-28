@@ -5,17 +5,19 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use crate::agents::runtime;
-use crate::observe::classifier::classify_line;
-use crate::observe::types::{Issue, ScanState};
-use crate::session::service;
-use crate::session::types::SessionState;
+use harness_agents::runtime;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_observe::classifier::classify_line;
+use harness_observe::types::{Issue, ScanState};
+use crate::service;
+use crate::types::SessionState;
 
+// `pub`, not `pub(crate)`: the root crate's `daemon::service::observe_async`
+// reads this field directly to detect whether a scan advanced.
 #[derive(Debug)]
-pub(crate) struct AgentLogTailState {
+pub struct AgentLogTailState {
     log_path: PathBuf,
-    pub(crate) offset: u64,
+    pub offset: u64,
     next_line_index: usize,
     scan_state: ScanState,
 }
@@ -50,7 +52,9 @@ impl AgentLogTailState {
     }
 }
 
-pub(crate) fn scan_all_agents(
+/// # Errors
+/// Returns [`CliError`] when an agent's log file cannot be read.
+pub fn scan_all_agents(
     state: &SessionState,
     session_id: &str,
     project_dir: &Path,
@@ -78,7 +82,19 @@ pub(crate) fn scan_all_agents(
     Ok(all_issues)
 }
 
-pub(crate) fn scan_all_agents_incremental(
+/// # Errors
+/// Returns [`CliError`] when an agent's log file cannot be read.
+///
+/// `tail_states` and `shared_cross_agent_editors` stay the concrete,
+/// default-hasher `HashMap`: both round-trip through [`ScanState`]'s own
+/// `cross_agent_editors` field via `mem::take`, which is not generic over
+/// the hasher, so genericizing the parameters here would not carry through
+/// the function body.
+#[allow(
+    clippy::implicit_hasher,
+    reason = "state round-trips through ScanState's concrete-hasher field"
+)]
+pub fn scan_all_agents_incremental(
     state: &SessionState,
     session_id: &str,
     project_dir: &Path,

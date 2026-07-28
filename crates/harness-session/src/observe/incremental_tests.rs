@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::session::service;
+use crate::service;
 use harness_protocol::agent::HookAgent;
 
 use super::scan::{AgentLogTailState, resolve_agent_runtime, scan_all_agents_incremental};
