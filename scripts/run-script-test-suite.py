@@ -879,6 +879,7 @@ def _prepare_tasks(tasks: tuple[Task, ...], sandbox_root: Path) -> tuple[Task, .
     real_validation_tests = (
         "adapter_probe_requires_exact_identity",
         "focused_install_rejects_corrupt_carried_binary",
+        "first_panel_only_install_uses_its_own_version",
         "independent_panel_version_is_accepted",
         "legacy_adapter_probes_are_normalized_before_activation",
         "non_owned_entrypoint_is_preserved",
@@ -941,6 +942,10 @@ def _prepare_tasks(tasks: tuple[Task, ...], sandbox_root: Path) -> tuple[Task, .
         "first_install_activates_before_entrypoints": (
             "harness aff",
             "harness aff",
+        ),
+        "first_panel_only_install_uses_its_own_version": (
+            "harness-panel",
+            "panel",
         ),
         "harness_cli_alias_selects_only_the_cli_leaf": (
             "harness harness-daemon",

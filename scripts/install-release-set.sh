@@ -870,7 +870,7 @@ validate_selected_sources() {
 }
 
 expected_core_version() {
-  local name path current_harness_path current_aff_path
+  local name path version current_harness_path current_aff_path
   # $target_dir/release persists across invocations, so checking a fixed
   # path like build_path(harness) would pick up a stale artifact left by an
   # earlier "all"/"harness" build even when harness isn't part of this
@@ -885,9 +885,21 @@ expected_core_version() {
       return
     fi
   done
-  # No selected binary carries a version (e.g. a codex/openrouter-only
-  # install); fall back to whichever is already active so the candidate
-  # still gets a meaningful version-derived identity.
+  # No core binary was selected (e.g. a panel-only install). Let an
+  # independently-versioned selection supply the identity before consulting the
+  # current install, so a first-time install of just that binary still derives a
+  # version instead of aborting on an empty one. Adapters, which answer --probe
+  # rather than --version, yield nothing here and fall through.
+  for name in "${selected_binaries[@]}"; do
+    path="$(build_path "$name")"
+    if [[ -x "$path" ]] && version="$(binary_version "$path")"; then
+      printf '%s\n' "$version"
+      return
+    fi
+  done
+  # Nothing selected carries a version (e.g. an adapter-only install); fall back
+  # to whichever is already active so the candidate still gets a meaningful
+  # version-derived identity.
   current_harness_path="$current_link/bin/harness"
   if [[ -x "$current_harness_path" ]]; then
     binary_version "$current_harness_path"
