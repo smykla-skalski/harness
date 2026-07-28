@@ -1088,7 +1088,7 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "WsErrorPayload",
     "WsPushEvent",
     "WsChunkFrame",
-    // session tasks (session/types/tasks.rs): 10 review-flow structs, generate-only.
+    // session tasks (session_types/tasks.rs): 10 review-flow structs, generate-only.
     // WorkItem is the task-board core; the rest are its nested review state. The 3
     // plain enums (TaskSeverity/TaskSource/ReviewPointState) are adopted generated
     // bare; the 3 legacy-decode enums + ReviewPoint stay bare Swift hand - see
@@ -1133,10 +1133,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ObserverOpenIssue",
     "ObserverActiveWorker",
     "ObserverAgentSessionSummary",
-    // session/types/state.rs: SessionMetrics takes the suffix (hand counts are Int,
+    // session_types/state.rs: SessionMetrics takes the suffix (hand counts are Int,
     // wire is u32). SessionStatus is NOT suffixed - it is adopted bare.
     "SessionMetrics",
-    // session/types/agents.rs leaf + the summaries SessionSummary that nests it:
+    // session_types/agents.rs leaf + the summaries SessionSummary that nests it:
     // both are structs with a Swift hand mirror, so they take the Wire suffix
     // (generate-only until SessionSummary reroutes off convertFromSnakeCase).
     "PendingLeaderTransfer",
@@ -1242,7 +1242,7 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // /AcpRuntimeProbe (thin mirrors); the probe references AcpAuthState bare.
     "AcpRuntimeProbeResponse",
     "AcpRuntimeProbe",
-    // session/types/agents.rs persona: Swift hands are AgentPersona/PersonaSymbol; the
+    // session_types/agents.rs persona: Swift hands are AgentPersona/PersonaSymbol; the
     // symbol is the internally-tagged sf_symbol/asset enum.
     "AgentPersona",
     "PersonaSymbol",
@@ -2478,10 +2478,12 @@ const OBSERVE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Mod
 /// its wire values stay PascalCase the generator does not emit), and Confidence
 /// (no Swift consumer yet).
 const OBSERVE_EMIT_ONLY: &[&str] = &["IssueSeverity", "IssueCategory", "IssueCode", "FixSafety"];
-const SESSION_STATE_SOURCE: &str = include_str!("../src/session/types/state.rs");
-const SESSION_AGENTS_SOURCE: &str = include_str!("../src/session/types/agents.rs");
+const SESSION_STATE_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/session_types/state.rs");
+const SESSION_AGENTS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/session_types/agents.rs");
 const SESSION_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionStateWireTypes.generated.swift";
-/// session/types foundation leaf for the SessionSummary dep graph: SessionStatus
+/// session_types foundation leaf for the SessionSummary dep graph: SessionStatus
 /// (lifecycle enum) + SessionMetrics (rollup counts) from state.rs, and
 /// PendingLeaderTransfer from agents.rs. SessionStatus is adopted bare - a closed
 /// string enum whose 5 cases match the hand enum exactly, so the generated form
@@ -2607,7 +2609,8 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 // carry app divergences (TaskStatus legacy-tolerant decode, TaskSeverity .title)
 // so the structs reference the existing bare Swift hand enums. ReviewPoint is also
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
-const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
+const SESSION_TASKS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/session_types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/task_board/wire/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../crates/harness-task-board/src/types.rs");
 const TASK_BOARD_ITEM_FIELDS_SOURCE: &str =
@@ -2937,7 +2940,8 @@ const DAEMON_STATE_EMIT_ONLY: &[&str] = &[
 const SHARED_AGENT_MODELS_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/agent_models.rs");
 const SESSION_SIGNAL_SOURCE: &str = SHARED_AGENT_MODELS_SOURCE;
-const SESSION_EVENTS_SOURCE: &str = include_str!("../src/session/types/events.rs");
+const SESSION_EVENTS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/session_types/events.rs");
 const SESSION_SIGNAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionSignalWireTypes.generated.swift";
 // The session signal record (events.rs SessionSignalRecord) + the runtime signal cluster it nests
 // (signal/mod.rs Signal -> SignalPayload/DeliveryConfig, SignalAck), the SessionDetail.signals
@@ -2952,7 +2956,8 @@ const SESSION_SIGNAL_EMIT_ONLY: &[&str] = &[
     "DeliveryConfig",
     "SignalAck",
 ];
-const AGENT_REGISTRATION_WIRE_SOURCE: &str = include_str!("../src/session/types/agents/wire.rs");
+const AGENT_REGISTRATION_WIRE_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/session_types/agents/wire.rs");
 const AGENT_RUNTIME_SOURCE: &str = SHARED_AGENT_MODELS_SOURCE;
 const AGENT_REGISTRATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentRegistrationWireTypes.generated.swift";
 // The SessionDetail.agents member. The public AgentRegistration is `#[serde(try_from)]` its owned

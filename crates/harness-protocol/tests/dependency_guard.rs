@@ -35,13 +35,13 @@ fn canonical_model_sources_do_not_import_application_layers() {
         include_str!("../src/managed_agents/tui.rs"),
         include_str!("../src/runtime_kind.rs"),
         include_str!("../src/runtime_kind/disconnect.rs"),
-        include_str!("../../../src/session/types/mod.rs"),
-        include_str!("../../../src/session/types/agents.rs"),
-        include_str!("../../../src/session/types/events.rs"),
-        include_str!("../../../src/session/types/identity.rs"),
-        include_str!("../../../src/session/types/policy.rs"),
-        include_str!("../../../src/session/types/state.rs"),
-        include_str!("../../../src/session/types/tasks.rs"),
+        include_str!("../src/session_types.rs"),
+        include_str!("../src/session_types/agents.rs"),
+        include_str!("../src/session_types/events.rs"),
+        include_str!("../src/session_types/identity.rs"),
+        include_str!("../src/session_types/policy.rs"),
+        include_str!("../src/session_types/state.rs"),
+        include_str!("../src/session_types/tasks.rs"),
     ];
     for source in sources {
         for forbidden in [

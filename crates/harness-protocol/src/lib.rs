@@ -9,6 +9,7 @@ mod observe_issue_code;
 mod observe_state;
 mod observe_tracking;
 mod runtime_kind;
+mod session_types;
 
 /// Canonical agent identities and transport-neutral wire models.
 pub mod agent {
@@ -84,5 +85,8 @@ pub mod hooks {
     }
 }
 
-#[path = "../../../src/session/types/mod.rs"]
-pub mod session;
+/// Canonical session model types: agent registration/status, session
+/// state/policy, task/review records, and session log/signal events.
+pub mod session {
+    pub use crate::session_types::*;
+}
