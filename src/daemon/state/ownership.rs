@@ -3,6 +3,7 @@ use std::sync::Mutex;
 pub use harness_protocol::daemon::DaemonOwnership;
 
 use crate::workspace::normalized_env_value;
+use harness_telemetry::observe_daemon_ownership_override;
 
 use super::DAEMON_OWNERSHIP_ENV;
 
@@ -47,14 +48,23 @@ impl ScopedOwnershipOverride {
     /// Install a process-local ownership override.
     ///
     /// # Panics
-    /// Panics only if the internal mutex is poisoned, which indicates another
-    /// thread panicked while holding the override lock.
+    /// Panics if the internal mutex is poisoned, which indicates another
+    /// thread panicked while holding the override lock, or if
+    /// `harness-telemetry`'s mirror mutex
+    /// ([`observe_daemon_ownership_override`]) is poisoned the same way.
     pub fn set(value: Option<DaemonOwnership>) -> Self {
         let mut guard = OWNERSHIP_OVERRIDE
             .lock()
             .expect("ownership override mutex poisoned");
         let previous = *guard;
         *guard = value;
+        drop(guard);
+        // `harness-telemetry` can't depend on this crate to read
+        // `OWNERSHIP_OVERRIDE` directly (wrong dependency direction), so its
+        // independent daemon-log path resolution needs this mirrored in.
+        observe_daemon_ownership_override(
+            value.map(|ownership| ownership == DaemonOwnership::External),
+        );
         Self { previous }
     }
 }
@@ -64,6 +74,10 @@ impl Drop for ScopedOwnershipOverride {
         *OWNERSHIP_OVERRIDE
             .lock()
             .expect("ownership override mutex poisoned") = self.previous;
+        observe_daemon_ownership_override(
+            self.previous
+                .map(|ownership| ownership == DaemonOwnership::External),
+        );
     }
 }
 

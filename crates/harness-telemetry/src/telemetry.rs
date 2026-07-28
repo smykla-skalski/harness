@@ -16,6 +16,7 @@ pub use config::{
     resolve_telemetry_config, runtime_service_from_args, runtime_service_from_current_process,
     shared_config_path,
 };
+pub use daemon_file::{observe_daemon_ownership_override, observe_daemon_root_override};
 pub use guard::TelemetryGuard;
 pub use metrics::{
     TelemetryBaggage, apply_current_baggage_to_span, apply_parent_context_from_headers,
