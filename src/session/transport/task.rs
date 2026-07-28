@@ -1,5 +1,6 @@
 use clap::Args;
 
+use crate::infra::io;
 use crate::session::service;
 use crate::session::types::{
     ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,
@@ -14,8 +15,12 @@ use harness_workspace::command_context::{AppContext, Execute};
 
 use super::support::{daemon_client_error, print_json, resolve_project_dir};
 
-fn task_action_url(session_id: &str, task_id: &str, action: &str) -> String {
-    format!("/v1/sessions/{session_id}/tasks/{task_id}/{action}")
+fn task_action_url(session_id: &str, task_id: &str, action: &str) -> Result<String, CliError> {
+    io::validate_safe_segment(session_id)?;
+    io::validate_safe_segment(task_id)?;
+    Ok(format!(
+        "/v1/sessions/{session_id}/tasks/{task_id}/{action}"
+    ))
 }
 
 #[derive(Debug, Clone, Args)]
@@ -112,6 +117,7 @@ pub struct TaskListArgs {
 impl Execute for TaskListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         let items = if let Some(client) = DaemonClient::try_connect() {
+            io::validate_safe_segment(&self.session_id)?;
             let detail: SessionDetail = client
                 .get(&format!("/v1/sessions/{}", self.session_id), &[])
                 .map_err(|error| daemon_client_error("get session detail", &error))?;
@@ -212,7 +218,7 @@ impl Execute for TaskCheckpointArgs {
                 summary: self.summary.clone(),
                 progress: self.progress,
             };
-            let url = task_action_url(&self.session_id, &self.task_id, "checkpoint");
+            let url = task_action_url(&self.session_id, &self.task_id, "checkpoint")?;
             let detail: SessionDetail = client
                 .post(&url, &request)
                 .map_err(|error| daemon_client_error("checkpoint task", &error))?;
@@ -287,7 +293,7 @@ impl Execute for TaskSubmitForReviewArgs {
                 summary: self.summary.clone(),
                 suggested_persona: self.suggested_persona.clone(),
             };
-            let url = task_action_url(&self.session_id, &self.task_id, "submit-for-review");
+            let url = task_action_url(&self.session_id, &self.task_id, "submit-for-review")?;
             let _: SessionDetail = client
                 .post(&url, &request)
                 .map_err(|error| daemon_client_error("submit task for review", &error))?;
@@ -328,7 +334,7 @@ impl Execute for TaskClaimReviewArgs {
             let request = TaskClaimReviewRequest {
                 actor: self.actor.clone(),
             };
-            let url = task_action_url(&self.session_id, &self.task_id, "claim-review");
+            let url = task_action_url(&self.session_id, &self.task_id, "claim-review")?;
             let _: SessionDetail = client
                 .post(&url, &request)
                 .map_err(|error| daemon_client_error("claim task review", &error))?;
@@ -375,7 +381,7 @@ impl Execute for TaskSubmitReviewArgs {
                 summary: self.summary.clone(),
                 points,
             };
-            let url = task_action_url(&self.session_id, &self.task_id, "submit-review");
+            let url = task_action_url(&self.session_id, &self.task_id, "submit-review")?;
             let _: SessionDetail = client
                 .post(&url, &request)
                 .map_err(|error| daemon_client_error("submit task review", &error))?;
@@ -429,7 +435,7 @@ impl Execute for TaskRespondReviewArgs {
                 disputed: self.disputed.clone(),
                 note: self.note.clone(),
             };
-            let url = task_action_url(&self.session_id, &self.task_id, "respond-review");
+            let url = task_action_url(&self.session_id, &self.task_id, "respond-review")?;
             let _: SessionDetail = client
                 .post(&url, &request)
                 .map_err(|error| daemon_client_error("respond to task review", &error))?;
@@ -479,7 +485,7 @@ impl Execute for TaskArbitrateArgs {
                 verdict: self.verdict,
                 summary: self.summary.clone(),
             };
-            let url = task_action_url(&self.session_id, &self.task_id, "arbitrate");
+            let url = task_action_url(&self.session_id, &self.task_id, "arbitrate")?;
             let _: SessionDetail = client
                 .post(&url, &request)
                 .map_err(|error| daemon_client_error("arbitrate task", &error))?;

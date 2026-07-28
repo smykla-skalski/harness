@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-use crate::infra::io::read_text;
+use crate::infra::io::{read_text, validate_safe_segment};
 use crate::session::service::{self, ImproverApplyOutcome, ImproverTarget};
 use crate::session::wire::ImproverApplyRequest;
 use crate::workspace::utc_now;
@@ -52,6 +52,7 @@ impl Execute for SessionImproverApplyArgs {
             )))
         })?;
         let outcome = if let Some(client) = DaemonClient::try_connect() {
+            validate_safe_segment(&self.session_id)?;
             let request = ImproverApplyRequest {
                 actor: self.actor.clone(),
                 issue_id: self.issue_id.clone(),

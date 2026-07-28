@@ -1,14 +1,13 @@
 //! Review transport daemon-routing coverage.
 //!
 //! Worker lifecycle mutations (`checkpoint`, `submit-for-review`) plus the
-//! remaining review commands and `improver apply`
-//! must prefer the daemon client when a running daemon is reachable.
-//! The existing `review_cli` integration tests only exercise the
-//! file-backed fallback, so deleting the `DaemonClient::try_connect()`
-//! branch from each command would go unnoticed. These tests stand up a
-//! fake running daemon via `install_fake_running_xdg_daemon`, run each
-//! `Execute::execute()` end-to-end, and assert the exact `POST` path and
-//! JSON body the CLI sent.
+//! remaining review commands and `improver apply` must prefer the daemon
+//! client when a running daemon is reachable. The existing `review_cli`
+//! integration tests only exercise the file-backed fallback, so deleting the
+//! `DaemonClient::try_connect()` branch from each command would go
+//! unnoticed. These tests stand up a fake running daemon via
+//! `install_fake_running_xdg_daemon`, run each `Execute::execute()`
+//! end-to-end, and assert the exact request path and JSON body sent.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -160,6 +159,9 @@ fn spawn_daemon_server(
                 write_response(&mut stream, "{\"ready\":true,\"daemon_epoch\":\"t\"}");
                 continue;
             }
+            if first_line.starts_with("GET /v1/test-shutdown") {
+                return;
+            }
             if first_line.starts_with("GET /v1/sessions/") {
                 let path = first_line
                     .split_whitespace()
@@ -230,6 +232,48 @@ where
     })
 }
 
+/// Connect to the fake daemon and ask its server thread to exit its accept
+/// loop, so callers can `join` it instead of leaving it blocked in `accept()`
+/// forever — nothing else in this suite ever sends a request the loop treats
+/// as terminal when the CLI-side request never happens.
+fn request_fake_daemon_shutdown(endpoint: &str) {
+    let addr = endpoint.trim_start_matches("http://");
+    if let Ok(mut stream) = TcpStream::connect(addr) {
+        let _ = stream.write_all(b"GET /v1/test-shutdown HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n");
+        let _ = stream.flush();
+    }
+}
+
+/// Same fake daemon as `run_against_fake_daemon`, but asserts the opposite:
+/// a rejected id must never reach it, even as a malformed path. The health
+/// handshake still succeeds, so a pass here cannot be explained by the local
+/// fallback running instead of the daemon branch.
+fn assert_rejected_before_any_request_reaches_daemon<F>(run: F)
+where
+    F: FnOnce(),
+{
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
+        let token = "fake-daemon-token";
+        let _lock = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
+        let (handle, captured) = spawn_daemon_server(listener, session_detail_response("unused"));
+        run();
+        request_fake_daemon_shutdown(&endpoint);
+        handle
+            .join()
+            .expect("fake daemon thread should exit cleanly after a shutdown request");
+        let slot = captured.lock().expect("lock");
+        assert!(
+            slot.is_none(),
+            "an id with a path separator or '..' must be rejected before any request is sent, \
+             but the daemon captured {:?}",
+            slot.as_ref().map(|request| &request.path)
+        );
+    });
+}
+
 #[test]
 fn task_list_routes_through_daemon_client() {
     let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000afff", || {
@@ -245,6 +289,22 @@ fn task_list_routes_through_daemon_client() {
         captured.path,
         "/v1/sessions/00000000-0000-4000-8000-00000000afff"
     );
+}
+
+#[test]
+fn task_list_rejects_a_session_id_that_would_escape_its_path_segment() {
+    assert_rejected_before_any_request_reaches_daemon(|| {
+        let args = TaskListArgs {
+            session_id: "../orchestrator/stop".into(),
+            status: None,
+            json: true,
+            project_dir: None,
+        };
+        let error = args.execute(&AppContext).expect_err(
+            "a session id with a path separator must be rejected before any request is sent",
+        );
+        assert!(error.to_string().contains("../orchestrator/stop"));
+    });
 }
 
 #[test]
@@ -266,6 +326,24 @@ fn checkpoint_args_route_through_daemon_client() {
     );
     assert!(captured.body.contains("\"actor\":\"worker-1\""));
     assert!(captured.body.contains("\"progress\":50"));
+}
+
+#[test]
+fn checkpoint_args_reject_a_task_id_that_would_escape_its_path_segment() {
+    assert_rejected_before_any_request_reaches_daemon(|| {
+        let args = TaskCheckpointArgs {
+            session_id: "00000000-0000-4000-8000-00000000a010".into(),
+            task_id: "foo/../bar".into(),
+            actor: "worker-1".into(),
+            summary: "halfway".into(),
+            progress: 50,
+            project_dir: None,
+        };
+        let error = args.execute(&AppContext).expect_err(
+            "a task id with a path separator must be rejected before any request is sent",
+        );
+        assert!(error.to_string().contains("foo/../bar"));
+    });
 }
 
 #[test]
@@ -433,4 +511,28 @@ fn improver_apply_args_routes_through_daemon_client() {
         "body must inline file contents: {}",
         captured.body
     );
+}
+
+#[test]
+fn improver_apply_args_reject_a_session_id_that_would_escape_its_path_segment() {
+    let tmp = tempdir().expect("tempdir for contents");
+    let contents_path = tmp.path().join("new.md");
+    std::fs::write(&contents_path, "new contents\n").expect("write contents");
+
+    assert_rejected_before_any_request_reaches_daemon(|| {
+        let args = SessionImproverApplyArgs {
+            session_id: "../orchestrator/stop".into(),
+            actor: "improver-1".into(),
+            issue_id: "issue-1".into(),
+            target: crate::session::service::ImproverTarget::Skill,
+            rel_path: "demo/SKILL.md".into(),
+            new_contents_file: contents_path.to_string_lossy().to_string(),
+            dry_run: true,
+            project_dir: None,
+        };
+        let error = args.execute(&AppContext).expect_err(
+            "a session id with a path separator must be rejected before any request is sent",
+        );
+        assert!(error.to_string().contains("../orchestrator/stop"));
+    });
 }
