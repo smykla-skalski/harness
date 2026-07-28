@@ -4,7 +4,7 @@ MCP pieces that let agents drive the Harness Monitor macOS app.
 
 | Path | Language | What it does |
 | --- | --- | --- |
-| `harness-mcp serve` (in `../src/mcp/`) | Rust | stdio MCP JSON-RPC server with 11 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, semantically pressing registered controls, scrolling registered targets, dragging between registered targets, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
+| `harness-mcp serve` (in `../crates/harness-mcp/src/mcp/`) | Rust | stdio MCP JSON-RPC server with 11 tools for enumerating Harness Monitor windows and elements, driving the mouse and keyboard, semantically pressing registered controls, scrolling registered targets, dragging between registered targets, and capturing screenshots. `list_elements` and `get_element` consult the app-side registry first and fall back to the bundled AX query helper when needed. |
 | [`harness-monitor-registry/`](harness-monitor-registry/) | Swift (SPM) | App-side actor + POSIX Unix-socket NDJSON listener that the Rust server connects to. Includes `.trackWindow(...)` for scene-root auto-harvest, `.trackAccessibility(...)` for explicit per-view registration, and the bundled `harness-monitor-input` helper for input, screenshots, and AX fallback queries. |
 
 The old Node.js implementation under `harness-monitor/` was replaced by the native Rust server to drop the Node.js runtime dependency. The JSON wire protocol to the Swift host is unchanged. Harness Monitor writes a per-registry capability token next to the socket as `mcp.token`; the Rust MCP client reads that token and includes it with every registry request. Raw local peers that only know the predictable socket path are rejected by the app-side listener.
@@ -136,5 +136,5 @@ The Swift host is implemented as a sibling SPM package so the app's `project.yml
 
 ## See also
 
-- `../src/mcp/` - Rust server implementation
+- `../crates/harness-mcp/src/mcp/` - Rust server implementation
 - `harness-monitor-registry/` - Swift registry host (app side)
