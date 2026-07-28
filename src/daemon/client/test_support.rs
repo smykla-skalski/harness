@@ -1,14 +1,24 @@
 use std::fs::OpenOptions;
+#[cfg(test)]
 use std::io::{Read, Write};
+#[cfg(test)]
 use std::net::{TcpListener, TcpStream};
+#[cfg(test)]
 use std::thread;
 
 use fs2::FileExt;
 
 use crate::daemon::state;
-use crate::daemon::state::{DaemonManifest, HostBridgeManifest, ScopedDaemonRootOverride};
+use crate::daemon::state::{
+    DaemonManifest, DaemonOwnership, HostBridgeManifest, ScopedDaemonRootOverride,
+};
 
-pub(crate) fn install_fake_running_xdg_daemon(
+/// # Panics
+/// Panics if any fixture directory, lock file, token file, or manifest
+/// cannot be created or written, or if the daemon singleton lock is already
+/// held.
+#[must_use]
+pub fn install_fake_running_xdg_daemon(
     xdg_root: &std::path::Path,
     endpoint: &str,
     token: &str,
@@ -51,13 +61,18 @@ pub(crate) fn install_fake_running_xdg_daemon(
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
-        ownership: Default::default(),
+        ownership: DaemonOwnership::default(),
     })
     .expect("write manifest");
 
     lock_file
 }
 
+// Only this crate's own `#[cfg(test)]` unit tests call these three; the
+// `tests/integration_daemon.rs` scenarios that need the module in a
+// non-test, `daemon-runtime` build only reach `install_fake_running_xdg_daemon`
+// above and bring their own request/response helpers.
+#[cfg(test)]
 pub(crate) fn fake_running_xdg_daemon(
     xdg_root: &std::path::Path,
     token: &str,
@@ -102,6 +117,7 @@ pub(crate) fn fake_running_xdg_daemon(
     (endpoint, lock_file, server)
 }
 
+#[cfg(test)]
 pub(crate) fn read_http_request(stream: &mut TcpStream) -> String {
     stream.set_nonblocking(false).expect("blocking stream");
     stream
@@ -122,6 +138,7 @@ pub(crate) fn read_http_request(stream: &mut TcpStream) -> String {
     String::from_utf8(buffer).expect("utf8 request")
 }
 
+#[cfg(test)]
 pub(crate) fn write_http_response(
     stream: &mut TcpStream,
     status: &str,

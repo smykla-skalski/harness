@@ -1,0 +1,474 @@
+use std::path::PathBuf;
+
+use super::{
+    BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND,
+    LeaveSignalRecord, Path, SessionAction, SessionMetrics, SessionState, SessionStatus,
+    TaskStatus, agent_status_label, build_signal, fmt, generate_session_id, is_permitted,
+    refresh_session, runtime, storage,
+};
+use crate::types::{
+    AgentRegistration, SessionPolicy, SessionRole, is_control_plane_actor_id,
+};
+
+/// # Errors
+/// Returns [`CliError`] when an explicit `session_id` is invalid or already
+/// taken, or when no unique session ID could be allocated after 8 attempts.
+pub fn create_initial_session(
+    context: &str,
+    title: &str,
+    session_id: Option<&str>,
+    now: &str,
+    project_dir: &Path,
+    policy_preset: Option<&str>,
+) -> Result<SessionState, CliError> {
+    if let Some(session_id) = session_id
+        .filter(|value| !value.trim().is_empty())
+        .map(ToString::to_string)
+    {
+        validate_explicit_session_id(Some(&session_id))?;
+        let candidate = build_initial_state(context, title, &session_id, now, policy_preset);
+        let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
+        if !storage::create_state(&layout, &candidate)? {
+            return Err(CliErrorKind::session_agent_conflict(format!(
+                "session '{session_id}' already exists"
+            ))
+            .into());
+        }
+        return Ok(candidate);
+    }
+
+    for _ in 0..8 {
+        let session_id = generate_session_id();
+        let candidate = build_initial_state(context, title, &session_id, now, policy_preset);
+        let layout = storage::layout_from_project_dir(project_dir, &session_id)?;
+        if storage::create_state(&layout, &candidate)? {
+            return Ok(candidate);
+        }
+    }
+
+    Err(
+        CliErrorKind::session_agent_conflict("failed to allocate a unique session ID".to_string())
+            .into(),
+    )
+}
+
+/// # Errors
+/// Returns [`CliError`] when `session_id` is present but not a well-formed
+/// session ID.
+pub fn validate_explicit_session_id(session_id: Option<&str>) -> Result<(), CliError> {
+    let Some(session_id) = session_id.filter(|value| !value.trim().is_empty()) else {
+        return Ok(());
+    };
+    storage::validate_new_session_id(session_id)
+}
+
+/// # Errors
+/// Returns [`CliError`] when the session is not [`SessionStatus::Active`].
+pub fn require_active(state: &SessionState) -> Result<(), CliError> {
+    if state.status != SessionStatus::Active {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+/// # Errors
+/// Returns [`CliError`] when the session is neither active nor leaderless
+/// degraded.
+pub fn require_managed_run_mutation(state: &SessionState) -> Result<(), CliError> {
+    if !state.status.allows_managed_run_mutation() {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}; managed-run mutations require an active or leaderless degraded session",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+/// # Errors
+/// Returns [`CliError`] when the session's status does not allow ending it.
+pub fn require_endable_session(state: &SessionState) -> Result<(), CliError> {
+    if !state.status.allows_end_session() {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+// Canonicalizing a persisted session (leader auto-promotion/degradation plus
+// historical-shape fix-ups) lives in `canonicalize`, the same crate's own
+// session-index normalization logic. Re-exported here, `pub` rather than
+// `pub(crate)` because the root crate's `daemon::db` module also calls both
+// directly, so every existing `super::canonicalize_persisted_session_state`
+// call site in this domain needs no change.
+pub use crate::canonicalize::{
+    canonicalize_active_session_without_leader, canonicalize_persisted_session_state,
+};
+
+/// # Errors
+/// Returns [`CliError`] when the session's status does not allow creating
+/// tasks.
+pub fn require_task_creation_state(state: &SessionState) -> Result<(), CliError> {
+    if !state.status.allows_task_creation() {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+/// # Errors
+/// Returns [`CliError`] when any task is still in progress, awaiting or in
+/// review, blocked, or open and assigned.
+pub fn ensure_session_can_end(state: &SessionState) -> Result<(), CliError> {
+    let active_tasks = state.tasks.values().any(|task| {
+        matches!(
+            task.status,
+            TaskStatus::InProgress
+                | TaskStatus::AwaitingReview
+                | TaskStatus::InReview
+                | TaskStatus::Blocked
+        ) || (task.status == TaskStatus::Open && task.assigned_to.is_some())
+    });
+    if active_tasks {
+        return Err(CliErrorKind::session_agent_conflict(
+            "cannot end session with in-progress tasks",
+        )
+        .into());
+    }
+    Ok(())
+}
+
+/// # Errors
+/// Returns [`CliError`] when `agent_id` is the current leader or is not
+/// registered in the session.
+pub fn require_removable_agent(
+    state: &SessionState,
+    agent_id: &str,
+) -> Result<(), CliError> {
+    if state.leader_id.as_deref() == Some(agent_id) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "cannot remove current leader '{agent_id}'; transfer leadership first"
+        ))
+        .into());
+    }
+    if !state.agents.contains_key(agent_id) {
+        return Err(
+            CliErrorKind::session_agent_conflict(format!("agent '{agent_id}' not found")).into(),
+        );
+    }
+    Ok(())
+}
+
+/// # Errors
+/// Returns [`CliError`] when `actor_id` is neither a registered, live agent
+/// nor a valid control-plane actor, or when the actor's role does not
+/// permit `action`.
+pub fn require_permission(
+    state: &SessionState,
+    actor_id: &str,
+    action: SessionAction,
+) -> Result<(), CliError> {
+    let Some(agent) = state.agents.get(actor_id) else {
+        if is_control_plane_actor_id(actor_id) {
+            return Ok(());
+        }
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{actor_id}' not registered in session '{}'",
+            state.session_id
+        ))
+        .into());
+    };
+    if !agent.status.is_alive() {
+        return Err(CliErrorKind::session_permission_denied(format!(
+            "agent '{actor_id}' is {} in session '{}'",
+            agent_status_label(&agent.status),
+            state.session_id
+        ))
+        .into());
+    }
+    if !is_permitted(agent.role, action)
+        && !allows_leaderless_task_delete(state, agent.role, action)
+    {
+        return Err(CliErrorKind::session_permission_denied(format!(
+            "{:?} cannot {:?} in session '{}'",
+            agent.role, action, state.session_id
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn allows_leaderless_task_delete(
+    state: &SessionState,
+    role: SessionRole,
+    action: SessionAction,
+) -> bool {
+    state.leader_id.is_none()
+        && state.status.allows_task_creation()
+        && action == SessionAction::DeleteTask
+        && is_permitted(role, SessionAction::CreateTask)
+}
+
+/// # Errors
+/// Returns [`CliError`] when `agent`'s runtime is not registered.
+pub fn build_leave_signal_record(
+    state: &SessionState,
+    agent: &AgentRegistration,
+    actor_id: &str,
+    message: &str,
+    action_hint: &str,
+    now: &str,
+    action: &str,
+) -> Result<LeaveSignalRecord, CliError> {
+    if runtime::runtime_for_name(agent.runtime.runtime_name()).is_none() {
+        return Err(leave_signal_delivery_error(
+            action,
+            &agent.agent_id,
+            format!("unknown runtime '{}'", agent.runtime),
+        ));
+    }
+    let signal_session_id = agent
+        .agent_session_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(&state.session_id)
+        .to_string();
+    Ok(LeaveSignalRecord {
+        runtime: agent.runtime.to_string(),
+        agent_id: agent.agent_id.clone(),
+        signal_session_id,
+        signal: build_signal(
+            actor_id,
+            LEAVE_SESSION_SIGNAL_COMMAND,
+            message,
+            Some(action_hint),
+            &state.session_id,
+            &agent.agent_id,
+            now,
+        ),
+    })
+}
+
+pub fn leave_signal_delivery_error(
+    action: &str,
+    agent_id: &str,
+    detail: impl fmt::Display,
+) -> CliError {
+    CliErrorKind::session_agent_conflict(format!(
+        "cannot {action}: leave signal delivery failed for agent '{agent_id}' ({detail}); session was not changed and needs attention before retry"
+    ))
+    .into()
+}
+
+#[must_use]
+pub fn build_initial_state(
+    context: &str,
+    title: &str,
+    session_id: &str,
+    now: &str,
+    policy_preset: Option<&str>,
+) -> SessionState {
+    let mut state = SessionState {
+        schema_version: CURRENT_VERSION,
+        state_version: 1,
+        session_id: session_id.to_string(),
+        project_name: String::new(),
+        worktree_path: PathBuf::new(),
+        shared_path: PathBuf::new(),
+        origin_path: PathBuf::new(),
+        branch_ref: format!("harness/{session_id}"),
+        title: title.to_string(),
+        context: context.to_string(),
+        status: SessionStatus::AwaitingLeader,
+        policy: policy_for_preset(policy_preset),
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
+        agents: BTreeMap::new(),
+        tasks: BTreeMap::new(),
+        leader_id: None,
+        archived_at: None,
+        last_activity_at: Some(now.to_string()),
+        observe_id: Some(format!("observe-{session_id}")),
+        pending_leader_transfer: None,
+        external_origin: None,
+        adopted_at: None,
+        metrics: SessionMetrics::default(),
+    };
+    refresh_session(&mut state, now);
+    state
+}
+
+/// # Errors
+/// Returns [`CliError`] when `policy_preset` names an unrecognized preset.
+pub fn validate_policy_preset(policy_preset: Option<&str>) -> Result<(), CliError> {
+    match policy_preset {
+        None | Some("swarm-default") => Ok(()),
+        Some(preset) => Err(CliErrorKind::session_agent_conflict(format!(
+            "unknown session policy preset '{preset}'; supported presets: swarm-default"
+        ))
+        .into()),
+    }
+}
+
+fn policy_for_preset(_policy_preset: Option<&str>) -> SessionPolicy {
+    SessionPolicy::default()
+}
+
+/// # Errors
+/// Returns [`CliError`] when `agent_id` does not exist or is not alive.
+pub fn require_active_target_agent(
+    state: &SessionState,
+    agent_id: &str,
+) -> Result<(), CliError> {
+    let agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    if !agent.status.is_alive() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is {}",
+            agent_status_label(&agent.status)
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+/// # Errors
+/// Returns [`CliError`] under the same conditions as
+/// [`require_active_target_agent`], or when `agent_id` cannot accept a new
+/// assignment (not worker-capable, or not currently accepting work).
+pub fn require_active_worker_target_agent(
+    state: &SessionState,
+    agent_id: &str,
+) -> Result<(), CliError> {
+    require_active_target_agent(state, agent_id)?;
+    let agent = state.agents.get(agent_id).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' not found"
+        )))
+    })?;
+    if !matches!(agent.role, SessionRole::Worker | SessionRole::Leader) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is a {:?}, not worker-capable",
+            agent.role
+        ))
+        .into());
+    }
+    if !agent.status.accepts_assignment() {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "agent '{agent_id}' is {} and cannot accept a new assignment",
+            agent_status_label(&agent.status)
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod remote_actor_tests {
+    use harness_agents::kind::RuntimeKind;
+    use harness_agents::runtime::RuntimeCapabilities;
+
+    use super::*;
+    use crate::types::AgentStatus;
+
+    #[test]
+    fn remote_control_plane_actor_can_mutate_without_agent_registration() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+
+        assert!(require_permission(&state, actor, SessionAction::CreateTask).is_ok());
+    }
+
+    #[test]
+    fn remote_admin_actor_can_mutate_with_admin_scope() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"admin","scopes":["admin"]}"#;
+
+        assert!(require_permission(&state, actor, SessionAction::EndSession).is_ok());
+    }
+
+    #[test]
+    fn registered_agent_matching_remote_actor_keeps_agent_permissions() {
+        let mut state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+        state.agents.insert(
+            actor.to_string(),
+            AgentRegistration {
+                agent_id: actor.to_string(),
+                name: "Colliding worker".to_string(),
+                runtime: RuntimeKind::from("codex"),
+                role: SessionRole::Worker,
+                capabilities: Vec::new(),
+                joined_at: "2026-07-10T12:00:00Z".to_string(),
+                updated_at: "2026-07-10T12:00:00Z".to_string(),
+                status: AgentStatus::Active,
+                agent_session_id: None,
+                managed_agent: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: RuntimeCapabilities::default(),
+                persona: None,
+                runtime_session_title: None,
+            },
+        );
+
+        assert!(require_permission(&state, actor, SessionAction::EndSession).is_err());
+    }
+
+    #[test]
+    fn invalid_remote_actors_cannot_gain_control_plane_permission() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let invalid_actors = [
+            r#"{"client_id":"phone-1","platform":"ios","role":"viewer","scopes":["read"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["admin"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["write","unknown"]}"#,
+            r#"{"client_id":"","platform":"ios","role":"operator","scopes":["write"]}"#,
+            "not-json",
+        ];
+
+        for actor in invalid_actors {
+            assert!(
+                require_permission(&state, actor, SessionAction::CreateTask).is_err(),
+                "invalid remote actor should not gain permission: {actor}"
+            );
+        }
+    }
+}

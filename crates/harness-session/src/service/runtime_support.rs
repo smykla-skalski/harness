@@ -1,0 +1,63 @@
+use super::{CliError, CliErrorKind, HookAgent, Path, SessionState, runtime, storage};
+// `refresh_session` lives in `canonicalize`, this same crate's session-index
+// normalization logic. Re-exported here, `pub` rather than `pub(crate)`
+// because the root crate's `daemon::*` mutation and reconciliation paths
+// call it directly, so every existing `super::refresh_session` call site in
+// this domain needs no change.
+pub use crate::canonicalize::refresh_session;
+
+#[must_use]
+pub fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
+    match runtime_name {
+        "claude" => Some(HookAgent::Claude),
+        "copilot" => Some(HookAgent::Copilot),
+        "codex" => Some(HookAgent::Codex),
+        "gemini" => Some(HookAgent::Gemini),
+        "vibe" => Some(HookAgent::Vibe),
+        "opencode" => Some(HookAgent::OpenCode),
+        _ => None,
+    }
+}
+
+/// # Errors
+/// Returns [`CliError`] when `runtime_name` is not a registered runtime.
+pub fn ensure_known_runtime(
+    runtime_name: &str,
+    message_prefix: &str,
+) -> Result<(), CliError> {
+    if resolve_registered_runtime(runtime_name).is_some() {
+        Ok(())
+    } else {
+        Err(CliError::from(CliErrorKind::session_agent_conflict(
+            format!("{message_prefix}, got '{runtime_name}'"),
+        )))
+    }
+}
+
+/// # Errors
+/// Returns [`CliError`] when the session layout cannot be resolved or the
+/// session does not exist.
+pub fn load_state_or_err(
+    session_id: &str,
+    project_dir: &Path,
+) -> Result<SessionState, CliError> {
+    let layout = storage::layout_from_project_dir(project_dir, session_id)?;
+    storage::load_state(&layout)?.ok_or_else(|| {
+        CliErrorKind::session_not_active(format!("harness session '{session_id}' not found")).into()
+    })
+}
+
+#[must_use]
+pub fn runtime_capabilities(runtime_name: &str) -> runtime::RuntimeCapabilities {
+    runtime::runtime_for_name(runtime_name).map_or_else(
+        || runtime::RuntimeCapabilities {
+            runtime: runtime_name.to_string(),
+            ..runtime::RuntimeCapabilities::default()
+        },
+        |agent_runtime| {
+            let mut capabilities = agent_runtime.capabilities();
+            capabilities.runtime = runtime_name.to_string();
+            capabilities
+        },
+    )
+}

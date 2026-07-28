@@ -8,8 +8,15 @@ mod api_tests;
 mod basic_tests;
 #[cfg(test)]
 mod discovery_tests;
-#[cfg(test)]
-pub(crate) mod test_support;
+// `pub`, not `pub(crate)`: the daemon-routing fixtures this crate's own unit
+// tests use are also the only way `tests/integration_daemon.rs`'s
+// `session_service_daemon_*` scenarios can fake a running daemon, since that
+// binary links `harness` as an ordinary dependency where `cfg(test)` is
+// never set. Gating on `daemon-runtime` rather than always-on keeps it out of
+// the default-feature build the same way the rest of this module's
+// daemon-only surface is gated.
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub mod test_support;
 
 use std::time::Duration;
 
