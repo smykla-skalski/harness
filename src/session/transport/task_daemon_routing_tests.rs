@@ -159,6 +159,9 @@ fn spawn_daemon_server(
                 write_response(&mut stream, "{\"ready\":true,\"daemon_epoch\":\"t\"}");
                 continue;
             }
+            if first_line.starts_with("GET /v1/test-shutdown") {
+                return;
+            }
             if first_line.starts_with("GET /v1/sessions/") {
                 let path = first_line
                     .split_whitespace()
@@ -229,6 +232,18 @@ where
     })
 }
 
+/// Connect to the fake daemon and ask its server thread to exit its accept
+/// loop, so callers can `join` it instead of leaving it blocked in `accept()`
+/// forever — nothing else in this suite ever sends a request the loop treats
+/// as terminal when the CLI-side request never happens.
+fn request_fake_daemon_shutdown(endpoint: &str) {
+    let addr = endpoint.trim_start_matches("http://");
+    if let Ok(mut stream) = TcpStream::connect(addr) {
+        let _ = stream.write_all(b"GET /v1/test-shutdown HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n");
+        let _ = stream.flush();
+    }
+}
+
 /// Same fake daemon as `run_against_fake_daemon`, but asserts the opposite:
 /// a rejected id must never reach it, even as a malformed path. The health
 /// handshake still succeeds, so a pass here cannot be explained by the local
@@ -245,7 +260,10 @@ where
         let _lock = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
         let (handle, captured) = spawn_daemon_server(listener, session_detail_response("unused"));
         run();
-        drop(handle);
+        request_fake_daemon_shutdown(&endpoint);
+        handle
+            .join()
+            .expect("fake daemon thread should exit cleanly after a shutdown request");
         let slot = captured.lock().expect("lock");
         assert!(
             slot.is_none(),
