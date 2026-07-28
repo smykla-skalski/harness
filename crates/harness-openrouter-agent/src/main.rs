@@ -1,7 +1,7 @@
 //! ACP shim binary for OpenRouter.
 //!
 //! The harness daemon spawns this binary as a supervised stdio child (see
-//! `src/agents/acp/catalog/openrouter.rs`). The child speaks ACP JSON-RPC over
+//! `crates/harness-agents/src/acp/catalog/openrouter.rs`). The child speaks ACP JSON-RPC over
 //! its stdin/stdout pair; this entry-point delegates to [`harness_openrouter_agent::acp::run_stdio`]
 //! after setting up `tracing` to stderr so log lines never pollute the JSON-RPC
 //! channel.

@@ -205,7 +205,7 @@ run = [
 [tasks."test:slow"]
 description = "Run self-contained ignored tests; use test:perf for timing budgets and e2e:swarm:full for the real-runtime swarm lane"
 run = [
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime --run-ignored only -E 'test(=agents::acp::throughput_bench::tests::throughput_meets_threshold)'",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime --run-ignored only -E 'test(=acp::throughput_bench::tests::throughput_meets_threshold)'",
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --test integration_daemon --features full-runtime --run-ignored only -E 'not test(~integration::daemon_perf::) and not test(=integration::commands::session::swarm_full_flow::swarm_full_flow_mise_lane_passes)'",

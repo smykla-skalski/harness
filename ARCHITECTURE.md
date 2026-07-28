@@ -77,7 +77,7 @@ flowchart LR
 
 | Path             | Owns                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------- |
-| `crates/harness-agents/src/` | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, runtime adapters for log discovery, signal delivery, and liveness detection |
+| `crates/harness-agents/src/` | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, runtime adapters for log discovery, signal delivery, liveness detection, write-surface policy, and the Agent Client Protocol client (`acp`, behind the `bridge-runtime` feature) |
 | `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `src/run/`       | retired suite execution; no CLI command reaches it and it is being removed         |
