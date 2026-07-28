@@ -183,6 +183,8 @@ fn lane_status(bridge: &BridgeStatusReport, lane: &str) -> HeadlessReadinessLane
         Some("host bridge is not running".to_string())
     } else if capability.is_none() {
         Some("capability is not enabled".to_string())
+    } else if capability.is_some_and(|capability| !capability.enabled) {
+        Some("capability is disabled".to_string())
     } else {
         Some("capability is unhealthy".to_string())
     };
@@ -381,5 +383,20 @@ mod tests {
         assert_eq!(report.selected_lane, "codex");
         assert!(report.runtime.available);
         assert!(report.model.available);
+    }
+
+    #[test]
+    fn disabled_lane_is_not_reported_as_unhealthy() {
+        let mut bridge = ready_bridge();
+        bridge
+            .capabilities
+            .get_mut(BRIDGE_CAPABILITY_ACP)
+            .expect("ACP capability")
+            .enabled = false;
+
+        let status = lane_status(&bridge, BRIDGE_CAPABILITY_ACP);
+
+        assert!(!status.available);
+        assert_eq!(status.reason.as_deref(), Some("capability is disabled"));
     }
 }
