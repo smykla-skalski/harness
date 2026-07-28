@@ -32,6 +32,50 @@ struct SmokeFailure {
     error: String,
 }
 
+struct DaemonHttpClient {
+    runtime: Runtime,
+    client: reqwest::Client,
+    endpoint: String,
+    token: String,
+}
+
+impl DaemonHttpClient {
+    fn new(endpoint: &str, token: &str) -> Self {
+        Self {
+            runtime: Runtime::new().expect("stage=http_client: create runtime"),
+            client: reqwest::Client::new(),
+            endpoint: endpoint.trim_end_matches('/').to_owned(),
+            token: token.to_owned(),
+        }
+    }
+
+    fn request_json(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<Value>,
+    ) -> Result<Value, String> {
+        let url = format!("{}{path}", self.endpoint);
+        self.runtime.block_on(async {
+            let mut request = self
+                .client
+                .request(method, &url)
+                .bearer_auth(&self.token)
+                .timeout(Duration::from_secs(10));
+            if let Some(body) = body {
+                request = request.json(&body);
+            }
+            let response = request.send().await.map_err(|error| error.to_string())?;
+            let status = response.status();
+            let text = response.text().await.map_err(|error| error.to_string())?;
+            if !status.is_success() {
+                return Err(format!("HTTP {status}: {text}"));
+            }
+            serde_json::from_str(&text).map_err(|error| format!("decode HTTP response: {error}"))
+        })
+    }
+}
+
 impl SmokeFailure {
     fn new(
         correlation_id: impl Into<String>,
@@ -97,10 +141,11 @@ fn openrouter_and_codex_complete_without_monitor() {
     );
     let _bridge_ready = wait_for_bridge_capabilities(&home, &xdg, &["codex", "acp"]);
     let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+    let http = DaemonHttpClient::new(&endpoint, &token);
 
-    let openrouter = run_openrouter(&home, &xdg, &project, &endpoint, &token, &openrouter_token)
+    let openrouter = run_openrouter(&home, &xdg, &project, &http, &openrouter_token)
         .unwrap_or_else(SmokeFailure::into_report);
-    let codex = run_codex(&home, &xdg, &project, &endpoint, &token)
+    let codex = run_codex(&home, &xdg, &project, &http)
         .unwrap_or_else(SmokeFailure::into_report);
     let reports = vec![openrouter, codex];
     println!(
@@ -128,15 +173,12 @@ fn run_openrouter(
     home: &Path,
     xdg: &Path,
     project: &Path,
-    endpoint: &str,
-    token: &str,
+    http: &DaemonHttpClient,
     openrouter_token: &str,
 ) -> Result<LiveAgentSmokeReport, SmokeFailure> {
     let runtime = "openrouter";
-    request_json(
+    http.request_json(
         Method::PUT,
-        endpoint,
-        token,
         "/v1/task-board/orchestrator/openrouter-token",
         Some(json!({ "token": openrouter_token })),
     )
@@ -160,10 +202,8 @@ fn run_openrouter(
     );
     let correlation_id = session.session_id.clone();
     let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/acp");
-    let started = request_json(
+    let started = http.request_json(
         Method::POST,
-        endpoint,
-        token,
         &start_path,
         Some(json!({
             "descriptor_id": "openrouter",
@@ -194,12 +234,11 @@ fn run_openrouter(
                 format!("response omitted managed agent id: {started}"),
             )
         })?;
-    poll_openrouter(endpoint, token, &correlation_id, managed_agent_id)
+    poll_openrouter(http, &correlation_id, managed_agent_id)
 }
 
 fn poll_openrouter(
-    endpoint: &str,
-    token: &str,
+    http: &DaemonHttpClient,
     correlation_id: &str,
     managed_agent_id: &str,
 ) -> Result<LiveAgentSmokeReport, SmokeFailure> {
@@ -207,8 +246,9 @@ fn poll_openrouter(
     let deadline = Instant::now() + SMOKE_TIMEOUT;
     loop {
         let inspect_path = format!("/v1/managed-agents/acp/inspect?session_id={correlation_id}");
-        let inspect =
-            request_json(Method::GET, endpoint, token, &inspect_path, None).map_err(|error| {
+        let inspect = http
+            .request_json(Method::GET, &inspect_path, None)
+            .map_err(|error| {
                 SmokeFailure::new(
                     correlation_id,
                     runtime,
@@ -227,7 +267,7 @@ fn poll_openrouter(
             .and_then(Value::as_str);
         if let Some(terminal_status) = stop_reason {
             let effective_model = agent.and_then(openrouter_effective_model);
-            let report = openrouter_report(endpoint, token, correlation_id)?;
+            let report = openrouter_report(http, correlation_id)?;
             if effective_model.as_deref() != Some(OPENROUTER_MODEL) {
                 return Err(SmokeFailure::new(
                     correlation_id,
@@ -260,7 +300,8 @@ fn poll_openrouter(
         if Instant::now() >= deadline {
             let transcript_path =
                 format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
-            let transcript = request_json(Method::GET, endpoint, token, &transcript_path, None)
+            let transcript = http
+                .request_json(Method::GET, &transcript_path, None)
                 .unwrap_or_else(|error| json!({ "read_error": error }));
             return Err(SmokeFailure::new(
                 correlation_id,
@@ -288,12 +329,11 @@ fn openrouter_effective_model(agent: &Value) -> Option<String> {
 }
 
 fn openrouter_report(
-    endpoint: &str,
-    token: &str,
+    http: &DaemonHttpClient,
     correlation_id: &str,
 ) -> Result<Option<String>, SmokeFailure> {
     let path = format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
-    let transcript = request_json(Method::GET, endpoint, token, &path, None).map_err(|error| {
+    let transcript = http.request_json(Method::GET, &path, None).map_err(|error| {
         SmokeFailure::new(
             correlation_id,
             "openrouter",
@@ -315,8 +355,7 @@ fn run_codex(
     home: &Path,
     xdg: &Path,
     project: &Path,
-    endpoint: &str,
-    token: &str,
+    http: &DaemonHttpClient,
 ) -> Result<LiveAgentSmokeReport, SmokeFailure> {
     let runtime = "codex";
     let session = start_session_via_http(
@@ -329,10 +368,8 @@ fn run_codex(
     );
     let correlation_id = session.session_id.clone();
     let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/codex");
-    let started = request_json(
+    let started = http.request_json(
         Method::POST,
-        endpoint,
-        token,
         &start_path,
         Some(json!({
             "prompt": SMOKE_PROMPT,
@@ -357,10 +394,8 @@ fn run_codex(
         })?;
     let deadline = Instant::now() + SMOKE_TIMEOUT;
     loop {
-        let snapshot = request_json(
+        let snapshot = http.request_json(
             Method::GET,
-            endpoint,
-            token,
             &format!("/v1/managed-agents/{run_id}"),
             None,
         )
@@ -441,32 +476,4 @@ fn required_env(name: &str, runtime: &str, model: &str) -> String {
         "live agent smoke stopped before network: stage=credential runtime={runtime} requested_model={model}: {name} is missing or empty"
     );
     value
-}
-
-fn request_json(
-    method: Method,
-    endpoint: &str,
-    token: &str,
-    path: &str,
-    body: Option<Value>,
-) -> Result<Value, String> {
-    let runtime = Runtime::new().map_err(|error| format!("create HTTP runtime: {error}"))?;
-    let client = reqwest::Client::new();
-    let url = format!("{}{}", endpoint.trim_end_matches('/'), path);
-    runtime.block_on(async {
-        let mut request = client
-            .request(method, &url)
-            .bearer_auth(token)
-            .timeout(Duration::from_secs(10));
-        if let Some(body) = body {
-            request = request.json(&body);
-        }
-        let response = request.send().await.map_err(|error| error.to_string())?;
-        let status = response.status();
-        let text = response.text().await.map_err(|error| error.to_string())?;
-        if !status.is_success() {
-            return Err(format!("HTTP {status}: {text}"));
-        }
-        serde_json::from_str(&text).map_err(|error| format!("decode HTTP response: {error}"))
-    })
 }
