@@ -15,7 +15,6 @@ use crate::agents::runtime::signal::{
     read_pending_signals, signal_matches_session,
 };
 use crate::agents::service as agents_service;
-use crate::daemon::index as daemon_index;
 use crate::session::ordering::sort_session_tasks;
 use crate::session::wire;
 use crate::workspace::{project_context_dir, utc_now};
@@ -23,6 +22,7 @@ use harness_daemon_client::ClientError;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
 
+use super::index as session_index;
 use super::roles::{SessionAction, is_permitted};
 use super::storage;
 use super::types::{

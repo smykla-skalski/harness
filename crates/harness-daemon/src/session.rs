@@ -1,5 +1,7 @@
 #[path = "../../../src/session/adopter.rs"]
 pub mod adopter;
+#[path = "../../../src/session/index/mod.rs"]
+pub mod index;
 #[path = "../../../src/session/observe/mod.rs"]
 pub mod observe;
 #[path = "../../../src/session/ordering.rs"]

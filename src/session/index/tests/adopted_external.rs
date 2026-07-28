@@ -4,9 +4,7 @@ use fs_err as fs;
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
-use crate::daemon::index::{
-    discover_sessions_for, discovered_project_for_checkout, resolve_session,
-};
+use super::*;
 use crate::daemon::{db::DaemonDb, service::adopt_session_record};
 use crate::session::types::CURRENT_VERSION;
 use crate::session::adopter::SessionAdopter;

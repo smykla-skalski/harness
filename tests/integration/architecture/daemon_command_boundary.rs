@@ -43,6 +43,18 @@ use super::helpers::collect_hits_in_paths;
 /// it; `get`/`get_optional`/`post`/`delete` there still back the managed-agent
 /// and session methods in `daemon::client::api` and stay.
 ///
+/// `session::service::queries` and its parent `mod.rs` used to keep a second,
+/// narrower back-edge into `crate::daemon::index` for cross-project session
+/// discovery even after the rest of this cascade landed: a filesystem-scanning
+/// module with no daemon-only state (no DB handle, no HTTP wire types) that
+/// the daemon's own mutation fallbacks also called directly to resolve a
+/// project dir. That module moved to `session::index`, so both sides call the
+/// same code without either depending on the other; `daemon::mod` re-exports
+/// it as `index` so the daemon's own call sites across `daemon::db`,
+/// `daemon::service`, `daemon::watch`, `daemon::snapshot`, and
+/// `daemon::timeline` did not need touching. Both files now join the blanket
+/// check below instead of needing a narrower one of their own.
+///
 /// `session::transport::support`'s `daemon_client()` helper (still needed by
 /// the managed-agent command surfaces that did not move this round) is not
 /// covered here either.
@@ -53,8 +65,10 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
         root,
         &[
             "src/agents/service.rs",
+            "src/session/service/mod.rs",
             "src/session/service/conversions.rs",
             "src/session/service/lifecycle.rs",
+            "src/session/service/queries.rs",
             "src/session/service/runtime_registration.rs",
             "src/session/service/signals.rs",
             "src/session/service/tasks.rs",
@@ -83,34 +97,6 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
     assert!(
         hits.is_empty(),
         "these command surfaces should stay off `crate::daemon`, using `harness_daemon_client` instead:\n{}",
-        hits.join("\n")
-    );
-}
-
-/// `session::service::queries` and its parent `mod.rs` still reach into
-/// `crate::daemon::index` for cross-project session discovery: a
-/// filesystem-scanning module the daemon's own mutation fallbacks also use
-/// directly to resolve a project dir, with no HTTP-reachable equivalent for
-/// the leaf client to wrap. Everything else in these two files - the typed
-/// `daemon::client` facade calls - moved to `harness_daemon_client`, so this
-/// guard is scoped to that narrower needle instead of the blanket
-/// `crate::daemon::` used above.
-#[test]
-fn session_queries_and_service_mod_stay_off_the_daemon_client_facade() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hits = collect_hits_in_paths(
-        root,
-        &[
-            "src/session/service/mod.rs",
-            "src/session/service/queries.rs",
-        ],
-        &["crate::daemon::client"],
-        |path, needle| format!("{path} reaches back into the daemon via `{needle}`"),
-    );
-
-    assert!(
-        hits.is_empty(),
-        "these files should stay off `crate::daemon::client`, using `harness_daemon_client` instead:\n{}",
         hits.join("\n")
     );
 }

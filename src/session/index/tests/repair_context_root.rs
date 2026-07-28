@@ -1,5 +1,5 @@
 use super::*;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 #[test]
 fn repair_context_root_keeps_agent_only_context_without_git_checkout() {

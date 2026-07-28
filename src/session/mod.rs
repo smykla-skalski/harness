@@ -1,4 +1,5 @@
 pub mod adopter;
+pub mod index;
 pub mod observe;
 pub mod ordering;
 pub mod persona;
