@@ -68,16 +68,16 @@ fn setup_wrapper_does_not_depend_on_block_registry() {
 #[test]
 fn infra_blocks_do_not_export_legacy_block_registry() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let blocks_mod = read_repo_file(root, "src/infra/blocks/mod.rs");
-    let registry = read_repo_file(root, "src/infra/blocks/registry.rs");
+    let blocks_mod = read_repo_file(root, "crates/harness-infra/src/blocks/mod.rs");
+    let registry = read_repo_file(root, "crates/harness-infra/src/blocks/registry.rs");
 
     assert!(
         !blocks_mod.contains("BlockRegistry"),
-        "src/infra/blocks/mod.rs should not export the retired BlockRegistry"
+        "crates/harness-infra/src/blocks/mod.rs should not export the retired BlockRegistry"
     );
     assert!(
         !registry.contains("pub struct BlockRegistry"),
-        "src/infra/blocks/registry.rs should keep only block requirement policy, not a global registry"
+        "crates/harness-infra/src/blocks/registry.rs should keep only block requirement policy, not a global registry"
     );
 }
 
@@ -109,7 +109,7 @@ fn kuma_contracts_are_isolated_to_block_namespace() {
     let hits = collect_hits_in_tree(
         &root.join("src"),
         root,
-        Some(&root.join("src/infra/blocks/kuma")),
+        Some(&root.join("crates/harness-infra/src/blocks/kuma")),
         &[
             "Kuma test harness",
             "~kuma",
@@ -130,7 +130,7 @@ fn kuma_contracts_are_isolated_to_block_namespace() {
 
     assert!(
         hits.is_empty(),
-        "found Kuma contract leaks outside src/infra/blocks/kuma:\n{}",
+        "found Kuma contract leaks outside crates/harness-infra/src/blocks/kuma:\n{}",
         hits.join("\n")
     );
 }

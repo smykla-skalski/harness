@@ -1,8 +1,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::infra::blocks::{BlockError, ProcessExecutor};
-use crate::infra::exec::CommandResult;
+use crate::blocks::{BlockError, ProcessExecutor};
+use crate::exec::CommandResult;
 
 use super::contract::{BuildSystem, BuildTarget};
 

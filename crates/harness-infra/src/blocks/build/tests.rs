@@ -3,10 +3,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::*;
-use crate::infra::blocks::{
-    FakeProcessExecutor, FakeProcessMethod, FakeResponse, StdProcessExecutor,
-};
-use crate::infra::exec::CommandResult;
+use crate::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse, StdProcessExecutor};
+use crate::exec::CommandResult;
 
 fn success_result(args: &[&str]) -> CommandResult {
     CommandResult {

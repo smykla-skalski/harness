@@ -170,7 +170,7 @@ mod tests {
     fn flock_is_held_at_returns_false_for_unlocked_file() {
         let tmp = tempdir().expect("tempdir");
         let path = tmp.path().join("unlocked.lock");
-        std::fs::write(&path, "").expect("create");
+        fs::write(&path, "").expect("create");
         assert!(!flock_is_held_at(&path));
     }
 

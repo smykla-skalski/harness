@@ -21,7 +21,9 @@ pub(crate) use harness_workspace::git;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub(crate) mod github_api;
 pub mod hooks;
-pub mod infra;
+pub mod infra {
+    pub use harness_infra::*;
+}
 pub use harness_kernel::kernel;
 #[cfg(feature = "mcp-runtime")]
 pub use harness_mcp::mcp;

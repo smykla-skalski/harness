@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::infra::blocks::BlockError;
+use crate::blocks::BlockError;
 
 use super::client::HttpClient;
 use super::types::{HttpMethod, HttpResponse};

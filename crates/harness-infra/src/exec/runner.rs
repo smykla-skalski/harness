@@ -11,7 +11,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::environment::merge_env;
+use crate::environment::merge_env;
 
 use super::{CommandResult, RUNTIME, filter_progress_line};
 

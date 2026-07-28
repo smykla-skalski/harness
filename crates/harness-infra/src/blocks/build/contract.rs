@@ -3,8 +3,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::infra::blocks::BlockError;
-use crate::infra::exec::CommandResult;
+use crate::blocks::BlockError;
+use crate::exec::CommandResult;
 
 /// A single build target invocation.
 ///
