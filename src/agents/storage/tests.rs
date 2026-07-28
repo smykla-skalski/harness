@@ -2,8 +2,10 @@ use std::collections::BTreeSet;
 use std::thread;
 
 use fs_err as fs;
+use serde_json::json;
 
 use super::*;
+use harness_kernel::hooks::context::{AgentContext, RawPayload, SessionContext, SkillContext};
 
 fn with_agent_storage_env(body: impl FnOnce(&Path)) {
     let tmp = tempfile::tempdir().unwrap();
@@ -39,6 +41,56 @@ fn read_session_lines(project_dir: &Path, agent: HookAgent, session_id: &str) ->
         .lines()
         .map(ToOwned::to_owned)
         .collect()
+}
+
+#[test]
+fn append_hook_event_transcript_uses_assistant_response_not_prompt_body() {
+    with_agent_storage_env(|project_dir| {
+        let context = NormalizedHookContext {
+            event: NormalizedEvent::SessionEnd,
+            session: SessionContext {
+                session_id: "gemini-real-session".into(),
+                cwd: Some(project_dir.to_path_buf()),
+                transcript_path: None,
+            },
+            tool: None,
+            agent: Some(AgentContext {
+                agent_id: None,
+                agent_type: Some("gemini".into()),
+                prompt: Some(
+                    "harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23 --role reviewer"
+                        .into(),
+                ),
+                response: Some("actual assistant reply".into()),
+            }),
+            skill: SkillContext::inactive(),
+            raw: RawPayload::new(json!({
+                "prompt": "harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23 --role reviewer",
+                "last_assistant_message": "actual assistant reply"
+            })),
+        };
+
+        append_hook_event(
+            project_dir,
+            HookAgent::Gemini,
+            "gemini-real-session",
+            "suite:run",
+            "session-stop",
+            &context,
+            &NormalizedHookResult::allow(),
+        )
+        .expect("append hook event");
+
+        let line = read_session_lines(project_dir, HookAgent::Gemini, "gemini-real-session")
+            .into_iter()
+            .next()
+            .expect("transcript line");
+        let payload: serde_json::Value = serde_json::from_str(&line).expect("parse transcript");
+        assert_eq!(
+            payload["message"]["content"][0]["text"].as_str(),
+            Some("actual assistant reply")
+        );
+    });
 }
 
 #[test]
