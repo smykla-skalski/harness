@@ -39,15 +39,6 @@ utoipa = "5.5.0"
 daemon-runtime = []
 
 [dev-dependencies]
-# The session-index test suite fixtures its sessions through
-# `harness::session::service`, resolved through the root crate's facade over
-# this crate's own `service` module, so this crate's own test binary reaches
-# back into the root crate as a dev-only dependency. Cargo permits a
-# dev-dependency cycle: the root crate's *library* build never needs this
-# crate's test target, only `cargo test -p harness-session` does. Default
-# features only: nothing this crate's tests call needs `daemon-runtime` or
-# its heavier optional deps.
-harness = { path = "../..", version = "54.0.0", default-features = false }
 harness-testkit = { path = "../../testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 tempfile = "3.27.0"
