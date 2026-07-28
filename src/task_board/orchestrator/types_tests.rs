@@ -52,3 +52,21 @@ fn a_readable_last_run_is_still_kept() {
     assert_eq!(last_run.run_id, "task-board-run-1");
     assert_eq!(last_run.sync.providers.len(), 1);
 }
+
+// Moved from `harness-task-board`'s `automation::status` tests: it exercises
+// `TaskBoardOrchestratorStatus`'s `automation` field, which lives here, so it
+// can no longer sit inside the crate now that `automation` is a separate one.
+#[test]
+fn legacy_status_omits_and_defaults_the_automation_snapshot() {
+    let status: TaskBoardOrchestratorStatus = serde_json::from_value(serde_json::json!({
+        "enabled": false,
+        "running": false,
+        "workflow_execution_counts": [],
+        "settings": TaskBoardOrchestratorSettings::default()
+    }))
+    .expect("decode legacy status");
+    assert!(status.automation.is_none());
+
+    let encoded = serde_json::to_value(status).expect("encode feature-off status");
+    assert!(encoded.get("automation").is_none());
+}

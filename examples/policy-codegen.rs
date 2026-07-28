@@ -2623,7 +2623,8 @@ const TASK_BOARD_ITEM_FIELDS_SOURCE: &str =
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../crates/harness-task-board/src/lane.rs");
 const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/progress_rollup.rs");
-const TASK_BOARD_WORKFLOW_SOURCE: &str = include_str!("../src/task_board/automation/workflow.rs");
+const TASK_BOARD_WORKFLOW_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/workflow.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
 // The task-board foundation enums that every item/summary/request references.
 // TaskBoardItemKind stays hand-written because its Unknown(String) variant
@@ -3007,7 +3008,7 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
 ];
-const GITHUB_CONFIG_SOURCE: &str = include_str!("../src/task_board/github/config.rs");
+const GITHUB_CONFIG_SOURCE: &str = include_str!("../crates/harness-task-board/src/github_config.rs");
 const GITHUB_CONFIG_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitHubProjectWireTypes.generated.swift";
 // The GitHubAutomationSettings sub-tree nested in
 // TaskBoardOrchestratorSettings.github_project. The structs suffix to *Wire;
@@ -3042,9 +3043,9 @@ const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardHeldDispatchItem",
 ];
 const TASK_BOARD_AUTOMATION_STATUS_SOURCE: &str =
-    include_str!("../src/task_board/automation/status.rs");
+    include_str!("../crates/harness-task-board/src/automation/status.rs");
 const TASK_BOARD_AUTOMATION_SETTINGS_SOURCE: &str =
-    include_str!("../src/task_board/automation/settings.rs");
+    include_str!("../crates/harness-task-board/src/automation/settings.rs");
 const TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE: &str =
     include_str!("../src/task_board/wire/task_board_automation.rs");
 const TASK_BOARD_AUTOMATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardAutomationWireTypes.generated.swift";

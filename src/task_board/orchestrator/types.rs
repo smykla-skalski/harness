@@ -8,8 +8,9 @@ use super::super::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
 use super::super::{
     TaskBoardAutomationPolicy, TaskBoardAutomationRetrySettings,
     TaskBoardAutomationSchedulingSettings, TaskBoardExecutionHostConfig,
-    TaskBoardLocalExecutionHostConfig, TaskBoardPolicyCompilationError,
-    TaskBoardRepositoryAutomationConfig, TaskBoardReviewerSettings, validate_task_board_policy,
+    TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorWorkflow,
+    TaskBoardPolicyCompilationError, TaskBoardRepositoryAutomationConfig,
+    TaskBoardReviewerSettings, validate_task_board_policy,
 };
 
 /// Settings' `github_project` field, kept under its old name because that is
@@ -102,16 +103,6 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub admission_policy: Option<TaskBoardAutomationPolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_version: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardOrchestratorWorkflow {
-    DefaultTask,
-    PrFix,
-    PrReview,
-    Review,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

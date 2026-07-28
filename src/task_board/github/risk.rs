@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::config::GitHubProjectConfig;
+use super::GitHubProjectConfig;
 use super::evidence::GitHubMergeEvidence;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -7,7 +7,7 @@ use crate::github_api::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::config::GitHubProjectConfig;
+use super::GitHubProjectConfig;
 use super::evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckEvidence, GitHubMergeEvidence,
     GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,

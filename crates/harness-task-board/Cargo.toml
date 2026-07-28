@@ -30,6 +30,7 @@ async-trait = "0.1.83"
 base64 = "0.23.0"
 caseless = "0.2.2"
 chrono = { version = "0.4.44", features = ["serde"] }
+chrono-tz = "0.10.4"
 clap = { version = "4.6.0", features = ["derive"] }
 fs-err = "3.3.0"
 gix = { version = "0.86.0", features = [
