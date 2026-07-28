@@ -1,11 +1,11 @@
-//! Fixture-driven validation of GitHub pull request discovery.
+//! Fixture-driven validation of GitHub task-board discovery.
 //!
-//! Discovery fans a repository out across three intent queries - work assigned
-//! to the viewer, pull requests the viewer authored, and dependency updates
-//! opened by `renovate[bot]` - paginates each, and folds the results into a
-//! `BTreeMap` keyed by issue number. These tests pin that contract against a
-//! local mock so category overlaps, pagination, missing metadata, and provider
-//! failures reproduce without touching live GitHub state.
+//! Discovery fans a repository out across three issue searches - work assigned
+//! to the viewer, issues the viewer authored, and automation issues opened by
+//! `renovate[bot]` - paginates each, and folds the results into a `BTreeMap`
+//! keyed by issue number. These tests pin that contract against a local mock so
+//! category overlaps, pagination, missing metadata, and provider failures
+//! reproduce without touching live GitHub state.
 
 use serde_json::{Value, json};
 
@@ -106,10 +106,10 @@ async fn discovery_pull_is_network_free_and_covers_every_intent() {
 }
 
 #[tokio::test]
-async fn discovery_dedups_a_pull_request_that_matches_two_intents() {
+async fn discovery_dedups_a_ticket_that_matches_two_intents() {
     let _guard = acquire_global_budget_test_lock().await;
     // #7 is both assigned to the viewer and opened by renovate: two intents, one
-    // pull request. The number-keyed fold must import it once, never twice.
+    // ticket. The number-keyed fold must import it once, never twice.
     let (endpoint, _captured, handle) = spawn_sequence_mock(vec![
         viewer("octo-user"),
         search_page(vec![node(7, "Shared")], None),
