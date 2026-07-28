@@ -8,7 +8,7 @@
 //! reason it entered the board.
 //!
 //! The kind stays a flat `snake_case` string enum so it round-trips through the
-//! existing derive-based serde, OpenAPI schema, and Swift codegen unchanged:
+//! existing derive-based serde, `OpenAPI` schema, and Swift codegen unchanged:
 //! `pr_fix` and `pr_review` keep their meaning and the both-intents state is
 //! the single new value `pr_fix_review`. No storage migration is required.
 
@@ -167,6 +167,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::cognitive_complexity,
+        reason = "one flat set of intent assertions per kind reads clearer kept together than split across helpers"
+    )]
     fn one_ticket_carries_both_intents_without_collapsing() {
         let both = TaskBoardWorkflowKind::PrFixReview;
         assert!(both.has_dependency_update_intent());
