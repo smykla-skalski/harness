@@ -165,3 +165,47 @@ fn remote_task() -> ExternalTask {
         ..ExternalTask::default()
     }
 }
+
+fn discovered_item() -> TaskBoardItem {
+    TaskBoardItem::new(
+        "task-1".into(),
+        "Bump serde".into(),
+        String::new(),
+        "2026-07-15T10:00:00Z".into(),
+    )
+}
+
+fn discovered_pull_request_task() -> ExternalTask {
+    ExternalTask {
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, "remote-1"),
+        pr_head_revision: Some("abc123".into()),
+        pr_author: Some("renovate[bot]".into()),
+        ..remote_task()
+    }
+}
+
+#[test]
+fn reconcile_backfills_missing_pull_request_head_and_author() {
+    let item = discovered_item();
+    assert!(item.workflow.pr_head_revision.is_none());
+
+    let patch = reconciliation_patch(&item, &discovered_pull_request_task(), false, None);
+
+    let workflow = patch.workflow.expect("head and author backfill onto the ticket");
+    assert_eq!(workflow.pr_head_revision.as_deref(), Some("abc123"));
+    assert_eq!(workflow.pr_author.as_deref(), Some("renovate[bot]"));
+}
+
+#[test]
+fn reconcile_never_overwrites_a_head_the_ticket_already_holds() {
+    let mut item = discovered_item();
+    item.workflow.pr_head_revision = Some("frozen".into());
+    item.workflow.pr_author = Some("renovate[bot]".into());
+
+    let patch = reconciliation_patch(&item, &discovered_pull_request_task(), false, None);
+
+    assert!(
+        patch.workflow.is_none(),
+        "an advancing head is a launch-freeze concern, not a discovery one"
+    );
+}
