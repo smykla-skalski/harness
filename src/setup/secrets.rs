@@ -29,9 +29,11 @@ use harness_workspace::command_context::AppContext;
 mod providers;
 #[cfg(target_os = "macos")]
 use providers::{
-    clear_provider_secret, provider_account, provider_any_configured, provider_configured,
+    clear_provider_secret, provider_account, provider_any_configured, provider_secret,
     provider_service, set_provider_secret,
 };
+#[cfg(any(target_os = "macos", test))]
+mod provider_validation;
 
 #[cfg(any(target_os = "macos", test))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";
@@ -85,7 +87,8 @@ pub enum SecretsCommand {
     Set(SecretMutateArgs),
     /// Remove a task-board secret from your Keychain.
     Clear(SecretScopeArgs),
-    /// Check whether a task-board secret is present without revealing it.
+    /// Verify a task-board secret without revealing it. Provider credentials
+    /// are authenticated against their upstream API.
     Test(SecretScopeArgs),
 }
 
@@ -212,10 +215,13 @@ fn run_test(args: &SecretScopeArgs) -> Result<i32, CliError> {
     if matches!(args.kind, SecretKindArg::Github | SecretKindArg::OpenRouter) {
         let client = DaemonClient::try_connect();
         let account = provider_account(client.as_ref())?;
-        let configured = provider_configured(args.kind, args.repository.as_deref(), &account)?;
-        let status = if configured { "present" } else { "missing" };
-        println!("{status}: {} ({account})", provider_service(args.kind));
-        return Ok(i32::from(!configured));
+        let Some(secret) = provider_secret(args.kind, args.repository.as_deref(), &account)? else {
+            println!("missing: {} ({account})", provider_service(args.kind));
+            return Ok(1);
+        };
+        provider_validation::validate_provider_secret(args.kind, &secret)?;
+        println!("valid: {} ({account})", provider_service(args.kind));
+        return Ok(0);
     }
     let (service, account) = resolve_service_account(args)?;
     if keychain_item_present(service, account.as_str()) {
