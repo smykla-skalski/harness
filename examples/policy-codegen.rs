@@ -2998,7 +2998,8 @@ const BRIDGE_STATUS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 // narrow UInt -> Int in the map. The bridge-internal/persisted types stay out of the allow-list.
 const BRIDGE_STATUS_EMIT_ONLY: &[&str] = &["BridgeStatusReport"];
 const SYNC_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
-const EXTERNAL_SYNC_SOURCE: &str = include_str!("../src/task_board/external/sync.rs");
+const EXTERNAL_SYNC_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/external/sync.rs");
 const SYNC_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSyncSummaryWireTypes.generated.swift";
 // The task_board sync summary (syncTaskBoard endpoint + nested in the orchestrator run summary).
 // ExternalProvider/ExternalSyncAction are decoder-agnostic hand enums (TaskBoardExternalProvider/

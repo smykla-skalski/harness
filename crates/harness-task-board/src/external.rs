@@ -1,13 +1,15 @@
 //! The `external` sync domain's foundation types (`ExternalTask`,
 //! `ExternalProvider`, the `ExternalSyncClient` trait, and the create-recovery
-//! contract) plus the `github` client cluster that implements them.
+//! contract), the `github` client cluster that implements them, and the
+//! `sync`/`scopes` engine that drives them against a `TaskBoardSyncStore`.
+//! `sync` reaches `TaskBoardSyncConflict` from this crate's own `automation`
+//! module (moved in a prior slice), not from `external` itself.
 //!
-//! `sync`, `scopes`, and the `sync_tests`/`tests` test-only clusters stay in
-//! the root crate's `src/task_board/external.rs` for later slices: `sync`
-//! constructs `GitHubSyncClient`/`GitHubInboxSyncClient` from this module and
-//! calls `canonical_external_status`/`local_external_status`, so those two
-//! are `pub` here (not `pub(crate)`) purely for that reverse, cross-crate
-//! reach, not because either is meant as public API.
+//! The `sync_tests`/`tests` test-only clusters stay in the root crate's
+//! `src/task_board/external.rs` for a later slice: several of their files
+//! reach `crate::daemon::db::AsyncDaemonDb`/`crate::daemon::client::test_support`
+//! as integration-test fixtures and need to relocate to `tests/integration/`
+//! first.
 
 use std::fmt;
 use std::ops::Not;
@@ -22,8 +24,11 @@ use crate::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardSta
 
 mod capabilities;
 mod config;
+mod create_intents;
 mod create_recovery;
 mod github;
+mod scopes;
+mod sync;
 mod targeting;
 
 pub use capabilities::{
@@ -31,6 +36,12 @@ pub use capabilities::{
     ExternalSyncField, ExternalTaskUpdate, ExternalUpdateOutcome,
 };
 pub use config::ExternalSyncConfig;
+pub use create_intents::{
+    TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
+    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
+    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
+    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
+};
 pub use create_recovery::ExternalCreateRecoveryClient;
 #[allow(
     unused_imports,
@@ -41,6 +52,21 @@ pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub use github::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
     reconciled_external_status,
+};
+pub use scopes::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+    ExternalProviderScopeAvailability, ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
+    ExternalProviderScopeState, ExternalSyncBatch, ExternalSyncScopeOutcome,
+};
+pub use sync::{
+    ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
+    TaskBoardExternalCreateStore, TaskBoardSyncCoordinatorFence,
+    TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+    assign_external_create_recovery, blocked_external_create_follow_ups,
+    blocked_external_create_recovery, configured_sync_clients,
+    configured_sync_clients_without_review_requests, load_external_create_recovery_work,
+    prepare_external_create_recovery, sync_external_tasks, sync_external_tasks_scoped,
+    sync_external_tasks_scoped_with_recovery,
 };
 pub use targeting::execution_repository_for_task;
 
@@ -216,11 +242,8 @@ impl Default for ExternalTask {
     }
 }
 
-// `pub`, not `pub(crate)`: root's `task_board::external` (a different crate,
-// since this module moved) still calls these from its own `sync` submodule,
-// which hasn't moved yet.
 #[must_use]
-pub fn canonical_external_status(status: TaskBoardStatus) -> TaskBoardStatus {
+pub(crate) fn canonical_external_status(status: TaskBoardStatus) -> TaskBoardStatus {
     if status.canonical_persisted_status() == TaskBoardStatus::Done {
         TaskBoardStatus::Done
     } else {
@@ -229,7 +252,7 @@ pub fn canonical_external_status(status: TaskBoardStatus) -> TaskBoardStatus {
 }
 
 #[must_use]
-pub fn local_external_status(status: TaskBoardStatus) -> Option<TaskBoardStatus> {
+pub(crate) fn local_external_status(status: TaskBoardStatus) -> Option<TaskBoardStatus> {
     match status.canonical_persisted_status() {
         TaskBoardStatus::Inbox | TaskBoardStatus::Todo => Some(TaskBoardStatus::Inbox),
         TaskBoardStatus::Done => Some(TaskBoardStatus::Done),
