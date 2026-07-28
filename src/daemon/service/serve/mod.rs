@@ -220,6 +220,7 @@ pub(crate) async fn initialize_startup_state(
             task_board_migration::migrate_task_board(async_db).await?;
             reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
+            super::super::provider_credentials::load_provider_credentials(async_db).await?;
         }
         spawn_startup_background_tasks(
             Arc::clone(&db),

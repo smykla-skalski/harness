@@ -20,8 +20,18 @@ use security_framework::passwords::{
 #[cfg(any(target_os = "macos", test))]
 use sha1::{Digest, Sha1};
 
+#[cfg(target_os = "macos")]
+use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::AppContext;
+
+#[cfg(target_os = "macos")]
+mod providers;
+#[cfg(target_os = "macos")]
+use providers::{
+    clear_provider_secret, provider_account, provider_configured, provider_service,
+    set_provider_secret,
+};
 
 #[cfg(any(target_os = "macos", test))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";
@@ -49,7 +59,7 @@ impl SecretsArgs {
         #[cfg(target_os = "macos")]
         {
             match &self.command {
-                SecretsCommand::List => Ok(run_list()),
+                SecretsCommand::List => run_list(),
                 SecretsCommand::Set(args) => run_set(args),
                 SecretsCommand::Clear(args) => run_clear(args),
                 SecretsCommand::Test(args) => run_test(args),
@@ -119,28 +129,52 @@ pub struct SecretMutateArgs {
 }
 
 #[cfg(target_os = "macos")]
-fn run_list() -> i32 {
+fn run_list() -> Result<i32, CliError> {
+    let client = DaemonClient::try_connect();
+    let provider_account = provider_account(client.as_ref())?;
     let entries = [
-        ("GitHub token", SERVICE_GITHUB, "default"),
-        ("SSH key (global)", SERVICE_SSH, "global"),
-        ("Signing SSH key (global)", SERVICE_SIGNING_SSH, "global"),
-        ("GPG key (global)", SERVICE_GPG, "global"),
-        ("OpenRouter token", SERVICE_OPENROUTER, "default"),
+        (
+            "GitHub token",
+            provider_configured(SecretKindArg::Github, None, &provider_account)?,
+        ),
+        (
+            "SSH key (global)",
+            keychain_item_present(SERVICE_SSH, "global"),
+        ),
+        (
+            "Signing SSH key (global)",
+            keychain_item_present(SERVICE_SIGNING_SSH, "global"),
+        ),
+        (
+            "GPG key (global)",
+            keychain_item_present(SERVICE_GPG, "global"),
+        ),
+        (
+            "OpenRouter token",
+            provider_configured(SecretKindArg::OpenRouter, None, &provider_account)?,
+        ),
     ];
     println!("Task-board credential status (Keychain):");
-    for (label, service, account) in entries {
-        let status = if keychain_item_present(service, account) {
+    for (label, configured) in entries {
+        let status = if configured {
             "configured"
         } else {
             "not configured"
         };
         println!("  {label}: {status}");
     }
-    0
+    Ok(0)
 }
 
 #[cfg(target_os = "macos")]
 fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
+    if matches!(
+        args.scope.kind,
+        SecretKindArg::Github | SecretKindArg::OpenRouter
+    ) {
+        let secret = read_secret(args)?;
+        return set_provider_secret(&args.scope, &secret);
+    }
     let (service, account) = resolve_service_account(&args.scope)?;
     let secret = read_secret(args)?;
     if secret.is_empty() {
@@ -156,6 +190,9 @@ fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
 
 #[cfg(target_os = "macos")]
 fn run_clear(args: &SecretScopeArgs) -> Result<i32, CliError> {
+    if matches!(args.kind, SecretKindArg::Github | SecretKindArg::OpenRouter) {
+        return clear_provider_secret(args);
+    }
     let (service, account) = resolve_service_account(args)?;
     match delete_generic_password(service, account.as_str()) {
         Ok(()) => {
@@ -172,6 +209,14 @@ fn run_clear(args: &SecretScopeArgs) -> Result<i32, CliError> {
 
 #[cfg(target_os = "macos")]
 fn run_test(args: &SecretScopeArgs) -> Result<i32, CliError> {
+    if matches!(args.kind, SecretKindArg::Github | SecretKindArg::OpenRouter) {
+        let client = DaemonClient::try_connect();
+        let account = provider_account(client.as_ref())?;
+        let configured = provider_configured(args.kind, args.repository.as_deref(), &account)?;
+        let status = if configured { "present" } else { "missing" };
+        println!("{status}: {} ({account})", provider_service(args.kind));
+        return Ok(i32::from(!configured));
+    }
     let (service, account) = resolve_service_account(args)?;
     if keychain_item_present(service, account.as_str()) {
         println!("present: {service} ({account})");
