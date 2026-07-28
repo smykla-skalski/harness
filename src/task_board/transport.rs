@@ -2,14 +2,13 @@ use clap::{Args, Subcommand};
 use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::client::DaemonClient;
-use harness_daemon_client::{ClientError, DaemonClient as LeafDaemonClient};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
 };
 use crate::task_board::types::{AgentMode, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus};
 use crate::task_board::wire::{TASK_BOARD_STORAGE_DATABASE, TaskBoardCapabilitiesResponse};
+use harness_daemon_client::{ClientError, DaemonClient};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 mod catalog;
 mod dispatch;
@@ -325,23 +324,11 @@ impl Execute for TaskBoardTriageEscalationCommand {
     }
 }
 
-pub(super) fn daemon_client() -> Result<DaemonClient, CliError> {
+/// Every command in this module now goes through the leaf
+/// `harness-daemon-client` rather than the root `daemon::client` facade, so
+/// `task_board::transport` carries no daemon-crate dependency.
+pub(super) fn leaf_daemon_client() -> Result<DaemonClient, CliError> {
     let client = DaemonClient::try_connect().ok_or_else(|| {
-        CliError::from(CliErrorKind::workflow_io(
-            "task-board commands require a running daemon; start Harness Monitor or run `harness-daemon dev`",
-        ))
-    })?;
-    client.require_database_task_board()?;
-    Ok(client)
-}
-
-/// Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade
-/// `daemon_client()` returns above, so command surfaces already converted off
-/// the facade stay free of a daemon-crate dependency. `daemon_client()` stays
-/// for the surfaces that still call typed facade methods this leaf client
-/// does not (yet) expose.
-pub(super) fn leaf_daemon_client() -> Result<LeafDaemonClient, CliError> {
-    let client = LeafDaemonClient::try_connect().ok_or_else(|| {
         CliError::from(CliErrorKind::workflow_io(
             "task-board commands require a running daemon; start Harness Monitor or run `harness-daemon dev`",
         ))
@@ -350,7 +337,7 @@ pub(super) fn leaf_daemon_client() -> Result<LeafDaemonClient, CliError> {
     Ok(client)
 }
 
-fn require_database_task_board(client: &LeafDaemonClient) -> Result<(), CliError> {
+fn require_database_task_board(client: &DaemonClient) -> Result<(), CliError> {
     let capability = client
         .get_optional::<TaskBoardCapabilitiesResponse>("/v1/task-board/capabilities", &[])
         .map_err(|error| leaf_daemon_client_error("check task-board capability", &error))?

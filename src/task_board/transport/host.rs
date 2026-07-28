@@ -1,10 +1,13 @@
 use clap::{Args, Subcommand};
 
 use crate::app::command_context::{AppContext, Execute};
-use crate::task_board::wire::TaskBoardHostSetProjectTypesRequest;
+use crate::task_board::wire::{
+    TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardHostSetProjectTypesResponse,
+};
 use harness_kernel::errors::CliError;
 
-use super::{daemon_client, print_json};
+use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum TaskBoardHostCommand {
@@ -52,7 +55,9 @@ impl Execute for TaskBoardHostCommand {
 
 impl TaskBoardHostListArgs {
     fn run(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let machines = daemon_client()?.task_board_host_list()?;
+        let machines: TaskBoardHostListResponse = leaf_daemon_client()?
+            .get("/v1/task-board/host/list", &[])
+            .map_err(|error| leaf_daemon_client_error("list task-board hosts", &error))?;
         if self.json {
             print_json(&machines)?;
         } else if machines.is_empty() {
@@ -73,7 +78,9 @@ impl TaskBoardHostListArgs {
 
 impl TaskBoardHostLocalArgs {
     fn run_local(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let machine = daemon_client()?.task_board_host_local()?;
+        let machine: TaskBoardHostLocalResponse = leaf_daemon_client()?
+            .get("/v1/task-board/host/local", &[])
+            .map_err(|error| leaf_daemon_client_error("get local task-board host", &error))?;
         if self.json {
             print_json(&machine)?;
         } else {
@@ -88,8 +95,12 @@ impl TaskBoardHostLocalArgs {
     }
 
     fn run_clear(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let stored = daemon_client()?
-            .set_task_board_host_project_types(&TaskBoardHostSetProjectTypesRequest::default())?;
+        let request = TaskBoardHostSetProjectTypesRequest::default();
+        let stored: TaskBoardHostSetProjectTypesResponse = leaf_daemon_client()?
+            .put("/v1/task-board/host/project-types", &request)
+            .map_err(|error| {
+                leaf_daemon_client_error("set task-board host project types", &error)
+            })?;
         if self.json {
             print_json(&stored)?;
         } else {
@@ -101,11 +112,14 @@ impl TaskBoardHostLocalArgs {
 
 impl TaskBoardHostSetProjectTypesArgs {
     fn run(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let stored = daemon_client()?.set_task_board_host_project_types(
-            &TaskBoardHostSetProjectTypesRequest {
-                project_types: self.project_types.clone(),
-            },
-        )?;
+        let request = TaskBoardHostSetProjectTypesRequest {
+            project_types: self.project_types.clone(),
+        };
+        let stored: TaskBoardHostSetProjectTypesResponse = leaf_daemon_client()?
+            .put("/v1/task-board/host/project-types", &request)
+            .map_err(|error| {
+                leaf_daemon_client_error("set task-board host project types", &error)
+            })?;
         if self.json {
             print_json(&stored)?;
         } else {

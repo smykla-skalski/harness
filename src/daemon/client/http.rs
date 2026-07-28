@@ -126,35 +126,6 @@ impl DaemonClient {
         process_response(response, "POST", path, &request_id, &start)
     }
 
-    pub(super) fn put<Req: serde::Serialize, Res: DeserializeOwned>(
-        &self,
-        path: &str,
-        body: &Req,
-    ) -> Result<Res, CliError> {
-        let runtime = &*RUNTIME;
-        let request_id = Uuid::new_v4().to_string();
-        let start = Instant::now();
-        let url = format!("{}{path}", self.endpoint);
-        let span = client_request_span("PUT", path, &request_id, &self.endpoint);
-        let _guard = span.enter();
-        record_trace_id(&span);
-        let propagation_headers = current_trace_headers();
-        let response = runtime.block_on(async {
-            let mut request = self
-                .http
-                .put(&url)
-                .bearer_auth(&self.token)
-                .header("x-request-id", &request_id)
-                .json(body)
-                .timeout(mutation_timeout_for_path(path));
-            for (header, value) in &propagation_headers {
-                request = request.header(header, value);
-            }
-            request.send().await
-        });
-        process_response(response, "PUT", path, &request_id, &start)
-    }
-
     pub(super) fn delete<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {
         let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();

@@ -2,12 +2,16 @@ use std::env;
 
 use clap::{ArgAction, Args, Subcommand, ValueEnum};
 
+use harness_daemon_client::DaemonClient;
+use serde_json::Value;
+
 use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
     TaskBoardAutomationPolicy, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-    TaskBoardOrchestratorStatus, normalize_repository_slug, validate_task_board_policy,
+    TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus, normalize_repository_slug,
+    validate_task_board_policy,
 };
 use crate::task_board::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
@@ -15,7 +19,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::orchestrator_tokens::TaskBoardOrchestratorGithubTokensArgs;
-use super::{daemon_client, print_json};
+use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -159,17 +163,25 @@ impl Execute for TaskBoardOrchestratorCommand {
 
 impl TaskBoardOrchestratorJsonArgs {
     fn execute_status(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let status = daemon_client()?.task_board_orchestrator_status()?;
+        let status: TaskBoardOrchestratorStatus = leaf_daemon_client()?
+            .get("/v1/task-board/orchestrator/status", &[])
+            .map_err(|error| {
+                leaf_daemon_client_error("get task-board orchestrator status", &error)
+            })?;
         print_status(&status, self.json)
     }
 
     fn execute_start(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let status = daemon_client()?.start_task_board_orchestrator()?;
+        let status: TaskBoardOrchestratorStatus = leaf_daemon_client()?
+            .post("/v1/task-board/orchestrator/start", &Value::Null)
+            .map_err(|error| leaf_daemon_client_error("start task-board orchestrator", &error))?;
         print_status(&status, self.json)
     }
 
     fn execute_stop(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let status = daemon_client()?.stop_task_board_orchestrator()?;
+        let status: TaskBoardOrchestratorStatus = leaf_daemon_client()?
+            .post("/v1/task-board/orchestrator/stop", &Value::Null)
+            .map_err(|error| leaf_daemon_client_error("stop task-board orchestrator", &error))?;
         print_status(&status, self.json)
     }
 }
@@ -183,18 +195,33 @@ impl Execute for TaskBoardOrchestratorRunOnceArgs {
             project_dir: self.project_dir.clone(),
             actor: self.actor.clone(),
         };
-        let status = daemon_client()?.run_task_board_orchestrator_once(&request)?;
+        let status: TaskBoardOrchestratorStatus = leaf_daemon_client()?
+            .post("/v1/task-board/orchestrator/run-once", &request)
+            .map_err(|error| {
+                leaf_daemon_client_error("run task-board orchestrator once", &error)
+            })?;
         print_status(&status, self.json)
     }
 }
 
 impl Execute for TaskBoardOrchestratorSettingsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let client = daemon_client()?;
-        let settings = if self.has_update() {
-            client.update_task_board_orchestrator_settings(&self.update_request())?
+        let client = leaf_daemon_client()?;
+        let settings: TaskBoardOrchestratorSettings = if self.has_update() {
+            client
+                .put(
+                    "/v1/task-board/orchestrator/settings",
+                    &self.update_request(),
+                )
+                .map_err(|error| {
+                    leaf_daemon_client_error("update task-board orchestrator settings", &error)
+                })?
         } else {
-            client.task_board_orchestrator_settings()?
+            client
+                .get("/v1/task-board/orchestrator/settings", &[])
+                .map_err(|error| {
+                    leaf_daemon_client_error("get task-board orchestrator settings", &error)
+                })?
         };
         if self.json {
             print_json(&settings)?;
@@ -245,13 +272,17 @@ fn parse_admission_policy(value: &str) -> Result<TaskBoardAutomationPolicy, Stri
 
 impl Execute for TaskBoardOrchestratorRuntimeConfigArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let client = daemon_client()?;
+        let client = leaf_daemon_client()?;
         let config = if self.has_update() {
-            let mut config = client.task_board_runtime_config()?;
+            let mut config = get_runtime_config(&client)?;
             self.apply_update(&mut config)?;
-            client.update_task_board_runtime_config(&config)?
+            client
+                .put("/v1/task-board/orchestrator/runtime-config", &config)
+                .map_err(|error| {
+                    leaf_daemon_client_error("update task-board runtime config", &error)
+                })?
         } else {
-            client.task_board_runtime_config()?
+            get_runtime_config(&client)?
         };
         if self.json {
             print_json(&config)?;
@@ -385,6 +416,12 @@ impl From<TaskBoardGitSigningModeArg> for TaskBoardGitSigningMode {
             TaskBoardGitSigningModeArg::Gpg => Self::Gpg,
         }
     }
+}
+
+fn get_runtime_config(client: &DaemonClient) -> Result<TaskBoardGitRuntimeConfig, CliError> {
+    client
+        .get("/v1/task-board/orchestrator/runtime-config", &[])
+        .map_err(|error| leaf_daemon_client_error("get task-board runtime config", &error))
 }
 
 fn dry_run_override(dry_run: bool, apply: bool) -> Option<bool> {

@@ -1,17 +1,32 @@
+use std::collections::HashSet;
+
+use harness_daemon_client::DaemonClient;
+
 use crate::app::command_context::{AppContext, Execute};
-use crate::task_board::wire::{
-    TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardListItemsRequest,
-    TaskBoardUpdateEstimateClears, TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
-    TaskBoardUpdateStateClears,
-};
-use harness_kernel::errors::CliError;
+use crate::infra::io;
+use crate::task_board::TASK_BOARD_LIST_MAX_LIMIT;
 use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
+use crate::task_board::wire::{
+    TaskBoardAuditResponse, TaskBoardCreateItemRequest, TaskBoardListItemsRequest,
+    TaskBoardListItemsResponse, TaskBoardUpdateEstimateClears, TaskBoardUpdateIdentityClears,
+    TaskBoardUpdateItemRequest, TaskBoardUpdateStateClears,
+};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     TaskBoardAuditArgs, TaskBoardCreateArgs, TaskBoardDeleteArgs, TaskBoardGetArgs,
-    TaskBoardListArgs, TaskBoardUpdateArgs, daemon_client, print_json,
+    TaskBoardListArgs, TaskBoardUpdateArgs, leaf_daemon_client, leaf_daemon_client_error,
+    print_json,
 };
+
+/// Stop the page walk after this many pages. Ported from the now-deleted
+/// `daemon::client::task_board_list` (the root facade's module, not the leaf
+/// client's) along with the query-string rendering and page-walk faults below
+/// -- this is their only copy now, not a duplicate of it. A daemon that keeps
+/// offering one more distinct cursor would otherwise grow the walk without
+/// bound.
+const TASK_BOARD_LIST_MAX_PAGES: usize = 200;
 
 impl Execute for TaskBoardCreateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -36,7 +51,9 @@ impl Execute for TaskBoardCreateArgs {
             work_item_id: self.fields.work_item_id.clone(),
             id: self.id.clone(),
         };
-        let item = daemon_client()?.create_task_board_item(&request)?;
+        let item: TaskBoardItem = leaf_daemon_client()?
+            .post("/v1/task-board/items", &request)
+            .map_err(|error| leaf_daemon_client_error("create task-board item", &error))?;
         print_json(&item)?;
         Ok(0)
     }
@@ -44,13 +61,13 @@ impl Execute for TaskBoardCreateArgs {
 
 impl Execute for TaskBoardListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let client = daemon_client()?;
+        let client = leaf_daemon_client()?;
         let request = self.request();
         // Naming a page asks for exactly that page, so the response carries the
         // cursor needed to ask for the next one. Every other read walks the
         // pages here and prints the whole selection.
         if self.limit.is_some() || self.cursor.is_some() {
-            let page = client.list_task_board_items_page(&request)?;
+            let page = list_task_board_items_page(&client, &request)?;
             if self.json {
                 print_json(&page)?;
             } else {
@@ -72,7 +89,7 @@ impl Execute for TaskBoardListArgs {
             }
             return Ok(0);
         }
-        let items = client.list_task_board_items(&request)?;
+        let items = list_task_board_items(&client, &request)?;
         if self.json {
             print_json(&items)?;
         } else {
@@ -108,7 +125,7 @@ fn print_item_lines(items: &[TaskBoardItem]) {
 
 impl Execute for TaskBoardGetArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let item = daemon_client()?.get_task_board_item(&self.id)?;
+        let item = get_task_board_item(&leaf_daemon_client()?, &self.id)?;
         if self.json {
             print_json(&item)?;
         } else {
@@ -120,14 +137,17 @@ impl Execute for TaskBoardGetArgs {
 
 impl Execute for TaskBoardUpdateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let client = daemon_client()?;
+        io::validate_safe_segment(&self.id)?;
+        let client = leaf_daemon_client()?;
         let current = self
             .fields
             .has_workflow_update()
-            .then(|| client.get_task_board_item(&self.id))
+            .then(|| get_task_board_item(&client, &self.id))
             .transpose()?;
         let request = self.request(current.as_ref());
-        let item = client.update_task_board_item(&self.id, &request)?;
+        let item: TaskBoardItem = client
+            .put(&item_path(&self.id), &request)
+            .map_err(|error| leaf_daemon_client_error("update task-board item", &error))?;
         print_json(&item)?;
         Ok(0)
     }
@@ -187,7 +207,10 @@ impl TaskBoardUpdateArgs {
 
 impl Execute for TaskBoardDeleteArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let item = daemon_client()?.delete_task_board_item(&self.id)?;
+        io::validate_safe_segment(&self.id)?;
+        let item: TaskBoardItem = leaf_daemon_client()?
+            .delete(&item_path(&self.id))
+            .map_err(|error| leaf_daemon_client_error("delete task-board item", &error))?;
         print_json(&item)?;
         Ok(0)
     }
@@ -195,7 +218,9 @@ impl Execute for TaskBoardDeleteArgs {
 
 impl Execute for TaskBoardAuditArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let summary = daemon_client()?.audit_task_board(&TaskBoardAuditRequest { status: None })?;
+        let summary: TaskBoardAuditResponse = leaf_daemon_client()?
+            .get("/v1/task-board/audit", &[])
+            .map_err(|error| leaf_daemon_client_error("audit task board", &error))?;
         if self.json {
             print_json(&summary)?;
         } else {
@@ -207,3 +232,173 @@ impl Execute for TaskBoardAuditArgs {
         Ok(0)
     }
 }
+
+fn get_task_board_item(client: &DaemonClient, item_id: &str) -> Result<TaskBoardItem, CliError> {
+    io::validate_safe_segment(item_id)?;
+    client
+        .get(&item_path(item_id), &[])
+        .map_err(|error| leaf_daemon_client_error("get task-board item", &error))
+}
+
+/// Read one bounded page of matching task-board items.
+fn list_task_board_items_page(
+    client: &DaemonClient,
+    request: &TaskBoardListItemsRequest,
+) -> Result<TaskBoardListItemsResponse, CliError> {
+    let owned = task_board_list_query(request)?;
+    let query = owned
+        .iter()
+        .map(|(name, value)| (*name, value.as_str()))
+        .collect::<Vec<_>>();
+    client
+        .get("/v1/task-board/items", &query)
+        .map_err(|error| leaf_daemon_client_error("list task-board items", &error))
+}
+
+/// Read every matching task-board item by walking the daemon's pages.
+///
+/// The daemon bounds each response, so a caller that wants the whole
+/// selection has to ask for the rest; this keeps that loop in one place
+/// rather than in every command that reads the board.
+///
+/// A walk that cannot advance fails instead of returning what it has. The
+/// daemon only ever pairs a cursor with a non-empty page, and never repeats
+/// the resume point it was handed, so either shape means the daemon is not
+/// the one this client is built against - and a `Vec` has nowhere to say the
+/// board was read only in part.
+///
+/// Sequence-bound cursors prevent overlap in valid responses. Ids are still
+/// tracked so a malformed overlapping page cannot put duplicate rows in the
+/// returned board.
+fn list_task_board_items(
+    client: &DaemonClient,
+    request: &TaskBoardListItemsRequest,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    let mut request = request.clone();
+    request.limit.get_or_insert(TASK_BOARD_LIST_MAX_LIMIT);
+    let mut items = Vec::new();
+    let mut seen = HashSet::new();
+    let mut items_change_seq = None;
+    for _ in 0..TASK_BOARD_LIST_MAX_PAGES {
+        let page = list_task_board_items_page(client, &request)?;
+        if let Some(expected) = items_change_seq
+            && page.items_change_seq != expected
+        {
+            return Err(changed_task_board_read(expected, page.items_change_seq));
+        }
+        items_change_seq.get_or_insert(page.items_change_seq);
+        let drained = page.items.is_empty();
+        items.extend(
+            page.items
+                .into_iter()
+                .filter(|item| seen.insert(item.id.clone())),
+        );
+        let Some(cursor) = page.next_cursor else {
+            return Ok(items);
+        };
+        if drained {
+            return Err(unusable_task_board_page(
+                &cursor,
+                "handed back a cursor with no items",
+            ));
+        }
+        if request.cursor.as_deref() == Some(cursor.as_str()) {
+            return Err(unusable_task_board_page(
+                &cursor,
+                "repeated the cursor it was given",
+            ));
+        }
+        request.cursor = Some(cursor);
+    }
+    Err(undrained_task_board_read())
+}
+
+/// Render a list request as the daemon's query string, in a stable order.
+fn task_board_list_query(
+    request: &TaskBoardListItemsRequest,
+) -> Result<Vec<(&'static str, String)>, CliError> {
+    let mut query = enum_facet_query(request)?;
+    append_text_query(request, &mut query);
+    append_page_query(request, &mut query);
+    Ok(query)
+}
+
+fn enum_facet_query(
+    request: &TaskBoardListItemsRequest,
+) -> Result<Vec<(&'static str, String)>, CliError> {
+    let mut query = Vec::new();
+    if let Some(status) = request.status {
+        query.push(("status", enum_label(status, "status")?));
+    }
+    if let Some(priority) = request.priority {
+        query.push(("priority", enum_label(priority, "priority")?));
+    }
+    if let Some(agent_mode) = request.agent_mode {
+        query.push(("agent_mode", enum_label(agent_mode, "agent mode")?));
+    }
+    Ok(query)
+}
+
+fn append_text_query(request: &TaskBoardListItemsRequest, query: &mut Vec<(&'static str, String)>) {
+    if let Some(project_id) = &request.project_id {
+        query.push(("project_id", project_id.clone()));
+    }
+    for tag in &request.tags {
+        query.push(("tag", tag.clone()));
+    }
+    if let Some(text) = &request.query {
+        query.push(("query", text.clone()));
+    }
+}
+
+fn append_page_query(request: &TaskBoardListItemsRequest, query: &mut Vec<(&'static str, String)>) {
+    if let Some(limit) = request.limit {
+        query.push(("limit", limit.to_string()));
+    }
+    if let Some(cursor) = &request.cursor {
+        query.push(("cursor", cursor.clone()));
+    }
+}
+
+fn enum_label<T: serde::Serialize>(value: T, label: &str) -> Result<String, CliError> {
+    serde_json::to_value(value)
+        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?
+        .as_str()
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            CliErrorKind::workflow_serialize(format!("task-board {label} is not a string")).into()
+        })
+}
+
+fn unusable_task_board_page(cursor: &str, fault: &str) -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "the daemon {fault} at task-board page cursor '{cursor}'; \
+         the board read cannot advance and would otherwise be silently partial"
+    ))
+    .into()
+}
+
+fn changed_task_board_read(expected: i64, actual: i64) -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "the task-board changed from sequence {expected} to {actual} during the page walk; \
+         restart from the first page"
+    ))
+    .into()
+}
+
+fn undrained_task_board_read() -> CliError {
+    CliErrorKind::workflow_io(format!(
+        "the task-board read did not drain within {TASK_BOARD_LIST_MAX_PAGES} pages; \
+         narrow it with a filter, or read one page at a time with --limit and --cursor"
+    ))
+    .into()
+}
+
+fn item_path(item_id: &str) -> String {
+    format!("/v1/task-board/items/{item_id}")
+}
+
+// Split into item_commands/tests.rs: with the ported page-walk mock-server
+// tests included, this file would otherwise clear the repo's line cap.
+#[cfg(test)]
+mod tests;
