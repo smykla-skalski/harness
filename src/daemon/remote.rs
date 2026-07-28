@@ -91,10 +91,12 @@ pub const fn scopes_for_role(role: RemoteRole) -> &'static [RemoteAccessScope] {
 #[must_use]
 pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [RemoteAccessScope]> {
     match route.path {
-        http_paths::READY | http_paths::WS | http_paths::STREAM | http_paths::SESSION_STREAM => {
-            Some(READ_SCOPES)
-        }
-        http_paths::REMOTE_PAIR_CLAIM
+        http_paths::READY
+        | http_paths::WS
+        | http_paths::STREAM
+        | http_paths::SESSION_STREAM
+        | http_paths::HEADLESS_READINESS
+        | http_paths::REMOTE_PAIR_CLAIM
         | http_paths::REMOTE_PAIR_STATUS
         | http_paths::REMOTE_CLIENT_SELF_REVOKE
         | http_paths::POLICIES_DUMP => Some(READ_SCOPES),

@@ -22,6 +22,16 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: false,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::HEADLESS_READINESS,
+        parity: HttpRouteParity::Exempt {
+            kind: WsExemptionKind::StandingDecision,
+            reason: "standalone CLI preflight probe run before any session or websocket \
+                     connection exists, so it has no interactive RPC context to ride",
+        },
+        swift_client_exposed: false,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::DIAGNOSTICS,
         parity: HttpRouteParity::Rpc {
