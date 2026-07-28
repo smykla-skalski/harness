@@ -3,11 +3,15 @@ fn protocol_package_has_no_harness_runtime_dependency() {
     let manifest = include_str!("../Cargo.toml");
     assert!(!manifest.lines().any(|line| {
         let line = line.trim_start();
+        // harness-kernel sits below harness-protocol in the leaf-crate stack;
+        // every leaf crate, including this one, depends on it. Matched by the
+        // exact manifest key (space then `=`) so a future crate merely
+        // prefixed with "harness-kernel" (e.g. harness-kernel-utils) still
+        // trips this guard.
         line.starts_with("harness =")
-            || line.starts_with("harness-") && line.contains("path =")
-                // harness-kernel sits below harness-protocol in the leaf-crate
-                // stack; every leaf crate, including this one, depends on it.
-                && !line.starts_with("harness-kernel")
+            || (line.starts_with("harness-")
+                && line.contains("path =")
+                && !line.starts_with("harness-kernel ="))
     }));
     assert!(
         !manifest.contains("agent-client-protocol"),
