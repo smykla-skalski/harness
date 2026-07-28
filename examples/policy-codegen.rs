@@ -2378,7 +2378,9 @@ const TIMELINE_SOURCE: &str = include_str!("../crates/harness-protocol/src/timel
 // The session aggregates moved to the session domain; the generator reads
 // files as text, so the summaries module has to keep reading them from there.
 const SESSION_SUMMARIES_SOURCE: &str = include_str!("../src/session/wire/summaries.rs");
-const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../src/hooks/protocol/payloads.rs");
+// AskUserQuestionOption/AskUserQuestionPrompt moved to the protocol crate; payloads.rs now
+// only re-exports them, so the summaries module has to keep reading them from their new file.
+const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../crates/harness-protocol/src/hook_prompts.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
 /// types are foundation-entangled (reference unmigrated daemon-state and
@@ -2895,9 +2897,10 @@ const DAEMON_STATE_SOURCE: &str = include_str!("../src/daemon/state/mod.rs");
 const DAEMON_LAUNCHD_SOURCE: &str = include_str!("../src/daemon/launchd/mod.rs");
 const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/DaemonStateWireTypes.generated.swift";
 // The /v1/diagnostics report (DaemonDiagnosticsReport from summaries.rs) and the daemon-state
-// cluster it nests: the manifest tree (state/mod.rs DaemonManifest -> HostBridgeManifest ->
-// HostBridgeCapabilityManifest, plus DaemonBinaryStamp), the workspace diagnostics
-// (DaemonDiagnostics -> DaemonAuditEvent), and the launchd LaunchAgentStatus. health and
+// cluster it nests: the manifest tree (DaemonManifest -> HostBridgeManifest ->
+// HostBridgeCapabilityManifest, plus DaemonBinaryStamp) and the workspace diagnostics
+// (DaemonDiagnostics -> DaemonAuditEvent) moved into the shared protocol crate's daemon.rs
+// (state/mod.rs now only re-exports them), and the launchd LaunchAgentStatus. health and
 // github_api resolve to the already-generated HealthResponseWire/GitHubApiDiagnosticsWire
 // (bare suffixed refs). acp_runtime_probe and DaemonManifest.ownership are dropped via
 // OMITTED_WIRE_FIELDS - the hand DaemonDiagnosticsReport/DaemonManifest never model them.
@@ -3420,8 +3423,13 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output: DAEMON_STATE_OUTPUT,
             description: "the Rust daemon diagnostics report, manifest and launch-agent state",
-            defaults: &[DAEMON_STATE_SOURCE],
-            sources: &[SUMMARIES_SOURCE, DAEMON_STATE_SOURCE, DAEMON_LAUNCHD_SOURCE],
+            defaults: &[DAEMON_STATE_SOURCE, SHARED_DAEMON_SOURCE],
+            sources: &[
+                SUMMARIES_SOURCE,
+                DAEMON_STATE_SOURCE,
+                DAEMON_LAUNCHD_SOURCE,
+                SHARED_DAEMON_SOURCE,
+            ],
         },
         GeneratedModule {
             output: SESSION_SIGNAL_OUTPUT,

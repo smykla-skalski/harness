@@ -31,6 +31,45 @@ public struct DaemonDiagnosticsReportWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct LaunchAgentStatusWire: Codable, Equatable, Sendable {
+  public var installed: Bool
+  public var loaded: Bool
+  public var label: String
+  public var path: String
+  public var domainTarget: String
+  public var serviceTarget: String
+  public var state: String?
+  public var pid: Int32?
+  public var lastExitStatus: Int32?
+  public var statusError: String?
+
+  public init(installed: Bool, loaded: Bool, label: String, path: String, domainTarget: String, serviceTarget: String, state: String? = nil, pid: Int32? = nil, lastExitStatus: Int32? = nil, statusError: String? = nil) {
+    self.installed = installed
+    self.loaded = loaded
+    self.label = label
+    self.path = path
+    self.domainTarget = domainTarget
+    self.serviceTarget = serviceTarget
+    self.state = state
+    self.pid = pid
+    self.lastExitStatus = lastExitStatus
+    self.statusError = statusError
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case installed
+    case loaded
+    case label
+    case path
+    case domainTarget = "domain_target"
+    case serviceTarget = "service_target"
+    case state
+    case pid
+    case lastExitStatus = "last_exit_status"
+    case statusError = "status_error"
+  }
+}
+
 public struct HostBridgeCapabilityManifestWire: Codable, Equatable, Sendable {
   public var enabled: Bool
   public var healthy: Bool
@@ -214,44 +253,5 @@ public struct DaemonDiagnosticsWire: Codable, Equatable, Sendable {
     case databasePath = "database_path"
     case databaseSizeBytes = "database_size_bytes"
     case lastEvent = "last_event"
-  }
-}
-
-public struct LaunchAgentStatusWire: Codable, Equatable, Sendable {
-  public var installed: Bool
-  public var loaded: Bool
-  public var label: String
-  public var path: String
-  public var domainTarget: String
-  public var serviceTarget: String
-  public var state: String?
-  public var pid: Int32?
-  public var lastExitStatus: Int32?
-  public var statusError: String?
-
-  public init(installed: Bool, loaded: Bool, label: String, path: String, domainTarget: String, serviceTarget: String, state: String? = nil, pid: Int32? = nil, lastExitStatus: Int32? = nil, statusError: String? = nil) {
-    self.installed = installed
-    self.loaded = loaded
-    self.label = label
-    self.path = path
-    self.domainTarget = domainTarget
-    self.serviceTarget = serviceTarget
-    self.state = state
-    self.pid = pid
-    self.lastExitStatus = lastExitStatus
-    self.statusError = statusError
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case installed
-    case loaded
-    case label
-    case path
-    case domainTarget = "domain_target"
-    case serviceTarget = "service_target"
-    case state
-    case pid
-    case lastExitStatus = "last_exit_status"
-    case statusError = "status_error"
   }
 }
