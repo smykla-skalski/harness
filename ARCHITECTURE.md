@@ -81,7 +81,8 @@ flowchart LR
 | `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `src/run/`       | retired suite execution; no CLI command reaches it and it is being removed         |
-| `src/observe/`   | live session inspection, doctor diagnostics, classifiers, dump/scan/watch flows, and fix routing for improving skills and suites |
+| `src/observe/`   | live session inspection, doctor diagnostics, dump/scan/watch flows, and fix routing for improving skills and suites |
+| `crates/harness-observe/src/` | session-log issue classification (the classifier), plus its `patterns`/text-redaction helpers |
 | `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |

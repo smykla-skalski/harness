@@ -6,8 +6,10 @@ use super::assert_split_modules_exist;
 #[test]
 fn observe_tool_checks_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let tool_checks_mod =
-        fs::read_to_string(root.join("src/observe/classifier/tool_checks/mod.rs")).unwrap();
+    let tool_checks_mod = fs::read_to_string(
+        root.join("crates/harness-observe/src/classifier/tool_checks/mod.rs"),
+    )
+    .unwrap();
 
     for needle in [
         "fn check_bash_tool_use(",
@@ -19,13 +21,13 @@ fn observe_tool_checks_root_stays_a_facade() {
     ] {
         assert!(
             !tool_checks_mod.contains(needle),
-            "src/observe/classifier/tool_checks/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-observe/src/classifier/tool_checks/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 
     for path in [
-        "src/observe/classifier/tool_checks/bash.rs",
-        "src/observe/classifier/tool_checks/questions.rs",
+        "crates/harness-observe/src/classifier/tool_checks/bash.rs",
+        "crates/harness-observe/src/classifier/tool_checks/questions.rs",
     ] {
         assert!(
             root.join(path).exists(),
@@ -196,7 +198,9 @@ fn infra_process_root_stays_prod_only() {
 #[test]
 fn observe_classifier_tests_stay_split_by_scenario() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let tests_mod = fs::read_to_string(root.join("src/observe/classifier/tests/mod.rs")).unwrap();
+    let tests_mod =
+        fs::read_to_string(root.join("crates/harness-observe/src/classifier/tests/mod.rs"))
+            .unwrap();
 
     for needle in [
         "fn detects_hook_denial(",
@@ -206,26 +210,28 @@ fn observe_classifier_tests_stay_split_by_scenario() {
     ] {
         assert!(
             !tests_mod.contains(needle),
-            "src/observe/classifier/tests/mod.rs should stay a helper facade instead of owning `{needle}`"
+            "crates/harness-observe/src/classifier/tests/mod.rs should stay a helper facade instead of owning `{needle}`"
         );
     }
 
     assert!(
-        !root.join("src/observe/classifier/tests.rs").exists(),
-        "src/observe/classifier/tests.rs should not return as a monolithic test file"
+        !root
+            .join("crates/harness-observe/src/classifier/tests.rs")
+            .exists(),
+        "crates/harness-observe/src/classifier/tests.rs should not return as a monolithic test file"
     );
 
     for path in [
-        "src/observe/classifier/tests/mod.rs",
-        "src/observe/classifier/tests/text_and_line.rs",
-        "src/observe/classifier/tests/tool_use_patterns.rs",
-        "src/observe/classifier/tests/assistant_diagnostics.rs",
-        "src/observe/classifier/tests/tool_guard_patterns.rs",
-        "src/observe/classifier/tests/workflow_rules.rs",
-        "src/observe/classifier/tests/state_and_registry.rs",
-        "src/observe/classifier/tests/query_tracking.rs",
-        "src/observe/classifier/tests/resource_tracking.rs",
-        "src/observe/classifier/tests/verification.rs",
+        "crates/harness-observe/src/classifier/tests/mod.rs",
+        "crates/harness-observe/src/classifier/tests/text_and_line.rs",
+        "crates/harness-observe/src/classifier/tests/tool_use_patterns.rs",
+        "crates/harness-observe/src/classifier/tests/assistant_diagnostics.rs",
+        "crates/harness-observe/src/classifier/tests/tool_guard_patterns.rs",
+        "crates/harness-observe/src/classifier/tests/workflow_rules.rs",
+        "crates/harness-observe/src/classifier/tests/state_and_registry.rs",
+        "crates/harness-observe/src/classifier/tests/query_tracking.rs",
+        "crates/harness-observe/src/classifier/tests/resource_tracking.rs",
+        "crates/harness-observe/src/classifier/tests/verification.rs",
     ] {
         assert!(
             root.join(path).exists(),
@@ -262,7 +268,8 @@ fn observe_patterns_root_stays_prod_only() {
 fn observe_classifier_text_checks_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let text_checks =
-        fs::read_to_string(root.join("src/observe/classifier/text_checks.rs")).unwrap();
+        fs::read_to_string(root.join("crates/harness-observe/src/classifier/text_checks.rs"))
+            .unwrap();
 
     for needle in [
         "fn check_ksa_codes(",
@@ -273,12 +280,12 @@ fn observe_classifier_text_checks_root_stays_prod_only() {
     ] {
         assert!(
             !text_checks.contains(needle),
-            "src/observe/classifier/text_checks.rs should stay focused on non-Bash checks instead of owning `{needle}`"
+            "crates/harness-observe/src/classifier/text_checks.rs should stay focused on non-Bash checks instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/observe/classifier/text_checks/bash.rs")
+        root.join("crates/harness-observe/src/classifier/text_checks/bash.rs")
             .exists(),
         "observe classifier bash text checks split module should exist"
     );
@@ -287,7 +294,8 @@ fn observe_classifier_text_checks_root_stays_prod_only() {
 #[test]
 fn observe_classifier_rules_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let rules = fs::read_to_string(root.join("src/observe/classifier/rules.rs")).unwrap();
+    let rules =
+        fs::read_to_string(root.join("crates/harness-observe/src/classifier/rules.rs")).unwrap();
 
     for needle in [
         "pub(super) static TEXT_RULES:",
@@ -296,12 +304,13 @@ fn observe_classifier_rules_root_stays_prod_only() {
     ] {
         assert!(
             !rules.contains(needle),
-            "src/observe/classifier/rules.rs should stay focused on rule evaluation instead of owning `{needle}`"
+            "crates/harness-observe/src/classifier/rules.rs should stay focused on rule evaluation instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/observe/classifier/rules/data.rs").exists(),
+        root.join("crates/harness-observe/src/classifier/rules/data.rs")
+            .exists(),
         "observe classifier rules data split module should exist"
     );
 }
