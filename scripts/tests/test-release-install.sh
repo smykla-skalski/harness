@@ -781,6 +781,32 @@ scenario_atomic_install_activates_all_binaries() {
   if (( ok )); then pass; fi
 }
 
+scenario_independent_panel_version_is_accepted() {
+  start_test "an independently-versioned harness-panel does not trip the core-version check"
+  local sandbox="$SANDBOX/independent-panel-version" status=0
+  write_fake_release_set "$sandbox/target" 48.0.0
+  # harness-panel versions on its own cadence, so its --version legitimately
+  # differs from the release core version. The installer must accept the
+  # candidate rather than holding the panel to the core version.
+  write_fake_release_binary "$sandbox/target" harness-panel 0.4.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null 2>&1 \
+    || status=$?
+
+  local ok=1
+  if (( status != 0 )); then
+    fail "installer rejected an independently-versioned harness-panel (status $status)"
+    ok=0
+  fi
+  [[ -L "$sandbox/install-root/current" ]] || {
+    fail "candidate was not activated"
+    ok=0
+  }
+  assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
+  assert_contains "harness-panel 0.4.0" \
+    "$("$sandbox/bin/harness-panel" --version)" || ok=0
+  if (( ok )); then pass; fi
+}
+
 scenario_successful_installs_prune_inactive_release_sets() {
   start_test "successful installs retain a bounded rollback window"
   local sandbox="$SANDBOX/release-retention"
@@ -1623,6 +1649,7 @@ RELEASE_INSTALL_TEST_SCENARIOS=(
   scenario_overlapping_build_groups_keep_separate_logs
   scenario_pipeline_lock_spans_build_and_install
   scenario_atomic_install_activates_all_binaries
+  scenario_independent_panel_version_is_accepted
   scenario_successful_installs_prune_inactive_release_sets
   scenario_live_worker_release_survives_retention
   scenario_failed_install_keeps_rollback_target
