@@ -1,5 +1,6 @@
 use clap::Args;
 
+use crate::infra::io;
 use harness_kernel::errors::CliError;
 use harness_workspace::command_context::{AppContext, Execute};
 
@@ -34,6 +35,7 @@ pub struct ManagedAgentListArgs {
 
 impl Execute for ManagedAgentListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let url = format!("/v1/sessions/{}/managed-agents", self.session_id);
         let response: ManagedAgentListResponse = super::support::daemon_client()?
             .get(&url, &[])
@@ -51,6 +53,7 @@ pub struct ManagedAgentShowArgs {
 
 impl Execute for ManagedAgentShowArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
         let url = format!("/v1/managed-agents/{}", self.agent_id);
         let snapshot: ManagedAgentSnapshot = super::support::daemon_client()?
             .get(&url, &[])

@@ -28,7 +28,7 @@ pub(super) fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
 pub(super) fn daemon_client() -> Result<DaemonClient, CliError> {
     DaemonClient::try_connect().ok_or_else(|| {
         CliErrorKind::workflow_io(
-            "harness daemon is not running; start the daemon before using managed TUIs",
+            "harness daemon is not running; start the daemon before using managed agents",
         )
         .into()
     })

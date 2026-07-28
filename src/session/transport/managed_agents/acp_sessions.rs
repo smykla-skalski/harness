@@ -5,6 +5,7 @@
 
 use clap::Args;
 
+use crate::infra::io;
 use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
 use harness_kernel::errors::CliError;
 use harness_protocol::managed_agents::acp::AcpSessionListPage;
@@ -24,6 +25,7 @@ pub struct AcpSessionsArgs {
 
 impl Execute for AcpSessionsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.acp_id)?;
         let mut query: Vec<(&str, &str)> = Vec::new();
         if let Some(cwd) = self.cwd.as_deref() {
             query.push(("cwd", cwd));
@@ -50,6 +52,8 @@ pub struct AcpCloseSessionArgs {
 
 impl Execute for AcpCloseSessionArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.acp_id)?;
+        io::validate_safe_segment(&self.agent_session_id)?;
         let url = format!(
             "/v1/managed-agents/{}/sessions/{}/close",
             self.acp_id, self.agent_session_id
@@ -72,6 +76,8 @@ pub struct AcpDeleteSessionArgs {
 
 impl Execute for AcpDeleteSessionArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.acp_id)?;
+        io::validate_safe_segment(&self.agent_session_id)?;
         let url = format!(
             "/v1/managed-agents/{}/sessions/{}",
             self.acp_id, self.agent_session_id

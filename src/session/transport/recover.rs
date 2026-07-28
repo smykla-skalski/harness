@@ -2,6 +2,7 @@ use std::path::Path;
 
 use clap::Args;
 
+use crate::infra::io;
 use crate::session::service;
 use crate::session::wire::ManagedAgentSnapshot;
 use harness_kernel::errors::CliError;
@@ -29,6 +30,7 @@ pub struct SessionRecoverLeaderArgs {
 
 impl Execute for SessionRecoverLeaderArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, Path::new(&local_project))?;

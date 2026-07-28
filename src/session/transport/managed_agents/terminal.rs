@@ -1,5 +1,6 @@
 use clap::{Args, ValueEnum};
 
+use crate::infra::io;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::managed_agents::tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest,
@@ -59,6 +60,7 @@ pub struct ManagedTerminalInputArgs {
 
 impl Execute for ManagedTerminalInputArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
         let request = AgentTuiInputRequest::from_input(self.input()?);
         let url = format!("/v1/managed-agents/{}/input", self.agent_id);
         let snapshot: ManagedAgentSnapshot = daemon_client()?
@@ -114,6 +116,7 @@ pub struct ManagedTerminalResizeArgs {
 
 impl Execute for ManagedTerminalResizeArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
         let request = AgentTuiResizeRequest {
             rows: self.rows,
             cols: self.cols,
@@ -135,6 +138,7 @@ pub struct ManagedTerminalStopArgs {
 
 impl Execute for ManagedTerminalStopArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
         let url = format!("/v1/managed-agents/{}/stop", self.agent_id);
         let snapshot: ManagedAgentSnapshot = daemon_client()?
             .post(&url, &serde_json::json!({}))

@@ -1,5 +1,6 @@
 use clap::Args;
 
+use crate::infra::io;
 use harness_kernel::errors::CliError;
 use harness_protocol::managed_agents::codex::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexSteerRequest,
@@ -20,6 +21,7 @@ pub struct CodexAgentSteerArgs {
 
 impl Execute for CodexAgentSteerArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
         let request = CodexSteerRequest {
             prompt: self.prompt.clone(),
         };
@@ -40,6 +42,7 @@ pub struct CodexAgentInterruptArgs {
 
 impl Execute for CodexAgentInterruptArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
         let url = format!("/v1/managed-agents/{}/interrupt", self.agent_id);
         let snapshot: ManagedAgentSnapshot = daemon_client()?
             .post(&url, &serde_json::json!({}))
@@ -62,6 +65,8 @@ pub struct CodexAgentApprovalArgs {
 
 impl Execute for CodexAgentApprovalArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.agent_id)?;
+        io::validate_safe_segment(&self.approval_id)?;
         let request = CodexApprovalDecisionRequest {
             decision: self.decision,
         };

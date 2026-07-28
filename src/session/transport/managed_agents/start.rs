@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use clap::{Args, Subcommand};
 
+use crate::infra::io;
 use crate::session::types::SessionRole;
 use crate::session::wire::ManagedAgentSnapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -192,6 +193,7 @@ pub struct AcpAgentStartArgs {
 
 impl Execute for AcpAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let endpoint = self
             .endpoint
             .as_deref()
@@ -299,6 +301,7 @@ pub struct AcpLogoutArgs {
 
 impl Execute for AcpLogoutArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.acp_id)?;
         let url = format!("/v1/managed-agents/{}/logout", self.acp_id);
         let response: serde_json::Value = daemon_client()?
             .post(&url, &serde_json::json!({}))
@@ -363,6 +366,7 @@ pub struct TerminalAgentStartArgs {
 
 impl Execute for TerminalAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let request = AgentTuiStartRequest {
             runtime: agent_to_str(self.runtime).to_string(),
             role: self.role,
@@ -438,6 +442,7 @@ pub struct CodexAgentStartArgs {
 
 impl Execute for CodexAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let request = CodexRunRequest {
             actor: None,
             prompt: self.prompt.clone(),
