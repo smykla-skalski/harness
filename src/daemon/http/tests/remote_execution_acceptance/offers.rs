@@ -47,13 +47,13 @@ const REPOSITORY_CASES: [RepositoryCase; 5] = [
     },
     RepositoryCase {
         name: "pr-fix-implementation-cycle-1",
-        workflow: TaskBoardWorkflowKind::PrFix,
+        workflow: TaskBoardWorkflowKind::PR_FIX,
         phase: TaskBoardExecutionPhase::Implementation,
         source: RepositorySource::Branch,
     },
     RepositoryCase {
         name: "pr-review-review",
-        workflow: TaskBoardWorkflowKind::PrReview,
+        workflow: TaskBoardWorkflowKind::PR_REVIEW,
         phase: TaskBoardExecutionPhase::Review,
         source: RepositorySource::Branch,
     },
@@ -225,7 +225,7 @@ fn execution_record(
 ) -> TaskBoardWorkflowExecutionRecord {
     let pull_request = matches!(
         case.workflow,
-        TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
+        TaskBoardWorkflowKind::PR_FIX | TaskBoardWorkflowKind::PR_REVIEW
     )
     .then(|| TaskBoardPullRequestIdentity {
         repository: REPOSITORY.into(),

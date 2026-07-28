@@ -215,8 +215,8 @@ async fn wrong_base_or_head_is_rejected_before_assignment_or_target_mutation() {
 async fn frozen_pull_request_head_binds_fork_repository_branch_ref_and_revision() {
     let fixture = controller_fixture(1).await;
     let mut parent = fixture.execution.clone();
-    parent.snapshot.workflow_kind = TaskBoardWorkflowKind::PrReview;
-    parent.transition.workflow_kind = TaskBoardWorkflowKind::PrReview;
+    parent.snapshot.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
+    parent.transition.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
     parent.transition.pull_request = Some(TaskBoardPullRequestIdentity {
         repository: REPOSITORY.into(),
         number: 17,
@@ -227,7 +227,7 @@ async fn frozen_pull_request_head_binds_fork_repository_branch_ref_and_revision(
         }),
     });
     let mut request = fixture.request.clone();
-    request.binding.workflow_kind = TaskBoardWorkflowKind::PrReview;
+    request.binding.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
     // The binding repository tracks the fork source the offer freezes.
     request.binding.repository = "contributor/harness".into();
     request.source =

@@ -9,7 +9,7 @@ use super::*;
 fn only_write_workflow_kinds_support_planning_approval() {
     for workflow_kind in [
         TaskBoardWorkflowKind::DefaultTask,
-        TaskBoardWorkflowKind::PrFix,
+        TaskBoardWorkflowKind::PR_FIX,
     ] {
         let mut snapshot = snapshot();
         snapshot.workflow_kind = workflow_kind;
@@ -22,7 +22,7 @@ fn only_write_workflow_kinds_support_planning_approval() {
     let default_plan = plan(&default_snapshot);
     let default_binding = binding(&default_plan, &default_snapshot);
     for workflow_kind in [
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         TaskBoardWorkflowKind::Review,
         TaskBoardWorkflowKind::Unknown,
     ] {
@@ -115,7 +115,7 @@ fn planning_result_rejects_cross_execution_workflow_and_repository_rebinding() {
     );
 
     let mut changed = snapshot.clone();
-    changed.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    changed.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     assert_eq!(
         validate_planning_result(&plan, &changed, "execution-1"),
         Err(TaskBoardPlanningResultError::InvalidPlanHash)

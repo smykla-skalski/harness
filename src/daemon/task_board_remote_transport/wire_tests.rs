@@ -58,7 +58,7 @@ fn sealed_offer_digest_binds_complete_attempt_and_repository_evidence() {
         binding.base_revision = "3333333333333333333333333333333333333333".into()
     }));
     let mut workflow_kind_changed = with_binding(&request, |binding| {
-        binding.workflow_kind = TaskBoardWorkflowKind::PrFix;
+        binding.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     });
     workflow_kind_changed.source = RemoteSourceMaterial::repository_branch(
         &request.binding.repository,

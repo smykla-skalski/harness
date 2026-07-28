@@ -99,7 +99,7 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
 
 fn fork_offer(assignment_id: &str, idempotency_key: &str) -> RemoteOfferRequest {
     let mut request = detached_offer(assignment_id, idempotency_key);
-    request.binding.workflow_kind = TaskBoardWorkflowKind::PrReview;
+    request.binding.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
     // The binding repository tracks the fork source the checkout is frozen against.
     request.binding.repository = FORK_REPOSITORY.into();
     request.source =

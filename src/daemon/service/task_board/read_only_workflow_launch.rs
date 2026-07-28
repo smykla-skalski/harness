@@ -163,7 +163,7 @@ async fn resolve_exact_head(
     item: &TaskBoardItem,
     worktree: &str,
 ) -> Result<(Option<TaskBoardPullRequestIdentity>, String), CliError> {
-    if item.workflow_kind == TaskBoardWorkflowKind::PrReview {
+    if item.workflow_kind.is_read_only_review() {
         let identity = resolve_task_board_pull_request_identity(item)
             .map_err(|error| invalid_transition(error.to_string()))?;
         let head = resolve_pr_review_head(&identity).await?;
@@ -226,10 +226,7 @@ fn required_head(head: &str) -> Result<String, CliError> {
 }
 
 const fn is_read_only_workflow(kind: TaskBoardWorkflowKind) -> bool {
-    matches!(
-        kind,
-        TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
-    )
+    matches!(kind, TaskBoardWorkflowKind::Review) || kind.is_read_only_review()
 }
 
 fn invalid_transition(detail: impl Into<String>) -> CliError {

@@ -329,7 +329,7 @@ fn every_provenance_drift_has_one_specific_invalidation() {
     );
 
     let mut changed = snapshot.clone();
-    changed.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    changed.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     assert_eq!(
         invalidations(&binding, &plan, &changed, "execution-1"),
         [TaskBoardPlanApprovalInvalidation::WorkflowChanged]
@@ -409,8 +409,8 @@ fn all_invalidations_use_fixed_domain_order() {
     let snapshot = snapshot();
     let plan = plan(&snapshot);
     let binding = binding(&plan, &snapshot);
-    let mut changed_snapshot = snapshot;
-    changed_snapshot.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    let mut changed_snapshot = snapshot.clone();
+    changed_snapshot.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     changed_snapshot.execution_repository = Some("sample/other".into());
     changed_snapshot.item_revision += 1;
     changed_snapshot.configuration_revision += 1;

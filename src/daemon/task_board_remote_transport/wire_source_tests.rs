@@ -24,7 +24,7 @@ fn same_repository_initial_source_is_exact_revision_and_digest_bound() {
 #[test]
 fn pr_fix_initial_source_binds_fork_branch_and_canonical_ref() {
     let mut request = offer_request();
-    request.binding.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    request.binding.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     request.binding.repository = "contributor/repo".into();
     request.source = RemoteSourceMaterial::repository_branch(
         "contributor/repo",
@@ -113,7 +113,7 @@ fn repository_source_rejects_noncanonical_git_revisions_and_refs() {
         "@",
     ] {
         let mut request = offer_request();
-        request.binding.workflow_kind = TaskBoardWorkflowKind::PrFix;
+        request.binding.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
         request.source = RemoteSourceMaterial::repository_branch(
             "contributor/repo",
             branch,

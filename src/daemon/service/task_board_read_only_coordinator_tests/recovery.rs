@@ -301,7 +301,7 @@ async fn running_report_uses_frozen_context_until_settlement_rechecks_revision()
 async fn completed_review_head_drift_before_ingestion_requires_human_without_evidence() {
     for (label, workflow_kind) in [
         ("local-head-drift", TaskBoardWorkflowKind::Review),
-        ("provider-head-drift", TaskBoardWorkflowKind::PrReview),
+        ("provider-head-drift", TaskBoardWorkflowKind::PR_REVIEW),
     ] {
         let fixture =
             seed_execution(label, workflow_kind, TaskBoardExecutionState::Pending, None).await;

@@ -3,7 +3,7 @@ use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use sha2::{Digest, Sha256};
@@ -100,10 +100,7 @@ async fn refuse_unusable_execution(
         .await?;
         return Ok(true);
     }
-    if matches!(
-        execution.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    ) && let Err(error) = requests::write_task_id(execution)
+    if execution.snapshot.workflow_kind.is_write() && let Err(error) = requests::write_task_id(execution)
     {
         require_human(
             db,
@@ -250,10 +247,7 @@ fn next_action_key(execution: &TaskBoardWorkflowExecutionRecord) -> Result<Strin
                 .ok_or_else(|| invalid_transition("review phase has no remaining reviewer action"))
         }
         Some(TaskBoardExecutionPhase::Evaluate) => {
-            if matches!(
-                execution.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-            ) {
+            if execution.snapshot.workflow_kind.is_write() {
                 Ok(format!(
                     "evaluate:{}",
                     execution.artifacts.current_revision_cycle

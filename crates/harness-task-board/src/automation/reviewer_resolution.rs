@@ -349,10 +349,14 @@ const fn orchestrator_workflow(
 ) -> Result<TaskBoardOrchestratorWorkflow, TaskBoardReviewerResolutionError> {
     match workflow_kind {
         TaskBoardWorkflowKind::DefaultTask => Ok(TaskBoardOrchestratorWorkflow::DefaultTask),
-        TaskBoardWorkflowKind::PrFix => Ok(TaskBoardOrchestratorWorkflow::PrFix),
-        TaskBoardWorkflowKind::PrReview => Ok(TaskBoardOrchestratorWorkflow::PrReview),
         TaskBoardWorkflowKind::Review => Ok(TaskBoardOrchestratorWorkflow::Review),
         TaskBoardWorkflowKind::Unknown => Err(TaskBoardReviewerResolutionError::UnknownWorkflow),
+        // A dependency update, alone or alongside a review request, runs the
+        // write fix workflow; a pure review request runs the read-only review.
+        TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrFixReview => {
+            Ok(TaskBoardOrchestratorWorkflow::PrFix)
+        }
+        TaskBoardWorkflowKind::PrReview => Ok(TaskBoardOrchestratorWorkflow::PrReview),
     }
 }
 

@@ -116,7 +116,7 @@ pub(super) async fn create_execution(
 ) -> TaskBoardWorkflowExecutionRecord {
     let snapshot = seed_snapshot(db, item_id, workflow_kind, reviewers).await;
     let pull_request =
-        (workflow_kind == TaskBoardWorkflowKind::PrReview).then(|| TaskBoardPullRequestIdentity {
+        (workflow_kind == TaskBoardWorkflowKind::PR_REVIEW).then(|| TaskBoardPullRequestIdentity {
             repository: "example/compass".into(),
             number: 17,
             head: None,

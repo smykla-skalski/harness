@@ -305,10 +305,12 @@ fn configured_repository<'a>(
 const fn workflow_setting(kind: TaskBoardWorkflowKind) -> Option<TaskBoardOrchestratorWorkflow> {
     match kind {
         TaskBoardWorkflowKind::DefaultTask => Some(TaskBoardOrchestratorWorkflow::DefaultTask),
-        TaskBoardWorkflowKind::PrFix => Some(TaskBoardOrchestratorWorkflow::PrFix),
-        TaskBoardWorkflowKind::PrReview => Some(TaskBoardOrchestratorWorkflow::PrReview),
         TaskBoardWorkflowKind::Review => Some(TaskBoardOrchestratorWorkflow::Review),
         TaskBoardWorkflowKind::Unknown => None,
+        TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrFixReview => {
+            Some(TaskBoardOrchestratorWorkflow::PrFix)
+        }
+        TaskBoardWorkflowKind::PrReview => Some(TaskBoardOrchestratorWorkflow::PrReview),
     }
 }
 

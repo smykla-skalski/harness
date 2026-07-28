@@ -33111,11 +33111,13 @@
       },
       "TaskBoardWorkflowKind": {
         "type": "string",
+        "description": "The workflow routing kind for a ticket. The three `Pr*` variants record\nwhich pull request intents put the ticket on the board.",
         "enum": [
           "unknown",
           "default_task",
           "pr_fix",
           "pr_review",
+          "pr_fix_review",
           "review"
         ]
       },

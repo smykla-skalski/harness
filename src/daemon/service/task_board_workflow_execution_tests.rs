@@ -193,7 +193,7 @@ async fn completed_attempt_replay_survives_phase_advance_but_conflict_fails() {
     let record = create_execution(
         &test.db,
         "task-replay",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
     )
@@ -268,7 +268,7 @@ async fn attempt_create_and_cas_are_fenced_by_durable_parent_phase() {
     let record = create_execution(
         &test.db,
         "task-phase-fence",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
     )

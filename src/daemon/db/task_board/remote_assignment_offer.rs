@@ -32,7 +32,7 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionState, TaskBoardOrchestratorSettings,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     remote_capability_for_phase, validate_task_board_attempt_update,
     validate_task_board_execution_target_update, validate_task_board_workflow_execution,
 };
@@ -394,7 +394,7 @@ fn implementation_base(parent: &TaskBoardWorkflowExecutionRecord) -> Option<&str
             .find(|review| review.revision_cycle == cycle - 1)
             .map(|review| review.head_revision.as_str());
     }
-    if parent.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+    if parent.snapshot.workflow_kind.has_dependency_update_intent() {
         return parent
             .transition
             .pull_request
@@ -463,10 +463,7 @@ async fn ensure_live_execution(
     transaction: &mut Transaction<'_, Sqlite>,
     parent: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
-    if matches!(
-        parent.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    ) {
+    if parent.snapshot.workflow_kind.is_write() {
         let settings_json = query_scalar::<_, String>(
             "SELECT settings_json FROM task_board_orchestrator_settings WHERE singleton = 1",
         )

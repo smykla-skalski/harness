@@ -21,7 +21,7 @@ async fn reviewer_outcome_rejects_stale_head_and_preserves_exact_pr_head() {
     let record = create_execution(
         &test.db,
         "task-pr-head",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
     )
@@ -54,7 +54,7 @@ async fn reviewer_outcome_rejects_stale_head_and_preserves_exact_pr_head() {
 async fn read_only_changes_required_requires_human_without_changing_head() {
     for workflow_kind in [
         TaskBoardWorkflowKind::Review,
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
     ] {
         let test = TestDatabase::open().await;
         let record = create_execution(
@@ -176,7 +176,7 @@ async fn pr_review_publish_and_cleanup_require_evidence_then_finish_idempotently
     let record = create_execution(
         &test.db,
         "task-terminal",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
     )

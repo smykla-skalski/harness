@@ -1,6 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowRevisionGuard, validate_plan_approval,
 };
 use harness_kernel::errors::CliError;
@@ -42,10 +42,7 @@ pub(super) async fn invalidate_revisions(
     now: &str,
 ) -> Result<(), CliError> {
     let mut updated = execution.clone();
-    if matches!(
-        execution.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    ) {
+    if execution.snapshot.workflow_kind.is_write() {
         let mut current_snapshot = execution.snapshot.clone();
         current_snapshot.item_revision = revisions.item_revision;
         current_snapshot.configuration_revision = revisions.configuration_revision;

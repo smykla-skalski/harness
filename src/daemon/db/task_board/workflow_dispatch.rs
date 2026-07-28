@@ -224,11 +224,11 @@ fn validate_write_launch(
     let execution_repository = task_board_read_only_execution_repository(item)
         .map_err(|error| db_error(error.to_string()))?;
     let pull_request = match item.workflow_kind {
-        TaskBoardWorkflowKind::PrFix => Some(
+        TaskBoardWorkflowKind::DefaultTask => None,
+        kind if kind.has_dependency_update_intent() => Some(
             resolve_task_board_pull_request_identity(item)
                 .map_err(|error| db_error(error.to_string()))?,
         ),
-        TaskBoardWorkflowKind::DefaultTask => None,
         _ => return Err(db_error("dispatch is not a write workflow")),
     };
     let PlanApprovalGate::Approved {
@@ -310,11 +310,11 @@ fn validate_launch(
         .checked_add(1)
         .ok_or_else(|| db_error("workflow item revision is out of range"))?;
     let pull_request = match item.workflow_kind {
-        TaskBoardWorkflowKind::PrReview => Some(
+        TaskBoardWorkflowKind::Review => None,
+        kind if kind.is_read_only_review() => Some(
             resolve_task_board_pull_request_identity(item)
                 .map_err(|error| db_error(error.to_string()))?,
         ),
-        TaskBoardWorkflowKind::Review => None,
         _ => return Err(db_error("dispatch is not a read-only workflow")),
     };
     if item.workflow_kind != launch.workflow_kind

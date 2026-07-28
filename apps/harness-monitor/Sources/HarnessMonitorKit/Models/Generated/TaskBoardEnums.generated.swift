@@ -4,38 +4,6 @@
 
 import Foundation
 
-public enum TaskBoardWorkflowKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
-  case defaultTask
-  case prFix
-  case prReview
-  case review
-  case unknown(String)
-
-  public static let allCases: [Self] = [.defaultTask, .prFix, .prReview, .review]
-
-  public var rawValue: String {
-    switch self {
-    case .defaultTask: "default_task"
-    case .prFix: "pr_fix"
-    case .prReview: "pr_review"
-    case .review: "review"
-    case .unknown(let raw): raw
-    }
-  }
-
-  public init(rawValue: String) {
-    switch rawValue {
-    case "default_task": self = .defaultTask
-    case "pr_fix": self = .prFix
-    case "pr_review": self = .prReview
-    case "review": self = .review
-    default: self = .unknown(rawValue)
-    }
-  }
-
-  public var id: String { rawValue }
-}
-
 public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case inbox
   case todo
@@ -135,6 +103,41 @@ public enum TaskBoardAgentMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
     case "interactive": self = .interactive
     case "planning": self = .planning
     case "evaluate": self = .evaluate
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+
+public enum TaskBoardWorkflowKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case defaultTask
+  case prFix
+  case prReview
+  case prFixReview
+  case review
+  case unknown(String)
+
+  public static let allCases: [Self] = [.defaultTask, .prFix, .prReview, .prFixReview, .review]
+
+  public var rawValue: String {
+    switch self {
+    case .defaultTask: "default_task"
+    case .prFix: "pr_fix"
+    case .prReview: "pr_review"
+    case .prFixReview: "pr_fix_review"
+    case .review: "review"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "default_task": self = .defaultTask
+    case "pr_fix": self = .prFix
+    case "pr_review": self = .prReview
+    case "pr_fix_review": self = .prFixReview
+    case "review": self = .review
     default: self = .unknown(rawValue)
     }
   }

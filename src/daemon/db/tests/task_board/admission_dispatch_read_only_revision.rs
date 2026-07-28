@@ -76,7 +76,7 @@ async fn read_only_publication_rebuilds_context_from_transaction_owned_item() {
 async fn read_only_publication_rejects_forged_workflow_identity() {
     let (db, _, preparation, mut launch) =
         reserved_read_only("forged-workflow-identity", false).await;
-    launch.workflow_kind = TaskBoardWorkflowKind::PrReview;
+    launch.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
 
     let error = db
         .complete_task_board_dispatch_preparation_with_workflow(

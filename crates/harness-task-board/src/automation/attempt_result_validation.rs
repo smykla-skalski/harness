@@ -1,7 +1,7 @@
 use crate::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardLocalAttemptResult,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowExecutionRecord,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,10 +72,7 @@ pub fn task_board_local_attempt_result_expectation<'a>(
             }
         }
         Some(TaskBoardExecutionPhase::Evaluate) => {
-            let write = matches!(
-                execution.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-            );
+            let write = execution.snapshot.workflow_kind.is_write();
             TaskBoardAttemptResultArtifactExpectation::Evaluation {
                 exact_head_revision: head,
                 head_revision: write.then_some(head),

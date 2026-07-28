@@ -258,7 +258,7 @@ async fn malformed_json_and_missing_exact_head_fail_closed() {
     let pr = create_execution(
         &test.db,
         "task-headless-pr",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-indigo"),
     )
@@ -287,7 +287,7 @@ async fn same_phase_cas_cannot_replace_pr_identity_or_exact_head() {
     let record = create_execution(
         &test.db,
         "task-frozen-pr",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
     )
@@ -325,7 +325,7 @@ async fn review_attempt_result_rejects_a_stale_exact_head() {
     let record = create_execution(
         &test.db,
         "task-review-attempt",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
     )
@@ -383,7 +383,7 @@ async fn ready_queue_is_due_bounded_and_deterministic() {
     let second = create_execution(
         &test.db,
         "task-b",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-b"),
     )

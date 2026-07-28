@@ -55,12 +55,12 @@ fn write_launch_requires_kind_specific_publication_automations() {
         .is_err()
     );
     assert!(
-        validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix)
+        validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PR_FIX)
             .is_err()
     );
 
     config.enabled_automations.enabled = vec![GitHubAutomation::CreateBranch];
-    validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix)
+    validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PR_FIX)
         .expect("PrFix CreateBranch admission");
     assert!(
         validate_publication_automations(

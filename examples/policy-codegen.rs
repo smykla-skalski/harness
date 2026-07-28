@@ -2618,6 +2618,8 @@ const SESSION_TASKS_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/session_types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/task_board/wire/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../crates/harness-task-board/src/types.rs");
+const TASK_BOARD_ITEM_INTENT_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/item_intent.rs");
 const TASK_BOARD_ITEM_FIELDS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/item_fields.rs");
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../crates/harness-task-board/src/lane.rs");
@@ -3310,7 +3312,11 @@ fn modules() -> Vec<GeneratedModule> {
             output: TASK_BOARD_ENUMS_OUTPUT,
             description: "the Rust task-board status, priority, agent-mode and workflow-kind enums",
             defaults: &[],
-            sources: &[TASK_BOARD_TYPES_SOURCE, TASK_BOARD_WORKFLOW_SOURCE],
+            sources: &[
+                TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_ITEM_INTENT_SOURCE,
+                TASK_BOARD_WORKFLOW_SOURCE,
+            ],
         },
         GeneratedModule {
             output: TASK_BOARD_SUMMARY_OUTPUT,
@@ -3330,6 +3336,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[
                 TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_ITEM_INTENT_SOURCE,
                 TASK_BOARD_ITEM_FIELDS_SOURCE,
                 TASK_BOARD_LANE_SOURCE,
                 TASK_BOARD_PROTOCOL_SOURCE,

@@ -69,7 +69,7 @@ async fn local_review_completes_evaluation_cleanup_and_atomic_projection() {
 async fn pr_review_completes_exact_head_publish_and_cleanup() {
     let fixture = seed_execution(
         "pr-lifecycle",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         TaskBoardExecutionState::Pending,
         None,
     )
@@ -102,7 +102,7 @@ async fn pr_review_completes_exact_head_publish_and_cleanup() {
 async fn stale_pr_head_before_publish_is_fenced_without_publish_claim() {
     let fixture = seed_execution(
         "pr-stale",
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         TaskBoardExecutionState::Pending,
         None,
     )

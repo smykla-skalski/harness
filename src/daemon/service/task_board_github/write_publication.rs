@@ -78,9 +78,11 @@ pub(crate) async fn publish_task_board_write_execution(
     let publication = write_publication_client(db, execution).await?;
     let local = local_head_evidence(execution).await?;
     let (number, mutated) = match execution.snapshot.workflow_kind {
-        TaskBoardWorkflowKind::PrFix => publish_pr_fix(db, execution, &publication, &local).await?,
         TaskBoardWorkflowKind::DefaultTask => {
             publish_default_task(db, execution, &publication, &local).await?
+        }
+        kind if kind.has_dependency_update_intent() => {
+            publish_pr_fix(db, execution, &publication, &local).await?
         }
         _ => {
             return Err(invalid_transition(
@@ -189,7 +191,7 @@ pub(super) async fn publish_pr_fix_branch(
             "PrFix head branch changed before publication",
         ));
     }
-    validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PrFix)?;
+    validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PR_FIX)?;
     let mut policy_item = item.clone();
     policy_item.project_id = Some(head.repository.clone());
     let decision = action_policy(
@@ -351,7 +353,7 @@ fn expected_publication_target(
     number: u64,
     observed_head: &str,
 ) -> Result<TaskBoardPullRequestIdentity, CliError> {
-    if execution.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+    if execution.snapshot.workflow_kind.has_dependency_update_intent() {
         return execution
             .transition
             .pull_request
@@ -399,10 +401,7 @@ async fn write_publication_client(
 fn validate_write_publication(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
-    if !matches!(
-        execution.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    ) {
+    if !execution.snapshot.workflow_kind.is_write() {
         return Err(invalid_transition(
             "write publication requires a DefaultTask or PrFix execution",
         ));
@@ -420,7 +419,7 @@ fn validate_write_publication(
             "write workflow pull request does not match its frozen repository",
         ));
     }
-    if execution.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+    if execution.snapshot.workflow_kind.has_dependency_update_intent() {
         required_frozen_head(
             execution.transition.pull_request.as_ref().ok_or_else(|| {
                 invalid_transition("PrFix publication has no frozen pull request")

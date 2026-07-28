@@ -9,7 +9,7 @@ use crate::task_board::{
     TASK_BOARD_LEGACY_LOCAL_TARGET_IDEMPOTENCY_RESOURCE, TaskBoardAttemptState,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardOrchestratorSettings, TaskBoardWorkflowCasMismatch,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     validate_task_board_attempt_update, validate_task_board_execution_target_claim,
     validate_task_board_legacy_local_target_adoption, validate_task_board_workflow_execution,
 };
@@ -385,10 +385,7 @@ async fn ensure_live_revisions(
     transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     parent: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {
-    if matches!(
-        parent.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    ) {
+    if parent.snapshot.workflow_kind.is_write() {
         let settings_json = sqlx::query_scalar::<_, String>(
             "SELECT settings_json FROM task_board_orchestrator_settings WHERE singleton = 1",
         )

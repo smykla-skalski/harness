@@ -379,10 +379,7 @@ fn approval_binding_is_valid(binding: &TaskBoardPlanApprovalBinding) -> bool {
 }
 
 const fn supports_planning_approval(workflow_kind: TaskBoardWorkflowKind) -> bool {
-    matches!(
-        workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    )
+    workflow_kind.is_write()
 }
 
 fn is_canonical_required(value: &str) -> bool {
@@ -415,13 +412,7 @@ fn append_optional_hash_part(digest: &mut Sha256, value: Option<&str>) {
 }
 
 const fn workflow_kind_tag(workflow_kind: TaskBoardWorkflowKind) -> &'static [u8] {
-    match workflow_kind {
-        TaskBoardWorkflowKind::Unknown => b"unknown",
-        TaskBoardWorkflowKind::DefaultTask => b"default_task",
-        TaskBoardWorkflowKind::PrFix => b"pr_fix",
-        TaskBoardWorkflowKind::PrReview => b"pr_review",
-        TaskBoardWorkflowKind::Review => b"review",
-    }
+    workflow_kind.as_wire_str().as_bytes()
 }
 
 struct PlanHashEvidence<'a> {

@@ -205,7 +205,7 @@ async fn resolve_write_identity(
     pull_request: Option<TaskBoardPullRequestIdentity>,
 ) -> Result<(Option<TaskBoardPullRequestIdentity>, String), CliError> {
     let local_head = super::read_only_workflow_launch::resolve_worktree_head(worktree).await?;
-    if item.workflow_kind != TaskBoardWorkflowKind::PrFix {
+    if !item.workflow_kind.has_dependency_update_intent() {
         return Ok((None, local_head));
     }
     let identity = pull_request
@@ -226,7 +226,8 @@ async fn resolve_write_identity(
 fn requested_pull_request(
     item: &TaskBoardItem,
 ) -> Result<Option<TaskBoardPullRequestIdentity>, CliError> {
-    (item.workflow_kind == TaskBoardWorkflowKind::PrFix)
+    item.workflow_kind
+        .has_dependency_update_intent()
         .then(|| {
             resolve_task_board_pull_request_identity(item)
                 .map_err(|error| invalid_transition(error.to_string()))
