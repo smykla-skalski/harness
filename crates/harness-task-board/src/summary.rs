@@ -1,14 +1,19 @@
 use std::collections::HashMap;
+#[cfg(any(test, feature = "daemon-runtime"))]
 use std::hash::BuildHasher;
 #[cfg(any(test, feature = "test-support"))]
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::dispatch::{DispatchPlan, build_dispatch_plans_with_policy};
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
+use super::dispatch::DispatchPlan;
+#[cfg(any(test, feature = "daemon-runtime"))]
+use super::dispatch::build_dispatch_plans_with_policy;
 #[cfg(any(test, feature = "test-support"))]
 use super::dispatch::{build_dispatch_plans, build_dispatch_plans_with_policy_root};
 use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
+#[cfg(any(test, feature = "daemon-runtime"))]
 use super::policy::PolicyApprovalGrant;
 use super::project::{TaskBoardProject, TaskBoardProjectSource};
 use super::project_color::TaskBoardProjectColor;
@@ -76,6 +81,7 @@ pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
 }
 
 #[must_use]
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub fn build_audit_summary_with_policy<S: BuildHasher>(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
@@ -88,6 +94,7 @@ pub fn build_audit_summary_with_policy<S: BuildHasher>(
     audit_summary(items, &plans)
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn audit_summary(items: &[TaskBoardItem], plans: &[DispatchPlan]) -> TaskBoardAuditSummary {
     TaskBoardAuditSummary {
         total: items.iter().filter(|item| !item.is_deleted()).count(),
@@ -270,6 +277,7 @@ fn is_github_repo(project_id: &str) -> bool {
     )
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
     let statuses = [
         TaskBoardStatus::Inbox,
