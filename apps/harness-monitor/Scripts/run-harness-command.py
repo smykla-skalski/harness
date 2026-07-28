@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import select
 import signal
 import subprocess
 import sys
@@ -15,6 +16,11 @@ from pathlib import Path
 
 PROCESS_POLL_INTERVAL_SECONDS = 0.1
 DEFAULT_CLEANUP_TIMEOUT_SECONDS = 5.0
+# Once the child is reaped, keep draining its already-written output for at most
+# this long. A well-behaved child closes the pipe and we stop on EOF; this only
+# bounds the pathological case where an orphaned grandchild both holds the pipe
+# open and keeps writing to it.
+STOP_DRAIN_GRACE_SECONDS = 1.0
 
 
 def parse_statuses(raw: str) -> frozenset[int]:
@@ -55,7 +61,11 @@ def wait_for_path_cleanup(path: Path, timeout_seconds: float) -> bool:
     return not path.exists()
 
 
-def pump_output(process: subprocess.Popen[bytes], log_file: object) -> threading.Thread:
+def pump_output(
+    process: subprocess.Popen[bytes],
+    log_file: object,
+    stop_reading: threading.Event,
+) -> threading.Thread:
     stdout_open = True
 
     def copy_output() -> None:
@@ -63,19 +73,37 @@ def pump_output(process: subprocess.Popen[bytes], log_file: object) -> threading
 
         assert process.stdout is not None
         stdout_fd = process.stdout.fileno()
+        # A blocking os.read never returns EOF while any process holds the write
+        # end open. When the child exits but leaves an orphaned grandchild that
+        # inherited this pipe, that read (and pump.join below) would wedge
+        # forever. select lets us notice stop_reading once the child is reaped
+        # and stop instead of waiting for an EOF that never comes. When stopping
+        # we poll non-blocking and only quit on an empty buffer, so everything
+        # the reaped child wrote is drained first even if it landed late.
+        drain_deadline: float | None = None
         while True:
-            try:
-                chunk = os.read(stdout_fd, 8192)
-            except InterruptedError:
-                continue
-            if not chunk:
-                break
-            if stdout_open:
+            if stop_reading.is_set() and drain_deadline is None:
+                drain_deadline = time.monotonic() + STOP_DRAIN_GRACE_SECONDS
+            poll_timeout = 0.0 if drain_deadline is not None else PROCESS_POLL_INTERVAL_SECONDS
+            ready, _, _ = select.select([stdout_fd], [], [], poll_timeout)
+            if ready:
                 try:
-                    os.write(sys.stdout.fileno(), chunk)
-                except BrokenPipeError:
-                    stdout_open = False
-            log_file.write(chunk)
+                    chunk = os.read(stdout_fd, 8192)
+                except InterruptedError:
+                    continue
+                if not chunk:
+                    break
+                if stdout_open:
+                    try:
+                        os.write(sys.stdout.fileno(), chunk)
+                    except BrokenPipeError:
+                        stdout_open = False
+                log_file.write(chunk)
+                if drain_deadline is not None and time.monotonic() >= drain_deadline:
+                    break
+                continue
+            if drain_deadline is not None:
+                break
         process.stdout.close()
 
     thread = threading.Thread(target=copy_output, name="monitor-harness-command-log-pump")
@@ -126,6 +154,7 @@ def supervise(
     child_new_session: bool,
 ) -> int:
     interrupted = threading.Event()
+    stop_reading = threading.Event()
     process_ref: list[subprocess.Popen[bytes] | None] = [None]
     pending_signals: list[int] = []
     install_signal_handlers(
@@ -153,10 +182,14 @@ def supervise(
             except ProcessLookupError:
                 break
 
-        pump = pump_output(process, log_file)
+        pump = pump_output(process, log_file, stop_reading)
         try:
             status = exit_status(wait_for_process_exit(process))
         finally:
+            # The child has been reaped (or we are unwinding on error). Release
+            # the pump so it can drain and exit instead of blocking on a pipe an
+            # orphaned grandchild might still hold open.
+            stop_reading.set()
             pump.join()
 
     if interrupted.is_set():
