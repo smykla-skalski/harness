@@ -116,7 +116,8 @@ fn session_list_shows_session_id() {
     let mut daemon = spawn_daemon_serve(&home, &xdg);
     wait_for_daemon_ready(&home, &xdg);
     // branch_ref is returned directly from the session start response and also
-    // forwarded by src/session/service/conversions.rs into CLI list/status output.
+    // forwarded by crates/harness-session/src/service/conversions.rs into CLI
+    // list/status output.
     let state = start_session_via_http(&home, &xdg, &project, LIST_SESSION_ID);
     assert_eq!(
         state.branch_ref,

@@ -5,11 +5,11 @@ use harness_protocol::agent::HookAgent;
 use harness_protocol::managed_agents::codex::CodexRunMode;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::types::SessionRole;
-
-use super::super::start::{
+use harness::session::transport::{
     AcpAgentStartArgs, AcpInspectArgs, AcpLogoutArgs, CodexAgentStartArgs, TerminalAgentStartArgs,
 };
+use harness::session::types::SessionRole;
+
 use super::support::{
     acp_snapshot_json, codex_snapshot_json, ok_response_json, run_against_fake_daemon,
     terminal_snapshot_json,

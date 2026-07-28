@@ -5,9 +5,9 @@
 
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::service;
-use crate::session::transport::SessionAdoptArgs;
-use crate::session::wire::SessionMutationResponse;
+use harness::session::service;
+use harness::session::transport::SessionAdoptArgs;
+use harness::session::wire::SessionMutationResponse;
 
 use super::support::run_against_fake_daemon;
 

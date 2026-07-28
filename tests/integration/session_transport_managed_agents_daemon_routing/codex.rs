@@ -5,7 +5,10 @@
 use harness_protocol::managed_agents::codex::CodexApprovalDecision;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::super::codex::{CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentSteerArgs};
+use harness::session::transport::{
+    CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentSteerArgs,
+};
+
 use super::support::{codex_snapshot_json, run_against_fake_daemon};
 
 #[test]

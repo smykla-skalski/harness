@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-use crate::infra::io::{read_text, validate_safe_segment};
-use crate::session::service::{self, ImproverApplyOutcome, ImproverTarget};
-use crate::session::wire::ImproverApplyRequest;
-use crate::workspace::utc_now;
+use harness_kernel::io::{read_text, validate_safe_segment};
+use crate::service::{self, ImproverApplyOutcome, ImproverTarget};
+use crate::wire::ImproverApplyRequest;
+use harness_workspace::workspace::utc_now;
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::{AppContext, Execute};

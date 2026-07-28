@@ -8,6 +8,86 @@ use serde_json::Value;
 pub mod http_paths {
     /// Authenticated daemon websocket endpoint.
     pub const WS: &str = "/v1/ws";
+    /// Headless execution readiness check, mirroring
+    /// `src/daemon/protocol/api_contract/http_paths.rs`'s own copy the same
+    /// way `WS` above already does.
+    pub const HEADLESS_READINESS: &str = "/v1/headless/readiness";
+}
+
+/// Daemon HTTP/WS wire-protocol version, mirroring
+/// `src/daemon/protocol/summaries.rs`'s own copy the same way `WS` above
+/// mirrors that file's `http_paths`: `harness-session::transport` needs it
+/// for the headless-readiness request without depending back on the root
+/// crate. Keep in sync by hand when the root copy's version number changes.
+pub const DAEMON_WIRE_VERSION: u32 = 5;
+
+/// Wire request for a headless execution readiness check.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessRequest {
+    pub client_version: String,
+    pub client_wire_version: u32,
+    pub runtime: String,
+    pub model: String,
+    #[serde(default)]
+    pub lane: Option<String>,
+}
+
+/// Wire response for a headless execution readiness check.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the wire report preserves each independently actionable readiness result"
+)]
+pub struct HeadlessReadinessReport {
+    pub ready: bool,
+    pub client: HeadlessReadinessPeer,
+    pub daemon: HeadlessReadinessPeer,
+    pub compatible: bool,
+    pub bridge_reachable: bool,
+    pub lanes: Vec<HeadlessReadinessLane>,
+    pub selected_lane: String,
+    pub credential: HeadlessReadinessCredential,
+    pub runtime: HeadlessReadinessRuntime,
+    pub model: HeadlessReadinessModel,
+    pub orchestrator_active: bool,
+    pub unmet_requirements: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessPeer {
+    pub version: String,
+    pub wire_version: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessLane {
+    pub name: String,
+    pub available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessCredential {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configured: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessRuntime {
+    pub requested: String,
+    pub available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessModel {
+    pub requested: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective: Option<String>,
+    pub available: bool,
 }
 
 /// Canonical websocket method names shared with the daemon router.

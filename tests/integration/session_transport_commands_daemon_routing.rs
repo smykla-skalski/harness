@@ -1,21 +1,87 @@
-use std::io::ErrorKind;
-use std::net::TcpListener;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tempfile::tempdir;
 
-use super::*;
-use crate::daemon::client::test_support::{
-    install_fake_running_xdg_daemon, read_http_request, write_http_response,
-};
-use crate::session::service::build_new_session_with_policy;
-use crate::workspace::utc_now;
+use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::session::service::{self, build_new_session_with_policy};
+use harness::session::transport::{SessionObserveArgs, SessionTitleArgs};
+use harness::session::types::SessionState;
+use harness::session::wire::SessionMutationResponse;
+use harness::workspace::utc_now;
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
-use harness_workspace::command_context::AppContext;
+use harness_workspace::command_context::{AppContext, Execute};
+
+// `harness::daemon::client::test_support`'s own `read_http_request`/
+// `write_http_response` stay `#[cfg(test)]`-gated to the root crate's own
+// unit tests; this scenario runs from `tests/integration_daemon.rs` instead,
+// so it carries its own copies, matching every other daemon-fixture test
+// relocated out of `session::transport`.
+fn read_http_request(stream: &mut TcpStream) -> String {
+    stream.set_nonblocking(false).expect("blocking stream");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .expect("read timeout");
+    // The per-read timeout above bounds a single `read()` call; this
+    // deadline bounds the whole request, since completing the body now
+    // takes another read past the one that lands the headers, and a
+    // timed-out individual read (a slow write under load, not a dead
+    // peer) should retry rather than fail the test outright.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut buffer = Vec::new();
+    let mut headers_done = false;
+    let mut content_length = 0_usize;
+    let mut header_end = 0_usize;
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let read = match stream.read(&mut chunk) {
+            Ok(read) => read,
+            Err(error)
+                if matches!(error.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock)
+                    && Instant::now() < deadline =>
+            {
+                continue;
+            }
+            Err(error) => panic!("read request: {error}"),
+        };
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if !headers_done
+            && let Some(pos) = buffer.windows(4).position(|window| window == b"\r\n\r\n")
+        {
+            headers_done = true;
+            header_end = pos + 4;
+            let head = String::from_utf8_lossy(&buffer[..pos]);
+            for line in head.split("\r\n") {
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    content_length = value.trim().parse().unwrap_or(0);
+                }
+            }
+        }
+        if headers_done && buffer.len() >= header_end + content_length {
+            break;
+        }
+    }
+    String::from_utf8(buffer).expect("utf8 request")
+}
+
+fn write_http_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &str) {
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream
+        .write_all(response.as_bytes())
+        .expect("write response");
+    stream.flush().expect("flush response");
+}
 
 #[test]
 fn session_title_execute_updates_active_session_via_daemon_client() {
@@ -64,7 +130,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
                     .lock()
                     .expect("request capture")
                     .push(request.clone());
-                let body = serde_json::to_string(&crate::session::wire::SessionMutationResponse {
+                let body = serde_json::to_string(&SessionMutationResponse {
                     state: build_new_session_with_policy(
                         "daemon title context",
                         "renamed title",
@@ -106,7 +172,7 @@ fn session_title_execute_updates_active_session_via_daemon_client() {
     });
 }
 
-fn session_observe_detail_response(state: &crate::session::types::SessionState) -> String {
+fn session_observe_detail_response(state: &SessionState) -> String {
     json!({
         "session": {
             "project_id": "p",

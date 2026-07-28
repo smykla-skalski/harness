@@ -13,9 +13,9 @@ use std::thread;
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
-use crate::daemon::client::test_support::install_fake_running_xdg_daemon;
-use crate::session::types::AgentStatus;
-use crate::session::wire::ManagedAgentSnapshot;
+use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::session::types::AgentStatus;
+use harness::session::wire::ManagedAgentSnapshot;
 use harness_protocol::managed_agents::acp::AcpAgentSnapshot;
 use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use harness_protocol::managed_agents::tui::{

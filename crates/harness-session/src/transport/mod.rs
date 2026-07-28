@@ -10,15 +10,18 @@ mod session_commands;
 mod signal;
 mod support;
 mod task;
-#[cfg(test)]
-mod task_daemon_routing_tests;
 
 pub use improver::SessionImproverApplyArgs;
+// `Acp*Args` are widened past `managed_agents`'s own re-export so the
+// fake-daemon-backed daemon-routing tests can construct and execute them
+// from `tests/integration/`, now that those tests live outside this crate
+// instead of nested inside `managed_agents` itself.
 pub use managed_agents::{
-    CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentStartArgs, CodexAgentSteerArgs,
-    ManagedAgentAttachArgs, ManagedAgentListArgs, ManagedAgentShowArgs, ManagedTerminalInputArgs,
-    ManagedTerminalResizeArgs, ManagedTerminalStopArgs, SessionAgentStartCommand,
-    SessionAgentsCommand, TerminalAgentStartArgs,
+    AcpAgentStartArgs, AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpInspectArgs, AcpLogoutArgs,
+    AcpSessionsArgs, CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentStartArgs,
+    CodexAgentSteerArgs, ManagedAgentAttachArgs, ManagedAgentListArgs, ManagedAgentShowArgs,
+    ManagedTerminalInputArgs, ManagedTerminalResizeArgs, ManagedTerminalStopArgs,
+    SessionAgentStartCommand, SessionAgentsCommand, TerminalAgentStartArgs,
 };
 pub use recover::SessionRecoverLeaderArgs;
 pub use session_commands::{

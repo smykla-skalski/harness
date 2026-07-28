@@ -3,7 +3,8 @@
 
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::super::acp_sessions::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessionsArgs};
+use harness::session::transport::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessionsArgs};
+
 use super::support::{ok_response_json, run_against_fake_daemon};
 
 #[test]

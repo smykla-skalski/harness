@@ -1,17 +1,15 @@
 use clap::Args;
 
-use crate::infra::io;
 use harness_kernel::errors::CliError;
+use harness_kernel::io;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::daemon_client_error;
-use crate::session::wire::{ManagedAgentListResponse, ManagedAgentSnapshot};
+use crate::transport::support::daemon_client_error;
+use crate::wire::{ManagedAgentListResponse, ManagedAgentSnapshot};
 
 mod acp_sessions;
 mod attach;
 mod codex;
-#[cfg(test)]
-mod daemon_routing_tests;
 mod inspect;
 mod start;
 mod terminal;
@@ -22,7 +20,7 @@ pub use attach::ManagedAgentAttachArgs;
 pub use codex::{CodexAgentApprovalArgs, CodexAgentInterruptArgs, CodexAgentSteerArgs};
 #[allow(unused_imports)]
 pub use start::{
-    AcpAgentCommand, AcpAgentStartArgs, AcpInspectArgs, CodexAgentStartArgs,
+    AcpAgentCommand, AcpAgentStartArgs, AcpInspectArgs, AcpLogoutArgs, CodexAgentStartArgs,
     SessionAgentStartCommand, SessionAgentsCommand, TerminalAgentStartArgs,
 };
 pub use terminal::{ManagedTerminalInputArgs, ManagedTerminalResizeArgs, ManagedTerminalStopArgs};
