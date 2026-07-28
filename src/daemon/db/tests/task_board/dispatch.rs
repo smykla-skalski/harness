@@ -8,7 +8,7 @@ use crate::daemon::db::task_board::write_workflow_fixture::{
 use crate::daemon::db::{AsyncDaemonDb, NewApprovalGrant, ReservedTaskBoardDispatch};
 use crate::task_board::{
     PolicyAction, PolicyReasonCode, SessionIntent, TaskBoardItem, TaskBoardStatus,
-    build_dispatch_plans_with_policy,
+    TaskBoardWorkflowStatus, build_dispatch_plans_with_policy,
 };
 
 #[tokio::test]
@@ -170,6 +170,14 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
     assert_eq!(still_todo.status, TaskBoardStatus::Todo);
     assert!(still_todo.session_id.is_none());
     assert!(still_todo.work_item_id.is_none());
+    // The admit window is no longer a blind spot: the ticket exposes exactly the
+    // execution that owns it while it waits in Todo.
+    assert_eq!(
+        still_todo.workflow.execution_id.as_deref(),
+        Some(preparation.workflow_execution_id.as_str()),
+        "a reserved ticket must expose its owning execution while still in Todo"
+    );
+    assert_eq!(still_todo.workflow.status, TaskBoardWorkflowStatus::Admitting);
 
     let repeated = db
         .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
@@ -182,6 +190,17 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
             ..
         } if repeated_id == &intent_id
     ));
+    // A repeated admission is a visible no-op: the ticket still owns exactly the
+    // first execution rather than a second competing one.
+    let after_repeat = db
+        .task_board_item("task-dispatch-reserved")
+        .await
+        .expect("reload reserved item");
+    assert_eq!(
+        after_repeat.workflow.execution_id.as_deref(),
+        Some(preparation.workflow_execution_id.as_str()),
+        "a repeated admission must not re-stamp a different execution"
+    );
 
     let claim = db
         .claim_task_board_dispatch_preparation(&intent_id)

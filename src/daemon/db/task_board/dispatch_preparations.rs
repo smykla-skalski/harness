@@ -193,11 +193,15 @@ impl AsyncDaemonDb {
         // reserves the intent, so the admit window stops being a blind spot: the
         // ticket exposes exactly one execution and a repeated admission is a
         // visible no-op rather than a second competing run. The ticket stays in
-        // Todo; only its workflow state moves to Admitting. The stamp bumps the
-        // item revision, so freeze that post-stamp revision as the source below.
-        let admitted_item_revision =
-            stamp_admitting_execution_in_tx(&mut transaction, item, item_revision, &workflow_execution_id)
-                .await?;
+        // Todo and at the same revision; only its workflow content moves to
+        // Admitting, so the claim guard and launch bindings are unaffected.
+        stamp_admitting_execution_in_tx(
+            &mut transaction,
+            item,
+            item_revision,
+            &workflow_execution_id,
+        )
+        .await?;
         let preparation = TaskBoardDispatchPreparation {
             board_item_id: plan.board_item_id.clone(),
             session_id,
@@ -207,7 +211,7 @@ impl AsyncDaemonDb {
             project_dir: project_dir.map(ToString::to_string),
             plan: plan.clone(),
             source_item_revision: (!matches!(workflow_kind, TaskBoardWorkflowKind::Unknown))
-                .then_some(admitted_item_revision),
+                .then_some(item_revision),
             hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;

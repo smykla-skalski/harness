@@ -7,9 +7,7 @@ use super::super::admission_lifecycle::{
 use super::super::dispatch_preparation_claim::{
     TaskBoardPreparationUnavailable, classify_unavailable_preparation_in_tx,
 };
-use super::super::items::{bump_change_in_tx, load_item_in_tx};
-use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
-use super::super::ITEMS_CHANGE_SCOPE;
+use super::super::items::{load_item_in_tx, replace_item_in_tx};
 use super::{
     ClaimedTaskBoardDispatchPreparation, PREPARATION_LEASE_SECONDS, ReservedTaskBoardDispatch,
     TaskBoardDispatchPreparation, preparation_revision_error,
@@ -416,30 +414,20 @@ pub(super) fn decode_preparation(payload: &str) -> Result<TaskBoardDispatchPrepa
 }
 
 /// Records the owning execution on the ticket at reservation time and moves its
-/// workflow state to `Admitting`, keeping the item in Todo. Returns the item
-/// revision after the write so the caller can freeze it as the preparation's
-/// source revision (the claim guard compares the two).
+/// workflow state to `Admitting`, keeping the item in Todo. The stamp is written
+/// in place at the same revision so the claim guard and the launch machinery see
+/// the item exactly as reserve froze it; only the workflow content changes, and
+/// completion overwrites it when the dispatch actually starts.
 pub(super) async fn stamp_admitting_execution_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    item: TaskBoardItem,
+    mut item: TaskBoardItem,
     item_revision: i64,
     workflow_execution_id: &str,
-) -> Result<i64, CliError> {
-    let before = item.clone();
-    let mut admitted = item;
-    admitted.workflow.execution_id = Some(workflow_execution_id.to_string());
-    admitted.workflow.status = TaskBoardWorkflowStatus::Admitting;
-    admitted.updated_at = utc_now();
-    let write = replace_with_lane_transition_in_tx(
-        transaction,
-        before,
-        item_revision,
-        admitted,
-        LaneTransitionKind::Generic,
-    )
-    .await?;
-    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-    Ok(write.item_revision)
+) -> Result<(), CliError> {
+    item.workflow.execution_id = Some(workflow_execution_id.to_string());
+    item.workflow.status = TaskBoardWorkflowStatus::Admitting;
+    item.updated_at = utc_now();
+    replace_item_in_tx(transaction, &item, item_revision).await
 }
 
 /// Clears the `Admitting` stamp when a reserved dispatch is retired, so the
@@ -452,7 +440,7 @@ pub(super) async fn clear_admitting_execution_in_tx(
     board_item_id: &str,
     workflow_execution_id: &str,
 ) -> Result<(), CliError> {
-    let Some((item, item_revision)) = load_item_in_tx(transaction, board_item_id).await? else {
+    let Some((mut item, item_revision)) = load_item_in_tx(transaction, board_item_id).await? else {
         return Ok(());
     };
     let owns = item.workflow.execution_id.as_deref() == Some(workflow_execution_id)
@@ -460,19 +448,8 @@ pub(super) async fn clear_admitting_execution_in_tx(
     if !owns {
         return Ok(());
     }
-    let before = item.clone();
-    let mut released = item;
-    released.workflow.execution_id = None;
-    released.workflow.status = TaskBoardWorkflowStatus::Idle;
-    released.updated_at = utc_now();
-    replace_with_lane_transition_in_tx(
-        transaction,
-        before,
-        item_revision,
-        released,
-        LaneTransitionKind::Generic,
-    )
-    .await?;
-    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-    Ok(())
+    item.workflow.execution_id = None;
+    item.workflow.status = TaskBoardWorkflowStatus::Idle;
+    item.updated_at = utc_now();
+    replace_item_in_tx(transaction, &item, item_revision).await
 }
