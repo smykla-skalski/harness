@@ -1,0 +1,49 @@
+[package]
+name = "harness-session"
+version = "54.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+harness-agents = { path = "../harness-agents", version = "54.0.0" }
+harness-infra = { path = "../harness-infra", version = "54.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
+clap = { version = "4.6.0", features = ["derive"] }
+fs-err = "3.3.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tracing = "0.1.44"
+utoipa = "5.5.0"
+
+[dev-dependencies]
+# The session-index test suite fixtures its sessions through
+# `harness::session::service`, which stays in the root crate for now, so
+# this crate's own test binary reaches back into it as a dev-only
+# dependency. Cargo permits a dev-dependency cycle: the root crate's
+# *library* build never needs this crate's test target, only
+# `cargo test -p harness-session` does. Default features only: nothing this
+# crate's tests call needs `daemon-runtime` or its heavier optional deps.
+harness = { path = "../..", version = "54.0.0", default-features = false }
+harness-testkit = { path = "../../testkit" }
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "3.27.0"
+
+# Matches the root crate's lint set rather than the lighter one the facade
+# crates carry, for the same reason harness-kernel, harness-workspace,
+# harness-infra, and harness-agents do: a crate extracted from src/ keeps
+# the rules its sources were written under.
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

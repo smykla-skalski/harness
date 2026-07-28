@@ -1,10 +1,13 @@
-use std::cmp::Reverse;
-
 use super::{
-    AgentRegistration, CliError, CliErrorKind, DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS, Path,
-    PendingLeaderTransfer, SessionRole, SessionState, SessionStatus, SessionTransition, env,
-    refresh_session, require_active_target_agent, storage,
+    CliError, CliErrorKind, DEFAULT_LEADER_UNRESPONSIVE_TIMEOUT_SECONDS, Path,
+    PendingLeaderTransfer, SessionState, SessionTransition, env, refresh_session,
+    require_active_target_agent, storage,
 };
+// Leader auto-promotion/degradation lives in `harness-session` now, beside
+// the session index that also needs it on every read; re-exported so every
+// existing `super::{promote_or_degrade, ...}` call site in this domain
+// needs no change.
+pub(crate) use crate::session::canonicalize::{promote_or_degrade, update_leader_roles};
 
 pub(crate) fn touch_agent(state: &mut SessionState, agent_id: &str, now: &str) {
     if let Some(agent) = state.agents.get_mut(agent_id) {
@@ -155,70 +158,6 @@ pub(crate) fn apply_leader_transfer(
             .map(ToString::to_string)
             .or_else(|| prior_request.and_then(|request| request.reason)),
         log_request_before_transfer: !leader_is_actor,
-    }
-}
-
-pub(crate) fn update_leader_roles(
-    state: &mut SessionState,
-    old_leader: &str,
-    new_leader_id: &str,
-    now: &str,
-) {
-    if let Some(old) = state.agents.get_mut(old_leader) {
-        old.role = SessionRole::Worker;
-        old.updated_at = now.to_string();
-        old.last_activity_at = Some(now.to_string());
-    }
-    if let Some(new) = state.agents.get_mut(new_leader_id) {
-        new.role = SessionRole::Leader;
-        new.updated_at = now.to_string();
-        new.last_activity_at = Some(now.to_string());
-    }
-}
-
-fn capability_priority(agent: &AgentRegistration) -> i32 {
-    agent
-        .capabilities
-        .iter()
-        .filter_map(|capability| capability.strip_prefix("priority:"))
-        .filter_map(|value| value.parse::<i32>().ok())
-        .max()
-        .unwrap_or_default()
-}
-
-fn promotion_key(agent: &AgentRegistration) -> (i32, Reverse<String>, Reverse<String>) {
-    (
-        capability_priority(agent),
-        Reverse(agent.joined_at.clone()),
-        Reverse(agent.agent_id.clone()),
-    )
-}
-
-pub(crate) fn resolve_auto_successor(state: &SessionState) -> Option<String> {
-    state
-        .policy
-        .auto_promotion
-        .role_order
-        .iter()
-        .find_map(|role| {
-            state
-                .agents
-                .values()
-                .filter(|agent| agent.status.is_alive() && agent.role == *role)
-                .max_by_key(|agent| promotion_key(agent))
-                .map(|agent| agent.agent_id.clone())
-        })
-}
-
-pub(crate) fn promote_or_degrade(state: &mut SessionState, now: &str) {
-    if let Some(next_leader_id) = resolve_auto_successor(state) {
-        let previous_leader = state.leader_id.clone().unwrap_or_default();
-        update_leader_roles(state, &previous_leader, &next_leader_id, now);
-        state.leader_id = Some(next_leader_id);
-        state.status = SessionStatus::Active;
-    } else {
-        state.leader_id = None;
-        state.status = SessionStatus::LeaderlessDegraded;
     }
 }
 

@@ -1,8 +1,8 @@
 use clap::ValueEnum;
 use serde_json::json;
 
+use crate::agent::HookAgent;
 use crate::agents::kind::{DisconnectReason, RuntimeKind};
-use crate::hooks::adapters::HookAgent;
 
 use super::test_support::{agent_registration, persona};
 use super::{

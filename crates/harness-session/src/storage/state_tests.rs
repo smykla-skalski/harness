@@ -1,0 +1,456 @@
+use std::path::Path;
+
+use fs_err as fs;
+use serde_json::{Value, json, to_value};
+
+use harness_kernel::io::{read_json_typed, write_json_pretty};
+use crate::types::{AgentStatus, CURRENT_VERSION, ManagedAgentKind};
+use harness_workspace::workspace::layout::SessionLayout;
+
+use super::state_store::{create_state, load_state};
+use super::test_support::sample_state;
+
+const STATE_FILE_SESSION_ID: &str = "00000000-0000-4000-8000-000000000001";
+const ROUND_TRIP_SESSION_ID: &str = "00000000-0000-4000-8000-000000000002";
+const V3_SESSION_ID: &str = "00000000-0000-4000-8000-000000000003";
+const V13_IDENTITIES_SESSION_ID: &str = "00000000-0000-4000-8000-000000000004";
+const V13_BAD_MANAGED_AGENT_SESSION_ID: &str = "00000000-0000-4000-8000-000000000005";
+const DEFAULTS_SESSION_ID: &str = "00000000-0000-4000-8000-000000000006";
+const V8_SESSION_ID: &str = "00000000-0000-4000-8000-000000000007";
+const V10_RUNTIME_SESSION_ID: &str = "00000000-0000-4000-8000-000000000008";
+const V11_BLANK_SESSION_ID: &str = "00000000-0000-4000-8000-000000000009";
+const V11_CONFLICT_SESSION_ID: &str = "00000000-0000-4000-8000-00000000000a";
+
+fn test_layout(tmp: &Path, session_id: &str) -> SessionLayout {
+    SessionLayout {
+        sessions_root: tmp.join("sessions"),
+        project_name: "demo".into(),
+        session_id: session_id.to_string(),
+    }
+}
+
+fn legacy_state_value(session_id: &str, schema_version: u64) -> Value {
+    let mut value = to_value(sample_state(session_id)).expect("serialize legacy state");
+    value
+        .as_object_mut()
+        .expect("state object")
+        .insert("schema_version".into(), json!(schema_version));
+    value
+}
+
+#[test]
+fn state_file_uses_new_layout() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = test_layout(tmp.path(), STATE_FILE_SESSION_ID);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let state = sample_state(STATE_FILE_SESSION_ID);
+    assert!(create_state(&layout, &state).expect("create"));
+
+    assert!(
+        layout.state_file().exists(),
+        "state.json must be in session_root"
+    );
+}
+
+#[test]
+fn state_round_trip_via_repository() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = test_layout(tmp.path(), ROUND_TRIP_SESSION_ID);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let state = sample_state(ROUND_TRIP_SESSION_ID);
+    assert!(create_state(&layout, &state).expect("create"));
+    let loaded = load_state(&layout).expect("load").expect("state");
+    assert_eq!(loaded.session_id, ROUND_TRIP_SESSION_ID);
+    assert_eq!(
+        loaded.observe_id.as_deref(),
+        Some(format!("observe-{ROUND_TRIP_SESSION_ID}").as_str())
+    );
+}
+
+#[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "one linear migrate-then-assert scenario, not nested branching logic"
+)]
+fn load_state_migrates_v3_state_and_persists_current_schema() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = V3_SESSION_ID;
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let state_file = layout.state_file();
+    write_json_pretty(
+        &state_file,
+        &json!({
+            "schema_version": 3,
+            "state_version": 7,
+            "session_id": session_id,
+            "context": "legacy context",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+            "leader_id": null,
+            "archived_at": null,
+            "last_activity_at": null,
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+                "agent_count": 0,
+                "active_agent_count": 0,
+                "open_task_count": 0,
+                "in_progress_task_count": 0,
+                "blocked_task_count": 0,
+                "completed_task_count": 0
+            }
+        }),
+    )
+    .expect("write legacy state");
+
+    let loaded = load_state(&layout)
+        .expect("load state")
+        .expect("state present");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert_eq!(loaded.title, "legacy context");
+    assert!(loaded.policy.leader_join.require_explicit_fallback_role);
+    assert_eq!(
+        loaded.policy.degraded_recovery.preset_id.as_deref(),
+        Some("swarm-default")
+    );
+
+    let persisted: Value = read_json_typed(&state_file).expect("read migrated state");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(persisted["title"], json!("legacy context"));
+    assert_eq!(
+        persisted["policy"]["degraded_recovery"]["preset_id"],
+        json!("swarm-default")
+    );
+}
+
+#[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "one linear migrate-then-assert scenario, not nested branching logic"
+)]
+fn load_state_migrates_v13_legacy_agent_identity_fields_to_canonical_schema() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = V13_IDENTITIES_SESSION_ID;
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 13);
+    let agent = state["agents"]["claude-leader"]
+        .as_object_mut()
+        .expect("agent object");
+    let session_agent_id = agent
+        .remove("session_agent_id")
+        .expect("canonical session_agent_id");
+    agent.insert("agent_id".into(), session_agent_id);
+    agent.insert("agent_session_id".into(), json!("runtime-claude-leader"));
+    agent.insert(
+        "managed_agent".into(),
+        json!({
+            "kind": "acp",
+            "id": "acp-claude-leader",
+        }),
+    );
+    write_json_pretty(&layout.state_file(), &state).expect("write v13 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    let agent = loaded.agents.get("claude-leader").expect("agent");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert_eq!(agent.agent_id, "claude-leader");
+    assert_eq!(
+        agent.agent_session_id.as_deref(),
+        Some("runtime-claude-leader")
+    );
+    assert!(matches!(
+        agent.managed_agent.as_ref(),
+        Some(managed_agent)
+            if managed_agent.kind == ManagedAgentKind::Acp
+                && managed_agent.id == "acp-claude-leader"
+    ));
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["session_agent_id"],
+        json!("claude-leader")
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["runtime_session_id"],
+        json!("runtime-claude-leader")
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["managed_agent_id"],
+        json!("acp-claude-leader")
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["managed_agent_family"],
+        json!("acp")
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("agent_id")
+            .is_none_or(serde_json::Value::is_null)
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("agent_session_id")
+            .is_none_or(serde_json::Value::is_null)
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("managed_agent")
+            .is_none_or(serde_json::Value::is_null)
+    );
+}
+
+#[test]
+fn load_state_rejects_v13_malformed_managed_agent_identity() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = V13_BAD_MANAGED_AGENT_SESSION_ID;
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 13);
+    let agent = state["agents"]["claude-leader"]
+        .as_object_mut()
+        .expect("agent object");
+    agent.insert("managed_agent".into(), json!("acp-claude-leader"));
+    write_json_pretty(&layout.state_file(), &state).expect("write v13 state");
+
+    let error = load_state(&layout).expect_err("invalid managed_agent should fail");
+    assert!(
+        error.to_string().contains("invalid managed_agent object"),
+        "expected managed_agent object error, got {error}"
+    );
+}
+
+#[test]
+fn state_defaults_external_origin_none() {
+    let state = sample_state(DEFAULTS_SESSION_ID);
+    assert_eq!(state.schema_version, CURRENT_VERSION);
+    assert!(state.external_origin.is_none());
+    assert!(state.adopted_at.is_none());
+}
+
+#[test]
+fn load_state_migrates_v8_state_to_v9_passthrough() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let layout = test_layout(tmp.path(), V8_SESSION_ID);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+    write_json_pretty(
+        &layout.state_file(),
+        &json!({
+            "schema_version": 8,
+            "state_version": 0,
+            "session_id": V8_SESSION_ID,
+            "project_name": "demo",
+            "worktree_path": "",
+            "shared_path": "",
+            "origin_path": "",
+            "branch_ref": "",
+            "title": "t",
+            "context": "c",
+            "status": "active",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "agents": {},
+            "tasks": {},
+            "leader_id": null,
+            "archived_at": null,
+            "last_activity_at": null,
+            "observe_id": null,
+            "pending_leader_transfer": null,
+            "metrics": {
+                "agent_count": 0,
+                "active_agent_count": 0,
+                "idle_agent_count": 0,
+                "open_task_count": 0,
+                "in_progress_task_count": 0,
+                "blocked_task_count": 0,
+                "completed_task_count": 0
+            }
+        }),
+    )
+    .expect("write v8 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert!(loaded.external_origin.is_none());
+    assert!(loaded.adopted_at.is_none());
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    // Fields with Option::is_none skipped during serialize
+    assert!(
+        persisted
+            .get("external_origin")
+            .is_none_or(serde_json::Value::is_null)
+    );
+}
+
+#[test]
+fn create_state_rejects_unsafe_session_id() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let escape_dir = tmp.path().join("escape");
+    let unsafe_id = escape_dir.to_string_lossy().into_owned();
+
+    let layout = SessionLayout {
+        sessions_root: tmp.path().join("sessions"),
+        project_name: "demo".into(),
+        session_id: unsafe_id.clone(),
+    };
+    let state = sample_state(&unsafe_id);
+
+    let error = create_state(&layout, &state).expect_err("unsafe id");
+    assert_eq!(error.code(), "KSRCLI059");
+    assert!(!escape_dir.join("state.json").exists());
+}
+
+#[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "one linear migrate-then-assert scenario, not nested branching logic"
+)]
+fn load_state_migrates_v10_unknown_runtime_without_bricking() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = V10_RUNTIME_SESSION_ID;
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 10);
+    let agent = state["agents"]["claude-leader"]
+        .as_object_mut()
+        .expect("agent object");
+    agent.insert("runtime".into(), json!("future-acp-runtime"));
+    agent.insert("status".into(), json!("disconnected"));
+    write_json_pretty(&layout.state_file(), &state).expect("write v10 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    let agent = loaded.agents.get("claude-leader").expect("agent");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert_eq!(agent.runtime.runtime_name(), "future-acp-runtime");
+    assert!(agent.managed_agent.is_none());
+    assert!(matches!(
+        agent.status,
+        AgentStatus::Disconnected {
+            reason: _,
+            stderr_tail: _
+        }
+    ));
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["runtime"],
+        json!({ "kind": "acp", "id": "future-acp-runtime" })
+    );
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["status"]["state"],
+        json!("disconnected")
+    );
+}
+
+#[test]
+fn load_state_migrates_v11_blank_tui_marker_by_quarantining_row() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = V11_BLANK_SESSION_ID;
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 11);
+    let agent = state["agents"]["claude-leader"]
+        .as_object_mut()
+        .expect("agent object");
+    agent.insert("capabilities".into(), json!(["review", "agent-tui:   "]));
+    write_json_pretty(&layout.state_file(), &state).expect("write v11 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    let agent = loaded.agents.get("claude-leader").expect("agent");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert_eq!(agent.capabilities, vec!["review"]);
+    assert!(agent.managed_agent.is_none());
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(persisted["schema_version"], json!(CURRENT_VERSION));
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["capabilities"],
+        json!(["review"])
+    );
+    assert!(
+        persisted["agents"]["claude-leader"]
+            .get("managed_agent")
+            .is_none_or(serde_json::Value::is_null)
+    );
+}
+
+#[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "one linear migrate-then-assert scenario, not nested branching logic"
+)]
+fn load_state_migrates_v11_conflicting_tui_markers_without_bricking_good_rows() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = V11_CONFLICT_SESSION_ID;
+    let layout = test_layout(tmp.path(), session_id);
+    fs::create_dir_all(layout.session_root()).expect("create session dir");
+
+    let mut state = legacy_state_value(session_id, 11);
+    let agents = state["agents"].as_object_mut().expect("agents object");
+    let mut good_agent = agents
+        .get("claude-leader")
+        .cloned()
+        .expect("template agent");
+    let good_object = good_agent.as_object_mut().expect("good agent object");
+    good_object.insert("session_agent_id".into(), json!("codex-reviewer"));
+    good_object.insert("agent_id".into(), json!("codex-reviewer"));
+    good_object.insert("name".into(), json!("codex reviewer"));
+    good_object.insert("runtime".into(), json!("codex"));
+    good_object.insert("role".into(), json!("worker"));
+    good_object.insert(
+        "capabilities".into(),
+        json!(["review", "agent-tui:tty-good"]),
+    );
+    agents.insert("codex-reviewer".into(), good_agent);
+
+    let bad_agent = agents
+        .get_mut("claude-leader")
+        .and_then(Value::as_object_mut)
+        .expect("bad agent object");
+    bad_agent.insert(
+        "capabilities".into(),
+        json!(["review", "agent-tui:tty-one", "agent-tui:tty-two"]),
+    );
+    write_json_pretty(&layout.state_file(), &state).expect("write v11 state");
+
+    let loaded = load_state(&layout).expect("load").expect("state");
+    assert_eq!(loaded.schema_version, CURRENT_VERSION);
+    assert!(loaded.agents["claude-leader"].managed_agent.is_none());
+    assert_eq!(loaded.agents["claude-leader"].capabilities, vec!["review"]);
+    assert_eq!(
+        loaded.agents["codex-reviewer"]
+            .managed_agent
+            .as_ref()
+            .map(|managed| managed.id.as_str()),
+        Some("tty-good")
+    );
+
+    let persisted: Value = read_json_typed(&layout.state_file()).expect("read migrated");
+    assert_eq!(
+        persisted["agents"]["claude-leader"]["capabilities"],
+        json!(["review"])
+    );
+    assert_eq!(
+        persisted["agents"]["codex-reviewer"]["managed_agent_id"],
+        json!("tty-good")
+    );
+    assert_eq!(
+        persisted["agents"]["codex-reviewer"]["managed_agent_family"],
+        json!("tui")
+    );
+}

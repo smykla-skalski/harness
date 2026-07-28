@@ -9,7 +9,6 @@
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use similar::TextDiff;
@@ -17,27 +16,11 @@ use similar::TextDiff;
 use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::write_text;
 use crate::session::roles::SessionAction;
-
-/// Canonical writeable targets for improver patches.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
-#[derive(utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-#[value(rename_all = "snake_case")]
-pub enum ImproverTarget {
-    Skill,
-    Plugin,
-    LocalSkillClaude,
-}
-
-impl ImproverTarget {
-    fn subdir(self) -> &'static str {
-        match self {
-            Self::Skill => "agents/skills",
-            Self::Plugin => "agents/plugins",
-            Self::LocalSkillClaude => "local-skills/claude",
-        }
-    }
-}
+// `ImproverTarget` lives beside the wire request that carries it
+// (`harness-session`) now, since the wire layer moved into its own crate
+// and can't reach back into this domain's service layer; re-exported so
+// every existing `session::service::ImproverTarget` path keeps resolving.
+pub use crate::session::wire::ImproverTarget;
 
 /// Result of [`apply_improver_apply`].
 #[derive(Debug, Clone, Serialize, Deserialize)]

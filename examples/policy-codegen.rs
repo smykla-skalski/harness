@@ -2377,7 +2377,8 @@ const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/
 const TIMELINE_SOURCE: &str = include_str!("../crates/harness-protocol/src/timeline.rs");
 // The session aggregates moved to the session domain; the generator reads
 // files as text, so the summaries module has to keep reading them from there.
-const SESSION_SUMMARIES_SOURCE: &str = include_str!("../src/session/wire/summaries.rs");
+const SESSION_SUMMARIES_SOURCE: &str =
+    include_str!("../crates/harness-session/src/wire/summaries.rs");
 // AskUserQuestionOption/AskUserQuestionPrompt moved to the protocol crate; payloads.rs now
 // only re-exports them, so the summaries module has to keep reading them from their new file.
 const HOOK_PROMPTS_SOURCE: &str = include_str!("../crates/harness-protocol/src/hook_prompts.rs");
@@ -2526,7 +2527,8 @@ const CODEX_SOURCE: &str = include_str!("../crates/harness-protocol/src/managed_
 // session_requests: clean serde request/response structs. Seven types are
 // SKIP_TYPES (no Swift mirror); the rest reference session::types enums that
 // already exist hand-written in Swift, so they stay unsuffixed references.
-const SESSION_REQUESTS_SOURCE: &str = include_str!("../src/session/wire/session_requests.rs");
+const SESSION_REQUESTS_SOURCE: &str =
+    include_str!("../crates/harness-session/src/wire/session_requests.rs");
 // reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named,
 // replacing the hand HarnessMonitorReviewsEnums file) rather than wire/model
 // split, since a string enum's generated form is a drop-in for the hand one.
@@ -2885,7 +2887,8 @@ const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &[
     "AcpMcpEnvVariable",
     "AcpMcpHttpHeader",
 ];
-const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/session/wire/managed_agents.rs");
+const MANAGED_AGENTS_SOURCE: &str =
+    include_str!("../crates/harness-session/src/wire/managed_agents.rs");
 const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ManagedAgentSnapshotWireTypes.generated.swift";
 // The managed-agent snapshot umbrella + its list response. ManagedAgentSnapshot is adjacently
 // tagged (kind + snapshot) over the three transport snapshots - Terminal/Codex resolve to the

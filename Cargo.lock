@@ -3528,6 +3528,7 @@ dependencies = [
  "harness-observe",
  "harness-protocol",
  "harness-run",
+ "harness-session",
  "harness-systemd-protocol",
  "harness-task-board",
  "harness-telemetry",
@@ -3704,6 +3705,7 @@ dependencies = [
  "harness-kernel",
  "harness-observe",
  "harness-protocol",
+ "harness-session",
  "harness-systemd-protocol",
  "harness-task-board",
  "harness-telemetry",
@@ -3812,6 +3814,7 @@ dependencies = [
  "harness-infra",
  "harness-kernel",
  "harness-protocol",
+ "harness-session",
  "harness-telemetry",
  "harness-workspace",
  "hex",
@@ -3969,6 +3972,28 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "tempfile",
+]
+
+[[package]]
+name = "harness-session"
+version = "54.0.0"
+dependencies = [
+ "clap",
+ "fs-err",
+ "harness",
+ "harness-agents",
+ "harness-infra",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-testkit",
+ "harness-workspace",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.19",
+ "tracing",
+ "utoipa",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ use super::{
     BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND,
     LeaveSignalRecord, Path, SessionAction, SessionMetrics, SessionState, SessionStatus,
     TaskStatus, agent_status_label, build_signal, fmt, generate_session_id, is_permitted,
-    promote_or_degrade, refresh_session, runtime, storage,
+    refresh_session, runtime, storage,
 };
 use crate::session::types::{
     AgentRegistration, SessionPolicy, SessionRole, is_control_plane_actor_id,
@@ -89,47 +89,15 @@ pub(crate) fn require_endable_session(state: &SessionState) -> Result<(), CliErr
     Ok(())
 }
 
-/// Canonicalize a persisted session that is still marked active without a
-/// leader.
-///
-/// Historical rows can hit this shape when the leader field was missing or
-/// truncated. The canonical fallback is the same logic used during live
-/// leader recovery: promote a live successor if one exists, otherwise
-/// degrade the session out of `active`.
-pub(crate) fn canonicalize_active_session_without_leader(
-    state: &mut SessionState,
-    now: &str,
-) -> bool {
-    if state.status != SessionStatus::Active || state.leader_id.is_some() {
-        return false;
-    }
-
-    state.schema_version = CURRENT_VERSION;
-    promote_or_degrade(state, now);
-    refresh_session(state, now);
-    true
-}
-
-pub(crate) fn canonicalize_persisted_session_state(state: &mut SessionState, now: &str) -> bool {
-    let mut changed = canonicalize_active_session_without_leader(state, now);
-    if canonicalize_legacy_ended_archive_semantics(state) {
-        changed = true;
-    }
-    changed
-}
-
-fn canonicalize_legacy_ended_archive_semantics(state: &mut SessionState) -> bool {
-    if state.schema_version >= CURRENT_VERSION
-        || state.status != SessionStatus::Ended
-        || state.archived_at.is_none()
-    {
-        return false;
-    }
-
-    state.schema_version = CURRENT_VERSION;
-    state.archived_at = None;
-    true
-}
+// Canonicalizing a persisted session (leader auto-promotion/degradation
+// plus historical-shape fix-ups) lives in `harness-session` now: the
+// session index needs the same normalization on every read, and this crate
+// stays a separate, larger extraction. Re-exported so every existing
+// `super::canonicalize_persisted_session_state` call site in this domain
+// needs no change.
+pub(crate) use crate::session::canonicalize::{
+    canonicalize_active_session_without_leader, canonicalize_persisted_session_state,
+};
 
 pub(crate) fn require_task_creation_state(state: &SessionState) -> Result<(), CliError> {
     if !state.status.allows_task_creation() {

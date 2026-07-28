@@ -1,6 +1,8 @@
-use super::{
-    CliError, CliErrorKind, HookAgent, Path, SessionMetrics, SessionState, runtime, storage,
-};
+use super::{CliError, CliErrorKind, HookAgent, Path, SessionState, runtime, storage};
+// `refresh_session` lives in `harness-session` now, beside the session
+// index that also needs it on every read; re-exported so every existing
+// `super::refresh_session` call site in this domain needs no change.
+pub(crate) use crate::session::canonicalize::refresh_session;
 
 pub(crate) fn resolve_registered_runtime(runtime_name: &str) -> Option<HookAgent> {
     match runtime_name {
@@ -35,12 +37,6 @@ pub(crate) fn load_state_or_err(
     storage::load_state(&layout)?.ok_or_else(|| {
         CliErrorKind::session_not_active(format!("harness session '{session_id}' not found")).into()
     })
-}
-
-pub(crate) fn refresh_session(state: &mut SessionState, now: &str) {
-    state.updated_at = now.to_string();
-    state.last_activity_at = Some(now.to_string());
-    state.metrics = SessionMetrics::recalculate(state);
 }
 
 pub(crate) fn runtime_capabilities(runtime_name: &str) -> runtime::RuntimeCapabilities {
