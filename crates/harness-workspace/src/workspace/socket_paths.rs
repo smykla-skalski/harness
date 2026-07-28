@@ -10,15 +10,15 @@
 //!   single daemon-global socket with no session concept; its own path-budget logic
 //!   (fallback to group container or `/tmp` hash) is intentional and unaffected.
 //! - `src/daemon/bridge/client.rs` — path is loaded from persisted `BridgeState::socket_path`.
-//! - `src/mcp/registry/client.rs` — path comes from `path::default_socket_path()`,
-//!   which returns `<group>/mcp.sock` (the Monitor accessibility socket). No session
-//!   concept; that socket is a shared singleton.
+//! - `crates/harness-mcp/src/mcp/registry/client.rs` — path comes from
+//!   `path::default_socket_path()`, which returns `<group>/mcp.sock` (the Monitor
+//!   accessibility socket). No session concept; that socket is a shared singleton.
 //!
 //! No production call site constructs a socket path inline. The migration applied
 //! in Task 11 is therefore limited to two test fixture helpers:
 //!
-//! - `src/mcp/registry/tests.rs` — `socket_path()` now calls `session_socket(dir.path(), "testid00", "registry")`
-//! - `src/mcp/tools/tests.rs`    — same helper updated
+//! - `crates/harness-mcp/src/mcp/registry/tests.rs` — `socket_path()` now calls `session_socket(dir.path(), "testid00", "registry")`
+//! - `crates/harness-mcp/src/mcp/tools/tests.rs`    — same helper updated
 //!
 //! The bridge test files (`tests/cleanup_and_config.rs`, `tests/legacy_server.rs`) bind
 //! to hardcoded names under the daemon root deliberately — they test legacy cleanup

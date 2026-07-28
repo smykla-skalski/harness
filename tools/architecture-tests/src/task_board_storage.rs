@@ -122,7 +122,7 @@ fn live_task_board_consumers_do_not_reopen_legacy_storage() {
         "src/daemon/client",
         "src/daemon/http",
         "src/daemon/websocket",
-        "src/mcp/tools/task_board",
+        "crates/harness-mcp/src/mcp/tools/task_board",
     ] {
         hits.extend(collect_hits_in_tree(
             &root.join(tree),

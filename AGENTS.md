@@ -83,7 +83,7 @@ Validation should match risk:
 - Docs-only edits: `git diff --check`.
 - Narrow Rust logic: run the focused unit/integration test first, then the touched crate's smallest relevant `mise` gate.
 - Shared CLI, hook, runtime, or storage behavior: run the focused test and each touched component's owning `mise` gate.
-- Any `src/` file a facade crate pulls in with `#[path]` (`harness-daemon`, `harness-bridge`, `harness-hook`, `harness-mcp`, `harness-protocol`; see `docs/agent-guides/root-reference.md`): the owning package gate only lints the copy inside its home crate, so run `mise run harness:check:rust` to cover the touched facade crates.
+- Any `src/` file a facade crate pulls in with `#[path]` (`harness-daemon`, `harness-bridge`, `harness-hook`, `harness-protocol`; see `docs/agent-guides/root-reference.md`): the owning package gate only lints the copy inside its home crate, so run `mise run harness:check:rust` to cover the touched facade crates.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
 Treat each focused gate as evidence only for the surfaces it covers. When touched code also affects version consistency, scripts, binary contracts, source size, or feature isolation, run the targeted `mise` task that owns that contract. Read each gate's own exit status rather than whatever the shell reported last.
