@@ -259,20 +259,17 @@ async fn fail_stage(
     Ok(())
 }
 
-/// A pull from GitHub is a whole-board operation, so a run narrowed to one item
-/// skips it rather than dragging the entire board through a network round trip
-/// for work it will not dispatch. A filter naming a lane other than Todo skips
-/// for the same reason, but an unfiltered run still pulls: no filter means the
-/// whole board, which is exactly what the pull fills.
+/// A pull from GitHub is a whole-board operation that fills the Inbox, so it is
+/// independent of which lane the run dispatches: only a run narrowed to one item
+/// skips it, rather than dragging the entire board through a network round trip
+/// for work that single item will not need. A lane filter, including a Todo-only
+/// selection, never gates the pull - discovery must keep finding new work no
+/// matter which statuses the run is about to execute.
 fn should_sync_github_tasks(
     input: &TaskBoardOrchestratorDispatchInput,
     settings: &TaskBoardOrchestratorSettings,
 ) -> bool {
-    if input.item_id.is_some()
-        || input
-            .status
-            .is_some_and(|status| status != TaskBoardStatus::Todo)
-    {
+    if input.item_id.is_some() {
         return false;
     }
     settings
@@ -280,6 +277,20 @@ fn should_sync_github_tasks(
         .enabled_automations
         .enables(GitHubAutomation::SyncTaskBoard)
         || !settings.github_inbox.repositories.is_empty()
+}
+
+/// The pull request discovery request. `status` is always `None`: discovery
+/// imports and reconciles every eligible pull request into Inbox regardless of
+/// which lane the run dispatches, so the dispatch status selection governs
+/// execution only, applied separately when listing dispatch candidates.
+fn github_discovery_request(dry_run: bool) -> TaskBoardSyncRequest {
+    TaskBoardSyncRequest {
+        status: None,
+        provider: Some(ExternalProvider::GitHub),
+        direction: ExternalSyncDirection::Pull,
+        conflict_policy: ExternalSyncConflictPolicy::Report,
+        dry_run,
+    }
 }
 
 async fn sync_github_tasks(
@@ -297,13 +308,7 @@ async fn sync_github_tasks(
     {
         return Ok(());
     }
-    let request = TaskBoardSyncRequest {
-        status: prepared.input.status,
-        provider: Some(ExternalProvider::GitHub),
-        direction: ExternalSyncDirection::Pull,
-        conflict_policy: ExternalSyncConflictPolicy::Report,
-        dry_run: prepared.input.dry_run,
-    };
+    let request = github_discovery_request(prepared.input.dry_run);
     prepared.sync = if let Some(session) = session {
         let context = session.sync_context();
         sync_task_board_for_orchestrator_with_context_db(db, &request, &context).await?
