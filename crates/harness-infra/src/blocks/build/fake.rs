@@ -1,7 +1,7 @@
 use std::sync;
 
-use crate::infra::blocks::BlockError;
-use crate::infra::exec::CommandResult;
+use crate::blocks::BlockError;
+use crate::exec::CommandResult;
 
 use super::contract::{BuildSystem, BuildTarget};
 

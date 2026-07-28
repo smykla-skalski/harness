@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::infra::blocks::BlockError;
-use crate::infra::blocks::process as process_block;
-use crate::infra::exec::CommandResult;
+use crate::blocks::BlockError;
+use crate::blocks::process as process_block;
+use crate::exec::CommandResult;
 
 use super::{FakeProcessExecutor, FakeResponse, ProcessExecutor, StdProcessExecutor};
 

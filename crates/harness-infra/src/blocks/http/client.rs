@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use crate::infra::blocks::BlockError;
-use crate::infra::exec;
+use crate::blocks::BlockError;
+use crate::exec;
 
 use super::types::{HttpMethod, HttpResponse};
 

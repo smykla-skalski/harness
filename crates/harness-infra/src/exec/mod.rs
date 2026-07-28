@@ -7,7 +7,7 @@ mod runtime;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use runtime::RUNTIME;
+pub use runtime::RUNTIME;
 
 pub use http::{HttpMethod, cp_api_json, cp_api_text, wait_for_http};
 pub(crate) use output_filter::filter_progress_line;

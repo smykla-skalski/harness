@@ -3,9 +3,9 @@ use std::path::Path;
 #[cfg(test)]
 use std::sync;
 
-use crate::infra::blocks::BlockError;
-use crate::infra::exec;
-use crate::infra::exec::CommandResult;
+use crate::blocks::BlockError;
+use crate::exec;
+use crate::exec::CommandResult;
 
 /// Subprocess execution. The lowest-level block.
 ///

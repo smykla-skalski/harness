@@ -86,7 +86,7 @@ flowchart LR
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |
 | `crates/harness-workspace/src/workspace/` | XDG paths, current session pointers, compact handoff, ambient harness files        |
-| `src/infra/`     | generic execution, persistence, environment, HTTP, process, and block abstractions |
+| `crates/harness-infra/src/` | generic execution, persistence, environment, HTTP, process, and block abstractions |
 | `src/errors/`    | typed error families plus transport-safe rendering                                 |
 
 ## Internal support roots

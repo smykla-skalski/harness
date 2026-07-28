@@ -143,7 +143,8 @@ fn workspace_compact_storage_root_stays_prod_only() {
 #[test]
 fn infra_exec_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let exec_mod = fs::read_to_string(root.join("src/infra/exec/mod.rs")).unwrap();
+    let exec_mod =
+        fs::read_to_string(root.join("crates/harness-infra/src/exec/mod.rs")).unwrap();
 
     for needle in [
         "pub(crate) fn run_command(",
@@ -153,11 +154,14 @@ fn infra_exec_root_stays_a_facade() {
     ] {
         assert!(
             !exec_mod.contains(needle),
-            "src/infra/exec/mod.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-infra/src/exec/mod.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 
-    for path in ["src/infra/exec/runner.rs", "src/infra/exec/tests.rs"] {
+    for path in [
+        "crates/harness-infra/src/exec/runner.rs",
+        "crates/harness-infra/src/exec/tests.rs",
+    ] {
         assert!(
             root.join(path).exists(),
             "infra exec split module should exist: {path}"
@@ -168,7 +172,8 @@ fn infra_exec_root_stays_a_facade() {
 #[test]
 fn infra_process_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let process = fs::read_to_string(root.join("src/infra/blocks/process.rs")).unwrap();
+    let process =
+        fs::read_to_string(root.join("crates/harness-infra/src/blocks/process.rs")).unwrap();
 
     for needle in [
         "fn std_process_executor_run_echo(",
@@ -177,12 +182,13 @@ fn infra_process_root_stays_prod_only() {
     ] {
         assert!(
             !process.contains(needle),
-            "src/infra/blocks/process.rs should stay focused on production process execution instead of owning `{needle}`"
+            "crates/harness-infra/src/blocks/process.rs should stay focused on production process execution instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/infra/blocks/process/tests.rs").exists(),
+        root.join("crates/harness-infra/src/blocks/process/tests.rs")
+            .exists(),
         "infra process split test module should exist"
     );
 }

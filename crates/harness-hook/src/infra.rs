@@ -1,15 +1,10 @@
 use std::sync::LazyLock;
 
-#[path = "../../../src/infra/blocks/error.rs"]
-mod error;
 pub use harness_kernel::io;
-#[path = "../../../src/infra/persistence/mod.rs"]
-pub mod persistence;
-#[path = "../../../src/infra/blocks/registry.rs"]
-mod registry;
+pub use harness_infra::persistence;
 
 pub mod blocks {
-    pub use super::registry::all_denied_binaries;
+    pub use harness_infra::blocks::all_denied_binaries;
 }
 
 pub mod exec {
