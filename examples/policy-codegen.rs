@@ -2534,33 +2534,33 @@ const SESSION_REQUESTS_SOURCE: &str =
 // split, since a string enum's generated form is a drop-in for the hand one.
 // Most are open enums (OPEN_STRING_ENUMS); ReviewAuthorAssociation is the lone
 // closed one, mirroring its closed Rust enum and exhaustive Swift consumers.
-const REVIEWS_ENUMS_SOURCE: &str = include_str!("../src/reviews/enums.rs");
+const REVIEWS_ENUMS_SOURCE: &str = include_str!("../crates/harness-reviews/src/enums.rs");
 // reviews leaves: small clean request/response structs (plus two enums). Split
 // into suffixed *Wire types; the hand models live in scattered/mixed Swift
 // files, so this is additive, not direct adoption. body_update's response
 // carries a DateTime (-> String) and the open ReviewsBodyUpdateOutcome.
-const REVIEWS_AVATAR_SOURCE: &str = include_str!("../src/reviews/avatar.rs");
+const REVIEWS_AVATAR_SOURCE: &str = include_str!("../crates/harness-reviews/src/avatar.rs");
 const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_update.rs");
-const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../src/reviews/file_comment.rs");
-const REVIEWS_THREAD_RESOLVE_SOURCE: &str = include_str!("../src/reviews/review_thread_resolve.rs");
+const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../crates/harness-reviews/src/file_comment.rs");
+const REVIEWS_THREAD_RESOLVE_SOURCE: &str = include_str!("../crates/harness-reviews/src/review_thread_resolve.rs");
 // reviews files-core: the file list/patch/preview/blob/viewed surface plus the
 // two cross-wire facade types from service.rs/local_clone.rs. preview.rs carries
 // no types (the preview structs live in mod.rs) but supplies the
 // `preview_line_limit` default fn and its const. service.rs/local_clone.rs each
 // expose one wire type (FilesLargeDiffStrategy, LocalCloneListEntry); their
 // daemon-internal serde types are SKIP_TYPES.
-const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../src/reviews/files/mod.rs");
-const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../src/reviews/files/blob.rs");
-const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../src/reviews/files/viewed.rs");
-const REVIEWS_FILES_PREVIEW_SOURCE: &str = include_str!("../src/reviews/files/preview.rs");
-const REVIEWS_FILES_SERVICE_SOURCE: &str = include_str!("../src/reviews/files/service.rs");
-const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str = include_str!("../src/reviews/files/local_clone.rs");
+const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/mod.rs");
+const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/blob.rs");
+const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/viewed.rs");
+const REVIEWS_FILES_PREVIEW_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/preview.rs");
+const REVIEWS_FILES_SERVICE_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/service.rs");
+const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/local_clone.rs");
 // reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
 // tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
 // the payload alongside the tag); the entries carry chrono DateTime, a boxed
 // SimpleActorEventEntry, and a JsonValue raw payload - all handled.
-const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../src/reviews/timeline/types.rs");
-const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../src/reviews/timeline/mod.rs");
+const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../crates/harness-reviews/src/timeline/types.rs");
+const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../crates/harness-reviews/src/timeline/mod.rs");
 // reviews types core: the query/item/check/action/policy request-response
 // surface. The public umbrella re-exports the split action and policy modules,
 // so generation needs all three files. The custom default fns it references live
@@ -3096,7 +3096,7 @@ const ACP_INCIDENT_EMIT_ONLY: &[&str] = &[
     "AcpAgentsReconciledPayload",
 ];
 const LOCAL_CLONE_PROGRESS_SOURCE: &str =
-    include_str!("../src/reviews/files/local_clone_progress_event.rs");
+    include_str!("../crates/harness-reviews/src/files/local_clone_progress_event.rs");
 const LOCAL_CLONE_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewLocalCloneProgressWireTypes.generated.swift";
 // The reviews local-clone progress push payload: an internally-tagged enum (tag = "kind") with
 // struct variants the Swift hand ReviewLocalCloneProgress flattens. The operation rides the

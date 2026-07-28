@@ -1,0 +1,57 @@
+[package]
+name = "harness-reviews"
+version = "54.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+harness-github-api = { path = "../harness-github-api", version = "54.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
+async-trait = "0.1.83"
+base64 = "0.23.0"
+chrono = { version = "0.4.44", features = ["serde"] }
+gix = { version = "0.86.0", features = [
+    "progress-tree",
+    "status",
+    "worktree-mutation",
+    "index",
+    "blocking-http-transport-reqwest-rust-tls",
+] }
+reqwest = { version = "0.13.2", features = ["json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.11.0"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["fs", "macros", "net", "rt-multi-thread", "sync", "test-util", "time"] }
+tracing = "0.1.44"
+utoipa = "5.5.0"
+
+[dev-dependencies]
+axum = { version = "=0.8.9", features = ["http2", "json", "ws"] }
+harness-github-api = { path = "../harness-github-api", version = "54.0.0", features = ["test-support"] }
+tempfile = "=3.27.0"
+
+[features]
+# Gates the REST patch fetcher (`files::patch_rest::fetch_patches`), which
+# only the daemon binary calls; matches the root crate's own feature of the
+# same name, forwarded from there for the same reason.
+daemon-runtime = []
+
+# Matches the root crate's lint set rather than the lighter one the facade
+# crates carry, for the same reason harness-kernel, harness-workspace,
+# harness-infra, harness-agents, and harness-github-api do: a crate extracted
+# from src/ keeps the rules its sources were written under.
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

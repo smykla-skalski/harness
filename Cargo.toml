@@ -15,6 +15,7 @@ members = [
   "crates/harness-observe",
   "crates/harness-panel",
   "crates/harness-protocol",
+  "crates/harness-reviews",
   "crates/harness-run",
   "crates/harness-session",
   "crates/harness-systemd",
@@ -58,6 +59,7 @@ harness-kernel = { path = "crates/harness-kernel", version = "54.0.0" }
 harness-mcp = { path = "crates/harness-mcp", version = "54.0.0", optional = true }
 harness-observe = { path = "crates/harness-observe", version = "54.0.0" }
 harness-protocol = { path = "crates/harness-protocol", version = "54.0.0" }
+harness-reviews = { path = "crates/harness-reviews", version = "54.0.0" }
 harness-run = { path = "crates/harness-run", version = "54.0.0" }
 harness-session = { path = "crates/harness-session", version = "54.0.0" }
 harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "54.0.0", optional = true }
@@ -194,6 +196,7 @@ daemon-runtime = [
   "dep:tracing-subscriber",
   "dep:utoipa-axum",
   "dep:x509-parser",
+  "harness-reviews/daemon-runtime",
 ]
 standalone-daemon = ["harness-observe/standalone-daemon", "harness-workspace/standalone-daemon"]
 standalone-worker = ["harness-kernel/standalone-worker", "harness-run/standalone-worker", "harness-workspace/standalone-worker"]

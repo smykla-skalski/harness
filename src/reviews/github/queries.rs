@@ -337,26 +337,8 @@ mutation AddReviewComment($id: ID!, $body: String!) {
 }
 ";
 
-/// Resolve a `PullRequestReviewThread` by its node ID. Returns the
-/// updated thread's `isResolved` flag so the daemon can echo the
-/// confirmed server-side state.
-pub(crate) const RESOLVE_REVIEW_THREAD_MUTATION: &str = r"
-mutation ResolveReviewReviewThread($threadId: ID!) {
-  resolveReviewThread(input: { threadId: $threadId }) {
-    thread { id isResolved }
-  }
-}
-";
-
-/// Inverse of `RESOLVE_REVIEW_THREAD_MUTATION` — unresolves a
-/// previously-resolved review thread.
-pub(crate) const UNRESOLVE_REVIEW_THREAD_MUTATION: &str = r"
-mutation UnresolveReviewReviewThread($threadId: ID!) {
-  unresolveReviewThread(input: { threadId: $threadId }) {
-    thread { id isResolved }
-  }
-}
-";
+// `RESOLVE_REVIEW_THREAD_MUTATION` and `UNRESOLVE_REVIEW_THREAD_MUTATION`
+// moved to `harness_reviews::review_thread_resolve`, their only consumer.
 
 pub(super) const ADD_REVIEW_THREAD_MUTATION: &str = r"
 mutation AddReviewFileThread(
@@ -394,42 +376,8 @@ mutation AddReviewFileThreadReply($threadId: ID!, $body: String!) {
 }
 ";
 
-pub(crate) const LIST_PR_FILES_QUERY: &str = r"
-query ListReviewPullRequestFiles($id: ID!, $after: String) {
-  node(id: $id) {
-    ... on PullRequest {
-      number
-      headRefOid
-      headRefName
-      baseRefOid
-      baseRefName
-      viewerCanUpdate
-      repository {
-        nameWithOwner
-      }
-      files(first: 100, after: $after) {
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        nodes {
-          path
-          additions
-          deletions
-          changeType
-          viewerViewedState
-        }
-      }
-    }
-  }
-  rateLimit {
-    limit
-    cost
-    remaining
-    resetAt
-  }
-}
-";
+// `LIST_PR_FILES_QUERY` moved to `harness_reviews::files::list`, its only
+// consumer, alongside `fetch_files`.
 
 pub(crate) const MARK_PR_FILE_AS_VIEWED_MUTATION: &str = r"
 mutation MarkReviewPullRequestFileAsViewed($pullRequestId: ID!, $path: String!) {
