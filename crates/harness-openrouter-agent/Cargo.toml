@@ -41,4 +41,8 @@ path = "tests/acp_bridge_suite.rs"
 name = "openrouter_http"
 path = "tests/openrouter_http.rs"
 
+[[test]]
+name = "openrouter_live"
+path = "tests/openrouter_live.rs"
+
 [workspace]
