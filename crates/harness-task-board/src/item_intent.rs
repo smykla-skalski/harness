@@ -85,7 +85,7 @@ impl TaskBoardWorkflowKind {
     /// A review-request pull request.
     pub const PR_REVIEW: Self = Self::PrReview;
     /// A pull request that is both a dependency update and a review request.
-    pub const PR_DEPENDENCY_AND_REVIEW: Self = Self::PrFixReview;
+    pub const PR_FIX_REVIEW: Self = Self::PrFixReview;
 
     /// Write workflows perform publishing side effects, so they require
     /// Headless dispatch and configured publication automation; other kinds are
@@ -122,6 +122,18 @@ impl TaskBoardWorkflowKind {
     #[must_use]
     pub const fn has_review_request_intent(self) -> bool {
         matches!(self, Self::PrReview | Self::PrFixReview)
+    }
+
+    /// A pure review-request pull request, which routes read-only. A pull
+    /// request that also carries a dependency update (`PrFixReview`) is a write
+    /// workflow (`is_write` is true) and routes through the write path, so it is
+    /// deliberately excluded here even though it carries a review intent. Read-
+    /// only dispatch, launch, head-freezing, and publication/evaluation gates
+    /// must use this rather than `has_review_request_intent` to avoid pulling a
+    /// both-intents ticket down a read-only path.
+    #[must_use]
+    pub const fn is_read_only_review(self) -> bool {
+        matches!(self, Self::PrReview)
     }
 
     /// The `snake_case` wire value, matching the derived serde representation.
@@ -169,6 +181,19 @@ mod tests {
         assert!(TaskBoardWorkflowKind::PrReview.has_review_request_intent());
         assert!(!TaskBoardWorkflowKind::PrReview.has_dependency_update_intent());
         assert_eq!(TaskBoardWorkflowKind::DefaultTask.pr_intents(), None);
+    }
+
+    #[test]
+    fn both_intents_route_as_write_never_read_only() {
+        // PrFixReview carries a review intent but is a write workflow, so
+        // read-only dispatch, launch, head-freezing, and publication/evaluation
+        // gates must treat it as write. Only a pure PrReview is read-only.
+        assert!(TaskBoardWorkflowKind::PrFixReview.is_write());
+        assert!(TaskBoardWorkflowKind::PrFixReview.has_review_request_intent());
+        assert!(!TaskBoardWorkflowKind::PrFixReview.is_read_only_review());
+        assert!(TaskBoardWorkflowKind::PrReview.is_read_only_review());
+        assert!(!TaskBoardWorkflowKind::PrReview.is_write());
+        assert!(!TaskBoardWorkflowKind::Review.is_read_only_review());
     }
 
     #[test]

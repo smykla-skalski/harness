@@ -100,7 +100,7 @@ pub(crate) async fn evaluate_task_board_async(
     let mut summary = TaskBoardEvaluationSummary::default();
     for item in &items {
         if matches!(item.workflow_kind, TaskBoardWorkflowKind::Review)
-            || item.workflow_kind.has_review_request_intent() {
+            || item.workflow_kind.is_read_only_review() {
             continue;
         }
         let Some((session_id, work_item_id)) = linked_task(item) else {

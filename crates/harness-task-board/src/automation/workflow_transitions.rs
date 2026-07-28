@@ -297,7 +297,7 @@ const fn exact_head_is_frozen(
     workflow_kind: TaskBoardWorkflowKind,
     phase: TaskBoardExecutionPhase,
 ) -> bool {
-    workflow_kind.has_review_request_intent()
+    workflow_kind.is_read_only_review()
         || matches!(workflow_kind, TaskBoardWorkflowKind::Review)
         || matches!(
             phase,

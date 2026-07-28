@@ -302,8 +302,8 @@ async fn resolve_pr_review(
 fn pr_review_identity(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<TaskBoardPullRequestIdentity, CliError> {
-    if !execution.snapshot.workflow_kind.has_review_request_intent()
-        || !execution.transition.workflow_kind.has_review_request_intent()
+    if !execution.snapshot.workflow_kind.is_read_only_review()
+        || !execution.transition.workflow_kind.is_read_only_review()
     {
         return Err(invalid_transition(
             "publish requires a PrReview execution and Task Board item",

@@ -160,7 +160,7 @@ fn prepare_read_only(
     }
     if launch.workflow_kind != item.workflow_kind
         || !(matches!(item.workflow_kind, TaskBoardWorkflowKind::Review)
-            || item.workflow_kind.has_review_request_intent())
+            || item.workflow_kind.is_read_only_review())
         || item.agent_mode != AgentMode::Evaluate
     {
         return Err(db_error(

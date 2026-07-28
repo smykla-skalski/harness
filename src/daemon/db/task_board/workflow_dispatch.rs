@@ -311,7 +311,7 @@ fn validate_launch(
         .ok_or_else(|| db_error("workflow item revision is out of range"))?;
     let pull_request = match item.workflow_kind {
         TaskBoardWorkflowKind::Review => None,
-        kind if kind.has_review_request_intent() => Some(
+        kind if kind.is_read_only_review() => Some(
             resolve_task_board_pull_request_identity(item)
                 .map_err(|error| db_error(error.to_string()))?,
         ),
