@@ -1,19 +1,11 @@
-#[path = "../../../src/telemetry/config.rs"]
 mod config;
-#[path = "../../../src/telemetry/console_fields.rs"]
 mod console_fields;
 mod daemon_file;
-#[path = "../../../src/telemetry/guard.rs"]
 mod guard;
-#[path = "../../../src/telemetry/metrics.rs"]
 mod metrics;
-#[path = "../../../src/telemetry/profiler.rs"]
 mod profiler;
-#[path = "../../../src/telemetry/providers.rs"]
 mod providers;
-#[path = "../../../src/telemetry/reachability.rs"]
 mod reachability;
-#[path = "../../../src/telemetry/subscriber.rs"]
 mod subscriber;
 
 use std::sync::{Mutex, MutexGuard, OnceLock};
