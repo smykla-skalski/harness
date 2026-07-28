@@ -134,10 +134,12 @@ fn collect_rs_files(start: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
-/// A whole file dedicated to tests, by this repository's own naming
-/// convention (`tests.rs`, `foo_tests.rs`, or anything under a `tests/`
-/// directory) never needs to build under `harness-daemon`, which disables
-/// every mirrored test target wholesale.
+/// A whole file dedicated to tests never needs to build under
+/// `harness-daemon`, which disables every mirrored test target wholesale.
+/// Matches this repository's own naming convention for such a file: any
+/// path segment or `_`-delimited part of a filename that is exactly `test`
+/// or `tests` (`tests.rs`, `foo_tests.rs`, `test_support.rs`, anything under
+/// a `tests/` directory), not only the two written out here.
 fn is_test_only_path(relative: &str) -> bool {
     relative
         .split(['/', '_', '.'])
