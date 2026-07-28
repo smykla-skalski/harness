@@ -162,7 +162,7 @@ async fn dispatch_task_board_create(request: &WsRequest, state: &DaemonHttpState
     let Ok(body) = parse_params::<TaskBoardCreateItemRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::create_item(state, &body).await;
+    let result = Box::pin(task_board_route_executor::create_item(state, &body)).await;
     dispatch_query_result(&request.id, result)
 }
 

@@ -166,6 +166,7 @@ impl GitHubSyncClient {
                                 labels,
                                 parent_reference,
                                 tracks_children,
+                                ..ExternalTask::default()
                             },
                         )
                     }),
@@ -454,6 +455,21 @@ fn review_request_query(repository: &GitHubRepository, login: &str) -> String {
         "repo:{} is:pr review-requested:{login} state:open",
         repository.slug()
     )
+}
+
+/// Open dependency-update pull requests opened by the known dependency bots.
+/// GitHub OR-s repeated `author:` qualifiers, so this matches either bot.
+fn dependency_update_query(repository: &GitHubRepository) -> String {
+    format!(
+        "repo:{} is:pr is:open author:renovate[bot] author:dependabot[bot]",
+        repository.slug()
+    )
+}
+
+/// Open pull requests carrying the dependency label, covering dependency
+/// updates opened by a human or a bot other than Renovate/Dependabot.
+fn dependency_label_query(repository: &GitHubRepository) -> String {
+    format!("repo:{} is:pr is:open label:dependencies", repository.slug())
 }
 
 pub(super) fn search_label_matches_filter(

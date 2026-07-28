@@ -33159,6 +33159,20 @@
               "type": "string"
             }
           },
+          "pr_author": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The pull request author recorded at discovery (e.g. `renovate[bot]`)."
+          },
+          "pr_head_revision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The pull request head commit recorded at discovery, so later admission\ncan bind execution to the exact revision the ticket was discovered at."
+          },
           "pr_number": {
             "type": [
               "integer",

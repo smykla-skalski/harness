@@ -52,6 +52,14 @@ pub(in crate::external::sync) fn reconciliation_patch(
     if item.status != status {
         patch.status = Some(status);
     }
+    // Union the discovered pull request intent with what the ticket already
+    // carries so a refresh never collapses a both-intents pull request: a ticket
+    // discovered as a review request that is now also a dependency update (or
+    // vice versa) becomes PrFixReview instead of overwriting one intent.
+    let unioned_kind = item.workflow_kind.union(task.workflow_kind);
+    if unioned_kind != item.workflow_kind {
+        patch.workflow_kind = Some(unioned_kind);
+    }
     if item.execution_repository.is_none()
         && let Some(repository) = execution_repository_for_task(task)
     {

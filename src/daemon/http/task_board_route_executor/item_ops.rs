@@ -37,7 +37,13 @@ pub(crate) async fn create_item(
     state: &DaemonHttpState,
     request: &TaskBoardCreateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
-    service::create_task_board_item_db(require_async_db(state, "task board create")?, request).await
+    // The task-board item future is large; box it so callers stay under the
+    // large-future lint.
+    Box::pin(service::create_task_board_item_db(
+        require_async_db(state, "task board create")?,
+        request,
+    ))
+    .await
 }
 
 /// Read the board, then select, page, and project it for this caller.

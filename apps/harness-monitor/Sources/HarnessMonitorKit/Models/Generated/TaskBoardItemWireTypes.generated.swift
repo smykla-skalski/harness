@@ -161,10 +161,12 @@ public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
   public var worktree: String?
   public var prNumber: UInt64?
   public var prUrl: String?
+  public var prHeadRevision: String?
+  public var prAuthor: String?
   public var lastError: String?
   public var policyTraceIds: [String]
 
-  public init(executionId: String? = nil, status: TaskBoardWorkflowStatusWire = .idle, currentStepId: String? = nil, attempts: UInt32 = 0, branch: String? = nil, worktree: String? = nil, prNumber: UInt64? = nil, prUrl: String? = nil, lastError: String? = nil, policyTraceIds: [String] = []) {
+  public init(executionId: String? = nil, status: TaskBoardWorkflowStatusWire = .idle, currentStepId: String? = nil, attempts: UInt32 = 0, branch: String? = nil, worktree: String? = nil, prNumber: UInt64? = nil, prUrl: String? = nil, prHeadRevision: String? = nil, prAuthor: String? = nil, lastError: String? = nil, policyTraceIds: [String] = []) {
     self.executionId = executionId
     self.status = status
     self.currentStepId = currentStepId
@@ -173,6 +175,8 @@ public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
     self.worktree = worktree
     self.prNumber = prNumber
     self.prUrl = prUrl
+    self.prHeadRevision = prHeadRevision
+    self.prAuthor = prAuthor
     self.lastError = lastError
     self.policyTraceIds = policyTraceIds
   }
@@ -187,6 +191,8 @@ public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
     worktree = try container.decodeIfPresent(String.self, forKey: .worktree)
     prNumber = try container.decodeIfPresent(UInt64.self, forKey: .prNumber)
     prUrl = try container.decodeIfPresent(String.self, forKey: .prUrl)
+    prHeadRevision = try container.decodeIfPresent(String.self, forKey: .prHeadRevision)
+    prAuthor = try container.decodeIfPresent(String.self, forKey: .prAuthor)
     lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
     policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
   }
@@ -200,6 +206,8 @@ public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
     case worktree
     case prNumber = "pr_number"
     case prUrl = "pr_url"
+    case prHeadRevision = "pr_head_revision"
+    case prAuthor = "pr_author"
     case lastError = "last_error"
     case policyTraceIds = "policy_trace_ids"
   }
