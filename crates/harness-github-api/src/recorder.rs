@@ -153,10 +153,9 @@ impl GitHubUsageRecorder {
     fn append_journal(&self, record: &UsageJournalRecord<'_>) {
         // Test builds (this crate's own, or a downstream crate's via
         // `test-support`) construct the recorder with an empty placeholder
-        // root - see `GitHubCache::new` - so `journal_path` here is a bare
-        // relative filename with no real directory behind it. Bail out
-        // rather than let it land relative to the test process's current
-        // directory.
+        // root - see `GitHubCache::new` - so `journal_path` here stays empty
+        // rather than joining a bare relative filename that would land next
+        // to whatever the test process's current directory happens to be.
         if self.journal_path.as_os_str().is_empty() {
             return;
         }

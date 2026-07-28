@@ -220,12 +220,12 @@ impl GitHubApiState {
         }
     }
 
-    // `&self` is unused here but required to match the production branch's
-    // signature above, since both are the same method name behind a cfg
-    // split.
+    // `&self` is required to match the production branch's signature above,
+    // since both are the same method name behind a cfg split.
     #[cfg(any(test, feature = "test-support"))]
-    #[allow(clippy::unused_self)]
-    const fn persist_data_revision(&self, _revision: u64) {}
+    const fn persist_data_revision(&self, _revision: u64) {
+        let _ = self;
+    }
 }
 
 pub async fn begin_external_mutation(operation: &str) -> GitHubMutationGuard {
