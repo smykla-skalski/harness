@@ -65,6 +65,12 @@ pub fn sync_agent_liveness(
     Ok(result)
 }
 
+/// Opaque per-agent activity snapshot passed between
+/// [`collect_agent_activity_from_state`] and [`apply_liveness_transitions`].
+///
+/// `pub`, not `pub(crate)`: the root crate's `daemon::service::read_reconciliation`
+/// holds this across those two calls, but never reads a field directly, so
+/// the fields stay private rather than growing accessors nothing needs yet.
 pub struct AgentActivityRecord {
     agent_id: String,
     last_activity: Option<String>,
@@ -77,7 +83,7 @@ pub struct AgentActivityRecord {
 /// # Errors
 /// Returns [`CliError`] when the session layout cannot be resolved or the
 /// session does not exist.
-pub fn collect_agent_activity(
+pub(crate) fn collect_agent_activity(
     session_id: &str,
     project_dir: &Path,
 ) -> Result<Vec<AgentActivityRecord>, CliError> {
@@ -138,7 +144,7 @@ pub fn apply_liveness_transitions(
 }
 
 #[must_use]
-pub fn compute_agent_transition(
+pub(crate) fn compute_agent_transition(
     state: &SessionState,
     record: &AgentActivityRecord,
     config: &LivenessConfig,

@@ -5,11 +5,6 @@
 //! different task). Post-condition is either `Started` (signal produced, target
 //! locked on this task, `queued_at` None) or `Queued` (task queued, `queued_at` set,
 //! target still locked on its prior task).
-#![allow(
-    clippy::cognitive_complexity,
-    clippy::too_many_lines,
-    reason = "integration-style scenario tests keep full setup and assertions together"
-)]
 
 use super::*;
 

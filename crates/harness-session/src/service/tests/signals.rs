@@ -1,9 +1,3 @@
-#![allow(
-    clippy::cognitive_complexity,
-    clippy::too_many_lines,
-    reason = "integration-style scenario tests keep full setup and assertions together"
-)]
-
 use super::*;
 
 #[test]
