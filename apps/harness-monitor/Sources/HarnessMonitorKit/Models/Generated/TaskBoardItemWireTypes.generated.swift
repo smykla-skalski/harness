@@ -215,6 +215,7 @@ public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
 
 public enum TaskBoardWorkflowStatusWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case idle = "idle"
+  case admitting = "admitting"
   case running = "running"
   case paused = "paused"
   case completed = "completed"
