@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::session::service::SPAWN_REVIEWER_COMMAND;
-use crate::task_board::types::AgentMode;
+use crate::types::AgentMode;
+use harness_session::service::SPAWN_REVIEWER_COMMAND;
 
 use super::{EvaluatorIntent, ReviewerIntent, WorkerIntent};
 

@@ -2,20 +2,20 @@
 //! switches, kill switch, and the graph/built-in gate selection. Split out of
 //! `dispatch.rs` to keep each file under the source-length cap.
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::Path;
 
-use crate::task_board::policy::{
+use crate::policy::{
     BuiltInPolicyGate, POLICY_VERSION, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
     PolicyApprovalState, PolicyDecision, PolicyGate, PolicyInput, PolicyReasonCode, PolicySubject,
 };
-#[cfg(test)]
-use crate::task_board::policy_graph::resolve_gate_policy;
-use crate::task_board::policy_graph::{
+#[cfg(any(test, feature = "test-support"))]
+use crate::policy_graph::resolve_gate_policy;
+use crate::policy_graph::{
     PolicyCanvasWorkspace, PolicyGraph, PolicyPendingGrantRequest, PolicyPipelineMode,
     RecordedPolicyDecision, record_pending_grant, record_policy_decision,
 };
-use crate::task_board::types::TaskBoardItem;
+use crate::types::TaskBoardItem;
 
 /// Persisted spawn switches that gate the dispatch decision fail-closed,
 /// independently of the authored graph. Resolved from the policy workspace by
@@ -65,7 +65,7 @@ pub(crate) fn spawn_policy_input(
     input
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn dispatch_policy(
     item: &TaskBoardItem,
     policy_root: &Path,
@@ -91,7 +91,8 @@ pub(super) fn dispatch_policy(
     (BuiltInPolicyGate::default().evaluate(&input), None)
 }
 
-pub(crate) fn dispatch_policy_from_graph(
+#[must_use]
+pub fn dispatch_policy_from_graph(
     item: &TaskBoardItem,
     policy: Option<(&str, &PolicyGraph)>,
     evaluated_at: Option<String>,
@@ -121,7 +122,8 @@ pub(crate) fn dispatch_policy_from_graph(
 
 /// The durable grant this dispatch consumes: only an approved live grant whose
 /// gate the decision cleared. Everything else leaves nothing to consume.
-pub(crate) fn consumed_grant_id(
+#[must_use]
+pub fn consumed_grant_id(
     grant: Option<&PolicyApprovalGrant>,
     decision: &PolicyDecision,
 ) -> Option<String> {

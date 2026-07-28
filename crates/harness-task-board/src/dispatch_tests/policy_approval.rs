@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::task_board::policy::{
+use crate::policy::{
     PolicyAction, PolicyApprovalGrant, PolicyApprovalState, PolicyDecision, PolicyReasonCode,
 };
-use crate::task_board::policy_graph::PolicyGraph;
+use crate::policy_graph::PolicyGraph;
 
 use super::{DispatchPlan, SpawnGateSwitches, build_dispatch_plans_with_policy, ready_item};
 

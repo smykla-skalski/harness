@@ -3,48 +3,24 @@
 // `progress_rollup`, `remote_spki_pin`, `runtime_config`, `store`, `machines`,
 // part of `wire`, `project`/`project_color`/`project_shape`, `triage*`,
 // `prompt*`/`worker_prompt`, `working_copy`, `policy_graph`, `policy_runtime`,
-// `automation`, and `github::config`'s whole GitHub automation-settings
-// wire-type module moved into the standalone `harness-task-board` crate.
-// Every other task-board subtree below reaches those through this glob
-// re-export exactly the way external callers (`daemon`, `session`, `hooks`)
-// already do, so none of them needed an import change for the move.
+// `automation`, `dispatch`/`evaluation`/`planning`, and `github::config`'s
+// whole GitHub automation-settings wire-type module moved into the
+// standalone `harness-task-board` crate. Every other task-board subtree
+// below reaches those through this glob re-export exactly the way external
+// callers (`daemon`, `session`, `hooks`) already do, so none of them needed
+// an import change for the move.
 pub use harness_task_board::*;
 
-pub mod dispatch;
-pub mod evaluation;
 pub mod external;
 pub mod github;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod legacy_import;
 pub mod orchestrator;
-pub mod planning;
 pub mod summary;
 pub mod transport;
 pub mod wire;
 
-pub use dispatch::{
-    DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
-    DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
-    ReviewerIntent, SessionIntent, TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
-    TaskCreationIntent, WorkerIntent,
-};
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use dispatch::{
-    SpawnGateSwitches, build_dispatch_plans_with_policy, consumed_grant_id,
-    dispatch_policy_from_graph, machine_mismatch_plan_with_policy,
-};
-#[cfg(test)]
-pub use dispatch::{
-    build_dispatch_plan, build_dispatch_plans, build_dispatch_plans_with_policy_root,
-    filter_for_local_machine, machine_mismatch_plan_with_policy_root,
-};
-pub use evaluation::{
-    EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
-    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
-    failed_workflow, missing_session_record, missing_task_record, record_from_decision,
-    skipped_unlinked_record,
-};
 pub use external::{
     ExternalCreateOutcome, ExternalProvider, ExternalProviderCapabilities, ExternalRevisionUpdate,
     ExternalSyncAction, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
@@ -76,10 +52,6 @@ pub use orchestrator::{
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
     TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
     TaskBoardWorkflowExecutionCount,
-};
-pub use planning::{
-    PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
-    begin_planning, revoke_plan, submit_plan,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use summary::build_audit_summary_with_policy;

@@ -1,12 +1,12 @@
 use super::*;
-use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::policy::{PolicyAction, PolicyReasonCode};
-use crate::task_board::policy_graph::{
+use crate::planning::{approve_plan, submit_plan};
+use crate::policy::{PolicyAction, PolicyReasonCode, PolicySubject};
+use crate::policy_graph::{
     PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode,
     PolicyGraphNodeKind, PolicyPipelinePromoteRequest, apply_promote, apply_save_draft,
-    apply_simulate,
+    apply_simulate, store_gate_policy,
 };
-use crate::task_board::types::ExternalRefProvider;
+use crate::types::{ExternalRefProvider, TaskBoardItemKind};
 use tempfile::tempdir;
 
 #[path = "dispatch_tests/policy_approval.rs"]
@@ -142,13 +142,17 @@ fn spawn_policy_input_fills_subject_enrichment_and_evaluated_at() {
     let input = super::spawn_policy_input(&item, Some("2026-07-13T12:00:00Z".into()));
 
     assert_eq!(input.action, PolicyAction::SpawnAgent);
-    assert_eq!(input.subject.task_board_item_id.as_deref(), Some("task-1"));
-    assert_eq!(input.subject.repository.as_deref(), Some("project-1"));
-    assert_eq!(input.subject.tags, ["cli", "board"]);
-    assert_eq!(input.subject.priority, Some(TaskBoardPriority::Critical));
-    assert_eq!(input.subject.agent_mode, Some(AgentMode::Interactive));
-    assert_eq!(input.subject.target_project_types, ["kuma", "kuma-mesh"]);
     assert_eq!(input.evaluated_at.as_deref(), Some("2026-07-13T12:00:00Z"));
+    assert_policy_input_subject_enrichment(&input.subject);
+}
+
+fn assert_policy_input_subject_enrichment(subject: &PolicySubject) {
+    assert_eq!(subject.task_board_item_id.as_deref(), Some("task-1"));
+    assert_eq!(subject.repository.as_deref(), Some("project-1"));
+    assert_eq!(subject.tags, ["cli", "board"]);
+    assert_eq!(subject.priority, Some(TaskBoardPriority::Critical));
+    assert_eq!(subject.agent_mode, Some(AgentMode::Interactive));
+    assert_eq!(subject.target_project_types, ["kuma", "kuma-mesh"]);
 }
 
 #[test]
@@ -168,6 +172,12 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
 
     let plan = build_dispatch_plan(&item);
 
+    assert_dispatch_plan_task_and_session(&plan);
+    assert_dispatch_plan_roles(&plan);
+    assert_dispatch_plan_policy_and_prompt(&plan);
+}
+
+fn assert_dispatch_plan_task_and_session(plan: &DispatchPlan) {
     assert!(plan.is_ready());
     assert_eq!(
         plan.session,
@@ -183,6 +193,9 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
         Some("Use session task creation.")
     );
     assert_eq!(plan.task.tags, ["cli", "board"]);
+}
+
+fn assert_dispatch_plan_roles(plan: &DispatchPlan) {
     assert_eq!(plan.worker.mode, AgentMode::Interactive);
     assert_eq!(plan.reviewer.suggested_persona, REVIEWER_PERSONA);
     assert_eq!(plan.evaluator.mode, AgentMode::Evaluate);
@@ -194,6 +207,9 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
             .map(|signal| (signal.command.as_str(), signal.trigger_step.as_str())),
         Some(("spawn_reviewer", "submit_for_review"))
     );
+}
+
+fn assert_dispatch_plan_policy_and_prompt(plan: &DispatchPlan) {
     assert!(plan.policy.is_allow());
     assert!(
         plan.rendered_prompt
@@ -202,7 +218,7 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
     assert!(plan.rendered_prompt.contains("Tags:\ncli, board"));
     assert!(plan.rendered_prompt.contains("External refs:\ngithub:123"));
     assert_eq!(
-        serde_json::to_value(&plan).expect("serialize plan")["rendered_prompt"],
+        serde_json::to_value(plan).expect("serialize plan")["rendered_prompt"],
         plan.rendered_prompt
     );
 }
@@ -227,7 +243,7 @@ fn inbox_items_are_not_dispatchable() {
 #[test]
 fn umbrella_items_are_not_dispatchable() {
     let mut item = ready_item();
-    item.kind = crate::task_board::types::TaskBoardItemKind::Umbrella;
+    item.kind = TaskBoardItemKind::Umbrella;
 
     let plan = build_dispatch_plan(&item);
 
@@ -235,7 +251,7 @@ fn umbrella_items_are_not_dispatchable() {
         plan.readiness,
         DispatchReadiness::Blocked {
             reason: DispatchBlockReason::Kind {
-                item_kind: crate::task_board::types::TaskBoardItemKind::Umbrella,
+                item_kind: TaskBoardItemKind::Umbrella,
             },
         }
     );
@@ -359,10 +375,10 @@ fn dispatch_policy_uses_supplied_board_root_pipeline() {
         },
     )
     .expect("promote policy graph");
-    crate::task_board::policy_graph::store_gate_policy(&board_root, Some(promoted.document));
+    store_gate_policy(&board_root, Some(promoted.document));
 
     let plan = build_dispatch_plan_with_policy_root(&ready_item(), &board_root);
-    crate::task_board::policy_graph::store_gate_policy(&board_root, None);
+    store_gate_policy(&board_root, None);
 
     assert!(matches!(
         plan.readiness,
@@ -398,10 +414,10 @@ fn dispatch_policy_prefers_cached_gate_policy_over_disk() {
         },
     });
     document.mode = PolicyGraphMode::Enforced;
-    crate::task_board::policy_graph::store_gate_policy(&board_root, Some(document));
+    store_gate_policy(&board_root, Some(document));
 
     let plan = build_dispatch_plan_with_policy_root(&ready_item(), &board_root);
-    crate::task_board::policy_graph::store_gate_policy(&board_root, None);
+    store_gate_policy(&board_root, None);
 
     assert!(matches!(
         plan.readiness,

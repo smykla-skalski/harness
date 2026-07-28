@@ -2759,13 +2759,15 @@ const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMo
 // The host Machine struct (Swift hand TaskBoardHostMachine); references the adopted
 // TaskBoardAgentMode bare. MachineRegistry is excluded by the allow-list.
 const TASK_BOARD_MACHINES_EMIT_ONLY: &[&str] = &["Machine"];
-const TASK_BOARD_PLANNING_SOURCE: &str = include_str!("../src/task_board/planning.rs");
+const TASK_BOARD_PLANNING_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/planning.rs");
 const TASK_BOARD_PLANNING_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPlanningWireTypes.generated.swift";
 // The planning transition (planning.rs) and its response wrapper (protocol facade),
 // which carries the rerouted TaskBoardItemWire. PlanApprovalGate (struct-variant
 // tagged) and the rest of the protocol facade are excluded by the allow-list.
 const TASK_BOARD_PLANNING_EMIT_ONLY: &[&str] = &["PlanningTransition", "TaskBoardPlanningResponse"];
-const TASK_BOARD_EVALUATION_SOURCE: &str = include_str!("../src/task_board/evaluation.rs");
+const TASK_BOARD_EVALUATION_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/evaluation.rs");
 const TASK_BOARD_EVALUATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEvaluationWireTypes.generated.swift";
 // The evaluate-endpoint summary, its records, outcome enum and signal-failure
 // (evaluation.rs). The record carries the rerouted TaskBoardItemWire and references
@@ -2777,7 +2779,8 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
     "TaskBoardEvaluationOutcome",
     "EvaluationSignalFailure",
 ];
-const TASK_BOARD_DISPATCH_SOURCE: &str = include_str!("../src/task_board/dispatch.rs");
+const TASK_BOARD_DISPATCH_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/dispatch.rs");
 const TASK_BOARD_STEPS_SOURCE: &str = include_str!("../src/task_board/wire/task_board_steps.rs");
 const TASK_BOARD_DISPATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardDispatchWireTypes.generated.swift";
 // The dispatch-endpoint execution summary and its plan/intent graph (dispatch.rs).
