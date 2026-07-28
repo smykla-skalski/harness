@@ -1,3 +1,5 @@
+use serde_json::Value;
+
 /// Minimum text length to bother displaying in dump mode.
 pub const MIN_DUMP_TEXT_LENGTH: usize = 5;
 
@@ -37,4 +39,30 @@ pub fn redact_details(text: &str) -> String {
     ENV_VALUE_RE
         .replace_all(&redacted, "$1=<redacted>")
         .into_owned()
+}
+
+// Lives here rather than in `dump` (which stays behind the `cli` feature):
+// `classifier` reads tool-result text unconditionally to run its own text
+// checks, so this needs a home that compiles regardless of that feature.
+/// Extract text from a `tool_result` content block.
+#[must_use]
+pub fn tool_result_text(block: &Value) -> String {
+    let content = &block["content"];
+    if let Some(arr) = content.as_array() {
+        let parts: Vec<&str> = arr
+            .iter()
+            .filter_map(|item| {
+                if item["type"].as_str() == Some("text") {
+                    item["text"].as_str()
+                } else {
+                    None
+                }
+            })
+            .collect();
+        parts.join("\n")
+    } else if let Some(s) = content.as_str() {
+        s.to_string()
+    } else {
+        String::new()
+    }
 }

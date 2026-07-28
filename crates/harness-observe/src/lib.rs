@@ -4,18 +4,25 @@
 
 pub mod application;
 pub mod classifier;
+#[cfg(feature = "cli")]
 mod compare;
+#[cfg(feature = "cli")]
 mod context_cmd;
+#[cfg(feature = "cli")]
 pub mod dump;
 mod issue_code;
+#[cfg(feature = "cli")]
 pub mod output;
 pub mod patterns;
+#[cfg(feature = "cli")]
 mod scan;
 mod session;
 pub mod session_event;
 mod text;
+#[cfg(feature = "cli")]
 pub mod transport;
 pub mod types;
+#[cfg(feature = "cli")]
 pub mod watch;
 
 #[cfg(test)]
