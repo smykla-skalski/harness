@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
 use super::{
-    BTreeMap, CURRENT_VERSION, CliError, DaemonClient, ResolvedRuntimeSessionAgent, SessionState,
+    BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, ResolvedRuntimeSessionAgent, SessionState,
     wire,
 };
 
 use crate::session::types::SessionPolicy;
+use harness_daemon_client::DaemonClient;
+use harness_protocol::session_wire::RuntimeSessionResolutionResponse;
 
 pub(crate) fn detail_to_session_state(detail: &wire::SessionDetail) -> SessionState {
     let agents = detail
@@ -84,7 +86,20 @@ pub(crate) fn resolve_runtime_session_via_daemon(
     runtime_name: &str,
     runtime_session_id: &str,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
-    client.resolve_runtime_session(runtime_name, runtime_session_id)
+    let response: Option<RuntimeSessionResolutionResponse> = client
+        .get_optional(
+            "/v1/runtime-sessions/resolve",
+            &[
+                ("runtime_name", runtime_name),
+                ("runtime_session_id", runtime_session_id),
+            ],
+        )
+        .map_err(|error| super::daemon_client_error("resolve runtime session", &error))?;
+    response.map(|payload| payload.resolved).ok_or_else(|| {
+        CliError::from(CliErrorKind::session_agent_conflict(
+            "daemon does not support /v1/runtime-sessions/resolve; upgrade the daemon".to_string(),
+        ))
+    })
 }
 
 #[cfg(test)]

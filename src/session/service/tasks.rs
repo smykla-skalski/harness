@@ -1,13 +1,25 @@
 use super::{
-    CliError, CliErrorKind, DaemonClient, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
-    TaskSource, TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs,
-    apply_advance_queued_tasks, apply_assign_task, apply_create_task, apply_delete_task,
-    apply_drop_task, apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
-    ensure_valid_progress, generate_checkpoint_id, load_state_or_err, log_checkpoint_recorded,
-    log_task_assigned, log_task_created, log_task_deleted, log_task_status_changed, wire,
-    reconcile_expired_pending_signals, refresh_session, sort_session_tasks, started_task_signals,
-    storage, utc_now, write_prepared_task_start_signals,
+    CliError, CliErrorKind, Path, TaskCheckpoint, TaskQueuePolicy, TaskSeverity, TaskSource,
+    TaskSpec, TaskStatus, WorkItem, append_task_drop_effect_logs, apply_advance_queued_tasks,
+    apply_assign_task, apply_create_task, apply_delete_task, apply_drop_task,
+    apply_record_checkpoint, apply_update_task, apply_update_task_queue_policy,
+    daemon_client_error, ensure_valid_progress, generate_checkpoint_id, load_state_or_err,
+    log_checkpoint_recorded, log_task_assigned, log_task_created, log_task_deleted,
+    log_task_status_changed, reconcile_expired_pending_signals, refresh_session,
+    sort_session_tasks, started_task_signals, storage, utc_now, wire,
+    write_prepared_task_start_signals,
 };
+use harness_daemon_client::DaemonClient;
+use tokio::runtime::Handle;
+
+/// Build the `/v1/sessions/{id}/tasks/{id}/{action}` URL shared by
+/// `assign_task`, `drop_task`, `update_task`, and `record_task_checkpoint`.
+/// `create_task_with_source` and `delete_task` hit their own action-less
+/// paths, and `list_tasks` reads the session detail endpoint instead, so none
+/// of the three go through this helper.
+fn task_action_url(session_id: &str, task_id: &str, action: &str) -> String {
+    format!("/v1/sessions/{session_id}/tasks/{task_id}/{action}")
+}
 
 /// Create a work item in the session.
 ///
@@ -42,17 +54,22 @@ pub fn create_task_with_source(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<WorkItem, CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let detail = client.create_task(
-            session_id,
-            &wire::TaskCreateRequest {
-                actor: actor_id.to_string(),
-                title: spec.title.to_string(),
-                context: spec.context.map(ToString::to_string),
-                severity: spec.severity,
-                suggested_fix: spec.suggested_fix.map(ToString::to_string),
-            },
-        )?;
+    // `daemon::service::mutations::tasks::create_task` calls this directly as
+    // its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::TaskCreateRequest {
+            actor: actor_id.to_string(),
+            title: spec.title.to_string(),
+            context: spec.context.map(ToString::to_string),
+            severity: spec.severity,
+            suggested_fix: spec.suggested_fix.map(ToString::to_string),
+        };
+        let detail: wire::SessionDetail = client
+            .post(&format!("/v1/sessions/{session_id}/task"), &request)
+            .map_err(|error| daemon_client_error("create task", &error))?;
         let created = detail.tasks.into_iter().max_by(|left, right| {
             left.created_at
                 .cmp(&right.created_at)
@@ -94,15 +111,20 @@ pub fn assign_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.assign_task(
-            session_id,
-            task_id,
-            &wire::TaskAssignRequest {
-                actor: actor_id.to_string(),
-                agent_id: agent_id.to_string(),
-            },
-        )?;
+    // `daemon::service::mutations::tasks::assign_task` calls this directly as
+    // its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::TaskAssignRequest {
+            actor: actor_id.to_string(),
+            agent_id: agent_id.to_string(),
+        };
+        let url = task_action_url(session_id, task_id, "assign");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("assign task", &error))?;
         return Ok(());
     }
 
@@ -141,17 +163,22 @@ pub fn drop_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.drop_task(
-            session_id,
-            task_id,
-            &wire::TaskDropRequest {
-                actor: actor_id.to_string(),
-                target: target.clone(),
-                queue_policy,
-                reason: None,
-            },
-        )?;
+    // `daemon::service::mutations::tasks::drop_task` calls this directly as its
+    // own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::TaskDropRequest {
+            actor: actor_id.to_string(),
+            target: target.clone(),
+            queue_policy,
+            reason: None,
+        };
+        let url = task_action_url(session_id, task_id, "drop");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("drop task", &error))?;
         return Ok(());
     }
 
@@ -204,8 +231,12 @@ pub fn list_tasks(
     status_filter: Option<TaskStatus>,
     project_dir: &Path,
 ) -> Result<Vec<WorkItem>, CliError> {
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        let detail = client.get_session_detail(session_id)?;
+        let detail: wire::SessionDetail = client
+            .get(&format!("/v1/sessions/{session_id}"), &[])
+            .map_err(|error| daemon_client_error("get session detail", &error))?;
         let mut items: Vec<WorkItem> = detail
             .tasks
             .into_iter()
@@ -237,14 +268,19 @@ pub fn delete_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.delete_task(
-            session_id,
-            task_id,
-            &wire::TaskDeleteRequest {
-                actor: actor_id.to_string(),
-            },
-        )?;
+    // `daemon::service::mutations::tasks::delete_task` calls this directly as
+    // its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::TaskDeleteRequest {
+            actor: actor_id.to_string(),
+        };
+        let url = format!("/v1/sessions/{session_id}/tasks/{task_id}");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("delete task", &error))?;
         return Ok(());
     }
 
@@ -302,16 +338,21 @@ pub fn update_task(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.update_task(
-            session_id,
-            task_id,
-            &wire::TaskUpdateRequest {
-                actor: actor_id.to_string(),
-                status,
-                note: note.map(ToString::to_string),
-            },
-        )?;
+    // `daemon::service::mutations::tasks::update_task` calls this directly as
+    // its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::TaskUpdateRequest {
+            actor: actor_id.to_string(),
+            status,
+            note: note.map(ToString::to_string),
+        };
+        let url = task_action_url(session_id, task_id, "status");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("update task", &error))?;
         return Ok(());
     }
 
@@ -354,16 +395,21 @@ pub fn record_task_checkpoint(
 ) -> Result<TaskCheckpoint, CliError> {
     ensure_valid_progress(progress)?;
 
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.checkpoint_task(
-            session_id,
-            task_id,
-            &wire::TaskCheckpointRequest {
-                actor: actor_id.to_string(),
-                summary: summary.to_string(),
-                progress,
-            },
-        )?;
+    // `daemon::service::mutations::tasks::checkpoint_task` calls this directly
+    // as its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::TaskCheckpointRequest {
+            actor: actor_id.to_string(),
+            summary: summary.to_string(),
+            progress,
+        };
+        let url = task_action_url(session_id, task_id, "checkpoint");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("checkpoint task", &error))?;
         return Ok(TaskCheckpoint {
             checkpoint_id: generate_checkpoint_id(task_id),
             task_id: task_id.to_string(),

@@ -30,7 +30,7 @@ pub enum ClientError {
     EmptyToken { path: std::path::PathBuf },
     #[error("daemon HTTP request failed: {0}")]
     Request(reqwest::Error),
-    #[error("daemon HTTP {method} {path} returned {status}: {body}")]
+    #[error("{}", response_display_message(method, path, *status, body))]
     Response {
         method: &'static str,
         path: String,
@@ -43,6 +43,30 @@ pub enum ClientError {
         path: String,
         source: serde_json::Error,
     },
+}
+
+/// Parses the daemon's `{"error":{"code","message"}}` envelope out of a
+/// non-success response body, mirroring the root facade's
+/// `daemon::client::http::parse_error_response`. Every caller that formats a
+/// `ClientError::Response` through `Display` - directly or via a
+/// `daemon_client_error`-style wrapper - gets the same clean message instead
+/// of a raw JSON dump; falls back to the full method/path/status/body when
+/// the envelope is missing or malformed.
+fn response_display_message(method: &str, path: &str, status: u16, body: &str) -> String {
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(body)
+        && let Some(error) = parsed.get("error")
+    {
+        let message = error
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("daemon returned an error");
+        let code = error
+            .get("code")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("DAEMON_ERROR");
+        return format!("daemon error ({code}, HTTP {status}): {message}");
+    }
+    format!("daemon HTTP {method} {path} returned {status}: {body}")
 }
 
 /// Authenticated synchronous client for a live Harness daemon.
@@ -504,6 +528,24 @@ mod tests {
         assert_eq!(
             mutation_timeout_for_path("/v1/task-board/items"),
             REQUEST_TIMEOUT
+        );
+    }
+
+    #[test]
+    fn response_display_message_parses_the_daemon_error_envelope() {
+        let body = r#"{"error":{"code":"SESSION_NOT_ACTIVE","message":"session is not active"}}"#;
+        assert_eq!(
+            response_display_message("POST", "/v1/sessions/abc/end", 409, body),
+            "daemon error (SESSION_NOT_ACTIVE, HTTP 409): session is not active"
+        );
+    }
+
+    #[test]
+    fn response_display_message_falls_back_when_the_body_is_not_the_error_envelope() {
+        let body = "not json";
+        assert_eq!(
+            response_display_message("POST", "/v1/sessions/abc/end", 500, body),
+            "daemon HTTP POST /v1/sessions/abc/end returned 500: not json"
         );
     }
 }

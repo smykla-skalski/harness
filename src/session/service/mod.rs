@@ -15,13 +15,13 @@ use crate::agents::runtime::signal::{
     read_pending_signals, signal_matches_session,
 };
 use crate::agents::service as agents_service;
-use crate::daemon::client::DaemonClient;
 use crate::daemon::index as daemon_index;
+use crate::hooks::adapters::HookAgent;
 use crate::session::ordering::sort_session_tasks;
 use crate::session::wire;
-use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::HookAgent;
 use crate::workspace::{project_context_dir, utc_now};
+use harness_daemon_client::ClientError;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::roles::{SessionAction, is_permitted};
 use super::storage;
@@ -40,6 +40,14 @@ const REMOVE_AGENT_SIGNAL_MESSAGE: &str = "You have been removed from this harne
 const END_SESSION_SIGNAL_ACTION_HINT: &str = "harness:session:end";
 const REMOVE_AGENT_SIGNAL_ACTION_HINT: &str = "harness:session:remove-agent";
 const START_TASK_SIGNAL_COMMAND: &str = "request_action";
+
+/// Map a leaf `harness-daemon-client` transport failure onto the domain's own
+/// error type, shared by every submodule that talks to the daemon directly.
+pub(crate) fn daemon_client_error(operation: &str, error: &ClientError) -> CliError {
+    CliError::from(CliErrorKind::workflow_io(format!(
+        "daemon {operation}: {error}"
+    )))
+}
 
 /// Task-specific fields for `create_task_with_source`.
 pub struct TaskSpec<'a> {

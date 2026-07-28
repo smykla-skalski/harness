@@ -1,17 +1,19 @@
 use crate::agents::kind::DisconnectReason;
 
 use super::{
-    AgentStatus, CliError, CliErrorKind, DaemonClient, Path, SessionRole, SessionState,
-    SessionTransition, agent_status_label, agents_service, append_leader_transfer_logs,
-    append_leave_signal_logs, apply_assign_role, apply_end_session, apply_join_session,
-    apply_remove_agent, apply_transfer_leader, clear_pending_leader_transfer,
-    create_initial_session, ensure_known_runtime, log_agent_joined, log_agent_removed,
+    AgentStatus, CliError, CliErrorKind, Path, SessionRole, SessionState, SessionTransition,
+    agent_status_label, agents_service, append_leader_transfer_logs, append_leave_signal_logs,
+    apply_assign_role, apply_end_session, apply_join_session, apply_remove_agent,
+    apply_transfer_leader, clear_pending_leader_transfer, create_initial_session,
+    daemon_client_error, ensure_known_runtime, log_agent_joined, log_agent_removed,
     log_role_changed, log_session_ended, log_session_started, prepare_end_session_leave_signals,
-    prepare_remove_agent_leave_signal, wire, refresh_session, release_agent_tasks,
-    require_active, require_removable_agent, resolve_join_role, resolve_registered_runtime,
+    prepare_remove_agent_leave_signal, refresh_session, release_agent_tasks, require_active,
+    require_removable_agent, resolve_join_role, resolve_registered_runtime,
     resolve_session_project_dir, slice, storage, utc_now, validate_explicit_session_id,
-    validate_policy_preset, write_prepared_leave_signals,
+    validate_policy_preset, wire, write_prepared_leave_signals,
 };
+use harness_daemon_client::DaemonClient;
+use tokio::runtime::Handle;
 
 /// Start a new leaderless orchestration session.
 ///
@@ -40,15 +42,25 @@ pub fn start_session_with_policy(
     validate_policy_preset(policy_preset)?;
     validate_explicit_session_id(session_id)?;
 
-    if let Some(client) = DaemonClient::try_connect() {
-        return client.start_session(&wire::SessionStartRequest {
+    // The daemon's own no-database fallback (`start_session_direct`) calls this
+    // function directly from its async worker threads, so a live daemon must
+    // never be dialed back while one already holds this call; skip straight to
+    // the local, file-based path instead of blocking a worker on itself.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SessionStartRequest {
             title: title.to_string(),
             context: context.to_string(),
             session_id: session_id.map(ToString::to_string),
             project_dir: project_dir.to_string_lossy().into_owned(),
             policy_preset: policy_preset.map(ToString::to_string),
             base_ref: None,
-        });
+        };
+        let response: wire::SessionMutationResponse = client
+            .post("/v1/sessions", &request)
+            .map_err(|error| daemon_client_error("start session", &error))?;
+        return Ok(response.state);
     }
 
     let now = utc_now();
@@ -113,19 +125,24 @@ pub fn join_session_with_fallback(
     persona: Option<&str>,
 ) -> Result<SessionState, CliError> {
     ensure_known_runtime(runtime_name, "agent join requires a known runtime")?;
-    if let Some(client) = DaemonClient::try_connect() {
-        return client.join_session(
-            session_id,
-            &wire::SessionJoinRequest {
-                runtime: runtime_name.to_string(),
-                role,
-                fallback_role,
-                capabilities: capabilities.to_vec(),
-                name: name.map(ToString::to_string),
-                project_dir: project_dir.to_string_lossy().into_owned(),
-                persona: persona.map(ToString::to_string),
-            },
-        );
+    // Same self-call risk as `start_session_with_policy`: the daemon's own
+    // no-database join fallback calls this directly from its async runtime.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SessionJoinRequest {
+            runtime: runtime_name.to_string(),
+            role,
+            fallback_role,
+            capabilities: capabilities.to_vec(),
+            name: name.map(ToString::to_string),
+            project_dir: project_dir.to_string_lossy().into_owned(),
+            persona: persona.map(ToString::to_string),
+        };
+        let response: wire::SessionMutationResponse = client
+            .post(&format!("/v1/sessions/{session_id}/join"), &request)
+            .map_err(|error| daemon_client_error("join session", &error))?;
+        return Ok(response.state);
     }
 
     let display_name = name.map_or_else(
@@ -178,13 +195,18 @@ pub fn join_session_with_fallback(
 /// Returns `CliError` if the caller lacks permission, workers have active tasks,
 /// or on storage failures.
 pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.end_session(
-            session_id,
-            &wire::SessionEndRequest {
-                actor: actor_id.to_string(),
-            },
-        )?;
+    // `daemon::service::mutations::sessions::end_session` calls this directly
+    // as its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SessionEndRequest {
+            actor: actor_id.to_string(),
+        };
+        let _: wire::SessionDetail = client
+            .post(&format!("/v1/sessions/{session_id}/end"), &request)
+            .map_err(|error| daemon_client_error("end session", &error))?;
         return Ok(());
     }
 
@@ -217,16 +239,21 @@ pub fn assign_role(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.assign_role(
-            session_id,
-            agent_id,
-            &wire::RoleChangeRequest {
-                actor: actor_id.to_string(),
-                role,
-                reason: reason.map(ToString::to_string),
-            },
-        )?;
+    // `daemon::service::mutations::agents::change_role` calls this directly as
+    // its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::RoleChangeRequest {
+            actor: actor_id.to_string(),
+            role,
+            reason: reason.map(ToString::to_string),
+        };
+        let url = format!("/v1/sessions/{session_id}/agents/{agent_id}/role");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("assign role", &error))?;
         return Ok(());
     }
 
@@ -259,14 +286,19 @@ pub fn remove_agent(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.remove_agent(
-            session_id,
-            agent_id,
-            &wire::AgentRemoveRequest {
-                actor: actor_id.to_string(),
-            },
-        )?;
+    // `daemon::service::mutations::agents::remove_agent` calls this directly as
+    // its own no-database-row fallback, from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::AgentRemoveRequest {
+            actor: actor_id.to_string(),
+        };
+        let url = format!("/v1/sessions/{session_id}/agents/{agent_id}/remove");
+        let _: wire::SessionDetail = client
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("remove agent", &error))?;
         return Ok(());
     }
 
@@ -301,15 +333,20 @@ pub fn transfer_leader(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.transfer_leader(
-            session_id,
-            &wire::LeaderTransferRequest {
-                actor: actor_id.to_string(),
-                new_leader_id: new_leader_id.to_string(),
-                reason: reason.map(ToString::to_string),
-            },
-        )?;
+    // `daemon::service::mutations::sessions::transfer_leader` calls this
+    // directly as its own no-database-row fallback, from inside the daemon's
+    // own async runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::LeaderTransferRequest {
+            actor: actor_id.to_string(),
+            new_leader_id: new_leader_id.to_string(),
+            reason: reason.map(ToString::to_string),
+        };
+        let _: wire::SessionDetail = client
+            .post(&format!("/v1/sessions/{session_id}/leader"), &request)
+            .map_err(|error| daemon_client_error("transfer leader", &error))?;
         return Ok(());
     }
 
@@ -367,13 +404,18 @@ pub fn transfer_leader(
 /// # Errors
 /// Returns `CliError` on storage failures or if the agent is already inactive.
 pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let _ = client.leave_session(
-            session_id,
-            &wire::SessionLeaveRequest {
-                agent_id: agent_id.to_string(),
-            },
-        )?;
+    // `daemon::service::leave::leave_session` calls this directly as its own
+    // no-database-row fallback, from inside the daemon's own async runtime, so
+    // the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SessionLeaveRequest {
+            agent_id: agent_id.to_string(),
+        };
+        let _: wire::SessionDetail = client
+            .post(&format!("/v1/sessions/{session_id}/leave"), &request)
+            .map_err(|error| daemon_client_error("leave session", &error))?;
         return Ok(());
     }
 
@@ -402,13 +444,16 @@ pub fn update_session_title(
     title: &str,
     project_dir: &Path,
 ) -> Result<SessionState, CliError> {
+    // No daemon-side caller reaches this directly (unlike its siblings above),
+    // so it needs no tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        return client.update_session_title(
-            session_id,
-            &wire::SessionTitleRequest {
-                title: title.to_string(),
-            },
-        );
+        let request = wire::SessionTitleRequest {
+            title: title.to_string(),
+        };
+        let response: wire::SessionMutationResponse = client
+            .post(&format!("/v1/sessions/{session_id}/title"), &request)
+            .map_err(|error| daemon_client_error("update session title", &error))?;
+        return Ok(response.state);
     }
 
     let project = resolve_session_project_dir(session_id, project_dir)?;

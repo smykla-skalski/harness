@@ -1,13 +1,15 @@
 use super::{
-    AckResult, CliError, CliErrorKind, DaemonClient, Path, ResolvedRuntimeSessionAgent,
-    SessionSignalRecord, SessionSignalStatus, SessionTransition, SignalAck,
-    apply_send_signal_state, apply_signal_ack_result, build_signal, load_signal_record_for_agent,
+    AckResult, CliError, CliErrorKind, Path, ResolvedRuntimeSessionAgent, SessionSignalRecord,
+    SessionSignalStatus, SessionTransition, SignalAck, apply_send_signal_state,
+    apply_signal_ack_result, build_signal, daemon_client_error, load_signal_record_for_agent,
     load_state_or_err, log_signal_acknowledged, log_signal_sent, log_task_assigned,
-    normalize_signal_ack_result, wire, read_pending_signals, reconcile_expired_pending_signals,
+    normalize_signal_ack_result, read_pending_signals, reconcile_expired_pending_signals,
     refresh_session, resolve_runtime_session_via_daemon, runtime, runtime_session_matches_agent,
     signal_context_root, signal_dirs_for_agent_in_context_root, signal_records_for_dirs, storage,
-    utc_now, write_signal_ack,
+    utc_now, wire, write_signal_ack,
 };
+use harness_daemon_client::DaemonClient;
+use tokio::runtime::Handle;
 
 /// Send a file-backed signal to a running agent session.
 ///
@@ -23,17 +25,22 @@ pub fn send_signal(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<SessionSignalRecord, CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        let detail = client.send_signal(
-            session_id,
-            &wire::SignalSendRequest {
-                actor: actor_id.to_string(),
-                agent_id: agent_id.to_string(),
-                command: command.to_string(),
-                message: message.to_string(),
-                action_hint: action_hint.map(ToString::to_string),
-            },
-        )?;
+    // `daemon::service::signals::send_signal` calls this directly as its own
+    // no-database-row fallback, from inside the daemon's own async runtime, so
+    // the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SignalSendRequest {
+            actor: actor_id.to_string(),
+            agent_id: agent_id.to_string(),
+            command: command.to_string(),
+            message: message.to_string(),
+            action_hint: action_hint.map(ToString::to_string),
+        };
+        let detail: wire::SessionDetail = client
+            .post(&format!("/v1/sessions/{session_id}/signal"), &request)
+            .map_err(|error| daemon_client_error("send signal", &error))?;
         return detail
             .signals
             .into_iter()
@@ -112,15 +119,24 @@ pub fn cancel_signal(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        client.cancel_signal(
-            session_id,
-            &wire::SignalCancelRequest {
-                actor: actor_id.to_string(),
-                agent_id: agent_id.to_string(),
-                signal_id: signal_id.to_string(),
-            },
-        )?;
+    // `daemon::service::signals::cancel_signal` calls this directly and
+    // unconditionally (even with a local DB present, since the signal file
+    // itself is always file-backed), from inside the daemon's own async
+    // runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SignalCancelRequest {
+            actor: actor_id.to_string(),
+            agent_id: agent_id.to_string(),
+            signal_id: signal_id.to_string(),
+        };
+        let _: wire::SessionDetail = client
+            .post(
+                &format!("/v1/sessions/{session_id}/signal-cancel"),
+                &request,
+            )
+            .map_err(|error| daemon_client_error("cancel signal", &error))?;
         return Ok(());
     }
 
@@ -179,8 +195,12 @@ pub fn list_signals(
     agent_filter: Option<&str>,
     project_dir: &Path,
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
-        let detail = client.get_session_detail(session_id)?;
+        let detail: wire::SessionDetail = client
+            .get(&format!("/v1/sessions/{session_id}"), &[])
+            .map_err(|error| daemon_client_error("get session detail", &error))?;
         let mut signals: Vec<SessionSignalRecord> = detail
             .signals
             .into_iter()
@@ -230,6 +250,8 @@ pub fn resolve_session_agent_for_runtime_session(
     runtime_name: &str,
     runtime_session_id: &str,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
+    // No daemon-side caller reaches this directly, so it needs no
+    // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
         return resolve_runtime_session_via_daemon(&client, runtime_name, runtime_session_id);
     }
@@ -279,16 +301,22 @@ pub fn record_signal_acknowledgment(
     result: AckResult,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    if let Some(client) = DaemonClient::try_connect() {
-        return client.record_signal_ack(
-            session_id,
-            &wire::SignalAckRequest {
-                agent_id: agent_id.to_string(),
-                signal_id: signal_id.to_string(),
-                result,
-                project_dir: project_dir.to_string_lossy().into_owned(),
-            },
-        );
+    // `daemon::service::sync_support::signals::record_signal_ack_fallback` calls
+    // this directly as its own no-database-row fallback, from inside the
+    // daemon's own async runtime, so the same self-call guard applies here.
+    if Handle::try_current().is_err()
+        && let Some(client) = DaemonClient::try_connect()
+    {
+        let request = wire::SignalAckRequest {
+            agent_id: agent_id.to_string(),
+            signal_id: signal_id.to_string(),
+            result,
+            project_dir: project_dir.to_string_lossy().into_owned(),
+        };
+        let _: serde_json::Value = client
+            .post(&format!("/v1/sessions/{session_id}/signal-ack"), &request)
+            .map_err(|error| daemon_client_error("record signal ack", &error))?;
+        return Ok(());
     }
 
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
