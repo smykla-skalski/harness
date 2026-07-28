@@ -2,12 +2,12 @@
 // `item_fields`, `item_query`, `lane`, `policy`, `git_identity_defaults`,
 // `progress_rollup`, `remote_spki_pin`, `runtime_config`, `store`, `machines`,
 // part of `wire`, `project`/`project_color`/`project_shape`, `triage*`,
-// `prompt*`/`worker_prompt`, `working_copy`, `policy_graph`, `automation`,
-// and `github::config`'s whole GitHub automation-settings wire-type module
-// moved into the standalone `harness-task-board` crate. Every other
-// task-board subtree below reaches those through this glob re-export
-// exactly the way external callers (`daemon`, `session`, `hooks`) already
-// do, so none of them needed an import change for the move.
+// `prompt*`/`worker_prompt`, `working_copy`, `policy_graph`, `policy_runtime`,
+// `automation`, and `github::config`'s whole GitHub automation-settings
+// wire-type module moved into the standalone `harness-task-board` crate.
+// Every other task-board subtree below reaches those through this glob
+// re-export exactly the way external callers (`daemon`, `session`, `hooks`)
+// already do, so none of them needed an import change for the move.
 pub use harness_task_board::*;
 
 pub mod dispatch;
@@ -20,8 +20,6 @@ pub mod github;
 pub(crate) mod legacy_import;
 pub mod orchestrator;
 pub mod planning;
-#[cfg(feature = "daemon-runtime")]
-pub mod policy_runtime;
 pub mod summary;
 pub mod transport;
 pub mod wire;

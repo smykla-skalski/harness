@@ -11,7 +11,7 @@ use super::models::{
 };
 use super::providers::{PolicyExecutionContext, PolicyProviderRegistry};
 use super::repository::BeginRunOutcome;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::repository::PolicyRuntimeRepository;
 use super::store::PolicyRunStore;
 
@@ -21,7 +21,7 @@ pub struct PolicyRuntimeExecutor {
 }
 
 enum PolicyRunStorage {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     LegacyFile(PolicyRuntimeRepository),
     Database(Arc<dyn PolicyRunStore>),
 }
@@ -33,7 +33,7 @@ impl PolicyRunStorage {
         trigger: PolicyRunTrigger,
     ) -> Result<BeginRunOutcome, CliError> {
         match self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Self::LegacyFile(repository) => repository.begin_run(run, trigger, Utc::now()),
             Self::Database(database) => database.begin_run(run, trigger, Utc::now()).await,
         }
@@ -45,7 +45,7 @@ impl PolicyRunStorage {
         trigger: PolicyRunTrigger,
     ) -> Result<Option<PolicyWorkflowRun>, CliError> {
         match self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Self::LegacyFile(repository) => repository.claim_waiting_run(run_id, trigger),
             Self::Database(database) => database.claim_waiting_run(run_id, trigger).await,
         }
@@ -53,7 +53,7 @@ impl PolicyRunStorage {
 
     async fn save(&self, run: &PolicyWorkflowRun) -> Result<(), CliError> {
         match self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Self::LegacyFile(repository) => repository.save(run),
             Self::Database(database) => database.save_run(run).await,
         }
@@ -62,7 +62,7 @@ impl PolicyRunStorage {
 
 impl PolicyRuntimeExecutor {
     #[must_use]
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn new(repository: PolicyRuntimeRepository, providers: PolicyProviderRegistry) -> Self {
         Self {
             storage: PolicyRunStorage::LegacyFile(repository),
@@ -75,7 +75,7 @@ impl PolicyRuntimeExecutor {
     // an `Arc::clone(&db)` argument still infers its own concrete type at the
     // call site instead of being pinned to the trait object and failing to
     // coerce.
-    pub(crate) fn new_database<S: PolicyRunStore + 'static>(
+    pub fn new_database<S: PolicyRunStore + 'static>(
         database: Arc<S>,
         providers: PolicyProviderRegistry,
     ) -> Self {

@@ -1,5 +1,7 @@
+use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use tempfile::tempdir;
 
@@ -15,7 +17,7 @@ use super::providers::{
     PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext, PolicyProviderRegistry,
 };
 use super::repository::{BeginRunOutcome, PolicyRuntimeRepository};
-use crate::task_board::policy_graph::PolicyWaitCondition;
+use crate::policy_graph::PolicyWaitCondition;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[path = "tests_hardening.rs"]
@@ -40,7 +42,7 @@ fn waiting_run_persists_and_resumes_on_matching_event() {
         ))
         .expect("query ready runs");
 
-    assert_eq!(ready, vec![run.run_id.clone()]);
+    assert_eq!(ready, vec![run.run_id]);
 }
 
 #[test]
@@ -272,7 +274,7 @@ fn concurrent_begin_run_for_same_subject_creates_exactly_one() {
     let mut handles = Vec::new();
     for _ in 0..8 {
         let repository = Arc::clone(&repository);
-        handles.push(std::thread::spawn(move || {
+        handles.push(thread::spawn(move || {
             repository
                 .begin_run(
                     begin_run_fixture(
@@ -321,7 +323,7 @@ fn concurrent_begin_run_for_distinct_subjects_each_create() {
     let mut handles = Vec::new();
     for subject_key in subjects {
         let repository = Arc::clone(&repository);
-        handles.push(std::thread::spawn(move || {
+        handles.push(thread::spawn(move || {
             repository
                 .begin_run(
                     begin_run_fixture(subject_key, "abc123", PolicyRunTrigger::Background),
@@ -400,7 +402,7 @@ fn begin_run_fixture(
 fn test_runtime_root() -> PathBuf {
     let temp = tempdir().expect("create tempdir");
     let root = temp.path().to_path_buf();
-    std::mem::forget(temp);
+    mem::forget(temp);
     root
 }
 

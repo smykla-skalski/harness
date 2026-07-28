@@ -13,20 +13,23 @@ publish = false
 # library and so never see its `cfg(test)` items. Matches `harness-agents`'s
 # and `harness-daemon-client`'s own `test-support` feature.
 test-support = []
-# Compiles the policy-graph decision-recording and legacy-import boundary the
-# daemon binary needs (sink installers, the canvas-workspace schema version)
-# without pulling them into a plain library build. The root crate activates
-# this alongside its own `daemon-runtime` feature.
+# Compiles the policy-graph decision-recording pieces the daemon binary needs
+# (sink installers, the canvas-workspace schema version) plus the whole
+# `policy_runtime` module (the workflow-run store, scheduler, event inbox, and
+# handoff/notification/task-creation outboxes) without pulling either into a
+# plain library build. The root crate activates this alongside its own
+# `daemon-runtime` feature, and `harness-daemon` forwards its own feature of
+# the same name onto it.
 daemon-runtime = []
 
 [dependencies]
+async-trait = "0.1.83"
 harness-github-api = { path = "../harness-github-api", version = "54.0.0" }
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
 arc-swap = "1.9.1"
-async-trait = "0.1.83"
 base64 = "0.23.0"
 caseless = "0.2.2"
 chrono = { version = "0.4.44", features = ["serde"] }

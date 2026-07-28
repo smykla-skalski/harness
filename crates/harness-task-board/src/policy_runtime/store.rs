@@ -14,7 +14,7 @@ use super::task_creation::TaskCreationRecord;
 /// both writes into one method, so the ordering the runtime relies on stays
 /// visible here instead of moving into whatever backs the trait.
 #[async_trait]
-pub(crate) trait PolicyActionStore: Send + Sync {
+pub trait PolicyActionStore: Send + Sync {
     /// Append one handoff record.
     async fn record_handoff_at(
         &self,
@@ -46,7 +46,7 @@ pub(crate) trait PolicyActionStore: Send + Sync {
 
 /// Durable store for policy workflow run state.
 #[async_trait]
-pub(crate) trait PolicyRunStore: Send + Sync {
+pub trait PolicyRunStore: Send + Sync {
     /// Start a run, or report the live run that already covers its subject.
     async fn begin_run(
         &self,
