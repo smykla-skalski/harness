@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 use super::super::session;
 use super::super::{DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, truncate_at};

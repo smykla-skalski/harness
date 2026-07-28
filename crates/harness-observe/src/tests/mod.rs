@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 
 use super::application::ObserveFilter;
 use super::application::maintenance::{load_observer_state, save_observer_state};
+use super::transport::ObserveFilterArgs;
 use super::types::{Issue, IssueCode, IssueSeverity, ObserverState};
-use super::{ObserveFilterArgs, redact_details, scan, types};
-use crate::workspace::project_context_dir;
+use super::{redact_details, scan, types};
+use harness_workspace::workspace::project_context_dir;
 
 mod output_rendering;
 
@@ -203,6 +204,55 @@ fn redact_details_strips_env_values() {
     assert!(redacted.contains("SECRET_KEY=<redacted>"));
 }
 
+/// Runs the first scan-save-load round-trip and returns the loaded state,
+/// asserting the invariants a caller can rely on for a follow-up cycle.
+fn run_first_lifecycle_cycle(
+    session_file: &Path,
+    project_context_root: &Path,
+    session_id: &str,
+) -> ObserverState {
+    let (issues, last_line) = scan::scan(session_file, 0).unwrap();
+    assert_eq!(last_line, 2);
+
+    let mut state = ObserverState::default_for_session(session_id);
+    state.cursor = last_line;
+    state.last_scan_time = "2026-03-15T10:02:00Z".to_string();
+    let state = save_observer_state(project_context_root, "project-default", &state).unwrap();
+
+    let loaded = load_observer_state(project_context_root, "project-default", session_id).unwrap();
+    assert_eq!(loaded.cursor, 2);
+    assert_eq!(loaded.session_id, session_id);
+    assert_eq!(loaded.state_version, state.state_version);
+
+    drop(issues);
+    loaded
+}
+
+/// Re-scanning from the first cycle's cursor should find nothing new, and the
+/// persisted state should still reflect the first cycle's cursor.
+fn assert_second_cycle_is_idempotent(
+    session_file: &Path,
+    project_context_root: &Path,
+    session_id: &str,
+    cursor: usize,
+) {
+    let (issues, last_line) = scan::scan(session_file, cursor).unwrap();
+    assert!(issues.is_empty());
+    assert_eq!(last_line, 2);
+
+    let loaded = load_observer_state(project_context_root, "project-default", session_id).unwrap();
+    assert_eq!(loaded.cursor, 2);
+}
+
+fn assert_observer_files_exist(project_context_root: &Path, observe_id: &str) {
+    let observe_dir = project_context_root
+        .join("agents")
+        .join("observe")
+        .join(observe_id);
+    assert!(observe_dir.join("events.jsonl").exists());
+    assert!(observe_dir.join("snapshot.json").exists());
+}
+
 #[test]
 fn state_file_lifecycle_two_cycles() {
     let session_id = "lifecycle-test-session";
@@ -224,46 +274,15 @@ fn state_file_lifecycle_two_cycles() {
         ],
         || {
             let project_context_root = project_context_dir(tmp_dir.path());
-            let (issues, last_line) = scan::scan(&session_file, 0).unwrap();
-            assert_eq!(last_line, 2);
-
-            let mut state = ObserverState::default_for_session(session_id);
-            state.cursor = last_line;
-            state.last_scan_time = "2026-03-15T10:02:00Z".to_string();
-            let state =
-                save_observer_state(&project_context_root, "project-default", &state).unwrap();
-
             let loaded =
-                load_observer_state(&project_context_root, "project-default", session_id).unwrap();
-            assert_eq!(loaded.cursor, 2);
-            assert_eq!(loaded.session_id, session_id);
-            assert_eq!(loaded.state_version, state.state_version);
-
-            let (issues2, last_line2) = scan::scan(&session_file, loaded.cursor).unwrap();
-            assert!(issues2.is_empty());
-            assert_eq!(last_line2, 2);
-
-            let loaded2 =
-                load_observer_state(&project_context_root, "project-default", session_id).unwrap();
-            assert_eq!(loaded2.cursor, 2);
-            assert!(
-                project_context_root
-                    .join("agents")
-                    .join("observe")
-                    .join("project-default")
-                    .join("events.jsonl")
-                    .exists()
+                run_first_lifecycle_cycle(&session_file, &project_context_root, session_id);
+            assert_second_cycle_is_idempotent(
+                &session_file,
+                &project_context_root,
+                session_id,
+                loaded.cursor,
             );
-            assert!(
-                project_context_root
-                    .join("agents")
-                    .join("observe")
-                    .join("project-default")
-                    .join("snapshot.json")
-                    .exists()
-            );
-
-            drop(issues);
+            assert_observer_files_exist(&project_context_root, "project-default");
         },
     );
 }

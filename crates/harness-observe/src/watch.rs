@@ -8,8 +8,8 @@ use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
+use harness_infra::exec::RUNTIME;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::infra::exec::RUNTIME;
 
 use super::application::ObserveFilter;
 use super::classifier;
@@ -121,7 +121,15 @@ fn emit_watch_issue(
 /// Uses `notify` to receive filesystem events for immediate reaction when the
 /// session file changes, with a fallback `poll_duration` sleep to catch any
 /// missed events.
-pub(super) fn execute_watch(
+///
+/// # Errors
+/// Returns an error when the session log cannot be located, the output/details
+/// files cannot be opened, or the filesystem watcher cannot be created.
+///
+/// # Panics
+/// Panics if the watch-started status JSON fails to serialize, which does not
+/// happen for this fixed-shape payload.
+pub fn execute_watch(
     session_id: &str,
     poll_interval: u64,
     timeout: u64,

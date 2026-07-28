@@ -3895,15 +3895,26 @@ dependencies = [
 name = "harness-observe"
 version = "54.0.0"
 dependencies = [
+ "chrono",
  "clap",
+ "fs-err",
+ "harness-agents",
+ "harness-infra",
  "harness-kernel",
  "harness-protocol",
+ "harness-workspace",
  "hex",
+ "notify",
  "regex",
  "serde",
  "serde-sarif",
  "serde_json",
+ "serde_yml",
  "sha2 0.11.0",
+ "temp-env",
+ "tempfile",
+ "tokio",
+ "walkdir",
 ]
 
 [[package]]

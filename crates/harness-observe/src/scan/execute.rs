@@ -10,7 +10,7 @@ use super::filters::apply_filters;
 use super::from::{resolve_effective_bounds, resolve_effective_from_line};
 use super::io::{scan_with_limit, write_details_file};
 use super::render::render_scan_output;
-use crate::observe::session;
+use crate::session;
 
 #[derive(Serialize)]
 struct ScanStarted<'a> {

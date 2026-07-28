@@ -81,8 +81,8 @@ flowchart LR
 | `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `crates/harness-run/src/` | tracked run domain: run models, state, and workflow                       |
-| `src/observe/`   | live session inspection, doctor diagnostics, dump/scan/watch flows, and fix routing for improving skills and suites |
-| `crates/harness-observe/src/` | session-log issue classification (the classifier), its `patterns`/text-redaction helpers, shared observe types, CLI argument shapes, and renderers (JSON/markdown/SARIF) |
+| `src/observe/`   | doctor diagnostics and the CLI-facing `observe` transport/dispatcher, which delegates scan/dump/watch/maintenance to `harness-observe` and keeps only the doctor mode local |
+| `crates/harness-observe/src/` | session-log issue classification (the classifier), its `patterns`/text-redaction helpers, shared observe types, CLI argument shapes, renderers (JSON/markdown/SARIF), session lookup, and the dump/scan/watch/compare flows plus observer-state maintenance (mute/unmute/cycle/status/verify/resolve-from) that fix routing for improving skills and suites relies on |
 | `src/setup/`     | environment bootstrap, capabilities/readiness evaluation, wrapper/session lifecycle, provider-aware cluster setup entrypoints, remote kubeconfig materialization, setup install-state tracking |
 | `src/hooks/`     | hook payload handling, guard policy, protocol normalization, hook effects          |
 | `src/kernel/`    | pure shared concepts such as command intent, topology, skill ids, gates            |

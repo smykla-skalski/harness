@@ -5,15 +5,15 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 use harness_protocol::observe::ObserverStateEvent;
 
-use crate::agents::storage::project_context_root_from_session_path;
-use crate::hooks::adapters::HookAgent;
-use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::observe::session;
-use crate::observe::types::ObserverState;
-use crate::workspace::{project_context_dir, utc_now};
+use crate::session;
+use crate::types::ObserverState;
+use harness_agents::storage::project_context_root_from_session_path;
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::{read_json_typed, write_json_pretty};
+use harness_protocol::agent::HookAgent;
 use harness_workspace::command_context::resolve_project_dir;
+use harness_workspace::workspace::{project_context_dir, utc_now};
 
 pub(crate) fn default_project_context_root() -> PathBuf {
     project_context_dir(&resolve_project_dir(None))
@@ -70,7 +70,10 @@ fn with_lock<T>(
     )
 }
 
-pub(crate) fn load_observer_state(
+/// # Errors
+/// Returns an error when the on-disk observer event log or snapshot exists
+/// but cannot be read or parsed.
+pub fn load_observer_state(
     project_context_root: &Path,
     observe_id: &str,
     session_id: &str,
@@ -81,7 +84,10 @@ pub(crate) fn load_observer_state(
     )
 }
 
-pub(crate) fn save_observer_state(
+/// # Errors
+/// Returns an error when the caller's `state_version` conflicts with a
+/// concurrent writer, or when the event/snapshot files cannot be written.
+pub fn save_observer_state(
     project_context_root: &Path,
     observe_id: &str,
     state: &ObserverState,
@@ -107,7 +113,8 @@ pub(crate) fn save_observer_state(
     })
 }
 
-pub(crate) fn is_observer_conflict(error: &CliError) -> bool {
+#[must_use]
+pub fn is_observer_conflict(error: &CliError) -> bool {
     error
         .details()
         .is_some_and(|details| details.contains("observer state conflict"))

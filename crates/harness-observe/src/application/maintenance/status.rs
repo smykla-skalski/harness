@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use crate::application::maintenance::{load_observer_state, render_pretty_json};
 use harness_kernel::errors::CliError;
-use crate::hooks::adapters::HookAgent;
-use crate::observe::application::maintenance::{load_observer_state, render_pretty_json};
+use harness_protocol::agent::HookAgent;
 
 #[derive(Serialize)]
 struct ActiveWorkerView<'a> {
@@ -27,7 +27,7 @@ struct ObserverStatus<'a> {
     active_workers: Vec<ActiveWorkerView<'a>>,
 }
 
-pub(in crate::observe::application) fn execute_status(
+pub(in crate::application) fn execute_status(
     session_id: &str,
     project_hint: Option<&str>,
     observe_id: &str,

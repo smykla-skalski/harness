@@ -3,7 +3,7 @@ use std::fs;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::application::ObserveFilter;
-use super::super::types::{FocusPreset, Issue, IssueCategory, IssueCode, IssueSeverity};
+use super::super::types::{Issue, IssueCategory, IssueCode, IssueSeverity};
 
 /// Apply focus/category filters, returning an error for invalid values.
 pub(crate) fn apply_filters(
@@ -56,27 +56,9 @@ fn apply_category_filter(
     filter: &ObserveFilter,
 ) -> Result<(), CliError> {
     if let Some(ref focus) = filter.focus {
-        let Some(preset) = FocusPreset::from_label(focus) else {
-            return Err(CliErrorKind::session_parse_error(format!(
-                "unknown focus preset '{focus}'. Valid: harness, skills, all"
-            ))
-            .into());
-        };
-        let Some(focus_categories) = preset.categories() else {
-            return Ok(());
-        };
-        if let Some(ref category) = filter.category {
-            let explicit: Vec<IssueCategory> = category
-                .split(',')
-                .filter_map(|c| IssueCategory::from_label(c.trim()))
-                .collect();
-            filtered.retain(|issue| {
-                focus_categories.contains(&issue.category) && explicit.contains(&issue.category)
-            });
-        } else {
-            filtered.retain(|issue| focus_categories.contains(&issue.category));
-        }
-    } else if let Some(ref category) = filter.category {
+        return apply_focus_filter(filtered, focus, filter.category.as_deref());
+    }
+    if let Some(ref category) = filter.category {
         let categories: Vec<IssueCategory> = category
             .split(',')
             .filter_map(|c| IssueCategory::from_label(c.trim()))
@@ -95,6 +77,53 @@ fn apply_category_filter(
         filtered.retain(|issue| categories.contains(&issue.category));
     }
     Ok(())
+}
+
+// `FocusPreset` is cfg-gated out of `types` for `standalone-daemon` builds
+// (see `types/mod.rs`), so this stays a matching pair of impls rather than a
+// single function, the same shape as `application::maintenance::catalog`'s
+// `execute_list_focus_presets`.
+#[cfg(not(feature = "standalone-daemon"))]
+fn apply_focus_filter(
+    filtered: &mut Vec<Issue>,
+    focus: &str,
+    category: Option<&str>,
+) -> Result<(), CliError> {
+    use super::super::types::FocusPreset;
+
+    let Some(preset) = FocusPreset::from_label(focus) else {
+        return Err(CliErrorKind::session_parse_error(format!(
+            "unknown focus preset '{focus}'. Valid: harness, skills, all"
+        ))
+        .into());
+    };
+    let Some(focus_categories) = preset.categories() else {
+        return Ok(());
+    };
+    if let Some(category) = category {
+        let explicit: Vec<IssueCategory> = category
+            .split(',')
+            .filter_map(|c| IssueCategory::from_label(c.trim()))
+            .collect();
+        filtered.retain(|issue| {
+            focus_categories.contains(&issue.category) && explicit.contains(&issue.category)
+        });
+    } else {
+        filtered.retain(|issue| focus_categories.contains(&issue.category));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "standalone-daemon")]
+fn apply_focus_filter(
+    _filtered: &mut Vec<Issue>,
+    focus: &str,
+    _category: Option<&str>,
+) -> Result<(), CliError> {
+    Err(CliErrorKind::session_parse_error(format!(
+        "observe scan --focus '{focus}' is unavailable in a standalone-daemon build"
+    ))
+    .into())
 }
 
 fn apply_overrides_file(filtered: &mut Vec<Issue>, overrides_path: &str) -> Result<(), CliError> {

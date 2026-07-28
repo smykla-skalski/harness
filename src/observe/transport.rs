@@ -4,18 +4,21 @@ use harness_workspace::command_context::{AppContext, Execute};
 
 pub use harness_observe::transport::{ObserveFilterArgs, ObserveMode, ObserveScanActionKind};
 
+use harness_observe::application::{
+    ObserveDumpRequest, ObserveFilter, ObserveScanRequest, ObserveWatchRequest,
+};
+
 use crate::hooks::adapters::HookAgent;
 
-use super::application::{
-    self, ObserveActionKind, ObserveDoctorRequest, ObserveDumpRequest, ObserveFilter,
-    ObserveRequest, ObserveScanRequest, ObserveWatchRequest,
-};
+use super::application::{self, ObserveDoctorRequest, ObserveRequest};
 
 /// Arguments for `harness observe`.
 ///
-/// Stays here rather than in `harness-observe`: its `Execute` impl and the
-/// `build_request`/`build_filter` conversions below read this crate's own
-/// `application::ObserveRequest`/`ObserveFilter`, which stay root-private.
+/// Stays here rather than in `harness-observe`: its `Execute` impl reads this
+/// crate's own `application::ObserveRequest`, which stays root-private
+/// because doctor mode reads `crate::setup`, which `harness-observe` cannot
+/// see. `ObserveFilter`/`ObserveScanRequest`/etc moved to `harness-observe`
+/// alongside the scan/watch/dump code that reads them.
 #[derive(Debug, Clone, Args)]
 pub struct ObserveArgs {
     /// Narrow canonical session resolution to a specific agent runtime.
@@ -36,23 +39,6 @@ impl Execute for ObserveArgs {
             self.agent,
             self.observe_id.clone(),
         ))
-    }
-}
-
-impl From<ObserveScanActionKind> for ObserveActionKind {
-    fn from(value: ObserveScanActionKind) -> Self {
-        match value {
-            ObserveScanActionKind::Cycle => Self::Cycle,
-            ObserveScanActionKind::Status => Self::Status,
-            ObserveScanActionKind::Resume => Self::Resume,
-            ObserveScanActionKind::Verify => Self::Verify,
-            ObserveScanActionKind::ResolveFrom => Self::ResolveFrom,
-            ObserveScanActionKind::Compare => Self::Compare,
-            ObserveScanActionKind::ListCategories => Self::ListCategories,
-            ObserveScanActionKind::ListFocusPresets => Self::ListFocusPresets,
-            ObserveScanActionKind::Mute => Self::Mute,
-            ObserveScanActionKind::Unmute => Self::Unmute,
-        }
     }
 }
 
@@ -83,12 +69,6 @@ fn build_filter(
         output_details: args.output_details,
         agent,
         observe_id,
-    }
-}
-
-impl From<ObserveFilterArgs> for ObserveFilter {
-    fn from(value: ObserveFilterArgs) -> Self {
-        build_filter(value, None, "project-default".to_string())
     }
 }
 

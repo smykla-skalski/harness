@@ -39,7 +39,8 @@ fn observe_tool_checks_root_stays_a_facade() {
 fn observe_maintenance_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let maintenance =
-        fs::read_to_string(root.join("src/observe/application/maintenance.rs")).unwrap();
+        fs::read_to_string(root.join("crates/harness-observe/src/application/maintenance.rs"))
+            .unwrap();
 
     for needle in [
         "struct RecentCycle {",
@@ -61,18 +62,18 @@ fn observe_maintenance_root_stays_a_facade() {
     ] {
         assert!(
             !maintenance.contains(needle),
-            "src/observe/application/maintenance.rs should stay focused on delegation instead of owning `{needle}`"
+            "crates/harness-observe/src/application/maintenance.rs should stay focused on delegation instead of owning `{needle}`"
         );
     }
 
     for path in [
-        "src/observe/application/maintenance/render.rs",
-        "src/observe/application/maintenance/storage.rs",
-        "src/observe/application/maintenance/scan.rs",
-        "src/observe/application/maintenance/status.rs",
-        "src/observe/application/maintenance/inspection.rs",
-        "src/observe/application/maintenance/catalog.rs",
-        "src/observe/application/maintenance/mutations.rs",
+        "crates/harness-observe/src/application/maintenance/render.rs",
+        "crates/harness-observe/src/application/maintenance/storage.rs",
+        "crates/harness-observe/src/application/maintenance/scan.rs",
+        "crates/harness-observe/src/application/maintenance/status.rs",
+        "crates/harness-observe/src/application/maintenance/inspection.rs",
+        "crates/harness-observe/src/application/maintenance/catalog.rs",
+        "crates/harness-observe/src/application/maintenance/mutations.rs",
     ] {
         assert!(
             root.join(path).exists(),
@@ -315,7 +316,7 @@ fn observe_classifier_rules_root_stays_prod_only() {
 #[test]
 fn observe_dump_root_stays_a_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let dump = fs::read_to_string(root.join("src/observe/dump.rs")).unwrap();
+    let dump = fs::read_to_string(root.join("crates/harness-observe/src/dump.rs")).unwrap();
 
     for needle in [
         "pub(super) fn execute_dump(",
@@ -326,13 +327,16 @@ fn observe_dump_root_stays_a_facade() {
     ] {
         assert!(
             !dump.contains(needle),
-            "src/observe/dump.rs should stay a thin facade instead of owning `{needle}`"
+            "crates/harness-observe/src/dump.rs should stay a thin facade instead of owning `{needle}`"
         );
     }
 
     assert_split_modules_exist(
         root,
-        &["src/observe/dump/execute.rs", "src/observe/dump/format.rs"],
+        &[
+            "crates/harness-observe/src/dump/execute.rs",
+            "crates/harness-observe/src/dump/format.rs",
+        ],
         "observe dump split module should exist",
     );
 }

@@ -1,7 +1,7 @@
 use harness_kernel::kernel::tooling::{ToolInput, legacy_tool_context};
-use harness_observe::dump::tool_result_text;
 
 use super::super::truncate_at;
+use super::tool_result_text;
 
 /// A formatted dump block with a label prefix and the block text.
 pub(crate) struct DumpBlock {
