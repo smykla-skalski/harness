@@ -1,9 +1,9 @@
-use crate::hooks::adapters::HookAgent;
 use crate::observe::load_observer_state;
 use crate::observe::types::IssueCode;
 use crate::session::service;
 use crate::session::types::{SessionRole, TaskSeverity};
 use crate::workspace::project_context_dir;
+use harness_protocol::agent::HookAgent;
 
 use super::once::execute_session_observe;
 use super::scan::scan_all_agents;

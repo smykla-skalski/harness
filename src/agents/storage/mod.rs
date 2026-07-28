@@ -6,13 +6,13 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_kernel::hooks::context::{NormalizedEvent, NormalizedHookContext};
-use harness_kernel::hooks::result::NormalizedHookResult;
-use crate::hooks::adapters::HookAgent;
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::{harness_data_root, project_context_dir, utc_now};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::hooks::context::{NormalizedEvent, NormalizedHookContext};
+use harness_kernel::hooks::result::NormalizedHookResult;
+use harness_protocol::agent::HookAgent;
 
 use super::types::{AgentLedgerEvent, AgentSessionRegistry};
 
@@ -166,8 +166,8 @@ pub(crate) fn append_hook_event(
     })
 }
 
-// #797 deleted this crate's own session-start/session-stop callers as dead
-// code, but `crates/harness-hook` mirrors this file via `#[path]` and its own
+// This crate has no live session-start/session-stop caller left, but
+// `crates/harness-hook` mirrors this file via `#[path]` and its own
 // session-start/session-stop commands still call this; each crate's
 // dead-code check runs on its own copy, so this shows as unreachable here
 // even though the daemon's timeline still renders the `agent_session_marker`

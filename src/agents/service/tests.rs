@@ -6,12 +6,12 @@ use serde_json::json;
 
 use super::*;
 use crate::agents::kind::DisconnectReason;
-use crate::hooks::protocol::context::{
-    AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
-};
-use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::session::service as session_service;
 use crate::session::types::{AgentStatus, SessionRole, SessionStatus};
+use harness_kernel::hooks::context::{
+    AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
+};
+use harness_kernel::hooks::result::NormalizedHookResult;
 
 fn with_temp_project_without_runtime_ids<F: FnOnce(&Path)>(project_name: &str, test_fn: F) {
     let tmp = tempfile::tempdir().expect("tempdir");

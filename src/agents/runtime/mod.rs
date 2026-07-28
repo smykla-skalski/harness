@@ -24,7 +24,7 @@ mod vibe;
 use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::CliError;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 use self::claude::ClaudeRuntime;
 use self::codex::CodexRuntime;
@@ -258,7 +258,7 @@ pub fn runtime_for_name(name: &str) -> Option<&'static dyn AgentRuntime> {
 #[cfg(test)]
 mod tests {
     use super::{hook_agent_for_runtime_name, runtime_for_name};
-    use crate::hooks::adapters::HookAgent;
+    use harness_protocol::agent::HookAgent;
 
     #[test]
     fn hook_agent_resolution_accepts_vibe_and_opencode() {

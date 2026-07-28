@@ -5,13 +5,13 @@ use fs_err as fs;
 use harness_testkit::with_isolated_harness_env;
 
 use crate::agents::runtime;
-use crate::hooks::adapters::HookAgent;
 use crate::observe::types::{
     Confidence, FixSafety, Issue, IssueCategory, IssueCode, IssueSeverity, MessageRole,
 };
 use crate::session::service;
 use crate::session::types::{SessionRole, SessionState};
 use crate::workspace::project_context_dir;
+use harness_protocol::agent::HookAgent;
 
 pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempfile::tempdir().expect("tempdir");

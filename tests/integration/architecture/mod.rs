@@ -3,6 +3,7 @@ mod daemon_command_boundary;
 mod docs_and_policy;
 mod helpers;
 mod hooks_agents_boundary;
+mod hooks_agents_session_boundary;
 mod hooks_and_observe;
 mod layout;
 mod run_and_create;

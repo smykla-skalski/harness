@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use clap::{Args, Subcommand};
 
-use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::agent::HookAgent;
 use harness_protocol::managed_agents::acp::{AcpAgentStartRequest, AcpEndpoint};
 use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
 use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
