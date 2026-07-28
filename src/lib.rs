@@ -26,7 +26,11 @@ pub(crate) use harness_workspace::git;
 pub(crate) mod github_api {
     pub use harness_github_api::*;
 }
-pub mod hooks;
+// Deliberate public API facade, not scaffolding: `harness::hooks` stays a
+// stable path for its existing callers across setup, daemon, and observe.
+pub mod hooks {
+    pub use harness_hooks::*;
+}
 pub mod infra {
     pub use harness_infra::*;
 }

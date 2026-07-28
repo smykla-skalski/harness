@@ -182,7 +182,7 @@ fn parse_session_recover_leader() {
     };
     assert_eq!(args.session_id, "sess-r");
     assert_eq!(args.preset, "swarm-default");
-    assert_eq!(args.runtime, crate::hooks::adapters::HookAgent::Codex);
+    assert_eq!(args.runtime, harness_protocol::agent::HookAgent::Codex);
     assert_eq!(args.project_dir.as_deref(), Some("/tmp/project"));
 }
 

@@ -84,10 +84,10 @@ fn infra_blocks_do_not_export_legacy_block_registry() {
 #[test]
 fn tool_fact_model_is_owned_by_kernel() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hooks_context = read_repo_file(root, "src/hooks/protocol/context.rs");
+    let hooks_context = read_repo_file(root, "crates/harness-hooks/src/protocol/context.rs");
     assert_file_lacks_needles(
         &hooks_context,
-        "src/hooks/protocol/context.rs should consume kernel::tooling instead of redefining",
+        "crates/harness-hooks/src/protocol/context.rs should consume kernel::tooling instead of redefining",
         &[
             "pub enum ToolCategory",
             "pub enum ToolInput",

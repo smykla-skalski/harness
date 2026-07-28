@@ -4,7 +4,7 @@ import Testing
 @testable import HarnessMonitorKit
 
 /// Wire-contract for the agent tool-activity cluster, generated from
-/// src/daemon/protocol/summaries.rs and src/hooks/protocol/payloads.rs.
+/// src/daemon/protocol/summaries.rs and crates/harness-hooks/src/protocol/payloads.rs.
 /// AgentToolActivitySummary nests in SessionDetail.agent_activity and pulls
 /// AgentPendingUserPrompt -> the hooks AskUserQuestionPrompt -> AskUserQuestionOption.
 /// These prove the daemon's nested snake_case payload decodes into the typed wire

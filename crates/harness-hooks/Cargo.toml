@@ -1,0 +1,48 @@
+[package]
+name = "harness-hooks"
+version = "54.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+harness-agents = { path = "../harness-agents", version = "54.0.0" }
+harness-infra = { path = "../harness-infra", version = "54.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
+harness-session = { path = "../harness-session", version = "54.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "54.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
+clap = { version = "4.6.0", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tokio = { version = "1.50.0", features = ["rt"] }
+tracing = "0.1.44"
+
+[features]
+# Forwarded from the root crate so the test modules gated on it stay gated the
+# same way once these sources compile here instead of there.
+standalone-worker = []
+
+[dev-dependencies]
+harness-testkit = { path = "../../testkit" }
+fs-err = "3.3.0"
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "3.27.0"
+tracing-subscriber = "=0.3.23"
+
+# Matches the root crate's lint set rather than the lighter one the facade
+# crates carry, for the same reason harness-kernel, harness-workspace,
+# harness-infra, harness-agents, and harness-session do: a crate extracted
+# from src/ keeps the rules its sources were written under.
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

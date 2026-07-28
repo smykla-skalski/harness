@@ -1,7 +1,7 @@
 use clap::{CommandFactory, error::ErrorKind};
 
 use super::*;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::CapabilitiesArgs;

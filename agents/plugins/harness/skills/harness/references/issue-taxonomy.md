@@ -16,7 +16,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - **Fix safety**: triage_required
 - **Owner**: harness
 - **Root cause**: guard or verify hook denied or errored unexpectedly
-- **Fix target**: `src/hooks/`, skill files, or hook transport wiring
+- **Fix target**: `crates/harness-hooks/src/`, skill files, or hook transport wiring
 - **Validation**: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### skill_behavior
@@ -48,7 +48,7 @@ Categories, severity, fix safety, ownership, and routing guidance for `harness o
 - **Fix safety**: auto_fix_guarded
 - **Owner**: harness
 - **Root cause**: workflow or state machine in wrong state
-- **Fix target**: owning workflow under `src/run/`, `src/hooks/`
+- **Fix target**: owning workflow under `src/run/`, `crates/harness-hooks/src/`
 - **Validation**: `mise run check` and `TMPDIR=/tmp mise run test`
 
 ### naming_error
@@ -126,7 +126,7 @@ TMPDIR=/tmp mise run test
 
 ## Common fix patterns
 
-**Hook not firing**: check hook registration, skill config, hook transport wiring under `src/hooks/`.
+**Hook not firing**: check hook registration, skill config, hook transport wiring under `crates/harness-hooks/src/`.
 
 **Wrong question or wrong operator flow**: update owning SKILL.md or agent descriptor with missing precondition checks.
 

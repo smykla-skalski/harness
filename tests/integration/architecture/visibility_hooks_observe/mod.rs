@@ -12,7 +12,7 @@ fn assert_split_modules_exist(root: &Path, paths: &[&str], message: &str) {
 #[test]
 fn hooks_application_context_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let context = fs::read_to_string(root.join("src/hooks/application/context.rs")).unwrap();
+    let context = fs::read_to_string(root.join("crates/harness-hooks/src/application/context.rs")).unwrap();
 
     for needle in [
         "struct HookInteraction {",
@@ -27,22 +27,22 @@ fn hooks_application_context_root_stays_prod_only() {
     ] {
         assert!(
             !context.contains(needle),
-            "src/hooks/application/context.rs should stay focused on production context hydration instead of owning `{needle}`"
+            "crates/harness-hooks/src/application/context.rs should stay focused on production context hydration instead of owning `{needle}`"
         );
     }
 
     assert_split_modules_exist(
         root,
         &[
-            "src/hooks/application/context/tests.rs",
-            "src/hooks/application/context/hydration.rs",
-            "src/hooks/application/context/interaction.rs",
+            "crates/harness-hooks/src/application/context/tests.rs",
+            "crates/harness-hooks/src/application/context/hydration.rs",
+            "crates/harness-hooks/src/application/context/interaction.rs",
         ],
         "hooks application context split module should exist",
     );
     assert_split_modules_exist(
         root,
-        &["src/hooks/application/context/command.rs"],
+        &["crates/harness-hooks/src/application/context/command.rs"],
         "hooks application context split module should exist",
     );
 }
@@ -53,22 +53,22 @@ fn hook_protocol_roots_stay_prod_only() {
 
     for (path, needles, split_path) in [
         (
-            "src/hooks/protocol/output.rs",
+            "crates/harness-hooks/src/protocol/output.rs",
             &[
                 "fn render_hook_message_deny()",
                 "fn hook_output_allow_is_always_empty()",
                 "mod tests {",
             ][..],
-            "src/hooks/protocol/output/tests.rs",
+            "crates/harness-hooks/src/protocol/output/tests.rs",
         ),
         (
-            "src/hooks/protocol/payloads.rs",
+            "crates/harness-hooks/src/protocol/payloads.rs",
             &[
                 "fn envelope_from_str_parses()",
                 "fn response_text_renders_bash_output()",
                 "mod tests {",
             ][..],
-            "src/hooks/protocol/payloads/tests.rs",
+            "crates/harness-hooks/src/protocol/payloads/tests.rs",
         ),
     ] {
         let contents = fs::read_to_string(root.join(path)).unwrap();
@@ -91,13 +91,13 @@ fn hook_misc_roots_stay_prod_only() {
 
     for (path, needles, split_path) in [
         (
-            "src/hooks/session.rs",
+            "crates/harness-hooks/src/session.rs",
             &[
                 "fn session_start_output_from_additional_context()",
                 "fn resolve_cwd_falls_back_to_project_dir()",
                 "mod tests {",
             ][..],
-            "src/hooks/session/tests.rs",
+            "crates/harness-hooks/src/session/tests.rs",
         ),
         (
             "crates/harness-kernel/src/redact.rs",

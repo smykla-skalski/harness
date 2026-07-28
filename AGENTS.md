@@ -111,7 +111,7 @@ Harness is a local control plane for running multiple AI coding agents as a coor
 Core areas:
 
 - `src/app/cli.rs` owns the top-level command tree and its dispatch.
-- `src/hooks/` owns tool lifecycle hooks, guards, and the hook protocol.
+- `crates/harness-hooks/src/` owns tool lifecycle hooks, guards, and the hook protocol.
 - `src/session/` owns multi-agent orchestration state, roles, service logic, transport, storage, and observation.
 - `crates/harness-agents/src/runtime/` owns runtime adapters for Claude, Codex, Gemini, Copilot, Vibe, and OpenCode.
 - `src/daemon/` owns the local daemon: HTTP routes, storage, and the task-board service.
@@ -181,7 +181,7 @@ Harness Monitor xcodebuild lane internals and fsmonitor cleanup details live in 
 
 ## Gotchas
 
-- The hook enforces nothing. `tool-guard` and `tool-result` allow unconditionally and hold no policy; the runtime records the call and injects pending session signals around them (`src/hooks/runtime/mod.rs`). Every generated registration hardcodes `--skill suite:run` (`src/setup/wrapper/registrations.rs`), but no hook branches on the skill any more: it is carried through only as a label on the recorded event. Write-surface enforcement lives in `agents::policy::evaluate_write`, reached by the ACP client with a real run directory. Do not add a guard to the hook expecting it to bind, and do not cite the hook as an enforcement boundary.
+- The hook enforces nothing. `tool-guard` and `tool-result` allow unconditionally and hold no policy; the runtime records the call and injects pending session signals around them (`crates/harness-hooks/src/runtime/mod.rs`). Every generated registration hardcodes `--skill suite:run` (`src/setup/wrapper/registrations.rs`), but no hook branches on the skill any more: it is carried through only as a label on the recorded event. Write-surface enforcement lives in `agents::policy::evaluate_write`, reached by the ACP client with a real run directory. Do not add a guard to the hook expecting it to bind, and do not cite the hook as an enforcement boundary.
 - `VersionedJsonRepository` saves atomically with tmp-file rename. Use the repository `load()` path instead of reading state files during saves.
 - Use the installed XcodeBuildMCP skill before XcodeBuildMCP tools. Monitor app work needs a full worktree plus explicit `HARNESS_MONITOR_BUILD_LANE` and `HARNESS_MONITOR_RUNTIME_LANE`.
 - Harness Monitor enables MCP accessibility tracking on normal app paths. In tracked-element hot paths, do not call `accessibilityFrame()` or republish on every `NSWindow.didUpdateNotification`; dense windows such as Settings can become visibly sluggish. Prefer clip-aware AppKit geometry conversion plus a throttled `didUpdate` refresh path.

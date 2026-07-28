@@ -1,4 +1,4 @@
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 use harness_observe::application::{ObserveDumpRequest, ObserveScanRequest, ObserveWatchRequest};
 
 /// `ObserveRequest::Doctor` is the only variant `application::execute` handles

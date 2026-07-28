@@ -19,6 +19,7 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check --all-targets -p harness-command
 "$cargo_local" check --all-targets -p harness-daemon-client
 "$cargo_local" check --all-targets -p harness-github-api
+"$cargo_local" check --all-targets -p harness-hooks
 "$cargo_local" check --all-targets -p harness-infra
 "$cargo_local" check --all-targets -p harness-kernel
 "$cargo_local" check --all-targets -p harness-observe

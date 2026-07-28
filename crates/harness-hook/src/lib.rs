@@ -1,7 +1,8 @@
 #![deny(unsafe_code)]
 
-#[path = "../../../src/hooks/mod.rs"]
-pub mod hooks;
+pub mod hooks {
+    pub use harness_hooks::*;
+}
 
 /// Agent hook adapters exposed for the root CLI compatibility facade.
 pub mod hook_adapters {

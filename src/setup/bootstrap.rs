@@ -2,7 +2,7 @@ use std::env;
 
 use clap::Args;
 
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 use crate::setup::wrapper;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::{AppContext, Execute, resolve_project_dir};

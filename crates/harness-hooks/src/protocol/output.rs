@@ -1,0 +1,155 @@
+use serde::Serialize;
+use serde_json::Value;
+
+use crate::HookType;
+use crate::protocol::hook_result::{Decision, HookResult};
+use crate::protocol::result::{NormalizedDecision, NormalizedHookResult};
+
+#[derive(Serialize)]
+struct PermissionHookOutput<'a> {
+    #[serde(rename = "hookSpecificOutput")]
+    hook_specific_output: PreToolUseSpecificOutput<'a>,
+}
+
+#[derive(Serialize)]
+struct PreToolUseSpecificOutput<'a> {
+    #[serde(rename = "hookEventName")]
+    hook_event_name: &'static str,
+    #[serde(rename = "permissionDecision")]
+    permission_decision: &'static str,
+    #[serde(
+        rename = "permissionDecisionReason",
+        skip_serializing_if = "Option::is_none"
+    )]
+    permission_decision_reason: Option<&'a str>,
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
+    additional_context: Option<&'a str>,
+    #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")]
+    updated_input: Option<&'a Value>,
+}
+
+#[derive(Serialize)]
+struct PostToolUseOutput<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decision: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'a str>,
+    #[serde(rename = "hookSpecificOutput")]
+    hook_specific_output: PostToolUseSpecificOutput<'a>,
+}
+
+#[derive(Serialize)]
+struct PostToolUseSpecificOutput<'a> {
+    #[serde(rename = "hookEventName")]
+    hook_event_name: &'a str,
+    #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
+    additional_context: Option<&'a str>,
+    #[serde(rename = "toolInput", skip_serializing_if = "Option::is_none")]
+    tool_input: Option<&'a Value>,
+}
+
+fn render_json<T: Serialize>(payload: &T) -> String {
+    serde_json::to_string(payload).expect("typed hook JSON serializes")
+}
+
+/// Format a hook result message with level prefix.
+#[must_use]
+pub fn render_hook_message(result: &HookResult) -> String {
+    if result.code.is_empty() {
+        return result.message.clone();
+    }
+    let level = match result.decision {
+        Decision::Warn => "WARNING",
+        Decision::Info => "INFO",
+        Decision::Allow | Decision::Deny => "ERROR",
+    };
+    if result.message.is_empty() {
+        format!("{level} [{}]", result.code)
+    } else {
+        format!("{level} [{}] {}", result.code, result.message)
+    }
+}
+
+fn render_pre_tool_use_output_normalized(result: &NormalizedHookResult) -> String {
+    let permission_decision = match result.decision {
+        NormalizedDecision::Allow => "allow",
+        _ => "deny",
+    };
+    let permission_decision_reason = pre_tool_use_permission_reason(result);
+    render_json(&PermissionHookOutput {
+        hook_specific_output: PreToolUseSpecificOutput {
+            hook_event_name: "PreToolUse",
+            permission_decision,
+            permission_decision_reason: permission_decision_reason.as_deref(),
+            additional_context: result.additional_context.as_deref(),
+            updated_input: result.updated_input.as_ref(),
+        },
+    })
+}
+
+fn pre_tool_use_permission_reason(result: &NormalizedHookResult) -> Option<String> {
+    let has_reason = result
+        .reason
+        .as_deref()
+        .is_some_and(|reason| !reason.is_empty())
+        || result.code.is_some();
+    has_reason.then(|| result.display_message())
+}
+
+fn render_post_tool_use_output_normalized(
+    result: &NormalizedHookResult,
+    event_name: &str,
+) -> String {
+    if result.decision == NormalizedDecision::Allow
+        && result.additional_context.is_none()
+        && result.updated_input.is_none()
+    {
+        return String::new();
+    }
+    let message = result.display_message();
+    let additional_context = result
+        .additional_context
+        .as_deref()
+        .or((result.decision != NormalizedDecision::Allow).then_some(message.as_str()));
+
+    render_json(&PostToolUseOutput {
+        decision: (result.decision == NormalizedDecision::Deny).then_some("block"),
+        reason: (result.decision == NormalizedDecision::Deny).then_some(message.as_str()),
+        hook_specific_output: PostToolUseSpecificOutput {
+            hook_event_name: event_name,
+            additional_context,
+            tool_input: result.updated_input.as_ref(),
+        },
+    })
+}
+
+/// Transform a `NormalizedHookResult` into the native Claude Code hook output
+/// format for the given hook type.
+#[must_use]
+pub fn render_normalized_hook_output(hook_type: HookType, result: &NormalizedHookResult) -> String {
+    if result.decision == NormalizedDecision::Allow
+        && result.additional_context.is_none()
+        && result.updated_input.is_none()
+    {
+        return String::new();
+    }
+
+    match hook_type {
+        HookType::PreToolUse => render_pre_tool_use_output_normalized(result),
+        HookType::PostToolUse => render_post_tool_use_output_normalized(result, "PostToolUse"),
+    }
+}
+
+/// Transform a `HookResult` into the native Claude Code hook output format for
+/// the given hook type.
+#[must_use]
+pub fn render_hook_output(hook_type: HookType, result: &HookResult) -> String {
+    render_normalized_hook_output(
+        hook_type,
+        &NormalizedHookResult::from_hook_result(result.clone()),
+    )
+}
+
+#[cfg(test)]
+#[path = "output/tests.rs"]
+mod tests;

@@ -11,7 +11,7 @@ use tokio::sync::broadcast;
 use crate::agents::runtime;
 use crate::daemon::agent_tui::{AgentTuiManagerHandle, AgentTuiStartRequest};
 use crate::daemon::protocol::{SessionUpdatedPayload, SessionsUpdatedPayload};
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 use crate::session::{
     service as session_service,
     types::{AgentStatus, SessionRole, SessionSignalStatus, SessionStatus},

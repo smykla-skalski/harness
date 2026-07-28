@@ -35,6 +35,7 @@ harness-command = { path = "../harness-command", version = "54.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "54.0.0" }
 harness-github-api = { path = "../harness-github-api", version = "54.0.0" }
 harness-hook = { path = "../harness-hook", version = "54.0.0" }
+harness-hooks = { path = "../harness-hooks", version = "54.0.0" }
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-observe = { path = "../harness-observe", version = "54.0.0", default-features = false }

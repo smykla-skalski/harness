@@ -3522,6 +3522,7 @@ dependencies = [
  "harness-command",
  "harness-daemon-client",
  "harness-github-api",
+ "harness-hooks",
  "harness-infra",
  "harness-kernel",
  "harness-mcp",
@@ -3701,6 +3702,7 @@ dependencies = [
  "harness-daemon-client",
  "harness-github-api",
  "harness-hook",
+ "harness-hooks",
  "harness-infra",
  "harness-kernel",
  "harness-observe",
@@ -3810,6 +3812,7 @@ dependencies = [
  "gray_matter",
  "harness-agents",
  "harness-daemon-client",
+ "harness-hooks",
  "harness-infra",
  "harness-kernel",
  "harness-protocol",
@@ -3833,6 +3836,29 @@ dependencies = [
  "uuid",
  "uzers",
  "walkdir",
+]
+
+[[package]]
+name = "harness-hooks"
+version = "54.0.0"
+dependencies = [
+ "clap",
+ "fs-err",
+ "harness-agents",
+ "harness-infra",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-session",
+ "harness-telemetry",
+ "harness-testkit",
+ "harness-workspace",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
