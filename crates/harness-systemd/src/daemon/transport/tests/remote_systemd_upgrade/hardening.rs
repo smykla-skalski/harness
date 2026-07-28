@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::transport::test_support::hardened_tempdir;
 use crate::errors::{CliError, CliErrorKind};
 use std::os::unix::fs::PermissionsExt as _;
 
@@ -336,7 +337,7 @@ fn snapshot_rejects_a_copied_binary_that_does_not_match_the_artifact() {
 
 #[test]
 fn failed_state_staging_leaves_current_database_and_sidecars_untouched() {
-    let temp = tempfile::tempdir().expect("tempdir");
+    let temp = hardened_tempdir().expect("tempdir");
     let source = temp.path().join("retained");
     let destination = temp.path().join("current");
     let source_database = source.join("daemon/external/harness.db");
@@ -384,7 +385,7 @@ fn failed_state_staging_leaves_current_database_and_sidecars_untouched() {
 
 #[test]
 fn snapshot_rejects_broken_symlink_and_restore_displaces_untrusted_destination() {
-    let temp = tempfile::tempdir().expect("tempdir");
+    let temp = hardened_tempdir().expect("tempdir");
     let broken_source = temp.path().join("broken-source");
     let snapshot = temp.path().join("snapshot");
     symlink("missing-source", &broken_source).expect("create broken source symlink");
@@ -410,7 +411,7 @@ fn snapshot_rejects_broken_symlink_and_restore_displaces_untrusted_destination()
 
 #[test]
 fn snapshot_skips_only_sidecars_next_to_the_managed_database() {
-    let temp = tempfile::tempdir().expect("tempdir");
+    let temp = hardened_tempdir().expect("tempdir");
     let source = temp.path().join("state");
     let snapshot = temp.path().join("snapshot");
     let database_parent = source.join("daemon").join("external");
@@ -465,7 +466,7 @@ fn operation_plan_rejects_state_store_overlap_and_unnormalized_paths() {
 
 #[test]
 fn retry_normalizes_retained_failed_state_before_finishing_restore() {
-    let temp = tempfile::tempdir().expect("tempdir");
+    let temp = hardened_tempdir().expect("tempdir");
     let source = temp.path().join("previous-state");
     let destination = temp.path().join("live-state");
     let retained = temp.path().join("failed-current");

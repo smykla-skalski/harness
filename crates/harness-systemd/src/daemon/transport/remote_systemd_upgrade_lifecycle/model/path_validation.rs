@@ -148,7 +148,7 @@ fn parse_error(message: impl Into<String>) -> CliError {
 mod tests {
     use std::time::Duration;
 
-    use tempfile::tempdir;
+    use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
     use super::*;
 

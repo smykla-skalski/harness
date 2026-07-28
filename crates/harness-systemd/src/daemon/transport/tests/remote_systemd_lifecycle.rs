@@ -3,8 +3,8 @@ use std::fs::{self, Permissions};
 use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _, symlink};
 use std::path::{Path, PathBuf};
 
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 use clap::Parser;
-use tempfile::tempdir;
 
 use crate::errors::CliError;
 

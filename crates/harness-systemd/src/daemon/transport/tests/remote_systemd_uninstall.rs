@@ -3,8 +3,9 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-use tempfile::{TempDir, tempdir_in};
+use tempfile::TempDir;
 
+use crate::daemon::transport::test_support::hardened_tempdir_in;
 use crate::errors::CliError;
 
 use super::super::remote_systemd_inhibitor::{
@@ -20,7 +21,7 @@ const CONTROL_GROUP: &str = "/system.slice/harness-remote-daemon.service";
 const BINARY: &str = "/usr/local/bin/harness-daemon";
 
 fn trusted_temp() -> TempDir {
-    tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("trusted temp dir")
+    hardened_tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("trusted temp dir")
 }
 
 #[path = "remote_systemd_uninstall/retry.rs"]

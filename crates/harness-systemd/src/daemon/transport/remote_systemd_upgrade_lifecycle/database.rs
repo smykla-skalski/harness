@@ -264,9 +264,9 @@ pub(super) fn database_path(state_path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
     use rusqlite::Connection;
     use rusqlite::config::DbConfig;
-    use tempfile::tempdir;
 
     use super::*;
 

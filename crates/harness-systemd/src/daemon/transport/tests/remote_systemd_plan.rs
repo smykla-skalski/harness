@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 use clap::Parser;
-use tempfile::tempdir;
 
 use super::super::remote_systemd::{DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan};
 use super::super::remote_systemd_lifecycle::{

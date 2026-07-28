@@ -115,7 +115,7 @@ mod tests {
     use std::fs::Permissions;
     use std::os::unix::fs::PermissionsExt as _;
 
-    use tempfile::tempdir;
+    use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
     use super::super::super::files::create_private_directory;
     use super::super::super::model::RECOVERY_ARM_VERSION;

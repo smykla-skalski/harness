@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::os::unix::fs::symlink;
 use std::time::Duration;
 
-use tempfile::tempdir_in;
+use crate::daemon::transport::test_support::hardened_tempdir_in;
 
 use super::super::super::remote_systemd_inhibitor::{inhibitor_path, install_inhibitor};
 use super::super::model::RemoteSystemdHealthReport;
@@ -25,7 +25,7 @@ struct ContractFixture {
 
 impl ContractFixture {
     fn new() -> Self {
-        let temp = tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("trusted tempdir");
+        let temp = hardened_tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("trusted tempdir");
         let binary = temp.path().join("harness");
         let unit_path = temp.path().join("harness-remote.service");
         let environment_path = temp.path().join("harness-remote.env");

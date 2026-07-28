@@ -4,7 +4,9 @@ use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _, symlink};
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
-use tempfile::{TempDir, tempdir};
+use tempfile::TempDir;
+
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
 use crate::daemon::transport::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use crate::errors::CliError;
