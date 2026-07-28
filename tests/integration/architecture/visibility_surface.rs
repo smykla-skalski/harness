@@ -41,6 +41,26 @@ fn helper_modules_do_not_leak_publicly() {
             "pub mod types;",
             "pub(crate) mod types {",
         ),
+        // `harness_hooks`'s root re-exports everything through root's
+        // `pub use harness_hooks::*;` glob facade, so a module that flips
+        // from `pub(crate)` to `pub` here leaks through that facade the
+        // same way it would have leaked through `src/hooks/mod.rs` before
+        // the extraction.
+        (
+            "crates/harness-hooks/src/lib.rs",
+            "pub mod application;",
+            "pub(crate) mod application;",
+        ),
+        (
+            "crates/harness-hooks/src/lib.rs",
+            "pub mod registry;",
+            "pub(crate) mod registry;",
+        ),
+        (
+            "crates/harness-hooks/src/lib.rs",
+            "pub mod session;",
+            "pub(crate) mod session;",
+        ),
     ] {
         let contents = read_repo_file(root, path);
         assert!(
