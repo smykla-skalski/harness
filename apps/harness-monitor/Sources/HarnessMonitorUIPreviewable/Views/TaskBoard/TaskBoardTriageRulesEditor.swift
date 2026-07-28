@@ -4,18 +4,18 @@ import SwiftUI
 struct TaskBoardTriageRulesEditor: View {
   let store: HarnessMonitorStore
   let isActive: Bool
-
-  @State private var state = TaskBoardTriageRulesEditorState()
+  let state: TaskBoardTriageRulesEditorState
 
   private var actions: TaskBoardTriageRulesEditorActions {
     TaskBoardTriageRulesEditorActions(store: store, state: state)
   }
 
   var body: some View {
+    @Bindable var editorState = state
     TaskBoardSection(title: "Triage Rules") {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         statusLine
-        TextEditor(text: $state.draftText)
+        TextEditor(text: $editorState.draftText)
           .font(.system(.body, design: .monospaced))
           .frame(minHeight: 160, maxHeight: 260)
           .overlay(

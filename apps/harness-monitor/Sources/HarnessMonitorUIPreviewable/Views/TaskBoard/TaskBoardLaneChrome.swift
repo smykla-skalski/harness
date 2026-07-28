@@ -175,6 +175,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
       .overlay {
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
           .strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)
+          .allowsHitTesting(false)
       }
       .overlay(alignment: .top) {
         TaskBoardLaneAccentCap(
@@ -183,6 +184,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
           punchesInteriorThrough: true,
           metrics: metrics
         )
+        .allowsHitTesting(false)
       }
       .animation(.easeOut(duration: 0.14), value: isDropCandidate)
       .animation(.easeOut(duration: 0.1), value: isDropTargeted)
@@ -251,6 +253,39 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   private var laneStrokeWidth: CGFloat {
     colorSchemeContrast == .increased ? 2 : 1
+  }
+}
+
+struct TaskBoardLaneDropHighlight: View {
+  let lane: TaskBoardInboxLane
+  let state: TaskBoardLaneDropHighlightState
+  @Environment(\.fontScale)
+  private var fontScale
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var laneColor: Color { taskBoardLaneColor(for: lane, appearance: laneAppearance) }
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+      .fill(
+        state.isTargeted
+          ? laneColor.opacity(reduceTransparency ? 0.18 : 0.12)
+          : .clear
+      )
+      .strokeBorder(
+        state.isTargeted
+          ? laneColor.opacity(colorSchemeContrast == .increased ? 0.84 : 0.62)
+          : .clear,
+        lineWidth: colorSchemeContrast == .increased ? 2 : 1
+      )
+      .allowsHitTesting(false)
+      .animation(.easeOut(duration: 0.1), value: state.isTargeted)
   }
 }
 

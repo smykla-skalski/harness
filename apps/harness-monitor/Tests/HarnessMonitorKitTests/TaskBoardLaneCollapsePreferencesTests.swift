@@ -72,6 +72,26 @@ struct TaskBoardLaneCollapsePreferencesTests {
     )
   }
 
+  @Test("Reveal requests expand their destination without changing other lanes")
+  func revealRequestsExpandTheirDestinationWithoutChangingOtherLanes() {
+    let initial = #"{"planning":true,"testing":true}"#
+    let expanded = TaskBoardLaneCollapsePreferences.expandedRawValue(
+      lane: .planning,
+      rawValue: initial
+    )
+    let overrides = TaskBoardLaneCollapsePreferences.overrides(from: expanded)
+
+    #expect(overrides[.planning] == false)
+    #expect(overrides[.testing] == true)
+    #expect(
+      !TaskBoardLaneCollapsePreferences.isCollapsed(
+        lane: .planning,
+        contentCount: 0,
+        rawValue: expanded
+      )
+    )
+  }
+
   @Test("Legacy Umbrella override loads as Inbox and writes canonically")
   func legacyUmbrellaOverrideLoadsAsInboxAndWritesCanonically() {
     let overrides = TaskBoardLaneCollapsePreferences.overrides(

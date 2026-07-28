@@ -88,10 +88,14 @@ struct TaskBoardRouteContentSourceTests {
     let laneDropSource = try taskBoardSourceFile(named: "TaskBoardLaneDropSupport.swift")
     let dragSource = try taskBoardSourceFile(named: "TaskBoardCardDragSupport.swift")
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let listTunerSource = try taskBoardSourceFile(named: "TaskBoardNativeListTuner.swift")
+    let dragRuntimeSource = try taskBoardSourceFile(named: "TaskBoardCardDragRuntime.swift")
+    let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
     let boardSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
     #expect(dragSource.contains("TaskBoardCardDragPayload"))
+    #expect(dragSource.contains("CodableRepresentation(contentType: .harnessMonitorTaskBoardCard)"))
     #expect(laneDropSource.contains("TaskBoardCardDropPlan"))
     #expect(laneDropSource.contains("items.allSatisfy"))
     #expect(laneSource.contains(".draggable(containerItemID: cardID)"))
@@ -99,15 +103,33 @@ struct TaskBoardRouteContentSourceTests {
     #expect(!laneSource.contains("TaskBoardCardPill(label: item.status.title"))
     #expect(!laneSource.contains("DragPreviewCard"))
     #expect(unifiedSource.contains("for: TaskBoardCardDragPayload.self"))
-    #expect(unifiedSource.contains("isEnabled: isDropEnabled"))
-    #expect(unifiedSource.contains("session: DropSession"))
-    #expect(unifiedSource.contains(".dropConfiguration(dropConfiguration)"))
-    #expect(unifiedSource.contains(".onDropSessionUpdated(updateDropSession)"))
-    #expect(unifiedSource.contains("? .move : .forbidden"))
-    #expect(unifiedSource.contains("isDropEnabled && isDropCandidate"))
-    #expect(unifiedSource.contains("TaskBoardCardDropPlan.resolve(payloads, to: lane)"))
+    #expect(unifiedSource.contains("List {"))
+    #expect(unifiedSource.contains("private var droppableListRowsContent: some DynamicViewContent"))
+    #expect(unifiedSource.contains("ForEach(displayLaneListRows)"))
+    #expect(unifiedSource.contains("indexed-destination"))
+    #expect(unifiedSource.contains(".introspect(.list, on: .macOS(.v26))"))
+    #expect(unifiedSource.contains("nativeListCoordinator.register(tableView, lane: lane)"))
+    #expect(listTunerSource.contains("draggingDestinationFeedbackStyle = .none"))
+    #expect(listTunerSource.contains("setGapTarget(nil, reason: \"before-model-mutation\")"))
+    #expect(dragRuntimeSource.contains("final class TaskBoardCardDragRuntime"))
+    #expect(listTunerSource.contains("tableView.scrollRowToVisible(row)"))
+    #expect(
+      unifiedSource.contains(
+        "TaskBoardCardDragDiagnostics.recordDropSession(session, lane: lane.rawValue)"
+      )
+    )
+    #expect(!unifiedSource.contains(".taskBoardCardReorderDropTarget("))
     #expect(!unifiedSource.contains(".onDrop("))
     #expect(!unifiedSource.contains("let dragPayload:"))
+    #expect(
+      laneSupportSource.contains(
+        """
+        lineWidth: cardStrokeWidth
+                  )
+                  .allowsHitTesting(false)
+        """
+      )
+    )
     #expect(boardSource.contains(".dragContainerSelection("))
     #expect(boardSource.contains(".dragContainer("))
     #expect(!laneSource.contains("TaskBoardItemDragPayload"))
@@ -127,6 +149,17 @@ struct TaskBoardRouteContentSourceTests {
     #expect(supportSource.contains("SessionSidebarMultiSelect.resolve("))
   }
 
+  @Test("Task board custom selection replaces the native rectangular focus effect")
+  func taskBoardCustomSelectionReplacesNativeRectangularFocusEffect() throws {
+    let supportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+
+    #expect(supportSource.contains(".focusEffectDisabled(isSelected)"))
+    #expect(supportSource.contains("if isSelected {"))
+    #expect(supportSource.contains("isSelected ? 2"))
+    #expect(!laneSource.contains(".selectionDisabled()"))
+  }
+
   @Test("Task board cards expose one selection-aware context menu per card")
   func taskBoardCardsExposeSelectionAwareContextMenus() throws {
     let boardSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
@@ -143,32 +176,92 @@ struct TaskBoardRouteContentSourceTests {
     #expect(
       !boardSource.contains(".contextMenu(forSelectionType: TaskBoardCardID.self)")
     )
-    #expect(unifiedSource.contains(".contextMenu {"))
+    #expect(!unifiedSource.contains(".contextMenu {"))
+    #expect(unifiedSource.contains(".background {"))
     #expect(unifiedSource.contains("TaskBoardCardContextMenu(cardID: cardID"))
-    #expect(contextMenuSource.contains("TaskBoardCardContextMenuScope.resolve("))
-    #expect(contextMenuSource.contains(".onAppear {"))
-    #expect(contextMenuSource.contains("actions.primeSelection(scope.cardIDs)"))
-    #expect(!contextMenuSource.contains("let _: Task"))
-    #expect(contextMenuSource.contains("if let githubURL = actions.githubURL(scope.primaryID)"))
     #expect(
       contextMenuSource.contains(
-        "Label(\"Open on GitHub\", systemImage: \"arrow.up.right.square\")"
+        "struct TaskBoardCardContextMenu: NSViewRepresentable"
       )
     )
-    #expect(contextMenuSource.contains("actions.openGitHubURL(githubURL)"))
+    #expect(contextMenuSource.contains("NSClickGestureRecognizer("))
+    #expect(contextMenuSource.contains("recognizer.buttonMask = 0x2"))
+    #expect(contextMenuSource.contains("recognizer.buttonMask = 0x1"))
+    #expect(contextMenuSource.contains("recognizer.delaysSecondaryMouseButtonEvents = true"))
+    #expect(contextMenuSource.contains("recognizer.delaysPrimaryMouseButtonEvents = true"))
+    #expect(contextMenuSource.contains("cell.focusRingType = .none"))
+    #expect(contextMenuSource.contains("NSMenu.popUpContextMenu("))
+    #expect(contextMenuSource.contains("TaskBoardCardContextMenuScope.resolve("))
+    #expect(contextMenuSource.contains("actions.primeSelection(scope.cardIDs)"))
+    #expect(!contextMenuSource.contains("let _: Task"))
+    #expect(contextMenuSource.contains("actions.githubURL(scope.primaryID) != nil"))
+    #expect(
+      contextMenuSource.contains(
+        "title: \"Open on GitHub\","
+      )
+    )
+    #expect(contextMenuSource.contains("symbol: \"arrow.up.right.square\""))
+    #expect(contextMenuSource.contains("actions.openGitHubURL(url)"))
     #expect(contextMenuActionsSource.contains("githubURL: githubURL"))
     #expect(contextMenuActionsSource.contains("openURL(url)"))
     #expect(overviewViewSource.contains("@Environment(\\.openURL)"))
-    #expect(contextMenuSource.contains("Menu(\"Move to...\")"))
+    #expect(contextMenuSource.contains("NSMenuItem(title: \"Move to...\""))
+    #expect(contextMenuSource.contains("actions.move($0.primaryID, $0.cardIDs, lane)"))
+    #expect(contextMenuSource.contains("if scope.isSingle, case .api = scope.primaryID"))
+    #expect(contextMenuSource.contains("\"Move to Top\""))
+    #expect(contextMenuSource.contains("\"Move to Bottom\""))
+    #expect(contextMenuSource.contains("actions.moveToEdge($0.primaryID, edge)"))
+    #expect(contextMenuSource.contains("actions.canMoveToEdge(scope.primaryID, edge)"))
+    #expect(contextMenuActionsSource.contains("canMoveToEdge: canMoveCardContextMenuItemToEdge"))
+    #expect(contextMenuActionsSource.contains("moveToEdge: moveCardContextMenuItemToEdge"))
+    #expect(contextMenuActionsSource.contains("actions.reorderTaskBoardItem("))
+    #expect(contextMenuActionsSource.contains("sourceStatus: context.item.status"))
+    #expect(contextMenuActionsSource.contains("destinationStatus: context.item.status"))
+    #expect(contextMenuActionsSource.contains("canonicalItems: allKnownTaskBoardItems"))
     #expect(
-      contextMenuSource.contains(
-        "ForEach(TaskBoardInboxLane.allCases.filter { $0 != .umbrella })"
+      !contextMenuActionsSource.contains(
+        "currentPresentation.apiItems(in: lane).map(\\.id)"
       )
     )
-    #expect(contextMenuSource.contains("Button(scope.deleteLabel, role: .destructive)"))
-    #expect(contextMenuSource.contains("!actions.canDelete(scope.cardIDs)"))
+    #expect(
+      contextMenuSource.contains(
+        "for lane in TaskBoardInboxLane.allCases where lane != .umbrella"
+      )
+    )
+    #expect(contextMenuSource.contains("title: scope.deleteLabel,"))
+    #expect(contextMenuSource.contains("actions.canDelete(scope.cardIDs)"))
     #expect(contextMenuSource.contains("actions.deleteTargets?(targets)"))
     #expect(!laneSource.contains(".contextMenu"))
+  }
+
+  @Test("Task board card context menu edge actions detect reached lane edges")
+  func taskBoardCardContextMenuEdgeActionsDetectReachedEdges() {
+    let orderedItemIDs = ["first", "middle", "last"]
+
+    #expect(
+      TaskBoardCardContextMenuEdge.top.isCurrentEdge(
+        itemID: "first",
+        orderedItemIDs: orderedItemIDs
+      )
+    )
+    #expect(
+      !TaskBoardCardContextMenuEdge.top.isCurrentEdge(
+        itemID: "middle",
+        orderedItemIDs: orderedItemIDs
+      )
+    )
+    #expect(
+      TaskBoardCardContextMenuEdge.bottom.isCurrentEdge(
+        itemID: "last",
+        orderedItemIDs: orderedItemIDs
+      )
+    )
+    #expect(
+      !TaskBoardCardContextMenuEdge.bottom.isCurrentEdge(
+        itemID: "middle",
+        orderedItemIDs: orderedItemIDs
+      )
+    )
   }
 
   @Test("Task board lanes keep board column chrome")
@@ -186,6 +279,58 @@ struct TaskBoardRouteContentSourceTests {
     #expect(laneChromeSource.contains("private var laneStrokeWidth: CGFloat"))
     #expect(!overviewSource.contains("Board-owned work awaiting progression."))
     #expect(!overviewSource.contains("Open work pulled from active sessions."))
+  }
+
+  @Test("Task board lanes highlight the active native drop target")
+  func taskBoardLanesHighlightTheActiveNativeDropTarget() throws {
+    let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let dragRuntimeSource = try taskBoardSourceFile(named: "TaskBoardCardDragRuntime.swift")
+    let laneChromeSource = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+
+    #expect(!unifiedSource.contains("@State private var isDropTargeted"))
+    #expect(unifiedSource.contains(".onDropSessionUpdated(handleLaneDropSession)"))
+    #expect(unifiedSource.contains("TaskBoardLaneDropHighlight("))
+    #expect(unifiedSource.contains("dragRuntime.setTargeted(targeted, lane: lane)"))
+    #expect(dragRuntimeSource.contains("final class TaskBoardLaneDropHighlightState"))
+    #expect(laneChromeSource.contains("state.isTargeted"))
+    #expect(unifiedSource.contains("taskBoardLaneIsDropTargeted("))
+  }
+
+  @Test("Accepted task moves use a native List reader to reveal the card after layout")
+  func acceptedTaskMovesUseTypedNativeListScrollingToRevealTheCard() throws {
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let boardSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let revealSource = try taskBoardSourceFile(
+      named: "TaskBoardLaneUnifiedColumn+Reveal.swift"
+    )
+    let listTunerSource = try taskBoardSourceFile(named: "TaskBoardNativeListTuner.swift")
+    let contextMenuSource = try taskBoardSourceFile(
+      named: "TaskBoardOverviewView+ContextMenu.swift"
+    )
+    let dropSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+BoardDrop.swift")
+    let collapseSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+LaneCollapse.swift")
+
+    #expect(
+      overviewSource.contains(
+        "@State private var laneRevealCoordinator = TaskBoardLaneRevealCoordinator()"
+      )
+    )
+    #expect(boardSource.contains("revealCoordinator: laneRevealCoordinatorValue"))
+    #expect(laneSource.contains(".task(id: actionableRevealRequest)"))
+    #expect(revealSource.contains("await nativeListCoordinator.reveal(row: row, in: lane)"))
+    #expect(revealSource.contains("revealCoordinator.consume(request)"))
+    #expect(revealSource.contains("revealCoordinator.retry(request)"))
+    #expect(listTunerSource.contains("tableView.scrollRowToVisible(row)"))
+    #expect(contextMenuSource.contains("requestLaneReveal("))
+    #expect(dropSource.contains("requestLaneReveal("))
+    #expect(collapseSource.contains("TaskBoardLaneCollapsePreferences.expandedRawValue("))
+
+    for source in [laneSource, contextMenuSource, dropSource, collapseSource] {
+      #expect(!source.contains("DispatchQueue.main"))
+      #expect(!source.contains("Task.sleep"))
+      #expect(!source.contains("Task.yield"))
+    }
   }
 
   @Test("Task board lanes expand beyond the fixed baseline when the dashboard is taller")
@@ -217,35 +362,71 @@ struct TaskBoardRouteContentSourceTests {
     #expect(laneChromeSource.contains("maxHeight: .infinity"))
   }
 
-  @Test("Dashboard retains visited routes without laying out hidden ones")
-  func dashboardRetainsRoutesWithoutHiddenLayout() throws {
+  @Test("Dashboard retains mounted route state without retaining Reviews publishers")
+  func dashboardRetainsMountedAuxiliaryRouteState() throws {
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
       named: "DashboardRouteContent.swift"
     )
+    let dashboardWindowSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardWindowView.swift"
+    )
+    let policyCanvasSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardPolicyCanvasRouteView.swift"
+    )
 
     #expect(dashboardSource.contains("DashboardRetainedRouteLayout(selectedRoute: route)"))
+    #expect(dashboardSource.contains("private struct DashboardRetainedAuxiliaryRoute"))
+    #expect(dashboardSource.contains("@State private var hasBeenMounted = false"))
+    #expect(dashboardSource.contains("private var isAuditVisible"))
+    #expect(dashboardSource.contains("private var isDiagnosticsVisible"))
+    #expect(dashboardSource.contains("private var isDebuggingVisible"))
+    #expect(dashboardSource.contains("private var isPolicyCanvasVisible"))
+    #expect(dashboardSource.contains("private var isReviewsVisible"))
     #expect(
       dashboardSource.contains(
-        ".layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)"
+        "DashboardRetainedAuxiliaryRoute(isVisible: isAuditVisible)"
       )
     )
     #expect(
       dashboardSource.contains(
-        ".layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)"
+        "DashboardRetainedAuxiliaryRoute(isVisible: isPolicyCanvasVisible)"
       )
     )
     #expect(
-      dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)")
+      dashboardSource.contains(
+        "DashboardRetainedAuxiliaryRoute(isVisible: isDiagnosticsVisible)"
+      )
     )
-    #expect(dashboardSource.contains("private struct DashboardRetainedRouteLayout: Layout"))
-    #expect(dashboardSource.contains("selectedSubview(in: subviews)?.place("))
-    #expect(dashboardSource.contains(".allowsHitTesting(isPolicyCanvasVisible)"))
-    #expect(dashboardSource.contains(".accessibilityHidden(!isPolicyCanvasVisible)"))
+    #expect(
+      dashboardSource.contains(
+        "DashboardRetainedAuxiliaryRoute(isVisible: isDebuggingVisible)"
+      )
+    )
+    #expect(dashboardSource.contains("if hasBeenMounted || isVisible"))
+    #expect(dashboardSource.contains(".opacity(isVisible ? 1 : 0)"))
+    #expect(dashboardSource.contains(".allowsHitTesting(isVisible)"))
+    #expect(dashboardSource.contains(".accessibilityHidden(!isVisible)"))
+    #expect(dashboardSource.contains("policyCanvasViewModelStore: policyCanvasViewModelStore"))
+    #expect(
+      dashboardWindowSource.contains(
+        "@StateObject private var policyCanvasViewModelStore"
+      )
+    )
+    #expect(
+      policyCanvasSource.contains(
+        "@ObservedObject private var policyCanvasViewModelStore"
+      )
+    )
+    #expect(dashboardSource.contains("if isReviewsVisible {"))
+    #expect(!dashboardSource.contains("DashboardRetainedAuxiliaryRoute(isVisible: isReviewsVisible)"))
+    #expect(!dashboardSource.contains("selectedAuxiliaryRoute"))
   }
 
-  @Test("Dashboard task board uses a persistent resizable retained inspector")
-  func dashboardTaskBoardUsesPersistentResizableRetainedInspector() throws {
+  @Test("Dashboard mounts the resizable inspector only while visible")
+  func dashboardTaskBoardMountsResizableInspectorOnlyWhileVisible() throws {
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
       named: "DashboardRouteContent.swift"
@@ -274,17 +455,28 @@ struct TaskBoardRouteContentSourceTests {
       )
     )
     #expect(dashboardWindowSource.contains("TaskBoardOperationsInspector("))
+    #expect(
+      dashboardWindowSource.contains(
+        "@State private var operationsInspectorTriageRulesState ="
+      )
+    )
+    #expect(
+      dashboardWindowSource.contains(
+        "triageRulesState: operationsInspectorTriageRulesState"
+      )
+    )
     #expect(dashboardWindowSource.contains("ZStack(alignment: .trailing) {"))
+    #expect(
+      dashboardWindowSource.contains(
+        "if operationsInspectorVisible && route == .taskBoard {"
+      )
+    )
     #expect(!dashboardSource.contains("HSplitView {"))
     #expect(!dashboardSource.contains("GeometryReader { geometry in"))
     #expect(!dashboardSource.contains("geometry.safeAreaInsets.top"))
     #expect(!dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
     #expect(!dashboardSource.contains("if operationsInspectorVisible {"))
-    #expect(
-      dashboardWindowSource.contains(
-        "isVisible: operationsInspectorVisible && route == .taskBoard"
-      )
-    )
+    #expect(!dashboardWindowSource.contains("isVisible: operationsInspectorVisible"))
     #expect(dashboardWindowSource.contains("taskBoardItems: dashboardUI.taskBoardItems"))
     #expect(dashboardSource.contains("showsOperationsPanel: false"))
     #expect(dashboardSource.contains("isCommandFocusActive: isRouteVisible"))
@@ -299,7 +491,8 @@ struct TaskBoardRouteContentSourceTests {
     #expect(overviewHostSource.contains("showsOperationsPanel: Bool = true"))
     #expect(overviewChromeSource.contains("if taskBoardSessionID == nil, showsOperationsPanel"))
     #expect(inspectorSource.contains("static let defaultValue = false"))
-    expectPersistentResizableInspectorSource(inspectorSource)
+    #expect(inspectorSource.contains("let triageRulesState: TaskBoardTriageRulesEditorState"))
+    expectVisibleResizableInspectorSource(inspectorSource)
     #expect(operationsPanelSource.contains("isActive: Bool = true"))
     #expect(operationsPanelSource.contains(".task(id: isActive)"))
     #expect(operationsPanelSource.contains("catch is CancellationError"))
@@ -362,9 +555,10 @@ struct TaskBoardRouteContentSourceTests {
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
 
-    #expect(unifiedSource.contains("ForEach(apiItems)"))
-    #expect(unifiedSource.contains("ForEach(inboxItems)"))
-    #expect(unifiedSource.contains("ForEach(decisions, id: \\.id)"))
+    #expect(unifiedSource.contains("decisions.map(TaskBoardLaneListRow.decision)"))
+    #expect(unifiedSource.contains("displayAPIItems.map(TaskBoardLaneListRow.api)"))
+    #expect(unifiedSource.contains("inboxItems.map(TaskBoardLaneListRow.inbox)"))
+    #expect(unifiedSource.contains("ForEach(displayLaneListRows)"))
     #expect(!unifiedSource.contains(".prefix(5)"))
     #expect(!unifiedSource.contains(".prefix(4)"))
     #expect(!unifiedSource.contains("TaskBoardLaneOverflowRow("))

@@ -36,7 +36,9 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
     kind: TaskBoardItemKind = .task,
     lanePosition: UInt32? = nil,
     laneOrigin: TaskBoardLaneOrigin? = nil,
-    laneSetAt: String? = nil
+    laneSetAt: String? = nil,
+    sourceProjectId: String? = nil,
+    executionRepository: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -47,6 +49,8 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
       priority: .high,
       tags: ["automation"],
       projectId: "project-1",
+      sourceProjectId: sourceProjectId,
+      executionRepository: executionRepository,
       agentMode: .interactive,
       kind: kind,
       externalRefs: [],

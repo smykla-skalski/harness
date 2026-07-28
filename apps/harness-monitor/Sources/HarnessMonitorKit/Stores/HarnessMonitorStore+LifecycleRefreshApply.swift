@@ -28,6 +28,7 @@ extension HarnessMonitorStore {
       items: refreshSnapshot.taskBoardItems,
       orchestratorStatus: refreshSnapshot.taskBoardOrchestratorStatus,
       stepModeConfirmationRevision: refreshSnapshot.stepModeConfirmationRevision,
+      positionMutationGeneration: refreshSnapshot.positionMutationGeneration,
       isInitialConnect: options.isInitialConnect
     )
     let measuredAutomationSnapshot = refreshSnapshot.taskBoardOrchestratorStatus
@@ -55,7 +56,9 @@ extension HarnessMonitorStore {
       globalTaskBoardProjects = refreshSnapshot.taskBoardProjects.value ?? globalTaskBoardProjects
       mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)
     }
-    if didChangeTaskBoardSnapshot {
+    if didChangeTaskBoardSnapshot
+      && taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+    {
       scheduleTaskBoardSnapshotCacheWrite(
         items: resolvedTaskBoardSnapshot.items,
         orchestratorStatus: resolvedTaskBoardSnapshot.orchestratorStatus
@@ -124,6 +127,7 @@ extension HarnessMonitorStore {
     items: TaskBoardSnapshotLoad<[TaskBoardItem]>,
     orchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>,
     stepModeConfirmationRevision: UInt64,
+    positionMutationGeneration: UInt64,
     isInitialConnect: Bool
   ) -> ResolvedTaskBoardRefreshSnapshot {
     let currentItems = globalTaskBoardItems
@@ -131,7 +135,10 @@ extension HarnessMonitorStore {
     let resolvedItems: [TaskBoardItem]
     let preservedItemIDs: Set<String>
 
-    if isInitialConnect, !currentItems.isEmpty {
+    if !canApplyTaskBoardItems(positionMutationGeneration: positionMutationGeneration) {
+      resolvedItems = currentItems
+      preservedItemIDs = []
+    } else if isInitialConnect, !currentItems.isEmpty {
       if let measuredItems = items.measured {
         if measuredItems.value.isEmpty {
           resolvedItems = currentItems
@@ -232,6 +239,8 @@ extension HarnessMonitorStore {
         }
         let stepModeConfirmationRevision =
           self.taskBoardRuntimeState.stepModeMutation.confirmationRevision
+        let positionMutationGeneration =
+          self.taskBoardRuntimeState.positionMutation.generation
         let snapshot = await Self.loadTaskBoardRefreshSnapshot(
           using: client,
           stepModeConfirmationRevision: stepModeConfirmationRevision
@@ -241,7 +250,8 @@ extension HarnessMonitorStore {
           snapshot: snapshot,
           preservedItemIDs: preservedItemIDs,
           preservedStatus: preservedStatus,
-          reachedDeadline: reachedDeadline
+          reachedDeadline: reachedDeadline,
+          positionMutationGeneration: positionMutationGeneration
         )
         if tick.shouldKeepWaiting && !reachedDeadline {
           continue
@@ -259,12 +269,14 @@ extension HarnessMonitorStore {
     snapshot: TaskBoardRefreshSnapshot,
     preservedItemIDs: Set<String>,
     preservedStatus: Bool,
-    reachedDeadline: Bool
+    reachedDeadline: Bool,
+    positionMutationGeneration: UInt64
   ) -> TaskBoardConfirmationTick {
     var tick = TaskBoardConfirmationTick(
       resolvedItems: globalTaskBoardItems,
       resolvedStatus: globalTaskBoardOrchestratorStatus,
       automationSnapshot: nil,
+      positionMutationGeneration: positionMutationGeneration,
       shouldApply: false,
       shouldKeepWaiting: false
     )
@@ -331,18 +343,24 @@ extension HarnessMonitorStore {
   }
 
   func commitTaskBoardConfirmationTick(_ tick: TaskBoardConfirmationTick) {
+    let resolvedItems = taskBoardItemsPreservingPositionMutation(
+      tick.resolvedItems,
+      positionMutationGeneration: tick.positionMutationGeneration
+    )
     let didChangeTaskBoardSnapshot =
-      globalTaskBoardItems != tick.resolvedItems
+      globalTaskBoardItems != resolvedItems
       || globalTaskBoardOrchestratorStatus?.withoutAutomationSnapshot
         != tick.resolvedStatus?.withoutAutomationSnapshot
     withUISyncBatch {
-      self.globalTaskBoardItems = tick.resolvedItems
+      self.globalTaskBoardItems = resolvedItems
       self.globalTaskBoardOrchestratorStatus = tick.resolvedStatus
       mergeTaskBoardAutomationSnapshot(tick.automationSnapshot)
     }
-    if didChangeTaskBoardSnapshot {
+    if didChangeTaskBoardSnapshot
+      && taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+    {
       scheduleTaskBoardSnapshotCacheWrite(
-        items: tick.resolvedItems,
+        items: resolvedItems,
         orchestratorStatus: tick.resolvedStatus
       )
     }

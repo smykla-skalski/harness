@@ -144,6 +144,7 @@ public enum HarnessMonitorAccessibility {
   public static let taskBoardOperationsInspector = "harness.task-board.operations.inspector"
   public static let taskBoardOperationsInspectorButton =
     "harness.task-board.operations.inspector.toolbar"
+  public static let taskBoardOptimisticSettle = "harness.task-board.optimistic-settle"
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"
   public static let openRecentRoot = "harness.open.recent"

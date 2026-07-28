@@ -48,6 +48,11 @@ struct TaskBoardCardDragPayload: Codable, Transferable, Identifiable, Sendable {
   let id: TaskBoardCardID
   let items: [TaskBoardCardDragItem]
 
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case items
+  }
+
   init(item: TaskBoardCardDragItem) {
     id = item.id
     items = [item]
@@ -56,6 +61,20 @@ struct TaskBoardCardDragPayload: Codable, Transferable, Identifiable, Sendable {
   init(primaryCardID: TaskBoardCardID, items: [TaskBoardCardDragItem]) {
     id = primaryCardID
     self.items = items
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(TaskBoardCardID.self, forKey: .id)
+    items = try container.decode([TaskBoardCardDragItem].self, forKey: .items)
+    traceTaskBoardCardDrag("payload decoded id=\(String(describing: id)) items=\(items.count)")
+  }
+
+  func encode(to encoder: Encoder) throws {
+    traceTaskBoardCardDrag("payload encoding id=\(String(describing: id)) items=\(items.count)")
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try container.encode(items, forKey: .items)
   }
 
   static var transferRepresentation: some TransferRepresentation {

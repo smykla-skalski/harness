@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -20,6 +21,8 @@ public struct TaskBoardOverviewView: View {
   let actions: TaskBoardOverviewActions
   @Environment(\.fontScale)
   var fontScale
+  @Environment(\.scenePhase)
+  var scenePhase
   @Environment(\.openURL)
   var openURL
   @Environment(\.openWindow)
@@ -30,8 +33,15 @@ public struct TaskBoardOverviewView: View {
   @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
   @State private var liveInboxItems = TaskBoardLiveInboxItems()
   @State private var presentationGeneration: UInt64 = 0
-  @State private var draggedCardIDs: [TaskBoardCardID] = []
-  @State private var dropCandidateLanes: Set<TaskBoardInboxLane> = []
+  @State private var cardDragRuntime = TaskBoardCardDragRuntime()
+  @State private var nativeListCoordinator = TaskBoardNativeListCoordinator()
+  @State private var cardGapModel = TaskBoardCardGapModel()
+  @State private var optimisticDropDeliveredAt: TimeInterval?
+  @State private var latestOptimisticSettleMilliseconds: Int?
+  /// One commit per drag: the row dropDestination and the whole-lane fallback can both
+  /// fire for the same drop, so the first commit wins. Reset at drag start.
+  @State private var didCommitDrop = false
+  @State private var laneRevealCoordinator = TaskBoardLaneRevealCoordinator()
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
   @State private var localHostRoutingState = TaskBoardLocalHostRoutingState()
@@ -77,6 +87,44 @@ public struct TaskBoardOverviewView: View {
   }
 
   var currentPresentation: TaskBoardOverviewPresentation { cachedPresentation }
+
+  func applyImmediateTaskBoardPresentation(_ presentation: TaskBoardOverviewPresentation) {
+    // Reject any older actor result already in flight. The next task keyed by
+    // the updated input remains authoritative and will reconcile this value.
+    presentationGeneration &+= 1
+    guard cachedPresentation != presentation else { return }
+    cachedPresentation = presentation
+    selectionModel.updateVisibleIDs(presentation.orderedCardIDs)
+  }
+
+  func applyImmediateTaskBoardPositionProjection() {
+    guard let store else { return }
+    let projection = currentPresentation.replacingTaskBoardItemsForImmediatePosition(
+      store.globalTaskBoardItems,
+      scopeSessionID: taskBoardSessionID
+    )
+    applyImmediateTaskBoardPresentation(projection)
+    traceTaskBoardCardDrag("optimistic presentation applied")
+  }
+
+  func beginOptimisticSettleMeasurement() {
+    guard HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled else { return }
+    optimisticDropDeliveredAt = ProcessInfo.processInfo.systemUptime
+    latestOptimisticSettleMilliseconds = nil
+  }
+
+  func finishOptimisticSettleMeasurement() {
+    guard let deliveredAt = optimisticDropDeliveredAt else { return }
+    latestOptimisticSettleMilliseconds = Int(
+      ((ProcessInfo.processInfo.systemUptime - deliveredAt) * 1_000).rounded()
+    )
+    optimisticDropDeliveredAt = nil
+  }
+
+  func cancelOptimisticSettleMeasurement() {
+    optimisticDropDeliveredAt = nil
+    latestOptimisticSettleMilliseconds = nil
+  }
 
   var liveInboxItemsValue: TaskBoardLiveInboxItems { liveInboxItems }
 
@@ -130,6 +178,14 @@ public struct TaskBoardOverviewView: View {
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
+    .overlay {
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        AccessibilityTextMarker(
+          identifier: HarnessMonitorAccessibility.taskBoardOptimisticSettle,
+          text: latestOptimisticSettleMilliseconds.map(String.init) ?? "pending"
+        )
+      }
+    }
     .environment(
       \.taskBoardLaneAppearance,
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
@@ -140,6 +196,30 @@ public struct TaskBoardOverviewView: View {
     .environment(relativeTimeClock)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
+    }
+    .onDisappear {
+      clearTransientCardDragState()
+    }
+    .onChange(of: isCommandFocusActive) { _, isActive in
+      if !isActive {
+        clearTransientCardDragState()
+      }
+    }
+    .onChange(of: isActionInFlight) { _, isInFlight in
+      if isInFlight {
+        clearTransientCardDragState()
+      }
+    }
+    .onChange(of: cachedPresentation.orderedCardIDs) {
+      finishOptimisticSettleMeasurement()
+    }
+    .onChange(of: scenePhase) { _, newPhase in
+      if newPhase != .active {
+        clearTransientCardDragState()
+      }
+    }
+    .onKeyPress(.escape, phases: .down) { _ in
+      cancelActiveCardDrag() ? .handled : .ignored
     }
     .task {
       await relativeTimeClock.run()
@@ -224,13 +304,31 @@ public struct TaskBoardOverviewView: View {
   }
 
   var draggedCardIDsValue: [TaskBoardCardID] {
-    get { draggedCardIDs }
-    nonmutating set { draggedCardIDs = newValue }
+    cardDragRuntime.cardIDs
   }
 
   var dropCandidateLanesValue: Set<TaskBoardInboxLane> {
-    get { dropCandidateLanes }
-    nonmutating set { dropCandidateLanes = newValue }
+    cardDragRuntime.candidateLanes
+  }
+
+  var cardDragRuntimeValue: TaskBoardCardDragRuntime {
+    cardDragRuntime
+  }
+
+  var nativeListCoordinatorValue: TaskBoardNativeListCoordinator {
+    nativeListCoordinator
+  }
+
+  var cardGapModelValue: TaskBoardCardGapModel {
+    cardGapModel
+  }
+
+  var didCommitDropValue: Bool { didCommitDrop }
+  func markDropCommitted() { didCommitDrop = true }
+  func resetDropCommit() { didCommitDrop = false }
+
+  var laneRevealCoordinatorValue: TaskBoardLaneRevealCoordinator {
+    laneRevealCoordinator
   }
 
   var taskBoardSelectionDispatcherValue: TaskBoardSelectionDispatcher {

@@ -15,6 +15,7 @@ extension RecordingHarnessClient {
     let items =
       dequeueTaskBoardItemSnapshot()
       ?? lock.withLock { taskBoardItemsStorage }
+    await taskBoardItemsReadGate.suspendIfConfigured()
     guard let status else {
       return items
     }

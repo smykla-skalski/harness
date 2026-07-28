@@ -28,16 +28,42 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
   }
 
   func testDashboardPolicyRouteDefersLiveEditorStartupWork() throws {
+    let dashboardWindowSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardWindowView.swift"
+    )
+    let dashboardRouteSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardRouteContent.swift"
+    )
     let dashboardPolicySource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
     )
 
     XCTAssertTrue(
-      dashboardPolicySource.contains(
+      dashboardWindowSource.contains(
         "@StateObject private var policyCanvasViewModelStore"
       )
     )
     XCTAssertTrue(
+      dashboardWindowSource.contains(
+        "StateObject(\n      wrappedValue: DashboardPolicyCanvasViewModelStore("
+      )
+    )
+    XCTAssertTrue(
+      dashboardRouteSource.contains(
+        "policyCanvasViewModelStore: policyCanvasViewModelStore"
+      )
+    )
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "@ObservedObject private var policyCanvasViewModelStore"
+      )
+    )
+    XCTAssertFalse(
+      dashboardPolicySource.contains(
+        "@StateObject private var policyCanvasViewModelStore"
+      )
+    )
+    XCTAssertFalse(
       dashboardPolicySource.contains(
         "StateObject(\n      wrappedValue: DashboardPolicyCanvasViewModelStore("
       )

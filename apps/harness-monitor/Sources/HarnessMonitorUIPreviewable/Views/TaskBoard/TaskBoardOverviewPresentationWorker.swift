@@ -134,6 +134,94 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   ) -> [TaskBoardCardID: TaskBoardCardPresentation] {
     inboxCardPresentationsByLane[lane] ?? [:]
   }
+
+  /// Projects the store's synchronous optimistic move into the rendered lane
+  /// arrays. The full presentation worker still reconciles the authoritative
+  /// snapshot off-main; this path only avoids waiting for that second hop
+  /// before settling the dropped card.
+  func replacingTaskBoardItemsForImmediatePosition(
+    _ items: [TaskBoardItem],
+    scopeSessionID: String?
+  ) -> Self {
+    let scopedItems =
+      if let scopeSessionID {
+        items.filter { $0.sessionId == scopeSessionID }
+      } else {
+        items
+      }
+    // A position mutation cannot change any facet or search field. Keep the
+    // exact membership the worker already resolved, while taking status and
+    // ordering from the store's synchronous optimistic snapshot.
+    let presentedItemIDs = Set(taskBoardItemsByID.keys)
+    let visibleItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(scopedItems)
+      .filter { presentedItemIDs.contains($0.id) }
+    let nextItemsByLane = Dictionary(grouping: visibleItems) { item in
+      TaskBoardInboxLane(taskBoardItem: item) ?? .inbox
+    }
+    let presentationsByID = apiCardPresentationsByLane.values.reduce(
+      into: [String: TaskBoardCardPresentation]()
+    ) { result, lanePresentations in
+      result.merge(lanePresentations, uniquingKeysWith: { current, _ in current })
+    }
+    let nextCardPresentationsByLane = nextItemsByLane.mapValues { laneItems in
+      Dictionary(
+        uniqueKeysWithValues: laneItems.compactMap { item in
+          presentationsByID[item.id].map { (item.id, $0) }
+        }
+      )
+    }
+    let reviewLanes: Set<TaskBoardInboxLane> = [
+      .agenticReview,
+      .testing,
+      .inReview,
+      .toReview,
+    ]
+    let priorNeedsYouCount = apiItemsByLane[.humanRequired]?.count ?? 0
+    let nextNeedsYouCount = nextItemsByLane[.humanRequired]?.count ?? 0
+    let priorReviewCount = reviewLanes.reduce(0) { count, lane in
+      count + (apiItemsByLane[lane]?.count ?? 0)
+    }
+    let nextReviewCount = reviewLanes.reduce(0) { count, lane in
+      count + (nextItemsByLane[lane]?.count ?? 0)
+    }
+    let priorBlockedCount = apiItemsByLane[.failed]?.count ?? 0
+    let nextBlockedCount = nextItemsByLane[.failed]?.count ?? 0
+    let priorOpenCount = taskBoardItems.count { $0.status != .done }
+    let nextOpenCount = visibleItems.count { $0.status != .done }
+
+    return Self(
+      taskBoardItems: visibleItems,
+      taskBoardItemsByID: Dictionary(
+        uniqueKeysWithValues: visibleItems.map { ($0.id, $0) }
+      ),
+      projectLabelResolver: projectLabelResolver,
+      apiItemsByLane: nextItemsByLane,
+      inboxItemsByLane: inboxItemsByLane,
+      inboxItemsByID: inboxItemsByID,
+      orderedCardIDs: TaskBoardInboxLane.allCases.flatMap { lane in
+        (nextItemsByLane[lane] ?? []).map { .api($0.id) }
+          + (inboxItemsByLane[lane] ?? []).map {
+            .inbox(
+              sessionID: $0.session.sessionId,
+              taskID: $0.task.taskId
+            )
+          }
+      },
+      apiCardPresentationsByLane: nextCardPresentationsByLane,
+      inboxCardPresentationsByLane: inboxCardPresentationsByLane,
+      decisionIDsByLane: decisionIDsByLane,
+      aggregateNeedsYouCount: aggregateNeedsYouCount - priorNeedsYouCount
+        + nextNeedsYouCount,
+      aggregateOpenCount: aggregateOpenCount - priorOpenCount + nextOpenCount,
+      aggregateReviewCount: aggregateReviewCount - priorReviewCount + nextReviewCount,
+      aggregateBlockedCount: aggregateBlockedCount - priorBlockedCount + nextBlockedCount,
+      aggregateDoneCount: aggregateDoneCount,
+      filterInventory: filterInventory,
+      searchCandidates: searchCandidates,
+      hasUnfilteredContent: hasUnfilteredContent,
+      responsibleNarrowingCauses: responsibleNarrowingCauses
+    )
+  }
 }
 
 actor TaskBoardOverviewPresentationWorker {

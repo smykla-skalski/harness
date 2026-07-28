@@ -53,6 +53,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case agentTuiOverflow
     case taskDropCockpit
     case taskBoardBoardOnly
+    case taskBoardDragPerformance
     case offlineCached
     case sidebarOverflow
     case empty

@@ -13,19 +13,15 @@ extension TaskBoardOverviewView {
 
   var taskBoardColumns: some View {
     let titleTypography = TaskBoardCardTitleTypography(fontScale: fontScale)
-    return ViewThatFits(in: .horizontal) {
+    return ScrollView(.horizontal, showsIndicators: true) {
       taskBoardLaneStrip(titleTypography: titleTypography)
-
-      ScrollView(.horizontal, showsIndicators: true) {
-        taskBoardLaneStrip(titleTypography: titleTypography)
-      }
-      .scrollClipDisabled()
     }
+    .scrollClipDisabled()
     .dragContainer(for: TaskBoardCardDragPayload.self, itemID: \.id) { cardIDs in
-      isActionInFlight ? [] : cardDragPayloads(cardIDs)
+      cardDragPayloads(cardIDs)
     }
-    .dragContainerSelection(isActionInFlight ? [] : orderedSelectedCardIDs)
-    .dragConfiguration(.init(allowMove: !isActionInFlight))
+    .dragContainerSelection(orderedSelectedCardIDs)
+    .dragConfiguration(.init(allowMove: true))
     .dragPreviewsFormation(.pile)
     .onDragSessionUpdated { session in
       updateCardDragSession(session)
@@ -62,12 +58,20 @@ extension TaskBoardOverviewView {
         inboxCardPresentations: currentPresentation.inboxCardPresentations(in: lane),
         titleTypography: titleTypography,
         isCollapsed: isCollapsed,
-        isDropEnabled: !isActionInFlight,
-        isDropCandidate: !isActionInFlight && dropCandidateLanesValue.contains(lane),
-        reorderDraggedItem: isActionInFlight ? nil : reorderDraggedItemValue,
+        dragRuntime: cardDragRuntimeValue,
+        dropHighlightState: cardDragRuntimeValue.highlightState(for: lane),
+        nativeListCoordinator: nativeListCoordinatorValue,
+        cardGapModel: cardGapModelValue,
         selectionModel: selectionModelValue,
+        revealCoordinator: laneRevealCoordinatorValue,
         actions: actions,
-        liveInboxItems: liveInboxItemsValue,
+        onDrop: { payloads, insertionOffset in
+          handleLaneDrop(
+            payloads,
+            to: lane,
+            insertionOffset: insertionOffset
+          )
+        },
         collapseOverridesRawValue: laneCollapsePreferencesRawValueBinding
       )
       .layoutValue(

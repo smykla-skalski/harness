@@ -134,6 +134,8 @@ extension HarnessMonitorStore {
 
       let stepModeConfirmationRevision =
         self.taskBoardRuntimeState.stepModeMutation.confirmationRevision
+      let positionMutationGeneration =
+        self.taskBoardRuntimeState.positionMutation.generation
       let snapshot = await Self.loadTaskBoardRefreshSnapshot(
         using: client,
         stepModeConfirmationRevision: stepModeConfirmationRevision,
@@ -143,7 +145,11 @@ extension HarnessMonitorStore {
       guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else { return }
 
       self.cancelInitialTaskBoardConfirmationRefresh()
-      self.applyTaskBoardDashboardSnapshot(snapshot, fallbackStatus: fallbackStatus)
+      self.applyTaskBoardDashboardSnapshot(
+        snapshot,
+        fallbackStatus: fallbackStatus,
+        positionMutationGeneration: positionMutationGeneration
+      )
       if includePolicyPipeline {
         await self.refreshPolicyPipeline()
       }

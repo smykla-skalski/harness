@@ -107,7 +107,9 @@ struct PreviewHarnessClientTaskBoardTests {
   func previewClientAppliesPositionMutations() async throws {
     let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
     let item = try #require(try await client.taskBoardItems(status: .inbox).first)
+    let sourceProjectID = try #require(item.sourceProjectId)
     let before = try await client.taskBoardItemPositionSnapshot(id: item.id)
+    #expect(before.item.sourceProjectId == sourceProjectID)
     let set = try await client.setTaskBoardItemPosition(
       id: item.id,
       request: TaskBoardSetItemPositionRequest(
@@ -116,6 +118,7 @@ struct PreviewHarnessClientTaskBoardTests {
       )
     )
     #expect(set.snapshot.item.lanePosition == 0)
+    #expect(set.snapshot.item.sourceProjectId == sourceProjectID)
     let reset = try await client.resetTaskBoardItemPosition(
       id: item.id,
       request: TaskBoardResetItemPositionRequest(
@@ -124,6 +127,7 @@ struct PreviewHarnessClientTaskBoardTests {
       )
     )
     #expect(reset.snapshot.item.lanePosition == nil)
+    #expect(reset.snapshot.item.sourceProjectId == sourceProjectID)
   }
 
   @Test("Preview positions compact source and reset lanes with one sequence per mutation")
@@ -327,6 +331,33 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect((try await client.taskBoardItem(id: items[1].id)).lanePosition == 1)
     #expect((try await client.taskBoardItem(id: items[2].id)).lanePosition == 2)
     #expect((try await client.taskBoardItem(id: unrelated.id)).lanePosition == 0)
+  }
+
+  @Test("Dense drag fixture preserves a same-lane reorder")
+  func denseDragFixturePreservesSameLaneReorder() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: .taskBoardDragPerformance,
+      isLaunchAgentInstalled: true
+    )
+    let before = try await client.taskBoardItemsSnapshot(status: .todo)
+    let moving = try #require(before.items.first)
+
+    _ = try await client.setTaskBoardItemPosition(
+      id: moving.id,
+      request: TaskBoardSetItemPositionRequest(
+        status: .todo,
+        lanePosition: 2,
+        expectedItemRevision: try #require(before.itemRevisions[moving.id]),
+        expectedItemsChangeSeq: before.itemsChangeSeq
+      )
+    )
+
+    let after = try await client.taskBoardItems(status: .todo)
+    #expect(
+      Array(after.prefix(3).map(\.id))
+        == ["perf-drag-todo-02", "perf-drag-todo-03", "perf-drag-todo-01"]
+    )
+    #expect(after.map(\.lanePosition) == (0..<after.count).map { UInt32($0) })
   }
 
   @Test("Preview position reset rejects default placement with the public state error")

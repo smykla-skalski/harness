@@ -326,7 +326,7 @@ extension HarnessMonitorStore {
     cacheWriteSync.pendingCacheWriteTaskToken &+= 1
   }
 
-  private func cancelPendingTaskBoardSnapshotCacheWriteTask() {
+  func cancelPendingTaskBoardSnapshotCacheWriteTask() {
     cacheWriteSync.pendingTaskBoardSnapshotCacheWriteTask?.cancel()
     cacheWriteSync.pendingTaskBoardSnapshotCacheWriteTask = nil
     cacheWriteSync.taskBoardSnapshotCacheWriteToken &+= 1

@@ -128,7 +128,7 @@ extension PreviewHarnessClientState {
     guard let item = taskBoardItems.first(where: { $0.id == id }) else {
       throw taskBoardItemUnavailable()
     }
-    return item
+    return item.applyingPreviewAttribution()
   }
 
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) -> TaskBoardItem {

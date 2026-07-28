@@ -110,6 +110,9 @@ private struct TaskBoardLaneQuickAddPreviewColumn: View {
   var isOpen = false
   var draftTitle = ""
   @State private var selectionModel = TaskBoardCardSelectionModel()
+  @State private var revealCoordinator = TaskBoardLaneRevealCoordinator()
+  @State private var dragRuntime = TaskBoardCardDragRuntime()
+  @State private var nativeListCoordinator = TaskBoardNativeListCoordinator()
 
   /// Only there to make the board's create capability true; the cards below are
   /// local fixtures, because the store loads its own asynchronously and a
@@ -132,12 +135,14 @@ private struct TaskBoardLaneQuickAddPreviewColumn: View {
       inboxCardPresentations: [:],
       titleTypography: TaskBoardCardTitleTypography(fontScale: 1),
       isCollapsed: false,
-      isDropEnabled: true,
-      isDropCandidate: false,
-      reorderDraggedItem: nil,
+      dragRuntime: dragRuntime,
+      dropHighlightState: dragRuntime.highlightState(for: lane),
+      nativeListCoordinator: nativeListCoordinator,
+      cardGapModel: TaskBoardCardGapModel(),
       selectionModel: selectionModel,
+      revealCoordinator: revealCoordinator,
       actions: TaskBoardOverviewActions(store: Self.store, scope: .dashboard),
-      liveInboxItems: TaskBoardLiveInboxItems(),
+      onDrop: { _, _ in false },
       quickAddDraftTitle: draftTitle,
       collapseOverridesRawValue: .constant("")
     )

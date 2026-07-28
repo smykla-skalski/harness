@@ -91,6 +91,215 @@ struct HarnessMonitorStoreTaskBoardRefreshCoalescingTests {
     #expect(store.cacheWriteSync.taskBoardRefreshCompletionWaiters.isEmpty)
   }
 
+  @Test("A refresh loaded before an optimistic move cannot restore the old position")
+  func staleRefreshCannotOverwriteOptimisticPosition() async {
+    let client = RecordingHarnessClient()
+    let moving = taskBoardItem(id: "moving", status: .todo)
+    let anchor = taskBoardItem(id: "anchor", status: .planning)
+    client.configureTaskBoardItems([moving, anchor])
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+    client.configureTaskBoardItemSnapshots([[moving, anchor]])
+    await client.blockNextTaskBoardItemsRead()
+
+    let refresh = Task { @MainActor in
+      await store.refreshTaskBoardDashboardSnapshot(using: client)
+    }
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    let mutation = store.beginOptimisticTaskBoardPosition(
+      id: "moving",
+      sourceStatus: .todo,
+      destinationStatus: .planning,
+      placement: .relative(
+        TaskBoardRelativeLanePlacement(anchorItemID: "anchor", edge: .after)
+      )
+    )
+    #expect(mutation != nil)
+    #expect(store.globalTaskBoardItems.map(\.id) == ["anchor", "moving"])
+    let position = Task { @MainActor in
+      await store.positionTaskBoardItem(
+        id: "moving",
+        sourceStatus: .todo,
+        destinationStatus: .planning,
+        placement: .relative(
+          TaskBoardRelativeLanePlacement(anchorItemID: "anchor", edge: .after)
+        ),
+        optimisticMutation: mutation
+      )
+    }
+    _ = await waitUntil {
+      store.taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+    }
+    #expect(store.taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty)
+
+    await client.releaseTaskBoardItemsRead()
+    await refresh.value
+
+    #expect(store.globalTaskBoardItems.map(\.id) == ["anchor", "moving"])
+    #expect(store.globalTaskBoardItems.last?.status == .planning)
+    #expect(await position.value)
+  }
+
+  @Test("A refresh stays behind an active optimistic move")
+  func refreshCannotOverwritePendingOptimisticPosition() async {
+    let client = RecordingHarnessClient()
+    let moving = taskBoardItem(id: "moving", status: .todo)
+    let anchor = taskBoardItem(id: "anchor", status: .planning)
+    client.configureTaskBoardItems([moving, anchor])
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+    let mutation = store.beginOptimisticTaskBoardPosition(
+      id: "moving",
+      sourceStatus: .todo,
+      destinationStatus: .planning,
+      placement: .relative(
+        TaskBoardRelativeLanePlacement(anchorItemID: "anchor", edge: .after)
+      )
+    )
+    #expect(mutation != nil)
+    client.configureTaskBoardItemSnapshots([[moving, anchor]])
+
+    await store.refreshTaskBoardDashboardSnapshot(using: client)
+
+    #expect(store.globalTaskBoardItems.map(\.id) == ["anchor", "moving"])
+    #expect(store.globalTaskBoardItems.last?.status == .planning)
+  }
+
+  @Test("A full lifecycle refresh cannot apply items loaded before a position move")
+  func lifecycleRefreshCannotOverwriteResolvedPosition() async {
+    let client = RecordingHarnessClient()
+    let moving = taskBoardItem(id: "moving", status: .todo)
+    let anchor = taskBoardItem(id: "anchor", status: .planning)
+    client.configureTaskBoardItems([moving, anchor])
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+    client.configureTaskBoardItemSnapshots([[moving, anchor]])
+    await client.blockNextTaskBoardItemsRead()
+
+    let refresh = Task { @MainActor in
+      await store.refresh(using: client, preserveSelection: false)
+    }
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    let placement = TaskBoardLanePlacement.relative(
+      TaskBoardRelativeLanePlacement(anchorItemID: "anchor", edge: .after)
+    )
+    let mutation = store.beginOptimisticTaskBoardPosition(
+      id: "moving",
+      sourceStatus: .todo,
+      destinationStatus: .planning,
+      placement: placement
+    )
+    let success = await store.positionTaskBoardItem(
+      id: "moving",
+      sourceStatus: .todo,
+      destinationStatus: .planning,
+      placement: placement,
+      optimisticMutation: mutation
+    )
+    #expect(success)
+
+    await client.releaseTaskBoardItemsRead()
+    await refresh.value
+
+    #expect(store.globalTaskBoardItems.map(\.id) == ["anchor", "moving"])
+    #expect(store.globalTaskBoardItems.last?.status == .planning)
+  }
+
+  @Test("A cancelled confirmation refresh cannot restore a pre-move snapshot")
+  func confirmationRefreshCannotOverwriteResolvedPosition() async throws {
+    let client = RecordingHarnessClient()
+    let moving = taskBoardItem(id: "moving", status: .todo)
+    let anchor = taskBoardItem(id: "anchor", status: .planning)
+    client.configureTaskBoardItems([moving, anchor])
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+    store.initialTaskBoardConfirmationGracePeriod = .seconds(1)
+    store.taskBoardConfirmationRetryInterval = .milliseconds(1)
+    client.configureTaskBoardItemSnapshots([[moving, anchor]])
+    await client.blockNextTaskBoardItemsRead()
+    store.scheduleInitialTaskBoardConfirmationRefresh(
+      using: client,
+      preservedItemIDs: ["moving"],
+      preservedStatus: false
+    )
+    let confirmationTask = try #require(store.initialTaskBoardConfirmationTask)
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    let placement = TaskBoardLanePlacement.relative(
+      TaskBoardRelativeLanePlacement(anchorItemID: "anchor", edge: .after)
+    )
+    let mutation = store.beginOptimisticTaskBoardPosition(
+      id: "moving",
+      sourceStatus: .todo,
+      destinationStatus: .planning,
+      placement: placement
+    )
+    let success = await store.positionTaskBoardItem(
+      id: "moving",
+      sourceStatus: .todo,
+      destinationStatus: .planning,
+      placement: placement,
+      optimisticMutation: mutation
+    )
+    #expect(success)
+
+    await client.releaseTaskBoardItemsRead()
+    await confirmationTask.value
+
+    #expect(store.globalTaskBoardItems.map(\.id) == ["anchor", "moving"])
+    #expect(store.globalTaskBoardItems.last?.status == .planning)
+  }
+
+  @Test("An older position response cannot overwrite a newer optimistic move")
+  func stalePositionResponseCannotOverwriteNewerMove() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([
+      taskBoardItem(id: "moving", status: .todo),
+      taskBoardItem(id: "planning-anchor", status: .planning),
+      taskBoardItem(id: "progress-anchor", status: .inProgress),
+    ])
+    let store = await makeBootstrappedStore(client: client)
+    let pendingCacheWrite = Task<Void, Never> {
+      _ = try? await Task.sleep(for: .seconds(60))
+    }
+    store.cacheWriteSync.pendingTaskBoardSnapshotCacheWriteTask = pendingCacheWrite
+    let cacheWriteToken = store.cacheWriteSync.taskBoardSnapshotCacheWriteToken
+    let first = try #require(
+      store.beginOptimisticTaskBoardPosition(
+        id: "moving",
+        sourceStatus: .todo,
+        destinationStatus: .planning,
+        placement: .relative(
+          TaskBoardRelativeLanePlacement(anchorItemID: "planning-anchor", edge: .after)
+        )
+      )
+    )
+    #expect(pendingCacheWrite.isCancelled)
+    #expect(store.cacheWriteSync.pendingTaskBoardSnapshotCacheWriteTask == nil)
+    #expect(store.cacheWriteSync.taskBoardSnapshotCacheWriteToken == cacheWriteToken + 1)
+    let second = try #require(
+      store.beginOptimisticTaskBoardPosition(
+        id: "moving",
+        sourceStatus: .planning,
+        destinationStatus: .inProgress,
+        placement: .relative(
+          TaskBoardRelativeLanePlacement(anchorItemID: "progress-anchor", edge: .after)
+        )
+      )
+    )
+
+    store.completeSuccessfulTaskBoardPosition(
+      taskBoardItem(id: "moving", status: .planning),
+      mutation: first
+    )
+
+    #expect(
+      store.globalTaskBoardItems.first(where: { $0.id == "moving" })?.status == .inProgress
+    )
+    #expect(
+      store.taskBoardRuntimeState.positionMutation.pendingTokens == Set([second.token])
+    )
+  }
+
   @Test("Policy push refreshes only policy state")
   func policyPushRefreshesOnlyPolicyState() async throws {
     let client = RecordingHarnessClient()
@@ -151,6 +360,29 @@ struct HarnessMonitorStoreTaskBoardRefreshCoalescingTests {
     try await Task.sleep(for: .milliseconds(100))
 
     #expect(lazyClient.readCallCount(.policyCanvasWorkspace) == lazyWorkspaceReads)
+  }
+
+  private func taskBoardItem(id: String, status: TaskBoardStatus) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: id,
+      title: "Board item \(id)",
+      body: "",
+      status: status,
+      priority: .medium,
+      tags: [],
+      projectId: "project-1",
+      agentMode: .interactive,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-07-28T10:00:00Z",
+      updatedAt: "2026-07-28T10:00:00Z",
+      deletedAt: nil
+    )
   }
 }
 

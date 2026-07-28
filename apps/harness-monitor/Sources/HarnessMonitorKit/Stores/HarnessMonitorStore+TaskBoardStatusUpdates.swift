@@ -63,21 +63,7 @@ extension HarnessMonitorStore {
       )
     }
 
-    guard taskBoardSucceeded, inboxSucceeded else {
-      return false
-    }
-    if !taskBoardUpdates.isEmpty, !inboxUpdates.isEmpty {
-      presentSuccessFeedback("Moved task board cards")
-    } else if !taskBoardUpdates.isEmpty {
-      presentSuccessFeedback(
-        taskBoardUpdates.count == 1 ? "Moved task board item" : "Moved task board items"
-      )
-    } else {
-      presentSuccessFeedback(
-        inboxUpdates.count == 1 ? "Moved session task" : "Moved session tasks"
-      )
-    }
-    return true
+    return taskBoardSucceeded && inboxSucceeded
   }
 
   func performTaskBoardItemStatusUpdates(
@@ -162,6 +148,8 @@ extension TaskBoardItem {
       priority: priority,
       tags: tags,
       projectId: projectId,
+      sourceProjectId: sourceProjectId,
+      executionRepository: executionRepository,
       targetProjectTypes: targetProjectTypes,
       agentMode: agentMode,
       kind: kind,

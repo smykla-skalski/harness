@@ -241,6 +241,7 @@ extension TaskBoardItem {
     TaskBoardItem(
       schemaVersion: schemaVersion, id: id, title: title, body: body, status: status,
       priority: priority, tags: tags, projectId: projectId,
+      sourceProjectId: sourceProjectId,
       executionRepository: executionRepository,
       targetProjectTypes: targetProjectTypes, agentMode: agentMode, kind: kind,
       externalRefs: externalRefs, importedFromProvider: importedFromProvider, planning: planning,

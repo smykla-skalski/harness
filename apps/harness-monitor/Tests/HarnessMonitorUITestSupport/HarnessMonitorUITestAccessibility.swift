@@ -4,6 +4,7 @@ enum HarnessMonitorUITestAccessibility {
   static let auditBuildState = "harness.audit.build.state"
   static let auditBuildBadge = "harness.audit.build.badge"
   static let perfScenarioState = "harness.perf.scenario.state"
+  static let taskBoardOptimisticSettle = "harness.task-board.optimistic-settle"
   static func windowShellState(_ windowID: String) -> String {
     "harness.window.\(slug(windowID)).shell.state"
   }

@@ -6,6 +6,7 @@ import SwiftUI
 struct TaskBoardLaneMetrics: Equatable {
   let laneSpacing: CGFloat
   let laneInnerPadding: CGFloat
+  let listRowHorizontalInset: CGFloat
   let laneWidth: CGFloat
   let laneCollapsedWidth: CGFloat
   let laneCollapsedInnerPadding: CGFloat
@@ -40,6 +41,10 @@ struct TaskBoardLaneMetrics: Equatable {
     let heightScale = min(scale, 1.18)
     laneSpacing = HarnessMonitorTheme.spacingSM * denseScale
     laneInnerPadding = HarnessMonitorTheme.spacingMD * denseScale
+    // A macOS plain List reserves spacingSM outside listRowInsets, and
+    // listSectionMargins is unavailable on macOS. Keep the remaining inset here
+    // so the card edge still lands on the header's laneInnerPadding.
+    listRowHorizontalInset = max(0, laneInnerPadding - HarnessMonitorTheme.spacingSM)
     laneWidth = 420 * broadScale
     laneCollapsedWidth = max(72, 72 * min(scale, 1.12))
     laneCollapsedInnerPadding = HarnessMonitorTheme.spacingSM * denseScale
@@ -229,6 +234,100 @@ final class TaskBoardRelativeTimeClock {
   }
 }
 
+enum TaskBoardLaneRevealAnchor: Equatable, Sendable {
+  case top
+  case minimal
+  case bottom
+}
+
+struct TaskBoardLaneRevealRequest: Equatable, Sendable {
+  let generation: UInt64
+  let retryAttempt: Int
+  let cardID: TaskBoardCardID
+  let lane: TaskBoardInboxLane
+  let anchor: TaskBoardLaneRevealAnchor
+  let priorDestinationCardIDs: [TaskBoardCardID]
+}
+
+@MainActor
+@Observable
+final class TaskBoardLaneRevealCoordinator {
+  private static let maximumRetryAttempts = 2
+  private var generation: UInt64 = 0
+  private(set) var pendingRequest: TaskBoardLaneRevealRequest?
+
+  @discardableResult
+  func request(
+    cardID: TaskBoardCardID,
+    in lane: TaskBoardInboxLane,
+    anchor: TaskBoardLaneRevealAnchor,
+    priorDestinationCardIDs: [TaskBoardCardID]
+  ) -> TaskBoardLaneRevealRequest {
+    generation &+= 1
+    let request = TaskBoardLaneRevealRequest(
+      generation: generation,
+      retryAttempt: 0,
+      cardID: cardID,
+      lane: lane,
+      anchor: anchor,
+      priorDestinationCardIDs: priorDestinationCardIDs
+    )
+    pendingRequest = request
+    return request
+  }
+
+  func actionableRequest(
+    in lane: TaskBoardInboxLane,
+    orderedCardIDs: [TaskBoardCardID]
+  ) -> TaskBoardLaneRevealRequest? {
+    guard
+      let request = pendingRequest,
+      request.lane == lane,
+      orderedCardIDs.contains(request.cardID),
+      orderedCardIDs != request.priorDestinationCardIDs
+    else {
+      return nil
+    }
+    return request
+  }
+
+  func isPending(_ request: TaskBoardLaneRevealRequest) -> Bool {
+    pendingRequest?.generation == request.generation
+  }
+
+  /// Reissues the current logical request with a fresh identity. A native list
+  /// reveal can be attempted before AppKit has installed or laid out its table;
+  /// changing the generation lets the lane's task retry after that layout turn
+  /// without allowing an older reveal to replace a newer user action.
+  @discardableResult
+  func retry(
+    _ request: TaskBoardLaneRevealRequest
+  ) -> TaskBoardLaneRevealRequest? {
+    guard
+      isPending(request),
+      request.retryAttempt < Self.maximumRetryAttempts
+    else {
+      return nil
+    }
+    generation &+= 1
+    let retryRequest = TaskBoardLaneRevealRequest(
+      generation: generation,
+      retryAttempt: request.retryAttempt + 1,
+      cardID: request.cardID,
+      lane: request.lane,
+      anchor: request.anchor,
+      priorDestinationCardIDs: request.priorDestinationCardIDs
+    )
+    pendingRequest = retryRequest
+    return retryRequest
+  }
+
+  func consume(_ request: TaskBoardLaneRevealRequest) {
+    guard isPending(request) else { return }
+    pendingRequest = nil
+  }
+}
+
 private struct TaskBoardCardUpdatedAtLabel: View {
   let updatedAt: Date?
   let font: Font
@@ -305,7 +404,9 @@ private struct TaskBoardCardChrome: ViewModifier {
             cardStrokeColor,
             lineWidth: cardStrokeWidth
           )
+          .allowsHitTesting(false)
       }
+      .focusEffectDisabled(isSelected)
   }
 
   private var selectedFillOpacity: Double {
@@ -376,6 +477,7 @@ extension View {
     onGeometryChange(for: CGRect.self) { proxy in
       proxy.frame(in: .named(coordinateSpace))
     } action: { frame in
+      TaskBoardCardDragDiagnostics.recordGeometryUpdate()
       tracking.setFrame(frame, for: id)
       guard let location = tracking.location else { return }
       if isHovered || frame.contains(location) { onChange() }

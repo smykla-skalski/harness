@@ -31,21 +31,24 @@ final class DropDestinationContractTests: XCTestCase {
     /// the rationale — the new handler is not automatically protected by the
     /// old one.
     private static let allowlist: [DropDestinationAllowance] = [
-        // TaskBoard lane column has two drop handlers, one for API items and
-        // one for inbox items. Both delegate to TaskBoardLaneDropPolicy /
-        // TaskBoardInboxDropPolicy via performAPIDrop / performInboxDrop,
-        // which route through TaskBoardDropDeduper. The only `return false`
-        // path in handleAPIDrop / handleInboxDrop is the empty-payloads
-        // defensive guard (no payload means SwiftUI delivered an empty
-        // session, which the type system makes runtime-impossible for the
-        // typed payload variants). In-flight feedback flows through
-        // taskBoardLaneBodyChrome(isDropTargeted:) and the dedup-aware
-        // updateAPIDropTargeted / updateInboxDropTargeted callbacks.
+        // One dynamic-content destination declaration is reused by every
+        // nonempty lane. SwiftUI supplies its insertion offset, and delivery
+        // delegates to TaskBoardOverviewActions, which reports stale/busy
+        // rejection. Keeping this at one prevents per-card responders.
         .init(
             relativePath:
                 "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardLaneUnifiedColumn.swift",
-            expectedCount: 2,
-            rationale: "delegated to drop-policy + deduper; empty-payload guard is defensive"
+            expectedCount: 1,
+            rationale: "one native dynamic-content declaration; rejected delivery reports feedback"
+        ),
+        // Empty API collections have no DynamicViewContent insertion surface,
+        // so Apple documents an ordinary modern destination for that state.
+        // The same declaration also preserves drops onto collapsed lanes.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardLaneFallbackDropDestination.swift",
+            expectedCount: 1,
+            rationale: "one native empty-content fallback; rejected delivery reports feedback"
         ),
         // SessionAgentSummaryCard's task-drop handler is the canonical
         // user-visible rejection pattern: every `return false` is paired
@@ -94,7 +97,7 @@ final class DropDestinationContractTests: XCTestCase {
         // forwards the payload list and the canvas-space location.
         .init(
             relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift",
+                "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator+HostedRoot.swift",
             expectedCount: 1,
             rationale: "delegated to viewModel.dropPalettePayloads; canvas overlays carry feedback"
         ),

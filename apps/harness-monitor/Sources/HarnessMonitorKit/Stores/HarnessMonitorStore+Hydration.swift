@@ -146,6 +146,8 @@ extension HarnessMonitorStore {
   func restorePersistedTaskBoardState() async {
     let shouldRestoreItems = globalTaskBoardItems.isEmpty
     let shouldRestoreStatus = globalTaskBoardOrchestratorStatus == nil
+    let positionMutationGeneration =
+      taskBoardRuntimeState.positionMutation.generation
     guard shouldRestoreItems || shouldRestoreStatus else {
       return
     }
@@ -154,10 +156,13 @@ extension HarnessMonitorStore {
     }
 
     withUISyncBatch {
-      if shouldRestoreItems {
+      if shouldRestoreItems,
+        globalTaskBoardItems.isEmpty,
+        canApplyTaskBoardItems(positionMutationGeneration: positionMutationGeneration)
+      {
         globalTaskBoardItems = cached.items
       }
-      if shouldRestoreStatus {
+      if shouldRestoreStatus, globalTaskBoardOrchestratorStatus == nil {
         globalTaskBoardOrchestratorStatus = cached.orchestratorStatus
       }
     }

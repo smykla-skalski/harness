@@ -105,11 +105,13 @@ extension HarnessMonitorPerfTests {
   }
 
   func markerText(_ element: XCUIElement) -> String {
-    if !element.label.isEmpty {
-      return element.label
+    let label = element.label
+    if !label.isEmpty {
+      return label
     }
 
-    if let value = element.value as? String, !value.isEmpty {
+    let value = element.value as? String
+    if let value, !value.isEmpty {
       return value
     }
 
