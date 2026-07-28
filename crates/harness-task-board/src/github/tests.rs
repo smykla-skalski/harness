@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::policy::{BuiltInPolicyGate, PolicyDecision, PolicyGate, PolicyReasonCode};
+use crate::policy::{BuiltInPolicyGate, PolicyDecision, PolicyGate, PolicyReasonCode};
 
 fn config() -> GitHubProjectConfig {
     let mut config = GitHubProjectConfig::new("smykla-skalski", "harness");
@@ -35,13 +35,13 @@ fn evaluate(evidence: &GitHubMergeEvidence) -> PolicyDecision {
     BuiltInPolicyGate::new(40).evaluate(&input)
 }
 
-fn assert_reason(decision: PolicyDecision, expected: PolicyReasonCode) {
+fn assert_reason(decision: &PolicyDecision, expected: PolicyReasonCode) {
     let reason_code = match decision {
         PolicyDecision::Allow { reason_code, .. }
         | PolicyDecision::Deny { reason_code, .. }
         | PolicyDecision::RequireHuman { reason_code, .. }
         | PolicyDecision::RequireConsensus { reason_code, .. }
-        | PolicyDecision::DryRunOnly { reason_code, .. } => reason_code,
+        | PolicyDecision::DryRunOnly { reason_code, .. } => *reason_code,
     };
     assert_eq!(reason_code, expected);
 }
@@ -50,7 +50,7 @@ fn assert_reason(decision: PolicyDecision, expected: PolicyReasonCode) {
 fn auto_merge_allows_when_github_evidence_is_green() {
     let evidence = green_evidence();
 
-    assert_reason(evaluate(&evidence), PolicyReasonCode::AutoMergeAllowed);
+    assert_reason(&evaluate(&evidence), PolicyReasonCode::AutoMergeAllowed);
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn auto_merge_blocks_failed_checks() {
     let mut evidence = green_evidence();
     evidence.checks = vec![GitHubCheckEvidence::failure("test")];
 
-    assert_reason(evaluate(&evidence), PolicyReasonCode::ChecksNotGreen);
+    assert_reason(&evaluate(&evidence), PolicyReasonCode::ChecksNotGreen);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn auto_merge_blocks_branch_protection_rejection() {
     evidence.branch_protection.merge_allowed = false;
 
     assert_reason(
-        evaluate(&evidence),
+        &evaluate(&evidence),
         PolicyReasonCode::BranchProtectionBlocked,
     );
 }
@@ -81,7 +81,7 @@ fn auto_merge_blocks_unapproved_reviewer_verdict() {
         unresolved_requested_changes: 0,
     }];
 
-    assert_reason(evaluate(&evidence), PolicyReasonCode::ReviewerNotApproved);
+    assert_reason(&evaluate(&evidence), PolicyReasonCode::ReviewerNotApproved);
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn auto_merge_blocks_unresolved_requested_changes() {
     }];
 
     assert_reason(
-        evaluate(&evidence),
+        &evaluate(&evidence),
         PolicyReasonCode::UnresolvedRequestedChanges,
     );
 }
@@ -104,7 +104,7 @@ fn auto_merge_blocks_protected_paths_with_consensus() {
     let mut evidence = green_evidence();
     evidence.pull_request.changed_paths = vec!["src/security/secrets.rs".into()];
 
-    assert_reason(evaluate(&evidence), PolicyReasonCode::ProtectedPathTouched);
+    assert_reason(&evaluate(&evidence), PolicyReasonCode::ProtectedPathTouched);
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn risk_classifier_blocks_auto_merge_above_threshold() {
         .map(|index| format!("src/task_board/generated_{index}.rs"))
         .collect();
 
-    assert_reason(evaluate(&evidence), PolicyReasonCode::RiskAboveThreshold);
+    assert_reason(&evaluate(&evidence), PolicyReasonCode::RiskAboveThreshold);
 }
 
 #[test]

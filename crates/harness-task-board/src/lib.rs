@@ -3,7 +3,8 @@
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
 //! project, working-copy, policy-graph, policy-runtime, external-sync/github,
-//! automation, and dispatch/evaluation/planning clusters.
+//! automation, dispatch/evaluation/planning, and the standalone `github`
+//! REST/GraphQL automation-client clusters.
 //!
 //! This is a later slice of the `task_board` extraction, following slice 4's
 //! triage/prompt/project/working-copy cluster, the slice that added
@@ -28,13 +29,20 @@
 //! earlier slice's doc comment flagged, where two files under the standalone
 //! `task_board::github` module (distinct from this crate's
 //! `external::github`) needed `automation::TaskBoardRepositoryAutomationConfig`
-//! before it was extracted. The remaining domain (`external`, the rest of
-//! `github` (`client`/`client_graphql`/`evidence`/`evidence_api`/
-//! `publication`/`repository`/`risk`), `transport`, and the
+//! before it was extracted. The remaining domain (`transport`, and the
 //! `legacy_import`/`orchestrator`/`summary` files that reach into those)
 //! stays in the root crate's `src/task_board` for later slices, and reaches
 //! back into this crate only through the root crate's own
 //! `pub use harness_task_board::*;` facade.
+//!
+//! This slice also moves the rest of the standalone `github` module in:
+//! `client`, `client_graphql`, `evidence`, `evidence_api`, `publication`,
+//! `repository`, and `risk` — the GitHub REST/GraphQL automation client used
+//! for branch publication and PR merge policy, not `external::github` (the
+//! sync-engine's own GitHub client, already in this crate). `github::config`'s
+//! wire types moved earlier as `github_config`, closing the only reverse
+//! dependency this cluster had; nothing else in it reaches back into the root
+//! crate.
 //!
 //! This slice moves `dispatch`, `evaluation`, and `planning`: the one
 //! `task_board` cluster with a real `session` dependency. Their six forward
@@ -75,6 +83,7 @@ pub mod dispatch;
 pub mod evaluation;
 pub mod external;
 pub mod git_identity_defaults;
+pub mod github;
 pub mod github_config;
 pub mod item_fields;
 pub mod item_intent;

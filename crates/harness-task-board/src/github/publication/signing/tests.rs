@@ -6,7 +6,7 @@ use rand_core06::OsRng;
 fn publication_preserves_existing_pgp_signature() {
     let signature = "-----BEGIN PGP SIGNATURE-----\nbody\n-----END PGP SIGNATURE-----";
     let profile = TaskBoardGitRuntimeProfile {
-        signing: crate::task_board::TaskBoardGitSigningConfig {
+        signing: crate::TaskBoardGitSigningConfig {
             mode: TaskBoardGitSigningMode::Gpg,
             ..Default::default()
         },
@@ -26,7 +26,7 @@ fn publication_preserves_existing_pgp_signature() {
 #[test]
 fn publication_rejects_gpg_mode_without_existing_signature() {
     let profile = TaskBoardGitRuntimeProfile {
-        signing: crate::task_board::TaskBoardGitSigningConfig {
+        signing: crate::TaskBoardGitSigningConfig {
             mode: TaskBoardGitSigningMode::Gpg,
             ..Default::default()
         },
@@ -50,7 +50,7 @@ fn publication_uses_configured_gpg_key_path_and_passphrase() {
     let key_path = tempdir.path().join("private.asc");
     fs::write(&key_path, private_key).expect("write private key");
     let profile = TaskBoardGitRuntimeProfile {
-        signing: crate::task_board::TaskBoardGitSigningConfig {
+        signing: crate::TaskBoardGitSigningConfig {
             mode: TaskBoardGitSigningMode::Gpg,
             gpg_key_id: Some(key_id),
             gpg_private_key_path: Some(key_path.to_string_lossy().into_owned()),
@@ -71,7 +71,7 @@ fn publication_uses_configured_gpg_key_path_and_passphrase() {
 fn publication_uses_configured_gpg_key_material_before_path() {
     let (private_key, key_id, _fingerprint) = generated_private_key(Some("secret"));
     let profile = TaskBoardGitRuntimeProfile {
-        signing: crate::task_board::TaskBoardGitSigningConfig {
+        signing: crate::TaskBoardGitSigningConfig {
             mode: TaskBoardGitSigningMode::Gpg,
             gpg_key_id: Some(key_id),
             gpg_private_key_path: Some("/path/that/must/not/be/read".into()),
@@ -92,7 +92,7 @@ fn publication_uses_configured_gpg_key_material_before_path() {
 #[test]
 fn publication_marks_configured_ssh_mode_for_native_publication() {
     let profile = TaskBoardGitRuntimeProfile {
-        signing: crate::task_board::TaskBoardGitSigningConfig {
+        signing: crate::TaskBoardGitSigningConfig {
             mode: TaskBoardGitSigningMode::Ssh,
             ssh_key_path: Some("/tmp/id_sign.pub".into()),
             ..Default::default()

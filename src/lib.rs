@@ -20,6 +20,7 @@ pub mod daemon;
 pub use harness_kernel::errors;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod feature_flags;
+#[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub(crate) use harness_workspace::git;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub(crate) mod github_api {

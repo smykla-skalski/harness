@@ -1,4 +1,4 @@
-use crate::task_board::TaskBoardGitRuntimeProfile;
+use crate::TaskBoardGitRuntimeProfile;
 
 pub(super) struct LocalBranchSnapshot {
     pub(super) head_tree_sha: String,

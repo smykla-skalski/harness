@@ -84,7 +84,6 @@ tempfile = "3.27.0"
 uzers = { version = "0.12.2", default-features = false }
 shell-words = "1.1.0"
 regex = "1.11.1"
-ssh-key = { version = "0.7.0-rc.10", features = ["crypto", "encryption"] }
 tokio = { version = "1.50.0", features = ["fs", "rt-multi-thread", "time", "process", "io-std", "io-util", "sync", "macros", "net", "tracing", "test-util"] }
 tokio-rustls = { version = "0.26.4", optional = true }
 tokio-util = { version = "0.7.18", features = ["compat"] }
@@ -97,7 +96,6 @@ noyalib = { version = "0.0.16", default-features = false, features = ["std", "co
 rayon = "1.11.0"
 base64 = "0.23.0"
 futures-util = "0.3.31"
-pgp = { version = "0.20.0", default-features = false }
 rand_core06 = { package = "rand_core", version = "0.6.4", features = ["std"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter", "json"], optional = true }

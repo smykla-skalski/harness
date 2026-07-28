@@ -5,7 +5,7 @@ use serde_json::json;
 
 use harness_kernel::errors::CliError;
 
-use crate::github_api::{
+use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 

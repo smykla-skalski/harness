@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use serde_json::json;
 
@@ -15,14 +16,14 @@ struct CapturedRequest {
 
 #[tokio::test]
 async fn request_pull_request_reviewers_posts_expected_payload() {
-    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
+    let _budget_guard = harness_github_api::acquire_global_budget_test_lock().await;
     let (endpoint, captured, handle) = spawn_json_mock(json!({
         "id": 1,
         "node_id": "PRR_1",
         "html_url": "https://github.invalid/owner/repo/pull/42#pullrequestreview-1",
         "user": null
     }));
-    let client = automation_client_with_base_uri(endpoint);
+    let client = automation_client_with_base_uri(&endpoint);
     let config = GitHubProjectConfig::new("owner", "repo");
 
     client
@@ -119,8 +120,8 @@ fn graphql_pull_request_handles_request_open_state() {
     }
 }
 
-fn automation_client_with_base_uri(base_uri: String) -> GitHubApiAutomationClient {
-    let client = crate::github_api::GitHubProtectedClient::with_base_url("token", &base_uri)
+fn automation_client_with_base_uri(base_uri: &str) -> GitHubApiAutomationClient {
+    let client = harness_github_api::GitHubProtectedClient::with_base_url("token", base_uri)
         .expect("protected client");
     GitHubApiAutomationClient {
         client,
@@ -132,7 +133,7 @@ fn automation_client_with_base_uri(base_uri: String) -> GitHubApiAutomationClien
 #[test]
 fn automation_client_keeps_database_runtime_profile() {
     let runtime_config = TaskBoardGitRuntimeConfig {
-        global: crate::task_board::TaskBoardGitRuntimeProfile {
+        global: crate::TaskBoardGitRuntimeProfile {
             author_name: Some("Database Author".to_string()),
             ..Default::default()
         },
@@ -179,7 +180,7 @@ fn capture_request(request: &str) -> CapturedRequest {
 
 fn read_http_request(stream: &mut TcpStream) -> String {
     stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+        .set_read_timeout(Some(Duration::from_secs(1)))
         .expect("read timeout");
     let mut buffer = Vec::new();
     loop {

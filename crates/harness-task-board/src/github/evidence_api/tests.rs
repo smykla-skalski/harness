@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
-use crate::task_board::github::{GitHubCheckConclusion, GitHubCheckStatus};
+use crate::github::{GitHubCheckConclusion, GitHubCheckStatus};
 
 use super::types::*;
 use super::*;
