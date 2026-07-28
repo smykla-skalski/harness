@@ -1,0 +1,282 @@
+//! Static catalog of ACP agent descriptors.
+//!
+//! Chunk 1 ships the descriptor type and the Copilot entry. Chunk 12 adds the
+//! cookbook second descriptor as a falsification test on the catalog claim;
+//! Chunk 13 layers the user-defined merge from `~/.config/harness/acp-agents.toml`.
+//!
+//! Falsification rule, restated honestly: a new built-in descriptor should be
+//! exactly one new file plus a one-line `mod` declaration and a one-line
+//! registry entry below. If a second descriptor needs anything else, the
+//! shape is wrong; rework before merging.
+
+pub mod claude;
+pub mod codex;
+pub mod copilot;
+pub mod gemini;
+pub mod openrouter;
+pub mod tags;
+
+use std::sync::LazyLock;
+
+pub use harness_protocol::managed_agents::acp::{
+    AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
+    AcpSessionEffortTransport, AcpSessionModelTransport, AcpSpawnConfiguration, CapabilityTag,
+    DoctorProbe,
+};
+
+static BUILTIN_DESCRIPTORS: LazyLock<Vec<AcpAgentDescriptor>> = LazyLock::new(|| {
+    vec![
+        copilot::descriptor(),
+        gemini::descriptor(),
+        claude::descriptor(),
+        codex::descriptor(),
+        openrouter::descriptor(),
+    ]
+});
+
+/// Return every built-in descriptor in stable order.
+///
+/// The returned vector contains references into process-wide storage. Chunk
+/// 13's user-defined merge layer can append owned descriptors without changing
+/// the built-in registry shape.
+#[must_use]
+pub fn acp_agents() -> Vec<&'static AcpAgentDescriptor> {
+    BUILTIN_DESCRIPTORS.iter().collect()
+}
+
+/// Look up a built-in descriptor by [`AcpAgentDescriptor::id`].
+#[must_use]
+pub fn find_builtin(id: &str) -> Option<&'static AcpAgentDescriptor> {
+    BUILTIN_DESCRIPTORS.iter().find(|d| d.id == id)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ptr;
+
+    use super::*;
+
+    #[test]
+    fn catalog_contains_copilot() {
+        let agents = acp_agents();
+        let copilot = agents
+            .iter()
+            .find(|d| d.id == "copilot")
+            .expect("copilot descriptor in catalog");
+        assert_eq!(copilot.display_name, "GitHub Copilot");
+        assert_eq!(copilot.launch_command, "copilot");
+        assert_eq!(copilot.launch_args, vec!["--acp", "--stdio"]);
+    }
+
+    #[test]
+    fn catalog_contains_gemini() {
+        let agents = acp_agents();
+        let gemini = agents
+            .iter()
+            .find(|d| d.id == "gemini")
+            .expect("gemini descriptor in catalog");
+        assert_eq!(gemini.display_name, "Gemini CLI");
+        assert_eq!(gemini.launch_command, "gemini");
+        assert_eq!(gemini.launch_args, vec!["--acp"]);
+    }
+
+    #[test]
+    fn catalog_contains_claude() {
+        let agents = acp_agents();
+        let claude = agents
+            .iter()
+            .find(|d| d.id == "claude")
+            .expect("claude descriptor in catalog");
+        assert_eq!(claude.display_name, "Claude Code");
+        assert_eq!(claude.launch_command, "claude-agent-acp");
+        assert!(claude.launch_args.is_empty());
+        assert!(claude.excluded_from_initial_default);
+    }
+
+    #[test]
+    fn catalog_contains_codex() {
+        let agents = acp_agents();
+        let codex = agents
+            .iter()
+            .find(|d| d.id == "codex")
+            .expect("codex descriptor in catalog");
+        assert_eq!(codex.display_name, "Codex");
+        assert_eq!(codex.launch_command, "harness-codex-acp");
+        assert!(codex.launch_args.is_empty());
+    }
+
+    #[test]
+    fn catalog_contains_openrouter() {
+        let agents = acp_agents();
+        let openrouter = agents
+            .iter()
+            .find(|d| d.id == "openrouter")
+            .expect("openrouter descriptor in catalog");
+        assert_eq!(openrouter.display_name, "OpenRouter");
+        assert_eq!(openrouter.launch_command, "harness-openrouter-agent");
+        assert!(openrouter.launch_args.is_empty());
+        assert!(openrouter.bundled_with_harness);
+    }
+
+    #[test]
+    fn catalog_returns_static_descriptor_references() {
+        let agents = acp_agents();
+        let copilot = agents
+            .into_iter()
+            .find(|d| d.id == "copilot")
+            .expect("copilot descriptor in catalog");
+        let found = find_builtin("copilot").expect("found by id");
+        assert!(ptr::eq(copilot, found));
+    }
+
+    #[test]
+    fn find_builtin_returns_known_descriptor() {
+        let descriptor = find_builtin("copilot").expect("found by id");
+        assert_eq!(descriptor.id, "copilot");
+    }
+
+    #[test]
+    fn find_builtin_returns_second_descriptor() {
+        let descriptor = find_builtin("gemini").expect("found by id");
+        assert_eq!(descriptor.id, "gemini");
+    }
+
+    #[test]
+    fn find_builtin_returns_claude_descriptor() {
+        let descriptor = find_builtin("claude").expect("found by id");
+        assert_eq!(descriptor.id, "claude");
+    }
+
+    #[test]
+    fn find_builtin_returns_codex_descriptor() {
+        let descriptor = find_builtin("codex").expect("found by id");
+        assert_eq!(descriptor.id, "codex");
+    }
+
+    #[test]
+    fn find_builtin_returns_none_for_unknown_id() {
+        assert!(find_builtin("nope").is_none());
+    }
+
+    #[test]
+    fn descriptor_round_trips_through_json() {
+        let original = copilot::descriptor();
+        let json = serde_json::to_string(&original).expect("serialise descriptor");
+        let parsed: AcpAgentDescriptor =
+            serde_json::from_str(&json).expect("deserialise descriptor");
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn descriptor_omits_install_hint_when_absent() {
+        let mut descriptor = copilot::descriptor();
+        descriptor.install_hint = None;
+        let json = serde_json::to_string(&descriptor).expect("serialise");
+        let parsed: AcpAgentDescriptor =
+            serde_json::from_str(&json).expect("deserialise without install_hint");
+        assert_eq!(parsed.install_hint, None);
+    }
+
+    #[test]
+    fn descriptor_defaults_model_catalog_when_absent() {
+        let json = serde_json::json!({
+            "id": "custom",
+            "display_name": "Custom ACP",
+            "capabilities": [],
+            "launch_command": "custom-acp",
+            "launch_args": [],
+            "env_passthrough": [],
+            "doctor_probe": {
+                "command": "custom-acp",
+                "args": ["--version"]
+            }
+        });
+        let parsed: AcpAgentDescriptor =
+            serde_json::from_value(json).expect("deserialise descriptor without model catalog");
+        assert_eq!(parsed.model_catalog, None);
+        assert!(!parsed.excluded_from_initial_default);
+    }
+
+    #[test]
+    fn descriptor_defaults_spawn_configuration_to_descriptor_runtime() {
+        let json = serde_json::json!({
+            "id": "custom",
+            "display_name": "Custom ACP",
+            "capabilities": [],
+            "launch_command": "custom-acp",
+            "launch_args": [],
+            "env_passthrough": [],
+            "doctor_probe": {
+                "command": "custom-acp",
+                "args": ["--version"]
+            }
+        });
+        let parsed: AcpAgentDescriptor =
+            serde_json::from_value(json).expect("deserialise descriptor without model catalog");
+        assert_eq!(
+            parsed.spawn_configuration,
+            AcpSpawnConfiguration::DescriptorRuntime
+        );
+    }
+
+    #[test]
+    fn descriptor_defaults_session_configuration_to_disabled() {
+        let json = serde_json::json!({
+            "id": "custom",
+            "display_name": "Custom ACP",
+            "capabilities": [],
+            "launch_command": "custom-acp",
+            "launch_args": [],
+            "env_passthrough": [],
+            "doctor_probe": {
+                "command": "custom-acp",
+                "args": ["--version"]
+            }
+        });
+        let parsed: AcpAgentDescriptor = serde_json::from_value(json)
+            .expect("deserialise descriptor without session configuration");
+        assert_eq!(
+            parsed.session_configuration,
+            AcpSessionConfiguration::default()
+        );
+    }
+
+    #[test]
+    fn copilot_capabilities_use_well_known_tags() {
+        let copilot = find_builtin("copilot").expect("copilot exists");
+        assert!(copilot.capabilities.iter().any(|t| t == tags::FS_READ));
+        assert!(copilot.capabilities.iter().any(|t| t == tags::FS_WRITE));
+        assert!(
+            copilot
+                .capabilities
+                .iter()
+                .any(|t| t == tags::TERMINAL_SPAWN)
+        );
+        assert!(copilot.capabilities.iter().any(|t| t == tags::STREAMING));
+        assert!(copilot.capabilities.iter().any(|t| t == tags::MULTI_TURN));
+    }
+
+    #[test]
+    fn copilot_env_passthrough_covers_documented_tokens() {
+        let copilot = find_builtin("copilot").expect("copilot exists");
+        for token in ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"] {
+            assert!(
+                copilot.env_passthrough.iter().any(|name| name == token),
+                "env passthrough missing {token}"
+            );
+        }
+    }
+
+    #[test]
+    fn descriptor_capabilities_differ_between_built_ins() {
+        let copilot = find_builtin("copilot").expect("copilot exists");
+        let gemini = find_builtin("gemini").expect("gemini exists");
+        assert_ne!(copilot.capabilities, gemini.capabilities);
+        assert!(
+            gemini
+                .capabilities
+                .iter()
+                .any(|t| t == tags::REQUIRES_NETWORK)
+        );
+    }
+}
