@@ -2380,7 +2380,7 @@ const TIMELINE_SOURCE: &str = include_str!("../crates/harness-protocol/src/timel
 const SESSION_SUMMARIES_SOURCE: &str = include_str!("../src/session/wire/summaries.rs");
 // AskUserQuestionOption/AskUserQuestionPrompt moved to the protocol crate; payloads.rs now
 // only re-exports them, so the summaries module has to keep reading them from their new file.
-const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../crates/harness-protocol/src/hook_prompts.rs");
+const HOOK_PROMPTS_SOURCE: &str = include_str!("../crates/harness-protocol/src/hook_prompts.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
 /// types are foundation-entangled (reference unmigrated daemon-state and
@@ -3146,7 +3146,7 @@ fn modules() -> Vec<GeneratedModule> {
                 SESSION_SUMMARIES_SOURCE,
                 TIMELINE_SOURCE,
                 SHARED_DAEMON_SOURCE,
-                HOOKS_PAYLOADS_SOURCE,
+                HOOK_PROMPTS_SOURCE,
             ],
         },
         GeneratedModule {
