@@ -7,7 +7,6 @@ use super::helpers::{collect_hits_in_tree, matches_extension, read_repo_file, re
 fn new_domain_roots_exist() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     for path in [
-        "ARCHITECTURE.md",
         "src/app",
         "src/observe",
         "src/setup",

@@ -198,7 +198,7 @@ fn repo_contains_no_legacy_grouped_lifecycle_commands() {
 
     hits.extend(collect_hits_in_paths(
         root,
-        &["README.md", "ARCHITECTURE.md"],
+        &["README.md"],
         &needles,
         |path, needle| format!("{path} still contains legacy grouped lifecycle command `{needle}`"),
     ));
@@ -240,7 +240,7 @@ fn repo_contains_no_legacy_public_create_skill_flags() {
 
     hits.extend(collect_hits_in_paths(
         root,
-        &["README.md", "ARCHITECTURE.md"],
+        &["README.md"],
         &needles,
         |path, needle| {
             format!("{path} still contains legacy public create flag contract `{needle}`")
@@ -283,7 +283,7 @@ fn repo_contains_no_legacy_observe_doctor_scan_action() {
 
     hits.extend(collect_hits_in_paths(
         root,
-        &["README.md", "ARCHITECTURE.md"],
+        &["README.md"],
         &needles,
         |path, needle| {
             format!("{path} still contains legacy observe doctor action contract `{needle}`")
