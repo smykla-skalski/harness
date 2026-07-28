@@ -271,7 +271,7 @@ pub fn validate_submit_review(
 /// [`apply_claim_review`] is rejected. Submitting twice from the same
 /// reviewer updates `submitted_at` and rebuilds consensus from the
 /// supplied `all_reviews` slice; file-level idempotency on `review_id`
-/// lives in [`crate::storage::files::append_review`].
+/// lives in [`crate::storage::append_review`].
 ///
 /// # Errors
 /// Same error set as [`validate_submit_review`].
