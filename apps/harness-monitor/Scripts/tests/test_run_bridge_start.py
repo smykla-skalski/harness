@@ -134,7 +134,10 @@ esac
                 except OSError:
                     pass
         if process.poll() is None:
-            process.kill()
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:

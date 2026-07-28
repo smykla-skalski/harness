@@ -85,7 +85,10 @@ def pump_output(
             if stop_reading.is_set() and drain_deadline is None:
                 drain_deadline = time.monotonic() + STOP_DRAIN_GRACE_SECONDS
             poll_timeout = 0.0 if drain_deadline is not None else PROCESS_POLL_INTERVAL_SECONDS
-            ready, _, _ = select.select([stdout_fd], [], [], poll_timeout)
+            try:
+                ready, _, _ = select.select([stdout_fd], [], [], poll_timeout)
+            except InterruptedError:
+                continue
             if ready:
                 try:
                     chunk = os.read(stdout_fd, 8192)
