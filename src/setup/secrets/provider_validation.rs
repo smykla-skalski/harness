@@ -16,8 +16,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 #[cfg(target_os = "macos")]
 pub(super) fn validate_provider_secret(kind: SecretKindArg, secret: &str) -> Result<(), CliError> {
     let base_url = match kind {
-        SecretKindArg::Github => env::var("HARNESS_GITHUB_API_URL")
-            .unwrap_or_else(|_| DEFAULT_GITHUB_API_URL.to_string()),
+        SecretKindArg::Github => DEFAULT_GITHUB_API_URL.to_string(),
         SecretKindArg::OpenRouter => env::var("OPENROUTER_API_URL")
             .unwrap_or_else(|_| DEFAULT_OPENROUTER_API_URL.to_string()),
         _ => unreachable!("provider credential kind required"),
