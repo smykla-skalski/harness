@@ -110,7 +110,7 @@ pub(super) async fn post_task_board_item(
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        Box::pin(task_board_route_executor::create_item(&state, &request)).await,
+        task_board_route_executor::create_item(&state, &request).await,
     )
 }
 

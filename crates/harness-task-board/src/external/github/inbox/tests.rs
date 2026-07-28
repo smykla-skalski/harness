@@ -22,8 +22,12 @@ fn github_inbox_search_queries_use_github_all_state_issue_form() {
         "repo:owner/repo is:pr review-requested:octo-user state:open"
     );
     assert_eq!(
-        dependency_update_query(&repository),
-        "repo:owner/repo is:pr is:open author:renovate[bot] author:dependabot[bot]"
+        dependency_author_query(&repository, "renovate[bot]"),
+        "repo:owner/repo is:pr is:open author:renovate[bot]"
+    );
+    assert_eq!(
+        dependency_author_query(&repository, "dependabot[bot]"),
+        "repo:owner/repo is:pr is:open author:dependabot[bot]"
     );
     assert_eq!(
         dependency_label_query(&repository),
@@ -74,6 +78,7 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
         MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["bad/repo", "good/repo"]);
 
@@ -81,9 +86,9 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
 
     handle.join().expect("mock server");
     let requests = requests.lock().expect("requests");
-    // viewer + bad(assigned fails) + good(assigned, review, dependency bots,
-    // dependency labelled)
-    assert_eq!(requests.len(), 6);
+    // viewer + bad(assigned fails) + good(assigned, review, two dependency-bot
+    // searches, dependency-labelled)
+    assert_eq!(requests.len(), 7);
     assert!(requests[1].contains("repo:bad/repo"));
     assert!(requests[2].contains("repo:good/repo"));
     assert_eq!(tasks.len(), 1);
@@ -103,6 +108,7 @@ async fn github_inbox_pull_imports_review_requests_as_inbox() {
         ),
         MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
@@ -110,8 +116,8 @@ async fn github_inbox_pull_imports_review_requests_as_inbox() {
 
     handle.join().expect("mock server");
     let requests = requests.lock().expect("requests");
-    // viewer + assigned + review + dependency bots + dependency labelled
-    assert_eq!(requests.len(), 5);
+    // viewer + assigned + review + two dependency-bot searches + dependency label
+    assert_eq!(requests.len(), 6);
     assert!(requests[2].contains("review-requested:octo-user"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].status, TaskBoardStatus::Inbox);
@@ -127,6 +133,7 @@ async fn github_inbox_review_request_tasks_parse_the_same_tracking_convention_as
             200,
             search_response_with_issue_body("https://example.test/good/pull/7", "Part of #5"),
         ),
+        MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
     ]);
@@ -157,6 +164,7 @@ async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
         MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
@@ -184,6 +192,7 @@ async fn github_inbox_discovers_dependency_update_pull_requests() {
             ),
         ),
         MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
@@ -191,8 +200,9 @@ async fn github_inbox_discovers_dependency_update_pull_requests() {
 
     handle.join().expect("mock server");
     let requests = requests.lock().expect("requests");
-    assert!(requests[3].contains("author:renovate[bot] author:dependabot[bot]"));
-    assert!(requests[4].contains("label:dependencies"));
+    assert!(requests[3].contains("author:renovate[bot]"));
+    assert!(requests[4].contains("author:dependabot[bot]"));
+    assert!(requests[5].contains("label:dependencies"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].workflow_kind, TaskBoardWorkflowKind::PrFix);
     assert_eq!(tasks[0].pr_head_revision.as_deref(), Some("abc123"));
@@ -226,6 +236,7 @@ async fn github_inbox_folds_a_pull_request_with_both_intents_into_one_ticket() {
                 "renovate[bot]",
             ),
         ),
+        MockResponse::json(200, empty_search_response()),
         MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);

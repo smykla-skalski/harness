@@ -457,13 +457,14 @@ fn review_request_query(repository: &GitHubRepository, login: &str) -> String {
     )
 }
 
-/// Open dependency-update pull requests opened by the known dependency bots.
-/// GitHub OR-s repeated `author:` qualifiers, so this matches either bot.
-fn dependency_update_query(repository: &GitHubRepository) -> String {
-    format!(
-        "repo:{} is:pr is:open author:renovate[bot] author:dependabot[bot]",
-        repository.slug()
-    )
+/// The pull request authors treated as dependency-update automation.
+pub(super) const DEPENDENCY_BOT_AUTHORS: &[&str] = &["renovate[bot]", "dependabot[bot]"];
+
+/// Open dependency-update pull requests opened by one dependency bot. GitHub
+/// issue search ANDs repeated `author:` qualifiers, so each bot is a separate
+/// query rather than one `author:a author:b` clause that could never match.
+fn dependency_author_query(repository: &GitHubRepository, author: &str) -> String {
+    format!("repo:{} is:pr is:open author:{author}", repository.slug())
 }
 
 /// Open pull requests carrying the dependency label, covering dependency

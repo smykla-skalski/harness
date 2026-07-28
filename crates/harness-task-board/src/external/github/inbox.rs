@@ -14,9 +14,9 @@ use harness_github_api::GitHubProtectedClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
-    GitHubRepository, assigned_issue_query, body_lists_child_issues, dependency_label_query,
-    dependency_update_query, github_external_id, github_inbox_issue_status, graphql,
-    parent_reference_in_body, parse_github_repository, review_request_query,
+    DEPENDENCY_BOT_AUTHORS, GitHubRepository, assigned_issue_query, body_lists_child_issues,
+    dependency_author_query, dependency_label_query, github_external_id, github_inbox_issue_status,
+    graphql, parent_reference_in_body, parse_github_repository, review_request_query,
     search_label_matches_filter, warn_github_message,
 };
 
@@ -176,7 +176,7 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
                     &error,
                 ),
             }
-            match self.dependency_update_tasks(repository, login.as_str()).await {
+            match self.dependency_update_tasks(repository).await {
                 Ok(dependency_tasks) => tasks.extend(dependency_tasks),
                 Err(error) => record_repository_failure(
                     &mut failures,
@@ -278,18 +278,26 @@ impl GitHubInboxSyncClient {
     async fn dependency_update_tasks(
         &self,
         repository: &GitHubRepository,
-        login: &str,
     ) -> Result<Vec<ExternalTask>, CliError> {
         let project_id = repository.slug();
-        let mut items = self
-            .search(repository, GitHubInboxSearchKind::DependencyBots, login)
-            .await?;
+        let context = format!("searching dependency pull requests in {project_id}");
+        let mut items = Vec::new();
+        // Each bot is a separate query - GitHub issue search ANDs repeated
+        // `author:` qualifiers, so one combined clause would never match.
+        for author in DEPENDENCY_BOT_AUTHORS {
+            let query = dependency_author_query(repository, author);
+            items.extend(graphql::search_issue_pull_requests(&self.client, &query, &context).await?);
+        }
         items.extend(
-            self.search(repository, GitHubInboxSearchKind::DependencyLabelled, login)
-                .await?,
+            graphql::search_issue_pull_requests(
+                &self.client,
+                &dependency_label_query(repository),
+                &context,
+            )
+            .await?,
         );
-        // A Renovate/Dependabot pull request is usually also labelled, so the two
-        // dependency searches overlap; keep the first hit per pull request number.
+        // A Renovate/Dependabot pull request is usually also labelled, and the
+        // bots are queried separately, so keep the first hit per PR number.
         let mut seen = BTreeSet::new();
         Ok(items
             .into_iter()
@@ -389,8 +397,6 @@ fn github_task_ref(
 enum GitHubInboxSearchKind {
     AssignedIssues,
     ReviewRequests,
-    DependencyBots,
-    DependencyLabelled,
 }
 
 impl GitHubInboxSearchKind {
@@ -398,8 +404,6 @@ impl GitHubInboxSearchKind {
         match self {
             Self::AssignedIssues => assigned_issue_query(repository, login),
             Self::ReviewRequests => review_request_query(repository, login),
-            Self::DependencyBots => dependency_update_query(repository),
-            Self::DependencyLabelled => dependency_label_query(repository),
         }
     }
 
@@ -408,10 +412,6 @@ impl GitHubInboxSearchKind {
         match self {
             Self::AssignedIssues => format!("searching assigned issues in {slug}"),
             Self::ReviewRequests => format!("searching review requests in {slug}"),
-            Self::DependencyBots => format!("searching dependency-bot pull requests in {slug}"),
-            Self::DependencyLabelled => {
-                format!("searching dependency-labelled pull requests in {slug}")
-            }
         }
     }
 }
