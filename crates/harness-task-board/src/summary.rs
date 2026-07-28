@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-#[cfg(test)]
+use std::hash::BuildHasher;
+#[cfg(any(test, feature = "test-support"))]
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use super::dispatch::{DispatchPlan, build_dispatch_plans_with_policy};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::dispatch::{build_dispatch_plans, build_dispatch_plans_with_policy_root};
 use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
 use super::policy::PolicyApprovalGrant;
@@ -68,19 +69,19 @@ pub struct TaskBoardMachineSummary {
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
     let plans = build_dispatch_plans(items);
     audit_summary(items, &plans)
 }
 
 #[must_use]
-pub(crate) fn build_audit_summary_with_policy(
+pub fn build_audit_summary_with_policy<S: BuildHasher>(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: &str,
     switches: super::dispatch::SpawnGateSwitches,
-    grants: &HashMap<String, PolicyApprovalGrant>,
+    grants: &HashMap<String, PolicyApprovalGrant, S>,
 ) -> TaskBoardAuditSummary {
     let plans =
         build_dispatch_plans_with_policy(items, policy, Some(evaluated_at), switches, grants);
@@ -114,13 +115,13 @@ pub fn build_sync_summary(
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_summary(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     build_dispatch_plans(items)
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_summary_with_policy_root(
     items: &[TaskBoardItem],
     policy_root: &Path,

@@ -32,7 +32,7 @@ use super::policy_runtime::task_creation::{
 };
 use super::store::{apply_canonical_persisted_status, read_path, validate_loaded_id};
 use super::types::{CURRENT_TASK_BOARD_ITEM_VERSION, TaskBoardItem};
-use crate::infra::io::read_json_typed;
+use harness_infra::io::read_json_typed;
 use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 
 mod status_compat;
@@ -49,20 +49,20 @@ const LEGACY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
 const LEGACY_SIMULATION_FILE: &str = "policy-pipeline-v2-simulation.json";
 
 #[derive(Debug)]
-pub(crate) struct LegacyTaskBoardSnapshot {
-    pub(crate) items: Vec<TaskBoardItem>,
-    pub(crate) machines: Vec<Machine>,
-    pub(crate) local_machine_id: Option<String>,
-    pub(crate) settings: TaskBoardOrchestratorSettings,
-    pub(crate) state: TaskBoardOrchestratorState,
-    pub(crate) policy_runs: Vec<PolicyWorkflowRun>,
-    pub(crate) policy_events: Vec<super::policy_runtime::models::PolicyWorkflowEvent>,
-    pub(crate) handoffs: Vec<HandoffRecord>,
-    pub(crate) notifications: Vec<NotificationRecord>,
-    pub(crate) task_creations: Vec<TaskCreationRecord>,
-    pub(crate) policy_workspace: Option<PolicyCanvasWorkspace>,
-    pub(crate) source_digest: String,
-    pub(crate) canonical_digest: String,
+pub struct LegacyTaskBoardSnapshot {
+    pub items: Vec<TaskBoardItem>,
+    pub machines: Vec<Machine>,
+    pub local_machine_id: Option<String>,
+    pub settings: TaskBoardOrchestratorSettings,
+    pub state: TaskBoardOrchestratorState,
+    pub policy_runs: Vec<PolicyWorkflowRun>,
+    pub policy_events: Vec<super::policy_runtime::models::PolicyWorkflowEvent>,
+    pub handoffs: Vec<HandoffRecord>,
+    pub notifications: Vec<NotificationRecord>,
+    pub task_creations: Vec<TaskCreationRecord>,
+    pub policy_workspace: Option<PolicyCanvasWorkspace>,
+    pub source_digest: String,
+    pub canonical_digest: String,
 }
 
 #[derive(Serialize)]
@@ -83,7 +83,14 @@ struct CanonicalSnapshot<'a> {
 }
 
 impl LegacyTaskBoardSnapshot {
-    pub(crate) fn load(root: &Path) -> Result<Self, CliError> {
+    /// Read the legacy file-backed task board at `root` into one canonical
+    /// snapshot, or an empty snapshot when `root` does not exist.
+    ///
+    /// # Errors
+    /// Returns `CliError` when `root`'s contents are not a well-formed legacy
+    /// task board (an unexpected entry, a malformed document, or an
+    /// unsupported schema version).
+    pub fn load(root: &Path) -> Result<Self, CliError> {
         if !root.exists() {
             return Self::empty();
         }
@@ -147,7 +154,8 @@ impl LegacyTaskBoardSnapshot {
         )
     }
 
-    pub(crate) fn counts(&self) -> BTreeMap<&'static str, usize> {
+    #[must_use]
+    pub fn counts(&self) -> BTreeMap<&'static str, usize> {
         BTreeMap::from([
             ("items", self.items.len()),
             ("machines", self.machines.len()),
@@ -165,7 +173,13 @@ impl LegacyTaskBoardSnapshot {
         ])
     }
 
-    pub(crate) fn empty() -> Result<Self, CliError> {
+    /// Build the canonical snapshot of an absent legacy task board: every
+    /// collection empty, with the digest of zero bytes.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the canonical snapshot cannot be serialized
+    /// for digesting.
+    pub fn empty() -> Result<Self, CliError> {
         Self::finish(
             Vec::new(),
             Vec::new(),

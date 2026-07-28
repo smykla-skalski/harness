@@ -3,21 +3,17 @@
 // `progress_rollup`, `remote_spki_pin`, `runtime_config`, `store`, `machines`,
 // part of `wire`, `project`/`project_color`/`project_shape`, `triage*`,
 // `prompt*`/`worker_prompt`, `working_copy`, `policy_graph`, `policy_runtime`,
-// `automation`, `dispatch`/`evaluation`/`planning`, and `github::config`'s
-// whole GitHub automation-settings wire-type module moved into the
-// standalone `harness-task-board` crate. Every other task-board subtree
-// below reaches those through this glob re-export exactly the way external
-// callers (`daemon`, `session`, `hooks`) already do, so none of them needed
-// an import change for the move.
+// `automation`, `dispatch`/`evaluation`/`planning`, `github::config`'s whole
+// GitHub automation-settings wire-type module, and now
+// `orchestrator`/`summary`/`legacy_import` moved into the standalone
+// `harness-task-board` crate. Every other task-board subtree below reaches
+// those through this glob re-export exactly the way external callers
+// (`daemon`, `session`, `hooks`) already do, so none of them needed an
+// import change for the move.
 pub use harness_task_board::*;
 
 pub mod external;
 pub mod github;
-#[allow(dead_code)]
-#[cfg(feature = "daemon-runtime")]
-pub(crate) mod legacy_import;
-pub mod orchestrator;
-pub mod summary;
 pub mod transport;
 pub mod wire;
 
@@ -42,25 +38,21 @@ pub(crate) use external::{
     configured_sync_clients_without_review_requests, imported_review_references_from_items,
     reconcile_review_item_from_snapshots, sync_external_tasks,
 };
-#[cfg(test)]
-pub use orchestrator::TaskBoardOrchestrator;
-pub use orchestrator::{
-    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardHeldDispatchItem,
-    TaskBoardHeldDispatchSummary, TaskBoardOrchestratorDispatchInput,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
-    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
-    TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
-    TaskBoardWorkflowExecutionCount,
-};
+// `summary::build_audit_summary_with_policy` was `pub(crate)` in this file
+// before the move and stays that way: nothing outside root's own daemon
+// service code (`daemon::service::task_board_db`,
+// `daemon::service::task_board_orchestrator_db`) needs it, so this explicit
+// import shadows the wider visibility the crate needs to grant for the
+// re-export itself to compile, the same way `external`'s
+// `TaskBoardExternalCreateBegin` cluster above does. Unlike that cluster,
+// this one imports directly from `harness_task_board` rather than through a
+// root-local facade submodule (`orchestrator`/`summary`/`legacy_import` have
+// none left after this move), so the shadowing is against the same crate the
+// glob above already pulls from, and rustc's `hidden_glob_reexports` flags
+// exactly that as an expected, not accidental, shadow.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use summary::build_audit_summary_with_policy;
-pub use summary::{
-    TaskBoardAuditSummary, TaskBoardMachineSummary, TaskBoardProjectSummary,
-    TaskBoardProviderSyncSummary, TaskBoardStatusCount, TaskBoardSyncSummary,
-    build_machine_summaries, build_project_summaries, build_sync_summary,
-};
-#[cfg(test)]
-pub use summary::{
-    build_audit_summary, build_dispatch_summary, build_dispatch_summary_with_policy_root,
-};
+#[expect(
+    hidden_glob_reexports,
+    reason = "deliberately narrows this one item back to pub(crate) against the glob above"
+)]
+pub(crate) use harness_task_board::build_audit_summary_with_policy;

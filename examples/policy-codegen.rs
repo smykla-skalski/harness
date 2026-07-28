@@ -2638,7 +2638,7 @@ const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
     "AgentMode",
     "TaskBoardWorkflowKind",
 ];
-const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
+const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../crates/harness-task-board/src/summary.rs");
 const TASK_BOARD_PROJECT_SOURCE: &str = include_str!("../crates/harness-task-board/src/project.rs");
 const TASK_BOARD_PROJECT_COLOR_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/project_color.rs");
@@ -3000,7 +3000,7 @@ const BRIDGE_STATUS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 // already-generated HostBridgeCapabilityManifestWire (daemon-state cluster) bare; pid/uptime
 // narrow UInt -> Int in the map. The bridge-internal/persisted types stay out of the allow-list.
 const BRIDGE_STATUS_EMIT_ONLY: &[&str] = &["BridgeStatusReport"];
-const SYNC_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
+const SYNC_SUMMARY_SOURCE: &str = include_str!("../crates/harness-task-board/src/summary.rs");
 const EXTERNAL_SYNC_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/external/sync.rs");
 const SYNC_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSyncSummaryWireTypes.generated.swift";
@@ -3031,7 +3031,8 @@ const GITHUB_CONFIG_EMIT_ONLY: &[&str] = &[
     "GitHubAutomationToggles",
     "ProtectedPathRule",
 ];
-const ORCHESTRATOR_TYPES_SOURCE: &str = include_str!("../src/task_board/orchestrator/types.rs");
+const ORCHESTRATOR_TYPES_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/orchestrator/types.rs");
 const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardOrchestratorWireTypes.generated.swift";
 // The orchestrator settings + status tree (orchestratorStatus/start/stop/run-once + settings get/
 // update). github_project rides the GitHubProjectConfigWire (TYPE_RENAMES on the alias); the run

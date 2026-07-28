@@ -3,9 +3,9 @@ use std::path::Path;
 
 use uuid::Uuid;
 
-use crate::infra::io::read_json_typed;
-use crate::workspace::utc_now;
+use harness_infra::io::read_json_typed;
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 use super::super::dispatch::DispatchExecutionSummary;
 use super::super::evaluation::TaskBoardEvaluationSummary;

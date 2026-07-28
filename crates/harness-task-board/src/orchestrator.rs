@@ -1,59 +1,59 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::PathBuf;
 
-#[cfg(test)]
-use crate::infra::io::write_json_pretty;
-#[cfg(test)]
-use crate::workspace::utc_now;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
+use harness_infra::io::write_json_pretty;
+#[cfg(any(test, feature = "test-support"))]
 use harness_kernel::errors::{CliError, CliErrorKind};
+#[cfg(any(test, feature = "test-support"))]
+use harness_workspace::workspace::utc_now;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::dispatch::DispatchExecutionSummary;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::evaluation::TaskBoardEvaluationSummary;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::external::ExternalSyncConfig;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::machines::{Machine, MachineRegistry};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::store::TaskBoardStore;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::summary::{build_audit_summary, build_sync_summary};
 #[cfg(test)]
 use super::types::TaskBoardItem;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 mod run_record;
 mod settings;
 mod types;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use self::run_record::{
     RunRecordInput, new_run_id, read_or_default, run_items_for_machine, run_record,
     workflow_statuses,
 };
-#[cfg(any(test, feature = "daemon-runtime"))]
+#[cfg(feature = "daemon-runtime")]
 pub(crate) use self::settings::parse_persisted_settings_read_only;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use self::settings::{
     apply_settings_update, dispatch_input, migrate_persisted_settings, normalize_github_inbox,
 };
 pub use self::types::*;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 const SETTINGS_FILE: &str = "orchestrator-settings.json";
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 const STATE_FILE: &str = "orchestrator-state.json";
 
 #[derive(Debug, Clone)]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub struct TaskBoardOrchestrator {
     board: TaskBoardStore,
     root: PathBuf,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl TaskBoardOrchestrator {
     #[must_use]
     pub fn new(root: PathBuf) -> Self {
