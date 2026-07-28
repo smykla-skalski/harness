@@ -248,6 +248,11 @@ pub use runtime_config::{
 #[cfg(any(test, feature = "test-support"))]
 pub use store::TaskBoardStore;
 pub use store::default_board_root;
+// Gated to match root's own re-narrowing import in `src/task_board/mod.rs`
+// exactly: an unconditional export here would make the glob re-export leak
+// this as public API whenever root's narrowing line's condition is false,
+// defeating the narrowing.
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub use summary::build_audit_summary_with_policy;
 pub use summary::{
     TaskBoardAuditSummary, TaskBoardMachineSummary, TaskBoardProjectSummary,
