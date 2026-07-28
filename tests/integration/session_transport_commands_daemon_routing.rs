@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tempfile::tempdir;
@@ -27,13 +27,28 @@ fn read_http_request(stream: &mut TcpStream) -> String {
     stream
         .set_read_timeout(Some(Duration::from_secs(1)))
         .expect("read timeout");
+    // The per-read timeout above bounds a single `read()` call; this
+    // deadline bounds the whole request, since completing the body now
+    // takes another read past the one that lands the headers, and a
+    // timed-out individual read (a slow write under load, not a dead
+    // peer) should retry rather than fail the test outright.
+    let deadline = Instant::now() + Duration::from_secs(5);
     let mut buffer = Vec::new();
     let mut headers_done = false;
     let mut content_length = 0_usize;
     let mut header_end = 0_usize;
     loop {
         let mut chunk = [0_u8; 1024];
-        let read = stream.read(&mut chunk).expect("read request");
+        let read = match stream.read(&mut chunk) {
+            Ok(read) => read,
+            Err(error)
+                if matches!(error.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock)
+                    && Instant::now() < deadline =>
+            {
+                continue;
+            }
+            Err(error) => panic!("read request: {error}"),
+        };
         if read == 0 {
             break;
         }
