@@ -1,10 +1,7 @@
 use super::{WorkerPromptContext, optional_facts, plan_worker_prompt, render_worker_prompt};
-use crate::task_board::prompt_catalog::{
-    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
-};
-use crate::task_board::{
-    ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-};
+use crate::prompt_catalog::{prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog};
+use crate::item_fields::{ExternalRef, ExternalRefProvider};
+use crate::types::{TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 /// Byte-for-byte what `render_worker_prompt` produced for an item with none of
 /// the optional sections and no session to report into.

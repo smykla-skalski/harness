@@ -1,8 +1,9 @@
 use std::path::Path;
 
-use crate::feature_flags::{TASK_BOARD_PROMPTS_FILE_ENV, TASK_BOARD_PROMPT_OVERRIDES_ENV};
-
-use super::{MAX_PROMPT_CONFIGURATION_BYTES, resolve_prompt_catalog_from_env};
+use super::{
+    MAX_PROMPT_CONFIGURATION_BYTES, TASK_BOARD_PROMPT_OVERRIDES_ENV, TASK_BOARD_PROMPTS_FILE_ENV,
+    resolve_prompt_catalog_from_env,
+};
 
 fn write_prompts_file(directory: &Path, body: &str) -> String {
     let path = directory.join("prompts.json");

@@ -2615,9 +2615,12 @@ const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowKind",
 ];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
-const TASK_BOARD_PROJECT_SOURCE: &str = include_str!("../src/task_board/project.rs");
-const TASK_BOARD_PROJECT_COLOR_SOURCE: &str = include_str!("../src/task_board/project_color.rs");
-const TASK_BOARD_PROJECT_SHAPE_SOURCE: &str = include_str!("../src/task_board/project_shape.rs");
+const TASK_BOARD_PROJECT_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/project.rs");
+const TASK_BOARD_PROJECT_COLOR_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/project_color.rs");
+const TASK_BOARD_PROJECT_SHAPE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/project_shape.rs");
 const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";
 // The audit, project and machine summary structs - all over primitives plus the
 // adopted TaskBoardStatus/TaskBoardAgentMode enums. The sync summary cluster is
@@ -2660,11 +2663,12 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardShiftedItemRevision",
     "TaskBoardItemPositionMutationResponse",
 ];
-const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../src/task_board/triage.rs");
+const TASK_BOARD_TRIAGE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
-    include_str!("../src/task_board/triage_override.rs");
+    include_str!("../crates/harness-task-board/src/triage_override.rs");
 const TASK_BOARD_TRIAGE_ESCALATION_SOURCE: &str =
-    include_str!("../src/task_board/triage_escalation.rs");
+    include_str!("../crates/harness-task-board/src/triage_escalation.rs");
 const TASK_BOARD_TRIAGE_PROTOCOL_SOURCE: &str =
     include_str!("../src/task_board/wire/task_board_triage.rs");
 const TASK_BOARD_TRIAGE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageWireTypes.generated.swift";
@@ -2690,11 +2694,12 @@ const TASK_BOARD_TRIAGE_EMIT_ONLY: &[&str] = &[
     "TaskBoardTriageOverrideMutationResponse",
     "TaskBoardTriageEscalationStatus",
 ];
-const TASK_BOARD_TRIAGE_RULES_SOURCE: &str = include_str!("../src/task_board/triage_rules.rs");
+const TASK_BOARD_TRIAGE_RULES_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/triage_rules.rs");
 const TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE: &str =
-    include_str!("../src/task_board/triage_rules/validation.rs");
+    include_str!("../crates/harness-task-board/src/triage_rules/validation.rs");
 const TASK_BOARD_TRIAGE_RULES_STORE_SOURCE: &str =
-    include_str!("../src/task_board/triage_rules/store.rs");
+    include_str!("../crates/harness-task-board/src/triage_rules/store.rs");
 const TASK_BOARD_TRIAGE_RULES_PROTOCOL_SOURCE: &str =
     include_str!("../src/task_board/wire/task_board_triage_rules.rs");
 const TASK_BOARD_TRIAGE_RULES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageRulesWireTypes.generated.swift";
@@ -2780,7 +2785,8 @@ const TASK_BOARD_DISPATCH_EMIT_ONLY: &[&str] = &[
     "TaskBoardDispatchPickResponse",
     "TaskBoardDispatchPickSelection",
 ];
-const TASK_BOARD_WORKING_COPY_SOURCE: &str = include_str!("../src/task_board/working_copy.rs");
+const TASK_BOARD_WORKING_COPY_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/working_copy.rs");
 const TASK_BOARD_WORKING_COPY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkingCopyWireTypes.generated.swift";
 // The task-board working-copy registry row surfaced to the resolve sheet and
 // Settings. Carries the checkout path the app forwards verbatim as project_dir.
@@ -3099,7 +3105,7 @@ const LOCAL_CLONE_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessM
 const LOCAL_CLONE_PROGRESS_EMIT_ONLY: &[&str] =
     &["LocalCloneProgressEventPayload", "LocalCloneOperationWire"];
 const WORKING_COPY_PROGRESS_SOURCE: &str =
-    include_str!("../src/task_board/working_copy/progress.rs");
+    include_str!("../crates/harness-task-board/src/working_copy/progress.rs");
 const WORKING_COPY_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkingCopyProgressWireTypes.generated.swift";
 // The task-board working-copy obtain progress push payload: an internally-tagged enum (tag =
 // "kind") whose `advanced` variant carries the live clone counts. The Swift hand

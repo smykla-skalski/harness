@@ -2,7 +2,7 @@ use super::{
     TaskBoardTriageEffectiveSource, TaskBoardTriageOverride, effective_triage_outcome,
     is_canonical_override_actor, is_canonical_override_reason, suppress_placement_for_override,
 };
-use crate::task_board::{TaskBoardTriageDecision, TriageCause, TriageReasonCode, TriageVerdict};
+use crate::triage::{TaskBoardTriageDecision, TriageCause, TriageReasonCode, TriageVerdict};
 
 fn decision(verdict: TriageVerdict) -> TaskBoardTriageDecision {
     TaskBoardTriageDecision {
@@ -59,6 +59,10 @@ fn placement_is_suppressed_only_while_an_override_is_active() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "a flat run of independent assertions, not real branching complexity"
+)]
 fn actor_and_reason_validators_reject_blank_control_and_oversized_text() {
     assert!(is_canonical_override_actor("operator-1"));
     assert!(!is_canonical_override_actor(""));

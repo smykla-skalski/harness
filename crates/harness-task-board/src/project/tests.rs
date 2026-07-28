@@ -1,5 +1,8 @@
 use super::*;
-use crate::task_board::{ExternalRef, ExternalRefProvider};
+use crate::item_fields::{ExternalRef, ExternalRefProvider};
+use crate::project_color::TaskBoardProjectColor;
+use crate::project_shape::TaskBoardProjectShape;
+use crate::types::TaskBoardItem;
 
 #[test]
 fn github_slug_is_normalized_to_lowercase_owner_and_repository() {
@@ -256,8 +259,8 @@ fn an_item_with_no_origin_is_unattributed() {
     assert_eq!(item_attribution(&blank), ItemProjectAttribution::Unattributed);
 }
 
-fn item() -> crate::task_board::TaskBoardItem {
-    crate::task_board::TaskBoardItem::new(
+fn item() -> TaskBoardItem {
+    TaskBoardItem::new(
         "task-1".into(),
         "Task".into(),
         String::new(),
@@ -271,8 +274,8 @@ fn project(slug: &str) -> TaskBoardProject {
         source: TaskBoardProjectSource::GitHub,
         slug: slug.into(),
         display_name: None,
-        color: crate::task_board::project_color::TaskBoardProjectColor::Blue,
-        shape: crate::task_board::project_shape::TaskBoardProjectShape::DEFAULT,
+        color: TaskBoardProjectColor::Blue,
+        shape: TaskBoardProjectShape::DEFAULT,
         created_at: "2026-07-24T00:00:00Z".into(),
         updated_at: "2026-07-24T00:00:00Z".into(),
     }

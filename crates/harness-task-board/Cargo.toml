@@ -20,18 +20,32 @@ harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
 base64 = "0.23.0"
 caseless = "0.2.2"
+chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.0", features = ["derive"] }
 fs-err = "3.3.0"
+gix = { version = "0.86.0", features = [
+  "progress-tree",
+  "status",
+  "worktree-mutation",
+  "index",
+  "blocking-http-transport-reqwest-rust-tls",
+] }
+hex = "0.4.3"
+libc = "0.2"
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yml = "0.0.13"
 sha2 = "0.11.0"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["fs", "macros", "rt", "sync"] }
+tracing = "0.1.44"
 utoipa = "5.5.0"
 uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+temp-env = "=0.3.6"
 
 # Matches the root crate's lint set rather than the lighter one the facade
 # crates carry, for the same reason harness-kernel, harness-workspace,

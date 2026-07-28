@@ -1,8 +1,9 @@
 use std::sync::Mutex as StdMutex;
 use std::sync::atomic::AtomicUsize;
+use std::time::Instant;
 
-use gix::progress::Value;
 use gix::progress::prodash::progress::Key;
+use gix::progress::{UNKNOWN, Value};
 
 use super::*;
 
@@ -26,7 +27,7 @@ impl RecordingSink {
 fn task(name: &str, done: usize, total: Option<usize>) -> Task {
     Task {
         name: name.to_owned(),
-        id: gix::progress::UNKNOWN,
+        id: UNKNOWN,
         progress: Some(Value {
             step: Arc::new(AtomicUsize::new(done)),
             done_at: total,
@@ -39,7 +40,7 @@ fn task(name: &str, done: usize, total: Option<usize>) -> Task {
 fn heading(name: &str) -> Task {
     Task {
         name: name.to_owned(),
-        id: gix::progress::UNKNOWN,
+        id: UNKNOWN,
         progress: None,
     }
 }
@@ -199,7 +200,7 @@ fn finishing_does_not_wait_out_the_sample_interval() {
     let sink: Arc<dyn WorkingCopyProgressSink> = Arc::new(RecordingSink::default());
     let reporter = CloneProgressReporter::start(sink, "owner/repo".into());
 
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     reporter.finish();
 
     // A polled flag would leave the caller waiting out the current interval,

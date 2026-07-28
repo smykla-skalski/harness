@@ -1,5 +1,9 @@
 use super::*;
+use std::fs::{self, OpenOptions};
 use std::sync::Mutex as StdMutex;
+
+use gix::objs::Tree;
+use gix::objs::tree::{Entry, EntryKind};
 
 #[derive(Default)]
 struct RecordingSink {
@@ -20,7 +24,7 @@ impl RecordingSink {
 
 fn set_test_user(repo_path: &Path) {
     use std::io::Write;
-    let mut f = std::fs::OpenOptions::new()
+    let mut f = OpenOptions::new()
         .append(true)
         .open(repo_path.join("config"))
         .expect("open repo config");
@@ -32,9 +36,9 @@ fn make_source_repo(path: &Path) -> gix::ObjectId {
     set_test_user(path);
     let repo = gix::open(path).expect("reopen bare");
     let blob_oid = repo.write_blob(b"hello fixture\n").expect("blob").detach();
-    let mut tree = gix::objs::Tree::empty();
-    tree.entries.push(gix::objs::tree::Entry {
-        mode: gix::objs::tree::EntryKind::Blob.into(),
+    let mut tree = Tree::empty();
+    tree.entries.push(Entry {
+        mode: EntryKind::Blob.into(),
         filename: "fixture.txt".into(),
         oid: blob_oid,
     });
@@ -120,7 +124,7 @@ async fn partial_checkout_without_marker_is_not_reused() {
         .expect("present");
     // Simulate a clone the daemon died in the middle of: the `.git` tree is
     // present but the completion marker was never written.
-    std::fs::remove_file(completion_marker(&first.checkout_path)).expect("remove marker");
+    fs::remove_file(completion_marker(&first.checkout_path)).expect("remove marker");
 
     // Reuse must reject it - allow_clone:false now reports "not present".
     let absent = runtime
