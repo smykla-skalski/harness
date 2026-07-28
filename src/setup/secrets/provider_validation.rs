@@ -33,6 +33,7 @@ fn validate_at(kind: SecretKindArg, secret: &str, base_url: &str) -> Result<(), 
     };
     let url = format!("{}/{path}", base_url.trim_end_matches('/'));
     let client = Client::builder()
+        .no_proxy()
         .timeout(REQUEST_TIMEOUT)
         .build()
         .map_err(|_| validation_error(provider, "could not build HTTP client"))?;
@@ -69,45 +70,55 @@ fn validation_error(provider: &str, detail: &str) -> CliError {
 mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::thread;
+    use std::thread::{self, JoinHandle};
 
     use super::*;
 
-    fn serve_once(status: &str, expected_path: &str, expected_secret: &str) -> String {
+    fn serve_once(
+        status: &str,
+        expected_path: &str,
+        expected_secret: &str,
+    ) -> (String, JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
         let address = listener.local_addr().expect("test server address");
         let expected_path = expected_path.to_string();
         let expected_secret = expected_secret.to_string();
         let status = status.to_string();
-        thread::spawn(move || {
+        let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept request");
             let mut request = [0_u8; 4096];
             let count = stream.read(&mut request).expect("read request");
             let request = String::from_utf8_lossy(&request[..count]);
             assert!(request.starts_with(&format!("GET {expected_path} HTTP/1.1")));
-            assert!(request.contains(&format!("authorization: Bearer {expected_secret}")));
+            assert!(
+                request
+                    .to_lowercase()
+                    .contains(&format!("authorization: bearer {expected_secret}"))
+            );
             write!(
                 stream,
                 "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             )
             .expect("write response");
         });
-        format!("http://{address}")
+        (format!("http://{address}"), server)
     }
 
     #[test]
     fn github_validation_authenticates_the_selected_secret() {
-        let base_url = serve_once("200 OK", "/user", "github-secret");
+        let (base_url, server) = serve_once("200 OK", "/user", "github-secret");
         validate_at(SecretKindArg::Github, "github-secret", &base_url)
             .expect("GitHub credential should validate");
+        server.join().expect("mock server should finish");
     }
 
     #[test]
     fn openrouter_rejection_names_provider_without_exposing_secret() {
-        let base_url = serve_once("401 Unauthorized", "/key", "openrouter-secret");
+        let (base_url, server) = serve_once("401 Unauthorized", "/key", "openrouter-secret");
         let error = validate_at(SecretKindArg::OpenRouter, "openrouter-secret", &base_url)
             .expect_err("OpenRouter credential should be rejected")
             .to_string();
+        server.join().expect("mock server should finish");
         assert!(error.contains("OpenRouter credential validation failed"));
         assert!(error.contains("HTTP 401"));
         assert!(!error.contains("openrouter-secret"));
