@@ -3,7 +3,7 @@ use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use serde::{Deserialize, Serialize};
+use harness_protocol::observe::ObserverStateEvent;
 
 use crate::agents::storage::project_context_root_from_session_path;
 use crate::hooks::adapters::HookAgent;
@@ -14,13 +14,6 @@ use crate::observe::types::ObserverState;
 use crate::workspace::{project_context_dir, utc_now};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::resolve_project_dir;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ObserverStateEvent {
-    sequence: u64,
-    recorded_at: String,
-    state: ObserverState,
-}
 
 pub(crate) fn default_project_context_root() -> PathBuf {
     project_context_dir(&resolve_project_dir(None))

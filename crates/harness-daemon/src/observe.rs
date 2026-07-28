@@ -3,7 +3,7 @@ use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use serde::{Deserialize, Serialize};
+use harness_protocol::observe::ObserverStateEvent;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
@@ -43,13 +43,6 @@ pub mod dump {
             content.as_str().unwrap_or_default().to_string()
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ObserverStateEvent {
-    sequence: u64,
-    recorded_at: String,
-    state: types::ObserverState,
 }
 
 fn observe_root(project_context_root: &Path, observe_id: &str) -> PathBuf {
