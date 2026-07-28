@@ -37,6 +37,8 @@ fn canonical_model_sources_do_not_import_application_layers() {
         include_str!("../src/runtime_kind/disconnect.rs"),
         include_str!("../src/session_types.rs"),
         include_str!("../src/session_types/agents.rs"),
+        include_str!("../src/session_types/agents/wire.rs"),
+        include_str!("../src/session_types/crosswalk.rs"),
         include_str!("../src/session_types/events.rs"),
         include_str!("../src/session_types/identity.rs"),
         include_str!("../src/session_types/policy.rs"),
