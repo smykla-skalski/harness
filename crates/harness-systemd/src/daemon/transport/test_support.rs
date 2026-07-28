@@ -14,26 +14,28 @@ use tempfile::TempDir;
 //
 // Pinning the mode of the returned directory alone is not enough: fixtures routinely create
 // further subdirectories underneath it (`fs::create_dir_all`), and `mkdir` always derives from
-// the ambient umask regardless of the parent's own mode. Tighten the process umask itself before
-// creating the fixture, which nextest's one-process-per-test model makes safe to do
+// the ambient umask regardless of the parent's own mode. Pin the process umask itself to a known
+// value before creating the fixture, which nextest's one-process-per-test model makes safe to do
 // unconditionally - it protects every directory this test creates afterward, not just this one.
+// This can loosen a stricter ambient umask (e.g. 0o077), but nothing here relies on directories
+// coming out more restrictive than 0o755, so that's fine.
 const HARDENED_MODE: u32 = 0o755;
 
 pub(crate) fn hardened_tempdir() -> io::Result<TempDir> {
-    tighten_umask();
+    pin_umask();
     let dir = tempfile::tempdir()?;
     harden(dir.path())?;
     Ok(dir)
 }
 
 pub(crate) fn hardened_tempdir_in(path: impl AsRef<Path>) -> io::Result<TempDir> {
-    tighten_umask();
+    pin_umask();
     let dir = tempfile::tempdir_in(path)?;
     harden(dir.path())?;
     Ok(dir)
 }
 
-fn tighten_umask() {
+fn pin_umask() {
     umask(Mode::from_bits_truncate(0o022));
 }
 
