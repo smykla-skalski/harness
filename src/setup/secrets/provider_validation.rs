@@ -1,3 +1,4 @@
+#[cfg(target_os = "macos")]
 use std::env;
 use std::time::Duration;
 
@@ -6,10 +7,13 @@ use reqwest::blocking::Client;
 
 use super::SecretKindArg;
 
+#[cfg(target_os = "macos")]
 const DEFAULT_GITHUB_API_URL: &str = "https://api.github.com";
+#[cfg(target_os = "macos")]
 const DEFAULT_OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
+#[cfg(target_os = "macos")]
 pub(super) fn validate_provider_secret(kind: SecretKindArg, secret: &str) -> Result<(), CliError> {
     let base_url = match kind {
         SecretKindArg::Github => env::var("HARNESS_GITHUB_API_URL")
@@ -31,7 +35,7 @@ fn validate_at(kind: SecretKindArg, secret: &str, base_url: &str) -> Result<(), 
     let client = Client::builder()
         .timeout(REQUEST_TIMEOUT)
         .build()
-        .map_err(|error| validation_error(provider, &format!("build HTTP client: {error}")))?;
+        .map_err(|_| validation_error(provider, "could not build HTTP client"))?;
     let mut request = client
         .get(&url)
         .bearer_auth(secret)
@@ -47,7 +51,7 @@ fn validate_at(kind: SecretKindArg, secret: &str, base_url: &str) -> Result<(), 
     }
     let response = request
         .send()
-        .map_err(|error| validation_error(provider, &format!("request failed: {error}")))?;
+        .map_err(|_| validation_error(provider, "request failed"))?;
     if response.status().is_success() {
         return Ok(());
     }
@@ -107,5 +111,15 @@ mod tests {
         assert!(error.contains("OpenRouter credential validation failed"));
         assert!(error.contains("HTTP 401"));
         assert!(!error.contains("openrouter-secret"));
+    }
+
+    #[test]
+    fn transport_failure_does_not_expose_secret_or_url() {
+        let error = validate_at(SecretKindArg::Github, "github-secret", "not a url")
+            .expect_err("invalid URL should fail")
+            .to_string();
+        assert!(error.contains("GitHub credential validation failed: request failed"));
+        assert!(!error.contains("github-secret"));
+        assert!(!error.contains("not a url"));
     }
 }

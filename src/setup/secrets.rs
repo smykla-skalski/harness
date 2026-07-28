@@ -32,7 +32,7 @@ use providers::{
     clear_provider_secret, provider_account, provider_any_configured, provider_secret,
     provider_service, set_provider_secret,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 mod provider_validation;
 
 #[cfg(any(target_os = "macos", test))]
