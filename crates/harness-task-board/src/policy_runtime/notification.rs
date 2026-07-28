@@ -1,16 +1,16 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-use crate::infra::persistence::versioned_json::VersionedJsonRepository;
-use crate::workspace::utc_now;
+#[cfg(any(test, feature = "test-support"))]
+use harness_infra::persistence::versioned_json::VersionedJsonRepository;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::workspace::utc_now;
 
 use super::action_persistence::PolicyActionPersistence;
 use super::models::PolicyActionDescriptor;
@@ -26,7 +26,7 @@ pub const POLICY_NOTIFICATION_OUTBOX_SCHEMA_VERSION: u32 = 1;
 
 /// Records older than this are pruned on append so a notification trail that is
 /// never delivered downstream cannot accumulate forever.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 const NOTIFICATION_RETENTION_SECONDS: i64 = 3600;
 
 #[derive(Debug, Default, Deserialize)]
@@ -65,12 +65,12 @@ impl Default for PolicyNotificationOutboxDocument {
 /// A durable, append-only trail of notifications a policy workflow asked to
 /// emit. Recording them durably means a notification survives a daemon restart
 /// and a downstream sender can drain the trail on its own schedule.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub struct PolicyNotificationOutbox {
     repository: VersionedJsonRepository<PolicyNotificationOutboxDocument>,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl PolicyNotificationOutbox {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {
@@ -124,7 +124,7 @@ pub struct NotificationPolicyProvider {
 
 impl NotificationPolicyProvider {
     #[must_use]
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn new(root: PathBuf) -> Self {
         Self {
             persistence: PolicyActionPersistence::legacy_files(root),
@@ -132,7 +132,7 @@ impl NotificationPolicyProvider {
     }
 
     #[must_use]
-    pub(crate) fn new_database<S: PolicyActionStore + 'static>(database: Arc<S>) -> Self {
+    pub fn new_database<S: PolicyActionStore + 'static>(database: Arc<S>) -> Self {
         Self {
             persistence: PolicyActionPersistence::database(database),
         }
@@ -198,12 +198,12 @@ fn notification_payload(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn prune_expired(records: &mut Vec<NotificationRecord>, now: DateTime<Utc>) {
     records.retain(|record| !record_is_expired(&record.recorded_at, now));
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn record_is_expired(recorded_at: &str, now: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(recorded_at).is_ok_and(|recorded| {
         now.signed_duration_since(recorded.with_timezone(&Utc))
@@ -215,8 +215,8 @@ fn record_is_expired(recorded_at: &str, now: DateTime<Utc>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::policy_runtime::models::{PolicyRunSubject, PolicyRunTrigger};
-    use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
+    use crate::policy_runtime::models::{PolicyRunSubject, PolicyRunTrigger};
+    use crate::policy_runtime::providers::PolicyProviderRegistry;
     use tempfile::tempdir;
 
     fn execution_context() -> PolicyExecutionContext {

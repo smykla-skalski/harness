@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -7,29 +7,29 @@ use chrono::Utc;
 use harness_kernel::errors::CliError;
 
 use super::handoff_outbox::HandoffRecord;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::handoff_outbox::PolicyHandoffOutbox;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::inbox::PolicyEventInbox;
 use super::models::PolicyWorkflowEvent;
 use super::notification::NotificationRecord;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::notification::PolicyNotificationOutbox;
 use super::store::PolicyActionStore;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::task_creation::PolicyTaskCreationOutbox;
 use super::task_creation::TaskCreationRecord;
 
 #[derive(Clone)]
 pub(crate) enum PolicyActionPersistence {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     LegacyFiles(PathBuf),
     Database(Arc<dyn PolicyActionStore>),
 }
 
 impl PolicyActionPersistence {
     #[must_use]
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn legacy_files(root: PathBuf) -> Self {
         Self::LegacyFiles(root)
     }
@@ -46,7 +46,7 @@ impl PolicyActionPersistence {
     ) -> Result<(), CliError> {
         let now = Utc::now();
         match self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Self::LegacyFiles(root) => {
                 PolicyHandoffOutbox::new(root.clone()).record_at(record, now)?;
                 PolicyEventInbox::new(root.clone()).publish_at(event, now)
@@ -65,7 +65,7 @@ impl PolicyActionPersistence {
     ) -> Result<(), CliError> {
         let now = Utc::now();
         match self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Self::LegacyFiles(root) => {
                 PolicyNotificationOutbox::new(root.clone()).record_at(record, now)
             }
@@ -79,7 +79,7 @@ impl PolicyActionPersistence {
     ) -> Result<(), CliError> {
         let now = Utc::now();
         match self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Self::LegacyFiles(root) => {
                 PolicyTaskCreationOutbox::new(root.clone()).record_at(record, now)
             }

@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -43,7 +43,7 @@ pub struct HandoffPolicyProvider {
 
 impl HandoffPolicyProvider {
     #[must_use]
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn new(root: PathBuf) -> Self {
         Self {
             persistence: PolicyActionPersistence::legacy_files(root),
@@ -51,7 +51,7 @@ impl HandoffPolicyProvider {
     }
 
     #[must_use]
-    pub(crate) fn new_database<S: PolicyActionStore + 'static>(database: Arc<S>) -> Self {
+    pub fn new_database<S: PolicyActionStore + 'static>(database: Arc<S>) -> Self {
         Self {
             persistence: PolicyActionPersistence::database(database),
         }
@@ -105,8 +105,8 @@ fn handoff_payload(payload: Option<&serde_json::Value>) -> Result<HandoffActionP
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::policy_runtime::models::{PolicyRunSubject, PolicyRunTrigger};
-    use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
+    use crate::policy_runtime::models::{PolicyRunSubject, PolicyRunTrigger};
+    use crate::policy_runtime::providers::PolicyProviderRegistry;
     use tempfile::tempdir;
 
     fn execution_context() -> PolicyExecutionContext {

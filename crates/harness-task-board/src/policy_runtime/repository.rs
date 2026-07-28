@@ -1,22 +1,22 @@
 use std::collections::HashMap;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 
-#[cfg(test)]
-use crate::infra::persistence::versioned_json::VersionedJsonRepository;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
+use harness_infra::persistence::versioned_json::VersionedJsonRepository;
+#[cfg(any(test, feature = "test-support"))]
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::events::run_matches_event;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::models::{POLICY_WORKFLOW_RUNS_SCHEMA_VERSION, PolicyWorkflowEvent};
 use super::models::{
     PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowRun, PolicyWorkflowRunsDocument,
 };
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::scheduler::timer_wait_is_due;
 
 /// A `Running` run whose `updated_at` is older than this is treated as
@@ -38,12 +38,12 @@ pub enum BeginRunOutcome {
     Existing(PolicyWorkflowRun),
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub struct PolicyRuntimeRepository {
     repository: VersionedJsonRepository<PolicyWorkflowRunsDocument>,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl PolicyRuntimeRepository {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {
@@ -273,10 +273,7 @@ fn same_subject(run: &PolicyWorkflowRun, workflow_id: &str, subject_key: &str) -
     run.workflow_id == workflow_id && run.subject.key == subject_key
 }
 
-pub(crate) fn save_run_in_document(
-    document: &mut PolicyWorkflowRunsDocument,
-    run: &PolicyWorkflowRun,
-) {
+pub fn save_run_in_document(document: &mut PolicyWorkflowRunsDocument, run: &PolicyWorkflowRun) {
     if let Some(existing) = document
         .runs
         .iter_mut()
@@ -288,7 +285,7 @@ pub(crate) fn save_run_in_document(
     }
 }
 
-pub(crate) fn begin_run_in_document(
+pub fn begin_run_in_document(
     document: &mut PolicyWorkflowRunsDocument,
     run: PolicyWorkflowRun,
     trigger: PolicyRunTrigger,
@@ -323,7 +320,7 @@ pub(crate) fn begin_run_in_document(
     outcome
 }
 
-pub(crate) fn claim_waiting_run_in_document(
+pub fn claim_waiting_run_in_document(
     document: &mut PolicyWorkflowRunsDocument,
     run_id: &str,
     trigger: PolicyRunTrigger,

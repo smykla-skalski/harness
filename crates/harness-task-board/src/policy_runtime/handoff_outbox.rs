@@ -1,22 +1,22 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::PathBuf;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-use crate::infra::persistence::versioned_json::VersionedJsonRepository;
-use crate::workspace::utc_now;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
+use harness_infra::persistence::versioned_json::VersionedJsonRepository;
+#[cfg(any(test, feature = "test-support"))]
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 pub const POLICY_HANDOFF_OUTBOX_SCHEMA_VERSION: u32 = 1;
 
 /// Records older than this are pruned on append so a handoff trail that never
 /// gets consumed downstream cannot accumulate forever. Mirrors the event
 /// inbox retention so both durable surfaces age out at the same rate.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 const HANDOFF_RETENTION_SECONDS: i64 = 3600;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,12 +46,12 @@ impl Default for PolicyHandoffOutboxDocument {
 /// A durable, append-only trail of workflow handoffs. The handoff provider
 /// records each emitted handoff here so the side effect survives a daemon
 /// restart and downstream tooling can audit what was handed off to whom.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub struct PolicyHandoffOutbox {
     repository: VersionedJsonRepository<PolicyHandoffOutboxDocument>,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl PolicyHandoffOutbox {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {
@@ -103,12 +103,12 @@ pub fn handoff_record(handoff_key: &str, workflow_id: &str, subject_key: &str) -
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn prune_expired(records: &mut Vec<HandoffRecord>, now: DateTime<Utc>) {
     records.retain(|record| !record_is_expired(&record.recorded_at, now));
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn record_is_expired(recorded_at: &str, now: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(recorded_at).is_ok_and(|recorded| {
         now.signed_duration_since(recorded.with_timezone(&Utc))

@@ -2,23 +2,23 @@
 //! ordering, the built-in policy gate, git-identity defaults, runtime
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
-//! project, working-copy, policy-graph, external-sync/github, and automation
-//! clusters.
+//! project, working-copy, policy-graph, policy-runtime, external-sync/github,
+//! and automation clusters.
 //!
 //! This is a later slice of the `task_board` extraction, following slice 4's
 //! triage/prompt/project/working-copy cluster, the slice that added
-//! `policy_graph`, and the slice that added `external`: the sync-domain
-//! foundation (`ExternalTask`, `ExternalProvider`, `ExternalSyncClient`, and
-//! the `capabilities`/`config`/`create_recovery`/`targeting` support it
-//! needs) plus the `github` provider-client cluster that implements that
-//! foundation. `external::sync`, `external::scopes`, and the
-//! `sync_tests`/`tests` test-only clusters stay in root's own
-//! `src/task_board/external.rs` until a follow-up slice moves them; that
-//! file's doc comment covers the reverse-dependency shape this split
-//! creates.
+//! `external`: the sync-domain foundation (`ExternalTask`, `ExternalProvider`,
+//! `ExternalSyncClient`, and the `capabilities`/`config`/`create_recovery`/
+//! `targeting` support it needs) plus the `github` provider-client cluster
+//! that implements that foundation, and slice 7, which added `policy_graph`
+//! and landed before this one because this slice's `policy_runtime` depends
+//! on it. `external::sync`, `external::scopes`, and the `sync_tests`/`tests`
+//! test-only clusters stay in root's own `src/task_board/external.rs` until
+//! a follow-up slice moves them; that file's doc comment covers the
+//! reverse-dependency shape this split creates.
 //!
-//! This slice adds `automation`. `automation` reaches forward into one root
-//! module that has not moved yet: `orchestrator::types`'s
+//! This slice also adds `automation`. `automation` reaches forward into one
+//! root module that has not moved yet: `orchestrator::types`'s
 //! `TaskBoardOrchestratorWorkflow` enum, which comes here as
 //! `automation::orchestrator_workflow` because the rest of that file also
 //! needs `dispatch`/`evaluation`/`summary` (out of scope for this slice). It
@@ -30,11 +30,11 @@
 //! `external::github`) needed `automation::TaskBoardRepositoryAutomationConfig`
 //! before it was extracted. The remaining domain (`dispatch`/`evaluation`/
 //! `planning`, `external`, the rest of `github` (`client`/`client_graphql`/
-//! `evidence`/`evidence_api`/`publication`/`repository`/`risk`),
-//! `policy_runtime`, `transport`, and the `legacy_import`/`orchestrator`/
-//! `summary` files that reach into those) stays in the root crate's
-//! `src/task_board` for later slices, and reaches back into this crate only
-//! through the root crate's own `pub use harness_task_board::*;` facade.
+//! `evidence`/`evidence_api`/`publication`/`repository`/`risk`), `transport`,
+//! and the `legacy_import`/`orchestrator`/`summary` files that reach into
+//! those) stays in the root crate's `src/task_board` for later slices, and
+//! reaches back into this crate only through the root crate's own
+//! `pub use harness_task_board::*;` facade.
 //!
 //! `prompt_config`, `prompt_catalog`, `triage_escalation_prompt`, and
 //! `worker_prompt` are unconditionally compiled here rather than gated behind
@@ -42,6 +42,12 @@
 //! declarations were: none of the four has a daemon-only dependency, and the
 //! gate only ever controlled whether root's own facade re-exported them, not
 //! whether the module compiled.
+//!
+//! `policy_runtime` keeps the `daemon-runtime` gate its old declaration
+//! carried instead: enabling it would grow every non-daemon consumer's
+//! default build by ~3,426 lines for no reason, so this crate defines its
+//! own `daemon-runtime` feature (matching `harness-reviews`'s) and
+//! `harness-daemon` forwards its own feature of the same name onto it.
 
 #![deny(unsafe_code)]
 
@@ -55,6 +61,8 @@ pub mod lane;
 pub mod machines;
 pub mod policy;
 pub mod policy_graph;
+#[cfg(feature = "daemon-runtime")]
+pub mod policy_runtime;
 pub mod progress_rollup;
 pub mod project;
 pub mod project_color;

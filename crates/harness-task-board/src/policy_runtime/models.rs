@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::task_board::PolicySubject;
-use crate::task_board::policy_graph::PolicyWaitCondition;
-use crate::workspace::utc_now;
+use crate::PolicySubject;
+use crate::policy_graph::PolicyWaitCondition;
+use harness_workspace::workspace::utc_now;
 
 pub const POLICY_WORKFLOW_RUNS_SCHEMA_VERSION: u32 = 1;
 

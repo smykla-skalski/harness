@@ -1,4 +1,4 @@
-use crate::task_board::policy_graph::PolicyWaitCondition;
+use crate::policy_graph::PolicyWaitCondition;
 
 use super::models::{PolicyRunStatus, PolicyWorkflowEvent, PolicyWorkflowRun};
 
