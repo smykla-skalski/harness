@@ -4096,6 +4096,7 @@ dependencies = [
  "harness-infra",
  "harness-kernel",
  "harness-protocol",
+ "harness-session",
  "harness-workspace",
  "hex",
  "libc",

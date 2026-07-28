@@ -1,20 +1,21 @@
 use std::collections::HashMap;
-#[cfg(test)]
+use std::hash::BuildHasher;
+#[cfg(any(test, feature = "test-support"))]
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::session::types::{TaskSeverity, TaskSource};
+use harness_session::types::{TaskSeverity, TaskSource};
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::default_board_root;
-#[cfg(not(test))]
+#[cfg(not(any(test, feature = "test-support")))]
 use super::machines::Machine;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::machines::{Machine, MachineRegistry};
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{PolicyApprovalGrant, PolicyDecision};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::store::TaskBoardStore;
 use super::types::{
     AgentMode, ExternalRef, TaskBoardItem, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus,
@@ -253,13 +254,13 @@ impl DispatchExecutionSummary {
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_plan(item: &TaskBoardItem) -> DispatchPlan {
     build_dispatch_plan_with_policy_root(item, &default_board_root())
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_plan_with_policy_root(
     item: &TaskBoardItem,
     policy_root: &Path,
@@ -296,12 +297,12 @@ fn build_dispatch_plan_with_decision(
 }
 
 #[must_use]
-pub(crate) fn build_dispatch_plans_with_policy(
+pub fn build_dispatch_plans_with_policy<S: BuildHasher>(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: Option<&str>,
     switches: SpawnGateSwitches,
-    grants: &HashMap<String, PolicyApprovalGrant>,
+    grants: &HashMap<String, PolicyApprovalGrant, S>,
 ) -> Vec<DispatchPlan> {
     items
         .iter()
@@ -321,13 +322,13 @@ pub(crate) fn build_dispatch_plans_with_policy(
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_plans(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     items.iter().map(build_dispatch_plan).collect()
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_plans_with_policy_root(
     items: &[TaskBoardItem],
     policy_root: &Path,
@@ -343,7 +344,7 @@ pub fn build_dispatch_plans_with_policy_root(
 /// cannot be loaded, every item is kept (fail-open) so dispatch on an
 /// unregistered host behaves like a single-machine setup.
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn filter_for_local_machine(
     items: Vec<TaskBoardItem>,
     board: &TaskBoardStore,
@@ -370,7 +371,7 @@ pub fn filter_for_local_machine(
 /// pipeline at `policy_root` for the plan's policy field so the response
 /// still reflects what policy evaluation would have produced.
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn machine_mismatch_plan_with_policy_root(
     item: &TaskBoardItem,
     machine: &Machine,
@@ -388,7 +389,7 @@ pub fn machine_mismatch_plan_with_policy_root(
 }
 
 #[must_use]
-pub(crate) fn machine_mismatch_plan_with_policy(
+pub fn machine_mismatch_plan_with_policy(
     item: &TaskBoardItem,
     machine: &Machine,
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
@@ -430,11 +431,11 @@ fn is_kind_blocked(readiness: &DispatchReadiness) -> bool {
 #[path = "dispatch_spawn_policy.rs"]
 mod spawn_policy;
 pub use spawn_policy::SpawnGateSwitches;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use spawn_policy::dispatch_policy;
 #[cfg(test)]
 pub(crate) use spawn_policy::spawn_policy_input;
-pub(crate) use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
+pub use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {
     if let Some(session_id) = item.session_id.as_deref() {

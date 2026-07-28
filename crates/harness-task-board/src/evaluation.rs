@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::session::types::{ReviewVerdict, TaskStatus, WorkItem};
+use harness_session::types::{ReviewVerdict, TaskStatus, WorkItem};
 
 use super::types::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
@@ -331,7 +331,7 @@ fn missing_record(
 
 #[cfg(test)]
 mod tests {
-    use crate::session::types::{TaskSeverity, TaskSource};
+    use harness_session::types::{ReviewConsensus, TaskQueuePolicy, TaskSeverity, TaskSource};
 
     use super::*;
 
@@ -356,7 +356,7 @@ mod tests {
             severity: TaskSeverity::Medium,
             status,
             assigned_to: None,
-            queue_policy: Default::default(),
+            queue_policy: TaskQueuePolicy::default(),
             queued_at: None,
             created_at: "2026-05-14T00:00:00Z".to_string(),
             updated_at: "2026-05-14T00:00:00Z".to_string(),
@@ -383,6 +383,11 @@ mod tests {
     fn completed_task_closes_board_workflow() {
         let decision = evaluate_task_board_item(&item(), &task(TaskStatus::Done));
 
+        assert_completed_decision_outcome(&decision);
+        assert_completed_decision_workflow(&decision);
+    }
+
+    fn assert_completed_decision_outcome(decision: &TaskBoardEvaluationDecision) {
         assert_eq!(decision.outcome, TaskBoardEvaluationOutcome::Completed);
         assert_eq!(decision.status, TaskBoardStatus::Done);
         assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Completed);
@@ -390,6 +395,9 @@ mod tests {
             decision.workflow.current_step_id.as_deref(),
             Some("completed")
         );
+    }
+
+    fn assert_completed_decision_workflow(decision: &TaskBoardEvaluationDecision) {
         assert_eq!(
             decision.workflow.execution_id.as_deref(),
             Some("workflow-1")
@@ -441,7 +449,7 @@ mod tests {
     #[test]
     fn review_change_consensus_stays_in_review() {
         let mut task = task(TaskStatus::InReview);
-        task.consensus = Some(crate::session::types::ReviewConsensus {
+        task.consensus = Some(ReviewConsensus {
             verdict: ReviewVerdict::RequestChanges,
             summary: "Needs one fix".to_string(),
             points: Vec::new(),

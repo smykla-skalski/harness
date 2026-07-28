@@ -2,7 +2,7 @@ use super::{
     AgentMode, DispatchBlockReason, DispatchReadiness, PlanApprovalGate, PolicyDecision,
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind, approval_gate,
 };
-use crate::task_board::PolicyReasonCode;
+use crate::PolicyReasonCode;
 
 pub(super) fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {
     if item.is_deleted() {

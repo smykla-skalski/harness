@@ -3,7 +3,7 @@
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
 //! project, working-copy, policy-graph, policy-runtime, external-sync/github,
-//! and automation clusters.
+//! automation, and dispatch/evaluation/planning clusters.
 //!
 //! This is a later slice of the `task_board` extraction, following slice 4's
 //! triage/prompt/project/working-copy cluster, the slice that added
@@ -28,13 +28,32 @@
 //! earlier slice's doc comment flagged, where two files under the standalone
 //! `task_board::github` module (distinct from this crate's
 //! `external::github`) needed `automation::TaskBoardRepositoryAutomationConfig`
-//! before it was extracted. The remaining domain (`dispatch`/`evaluation`/
-//! `planning`, `external`, the rest of `github` (`client`/`client_graphql`/
-//! `evidence`/`evidence_api`/`publication`/`repository`/`risk`), `transport`,
-//! and the `legacy_import`/`orchestrator`/`summary` files that reach into
-//! those) stays in the root crate's `src/task_board` for later slices, and
-//! reaches back into this crate only through the root crate's own
+//! before it was extracted. The remaining domain (`external`, the rest of
+//! `github` (`client`/`client_graphql`/`evidence`/`evidence_api`/
+//! `publication`/`repository`/`risk`), `transport`, and the
+//! `legacy_import`/`orchestrator`/`summary` files that reach into those)
+//! stays in the root crate's `src/task_board` for later slices, and reaches
+//! back into this crate only through the root crate's own
 //! `pub use harness_task_board::*;` facade.
+//!
+//! This slice moves `dispatch`, `evaluation`, and `planning`: the one
+//! `task_board` cluster with a real `session` dependency. Their six forward
+//! references (`dispatch_lifecycle.rs`'s `SPAWN_REVIEWER_COMMAND`;
+//! `dispatch.rs`'s and `evaluation.rs`'s `TaskSeverity`/`TaskSource`/
+//! `ReviewVerdict`/`TaskStatus`/`WorkItem`/`ReviewConsensus`) repoint from
+//! `crate::session::` to the new `harness-session` dependency directly, now
+//! that session is a real crate. `build_dispatch_plans_with_policy`,
+//! `machine_mismatch_plan_with_policy`, `consumed_grant_id`, and
+//! `dispatch_policy_from_graph` widen from `pub(crate)` to `pub`, gated the
+//! same way `SpawnGateSwitches` already was, so the daemon's `daemon-runtime`
+//! dispatch code keeps reaching them across the new crate boundary. The
+//! `build_dispatch_plan(s)`/`filter_for_local_machine`/
+//! `machine_mismatch_plan_with_policy_root` test-only builders widen their
+//! bare `#[cfg(test)]` to `#[cfg(any(test, feature = "test-support"))]` for
+//! the same reason `store`/`machines` already needed it: root's own
+//! `#[cfg(test)]` call sites (`summary.rs`,
+//! `daemon::service::task_board::dispatch`) need them visible when the
+//! *root* crate is under test, which this crate's own `cfg(test)` never is.
 //!
 //! `prompt_config`, `prompt_catalog`, `triage_escalation_prompt`, and
 //! `worker_prompt` are unconditionally compiled here rather than gated behind
@@ -52,6 +71,8 @@
 #![deny(unsafe_code)]
 
 pub mod automation;
+pub mod dispatch;
+pub mod evaluation;
 pub mod external;
 pub mod git_identity_defaults;
 pub mod github_config;
@@ -60,6 +81,7 @@ pub mod item_intent;
 pub mod item_query;
 pub mod lane;
 pub mod machines;
+pub mod planning;
 pub mod policy;
 pub mod policy_graph;
 #[cfg(feature = "daemon-runtime")]
@@ -87,6 +109,28 @@ mod worker_prompt;
 pub mod working_copy;
 
 pub use automation::*;
+pub use dispatch::{
+    DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
+    DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
+    ReviewerIntent, SessionIntent, TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
+    TaskCreationIntent, WorkerIntent,
+};
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub use dispatch::{
+    SpawnGateSwitches, build_dispatch_plans_with_policy, consumed_grant_id,
+    dispatch_policy_from_graph, machine_mismatch_plan_with_policy,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use dispatch::{
+    build_dispatch_plan, build_dispatch_plans, build_dispatch_plans_with_policy_root,
+    filter_for_local_machine, machine_mismatch_plan_with_policy_root,
+};
+pub use evaluation::{
+    EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
+    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
+    failed_workflow, missing_session_record, missing_task_record, record_from_decision,
+    skipped_unlinked_record,
+};
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
     TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
@@ -112,6 +156,10 @@ pub use lane::{
 pub use machines::Machine;
 #[cfg(any(test, feature = "test-support"))]
 pub use machines::MachineRegistry;
+pub use planning::{
+    PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
+    begin_planning, revoke_plan, submit_plan,
+};
 pub use policy::{
     BuiltInPolicyGate, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
     PolicyApprovalState, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput, PolicyReasonCode,
@@ -181,6 +229,7 @@ pub use triage_rules::{
 };
 pub use types::{
     AgentMode, PrIntentSet, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardTombstoneCause, TaskBoardWorkflowKind, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
+    TaskBoardTombstoneCause, TaskBoardWorkflowKind, TaskBoardWorkflowState,
+    TaskBoardWorkflowStatus,
 };
 pub use worker_prompt::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};
