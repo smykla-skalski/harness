@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::external::ExternalProvider;
+use crate::external::ExternalProvider;
 
 fn repository() -> GitHubRepository {
     GitHubRepository {

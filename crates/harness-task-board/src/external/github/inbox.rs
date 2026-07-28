@@ -2,14 +2,14 @@ use std::fmt;
 
 use async_trait::async_trait;
 
-use crate::github_api::GitHubProtectedClient;
-use crate::task_board::external::targeting::github_repository_for_item;
-use crate::task_board::external::{
+use crate::external::targeting::github_repository_for_item;
+use crate::external::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTask, ExternalTaskRef,
     normalize_token,
 };
-use crate::task_board::normalize_repository_slug;
-use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use crate::normalize_repository_slug;
+use crate::types::{TaskBoardItem, TaskBoardStatus};
+use harness_github_api::GitHubProtectedClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
@@ -74,7 +74,11 @@ impl GitHubInboxSyncClient {
         )
     }
 
-    pub(crate) fn from_config_assigned_only(config: &ExternalSyncConfig) -> Result<Self, CliError> {
+    /// Build a GitHub inbox client that only imports assigned tasks.
+    ///
+    /// # Errors
+    /// Returns an error when no GitHub token is configured or repositories are invalid.
+    pub fn from_config_assigned_only(config: &ExternalSyncConfig) -> Result<Self, CliError> {
         let mut client = Self::from_config(config)?;
         client.include_review_requests = false;
         Ok(client)

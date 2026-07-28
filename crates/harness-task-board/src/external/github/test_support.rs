@@ -1,6 +1,7 @@
-use std::io::{Read, Write};
+use std::fmt::Write as _;
+use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -84,7 +85,7 @@ where
                 prepare_accepted_stream(&stream);
                 return stream;
             }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(error) if error.kind() == ErrorKind::WouldBlock => {
                 assert!(Instant::now() < deadline, "timed out waiting for request");
                 thread::sleep(Duration::from_millis(5));
             }
@@ -162,11 +163,14 @@ fn write_response(stream: &mut TcpStream, response: MockResponse) {
     } else {
         "Server Error"
     };
-    let extra_headers = response
-        .headers
-        .into_iter()
-        .map(|(name, value)| format!("{name}: {value}\r\n"))
-        .collect::<String>();
+    let extra_headers =
+        response
+            .headers
+            .into_iter()
+            .fold(String::new(), |mut extra_headers, (name, value)| {
+                let _ = writeln!(extra_headers, "{name}: {value}\r");
+                extra_headers
+            });
     let raw = format!(
         "HTTP/1.1 {} {reason}\r\nContent-Type: application/json\r\n{extra_headers}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
         response.status,
@@ -186,7 +190,7 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         listener.set_nonblocking(true).expect("nonblocking");
         let address = listener.local_addr().expect("listener address");
-        let (write_request, wait_to_write) = std::sync::mpsc::channel();
+        let (write_request, wait_to_write) = mpsc::channel();
         let client = thread::spawn(move || {
             let mut stream = TcpStream::connect(address).expect("connect");
             if wait_to_write.recv().is_err() {
@@ -201,7 +205,7 @@ mod tests {
                 .set_nonblocking(true)
                 .expect("simulate inherited nonblocking mode");
         });
-        #[cfg(all(unix, feature = "bridge-runtime"))]
+        #[cfg(unix)]
         assert!(!stream_is_nonblocking(&stream));
         write_request.send(()).expect("release request writer");
 
@@ -211,7 +215,7 @@ mod tests {
         assert!(request.starts_with("GET /delayed HTTP/1.1\r\n"));
     }
 
-    #[cfg(all(unix, feature = "bridge-runtime"))]
+    #[cfg(unix)]
     fn stream_is_nonblocking(stream: &TcpStream) -> bool {
         use nix::fcntl::{FcntlArg, OFlag, fcntl};
 

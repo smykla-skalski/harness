@@ -2,13 +2,23 @@
 //! ordering, the built-in policy gate, git-identity defaults, runtime
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
-//! project, working-copy, and policy-graph clusters.
+//! project, working-copy, policy-graph, and external-sync/github clusters.
 //!
-//! This is slice 7 of the `task_board` extraction (slice 1 established the
-//! crate; slice 4 added `triage*`, `prompt*`/`worker_prompt`, `project`/
-//! `project_color`/`project_shape`, and `working_copy`; this adds
-//! `policy_graph`). The remaining domain (`automation`, `dispatch`/
-//! `evaluation`/`planning`, `external`, `github`, `policy_runtime`,
+//! This is a later slice of the `task_board` extraction, following slice 4's
+//! triage/prompt/project/working-copy cluster and the slice that added
+//! `policy_graph`. It adds `external`: the sync-domain foundation
+//! (`ExternalTask`, `ExternalProvider`, `ExternalSyncClient`, and the
+//! `capabilities`/`config`/`create_recovery`/`targeting` support it needs)
+//! plus the `github` provider-client cluster that implements that
+//! foundation. `external::sync`, `external::scopes`, and the
+//! `sync_tests`/`tests` test-only clusters stay in root's own
+//! `src/task_board/external.rs` until a follow-up slice moves them; that
+//! file's doc comment covers the reverse-dependency shape this split
+//! creates. The standalone `task_board::github` module (distinct from this
+//! crate's `external::github`) also stays in root: two of its files need
+//! `automation::TaskBoardRepositoryAutomationConfig`, which hasn't been
+//! extracted yet. The rest of the remaining domain (`automation`,
+//! `dispatch`/`evaluation`/`planning`, `github`, `policy_runtime`,
 //! `transport`, and the `legacy_import`/`orchestrator`/`summary` files that
 //! reach into those) stays in the root crate's `src/task_board` for later
 //! slices, and reaches back into this crate only through the root crate's
@@ -23,6 +33,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod external;
 pub mod git_identity_defaults;
 pub mod item_fields;
 pub mod item_query;

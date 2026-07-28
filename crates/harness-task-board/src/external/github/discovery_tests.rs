@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use super::test_support::{MockResponse, spawn_sequence_mock};
 use super::*;
-use crate::github_api::acquire_global_budget_test_lock;
+use harness_github_api::acquire_global_budget_test_lock;
 
 const REPOSITORY: &str = "octocat/harness";
 
@@ -28,7 +28,7 @@ fn viewer(login: &str) -> MockResponse {
     MockResponse::json(json!({ "data": { "viewer": { "login": login } } }).to_string())
 }
 
-fn search_page(nodes: Vec<Value>, next_cursor: Option<&str>) -> MockResponse {
+fn search_page(nodes: &[Value], next_cursor: Option<&str>) -> MockResponse {
     MockResponse::json(
         json!({
             "data": {
@@ -46,7 +46,7 @@ fn search_page(nodes: Vec<Value>, next_cursor: Option<&str>) -> MockResponse {
 }
 
 fn empty_page() -> MockResponse {
-    search_page(Vec::new(), None)
+    search_page(&[], None)
 }
 
 fn node(number: u64, title: &str) -> Value {
@@ -79,9 +79,9 @@ async fn discovery_pull_is_network_free_and_covers_every_intent() {
     let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, captured, handle) = spawn_sequence_mock(vec![
         viewer("octo-user"),
-        search_page(vec![node(10, "Assigned")], None),
-        search_page(vec![node(11, "Authored")], None),
-        search_page(vec![node(12, "Bump serde")], None),
+        search_page(&[node(10, "Assigned")], None),
+        search_page(&[node(11, "Authored")], None),
+        search_page(&[node(12, "Bump serde")], None),
     ]);
 
     let tasks = discovery_client(&endpoint)
@@ -112,9 +112,9 @@ async fn discovery_dedups_a_ticket_that_matches_two_intents() {
     // ticket. The number-keyed fold must import it once, never twice.
     let (endpoint, _captured, handle) = spawn_sequence_mock(vec![
         viewer("octo-user"),
-        search_page(vec![node(7, "Shared")], None),
+        search_page(&[node(7, "Shared")], None),
         empty_page(),
-        search_page(vec![node(7, "Shared")], None),
+        search_page(&[node(7, "Shared")], None),
     ]);
 
     let tasks = discovery_client(&endpoint)
@@ -131,8 +131,8 @@ async fn discovery_pagination_keeps_every_hit_exactly_once() {
     let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, captured, handle) = spawn_sequence_mock(vec![
         viewer("octo-user"),
-        search_page(vec![node(1, "a"), node(2, "b")], Some("CURSOR-1")),
-        search_page(vec![node(3, "c")], None),
+        search_page(&[node(1, "a"), node(2, "b")], Some("CURSOR-1")),
+        search_page(&[node(3, "c")], None),
         empty_page(),
         empty_page(),
     ]);
@@ -145,7 +145,11 @@ async fn discovery_pagination_keeps_every_hit_exactly_once() {
     handle.join().expect("mock server");
     assert_eq!(
         external_ids(&tasks),
-        vec!["octocat/harness#1", "octocat/harness#2", "octocat/harness#3"]
+        vec![
+            "octocat/harness#1",
+            "octocat/harness#2",
+            "octocat/harness#3"
+        ]
     );
     let captured = captured.lock().expect("captured");
     // The second page must forward the first page's cursor, or a hit is skipped.
@@ -157,7 +161,7 @@ async fn discovery_missing_optional_metadata_maps_to_a_documented_leaf() {
     let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, _captured, handle) = spawn_sequence_mock(vec![
         viewer("octo-user"),
-        search_page(vec![full_node(42, "No metadata", None, &[])], None),
+        search_page(&[full_node(42, "No metadata", None, &[])], None),
         empty_page(),
         empty_page(),
     ]);

@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::github_api::GitHubPullRequestSnapshot;
-use crate::task_board::store::TaskBoardItemPatch;
+use crate::store::TaskBoardItemPatch;
 #[cfg(test)]
-use crate::task_board::store::TaskBoardStore;
-use crate::task_board::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
-use crate::workspace::utc_now;
+use crate::store::TaskBoardStore;
+use crate::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
+use harness_github_api::GitHubPullRequestSnapshot;
 #[cfg(test)]
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 use super::super::{canonical_external_status, local_external_status};
 
@@ -58,7 +58,10 @@ pub(crate) fn imported_review_pull_request_references(
         .collect())
 }
 
-pub(crate) fn imported_review_references_from_items(items: &[TaskBoardItem]) -> Vec<(String, u64)> {
+// `pub`: root's `task_board::external::sync` (a different crate now)
+// still calls into this.
+#[must_use]
+pub fn imported_review_references_from_items(items: &[TaskBoardItem]) -> Vec<(String, u64)> {
     items
         .iter()
         .filter(|item| is_imported_review(item))
@@ -73,7 +76,7 @@ pub(crate) fn imported_review_references_from_items(items: &[TaskBoardItem]) -> 
         .collect()
 }
 
-pub(crate) fn reconcile_review_item_from_snapshots(
+pub fn reconcile_review_item_from_snapshots(
     item: &mut TaskBoardItem,
     snapshots: &[GitHubPullRequestSnapshot],
 ) -> bool {
@@ -198,7 +201,7 @@ fn observed_review_status(snapshot: &GitHubPullRequestSnapshot) -> Option<TaskBo
     None
 }
 
-pub(crate) fn reconciled_external_status(
+pub fn reconciled_external_status(
     current: TaskBoardStatus,
     last_synced: Option<TaskBoardStatus>,
     observed: TaskBoardStatus,

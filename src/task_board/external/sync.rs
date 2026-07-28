@@ -10,7 +10,7 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
-use super::targeting::execution_repository_for_task;
+use super::execution_repository_for_task;
 use super::{
     ExternalProvider, ExternalRevisionUpdate, ExternalSyncClient, ExternalSyncConfig,
     ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
@@ -234,11 +234,6 @@ async fn prepare_pull_inputs(
     })
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    clippy::too_many_lines,
-    reason = "pull reconciliation keeps existing, dry-run, and create branches explicit; rustfmt wrapping the prepare_pull_inputs call onto multiple lines pushed the line count past the pedantic threshold with no logic change"
-)]
 async fn pull_provider_tasks(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
@@ -263,89 +258,16 @@ async fn pull_provider_tasks(
     )
     .await?;
     for task in tasks.iter().cloned() {
-        let resolved_parent_item_id = resolve_parent_item_id(&provider_item_index, &task);
-        let matched =
-            provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref());
-        if matches!(matched, SnapshotMatch::Ambiguous) {
-            // Two board items claim this reference, so there is no single item
-            // to update. Leaving the rest of the repository unsynced over one
-            // duplicated claim costs far more than skipping the claim.
-            tracing::warn!(
-                external_id = %task.reference.external_id,
-                "skipping a provider reference more than one board item claims"
-            );
-            ambiguous_references.push(task.reference.external_id.clone());
-            continue;
-        }
-        if let SnapshotMatch::Found(snapshot) = matched {
-            let item = &snapshot.item;
-            if !existing_pull_matches_status_filter(options.status, item, &task) {
-                continue;
-            }
-            reconcile_existing_item(
-                board,
-                options,
-                client.provider(),
-                item,
-                snapshot.item_revision,
-                task,
-                resolved_parent_item_id.as_deref(),
-                operations,
-            )
-            .await?;
-            continue;
-        }
-        if matched_exclusion_label(&task.labels).is_some() {
-            continue;
-        }
-        if task.title.trim().is_empty() {
-            continue;
-        }
-        if handle_matching_provider_exclusion(
+        reconcile_one_pulled_task(
             board,
-            &provider_item_index,
             options,
-            client.provider(),
-            &task,
-            resolved_parent_item_id.clone(),
+            client,
+            &provider_item_index,
+            task,
             operations,
+            ambiguous_references,
         )
-        .await?
-        {
-            continue;
-        }
-        if !new_pull_matches_status_filter(options.status, &task) {
-            continue;
-        }
-        if options.dry_run {
-            operations.push(operation(OperationDraft {
-                provider: client.provider(),
-                action: ExternalSyncAction::Pull,
-                board_item_id: Some(external_item_id(&task.reference)),
-                reference: task.reference.clone(),
-                dry_run: true,
-                applied: false,
-                changed_fields: pull_create_fields(&task),
-                unsupported_fields: Vec::new(),
-            }));
-            continue;
-        }
-        let item = create_item_from_external(&task);
-        // A create collision fails outright rather than reconciling against
-        // a fresh point read, which the batch-snapshot contract rules out;
-        // the next pass picks it up through the normal matched-item path.
-        let item = board.create_item(item).await?;
-        let item = link_resolved_parent(board, item, resolved_parent_item_id.as_deref()).await?;
-        operations.push(operation(OperationDraft {
-            provider: client.provider(),
-            action: ExternalSyncAction::Pull,
-            board_item_id: Some(item.id),
-            reference: task.reference.clone(),
-            dry_run: false,
-            applied: true,
-            changed_fields: pull_create_fields(&task),
-            unsupported_fields: Vec::new(),
-        }));
+        .await?;
     }
     reconcile_stale_github_review_requests(
         board,
@@ -357,6 +279,109 @@ async fn pull_provider_tasks(
     )
     .await?;
     Ok(recovered_create)
+}
+
+/// One provider task's share of `pull_provider_tasks`'s loop: resolve it
+/// against the board's provider-item index and either reconcile an existing
+/// match, skip it (ambiguous claim, excluded, filtered, or empty title), or
+/// create a new item for it.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "five genuinely distinct per-task outcomes (ambiguous-skip, found-and-reconcile, excluded-skip, dry-run-record, real-create); each `continue` in the original loop is now an early return here"
+)]
+async fn reconcile_one_pulled_task(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    client: &dyn ExternalSyncClient,
+    provider_item_index: &ProviderItemIndex,
+    task: ExternalTask,
+    operations: &mut Vec<ExternalSyncOperation>,
+    ambiguous_references: &mut Vec<String>,
+) -> Result<(), CliError> {
+    let resolved_parent_item_id = resolve_parent_item_id(provider_item_index, &task);
+    let matched =
+        provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref());
+    if matches!(matched, SnapshotMatch::Ambiguous) {
+        // Two board items claim this reference, so there is no single item
+        // to update. Leaving the rest of the repository unsynced over one
+        // duplicated claim costs far more than skipping the claim.
+        tracing::warn!(
+            external_id = %task.reference.external_id,
+            "skipping a provider reference more than one board item claims"
+        );
+        ambiguous_references.push(task.reference.external_id.clone());
+        return Ok(());
+    }
+    if let SnapshotMatch::Found(snapshot) = matched {
+        let item = &snapshot.item;
+        if !existing_pull_matches_status_filter(options.status, item, &task) {
+            return Ok(());
+        }
+        reconcile_existing_item(
+            board,
+            options,
+            client.provider(),
+            item,
+            snapshot.item_revision,
+            task,
+            resolved_parent_item_id.as_deref(),
+            operations,
+        )
+        .await?;
+        return Ok(());
+    }
+    if matched_exclusion_label(&task.labels).is_some() {
+        return Ok(());
+    }
+    if task.title.trim().is_empty() {
+        return Ok(());
+    }
+    if handle_matching_provider_exclusion(
+        board,
+        provider_item_index,
+        options,
+        client.provider(),
+        &task,
+        resolved_parent_item_id.clone(),
+        operations,
+    )
+    .await?
+    {
+        return Ok(());
+    }
+    if !new_pull_matches_status_filter(options.status, &task) {
+        return Ok(());
+    }
+    if options.dry_run {
+        operations.push(operation(OperationDraft {
+            provider: client.provider(),
+            action: ExternalSyncAction::Pull,
+            board_item_id: Some(external_item_id(&task.reference)),
+            reference: task.reference.clone(),
+            dry_run: true,
+            applied: false,
+            changed_fields: pull_create_fields(&task),
+            unsupported_fields: Vec::new(),
+        }));
+        return Ok(());
+    }
+    let item = create_item_from_external(&task);
+    // A create collision fails outright rather than reconciling against
+    // a fresh point read, which the batch-snapshot contract rules out;
+    // the next pass picks it up through the normal matched-item path.
+    let item = board.create_item(item).await?;
+    let item = link_resolved_parent(board, item, resolved_parent_item_id.as_deref()).await?;
+    operations.push(operation(OperationDraft {
+        provider: client.provider(),
+        action: ExternalSyncAction::Pull,
+        board_item_id: Some(item.id),
+        reference: task.reference.clone(),
+        dry_run: false,
+        applied: true,
+        changed_fields: pull_create_fields(&task),
+        unsupported_fields: Vec::new(),
+    }));
+    Ok(())
 }
 
 async fn handle_matching_provider_exclusion(

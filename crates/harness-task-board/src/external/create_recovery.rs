@@ -11,7 +11,7 @@ use super::{ExternalProvider, ExternalTask};
 
 /// Immutable provider-create input captured before the first remote side effect.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ExternalCreateRequest {
+pub struct ExternalCreateRequest {
     item_id: String,
     create_key: String,
     title: String,
@@ -21,7 +21,7 @@ pub(crate) struct ExternalCreateRequest {
 
 impl ExternalCreateRequest {
     #[must_use]
-    pub(crate) fn new(
+    pub fn new(
         item_id: impl Into<String>,
         create_key: impl Into<String>,
         title: impl Into<String>,
@@ -38,41 +38,41 @@ impl ExternalCreateRequest {
     }
 
     #[must_use]
-    pub(crate) fn item_id(&self) -> &str {
+    pub fn item_id(&self) -> &str {
         &self.item_id
     }
 
     #[must_use]
-    pub(crate) fn create_key(&self) -> &str {
+    pub fn create_key(&self) -> &str {
         &self.create_key
     }
 
     #[must_use]
-    pub(crate) fn title(&self) -> &str {
+    pub fn title(&self) -> &str {
         &self.title
     }
 
     #[must_use]
-    pub(crate) fn body(&self) -> &str {
+    pub fn body(&self) -> &str {
         &self.body
     }
 
     #[must_use]
-    pub(crate) fn provider_target(&self) -> &str {
+    pub fn provider_target(&self) -> &str {
         &self.provider_target
     }
 }
 
 /// Result of probing a provider for an earlier create attempt.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ExternalCreateProbe {
+pub enum ExternalCreateProbe {
     Found(Box<ExternalTask>),
     Absent,
 }
 
 /// Fenced provider-scope lease available to long-running recovery operations.
 #[async_trait]
-pub(crate) trait ExternalCreateLease: Send + Sync {
+pub trait ExternalCreateLease: Send + Sync {
     /// Renew and validate the current provider-scope lease.
     ///
     /// Provider implementations call this before every remote page or side effect.
@@ -91,7 +91,7 @@ pub(crate) trait ExternalCreateLease: Send + Sync {
 /// request under its create key. Implementations can renew the supplied lease
 /// before every remote page or side effect.
 #[async_trait]
-pub(crate) trait ExternalCreateRecoveryClient: Send + Sync {
+pub trait ExternalCreateRecoveryClient: Send + Sync {
     #[must_use]
     fn provider(&self) -> ExternalProvider;
 
@@ -140,7 +140,8 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
-    use crate::task_board::{ExternalSyncClient, ExternalTaskRef, TaskBoardItem, TaskBoardStatus};
+    use crate::external::{ExternalSyncClient, ExternalTaskRef};
+    use crate::{TaskBoardItem, TaskBoardStatus};
 
     #[tokio::test]
     async fn external_sync_client_defaults_to_no_create_recovery_capability() {

@@ -94,7 +94,7 @@ impl ExternalRevisionUpdate {
     }
 
     #[must_use]
-    pub(crate) fn resolve(&self, current: Option<&str>) -> Option<String> {
+    pub fn resolve(&self, current: Option<&str>) -> Option<String> {
         match self {
             Self::Preserve => current.map(ToOwned::to_owned),
             Self::Set(revision) => Some(revision.clone()),

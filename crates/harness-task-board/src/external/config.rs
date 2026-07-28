@@ -102,7 +102,6 @@ impl ExternalSyncConfig {
         self
     }
 
-    #[must_use]
     /// Return the configured token for a provider.
     ///
     /// # Errors
