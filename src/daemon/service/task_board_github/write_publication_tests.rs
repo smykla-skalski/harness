@@ -55,8 +55,11 @@ fn write_launch_requires_kind_specific_publication_automations() {
         .is_err()
     );
     assert!(
-        validate_publication_automations(&config.enabled_automations, TaskBoardWorkflowKind::PR_FIX)
-            .is_err()
+        validate_publication_automations(
+            &config.enabled_automations,
+            TaskBoardWorkflowKind::PR_FIX
+        )
+        .is_err()
     );
 
     config.enabled_automations.enabled = vec![GitHubAutomation::CreateBranch];

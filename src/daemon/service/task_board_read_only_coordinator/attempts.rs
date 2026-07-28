@@ -100,7 +100,8 @@ async fn refuse_unusable_execution(
         .await?;
         return Ok(true);
     }
-    if execution.snapshot.workflow_kind.is_write() && let Err(error) = requests::write_task_id(execution)
+    if execution.snapshot.workflow_kind.is_write()
+        && let Err(error) = requests::write_task_id(execution)
     {
         require_human(
             db,

@@ -1,5 +1,5 @@
-use harness_protocol::agent::HookAgent;
 use harness_observe::application::{ObserveDumpRequest, ObserveScanRequest, ObserveWatchRequest};
+use harness_protocol::agent::HookAgent;
 
 /// `ObserveRequest::Doctor` is the only variant `application::execute` handles
 /// locally: doctor mode reads `crate::setup`, which `harness-observe` cannot

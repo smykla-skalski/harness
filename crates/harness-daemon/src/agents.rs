@@ -9,8 +9,8 @@ pub use harness_agents::runtime;
 
 pub mod service {
     use super::Path;
-    use harness_protocol::agent::HookAgent;
     use harness_kernel::errors::{CliError, CliErrorKind};
+    use harness_protocol::agent::HookAgent;
 
     /// Resolve the canonical session identifier for a known agent.
     ///

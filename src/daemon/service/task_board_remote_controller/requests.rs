@@ -323,9 +323,7 @@ fn initial_repository_source(
         .pull_request
         .as_ref()
         .and_then(|pull_request| pull_request.head.as_ref())
-        .filter(|_| {
-            execution.snapshot.workflow_kind.is_pull_request()
-        });
+        .filter(|_| execution.snapshot.workflow_kind.is_pull_request());
     if let Some(head) = head {
         if head.revision != revision {
             return Err(invalid("frozen pull-request source revision changed"));
@@ -381,7 +379,11 @@ fn implementation_base(execution: &TaskBoardWorkflowExecutionRecord) -> Result<&
             .map(|review| review.head_revision.as_str())
             .ok_or_else(|| invalid("remote implementation has no prior reviewed base"));
     }
-    if execution.snapshot.workflow_kind.has_dependency_update_intent() {
+    if execution
+        .snapshot
+        .workflow_kind
+        .has_dependency_update_intent()
+    {
         return execution
             .transition
             .pull_request

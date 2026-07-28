@@ -6,9 +6,7 @@ use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
 
-use crate::task_board::wire::{
-    TASK_BOARD_STORAGE_DATABASE, TaskBoardCapabilitiesResponse,
-};
+use crate::task_board::wire::{TASK_BOARD_STORAGE_DATABASE, TaskBoardCapabilitiesResponse};
 use crate::task_board::{
     TaskBoardGitHubCredentialSnapshot, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardOpenRouterCredentialSnapshot,
@@ -99,10 +97,7 @@ fn scoped_provider_account(
     if capabilities.storage != TASK_BOARD_STORAGE_DATABASE {
         return Err(provider_upgrade_required());
     }
-    Ok(format!(
-        "db{}-global",
-        sha1_hex(&capabilities.instance_id)
-    ))
+    Ok(format!("db{}-global", sha1_hex(&capabilities.instance_id)))
 }
 
 fn provider_upgrade_required() -> CliError {
@@ -182,11 +177,10 @@ fn load_github_snapshot(account: &str) -> Result<TaskBoardGitHubCredentialSnapsh
         if !allow_legacy_raw {
             return Err("expected a JSON credential snapshot".to_string());
         }
-        legacy_raw_token(bytes)
-            .map(|token| TaskBoardGitHubCredentialSnapshot {
-                global_token: Some(token),
-                repository_tokens: Vec::new(),
-            })
+        legacy_raw_token(bytes).map(|token| TaskBoardGitHubCredentialSnapshot {
+            global_token: Some(token),
+            repository_tokens: Vec::new(),
+        })
     })
 }
 

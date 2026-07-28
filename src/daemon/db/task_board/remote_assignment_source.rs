@@ -93,9 +93,7 @@ fn repository_source_matches(
         .pull_request
         .as_ref()
         .and_then(|pull_request| pull_request.head.as_ref())
-        .filter(|_| {
-            parent.snapshot.workflow_kind.is_pull_request()
-        });
+        .filter(|_| parent.snapshot.workflow_kind.is_pull_request());
     if let Some(head) = fork_head {
         return repository == head.repository.as_str()
             && matches!(

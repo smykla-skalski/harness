@@ -1,12 +1,12 @@
 use clap::{CommandFactory, error::ErrorKind};
 
 use super::*;
-use harness_protocol::agent::HookAgent;
 use crate::observe::{ObserveArgs, ObserveMode};
 use crate::session::transport::{SessionCommand, SessionObserveArgs};
 use crate::setup::CapabilitiesArgs;
 use crate::task_board::transport::{TaskBoardCommand, TaskBoardOrchestratorCommand};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardStatus, TaskBoardWorkflowStatus};
+use harness_protocol::agent::HookAgent;
 
 #[path = "tests/daemon.rs"]
 mod daemon;
