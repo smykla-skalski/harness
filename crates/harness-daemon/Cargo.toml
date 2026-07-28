@@ -10,7 +10,6 @@ test = false
 [[bin]]
 name = "harness-daemon"
 path = "src/main.rs"
-test = false
 
 [dependencies]
 agent-client-protocol = "=2.0.0"

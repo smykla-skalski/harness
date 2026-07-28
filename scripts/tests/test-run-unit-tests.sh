@@ -109,13 +109,13 @@ assert_call_matches() {
   [[ "$actual" == "$expected" ]]
 }
 
-scenario_no_arguments_preserves_all_four_groups() {
+scenario_no_arguments_preserves_all_groups() {
   reset_calls
   if ! run_task >"$SANDBOX/no-args.log" 2>&1; then
     fail "no-argument test:unit run failed: $(<"$SANDBOX/no-args.log")"
     return
   fi
-  if assert_call_count 4 \
+  if assert_call_count 5 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime \
     && assert_call_matches 2 \
@@ -124,13 +124,16 @@ scenario_no_arguments_preserves_all_four_groups() {
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime \
     && assert_call_matches 4 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd \
-    && grep -Fq "==> test:unit 1/4: root Harness library" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 2/4: supporting workspace crates" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 3/4: harness-agents (bridge-runtime feature)" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 4/4: Linux systemd crate" "$SANDBOX/no-args.log"; then
-    pass "no-argument invocation exercises and identifies all four groups"
+    && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon \
+    && grep -Fq "==> test:unit 1/5: root Harness library" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 2/5: supporting workspace crates" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 3/5: harness-agents (bridge-runtime feature)" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 4/5: Linux systemd crate" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 5/5: harness-daemon binary-only unit tests" "$SANDBOX/no-args.log"; then
+    pass "no-argument invocation exercises and identifies all five groups"
   else
-    fail "no-argument invocation did not preserve and identify all four groups: $(calls_snapshot)"
+    fail "no-argument invocation did not preserve and identify all five groups: $(calls_snapshot)"
   fi
 }
 
@@ -140,7 +143,7 @@ scenario_forwards_simple_filter_to_every_group() {
     fail "filtered test:unit run failed: $(<"$SANDBOX/simple-filter.log")"
     return
   fi
-  if assert_call_count 4 \
+  if assert_call_count 5 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 2 \
@@ -148,8 +151,10 @@ scenario_forwards_simple_filter_to_every_group() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)'; then
-    pass "a simple nextest filter reaches every package group, including harness-systemd"
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)' \
+    && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon -E 'test(=path::to::test)'; then
+    pass "a simple nextest filter reaches every package group, including harness-systemd and the harness-daemon bin"
   else
     fail "simple nextest filter was not forwarded to every group: $(calls_snapshot)"
   fi
@@ -162,7 +167,7 @@ scenario_preserves_multiword_single_token_filter() {
     fail "multi-word filter test:unit run failed: $(<"$SANDBOX/multiword-filter.log")"
     return
   fi
-  if assert_call_count 4 \
+  if assert_call_count 5 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E "$filter" \
     && assert_call_matches 2 \
@@ -170,7 +175,9 @@ scenario_preserves_multiword_single_token_filter() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime -E "$filter" \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter"; then
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter" \
+    && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon -E "$filter"; then
     pass "a filter containing spaces survives as a single token in every group"
   else
     fail "multi-word single-token filter was split or mangled: $(calls_snapshot)"
@@ -190,7 +197,7 @@ scenario_rejects_shell_injection_attempt() {
     fail "shell metacharacter payload executed instead of being forwarded literally"
     return
   fi
-  if assert_call_count 4 \
+  if assert_call_count 5 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$payload" \
     && assert_call_matches 2 \
@@ -198,7 +205,9 @@ scenario_rejects_shell_injection_attempt() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime "$payload" \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$payload"; then
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$payload" \
+    && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon "$payload"; then
     pass "a shell metacharacter payload is forwarded as an inert literal argument"
   else
     fail "injection-attempt payload was not forwarded as an inert literal argument: $(calls_snapshot)"
@@ -221,7 +230,7 @@ scenario_focused_harness_task_runs_one_native_process() {
   fi
 }
 
-scenario_no_arguments_preserves_all_four_groups
+scenario_no_arguments_preserves_all_groups
 scenario_forwards_simple_filter_to_every_group
 scenario_preserves_multiword_single_token_filter
 scenario_rejects_shell_injection_attempt
