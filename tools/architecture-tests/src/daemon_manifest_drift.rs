@@ -144,10 +144,12 @@ fn is_test_only_path(relative: &str) -> bool {
         .any(|token| token == "test" || token == "tests")
 }
 
-/// Drops every `#[cfg(test)]`-gated block from `contents`, so a dev-only
-/// crate used solely inside one is invisible to the dependency scan below.
-/// Brace-tracked rather than a plain substring cut, so production code that
-/// follows the block in the same file still gets scanned.
+/// Drops every plain `#[cfg(test)]`-gated item from `contents`, block or
+/// bare statement, so a dev-only crate used solely there is invisible to the
+/// dependency scan below. Deliberately narrower than `#[cfg(any(test,
+/// feature = "daemon-runtime"))]` and similar: those also gate production
+/// reachability under a real feature, so stripping them would risk hiding a
+/// genuine production dependency instead of a dev-only one.
 fn strip_cfg_test_blocks(contents: &str) -> String {
     let mut kept = String::with_capacity(contents.len());
     let mut depth: i32 = 0;
@@ -156,31 +158,38 @@ fn strip_cfg_test_blocks(contents: &str) -> String {
 
     for line in contents.lines() {
         let trimmed = line.trim_start();
+        // Brace-tracked, not a plain substring cut, so production code that
+        // follows a gated block in the same file still gets scanned. A
+        // `#[cfg(test)]` item can carry further attributes or line comments
+        // before its own line (e.g. a trailing `#[allow(..)]`); keep waiting
+        // through those, since the first real code line is always the gated
+        // item itself, block or bare statement, and resolves the wait either
+        // way. Excluding that line unconditionally - not just skipping past
+        // it - matters for a bare statement like `use dev_only::Thing;` with
+        // no `{` of its own: it never opens a skip region, so leaving it in
+        // `kept` would still surface a dev-only crate to the scan below.
+        let mut exclude_this_line = skip_from_depth.is_some();
         if skip_from_depth.is_none() {
-            if trimmed.starts_with("#[cfg(test)]") || trimmed.starts_with("#[cfg(any(test,") {
+            if trimmed.starts_with("#[cfg(test)]") {
                 pending_test_attribute = true;
-                continue;
+                exclude_this_line = true;
+            } else if pending_test_attribute {
+                exclude_this_line = true;
+                if trimmed.starts_with('#') || trimmed.starts_with("//") {
+                    // another attribute or a comment on the same gated item;
+                    // keep waiting for the item itself
+                } else {
+                    if line.contains('{') {
+                        skip_from_depth = Some(depth);
+                    }
+                    pending_test_attribute = false;
+                }
             }
-            kept.push_str(line);
-            kept.push('\n');
         }
 
-        // A `#[cfg(test)]` item can carry further attributes or line
-        // comments before its own line (e.g. a trailing `#[allow(..)]`), so
-        // keep waiting through those; the first real code line is always the
-        // gated item itself, block or bare statement, and resolves the wait
-        // either way. Leaving it pending after a bare `mod tests;` or
-        // `use ..;` (no `{` of its own) would otherwise attach to the next
-        // unrelated brace anywhere later in the file and wrongly swallow
-        // real production code into the skip region.
-        let is_still_an_attribute_or_comment =
-            trimmed.starts_with('#') || trimmed.starts_with("//");
-        if skip_from_depth.is_none() && pending_test_attribute && !is_still_an_attribute_or_comment
-        {
-            if line.contains('{') {
-                skip_from_depth = Some(depth);
-            }
-            pending_test_attribute = false;
+        if !exclude_this_line {
+            kept.push_str(line);
+            kept.push('\n');
         }
         for character in line.chars() {
             match character {
@@ -215,37 +224,39 @@ fn used_cfg_feature_names(contents: &str) -> BTreeSet<String> {
     names
 }
 
-/// The first path segment of every top-level `use <crate>::...` import.
-/// `clippy::absolute_paths` is `deny` for the root crate that also compiles
-/// this same source, so a fully-qualified call with no matching `use` would
-/// already fail that lint independently of this check.
+/// Every crate-looking identifier immediately before a `::`, whether it
+/// comes from a `use <crate>::...` import (which this also covers - no
+/// separate `use`-only pass is needed, since `use foo::bar;` contains the
+/// same literal `foo::` this already finds) or a fully-qualified call with
+/// no `use` at all (`serde_json::to_value(..)`, `tracing::warn!(..)`). This
+/// repository's `absolute-paths-max-segments = 2` clippy config allows that
+/// two-segment shape outright, so a crate used only that way carries no
+/// matching `use` line anywhere to find. Over-collects internal path
+/// segments too (the `bar` in `foo::bar::Baz`, or a type before `::method`,
+/// filtered to a lowercase-or-`_` leading character to drop most of the
+/// latter), but the caller only acts on a name that already matches a real
+/// dependency in one of the two manifests, so that noise never surfaces.
 fn used_crate_idents(contents: &str) -> BTreeSet<String> {
-    contents
-        .lines()
-        .filter_map(use_crate_ident)
-        .map(str::to_string)
-        .collect()
-}
-
-fn use_crate_ident(line: &str) -> Option<&str> {
-    let mut rest = line.trim_start();
-    if let Some(after_paren) = rest.strip_prefix("pub(") {
-        let close = after_paren.find(')')?;
-        rest = after_paren[close + 1..].trim_start();
-    } else if let Some(after_pub) = rest.strip_prefix("pub ") {
-        rest = after_pub.trim_start();
+    let mut idents = BTreeSet::new();
+    for line in contents.lines() {
+        for (position, _) in line.match_indices("::") {
+            let prefix = &line[..position];
+            let ident_start = prefix
+                .rfind(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
+                .map_or(0, |index| index + 1);
+            let ident = &prefix[ident_start..];
+            let looks_like_a_crate_name = ident
+                .chars()
+                .next()
+                .is_some_and(|character| character.is_ascii_lowercase() || character == '_');
+            if looks_like_a_crate_name
+                && !matches!(ident, "crate" | "self" | "super" | "std" | "core" | "alloc")
+            {
+                idents.insert(ident.to_string());
+            }
+        }
     }
-    let rest = rest.strip_prefix("use ")?.trim_start();
-    let end = rest.find("::")?;
-    let ident = &rest[..end];
-    let is_plain_ident = !ident.is_empty()
-        && ident
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_');
-    if !is_plain_ident || matches!(ident, "crate" | "self" | "super" | "std" | "core" | "alloc") {
-        return None;
-    }
-    Some(ident)
+    idents
 }
 
 fn manifest_dependency_idents(manifest: &str) -> BTreeSet<String> {
