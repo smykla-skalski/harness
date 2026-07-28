@@ -45,6 +45,10 @@ query TaskBoardGitHubSearch($query: String!, $after: String) {
         url
         state
         updatedAt
+        headRefOid
+        author {
+          login
+        }
         labels(first: 20) {
           nodes {
             name
@@ -243,6 +247,12 @@ pub(super) struct GitHubSearchIssuePullRequestItem {
     pub(super) state: String,
     #[serde(rename = "updatedAt")]
     pub(super) updated_at: String,
+    /// The pull request head commit, selected only on the pull request fragment;
+    /// `None` for issues and any node that did not resolve a head.
+    #[serde(default, rename = "headRefOid")]
+    pub(super) head_ref_oid: Option<String>,
+    #[serde(default)]
+    author: Option<GitHubSearchAuthor>,
     #[serde(default)]
     labels: GitHubSearchLabelConnection,
 }
@@ -255,6 +265,15 @@ impl GitHubSearchIssuePullRequestItem {
             .map(|label| label.name.clone())
             .collect()
     }
+
+    pub(super) fn author_login(&self) -> Option<&str> {
+        self.author.as_ref().map(|author| author.login.as_str())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GitHubSearchAuthor {
+    login: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

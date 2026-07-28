@@ -157,6 +157,13 @@ pub struct TaskBoardWorkflowState {
     pub pr_number: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pr_url: Option<String>,
+    /// The pull request head commit recorded at discovery, so later admission
+    /// can bind execution to the exact revision the ticket was discovered at.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_head_revision: Option<String>,
+    /// The pull request author recorded at discovery (e.g. `renovate[bot]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_author: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

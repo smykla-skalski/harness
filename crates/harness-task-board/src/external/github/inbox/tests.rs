@@ -21,6 +21,18 @@ fn github_inbox_search_queries_use_github_all_state_issue_form() {
         review_request_query(&repository, "octo-user"),
         "repo:owner/repo is:pr review-requested:octo-user state:open"
     );
+    assert_eq!(
+        dependency_author_query(&repository, "renovate[bot]"),
+        "repo:owner/repo is:pr is:open author:renovate[bot]"
+    );
+    assert_eq!(
+        dependency_author_query(&repository, "dependabot[bot]"),
+        "repo:owner/repo is:pr is:open author:dependabot[bot]"
+    );
+    assert_eq!(
+        dependency_label_query(&repository),
+        "repo:owner/repo is:pr is:open label:dependencies"
+    );
 }
 
 #[test]
@@ -64,6 +76,9 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
             search_response_with_issue("https://example.test/good/7"),
         ),
         MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["bad/repo", "good/repo"]);
 
@@ -71,7 +86,9 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
 
     handle.join().expect("mock server");
     let requests = requests.lock().expect("requests");
-    assert_eq!(requests.len(), 4);
+    // viewer + bad(assigned fails) + good(assigned, review, two dependency-bot
+    // searches, dependency-labelled)
+    assert_eq!(requests.len(), 7);
     assert!(requests[1].contains("repo:bad/repo"));
     assert!(requests[2].contains("repo:good/repo"));
     assert_eq!(tasks.len(), 1);
@@ -89,6 +106,9 @@ async fn github_inbox_pull_imports_review_requests_as_inbox() {
             200,
             search_response_with_issue("https://example.test/good/pull/7"),
         ),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
@@ -96,7 +116,8 @@ async fn github_inbox_pull_imports_review_requests_as_inbox() {
 
     handle.join().expect("mock server");
     let requests = requests.lock().expect("requests");
-    assert_eq!(requests.len(), 3);
+    // viewer + assigned + review + two dependency-bot searches + dependency label
+    assert_eq!(requests.len(), 6);
     assert!(requests[2].contains("review-requested:octo-user"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].status, TaskBoardStatus::Inbox);
@@ -112,6 +133,9 @@ async fn github_inbox_review_request_tasks_parse_the_same_tracking_convention_as
             200,
             search_response_with_issue_body("https://example.test/good/pull/7", "Part of #5"),
         ),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
@@ -138,6 +162,9 @@ async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
             search_response_with_issue_state("https://example.test/good/7", "CLOSED"),
         ),
         MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
     ]);
     let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
 
@@ -146,6 +173,80 @@ async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
     handle.join().expect("mock server");
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].status, TaskBoardStatus::Done);
+}
+
+#[tokio::test]
+async fn github_inbox_discovers_dependency_update_pull_requests() {
+    let _guard = acquire_global_budget_test_lock().await;
+    let (endpoint, requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(
+            200,
+            search_response_with_pull_request(
+                12,
+                "https://example.test/good/pull/12",
+                "abc123",
+                "renovate[bot]",
+            ),
+        ),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+    ]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
+
+    let tasks = client.pull_tasks().await.expect("inbox pull");
+
+    handle.join().expect("mock server");
+    let requests = requests.lock().expect("requests");
+    assert!(requests[3].contains("author:renovate[bot]"));
+    assert!(requests[4].contains("author:dependabot[bot]"));
+    assert!(requests[5].contains("label:dependencies"));
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].workflow_kind, TaskBoardWorkflowKind::PrFix);
+    assert_eq!(tasks[0].pr_head_revision.as_deref(), Some("abc123"));
+    assert_eq!(tasks[0].pr_author.as_deref(), Some("renovate[bot]"));
+    assert_eq!(tasks[0].status, TaskBoardStatus::Inbox);
+}
+
+#[tokio::test]
+async fn github_inbox_folds_a_pull_request_with_both_intents_into_one_ticket() {
+    let _guard = acquire_global_budget_test_lock().await;
+    // The same pull request #7 is both review-requested and a dependency update,
+    // so it must import once carrying both intents rather than twice.
+    let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(
+            200,
+            search_response_with_pull_request(
+                7,
+                "https://example.test/good/pull/7",
+                "deadbeef",
+                "renovate[bot]",
+            ),
+        ),
+        MockResponse::json(
+            200,
+            search_response_with_pull_request(
+                7,
+                "https://example.test/good/pull/7",
+                "deadbeef",
+                "renovate[bot]",
+            ),
+        ),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+    ]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
+
+    let tasks = client.pull_tasks().await.expect("inbox pull");
+
+    handle.join().expect("mock server");
+    assert_eq!(tasks.len(), 1, "both intents fold into one ticket");
+    assert_eq!(tasks[0].workflow_kind, TaskBoardWorkflowKind::PrFixReview);
+    assert_eq!(tasks[0].pr_head_revision.as_deref(), Some("deadbeef"));
 }
 
 #[tokio::test]
@@ -247,6 +348,32 @@ fn search_response_with_issue_body(url: &str, body: &str) -> serde_json::Value {
                     "state": "OPEN",
                     "updatedAt": "2026-05-19T00:00:00Z",
                     "labels": { "nodes": [] }
+                }]
+            }
+        }
+    })
+}
+
+fn search_response_with_pull_request(
+    number: u64,
+    url: &str,
+    head: &str,
+    author: &str,
+) -> serde_json::Value {
+    json!({
+        "data": {
+            "search": {
+                "pageInfo": { "hasNextPage": false, "endCursor": null },
+                "nodes": [{
+                    "number": number,
+                    "title": "Bump serde to 1.0.200",
+                    "body": null,
+                    "url": url,
+                    "state": "OPEN",
+                    "updatedAt": "2026-05-19T00:00:00Z",
+                    "headRefOid": head,
+                    "author": { "login": author },
+                    "labels": { "nodes": [{ "name": "dependencies" }] }
                 }]
             }
         }

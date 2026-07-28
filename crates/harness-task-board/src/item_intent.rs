@@ -114,6 +114,38 @@ impl TaskBoardWorkflowKind {
         }
     }
 
+    /// The pull request kind carrying an intent set. Empty or unmatched sets map
+    /// to `DefaultTask`.
+    #[must_use]
+    pub const fn from_pr_intents(intents: PrIntentSet) -> Self {
+        match (intents.has_dependency_update(), intents.has_review_request()) {
+            (true, true) => Self::PrFixReview,
+            (true, false) => Self::PrFix,
+            (false, true) => Self::PrReview,
+            (false, false) => Self::DefaultTask,
+        }
+    }
+
+    /// Merge two kinds by unioning their pull request intents, so a pull request
+    /// discovered as both a dependency update and a review request becomes one
+    /// `PrFixReview` ticket. A ticket imported before intent classification
+    /// (`DefaultTask`/`Unknown`) adopts the pull request kind discovery now
+    /// reports, so a refresh backfills intent onto already-imported tickets; a
+    /// terminal `Review` projection keeps its kind, and a non-pull-request
+    /// `other` leaves `self` unchanged.
+    #[must_use]
+    pub const fn union(self, other: Self) -> Self {
+        if let Some(theirs) = other.pr_intents() {
+            if let Some(mine) = self.pr_intents() {
+                return Self::from_pr_intents(mine.with(theirs));
+            }
+            if matches!(self, Self::DefaultTask | Self::Unknown) {
+                return other;
+            }
+        }
+        self
+    }
+
     #[must_use]
     pub const fn has_dependency_update_intent(self) -> bool {
         matches!(self, Self::PrFix | Self::PrFixReview)
@@ -167,25 +199,51 @@ mod tests {
     }
 
     #[test]
-    #[allow(
-        clippy::cognitive_complexity,
-        reason = "one flat set of intent assertions per kind reads clearer kept together than split across helpers"
-    )]
     fn one_ticket_carries_both_intents_without_collapsing() {
         let both = TaskBoardWorkflowKind::PrFixReview;
+        assert!(both.has_dependency_update_intent());
+        assert!(both.has_review_request_intent());
         assert_eq!(
             both.pr_intents(),
             Some(PrIntentSet::DEPENDENCY_UPDATE.with(PrIntentSet::REVIEW_REQUEST))
         );
-        for (kind, dependency_update, review_request) in [
-            (both, true, true),
-            (TaskBoardWorkflowKind::PrFix, true, false),
-            (TaskBoardWorkflowKind::PrReview, false, true),
-        ] {
-            assert_eq!(kind.has_dependency_update_intent(), dependency_update);
-            assert_eq!(kind.has_review_request_intent(), review_request);
-        }
+    }
+
+    #[test]
+    fn single_intent_kinds_carry_exactly_one() {
+        assert!(TaskBoardWorkflowKind::PrFix.has_dependency_update_intent());
+        assert!(!TaskBoardWorkflowKind::PrFix.has_review_request_intent());
+        assert!(TaskBoardWorkflowKind::PrReview.has_review_request_intent());
+        assert!(!TaskBoardWorkflowKind::PrReview.has_dependency_update_intent());
         assert_eq!(TaskBoardWorkflowKind::DefaultTask.pr_intents(), None);
+    }
+
+    #[test]
+    fn union_backfills_and_merges_intents() {
+        // An unclassified ticket adopts the discovered pull request kind.
+        assert_eq!(
+            TaskBoardWorkflowKind::DefaultTask.union(TaskBoardWorkflowKind::PrFix),
+            TaskBoardWorkflowKind::PrFix
+        );
+        assert_eq!(
+            TaskBoardWorkflowKind::Unknown.union(TaskBoardWorkflowKind::PrReview),
+            TaskBoardWorkflowKind::PrReview
+        );
+        // Two pull request kinds union their intents.
+        assert_eq!(
+            TaskBoardWorkflowKind::PrReview.union(TaskBoardWorkflowKind::PrFix),
+            TaskBoardWorkflowKind::PrFixReview
+        );
+        // A non-pull-request other never downgrades a pull request kind, and a
+        // terminal Review keeps its own kind.
+        assert_eq!(
+            TaskBoardWorkflowKind::PrFix.union(TaskBoardWorkflowKind::DefaultTask),
+            TaskBoardWorkflowKind::PrFix
+        );
+        assert_eq!(
+            TaskBoardWorkflowKind::Review.union(TaskBoardWorkflowKind::PrFix),
+            TaskBoardWorkflowKind::Review
+        );
     }
 
     #[test]

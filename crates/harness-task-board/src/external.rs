@@ -20,7 +20,9 @@ use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use crate::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
+use crate::types::{
+    ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind,
+};
 
 mod capabilities;
 mod config;
@@ -224,6 +226,18 @@ pub struct ExternalTask {
     /// Whether the provider reports this task as tracking children of its own.
     #[serde(default, skip_serializing_if = "Not::not")]
     pub tracks_children: bool,
+    /// The workflow kind the provider discovered this task as. GitHub pull
+    /// request discovery sets the dependency-update, review-request, or both
+    /// intent here; other imports leave it at the default.
+    #[serde(default)]
+    pub workflow_kind: TaskBoardWorkflowKind,
+    /// The discovered pull request head commit, recorded onto the ticket so
+    /// admission can bind execution to the exact revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_head_revision: Option<String>,
+    /// The discovered pull request author (e.g. `renovate[bot]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_author: Option<String>,
 }
 
 impl Default for ExternalTask {
@@ -238,6 +252,9 @@ impl Default for ExternalTask {
             labels: Vec::new(),
             parent_reference: None,
             tracks_children: false,
+            workflow_kind: TaskBoardWorkflowKind::DefaultTask,
+            pr_head_revision: None,
+            pr_author: None,
         }
     }
 }
