@@ -2,13 +2,14 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use tokio::sync::oneshot;
+use tokio::time::timeout;
 
 use super::git_ssh_publish::run_native_publication_worker;
-use crate::github_api::{GitHubProtectedClient, stable_data_revision_guard};
+use harness_github_api::{GitHubProtectedClient, stable_data_revision_guard};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cancelled_waiter_leaves_native_mutation_owned_by_worker() {
-    let _test_guard = crate::github_api::acquire_global_budget_test_lock().await;
+    let _test_guard = harness_github_api::acquire_global_budget_test_lock().await;
     let mut changes = GitHubProtectedClient::data_changes();
     let initial_revision = GitHubProtectedClient::data_revision();
     let (started_tx, started_rx) = oneshot::channel();
@@ -25,7 +26,7 @@ async fn cancelled_waiter_leaves_native_mutation_owned_by_worker() {
     assert!(cancelled.is_cancelled());
 
     assert!(
-        tokio::time::timeout(
+        timeout(
             Duration::from_millis(25),
             stable_data_revision_guard(initial_revision),
         )
@@ -35,7 +36,7 @@ async fn cancelled_waiter_leaves_native_mutation_owned_by_worker() {
     );
     release_tx.send(()).expect("release native worker");
 
-    let change = tokio::time::timeout(Duration::from_secs(1), changes.recv())
+    let change = timeout(Duration::from_secs(1), changes.recv())
         .await
         .expect("data change timeout")
         .expect("data change");

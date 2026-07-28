@@ -6,14 +6,14 @@ use tempfile::{TempDir, tempdir};
 
 use super::super::types::{BranchPublicationMode, LocalBranchSnapshot, LocalCommitAuthor};
 use super::*;
-use crate::task_board::TaskBoardGitRuntimeProfile;
+use crate::TaskBoardGitRuntimeProfile;
 
 #[test]
 fn update_rewind_after_preflight_fails_without_overwriting_remote() {
     let fixture = PublicationRaceFixture::new();
     let plan = fixture.plan(
         "feature/update",
-        BranchPublicationMode::Update {
+        &BranchPublicationMode::Update {
             parent_sha: fixture.base.clone(),
         },
     );
@@ -37,7 +37,7 @@ fn create_race_after_preflight_fails_without_overwriting_remote() {
     let fixture = PublicationRaceFixture::new();
     let plan = fixture.plan(
         "feature/create",
-        BranchPublicationMode::Create {
+        &BranchPublicationMode::Create {
             parent_sha: fixture.base.clone(),
         },
     );
@@ -57,7 +57,7 @@ fn create_allows_default_advance_but_keeps_frozen_parent() {
     let fixture = PublicationRaceFixture::new();
     let plan = fixture.plan(
         "feature/create",
-        BranchPublicationMode::Create {
+        &BranchPublicationMode::Create {
             parent_sha: fixture.base.clone(),
         },
     );
@@ -88,7 +88,7 @@ fn update_with_exact_remote_parent_succeeds() {
     let fixture = PublicationRaceFixture::new();
     let plan = fixture.plan(
         "feature/update",
-        BranchPublicationMode::Update {
+        &BranchPublicationMode::Update {
             parent_sha: fixture.base.clone(),
         },
     );
@@ -176,8 +176,8 @@ impl PublicationRaceFixture {
         }
     }
 
-    fn plan(&self, branch: &str, mode: BranchPublicationMode) -> GitPublishPlan {
-        let parent_branch = match &mode {
+    fn plan(&self, branch: &str, mode: &BranchPublicationMode) -> GitPublishPlan {
+        let parent_branch = match mode {
             BranchPublicationMode::Create { .. } => "main",
             BranchPublicationMode::Update { .. } => branch,
         };
@@ -186,7 +186,7 @@ impl PublicationRaceFixture {
             remote_url: self.remote.display().to_string(),
             auth_header: github_auth_header("local-token").expect("auth header"),
             fetch_ref: branch_head_ref(parent_branch),
-            push_lease: branch_push_lease(branch, &mode),
+            push_lease: branch_push_lease(branch, mode),
             push_refspec_prefix: branch_push_refspec_prefix(branch),
             commit_payload: native_commit_payload(&self.snapshot, mode.parent_sha())
                 .expect("commit payload"),

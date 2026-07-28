@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::GitHubProjectConfig;
 use super::risk::classify_github_merge_risk;
-use crate::task_board::policy::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
+use crate::policy::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GitHubMergeEvidence {

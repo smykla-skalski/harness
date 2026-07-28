@@ -1,14 +1,14 @@
 use serde_json::json;
 
-use crate::github_api::{
+use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use harness_kernel::errors::CliError;
 
 use super::{GraphqlPullRequestHandle, PULL_REQUEST_HANDLE_QUERY, PullRequestHandleResponse};
-use crate::task_board::github::{GitHubProjectConfig, GitHubPullRequestHandle};
+use crate::github::{GitHubProjectConfig, GitHubPullRequestHandle};
 
-pub(in crate::task_board::github) async fn pull_request_handle_fresh(
+pub(in crate::github) async fn pull_request_handle_fresh(
     client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,

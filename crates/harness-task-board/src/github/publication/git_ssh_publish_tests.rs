@@ -4,11 +4,9 @@ use std::process::Command as TestCommand;
 
 use super::super::types::LocalCommitAuthor;
 use super::*;
-use crate::task_board::{
-    TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-};
+use crate::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode};
 
-const ED25519_PRIVATE_KEY: &str = r#"
+const ED25519_PRIVATE_KEY: &str = r"
 -----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACCzPq7zfqLffKoBDe/eo04kH2XxtSmk9D7RQyf1xUqrYgAAAJgAIAxdACAM
@@ -16,7 +14,7 @@ XQAAAAtzc2gtZWQyNTUxOQAAACCzPq7zfqLffKoBDe/eo04kH2XxtSmk9D7RQyf1xUqrYg
 AAAEC2BsIi0QwW2uFscKTUUXNHLsYX4FxlaSDSblbAj7WR7bM+rvN+ot98qgEN796jTiQf
 ZfG1KaT0PtFDJ/XFSqtiAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
 -----END OPENSSH PRIVATE KEY-----
-"#;
+";
 
 #[test]
 fn github_auth_header_keeps_token_out_of_arguments() {
@@ -96,9 +94,7 @@ fn publishes_ssh_signed_commit_from_configured_key_path_to_local_bare_remote() {
         fetch_ref: branch_head_ref("main"),
         push_lease: branch_push_lease(
             "feature/ssh-signed",
-            &BranchPublicationMode::Create {
-                parent_sha: parent_sha.clone(),
-            },
+            &BranchPublicationMode::Create { parent_sha },
         ),
         push_refspec_prefix: branch_push_refspec_prefix("feature/ssh-signed"),
         commit_payload: commit.commit_payload,

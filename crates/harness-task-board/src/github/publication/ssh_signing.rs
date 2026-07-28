@@ -6,9 +6,9 @@ use gix::objs::WriteTo;
 use gix::{ObjectId, objs};
 use ssh_key::{HashAlg, LineEnding, PrivateKey};
 
-use crate::sandbox;
-use crate::task_board::TaskBoardGitRuntimeProfile;
+use crate::TaskBoardGitRuntimeProfile;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::sandbox;
 
 use super::signing::unsigned_commit_payload;
 use super::types::{
@@ -170,13 +170,13 @@ fn actor_signature(actor: &str, label: &str) -> Result<Signature, CliError> {
 
 #[cfg(test)]
 mod tests {
+    use gix::hash::Kind;
+
     use super::super::types::LocalCommitAuthor;
     use super::*;
-    use crate::task_board::{
-        TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-    };
+    use crate::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode};
 
-    const ED25519_PRIVATE_KEY: &str = r#"
+    const ED25519_PRIVATE_KEY: &str = r"
 -----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACCzPq7zfqLffKoBDe/eo04kH2XxtSmk9D7RQyf1xUqrYgAAAJgAIAxdACAM
@@ -184,7 +184,7 @@ XQAAAAtzc2gtZWQyNTUxOQAAACCzPq7zfqLffKoBDe/eo04kH2XxtSmk9D7RQyf1xUqrYg
 AAAEC2BsIi0QwW2uFscKTUUXNHLsYX4FxlaSDSblbAj7WR7bM+rvN+ot98qgEN796jTiQf
 ZfG1KaT0PtFDJ/XFSqtiAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
 -----END OPENSSH PRIVATE KEY-----
-"#;
+";
 
     #[test]
     fn ssh_commit_payload_signature_uses_direct_key_material() {
@@ -270,7 +270,7 @@ ZfG1KaT0PtFDJ/XFSqtiAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
                 .armored_signature
                 .contains("-----BEGIN SSH SIGNATURE-----")
         );
-        let parsed = objs::CommitRef::from_bytes(&commit.commit_payload, gix::hash::Kind::Sha1)
+        let parsed = objs::CommitRef::from_bytes(&commit.commit_payload, Kind::Sha1)
             .expect("parse serialized commit");
         let gpgsig = parsed
             .extra_headers()

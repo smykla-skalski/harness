@@ -58,7 +58,6 @@ nix = { version = "0.31", features = ["signal"] }
 notify = "8.2.0"
 portable-pty = "0.9.0"
 pathdiff = "0.2.3"
-pgp = { version = "0.20.0", default-features = false }
 rand_core06 = { package = "rand_core", version = "0.6.4", features = ["std"] }
 rcgen = { version = "0.14.8", default-features = false, features = ["pem", "ring", "x509-parser"] }
 regex = "1.11.1"
@@ -76,7 +75,6 @@ shell-words = "1.1.0"
 signal-hook = "0.4"
 similar = "3.0"
 sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
-ssh-key = { version = "0.7.0-rc.10", features = ["crypto", "encryption"] }
 tar = "0.4.44"
 tempfile = "3.27.0"
 thiserror = "2.0.18"

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 
-use crate::task_board::policy::PolicyInput;
+use crate::policy::PolicyInput;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 mod client;
@@ -21,13 +21,12 @@ pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
 };
-pub use harness_task_board::github_config::{
+pub use crate::github_config::{
     GitHubAutomation, GitHubAutomationLabels, GitHubAutomationSettings, GitHubAutomationToggles,
     GitHubMergeMethod, GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
 };
 pub use publication::GitHubBranchState;
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use publication::{SigningVerifyOutcome, verify_signing_for_profile};
+pub use publication::{SigningVerifyOutcome, verify_signing_for_profile};
 pub use risk::{GitHubRiskClassification, GitHubRiskReason, classify_github_merge_risk};
 
 #[async_trait]

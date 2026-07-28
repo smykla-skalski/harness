@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::time::Duration;
 
-use crate::github_api::{
+use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};

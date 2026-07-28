@@ -7,9 +7,9 @@ use pgp::crypto::hash::HashAlgorithm;
 use pgp::types::{KeyDetails, Password};
 use rand_core06::OsRng;
 
-use crate::sandbox;
-use crate::task_board::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningMode};
+use crate::{TaskBoardGitRuntimeProfile, TaskBoardGitSigningMode};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::sandbox;
 
 use super::snapshot_error;
 use super::types::{
@@ -121,7 +121,8 @@ pub(super) fn publication_signature(
 /// the UI's "Verify…" action after the user saves new key material so the
 /// daemon can confirm the key, passphrase, and mode all line up without
 /// pushing a real commit.
-pub(crate) fn verify_signing_for_profile(
+#[must_use]
+pub fn verify_signing_for_profile(
     profile: &TaskBoardGitRuntimeProfile,
 ) -> SigningVerifyOutcome {
     const PAYLOAD: &[u8] = b"harness-signing-verify\n";
@@ -156,7 +157,7 @@ pub(crate) fn verify_signing_for_profile(
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum SigningVerifyOutcome {
+pub enum SigningVerifyOutcome {
     Skipped,
     Signed {
         mode: String,

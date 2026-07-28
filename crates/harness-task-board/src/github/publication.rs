@@ -5,16 +5,17 @@ use serde::Deserialize;
 use serde_json::json;
 use tokio::task::spawn_blocking;
 
-use crate::git::GitRepository;
-use crate::github_api::{
-    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
-};
-use crate::sandbox;
-use crate::task_board::TaskBoardGitRuntimeConfig;
+use crate::TaskBoardGitRuntimeConfig;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use harness_github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
+use harness_workspace::git::GitRepository;
+use harness_workspace::sandbox;
+
 use super::{GitHubAutomation, GitHubProjectConfig};
-pub(crate) use signing::{SigningVerifyOutcome, verify_signing_for_profile};
+pub use signing::{SigningVerifyOutcome, verify_signing_for_profile};
 use signing::{commit_author, local_commit_signature};
 use types::{BranchPublicationMode, LocalBranchSnapshot};
 
