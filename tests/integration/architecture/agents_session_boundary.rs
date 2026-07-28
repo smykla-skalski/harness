@@ -21,7 +21,7 @@ use super::helpers::collect_hits_in_tree;
 /// describing the status this reason accompanies, not a compiled dependency
 /// edge.
 #[test]
-fn agents_tree_stays_off_session_service() {
+fn agents_tree_stays_off_session() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let known_exceptions = ["src/agents/kind/disconnect.rs"];
 
