@@ -35,7 +35,9 @@ pub use harness_mcp::mcp;
 pub mod observe;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod reviews;
-pub mod run;
+pub mod run {
+    pub use harness_run::*;
+}
 pub use harness_workspace::sandbox;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod session;

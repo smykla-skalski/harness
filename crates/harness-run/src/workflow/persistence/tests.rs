@@ -4,7 +4,7 @@ use serde_json::json;
 use tempfile::TempDir;
 
 use super::*;
-use crate::run::workflow::{ManifestFixDecision, SuiteFixState};
+use crate::workflow::{ManifestFixDecision, SuiteFixState};
 
 #[test]
 fn read_runner_state_rejects_legacy_flat_state() {

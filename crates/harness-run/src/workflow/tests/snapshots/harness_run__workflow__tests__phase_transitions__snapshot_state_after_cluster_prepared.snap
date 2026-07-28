@@ -1,5 +1,6 @@
 ---
-source: src/run/workflow/mod.rs
+source: crates/harness-run/src/workflow/tests/phase_transitions.rs
+assertion_line: 312
 expression: "serde_json::to_string_pretty(&json).unwrap()"
 ---
 {
