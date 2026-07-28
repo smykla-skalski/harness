@@ -588,6 +588,68 @@
         "x-websocket-method": "github.status"
       }
     },
+    "/v1/headless/readiness": {
+      "post": {
+        "tags": [
+          "daemon"
+        ],
+        "description": "Report every prerequisite for a requested headless agent run without exposing credential values",
+        "operationId": "post_headless_readiness",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeadlessReadinessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Headless execution readiness report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeadlessReadinessReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        }
+      }
+    },
     "/v1/health": {
       "get": {
         "tags": [
@@ -17901,6 +17963,195 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "HeadlessReadinessCredential": {
+        "type": "object",
+        "required": [
+          "required"
+        ],
+        "properties": {
+          "configured": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "HeadlessReadinessLane": {
+        "type": "object",
+        "required": [
+          "name",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "HeadlessReadinessModel": {
+        "type": "object",
+        "required": [
+          "requested",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "effective": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested": {
+            "type": "string"
+          }
+        }
+      },
+      "HeadlessReadinessPeer": {
+        "type": "object",
+        "required": [
+          "version",
+          "wire_version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "wire_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "HeadlessReadinessReport": {
+        "type": "object",
+        "required": [
+          "ready",
+          "client",
+          "daemon",
+          "compatible",
+          "bridge_reachable",
+          "lanes",
+          "selected_lane",
+          "credential",
+          "runtime",
+          "model",
+          "orchestrator_active",
+          "unmet_requirements"
+        ],
+        "properties": {
+          "bridge_reachable": {
+            "type": "boolean"
+          },
+          "client": {
+            "$ref": "#/components/schemas/HeadlessReadinessPeer"
+          },
+          "compatible": {
+            "type": "boolean"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/HeadlessReadinessCredential"
+          },
+          "daemon": {
+            "$ref": "#/components/schemas/HeadlessReadinessPeer"
+          },
+          "lanes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeadlessReadinessLane"
+            }
+          },
+          "model": {
+            "$ref": "#/components/schemas/HeadlessReadinessModel"
+          },
+          "orchestrator_active": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/HeadlessReadinessRuntime"
+          },
+          "selected_lane": {
+            "type": "string"
+          },
+          "unmet_requirements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "HeadlessReadinessRequest": {
+        "type": "object",
+        "required": [
+          "client_version",
+          "client_wire_version",
+          "runtime",
+          "model"
+        ],
+        "properties": {
+          "client_version": {
+            "type": "string"
+          },
+          "client_wire_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "lane": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          }
+        }
+      },
+      "HeadlessReadinessRuntime": {
+        "type": "object",
+        "required": [
+          "requested",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "requested": {
+            "type": "string"
           }
         }
       },

@@ -226,6 +226,7 @@ pub(super) fn openrouter_catalog() -> RuntimeModelCatalog {
         runtime: "openrouter".into(),
         models: vec![
             thinking("anthropic/claude-haiku-4-5", "Claude Haiku 4.5", Fast),
+            reasoning("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", Fast),
             reasoning("openai/gpt-5.4-mini", "GPT-5.4 mini", Fast),
             thinking("google/gemini-2.5-flash", "Gemini 2.5 Flash", Fast),
             thinking("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6", Balanced),

@@ -114,6 +114,17 @@ mod tests {
     }
 
     #[test]
+    fn openrouter_catalog_contains_headless_smoke_model() {
+        let catalog = catalog_for("openrouter").expect("OpenRouter catalog");
+        assert!(
+            catalog
+                .models
+                .iter()
+                .any(|model| model.id == "deepseek/deepseek-v4-flash")
+        );
+    }
+
+    #[test]
     fn each_catalog_default_and_cheapest_are_in_models() {
         for catalog in all_catalogs() {
             let ids: Vec<&str> = catalog.models.iter().map(|m| m.id.as_str()).collect();

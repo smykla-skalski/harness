@@ -64,6 +64,73 @@ pub struct ReadinessResponse {
     pub daemon_epoch: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessRequest {
+    pub client_version: String,
+    pub client_wire_version: u32,
+    pub runtime: String,
+    pub model: String,
+    #[serde(default)]
+    pub lane: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the wire report preserves each independently actionable readiness result"
+)]
+pub struct HeadlessReadinessReport {
+    pub ready: bool,
+    pub client: HeadlessReadinessPeer,
+    pub daemon: HeadlessReadinessPeer,
+    pub compatible: bool,
+    pub bridge_reachable: bool,
+    pub lanes: Vec<HeadlessReadinessLane>,
+    pub selected_lane: String,
+    pub credential: HeadlessReadinessCredential,
+    pub runtime: HeadlessReadinessRuntime,
+    pub model: HeadlessReadinessModel,
+    pub orchestrator_active: bool,
+    pub unmet_requirements: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessPeer {
+    pub version: String,
+    pub wire_version: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessLane {
+    pub name: String,
+    pub available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessCredential {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub configured: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessRuntime {
+    pub requested: String,
+    pub available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HeadlessReadinessModel {
+    pub requested: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective: Option<String>,
+    pub available: bool,
+}
+
 pub use harness_protocol::session_wire::RuntimeSessionResolutionResponse;
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
