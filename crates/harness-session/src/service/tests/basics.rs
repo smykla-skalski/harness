@@ -1,0 +1,470 @@
+use super::*;
+
+mod recovery;
+
+#[test]
+fn start_creates_leaderless_session() {
+    with_temp_project(|project| {
+        let state = start_session("test goal", "", project, None).expect("start");
+        assert_eq!(state.status, SessionStatus::AwaitingLeader);
+        assert!(state.leader_id.is_none());
+        assert!(state.agents.is_empty());
+        assert_eq!(state.metrics.agent_count, 0);
+        assert_eq!(state.metrics.active_agent_count, 0);
+    });
+}
+
+#[test]
+fn join_adds_agent() {
+    with_temp_project(|project| {
+        let state = start_session(
+            "test",
+            "",
+            project,
+            Some("00000000-0000-4000-8000-000000000001"),
+        )
+        .expect("start");
+        let state = join_session(
+            &state.session_id,
+            SessionRole::Worker,
+            "codex",
+            &["general".into()],
+            None,
+            project,
+            None,
+        )
+        .expect("join");
+        assert_eq!(state.status, SessionStatus::AwaitingLeader);
+        assert!(state.leader_id.is_none());
+        assert_eq!(state.agents.len(), 1);
+        assert_eq!(state.metrics.agent_count, 1);
+    });
+}
+
+#[test]
+fn archived_session_is_hidden_from_local_queries_even_with_include_all() {
+    with_temp_project(|project| {
+        let state = start_active_session(
+            "archive me",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000002"),
+        )
+        .expect("start");
+        let layout = storage::layout_from_project_dir(project, &state.session_id).expect("layout");
+        storage::update_state(&layout, |state| {
+            state.archived_at = Some("2026-05-02T00:00:00Z".into());
+            Ok(())
+        })
+        .expect("archive state");
+
+        assert!(
+            list_sessions(project, true)
+                .expect("list archived session")
+                .is_empty()
+        );
+        assert!(
+            session_status(&state.session_id, project).is_err(),
+            "archived sessions must be hidden from local status queries"
+        );
+        assert!(
+            resolve_session_project_dir(&state.session_id, project).is_err(),
+            "archived sessions must be hidden from local project-dir resolution"
+        );
+    });
+}
+
+#[test]
+fn join_session_downgrades_requested_leader_to_explicit_fallback_role() {
+    with_temp_project(|project| {
+        let state = start_active_session_with_policy(
+            "swarm contract",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000013"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.expect("leader");
+
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("fallback-candidate"), || {
+            join_session_with_fallback(
+                "00000000-0000-4002-8000-000000000013",
+                SessionRole::Leader,
+                Some(SessionRole::Improver),
+                "codex",
+                &["priority:90".into()],
+                Some("fallback candidate"),
+                project,
+                None,
+            )
+        })
+        .expect("join");
+
+        let improver = joined
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("codex agent");
+        assert_eq!(improver.role, SessionRole::Improver);
+        assert_eq!(joined.leader_id.as_deref(), Some(leader_id.as_str()));
+    });
+}
+
+#[test]
+fn join_session_recovers_leaderless_degraded_session_with_manual_leader_join() {
+    with_temp_project(|project| {
+        start_active_session_with_policy(
+            "swarm contract",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000001f"),
+            Some("swarm-default"),
+        )
+        .expect("start");
+        let layout =
+            storage::layout_from_project_dir(project, "00000000-0000-4002-8000-00000000001f")
+                .expect("layout");
+        storage::update_state(&layout, |state| {
+            let previous_leader = state.leader_id.take().expect("leader");
+            state.status = SessionStatus::LeaderlessDegraded;
+            let leader = state
+                .agents
+                .get_mut(&previous_leader)
+                .expect("leader registration");
+            leader.status = AgentStatus::disconnected_unknown();
+            Ok(())
+        })
+        .expect("degrade session");
+
+        let joined = temp_env::with_var("CODEX_SESSION_ID", Some("manual-recovery"), || {
+            join_session_with_fallback(
+                "00000000-0000-4002-8000-00000000001f",
+                SessionRole::Leader,
+                None,
+                "codex",
+                &["priority:90".into()],
+                Some("Recovered leader"),
+                project,
+                None,
+            )
+        })
+        .expect("recover leader");
+
+        let recovered = joined
+            .leader_id
+            .as_deref()
+            .and_then(|leader_id| joined.agents.get(leader_id))
+            .expect("recovered leader");
+        assert_eq!(joined.status, SessionStatus::Active);
+        assert_eq!(recovered.runtime, "codex");
+        assert_eq!(recovered.role, SessionRole::Leader);
+    });
+}
+
+#[test]
+fn start_session_rejects_duplicate_session_id() {
+    with_temp_project(|project| {
+        let session_id = "00000000-0000-4000-8000-000000000002";
+        start_session("goal1", "", project, Some(session_id)).expect("first");
+        let error = start_session("goal2", "", project, Some(session_id)).expect_err("dup");
+
+        assert_eq!(error.code(), "KSRCLI092");
+        assert_eq!(
+            session_status(session_id, project).expect("status").context,
+            "goal1"
+        );
+    });
+}
+
+#[test]
+fn start_session_rejects_non_uuid_explicit_session_id() {
+    with_temp_project(|project| {
+        let error = start_session("goal", "", project, Some("not-a-uuid")).expect_err("id");
+
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+        assert!(
+            error
+                .to_string()
+                .contains("session id must be a lowercase UUID"),
+            "unexpected error: {error}"
+        );
+    });
+}
+
+#[test]
+fn start_session_with_policy_rejects_unknown_preset() {
+    with_temp_project(|project| {
+        let error = start_session_with_policy(
+            "goal",
+            "",
+            project,
+            Some("unknown-preset"),
+            Some("swarm-future"),
+        )
+        .expect_err("unknown preset should be rejected");
+
+        assert_eq!(error.code(), "KSRCLI092");
+        assert!(
+            error
+                .to_string()
+                .contains("unknown session policy preset 'swarm-future'"),
+            "unexpected error: {error}"
+        );
+    });
+}
+
+#[test]
+fn auto_generated_session_ids_are_unique() {
+    with_temp_project(|project| {
+        let first = start_session("goal1", "", project, None).expect("first");
+        let second = start_session("goal2", "", project, None).expect("second");
+        assert_ne!(first.session_id, second.session_id);
+    });
+}
+
+#[test]
+fn join_same_runtime_keeps_distinct_agents() {
+    with_temp_project(|project| {
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000015"),
+        )
+        .expect("start");
+
+        let (first, second) =
+            temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
+                let first = join_session(
+                    "00000000-0000-4002-8000-000000000015",
+                    SessionRole::Worker,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("first");
+                let second = join_session(
+                    "00000000-0000-4002-8000-000000000015",
+                    SessionRole::Reviewer,
+                    "codex",
+                    &[],
+                    None,
+                    project,
+                    None,
+                )
+                .expect("second");
+                (first, second)
+            });
+
+        assert_eq!(first.agents.len(), 2);
+        assert_eq!(second.agents.len(), 3);
+        let codex_ids: Vec<_> = second
+            .agents
+            .keys()
+            .filter(|id| id.starts_with("codex-"))
+            .collect();
+        assert_eq!(codex_ids.len(), 2);
+    });
+}
+
+#[test]
+fn join_records_runtime_session_id_when_available() {
+    with_temp_project(|project| {
+        start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000014"),
+        )
+        .unwrap();
+
+        let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some("codex-worker"))], || {
+            join_session(
+                "00000000-0000-4002-8000-000000000014",
+                SessionRole::Worker,
+                "codex",
+                &[],
+                None,
+                project,
+                None,
+            )
+            .unwrap()
+        });
+
+        let codex_worker = joined
+            .agents
+            .values()
+            .find(|agent| agent.runtime == "codex")
+            .expect("codex worker should be present");
+        assert_eq!(
+            codex_worker.agent_session_id.as_deref(),
+            Some("codex-worker")
+        );
+    });
+}
+
+#[test]
+fn end_session_requires_leader() {
+    with_temp_project(|project| {
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000022"),
+        )
+        .expect("start");
+        let joined = join_session(
+            &state.session_id,
+            SessionRole::Worker,
+            "codex",
+            &[],
+            None,
+            project,
+            None,
+        )
+        .expect("join");
+        let worker_id = joined
+            .agents
+            .keys()
+            .find(|id| id.starts_with("codex"))
+            .expect("worker id")
+            .clone();
+        let result = end_session(&state.session_id, &worker_id, project);
+        assert!(result.is_err());
+    });
+}
+
+#[test]
+fn control_plane_can_end_non_ended_sessions() {
+    with_temp_project(|project| {
+        let awaiting = start_session(
+            "awaiting end",
+            "",
+            project,
+            Some("00000000-0000-4002-8000-000000000010"),
+        )
+        .expect("start awaiting session");
+        end_session(&awaiting.session_id, CONTROL_PLANE_ACTOR_ID, project)
+            .expect("end awaiting leader session");
+        assert_eq!(
+            session_status(&awaiting.session_id, project)
+                .expect("awaiting status")
+                .status,
+            SessionStatus::Ended
+        );
+
+        let paused = start_active_session(
+            "paused end",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-00000000003d"),
+        )
+        .expect("start paused session");
+        let paused_layout =
+            storage::layout_from_project_dir(project, &paused.session_id).expect("paused layout");
+        storage::update_state(&paused_layout, |state| {
+            state.status = SessionStatus::Paused;
+            Ok(())
+        })
+        .expect("pause session");
+        end_session(&paused.session_id, CONTROL_PLANE_ACTOR_ID, project)
+            .expect("end paused session");
+        assert_eq!(
+            session_status(&paused.session_id, project)
+                .expect("paused status")
+                .status,
+            SessionStatus::Ended
+        );
+
+        let degraded = start_active_session(
+            "degraded end",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000041"),
+        )
+        .expect("start degraded session");
+        let previous_leader = degraded.leader_id.clone().expect("leader");
+        let degraded_layout = storage::layout_from_project_dir(project, &degraded.session_id)
+            .expect("degraded layout");
+        storage::update_state(&degraded_layout, |state| {
+            state.status = SessionStatus::LeaderlessDegraded;
+            state.leader_id = None;
+            let leader = state
+                .agents
+                .get_mut(&previous_leader)
+                .expect("leader registration");
+            leader.status = AgentStatus::disconnected_unknown();
+            Ok(())
+        })
+        .expect("degrade session");
+        end_session(&degraded.session_id, CONTROL_PLANE_ACTOR_ID, project)
+            .expect("end leaderless degraded session");
+        assert_eq!(
+            session_status(&degraded.session_id, project)
+                .expect("degraded status")
+                .status,
+            SessionStatus::Ended
+        );
+    });
+}
+
+#[test]
+fn task_lifecycle() {
+    with_temp_project(|project| {
+        let state = start_active_session(
+            "test",
+            "",
+            project,
+            Some("claude"),
+            Some("00000000-0000-4002-8000-000000000023"),
+        )
+        .expect("start");
+        let leader_id = state.leader_id.expect("leader id");
+
+        let item = create_task(
+            "00000000-0000-4002-8000-000000000023",
+            "fix bug",
+            Some("details"),
+            TaskSeverity::High,
+            &leader_id,
+            project,
+        )
+        .expect("task");
+        assert_eq!(item.status, TaskStatus::Open);
+
+        let tasks =
+            list_tasks("00000000-0000-4002-8000-000000000023", None, project).expect("list");
+        assert_eq!(tasks.len(), 1);
+
+        update_task(
+            "00000000-0000-4002-8000-000000000023",
+            &item.task_id,
+            TaskStatus::Done,
+            Some("fixed"),
+            &leader_id,
+            project,
+        )
+        .expect("update");
+
+        let tasks = list_tasks(
+            "00000000-0000-4002-8000-000000000023",
+            Some(TaskStatus::Done),
+            project,
+        )
+        .expect("done");
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].notes.len(), 1);
+        assert!(tasks[0].completed_at.is_some());
+    });
+}

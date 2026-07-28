@@ -1,10 +1,4 @@
 pub(crate) mod application;
-// `classifier` lives in `harness-observe` now, alongside the `patterns` and
-// text helpers it depends on; this facade keeps `crate::observe::classifier`
-// resolving for `session/observe/scan.rs`, same shape as `crate::infra`.
-pub(crate) mod classifier {
-    pub use harness_observe::classifier::*;
-}
 mod doctor;
 // `ObserveFilterArgs`/`ObserveMode`/`ObserveScanActionKind` moved to
 // `harness-observe`; `ObserveArgs` and the CLI-args-to-request glue stay here
@@ -19,8 +13,4 @@ pub use types::{
     Confidence, FOCUS_PRESETS, FixSafety, FocusPreset, Issue, IssueCategory, IssueCode,
     IssueSeverity, MessageRole, ObserverState, OccurrenceTracker, OpenIssue, ScanState, SourceTool,
     ToolUseRecord, compute_issue_id,
-};
-
-pub(crate) use harness_observe::application::maintenance::{
-    is_observer_conflict, load_observer_state, save_observer_state,
 };

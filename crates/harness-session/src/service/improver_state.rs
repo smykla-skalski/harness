@@ -1,0 +1,408 @@
+//! Improver patch application against the canonical skill/plugin sources.
+//!
+//! The improver role is the only actor allowed to rewrite files under
+//! `agents/skills/`, `agents/plugins/`, and `local-skills/claude/`. The
+//! helpers in this module canonicalize and guard the target path, back up
+//! the original before writing, skip no-op rewrites, and atomically
+//! replace the file on success.
+
+use std::fs;
+use std::path::{Component, Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use similar::TextDiff;
+
+use crate::roles::SessionAction;
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
+use harness_kernel::io::write_text;
+// `ImproverTarget` lives beside the wire request that carries it
+// (`harness-session`) now, since the wire layer moved into its own crate
+// and can't reach back into this domain's service layer; re-exported so
+// every existing `session::service::ImproverTarget` path keeps resolving.
+pub use crate::wire::ImproverTarget;
+
+/// Result of [`apply_improver_apply`].
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ImproverApplyOutcome {
+    #[schema(value_type = String)]
+    pub canonical_path: PathBuf,
+    pub before_sha256: String,
+    pub after_sha256: String,
+    pub applied: bool,
+    #[schema(value_type = Option<String>)]
+    pub backup_path: Option<PathBuf>,
+    pub unified_diff: String,
+}
+
+/// Canonicalize `rel` under `repo_root/<target-subdir>` and reject any
+/// path that escapes the target root, that is absolute, or that contains
+/// `..` / prefix / root components.
+///
+/// Symlink escapes are caught because `canonicalize` resolves symlinks
+/// before the `starts_with` check.
+///
+/// # Errors
+/// Returns [`CliError`] when the path is absolute, escapes the root,
+/// points outside the target subdirectory, or cannot be canonicalized.
+pub fn validate_skill_patch_path(
+    repo_root: &Path,
+    target: ImproverTarget,
+    rel: &Path,
+) -> Result<PathBuf, CliError> {
+    if rel.as_os_str().is_empty() {
+        return Err(
+            CliErrorKind::usage_error("improver path must not be empty".to_string()).into(),
+        );
+    }
+    if rel.is_absolute() {
+        return Err(CliErrorKind::usage_error(format!(
+            "improver path must be relative: {}",
+            rel.display()
+        ))
+        .into());
+    }
+    for comp in rel.components() {
+        match comp {
+            Component::Normal(_) | Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(CliErrorKind::usage_error(format!(
+                    "improver path contains disallowed component: {}",
+                    rel.display()
+                ))
+                .into());
+            }
+        }
+    }
+
+    let allowed_root = repo_root.join(target.subdir());
+    let canonical_root = fs::canonicalize(&allowed_root)
+        .map_err(|e| CliError::from(io_for("canonicalize", &allowed_root, &e)))?;
+    let candidate = allowed_root.join(rel);
+    let canonical = fs::canonicalize(&candidate)
+        .map_err(|e| CliError::from(io_for("canonicalize", &candidate, &e)))?;
+    if !canonical.starts_with(&canonical_root) {
+        return Err(CliErrorKind::usage_error(format!(
+            "improver path escapes allowed root {}: {}",
+            canonical_root.display(),
+            canonical.display()
+        ))
+        .into());
+    }
+    Ok(canonical)
+}
+
+/// Apply `new_contents` to the file at `rel` under the improver's target
+/// root. Skip the write when the SHA-256 matches the current file. On
+/// change, back up the original to
+/// `<repo_root>/.harness-cache/improver-backups/<issue_id>.<ts>.bak`
+/// and atomically rename a temp file into place.
+///
+/// # Errors
+/// Returns [`CliError`] when the path fails validation, the target file
+/// is missing, the backup write fails, or the atomic rename fails.
+pub fn apply_improver_apply(
+    repo_root: &Path,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+    issue_id: &str,
+    now: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
+    let planned = plan_improver_apply(repo_root, target, rel, new_contents)?;
+    if planned.before_sha256 == planned.after_sha256 {
+        return Ok(planned);
+    }
+
+    let backup_dir = repo_root.join(".harness-cache").join("improver-backups");
+    fs::create_dir_all(&backup_dir)
+        .map_err(|e| CliError::from(io_for("create_dir_all", &backup_dir, &e)))?;
+    let backup_name = format!("{}.{}.bak", sanitize(issue_id), sanitize(now));
+    let backup_path = backup_dir.join(backup_name);
+    let existing = fs::read(&planned.canonical_path)
+        .map_err(|e| CliError::from(io_for("read", &planned.canonical_path, &e)))?;
+    fs::write(&backup_path, &existing)
+        .map_err(|e| CliError::from(io_for("write backup", &backup_path, &e)))?;
+
+    // Atomic write with rollback: if write_text fails, restore the original
+    // contents from the in-memory pre-write bytes so the on-disk file never
+    // ends up truncated or partially written. The backup stays in place so
+    // a human can re-replay if the rollback itself fails.
+    if let Err(error) = write_text(&planned.canonical_path, new_contents) {
+        if let Err(restore_err) = fs::write(&planned.canonical_path, &existing) {
+            return Err(CliError::from(io_for(
+                "rollback improver write",
+                &planned.canonical_path,
+                &restore_err,
+            )));
+        }
+        return Err(error);
+    }
+
+    Ok(ImproverApplyOutcome {
+        applied: true,
+        backup_path: Some(backup_path),
+        ..planned
+    })
+}
+
+/// Session-aware improver apply facade used by the CLI transport and any
+/// other caller that only has a `session_id`, `actor`, and local project
+/// hint. Resolves the session's own project directory, requires the actor
+/// holds `SessionAction::ImproverApply`, and runs the diff/write against
+/// the session-resolved project — not the `local_project_dir` arg. The
+/// `local_project_dir` is used solely to help locate the session on disk
+/// (the resolver also falls back to the daemon / file index), so a bogus
+/// CLI `--project-dir` cannot escape the session's own repo root.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved, the actor
+/// lacks permission, or the apply/preview fails.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "CLI-facing facade passes every improver arg through; collapsing into a struct would only shift the shape"
+)]
+pub fn improver_apply(
+    session_id: &str,
+    actor: &str,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+    issue_id: &str,
+    dry_run: bool,
+    local_project_dir: &Path,
+    now: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
+    let session_project =
+        super::queries::resolve_session_project_dir(session_id, local_project_dir)?;
+    let state = super::queries::session_status(session_id, &session_project)?;
+    super::session_helpers::require_permission(&state, actor, SessionAction::ImproverApply)?;
+    if dry_run {
+        preview_improver_apply(&session_project, target, rel, new_contents)
+    } else {
+        apply_improver_apply(&session_project, target, rel, new_contents, issue_id, now)
+    }
+}
+
+/// Validate and diff an improver apply request without writing files.
+///
+/// # Errors
+/// Returns [`CliError`] when validation or target reads fail.
+pub fn preview_improver_apply(
+    repo_root: &Path,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
+    plan_improver_apply(repo_root, target, rel, new_contents)
+}
+
+fn plan_improver_apply(
+    repo_root: &Path,
+    target: ImproverTarget,
+    rel: &Path,
+    new_contents: &str,
+) -> Result<ImproverApplyOutcome, CliError> {
+    let canonical = validate_skill_patch_path(repo_root, target, rel)?;
+    let existing =
+        fs::read(&canonical).map_err(|e| CliError::from(io_for("read", &canonical, &e)))?;
+    let existing_text: String = String::from_utf8_lossy(&existing).into_owned();
+    let new_contents_owned: String = new_contents.to_string();
+    let before = sha256_hex(&existing);
+    let after = sha256_hex(new_contents.as_bytes());
+    let rel_display = rel.display().to_string();
+    let unified_diff = TextDiff::from_lines(&existing_text, &new_contents_owned)
+        .unified_diff()
+        .header(&rel_display, &rel_display)
+        .to_string();
+
+    Ok(ImproverApplyOutcome {
+        canonical_path: canonical,
+        before_sha256: before,
+        after_sha256: after,
+        applied: false,
+        backup_path: None,
+        unified_diff,
+    })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
+fn sanitize(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+    use tempfile::TempDir;
+
+    fn seed_repo(target: ImproverTarget) -> (TempDir, PathBuf) {
+        let dir = TempDir::new().expect("tempdir");
+        let sub = dir.path().join(target.subdir());
+        fs::create_dir_all(&sub).expect("create target dir");
+        (dir, sub)
+    }
+
+    fn write_file(path: &Path, text: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("mkparent");
+        }
+        fs::write(path, text).expect("write");
+    }
+
+    #[test]
+    fn validates_nested_relative_path_under_target_root() {
+        let (repo, sub) = seed_repo(ImproverTarget::Skill);
+        let target_file = sub.join("harness/SKILL.md");
+        write_file(&target_file, "old\n");
+        let canon = validate_skill_patch_path(
+            repo.path(),
+            ImproverTarget::Skill,
+            Path::new("harness/SKILL.md"),
+        )
+        .expect("validate");
+        assert_eq!(canon, fs::canonicalize(&target_file).unwrap());
+    }
+
+    #[test]
+    fn rejects_absolute_paths() {
+        let (repo, _) = seed_repo(ImproverTarget::Plugin);
+        let err = validate_skill_patch_path(
+            repo.path(),
+            ImproverTarget::Plugin,
+            Path::new("/etc/passwd"),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("must be relative"));
+    }
+
+    #[test]
+    fn rejects_parent_traversal_in_relative_path() {
+        let (repo, _) = seed_repo(ImproverTarget::Skill);
+        let err = validate_skill_patch_path(
+            repo.path(),
+            ImproverTarget::Skill,
+            Path::new("../../etc/passwd"),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("disallowed component"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_escaping_allowed_root() {
+        let (repo, sub) = seed_repo(ImproverTarget::LocalSkillClaude);
+        let outside = repo.path().join("outside.md");
+        write_file(&outside, "secret\n");
+        let link = sub.join("leak.md");
+        symlink(&outside, &link).expect("symlink");
+        let err = validate_skill_patch_path(
+            repo.path(),
+            ImproverTarget::LocalSkillClaude,
+            Path::new("leak.md"),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("escapes allowed root"));
+    }
+
+    #[test]
+    fn apply_writes_new_contents_and_backs_up_original() {
+        let (repo, sub) = seed_repo(ImproverTarget::Skill);
+        let file = sub.join("SKILL.md");
+        write_file(&file, "old body\n");
+        let outcome = apply_improver_apply(
+            repo.path(),
+            ImproverTarget::Skill,
+            Path::new("SKILL.md"),
+            "new body\n",
+            "issue-1",
+            "2026-04-24T00:00:00Z",
+        )
+        .expect("apply");
+        assert!(outcome.applied);
+        assert_ne!(outcome.before_sha256, outcome.after_sha256);
+        let on_disk = fs::read_to_string(&file).expect("read");
+        assert_eq!(on_disk, "new body\n");
+        let backup = outcome.backup_path.expect("backup path");
+        assert!(backup.exists());
+        let backup_contents = fs::read_to_string(&backup).expect("read backup");
+        assert_eq!(backup_contents, "old body\n");
+        assert!(outcome.unified_diff.contains("-old body"));
+    }
+
+    #[test]
+    fn apply_is_idempotent_when_contents_match() {
+        let (repo, sub) = seed_repo(ImproverTarget::Plugin);
+        let file = sub.join("plugin.md");
+        write_file(&file, "same\n");
+        let outcome = apply_improver_apply(
+            repo.path(),
+            ImproverTarget::Plugin,
+            Path::new("plugin.md"),
+            "same\n",
+            "issue-2",
+            "ts",
+        )
+        .expect("apply");
+        assert!(!outcome.applied);
+        assert_eq!(outcome.before_sha256, outcome.after_sha256);
+        assert!(outcome.backup_path.is_none());
+        let backups = repo.path().join(".harness-cache").join("improver-backups");
+        assert!(
+            !backups.exists() || fs::read_dir(&backups).unwrap().next().is_none(),
+            "no backup should be created on no-op apply"
+        );
+    }
+
+    #[test]
+    fn dry_run_reports_hashes_and_diff_without_writing() {
+        let (repo, sub) = seed_repo(ImproverTarget::Skill);
+        let file = sub.join("SKILL.md");
+        write_file(&file, "old\n");
+        let outcome = preview_improver_apply(
+            repo.path(),
+            ImproverTarget::Skill,
+            Path::new("SKILL.md"),
+            "new\n",
+        )
+        .expect("preview");
+        assert!(!outcome.applied);
+        assert_ne!(outcome.before_sha256, outcome.after_sha256);
+        assert!(outcome.backup_path.is_none());
+        assert!(outcome.unified_diff.contains("-old"));
+        assert!(outcome.unified_diff.contains("+new"));
+        assert_eq!(fs::read_to_string(file).expect("read"), "old\n");
+    }
+
+    #[test]
+    fn apply_rejects_missing_target_file() {
+        let (repo, _) = seed_repo(ImproverTarget::Skill);
+        let err = apply_improver_apply(
+            repo.path(),
+            ImproverTarget::Skill,
+            Path::new("missing.md"),
+            "x\n",
+            "issue",
+            "ts",
+        )
+        .unwrap_err();
+        assert!(err.to_string().to_lowercase().contains("canonicalize"));
+    }
+}

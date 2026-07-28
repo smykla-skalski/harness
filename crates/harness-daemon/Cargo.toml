@@ -41,7 +41,7 @@ harness-observe = { path = "../harness-observe", version = "54.0.0", default-fea
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-reviews = { path = "../harness-reviews", version = "54.0.0", features = ["daemon-runtime"] }
-harness-session = { path = "../harness-session", version = "54.0.0" }
+harness-session = { path = "../harness-session", version = "54.0.0", features = ["daemon-runtime"] }
 harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "54.0.0", optional = true }
 harness-task-board = { path = "../harness-task-board", version = "54.0.0" }
 harness-telemetry = { path = "../harness-telemetry", version = "54.0.0" }

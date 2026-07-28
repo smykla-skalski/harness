@@ -177,6 +177,7 @@ bridge-runtime = [
 ]
 daemon-runtime = [
   "bridge-runtime",
+  "harness-session/daemon-runtime",
   "dep:agent-client-protocol-http",
   "dep:async-stream",
   "dep:axum",

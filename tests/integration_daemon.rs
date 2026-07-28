@@ -31,6 +31,8 @@ mod integration {
     mod daemon_sandbox_mode;
     pub mod helpers;
     mod policy_drift;
+    mod session_service_daemon_path_validation;
+    mod session_service_daemon_reentrancy;
 
     // Everything else under `architecture` scans the source tree and needs no
     // runtime, so only this one file follows the daemon here. It keeps its
