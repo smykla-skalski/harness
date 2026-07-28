@@ -16,9 +16,9 @@
 pub mod acp;
 // Deliberate public API facade, not scaffolding: `harness::agents::kind`
 // stays a stable path for the root crate's existing callers and for `acp`.
-// The physical `kind/mod.rs` and `kind/disconnect.rs` files are not part of
-// this crate's build; `harness-protocol` alone pulls them in with `#[path]`
-// to give `AcpAgentId`/`DisconnectReason`/`RuntimeKind` their one physical
+// The physical `runtime_kind.rs` and `runtime_kind/disconnect.rs` files live
+// in `harness-protocol`, which alone owns them, giving
+// `AcpAgentId`/`DisconnectReason`/`RuntimeKind` their one physical
 // definition.
 pub mod kind {
     pub use harness_protocol::agent::{AcpAgentId, DisconnectReason, RuntimeKind};
