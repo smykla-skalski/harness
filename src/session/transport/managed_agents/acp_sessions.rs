@@ -5,8 +5,9 @@
 
 use clap::Args;
 
-use crate::session::transport::support::{daemon_client, print_json};
+use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
 use harness_kernel::errors::CliError;
+use harness_protocol::managed_agents::acp::AcpSessionListPage;
 use harness_workspace::command_context::{AppContext, Execute};
 
 #[derive(Debug, Clone, Args)]
@@ -23,11 +24,17 @@ pub struct AcpSessionsArgs {
 
 impl Execute for AcpSessionsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.list_acp_agent_sessions(
-            &self.acp_id,
-            self.cwd.as_deref(),
-            self.cursor.as_deref(),
-        )?;
+        let mut query: Vec<(&str, &str)> = Vec::new();
+        if let Some(cwd) = self.cwd.as_deref() {
+            query.push(("cwd", cwd));
+        }
+        if let Some(cursor) = self.cursor.as_deref() {
+            query.push(("cursor", cursor));
+        }
+        let url = format!("/v1/managed-agents/{}/sessions", self.acp_id);
+        let response: AcpSessionListPage = daemon_client()?
+            .get(&url, &query)
+            .map_err(|error| daemon_client_error("list ACP agent sessions", &error))?;
         print_json(&response)?;
         Ok(0)
     }
@@ -43,8 +50,13 @@ pub struct AcpCloseSessionArgs {
 
 impl Execute for AcpCloseSessionArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response =
-            daemon_client()?.close_acp_agent_session(&self.acp_id, &self.agent_session_id)?;
+        let url = format!(
+            "/v1/managed-agents/{}/sessions/{}/close",
+            self.acp_id, self.agent_session_id
+        );
+        let response: serde_json::Value = daemon_client()?
+            .post(&url, &serde_json::json!({}))
+            .map_err(|error| daemon_client_error("close ACP agent session", &error))?;
         print_json(&response)?;
         Ok(0)
     }
@@ -60,8 +72,13 @@ pub struct AcpDeleteSessionArgs {
 
 impl Execute for AcpDeleteSessionArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response =
-            daemon_client()?.delete_acp_agent_session(&self.acp_id, &self.agent_session_id)?;
+        let url = format!(
+            "/v1/managed-agents/{}/sessions/{}",
+            self.acp_id, self.agent_session_id
+        );
+        let response: serde_json::Value = daemon_client()?
+            .delete(&url)
+            .map_err(|error| daemon_client_error("delete ACP agent session", &error))?;
         print_json(&response)?;
         Ok(0)
     }

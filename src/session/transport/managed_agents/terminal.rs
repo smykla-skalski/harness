@@ -1,26 +1,13 @@
 use clap::{Args, ValueEnum};
 
-use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::managed_agents::tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest,
 };
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::{daemon_client_error, print_json};
+use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
 use crate::session::wire::ManagedAgentSnapshot;
-
-// Uses the leaf `harness-daemon-client`, not the root `daemon::client` facade
-// `support::daemon_client()` returns, so these managed-terminal commands stay
-// free of a daemon-crate dependency.
-fn daemon_client() -> Result<DaemonClient, CliError> {
-    DaemonClient::try_connect().ok_or_else(|| {
-        CliErrorKind::workflow_io(
-            "harness daemon is not running; start the daemon before using managed TUIs",
-        )
-        .into()
-    })
-}
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum TuiKeyArg {
