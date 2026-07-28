@@ -5,25 +5,38 @@ use std::path::{Path, PathBuf};
 use fs_err as fs;
 use harness_protocol::observe::ObserverStateEvent;
 
+#[cfg(feature = "cli")]
 use crate::session;
 use crate::types::ObserverState;
+#[cfg(feature = "cli")]
 use harness_agents::storage::project_context_root_from_session_path;
 use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::{read_json_typed, write_json_pretty};
+#[cfg(feature = "cli")]
 use harness_protocol::agent::HookAgent;
+#[cfg(feature = "cli")]
 use harness_workspace::command_context::resolve_project_dir;
-use harness_workspace::workspace::{project_context_dir, utc_now};
+#[cfg(feature = "cli")]
+use harness_workspace::workspace::project_context_dir;
+use harness_workspace::workspace::utc_now;
 
+// Only the CLI maintenance dispatch (inspection/mutations/scan/status) needs
+// to resolve a project context root from a bare session_id: the daemon
+// already holds a resolved root and passes it straight to
+// `load_observer_state`/`save_observer_state` below.
+#[cfg(feature = "cli")]
 pub(crate) fn default_project_context_root() -> PathBuf {
     project_context_dir(&resolve_project_dir(None))
 }
 
+#[cfg(feature = "cli")]
 pub(crate) fn project_context_root_for_session_path(session_path: &Path) -> PathBuf {
     project_context_root_from_session_path(session_path)
         .unwrap_or_else(default_project_context_root)
 }
 
+#[cfg(feature = "cli")]
 pub(crate) fn resolve_project_context_root(
     session_id: &str,
     project_hint: Option<&str>,

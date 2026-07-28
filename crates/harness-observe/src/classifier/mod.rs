@@ -15,8 +15,8 @@ use regex::Regex;
 use harness_protocol::observe::{Issue, IssueCategory, MessageRole, ScanState, SourceTool};
 
 use self::emitter::{IssueBlueprint, IssueEmitter};
-use crate::dump::tool_result_text;
 use crate::session_event::{SessionContent, SessionContentBlock, parse_session_event};
+use crate::text::tool_result_text;
 
 pub use tool_checks::check_tool_use_for_issues;
 
