@@ -74,9 +74,10 @@ pub enum PolicyReasonCode {
     SpawnKillSwitchEngaged,
 }
 
-/// Resolution state of a durable [`ApprovalGate`](crate::task_board::policy_graph)
-/// grant, injected into evaluation by the caller. `None` on the input means no
-/// grant exists yet for the gate.
+/// Resolution state of a durable `ApprovalGate` (`crate::task_board::policy_graph`
+/// in the root crate, which stays there for now) grant, injected into
+/// evaluation by the caller. `None` on the input means no grant exists yet
+/// for the gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]

@@ -1,8 +1,6 @@
 use super::helpers::{collect_hits_in_paths, collect_hits_in_tree, repo_root};
 
 const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[
-    ("src/task_board/store.rs", "pub struct TaskBoardStore"),
-    ("src/task_board/machines.rs", "pub struct MachineRegistry"),
     (
         "src/task_board/orchestrator.rs",
         "pub struct TaskBoardOrchestrator",
@@ -26,6 +24,24 @@ const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[
     (
         "src/task_board/policy_runtime/task_creation.rs",
         "pub struct PolicyTaskCreationOutbox",
+    ),
+];
+
+/// `store.rs`/`machines.rs` moved into `harness-task-board`, which cannot
+/// share the root crate's `cfg(test)` activation domain: the root crate's own
+/// `#[cfg(test)]` call sites (e.g. `daemon::service::task_board::store()`)
+/// need `TaskBoardStore` visible when the *root* crate is under test, which a
+/// dependency crate's own `cfg(test)` never is. `test-support` is that
+/// crate's escape hatch for exactly this, matching `harness-agents`'s and
+/// `harness-daemon-client`'s own feature of the same name.
+const LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD: &[(&str, &str)] = &[
+    (
+        "crates/harness-task-board/src/store.rs",
+        "pub struct TaskBoardStore",
+    ),
+    (
+        "crates/harness-task-board/src/machines.rs",
+        "pub struct MachineRegistry",
     ),
 ];
 
@@ -133,6 +149,16 @@ fn legacy_task_board_file_repositories_are_test_only() {
         assert!(
             source.contains(&test_only_declaration),
             "{relative_path} must keep `{declaration}` test-only"
+        );
+    }
+    for (relative_path, declaration) in LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD {
+        let source = std::fs::read_to_string(root.join(relative_path))
+            .unwrap_or_else(|error| panic!("read {relative_path}: {error}"));
+        let test_only_declaration =
+            format!("#[cfg(any(test, feature = \"test-support\"))]\n{declaration}");
+        assert!(
+            source.contains(&test_only_declaration),
+            "{relative_path} must keep `{declaration}` test-only (test or test-support)"
         );
     }
 }

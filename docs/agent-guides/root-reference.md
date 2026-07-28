@@ -21,7 +21,8 @@ Paths are relative to the repository root.
 - `src/hooks/` - tool lifecycle hook handlers, guards, and hook protocol types.
 - `src/workspace/compact/` - file fingerprinting with SHA256 and mtime.
 - `src/session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
-- `src/task_board/` - cross-project board state, planning gates, dispatch/evaluate reconciliation, orchestrator state, external sync, and policy pipeline graph evaluation. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
+- `src/task_board/` - planning gates, dispatch/evaluate reconciliation, external sync, and policy pipeline graph evaluation; reaches the item/query/policy core below through the root crate's own facade. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
+- `crates/harness-task-board/src/` - task-board item types, the query/pagination layer, lane ordering, the built-in policy gate, git-identity defaults, runtime configuration wire types, progress rollups, and the legacy file-backed store/machine-registry test doubles.
 - `crates/harness-agents/src/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
 
 ## Facade-crate src includes

@@ -16,6 +16,7 @@ members = [
   "crates/harness-protocol",
   "crates/harness-systemd",
   "crates/harness-systemd-protocol",
+  "crates/harness-task-board",
   "crates/harness-telemetry",
   "crates/harness-workspace",
   "testkit",
@@ -54,6 +55,7 @@ harness-mcp = { path = "crates/harness-mcp", version = "54.0.0", optional = true
 harness-observe = { path = "crates/harness-observe", version = "54.0.0" }
 harness-protocol = { path = "crates/harness-protocol", version = "54.0.0" }
 harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "54.0.0", optional = true }
+harness-task-board = { path = "crates/harness-task-board", version = "54.0.0" }
 harness-telemetry = { path = "crates/harness-telemetry", version = "54.0.0" }
 harness-workspace = { path = "crates/harness-workspace", version = "54.0.0" }
 arc-swap = "1.9.1"
@@ -144,6 +146,7 @@ tempfile = "=3.27.0"
 insta = "=1.48.0"
 harness-agents = { path = "crates/harness-agents", version = "54.0.0", features = ["test-support"] }
 harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0.0", features = ["test-support"] }
+harness-task-board = { path = "crates/harness-task-board", version = "54.0.0", features = ["test-support"] }
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 axum = { version = "=0.8.9", features = ["http2", "json", "ws"] }

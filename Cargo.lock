@@ -3527,6 +3527,7 @@ dependencies = [
  "harness-observe",
  "harness-protocol",
  "harness-systemd-protocol",
+ "harness-task-board",
  "harness-telemetry",
  "harness-testkit",
  "harness-workspace",
@@ -3701,6 +3702,7 @@ dependencies = [
  "harness-observe",
  "harness-protocol",
  "harness-systemd-protocol",
+ "harness-task-board",
  "harness-telemetry",
  "harness-workspace",
  "hex",
@@ -3960,6 +3962,28 @@ dependencies = [
  "temp-env",
  "tempfile",
  "thiserror 2.0.19",
+]
+
+[[package]]
+name = "harness-task-board"
+version = "54.0.0"
+dependencies = [
+ "base64 0.23.0",
+ "caseless",
+ "clap",
+ "fs-err",
+ "harness-infra",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-workspace",
+ "rayon",
+ "serde",
+ "serde_json",
+ "serde_yml",
+ "sha2 0.11.0",
+ "tempfile",
+ "utoipa",
+ "uuid",
 ]
 
 [[package]]

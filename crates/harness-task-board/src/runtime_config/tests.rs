@@ -4,6 +4,10 @@ use super::{
 };
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "a flat run of independent assertions, not real branching complexity"
+)]
 fn resolved_profile_merges_repository_override() {
     let config = TaskBoardGitRuntimeConfig {
         global: TaskBoardGitRuntimeProfile {

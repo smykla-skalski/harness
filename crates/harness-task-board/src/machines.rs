@@ -1,29 +1,29 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::collections::BTreeSet;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::env;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::io;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::{Path, PathBuf};
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use uuid::Uuid;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use harness_kernel::errors::{CliError, CliErrorKind};
-#[cfg(test)]
-use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::workspace::utc_now;
+#[cfg(any(test, feature = "test-support"))]
+use harness_infra::io::{read_json_typed, write_json_pretty};
+use harness_workspace::workspace::utc_now;
 
 use super::types::AgentMode;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 const REGISTRY_DIR: &str = "machines";
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 const LOCAL_ID_FILE: &str = "local.json";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,18 +75,18 @@ impl Machine {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 struct LocalIdFile {
     id: String,
 }
 
 #[derive(Debug, Clone)]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub struct MachineRegistry {
     root: PathBuf,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl MachineRegistry {
     #[must_use]
     pub fn new(board_root: impl Into<PathBuf>) -> Self {
@@ -213,7 +213,7 @@ impl MachineRegistry {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn normalize_strings(values: &[String]) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::with_capacity(values.len());
@@ -230,7 +230,7 @@ fn normalize_strings(values: &[String]) -> Vec<String> {
     out
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn default_label() -> String {
     env::var("HARNESS_MACHINE_LABEL")
         .ok()
@@ -247,12 +247,12 @@ fn default_label() -> String {
         .unwrap_or_else(|| "local".to_string())
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn generate_local_id() -> String {
     Uuid::new_v4().simple().to_string()
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn io_error(action: &str, path: &Path, error: io::Error) -> CliError {
     CliError::new(CliErrorKind::workflow_io(format!(
         "task-board machine registry {action} '{}': {error}",

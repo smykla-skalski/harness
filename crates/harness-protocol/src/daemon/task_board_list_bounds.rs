@@ -1,9 +1,9 @@
 //! Bounds every task-board list read is held to.
 //!
-//! This file is deliberately free of `crate::` paths so the standalone
-//! `harness-protocol` crate can `#[path]`-include it. The MCP tool advertises
-//! these numbers in its input schema and the daemon enforces them, and the two
-//! live in different crates, so a shared source file is the only way the
+//! Lives here rather than in `harness-task-board` because the MCP tool
+//! advertises these numbers in its input schema and the daemon enforces them,
+//! and the two reach this crate through different dependency paths; a shared
+//! definition in the one crate both already depend on is the only way the
 //! advertised bound cannot drift from the enforced one.
 
 /// Page size used when a caller names none.

@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::PolicyApprovalGrant;
+use crate::PolicyApprovalGrant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]

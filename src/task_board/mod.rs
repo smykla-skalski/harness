@@ -1,36 +1,34 @@
+// Deliberate public API facade, not scaffolding: `crate::task_board::types`,
+// `item_fields`, `item_query`, `lane`, `policy`, `git_identity_defaults`,
+// `progress_rollup`, `remote_spki_pin`, `runtime_config`, `store`, `machines`,
+// and part of `wire` moved into the standalone `harness-task-board` crate.
+// Every other task-board subtree below reaches those through this glob
+// re-export exactly the way external callers (`daemon`, `session`, `hooks`)
+// already do, so none of them needed an import change for the move.
+pub use harness_task_board::*;
+
 pub mod automation;
 pub mod dispatch;
 pub mod evaluation;
 pub mod external;
 mod external_create_intents;
-pub mod git_identity_defaults;
 pub mod github;
-pub mod item_fields;
-pub mod item_query;
-pub mod item_query_bounds;
-pub mod lane;
 #[allow(dead_code)]
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod legacy_import;
-pub mod machines;
 pub mod orchestrator;
 pub mod planning;
-pub mod policy;
 pub mod policy_graph;
 pub mod project;
 pub mod project_color;
 pub mod project_shape;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
-pub mod progress_rollup;
 mod prompt_builtins;
 pub(crate) mod prompt_catalog;
 #[cfg(feature = "daemon-runtime")]
 mod prompt_config;
 mod prompt_template;
-pub(crate) mod remote_spki_pin;
-pub mod runtime_config;
-pub mod store;
 pub mod summary;
 pub mod transport;
 pub mod triage;
@@ -38,7 +36,6 @@ pub mod triage_escalation;
 mod triage_escalation_prompt;
 pub mod triage_override;
 pub mod triage_rules;
-pub mod types;
 pub mod wire;
 mod worker_prompt;
 pub mod working_copy;
@@ -87,25 +84,6 @@ pub(crate) use external_create_intents::{
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
     TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
 };
-pub use git_identity_defaults::{
-    TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
-    TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
-    discover as discover_git_identity_defaults,
-};
-pub use item_query::{
-    PreparedTaskBoardItemQuery, TASK_BOARD_LIST_DEFAULT_LIMIT,
-    TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
-    TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardItemQuery,
-    TaskBoardListCursor, TaskBoardListPage, TaskBoardQueryFields, TaskBoardQueryTarget,
-    normalize_query_text, select_page, validated_limit,
-};
-pub use lane::{
-    TaskBoardLaneOrigin, sort_task_board_items, validate_lane_placement,
-    validate_task_board_lane_order,
-};
-pub use machines::Machine;
-#[cfg(test)]
-pub use machines::MachineRegistry;
 #[cfg(test)]
 pub use orchestrator::TaskBoardOrchestrator;
 pub use orchestrator::{
@@ -120,11 +98,6 @@ pub use orchestrator::{
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
     begin_planning, revoke_plan, submit_plan,
-};
-pub use policy::{
-    BuiltInPolicyGate, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
-    PolicyApprovalState, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput, PolicyReasonCode,
-    PolicySubject,
 };
 pub use policy_graph::{
     GraphPolicyGate, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PolicyCanvasPoint,
@@ -142,18 +115,6 @@ pub use policy_graph::{
     PolicyPipelineValidationIssue, PolicyScenario, replay::PolicyPipelineReplayDecision,
     replay::PolicyPipelineReplayResult,
 };
-pub use progress_rollup::{TaskBoardProgressRollup, build_progress_rollups};
-pub use runtime_config::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
-    normalize_repository_slug,
-};
-#[cfg(test)]
-pub use store::TaskBoardStore;
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use store::default_board_root;
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use summary::build_audit_summary_with_policy;
 pub use summary::{
@@ -183,9 +144,6 @@ pub use triage_override::{
     effective_triage_outcome, is_canonical_override_actor, is_canonical_override_reason,
     suppress_placement_for_override,
 };
-pub use item_fields::{
-    ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,
-};
 pub use triage_rules::{
     MAX_CONDITIONS_PER_RULE, MAX_LABEL_CONDITION_ITEMS, MAX_RULE_ID_BYTES,
     MAX_STRING_CONDITION_BYTES, MAX_TRIAGE_RULES, RUNTIME_RULES_EVALUATOR_IDENTITY,
@@ -196,10 +154,6 @@ pub use triage_rules::{
     TriageRuleSetRevisionStatus, TriageRuleSetRevisionSummary, TriageRuleSetV1,
     TriageRuleSetValidationIssue, TriageRuleSetValidationReport, evaluate_triage_rule_set,
     is_canonical_rule_id, validate_triage_rule_set,
-};
-pub use types::{
-    AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
-    TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
 #[cfg(feature = "daemon-runtime")]
 pub(crate) use prompt_catalog::install_prompt_catalog;

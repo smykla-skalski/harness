@@ -2361,7 +2361,7 @@ fn emit_enum_item(
     }
 }
 
-const POLICY_SOURCE: &str = include_str!("../src/task_board/policy.rs");
+const POLICY_SOURCE: &str = include_str!("../crates/harness-task-board/src/policy.rs");
 const POLICY_GRAPH_SOURCE: &str = include_str!("../src/task_board/policy_graph.rs");
 const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/models.rs");
 const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
@@ -2485,7 +2485,7 @@ const SESSION_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 const SESSION_STATE_EMIT_ONLY: &[&str] =
     &["SessionStatus", "SessionMetrics", "PendingLeaderTransfer"];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
-    include_str!("../src/task_board/git_identity_defaults.rs");
+    include_str!("../crates/harness-task-board/src/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
 const VOICE_SOURCE: &str = include_str!("../src/daemon/protocol/voice.rs");
 const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
@@ -2589,11 +2589,13 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/task_board/wire/task_board.rs");
-const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
-const TASK_BOARD_ITEM_FIELDS_SOURCE: &str = include_str!("../src/task_board/item_fields.rs");
-const TASK_BOARD_LANE_SOURCE: &str = include_str!("../src/task_board/lane.rs");
+const TASK_BOARD_TYPES_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/types.rs");
+const TASK_BOARD_ITEM_FIELDS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/item_fields.rs");
+const TASK_BOARD_LANE_SOURCE: &str = include_str!("../crates/harness-task-board/src/lane.rs");
 const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
-    include_str!("../src/task_board/progress_rollup.rs");
+    include_str!("../crates/harness-task-board/src/progress_rollup.rs");
 const TASK_BOARD_WORKFLOW_SOURCE: &str = include_str!("../src/task_board/automation/workflow.rs");
 const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
 // The task-board foundation enums that every item/summary/request references.
@@ -2718,7 +2720,8 @@ const TASK_BOARD_TRIAGE_RULES_EMIT_ONLY: &[&str] = &[
     "TaskBoardTriageRulesRevisionsResponse",
     "TaskBoardTriageRulesAuditResponse",
 ];
-const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
+const TASK_BOARD_MACHINES_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/machines.rs");
 const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
 // The host Machine struct (Swift hand TaskBoardHostMachine); references the adopted
 // TaskBoardAgentMode bare. MachineRegistry is excluded by the allow-list.
@@ -2940,7 +2943,8 @@ const AGENT_REGISTRATION_EMIT_ONLY: &[&str] = &[
     "RuntimeCapabilities",
     "HookIntegrationDescriptor",
 ];
-const TASK_BOARD_CREDENTIAL_SOURCE: &str = include_str!("../src/task_board/runtime_config.rs");
+const TASK_BOARD_CREDENTIAL_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/runtime_config.rs");
 const TASK_BOARD_CREDENTIAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardCredentialWireTypes.generated.swift";
 // The two token-sync response bodies (GitHub/OpenRouter) the orchestrator credential
 // endpoints return - tiny bool/count structs. The big git-runtime-config tree and the request

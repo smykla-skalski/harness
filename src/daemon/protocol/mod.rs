@@ -25,7 +25,7 @@ pub use summaries::*;
 // tool surface compiles into the standalone `harness-mcp` crate too, where the
 // only namespace shared with this one is `crate::daemon::protocol`.
 pub use crate::session::wire::*;
-pub use crate::task_board::item_query_bounds::{
+pub use harness_protocol::daemon::task_board_list_bounds::{
     TASK_BOARD_LIST_DEFAULT_LIMIT, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
     TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
 };

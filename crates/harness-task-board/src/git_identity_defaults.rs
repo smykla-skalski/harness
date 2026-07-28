@@ -221,6 +221,10 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "a flat run of independent assertions, not real branching complexity"
+    )]
     fn parse_git_bool_handles_truthy_and_falsy_forms() {
         assert_eq!(parse_git_bool("true"), Some(true));
         assert_eq!(parse_git_bool("YES"), Some(true));
