@@ -10,13 +10,15 @@ printf '==> test:unit 2/6: supporting workspace crates\n' >&2
 # harness-panel's build script otherwise shells out to npm to produce the
 # assets it embeds; the unit-test gate exercises the Rust side only, so it
 # gets the placeholder bundle instead of a frontend build on every run.
-HARNESS_PANEL_SKIP_FRONTEND_BUILD=1 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-telemetry -p harness-testkit -p harness-workspace "$@"
+HARNESS_PANEL_SKIP_FRONTEND_BUILD=1 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace "$@"
 # Own invocation: `acp` only compiles with `bridge-runtime`, which the rest of
 # the supporting group above has no reason to build.
 printf '==> test:unit 3/6: harness-agents (bridge-runtime feature)\n' >&2
 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime "$@"
-# Own invocation too: `policy_runtime`'s tests live behind `daemon-runtime`,
-# which the rest of the supporting group above has no reason to build.
+# Extra invocation, on top of harness-task-board's own default-feature run
+# above: `policy_runtime`'s tests live behind `daemon-runtime`, which the rest
+# of the supporting group has no reason to build, so leaving it out of that
+# group's features would drop policy_runtime's tests from this gate entirely.
 printf '==> test:unit 4/6: harness-task-board (daemon-runtime feature)\n' >&2
 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime "$@"
 printf '==> test:unit 5/6: Linux systemd crate\n' >&2
