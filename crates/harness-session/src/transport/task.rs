@@ -1,11 +1,11 @@
 use clap::Args;
 
-use crate::infra::io;
-use crate::session::service;
-use crate::session::types::{
+use harness_kernel::io;
+use crate::service;
+use crate::types::{
     ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,
 };
-use crate::session::wire::{
+use crate::wire::{
     SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };

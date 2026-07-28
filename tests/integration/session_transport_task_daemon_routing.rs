@@ -18,16 +18,14 @@ use harness_testkit::with_isolated_harness_env;
 use serde_json::json;
 use tempfile::tempdir;
 
-use crate::daemon::client::test_support::install_fake_running_xdg_daemon;
-use crate::session::service;
-use crate::session::types::{ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
-use harness_workspace::command_context::{AppContext, Execute};
-
-use super::improver::SessionImproverApplyArgs;
-use super::task::{
-    TaskArbitrateArgs, TaskCheckpointArgs, TaskClaimReviewArgs, TaskListArgs,
-    TaskRespondReviewArgs, TaskSubmitForReviewArgs, TaskSubmitReviewArgs,
+use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::session::service;
+use harness::session::transport::{
+    SessionImproverApplyArgs, TaskArbitrateArgs, TaskCheckpointArgs, TaskClaimReviewArgs,
+    TaskListArgs, TaskRespondReviewArgs, TaskSubmitForReviewArgs, TaskSubmitReviewArgs,
 };
+use harness::session::types::{ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
+use harness_workspace::command_context::{AppContext, Execute};
 
 struct CapturedRequest {
     path: String,
@@ -488,7 +486,7 @@ fn improver_apply_args_routes_through_daemon_client() {
             session_id: "00000000-0000-4000-8000-00000000a006".into(),
             actor: "improver-1".into(),
             issue_id: "issue/abc".into(),
-            target: crate::session::service::ImproverTarget::Skill,
+            target: service::ImproverTarget::Skill,
             rel_path: "demo/SKILL.md".into(),
             new_contents_file: contents_path.to_string_lossy().to_string(),
             dry_run: true,
@@ -526,7 +524,7 @@ fn improver_apply_args_reject_a_session_id_that_would_escape_its_path_segment() 
             session_id: "../orchestrator/stop".into(),
             actor: "improver-1".into(),
             issue_id: "issue-1".into(),
-            target: crate::session::service::ImproverTarget::Skill,
+            target: service::ImproverTarget::Skill,
             rel_path: "demo/SKILL.md".into(),
             new_contents_file: contents_path.to_string_lossy().to_string(),
             dry_run: true,

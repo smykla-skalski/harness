@@ -5,7 +5,8 @@
 
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::super::{ManagedAgentListArgs, ManagedAgentShowArgs};
+use harness::session::transport::{ManagedAgentListArgs, ManagedAgentShowArgs};
+
 use super::support::{run_against_fake_daemon, terminal_snapshot_json};
 
 #[test]

@@ -18,15 +18,21 @@ harness-observe = { path = "../harness-observe", version = "54.0.0", default-fea
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
 chrono = { version = "0.4.44", features = ["serde"] }
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive", "env"] }
+# Only `managed_agents::attach`'s websocket proxy loop needs these three;
+# everything else in `transport` reaches the daemon through the leaf
+# `harness-daemon-client` instead.
+crossterm = "0.29.0"
 fs-err = "3.3.0"
+futures-util = "0.3.31"
 hex = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.11.0"
 similar = "3.0"
 thiserror = "2.0.18"
-tokio = { version = "1.50.0", features = ["rt", "time"] }
+tokio = { version = "1.50.0", features = ["rt", "sync", "time"] }
+tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect"] }
 tracing = "0.1.44"
 utoipa = "5.5.0"
 

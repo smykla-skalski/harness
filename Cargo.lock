@@ -4018,7 +4018,9 @@ version = "54.0.0"
 dependencies = [
  "chrono",
  "clap",
+ "crossterm",
  "fs-err",
+ "futures-util",
  "harness-agents",
  "harness-daemon-client",
  "harness-infra",
@@ -4036,6 +4038,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.19",
  "tokio",
+ "tokio-tungstenite 0.30.0",
  "tracing",
  "utoipa",
 ]

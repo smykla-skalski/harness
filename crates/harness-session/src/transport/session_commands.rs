@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::infra::io;
-use crate::session::types::SessionRole;
-use crate::session::wire::{
+use crate::types::SessionRole;
+use crate::wire::{
     AdoptSessionRequest, ObserveSessionRequest, SessionDetail, SessionMutationResponse,
 };
-use crate::session::{observe, service};
+use crate::{observe, service};
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::CliError;
+use harness_kernel::io;
 use harness_protocol::agent::HookAgent;
 use harness_workspace::command_context::{AppContext, Execute};
 
@@ -494,7 +494,3 @@ impl Execute for SessionAdoptArgs {
         Ok(0)
     }
 }
-
-#[cfg(test)]
-#[path = "session_commands/tests.rs"]
-mod tests;

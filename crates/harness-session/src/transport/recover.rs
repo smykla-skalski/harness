@@ -2,9 +2,9 @@ use std::path::Path;
 
 use clap::Args;
 
-use crate::infra::io;
-use crate::session::service;
-use crate::session::wire::ManagedAgentSnapshot;
+use harness_kernel::io;
+use crate::service;
+use crate::wire::ManagedAgentSnapshot;
 use harness_kernel::errors::CliError;
 use harness_protocol::agent::HookAgent;
 use harness_workspace::command_context::{AppContext, Execute};

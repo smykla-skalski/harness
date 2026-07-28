@@ -1,13 +1,8 @@
 //! Multi-agent session foundation: role permissions, task ordering, persona
 //! resolution, external-session adoption, the on-disk session index, session
-//! storage/journal persistence, the session orchestration service, and
-//! file-backed session observation.
-//!
-//! `transport` stays in the root crate for now: it is a separate, larger
-//! extraction tracked as its own follow-up. Its remaining cross-references
-//! into this crate resolve through the root crate's
-//! `pub use harness_session::*;` facade the same way every other external
-//! consumer's `crate::session::` path does.
+//! storage/journal persistence, the session orchestration service,
+//! file-backed session observation, and the CLI command-surface transport
+//! layer over all of it.
 
 #![deny(unsafe_code)]
 
@@ -20,6 +15,7 @@ pub mod persona;
 pub mod roles;
 pub mod service;
 pub mod storage;
+pub mod transport;
 // Deliberate public API facade, not scaffolding: `harness::session::types`
 // stays a stable path for the root crate's existing callers. The physical
 // `types/` files are not part of this crate's build; `harness-protocol`

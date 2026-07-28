@@ -33,6 +33,9 @@ mod integration {
     mod policy_drift;
     mod session_service_daemon_path_validation;
     mod session_service_daemon_reentrancy;
+    mod session_transport_commands_daemon_routing;
+    mod session_transport_managed_agents_daemon_routing;
+    mod session_transport_task_daemon_routing;
 
     // Everything else under `architecture` scans the source tree and needs no
     // runtime, so only this one file follows the daemon here. It keeps its

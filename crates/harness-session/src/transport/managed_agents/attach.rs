@@ -13,7 +13,7 @@ use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::daemon_client;
+use crate::transport::support::daemon_client;
 
 #[derive(Debug, Clone, Args)]
 pub struct ManagedAgentAttachArgs {

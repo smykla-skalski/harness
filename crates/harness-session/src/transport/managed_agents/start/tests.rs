@@ -71,6 +71,10 @@ fn terminal_cli_accepts_allow_custom_model_flag() {
 }
 
 #[test]
+#[allow(
+    clippy::cognitive_complexity,
+    reason = "one parse plus its full set of field assertions reads clearer kept together than split across helpers"
+)]
 fn acp_start_cli_parses_agent_and_session_flags() {
     let parsed = AcpParse::try_parse_from([
         "acp",

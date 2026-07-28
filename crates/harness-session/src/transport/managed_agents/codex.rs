@@ -1,14 +1,14 @@
 use clap::Args;
 
-use crate::infra::io;
+use harness_kernel::io;
 use harness_kernel::errors::CliError;
 use harness_protocol::managed_agents::codex::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexSteerRequest,
 };
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
-use crate::session::wire::ManagedAgentSnapshot;
+use crate::transport::support::{daemon_client, daemon_client_error, print_json};
+use crate::wire::ManagedAgentSnapshot;
 
 #[derive(Debug, Clone, Args)]
 pub struct CodexAgentSteerArgs {
