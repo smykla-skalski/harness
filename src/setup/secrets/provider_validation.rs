@@ -3,7 +3,7 @@ use std::env;
 use std::time::Duration;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use reqwest::blocking::Client;
+use reqwest::{Url, blocking::Client};
 
 use super::SecretKindArg;
 
@@ -31,14 +31,15 @@ fn validate_at(kind: SecretKindArg, secret: &str, base_url: &str) -> Result<(), 
         SecretKindArg::OpenRouter => ("OpenRouter", "key"),
         _ => unreachable!("provider credential kind required"),
     };
-    let url = format!("{}/{path}", base_url.trim_end_matches('/'));
+    let url = Url::parse(&format!("{}/{path}", base_url.trim_end_matches('/')))
+        .map_err(|_| validation_error(provider, "invalid API URL"))?;
     let client = Client::builder()
         .no_proxy()
         .timeout(REQUEST_TIMEOUT)
         .build()
         .map_err(|_| validation_error(provider, "could not build HTTP client"))?;
     let mut request = client
-        .get(&url)
+        .get(url)
         .bearer_auth(secret)
         .header("User-Agent", "Harness");
     if matches!(kind, SecretKindArg::Github) {
@@ -50,9 +51,16 @@ fn validate_at(kind: SecretKindArg, secret: &str, base_url: &str) -> Result<(), 
             .header("HTTP-Referer", "https://harness.dev")
             .header("X-Title", "Harness");
     }
-    let response = request
-        .send()
-        .map_err(|_| validation_error(provider, "request failed"))?;
+    let response = request.send().map_err(|error| {
+        let detail = if error.is_timeout() {
+            "request timed out"
+        } else if error.is_connect() {
+            "could not connect"
+        } else {
+            "request failed"
+        };
+        validation_error(provider, detail)
+    })?;
     if response.status().is_success() {
         return Ok(());
     }
@@ -125,12 +133,23 @@ mod tests {
     }
 
     #[test]
-    fn transport_failure_does_not_expose_secret_or_url() {
+    fn invalid_api_url_does_not_expose_secret_or_url() {
         let error = validate_at(SecretKindArg::Github, "github-secret", "not a url")
             .expect_err("invalid URL should fail")
             .to_string();
-        assert!(error.contains("GitHub credential validation failed: request failed"));
+        assert!(error.contains("GitHub credential validation failed: invalid API URL"));
         assert!(!error.contains("github-secret"));
         assert!(!error.contains("not a url"));
+    }
+
+    #[test]
+    fn connection_failure_does_not_expose_secret_or_url() {
+        let base_url = "http://127.0.0.1:0";
+        let error = validate_at(SecretKindArg::Github, "github-secret", base_url)
+            .expect_err("connection should fail")
+            .to_string();
+        assert!(error.contains("GitHub credential validation failed: could not connect"));
+        assert!(!error.contains("github-secret"));
+        assert!(!error.contains(base_url));
     }
 }
