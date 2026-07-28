@@ -163,13 +163,18 @@ fn strip_cfg_test_blocks(contents: &str) -> String {
         // Brace-tracked, not a plain substring cut, so production code that
         // follows a gated block in the same file still gets scanned. A
         // `#[cfg(test)]` item can carry further attributes or line comments
-        // before its own line (e.g. a trailing `#[allow(..)]`); keep waiting
-        // through those, since the first real code line is always the gated
-        // item itself, block or bare statement, and resolves the wait either
-        // way. Excluding that line unconditionally - not just skipping past
-        // it - matters for a bare statement like `use dev_only::Thing;` with
-        // no `{` of its own: it never opens a skip region, so leaving it in
-        // `kept` would still surface a dev-only crate to the scan below.
+        // before its own line (e.g. a trailing `#[allow(..)]`), and its own
+        // opening `{` is not guaranteed to share a line with the item
+        // (`mod tests\n{` is valid Rust; nothing here enforces rustfmt's
+        // same-line style). Keep waiting through all of that: a line ending
+        // in neither `{` nor `;` cannot be the end of the gated item, since
+        // every legal item is one or the other, so it is safe to hold off
+        // resolving until one appears. Only resolving on that concrete
+        // character - not on the first non-attribute line, brace or not -
+        // also keeps `skip_from_depth`'s later `depth <= start_depth` check
+        // correct: it only ever gets set on the very line whose own `{` is
+        // about to raise `depth` past `start_depth`, so that check can never
+        // fire back to `None` on the same line it just opened.
         let mut exclude_this_line = skip_from_depth.is_some();
         if skip_from_depth.is_none() {
             if trimmed.starts_with("#[cfg(test)]") {
@@ -180,12 +185,17 @@ fn strip_cfg_test_blocks(contents: &str) -> String {
                 if trimmed.starts_with('#') || trimmed.starts_with("//") {
                     // another attribute or a comment on the same gated item;
                     // keep waiting for the item itself
-                } else {
-                    if line.contains('{') {
-                        skip_from_depth = Some(depth);
-                    }
+                } else if line.contains('{') {
+                    skip_from_depth = Some(depth);
+                    pending_test_attribute = false;
+                } else if trimmed.ends_with(';') {
+                    // a bare statement (`mod tests;`, `use foo::Bar;`) with
+                    // nothing to skip beyond this already-excluded line
                     pending_test_attribute = false;
                 }
+                // otherwise the item's declaration continues past this
+                // line with neither terminator yet (e.g. a multi-line `fn`
+                // signature) - keep waiting
             }
         }
 
