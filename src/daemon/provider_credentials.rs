@@ -61,7 +61,13 @@ pub(crate) async fn load_provider_credentials(db: &AsyncDaemonDb) -> Result<(), 
     Ok(())
 }
 
+// Only `load_for_instance` (macOS, non-test) calls this in production; the
+// hash format itself stays cross-platform testable via
+// `database_account_matches_monitor_scope` below, so a non-macOS,
+// non-test build (e.g. `--features full-runtime` on Linux) sees no caller
+// at all.
 #[must_use]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn database_credential_account(instance_id: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(instance_id.as_bytes());
