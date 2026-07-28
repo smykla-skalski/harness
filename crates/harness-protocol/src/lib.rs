@@ -8,6 +8,7 @@ mod hook_session;
 mod observe_classification;
 mod observe_issue_code;
 mod observe_state;
+mod observe_tracking;
 #[path = "../../../src/agents/kind/mod.rs"]
 mod runtime_kind;
 
@@ -29,15 +30,19 @@ pub mod hook {
     pub use crate::hook_session::{SessionStartHookOutput, SessionStartHookSpecificOutput};
 }
 
-/// Observer-state classification, issue identity, and the on-disk event
-/// record shared by the CLI observer loop and the daemon.
+/// Observer-state classification, issue identity, scan-time issue tracking,
+/// and the on-disk event record shared by the CLI observer loop and the
+/// daemon.
 pub mod observe {
-    pub use crate::observe_classification::{FixSafety, IssueCategory, IssueSeverity};
+    pub use crate::observe_classification::{
+        Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole, SourceTool,
+    };
     pub use crate::observe_issue_code::IssueCode;
     pub use crate::observe_state::{
-        ActiveWorker, AgentObserveRecord, AttemptResult, IssueAttempt, ObserverState,
+        ActiveWorker, AgentObserveRecord, AttemptResult, Issue, IssueAttempt, ObserverState,
         ObserverStateEvent, OpenIssue,
     };
+    pub use crate::observe_tracking::{OccurrenceTracker, ScanState, ToolUseRecord, ToolUseWindow};
 }
 
 /// Daemon websocket contracts shared by standalone Harness clients.
