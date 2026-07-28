@@ -115,7 +115,7 @@ scenario_no_arguments_preserves_all_groups() {
     fail "no-argument test:unit run failed: $(<"$SANDBOX/no-args.log")"
     return
   fi
-  if assert_call_count 5 \
+  if assert_call_count 6 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime \
     && assert_call_matches 2 \
@@ -123,17 +123,20 @@ scenario_no_arguments_preserves_all_groups() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime \
     && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd \
+    && assert_call_matches 6 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon \
-    && grep -Fq "==> test:unit 1/5: root Harness library" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 2/5: supporting workspace crates" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 3/5: harness-agents (bridge-runtime feature)" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 4/5: Linux systemd crate" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 5/5: harness-daemon binary-only unit tests" "$SANDBOX/no-args.log"; then
-    pass "no-argument invocation exercises and identifies all five groups"
+    && grep -Fq "==> test:unit 1/6: root Harness library" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 2/6: supporting workspace crates" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 3/6: harness-agents (bridge-runtime feature)" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 4/6: harness-task-board (daemon-runtime feature)" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 5/6: Linux systemd crate" "$SANDBOX/no-args.log" \
+    && grep -Fq "==> test:unit 6/6: harness-daemon binary-only unit tests" "$SANDBOX/no-args.log"; then
+    pass "no-argument invocation exercises and identifies all six groups"
   else
-    fail "no-argument invocation did not preserve and identify all five groups: $(calls_snapshot)"
+    fail "no-argument invocation did not preserve and identify all six groups: $(calls_snapshot)"
   fi
 }
 
@@ -143,7 +146,7 @@ scenario_forwards_simple_filter_to_every_group() {
     fail "filtered test:unit run failed: $(<"$SANDBOX/simple-filter.log")"
     return
   fi
-  if assert_call_count 5 \
+  if assert_call_count 6 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 2 \
@@ -151,8 +154,10 @@ scenario_forwards_simple_filter_to_every_group() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)' \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)' \
+    && assert_call_matches 6 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon -E 'test(=path::to::test)'; then
     pass "a simple nextest filter reaches every package group, including harness-systemd and the harness-daemon bin"
   else
@@ -167,7 +172,7 @@ scenario_preserves_multiword_single_token_filter() {
     fail "multi-word filter test:unit run failed: $(<"$SANDBOX/multiword-filter.log")"
     return
   fi
-  if assert_call_count 5 \
+  if assert_call_count 6 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E "$filter" \
     && assert_call_matches 2 \
@@ -175,8 +180,10 @@ scenario_preserves_multiword_single_token_filter() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime -E "$filter" \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter" \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime -E "$filter" \
     && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter" \
+    && assert_call_matches 6 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon -E "$filter"; then
     pass "a filter containing spaces survives as a single token in every group"
   else
@@ -197,7 +204,7 @@ scenario_rejects_shell_injection_attempt() {
     fail "shell metacharacter payload executed instead of being forwarded literally"
     return
   fi
-  if assert_call_count 5 \
+  if assert_call_count 6 \
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$payload" \
     && assert_call_matches 2 \
@@ -205,8 +212,10 @@ scenario_rejects_shell_injection_attempt() {
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime "$payload" \
     && assert_call_matches 4 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$payload" \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime "$payload" \
     && assert_call_matches 5 \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$payload" \
+    && assert_call_matches 6 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon "$payload"; then
     pass "a shell metacharacter payload is forwarded as an inert literal argument"
   else
