@@ -3,7 +3,7 @@ use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardReviewCycle,
     TaskBoardReviewRoundDecision, TaskBoardReviewerOutcome, TaskBoardTerminalOutcome,
     TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
-    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
     advance_task_board_workflow, evaluate_task_board_review_round,
     restart_task_board_workflow_revision,
 };
@@ -112,10 +112,7 @@ fn apply_review_decision(
             record.blocked_reason = None;
         }
         TaskBoardReviewRoundDecision::ChangesRequired => {
-            if matches!(
-                record.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-            ) && record.artifacts.current_revision_cycle
+            if record.snapshot.workflow_kind.is_write() && record.artifacts.current_revision_cycle
                 < record.resolved_reviewers.max_revision_cycles
             {
                 record.transition = restart_task_board_workflow_revision(&record.transition)
@@ -124,10 +121,7 @@ fn apply_review_decision(
                 record.blocked_reason = Some("review_changes_required".into());
             } else {
                 require_human(record, "review_revision_requires_new_head", updated_at);
-                let summary = if matches!(
-                    record.snapshot.workflow_kind,
-                    TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-                ) {
+                let summary = if record.snapshot.workflow_kind.is_write() {
                     "review changes exhausted the permitted revision cycles"
                 } else {
                     "read-only review requires a new externally supplied head"

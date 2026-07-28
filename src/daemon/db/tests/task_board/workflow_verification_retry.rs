@@ -194,7 +194,7 @@ async fn verification_fixture(
         "Atomic parent and child persistence".into(),
         NOW.into(),
     );
-    item.workflow_kind = TaskBoardWorkflowKind::PrReview;
+    item.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
     item.execution_repository = Some("example/repo".into());
     let mutation = db
         .create_task_board_item(item)
@@ -214,7 +214,7 @@ async fn verification_fixture(
         execution_id: execution_id.clone(),
         item_id,
         snapshot: TaskBoardWorkflowSnapshot {
-            workflow_kind: TaskBoardWorkflowKind::PrReview,
+            workflow_kind: TaskBoardWorkflowKind::PR_REVIEW,
             execution_repository: Some("example/repo".into()),
             item_revision: mutation.item_revision,
             configuration_revision: db
@@ -235,7 +235,7 @@ async fn verification_fixture(
         },
         resolved_reviewers: reviewers,
         transition: TaskBoardWorkflowTransitionState {
-            workflow_kind: TaskBoardWorkflowKind::PrReview,
+            workflow_kind: TaskBoardWorkflowKind::PR_REVIEW,
             phase: Some(TaskBoardExecutionPhase::Publish),
             execution_state: TaskBoardExecutionState::Running,
             pull_request: Some(pull_request),

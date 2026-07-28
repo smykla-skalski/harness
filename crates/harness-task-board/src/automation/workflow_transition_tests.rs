@@ -25,11 +25,11 @@ fn workflow_definitions_have_the_exact_phase_sequences() {
         write
     );
     assert_eq!(
-        task_board_workflow_phases(TaskBoardWorkflowKind::PrFix),
+        task_board_workflow_phases(TaskBoardWorkflowKind::PR_FIX),
         write
     );
     assert_eq!(
-        task_board_workflow_phases(TaskBoardWorkflowKind::PrReview),
+        task_board_workflow_phases(TaskBoardWorkflowKind::PR_REVIEW),
         [
             TaskBoardExecutionPhase::Review,
             TaskBoardExecutionPhase::Publish,
@@ -62,18 +62,18 @@ fn write_workflows_freeze_pr_identity_and_advance_through_approval() {
 
     let identity = pull_request(41);
     let fix = start_task_board_workflow(
-        TaskBoardWorkflowKind::PrFix,
+        TaskBoardWorkflowKind::PR_FIX,
         Some(&identity),
         Some("head-base"),
     )
     .expect("start pr fix");
     assert_eq!(fix.pull_request.as_ref(), Some(&identity));
     assert_eq!(
-        start_task_board_workflow(TaskBoardWorkflowKind::PrFix, None, Some("head-base")),
+        start_task_board_workflow(TaskBoardWorkflowKind::PR_FIX, None, Some("head-base")),
         Err(TaskBoardWorkflowTransitionError::MissingPullRequestIdentity)
     );
     assert_eq!(
-        start_task_board_workflow(TaskBoardWorkflowKind::PrFix, Some(&identity), None),
+        start_task_board_workflow(TaskBoardWorkflowKind::PR_FIX, Some(&identity), None),
         Err(TaskBoardWorkflowTransitionError::MissingHeadRevision)
     );
 }
@@ -90,7 +90,7 @@ fn pr_fix_freezes_fork_repository_branch_and_source_revision() {
         }),
     };
     let state = start_task_board_workflow(
-        TaskBoardWorkflowKind::PrFix,
+        TaskBoardWorkflowKind::PR_FIX,
         Some(&identity),
         Some("source-head"),
     )
@@ -101,7 +101,7 @@ fn pr_fix_freezes_fork_repository_branch_and_source_revision() {
     malformed.head.as_mut().expect("head").branch = " ".into();
     assert_eq!(
         start_task_board_workflow(
-            TaskBoardWorkflowKind::PrFix,
+            TaskBoardWorkflowKind::PR_FIX,
             Some(&malformed),
             Some("source-head"),
         ),
@@ -133,7 +133,7 @@ fn write_revision_cycle_retains_the_reviewed_head_as_next_base() {
 fn pr_review_stays_on_exact_head_and_skips_evaluation() {
     let identity = pull_request(23);
     let state = start_task_board_workflow(
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         Some(&identity),
         Some("head-indigo"),
     )
@@ -152,7 +152,7 @@ fn pr_review_stays_on_exact_head_and_skips_evaluation() {
 fn deserialized_pr_state_cannot_bypass_required_identity_or_head() {
     let identity = pull_request(29);
     let mut review = start_task_board_workflow(
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         Some(&identity),
         Some("head-indigo"),
     )

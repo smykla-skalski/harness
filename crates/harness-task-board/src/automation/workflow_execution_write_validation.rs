@@ -250,7 +250,7 @@ fn validate_implementation_result(
                 "base head does not match the preceding reviewed cycle",
             );
         }
-    } else if record.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+    } else if record.snapshot.workflow_kind.has_dependency_update_intent() {
         let frozen_head = frozen_pr_fix_head(record).ok_or_else(|| {
             field_error(
                 "attempt.artifact.implementation",

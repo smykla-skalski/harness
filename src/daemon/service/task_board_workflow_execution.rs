@@ -38,10 +38,8 @@ pub(crate) async fn create_or_load_workflow_execution(
     request: &TaskBoardWorkflowExecutionCreateRequest,
 ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
     let created_at = canonical_time(&request.created_at)?;
-    if !matches!(
-        request.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::PrReview | TaskBoardWorkflowKind::Review
-    ) {
+    if !(matches!(request.snapshot.workflow_kind, TaskBoardWorkflowKind::Review)
+        || request.snapshot.workflow_kind.has_review_request_intent()) {
         return Err(invalid_transition(
             "read-only workflow execution requires Review or PrReview",
         ));
@@ -372,10 +370,7 @@ fn phase_evidence_allows_advance(
             )
         }
         Some(TaskBoardExecutionPhase::Evaluate) => {
-            let action = if matches!(
-                record.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-            ) {
+            let action = if record.snapshot.workflow_kind.is_write() {
                 format!("evaluate:{}", record.artifacts.current_revision_cycle)
             } else {
                 "evaluate".into()

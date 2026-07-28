@@ -482,13 +482,7 @@ fn positive_cost_evidence(
 }
 
 const fn workflow_name(workflow: TaskBoardWorkflowKind) -> &'static str {
-    match workflow {
-        TaskBoardWorkflowKind::Unknown => "unknown",
-        TaskBoardWorkflowKind::DefaultTask => "default_task",
-        TaskBoardWorkflowKind::PrFix => "pr_fix",
-        TaskBoardWorkflowKind::PrReview => "pr_review",
-        TaskBoardWorkflowKind::Review => "review",
-    }
+    workflow.as_wire_str()
 }
 
 fn canonical_time(value: DateTime<Utc>) -> String {

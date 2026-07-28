@@ -8,7 +8,7 @@ use crate::task_board::{
     TaskBoardEvaluationResult, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardImplementationResult, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
     TaskBoardReadOnlyRunContext, TaskBoardReviewResult, TaskBoardReviewerOutcome,
-    TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord,
     validate_task_board_read_only_run_context,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -340,10 +340,7 @@ fn evaluation_prompt(
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<String, CliError> {
     let exact_head = exact_head(execution)?;
-    let write = matches!(
-        execution.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    );
+    let write = execution.snapshot.workflow_kind.is_write();
     let response = TaskBoardLocalAttemptResult {
         schema_version: TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION,
         execution_id: execution.execution_id.clone(),

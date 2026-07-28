@@ -133,10 +133,7 @@ impl RemoteSourceMaterial {
                 if requires_prior_phase_bundle(binding) {
                     return Err(RemoteWireError::InvalidSourceMaterial);
                 }
-                let fork_source = matches!(
-                    binding.workflow_kind,
-                    TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
-                );
+                let fork_source = binding.workflow_kind.is_pull_request();
                 if fork_source != matches!(selector, RemoteRepositorySelector::Branch { .. }) {
                     return Err(RemoteWireError::InvalidSourceMaterial);
                 }
@@ -204,10 +201,7 @@ fn require_binding_repository(
 }
 
 fn requires_prior_phase_bundle(binding: &RemoteAttemptBinding) -> bool {
-    let write = matches!(
-        binding.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    );
+    let write = binding.workflow_kind.is_write();
     match binding.phase {
         TaskBoardExecutionPhase::Implementation => implementation_cycle(binding) > 1,
         TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate => write,

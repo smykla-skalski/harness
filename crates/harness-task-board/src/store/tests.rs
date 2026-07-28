@@ -5,8 +5,8 @@ use tempfile::tempdir;
 use super::parse_cache::ParseCache;
 use crate::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::types::{
-    AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
-    TaskBoardWorkflowStatus,
+    AgentMode, PlanningState, PrIntentSet, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+    TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 use fs_err as fs;
 
@@ -358,6 +358,32 @@ fn create_get_list_update_delete_round_trips_markdown() {
 
     store.delete("task-1").expect("delete item");
     assert!(store.list(None).expect("list active").is_empty());
+}
+
+#[test]
+fn pull_request_intents_survive_a_markdown_round_trip() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    for (id, kind) in [
+        ("dep", TaskBoardWorkflowKind::PrFix),
+        ("review", TaskBoardWorkflowKind::PrReview),
+        ("both", TaskBoardWorkflowKind::PrFixReview),
+    ] {
+        let mut item =
+            TaskBoardItem::new(id.into(), id.into(), String::new(), "2026-05-14T00:00:00Z".into());
+        item.workflow_kind = kind;
+        store.create(id, "body", item).expect("create item");
+
+        let loaded = store.get(id).expect("load item");
+        assert_eq!(loaded.workflow_kind, kind, "{id} kind survives the round trip");
+    }
+
+    // The both-intents ticket keeps both meanings rather than collapsing to one
+    // category, so a client can still select the workflow from structured state.
+    let both = store.get("both").expect("load both").workflow_kind;
+    assert!(both.has_dependency_update_intent());
+    assert!(both.has_review_request_intent());
+    assert_eq!(both.pr_intents(), Some(PrIntentSet::DEPENDENCY_AND_REVIEW));
 }
 
 #[test]

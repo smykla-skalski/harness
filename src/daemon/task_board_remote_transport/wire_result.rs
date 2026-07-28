@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::task_board::{
     TaskBoardAttemptResultArtifactExpectation, TaskBoardExecutionPhase,
-    TaskBoardLocalAttemptResult, TaskBoardLocalAttemptResultExpectation, TaskBoardWorkflowKind,
+    TaskBoardLocalAttemptResult, TaskBoardLocalAttemptResultExpectation,
     validate_task_board_local_attempt_result,
 };
 
@@ -93,10 +93,7 @@ fn result_expectation(
                 .expected_head_revision
                 .as_deref()
                 .ok_or(RemoteWireError::ResultBindingMismatch)?;
-            let write = matches!(
-                binding.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-            );
+            let write = binding.workflow_kind.is_write();
             let revision_cycle = if write {
                 Some(action_cycle(&binding.action_key, "evaluate:")?)
             } else {

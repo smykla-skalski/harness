@@ -89,13 +89,7 @@ fn preparation_revision_error(
     {
         Some("workflow item revision changed before preparation claim")
     } else if preparation.source_item_revision.is_none()
-        && matches!(
-            item.workflow_kind,
-            TaskBoardWorkflowKind::DefaultTask
-                | TaskBoardWorkflowKind::PrFix
-                | TaskBoardWorkflowKind::Review
-                | TaskBoardWorkflowKind::PrReview
-        )
+        && !matches!(item.workflow_kind, TaskBoardWorkflowKind::Unknown)
     {
         Some("legacy workflow preparation has no frozen item revision")
     } else {
@@ -202,14 +196,8 @@ impl AsyncDaemonDb {
             actor: actor.to_string(),
             project_dir: project_dir.map(ToString::to_string),
             plan: plan.clone(),
-            source_item_revision: matches!(
-                item.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask
-                    | TaskBoardWorkflowKind::PrFix
-                    | TaskBoardWorkflowKind::Review
-                    | TaskBoardWorkflowKind::PrReview
-            )
-            .then_some(item_revision),
+            source_item_revision: (!matches!(item.workflow_kind, TaskBoardWorkflowKind::Unknown))
+                .then_some(item_revision),
             hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;

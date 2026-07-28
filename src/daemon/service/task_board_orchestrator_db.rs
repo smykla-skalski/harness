@@ -201,10 +201,8 @@ async fn run_publish_phase(
 ) -> Result<(), CliError> {
     let mut items = items_for_input(db, &prepared.input).await?;
     items.retain(|item| {
-        !matches!(
-            item.workflow_kind,
-            TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
-        )
+        !(matches!(item.workflow_kind, TaskBoardWorkflowKind::Review)
+            || item.workflow_kind.has_review_request_intent())
     });
     run_task_board_github_automation_async(settings, &prepared.input, &items, db).await
 }

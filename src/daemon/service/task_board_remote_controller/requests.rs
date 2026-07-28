@@ -324,10 +324,7 @@ fn initial_repository_source(
         .as_ref()
         .and_then(|pull_request| pull_request.head.as_ref())
         .filter(|_| {
-            matches!(
-                execution.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
-            )
+            execution.snapshot.workflow_kind.is_pull_request()
         });
     if let Some(head) = head {
         if head.revision != revision {
@@ -384,7 +381,7 @@ fn implementation_base(execution: &TaskBoardWorkflowExecutionRecord) -> Result<&
             .map(|review| review.head_revision.as_str())
             .ok_or_else(|| invalid("remote implementation has no prior reviewed base"));
     }
-    if execution.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+    if execution.snapshot.workflow_kind.has_dependency_update_intent() {
         return execution
             .transition
             .pull_request
@@ -432,10 +429,7 @@ pub(super) fn requires_prior_bundle(
     execution: &TaskBoardWorkflowExecutionRecord,
     phase: TaskBoardExecutionPhase,
 ) -> bool {
-    let write = matches!(
-        execution.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    );
+    let write = execution.snapshot.workflow_kind.is_write();
     match phase {
         TaskBoardExecutionPhase::Implementation => execution.artifacts.current_revision_cycle > 1,
         TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate => write,

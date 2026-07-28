@@ -162,7 +162,7 @@ fn worker_start_requires_an_unexpired_lease_and_deadline() {
 #[test]
 fn fork_repository_and_prior_phase_bundle_expose_their_initial_revision() {
     let mut forked = repository_offer(TaskBoardExecutionPhase::Implementation);
-    forked.binding.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    forked.binding.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     // The binding repository tracks the fork even for a PR-fix source branch.
     forked.binding.repository = "contributor/repo".into();
     forked.source =

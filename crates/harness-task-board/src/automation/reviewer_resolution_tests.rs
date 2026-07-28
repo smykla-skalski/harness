@@ -84,7 +84,7 @@ fn reviewer_resolution_uses_repository_then_workflow_then_global_precedence() {
     .expect("resolve workflow");
     let global = resolve_task_board_reviewers(
         &settings,
-        TaskBoardWorkflowKind::PrFix,
+        TaskBoardWorkflowKind::PR_FIX,
         Some("sample/widgets"),
     )
     .expect("resolve global");

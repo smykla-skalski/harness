@@ -159,10 +159,8 @@ fn prepare_read_only(
         ));
     }
     if launch.workflow_kind != item.workflow_kind
-        || !matches!(
-            item.workflow_kind,
-            TaskBoardWorkflowKind::Review | TaskBoardWorkflowKind::PrReview
-        )
+        || !(matches!(item.workflow_kind, TaskBoardWorkflowKind::Review)
+            || item.workflow_kind.has_review_request_intent())
         || item.agent_mode != AgentMode::Evaluate
     {
         return Err(db_error(
@@ -201,10 +199,7 @@ fn prepare_write(
         ));
     }
     if launch.workflow_kind != item.workflow_kind
-        || !matches!(
-            item.workflow_kind,
-            TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-        )
+        || !item.workflow_kind.is_write()
         || item.agent_mode != AgentMode::Headless
     {
         return Err(db_error(

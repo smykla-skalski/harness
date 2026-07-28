@@ -3,7 +3,7 @@ use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
     TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard, normalize_repository_slug,
+    TaskBoardWorkflowRevisionGuard, normalize_repository_slug,
     restart_task_board_workflow_revision,
 };
 use harness_kernel::errors::CliError;
@@ -296,10 +296,7 @@ async fn ingest_evaluation(
         return advance(db, execution, revisions, now).await;
     }
     if verdict == TaskBoardPhaseVerdict::ChangesRequired
-        && matches!(
-            execution.snapshot.workflow_kind,
-            TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-        )
+        && execution.snapshot.workflow_kind.is_write()
         && execution.artifacts.current_revision_cycle
             < execution.resolved_reviewers.max_revision_cycles
     {

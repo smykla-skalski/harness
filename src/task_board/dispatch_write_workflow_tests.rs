@@ -19,7 +19,7 @@ fn approved_write_item(kind: TaskBoardWorkflowKind, mode: AgentMode) -> TaskBoar
 fn write_workflows_block_non_headless_modes_before_reservation() {
     for kind in [
         TaskBoardWorkflowKind::DefaultTask,
-        TaskBoardWorkflowKind::PrFix,
+        TaskBoardWorkflowKind::PR_FIX,
     ] {
         for mode in [
             AgentMode::Interactive,
@@ -39,7 +39,7 @@ fn write_workflows_block_non_headless_modes_before_reservation() {
 fn write_workflows_keep_headless_dispatch_ready() {
     for kind in [
         TaskBoardWorkflowKind::DefaultTask,
-        TaskBoardWorkflowKind::PrFix,
+        TaskBoardWorkflowKind::PR_FIX,
     ] {
         let plan = build_dispatch_plan(&approved_write_item(kind, AgentMode::Headless));
         assert_eq!(plan.readiness, DispatchReadiness::Ready);

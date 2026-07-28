@@ -88,8 +88,8 @@ fn later_implementation_cycle_is_chained_to_the_preceding_review_head() {
 #[test]
 fn pr_fix_cycle_one_implementation_binds_the_frozen_pull_request_head() {
     let mut record = write_execution();
-    record.snapshot.workflow_kind = TaskBoardWorkflowKind::PrFix;
-    record.transition.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    record.snapshot.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
+    record.transition.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     record.transition.pull_request = Some(TaskBoardPullRequestIdentity {
         repository: "example/compass".into(),
         number: 42,

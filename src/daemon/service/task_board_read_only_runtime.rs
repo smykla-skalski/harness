@@ -182,9 +182,12 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<String, CliError> {
+        // A dependency-update pull request resolves its worktree head like a
+        // default task; a pure review request uses the frozen PR head.
         match execution.snapshot.workflow_kind {
             TaskBoardWorkflowKind::DefaultTask
             | TaskBoardWorkflowKind::PrFix
+            | TaskBoardWorkflowKind::PrFixReview
             | TaskBoardWorkflowKind::Review => {
                 git_evidence::resolve_local_workflow_head(execution).await
             }
@@ -299,8 +302,8 @@ async fn resolve_pr_review(
 fn pr_review_identity(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<TaskBoardPullRequestIdentity, CliError> {
-    if execution.snapshot.workflow_kind != TaskBoardWorkflowKind::PrReview
-        || execution.transition.workflow_kind != TaskBoardWorkflowKind::PrReview
+    if !execution.snapshot.workflow_kind.has_review_request_intent()
+        || !execution.transition.workflow_kind.has_review_request_intent()
     {
         return Err(invalid_transition(
             "publish requires a PrReview execution and Task Board item",

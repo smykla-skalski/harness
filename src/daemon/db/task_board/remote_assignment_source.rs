@@ -94,10 +94,7 @@ fn repository_source_matches(
         .as_ref()
         .and_then(|pull_request| pull_request.head.as_ref())
         .filter(|_| {
-            matches!(
-                parent.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::PrFix | TaskBoardWorkflowKind::PrReview
-            )
+            parent.snapshot.workflow_kind.is_pull_request()
         });
     if let Some(head) = fork_head {
         return repository == head.repository.as_str()
@@ -120,10 +117,7 @@ fn initial_repository_revision(parent: &TaskBoardWorkflowExecutionRecord) -> Opt
             initial_implementation_revision(parent)
         }
         Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate) => {
-            if matches!(
-                parent.snapshot.workflow_kind,
-                TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-            ) {
+            if parent.snapshot.workflow_kind.is_write() {
                 None
             } else {
                 parent.transition.exact_head_revision.as_deref()
@@ -134,7 +128,7 @@ fn initial_repository_revision(parent: &TaskBoardWorkflowExecutionRecord) -> Opt
 }
 
 fn initial_implementation_revision(parent: &TaskBoardWorkflowExecutionRecord) -> Option<&str> {
-    if parent.snapshot.workflow_kind == TaskBoardWorkflowKind::PrFix {
+    if parent.snapshot.workflow_kind.has_dependency_update_intent() {
         return parent
             .transition
             .pull_request

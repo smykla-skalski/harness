@@ -184,7 +184,7 @@ async fn seed_execution_in_database(
         item_id: item_id.clone(),
         snapshot: TaskBoardWorkflowSnapshot {
             workflow_kind,
-            execution_repository: (workflow_kind == TaskBoardWorkflowKind::PrReview)
+            execution_repository: (workflow_kind == TaskBoardWorkflowKind::PR_REVIEW)
                 .then(|| "example/compass".into()),
             item_revision: mutation.item_revision,
             configuration_revision: db
@@ -277,7 +277,7 @@ fn prepare_item(
     item.workflow.status = TaskBoardWorkflowStatus::Running;
     item.workflow.current_step_id = Some("review".into());
     item.workflow.worktree = Some("/tmp/read-only-worktree".into());
-    if workflow_kind == TaskBoardWorkflowKind::PrReview {
+    if workflow_kind == TaskBoardWorkflowKind::PR_REVIEW {
         item.execution_repository = Some("example/compass".into());
         item.workflow.pr_number = Some(17);
         item.workflow.pr_url = Some("https://github.com/example/compass/pull/17".into());
@@ -304,7 +304,7 @@ pub(super) async fn seed_settings(db: &AsyncDaemonDb) {
 }
 
 fn pull_request(workflow_kind: TaskBoardWorkflowKind) -> Option<TaskBoardPullRequestIdentity> {
-    (workflow_kind == TaskBoardWorkflowKind::PrReview).then(|| TaskBoardPullRequestIdentity {
+    (workflow_kind == TaskBoardWorkflowKind::PR_REVIEW).then(|| TaskBoardPullRequestIdentity {
         repository: "example/compass".into(),
         number: 17,
         head: None,
@@ -410,7 +410,7 @@ pub(super) async fn seed_publish_attempt(
 ) -> Fixture {
     let fixture = seed_execution_at_phase(
         label,
-        TaskBoardWorkflowKind::PrReview,
+        TaskBoardWorkflowKind::PR_REVIEW,
         crate::task_board::TaskBoardExecutionPhase::Publish,
         parent_state,
         None,

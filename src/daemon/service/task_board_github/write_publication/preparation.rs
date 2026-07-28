@@ -58,10 +58,7 @@ pub(in crate::daemon::service::task_board_github) fn validate_publication_automa
             "DefaultTask publication requires OpenPullRequest automation",
         ));
     }
-    if matches!(
-        workflow_kind,
-        TaskBoardWorkflowKind::DefaultTask | TaskBoardWorkflowKind::PrFix
-    ) {
+    if workflow_kind.is_write() {
         Ok(())
     } else {
         Err(invalid_transition(

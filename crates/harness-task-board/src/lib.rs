@@ -50,6 +50,7 @@ pub mod external;
 pub mod git_identity_defaults;
 pub mod github_config;
 pub mod item_fields;
+pub mod item_intent;
 pub mod item_query;
 pub mod lane;
 pub mod machines;
@@ -171,7 +172,7 @@ pub use triage_rules::{
     is_canonical_rule_id, validate_triage_rule_set,
 };
 pub use types::{
-    AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTombstoneCause,
-    TaskBoardWorkflowKind, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
+    AgentMode, PrIntentSet, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+    TaskBoardTombstoneCause, TaskBoardWorkflowKind, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
 pub use worker_prompt::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};
