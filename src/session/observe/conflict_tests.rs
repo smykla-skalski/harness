@@ -1,7 +1,7 @@
-use crate::hooks::adapters::HookAgent;
 use crate::observe::types::IssueCode;
 use crate::session::service;
 use crate::session::types::SessionRole;
+use harness_protocol::agent::HookAgent;
 
 use super::scan::scan_all_agents;
 use super::test_support::{start_active_session, with_temp_project, write_agent_log_lines};

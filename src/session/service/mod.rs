@@ -16,12 +16,12 @@ use crate::agents::runtime::signal::{
 };
 use crate::agents::service as agents_service;
 use crate::daemon::index as daemon_index;
-use crate::hooks::adapters::HookAgent;
 use crate::session::ordering::sort_session_tasks;
 use crate::session::wire;
 use crate::workspace::{project_context_dir, utc_now};
 use harness_daemon_client::ClientError;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::agent::HookAgent;
 
 use super::roles::{SessionAction, is_permitted};
 use super::storage;

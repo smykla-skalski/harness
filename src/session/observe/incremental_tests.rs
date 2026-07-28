@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::hooks::adapters::HookAgent;
 use crate::session::service;
+use harness_protocol::agent::HookAgent;
 
 use super::scan::{AgentLogTailState, resolve_agent_runtime, scan_all_agents_incremental};
 use super::test_support::{

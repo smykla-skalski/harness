@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::daemon::client::DaemonClient;
-use crate::hooks::adapters::HookAgent;
 use harness_daemon_client::ClientError;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::agent::HookAgent;
 use harness_workspace::command_context::resolve_project_dir as resolve_project_path;
 
 pub(super) fn resolve_project_dir(hint: Option<&str>) -> String {

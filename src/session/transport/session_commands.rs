@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::hooks::adapters::HookAgent;
 use crate::session::types::SessionRole;
 use crate::session::wire::{AdoptSessionRequest, ObserveSessionRequest, SessionDetail};
 use crate::session::{observe, service};
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::CliError;
+use harness_protocol::agent::HookAgent;
 use harness_workspace::command_context::{AppContext, Execute};
 
 use super::support::{

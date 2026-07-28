@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use harness_kernel::errors::CliError;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 /// Liveness status for an agent session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
