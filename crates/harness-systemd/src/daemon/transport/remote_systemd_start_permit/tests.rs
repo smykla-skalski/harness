@@ -11,6 +11,8 @@ use nix::fcntl::{FcntlArg, fcntl};
 #[cfg(target_os = "linux")]
 use nix::unistd::close;
 
+use crate::daemon::transport::test_support::hardened_tempdir_in;
+
 use super::{
     PERMIT_PREFIX, install_runtime_start_permit, remove_stale_runtime_start_permit,
     require_runtime_start_permit_absent, runtime_start_permit_is_live, runtime_start_permit_path,
@@ -20,7 +22,7 @@ use super::{
 const UNRELATED_PERMIT_BYTES: &[u8] = b"[Unit]\nDescription=unrelated\n";
 
 fn trusted_temp() -> TempDir {
-    TempDir::new_in(env!("CARGO_MANIFEST_DIR")).expect("create trusted temp directory")
+    hardened_tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("create trusted temp directory")
 }
 
 fn unit_path(temp: &TempDir) -> PathBuf {

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
 
-use tempfile::tempdir;
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
 use super::*;
 

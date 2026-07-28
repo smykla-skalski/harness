@@ -6,13 +6,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rusqlite::{Connection, config::DbConfig};
-use tempfile::tempdir_in;
 
 use crate::daemon::transport::remote_systemd_inhibitor::inhibitor_path;
 use crate::daemon::transport::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use crate::daemon::transport::remote_systemd_upgrade_lifecycle::{
     RemoteSystemdOperationPlan, RemoteSystemdUpgradePlan, establish_release_pair_for_tests,
 };
+use crate::daemon::transport::test_support::hardened_tempdir_in;
 use crate::errors::{CliError, CliErrorKind};
 
 #[path = "support/health.rs"]
@@ -44,8 +44,10 @@ pub(super) struct UpgradeFixture {
 
 impl UpgradeFixture {
     pub(super) fn new() -> Self {
-        let temp = tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("trusted tempdir");
-        let private_temp = tempdir_in(temp_dir()).expect("private tempdir");
+        let temp = hardened_tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("trusted tempdir");
+        // `private_temp` also needs a pinned mode to satisfy validate_trusted_ancestors' own
+        // session-temp boundary check, which requires the same absence of write bits.
+        let private_temp = hardened_tempdir_in(temp_dir()).expect("private tempdir");
         let binary = temp.path().join("installed-harness");
         let controller = temp.path().join("harness-systemd");
         let candidate = temp.path().join("candidate-harness");

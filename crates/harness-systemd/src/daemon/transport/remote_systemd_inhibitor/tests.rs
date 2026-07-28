@@ -4,10 +4,12 @@ use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _, symlink};
 use fs_err as fs;
 use tempfile::TempDir;
 
+use crate::daemon::transport::test_support::hardened_tempdir_in;
+
 use super::*;
 
 fn trusted_temp() -> TempDir {
-    TempDir::new_in(env!("CARGO_MANIFEST_DIR")).expect("create trusted temp directory")
+    hardened_tempdir_in(env!("CARGO_MANIFEST_DIR")).expect("create trusted temp directory")
 }
 
 fn unit_path(root: &Path) -> PathBuf {

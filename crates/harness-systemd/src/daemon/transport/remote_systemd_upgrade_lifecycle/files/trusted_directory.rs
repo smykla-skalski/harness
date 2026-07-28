@@ -175,7 +175,7 @@ mod tests {
     use std::fs::Permissions;
     use std::os::unix::fs::{PermissionsExt as _, symlink};
 
-    use tempfile::tempdir;
+    use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
     use super::*;
 

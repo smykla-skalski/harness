@@ -2,8 +2,8 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 use std::time::Duration;
 
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 use serde_json::Value;
-use tempfile::tempdir;
 
 use super::*;
 

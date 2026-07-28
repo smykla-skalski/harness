@@ -4,7 +4,7 @@ use std::fs::{self, Permissions};
 use std::os::unix::fs::{PermissionsExt as _, symlink};
 use std::path::Path;
 
-use tempfile::tempdir;
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
 use crate::app::command_context::{AppContext, Execute as _};
 

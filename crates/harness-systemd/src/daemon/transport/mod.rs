@@ -10,6 +10,8 @@ mod remote_systemd_upgrade;
 mod remote_systemd_upgrade_lifecycle;
 mod systemd_mount_namespace;
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;
 
 pub use remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};

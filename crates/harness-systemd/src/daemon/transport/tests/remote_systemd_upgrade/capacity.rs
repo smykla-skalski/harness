@@ -3,6 +3,7 @@ use std::path::Path;
 use sha2::{Digest as _, Sha256};
 
 use crate::daemon::transport::remote_systemd_upgrade_lifecycle::RemoteSystemdOperationPlan;
+use crate::daemon::transport::test_support::hardened_tempdir;
 
 use super::*;
 
@@ -190,7 +191,7 @@ fn assert_bidirectional_reserves_released(plan: &RemoteSystemdOperationPlan) {
 
 #[test]
 fn inode_reserve_rejects_shortage_before_creating_partial_state() {
-    let directory = tempfile::tempdir().expect("temporary directory");
+    let directory = hardened_tempdir().expect("temporary directory");
     let reserve = directory.path().join("inode-reserve");
 
     let error = reserve_inode_capacity_with_available_for_tests(&reserve, 4, 4)

@@ -2,7 +2,7 @@ use std::fs;
 use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _, symlink};
 use std::time::Duration;
 
-use tempfile::tempdir;
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
 use super::super::super::model::RecoveryOperation;
 use super::*;

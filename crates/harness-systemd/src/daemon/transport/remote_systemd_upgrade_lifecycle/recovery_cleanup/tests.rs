@@ -4,7 +4,9 @@ use std::os::unix::fs::{PermissionsExt as _, symlink};
 use std::path::Path;
 use std::time::Duration;
 
-use tempfile::{TempDir, tempdir};
+use tempfile::TempDir;
+
+use crate::daemon::transport::test_support::hardened_tempdir as tempdir;
 
 use super::super::automation::render_recovery_units_for_tests;
 use super::super::files::create_private_directory;
