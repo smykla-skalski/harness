@@ -125,18 +125,11 @@ pub enum DaemonLocationKind {
 
 /// Result of [`adopt_running_daemon_root`]. Emitted at `tracing::info!`
 /// level by bridge subcommands so "where did my bridge land?" is greppable.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AdoptionOutcome {
-    /// `state::daemon_root()` already points at a live daemon - nothing
-    /// changed.
-    AlreadyCoherent { root: PathBuf },
-    /// The effective root had no live daemon, but another candidate did.
-    /// The process-local override was flipped to that candidate.
-    Adopted { from: PathBuf, to: PathBuf },
-    /// No candidate had a live daemon. Caller should proceed with
-    /// `default_root` and optionally warn.
-    NoRunningDaemon { default_root: PathBuf },
-}
+///
+/// Re-exported from `harness-daemon-client` instead of hand-copied a second
+/// time; both crates need the same three-variant shape, and #626 already
+/// fixed this duplication class for `HookResult`.
+pub use harness_daemon_client::discovery::AdoptionOutcome;
 
 /// Build the ordered list of plausible daemon roots for the current host.
 ///
