@@ -6,6 +6,7 @@ mod support;
 use support::*;
 
 mod basics;
+mod daemon_path_validation;
 mod daemon_reentrancy;
 mod leave_signals;
 mod liveness;

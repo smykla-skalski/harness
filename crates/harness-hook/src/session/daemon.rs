@@ -9,6 +9,7 @@ use harness_protocol::session_wire::{
 };
 use serde::Deserialize;
 
+use crate::infra::io::validate_safe_segment;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::service::ResolvedRuntimeSessionAgent;
@@ -58,6 +59,9 @@ pub(super) fn record_signal_ack(
     project_dir: &Path,
 ) -> Option<Result<(), CliError>> {
     let client = DaemonClient::try_connect()?;
+    if let Err(error) = validate_safe_segment(session_id) {
+        return Some(Err(error));
+    }
     let request = SignalAckRequest {
         agent_id: agent_id.to_string(),
         signal_id: signal_id.to_string(),
@@ -77,6 +81,9 @@ pub(super) fn record_signal_ack(
 
 pub(super) fn leave_session(session_id: &str, agent_id: &str) -> Option<Result<(), CliError>> {
     let client = DaemonClient::try_connect()?;
+    if let Err(error) = validate_safe_segment(session_id) {
+        return Some(Err(error));
+    }
     Some(
         client
             .post::<_, serde_json::Value>(
@@ -98,6 +105,9 @@ pub(super) fn register_runtime_session(
     project_dir: &Path,
 ) -> Option<Result<bool, CliError>> {
     let client = DaemonClient::try_connect()?;
+    if let Err(error) = validate_safe_segment(session_id) {
+        return Some(Err(error));
+    }
     let request = AgentRuntimeSessionRegistrationRequest {
         managed_agent_id: managed_agent_id.to_string(),
         runtime: runtime_name.to_string(),
@@ -120,6 +130,9 @@ pub(super) fn session_agent_is_alive(
     agent_id: &str,
 ) -> Option<Result<bool, CliError>> {
     let client = DaemonClient::try_connect()?;
+    if let Err(error) = validate_safe_segment(session_id) {
+        return Some(Err(error));
+    }
     Some(
         client
             .get::<SessionAgentResponse>(&format!("/v1/sessions/{session_id}"), &[])
@@ -138,6 +151,9 @@ pub(crate) fn signal_managed_terminal_ready(
     managed_agent_id: &str,
 ) -> Option<Result<(), CliError>> {
     let client = DaemonClient::try_connect()?;
+    if let Err(error) = validate_safe_segment(managed_agent_id) {
+        return Some(Err(error));
+    }
     Some(
         client
             .post::<_, serde_json::Value>(

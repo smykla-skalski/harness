@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use crate::infra::io::validate_safe_segment;
 use crate::session::types::{HarnessSessionId, ManagedAgentId, ManagedAgentRef, RuntimeSessionId};
 use crate::session::wire;
 use harness_daemon_client::DaemonClient;
@@ -40,6 +41,7 @@ pub fn register_agent_runtime_session(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id.as_str())?;
         let request = wire::AgentRuntimeSessionRegistrationRequest {
             managed_agent_id: managed_agent_id.to_string(),
             runtime: runtime_name.to_string(),

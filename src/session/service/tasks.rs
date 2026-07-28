@@ -9,6 +9,7 @@ use super::{
     sort_session_tasks, started_task_signals, storage, utc_now, wire,
     write_prepared_task_start_signals,
 };
+use crate::infra::io::validate_safe_segment;
 use harness_daemon_client::DaemonClient;
 use tokio::runtime::Handle;
 
@@ -17,8 +18,12 @@ use tokio::runtime::Handle;
 /// `create_task_with_source` and `delete_task` hit their own action-less
 /// paths, and `list_tasks` reads the session detail endpoint instead, so none
 /// of the three go through this helper.
-fn task_action_url(session_id: &str, task_id: &str, action: &str) -> String {
-    format!("/v1/sessions/{session_id}/tasks/{task_id}/{action}")
+fn task_action_url(session_id: &str, task_id: &str, action: &str) -> Result<String, CliError> {
+    validate_safe_segment(session_id)?;
+    validate_safe_segment(task_id)?;
+    Ok(format!(
+        "/v1/sessions/{session_id}/tasks/{task_id}/{action}"
+    ))
 }
 
 /// Create a work item in the session.
@@ -60,6 +65,7 @@ pub fn create_task_with_source(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::TaskCreateRequest {
             actor: actor_id.to_string(),
             title: spec.title.to_string(),
@@ -121,7 +127,7 @@ pub fn assign_task(
             actor: actor_id.to_string(),
             agent_id: agent_id.to_string(),
         };
-        let url = task_action_url(session_id, task_id, "assign");
+        let url = task_action_url(session_id, task_id, "assign")?;
         let _: wire::SessionDetail = client
             .post(&url, &request)
             .map_err(|error| daemon_client_error("assign task", &error))?;
@@ -175,7 +181,7 @@ pub fn drop_task(
             queue_policy,
             reason: None,
         };
-        let url = task_action_url(session_id, task_id, "drop");
+        let url = task_action_url(session_id, task_id, "drop")?;
         let _: wire::SessionDetail = client
             .post(&url, &request)
             .map_err(|error| daemon_client_error("drop task", &error))?;
@@ -234,6 +240,7 @@ pub fn list_tasks(
     // No daemon-side caller reaches this directly, so it needs no
     // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
+        validate_safe_segment(session_id)?;
         let detail: wire::SessionDetail = client
             .get(&format!("/v1/sessions/{session_id}"), &[])
             .map_err(|error| daemon_client_error("get session detail", &error))?;
@@ -274,6 +281,8 @@ pub fn delete_task(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
+        validate_safe_segment(task_id)?;
         let request = wire::TaskDeleteRequest {
             actor: actor_id.to_string(),
         };
@@ -349,7 +358,7 @@ pub fn update_task(
             status,
             note: note.map(ToString::to_string),
         };
-        let url = task_action_url(session_id, task_id, "status");
+        let url = task_action_url(session_id, task_id, "status")?;
         let _: wire::SessionDetail = client
             .post(&url, &request)
             .map_err(|error| daemon_client_error("update task", &error))?;
@@ -406,7 +415,7 @@ pub fn record_task_checkpoint(
             summary: summary.to_string(),
             progress,
         };
-        let url = task_action_url(session_id, task_id, "checkpoint");
+        let url = task_action_url(session_id, task_id, "checkpoint")?;
         let _: wire::SessionDetail = client
             .post(&url, &request)
             .map_err(|error| daemon_client_error("checkpoint task", &error))?;

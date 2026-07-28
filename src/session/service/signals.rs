@@ -8,6 +8,7 @@ use super::{
     signal_context_root, signal_dirs_for_agent_in_context_root, signal_records_for_dirs, storage,
     utc_now, wire, write_signal_ack,
 };
+use crate::infra::io::validate_safe_segment;
 use harness_daemon_client::DaemonClient;
 use tokio::runtime::Handle;
 
@@ -31,6 +32,7 @@ pub fn send_signal(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::SignalSendRequest {
             actor: actor_id.to_string(),
             agent_id: agent_id.to_string(),
@@ -126,6 +128,7 @@ pub fn cancel_signal(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::SignalCancelRequest {
             actor: actor_id.to_string(),
             agent_id: agent_id.to_string(),
@@ -198,6 +201,7 @@ pub fn list_signals(
     // No daemon-side caller reaches this directly, so it needs no
     // tokio-runtime guard.
     if let Some(client) = DaemonClient::try_connect() {
+        validate_safe_segment(session_id)?;
         let detail: wire::SessionDetail = client
             .get(&format!("/v1/sessions/{session_id}"), &[])
             .map_err(|error| daemon_client_error("get session detail", &error))?;
@@ -307,6 +311,7 @@ pub fn record_signal_acknowledgment(
     if Handle::try_current().is_err()
         && let Some(client) = DaemonClient::try_connect()
     {
+        validate_safe_segment(session_id)?;
         let request = wire::SignalAckRequest {
             agent_id: agent_id.to_string(),
             signal_id: signal_id.to_string(),
