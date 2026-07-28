@@ -12,7 +12,7 @@ use super::super::remote_systemd_lifecycle::RemoteSystemdCommandOutput;
 use super::super::remote_systemd_start_permit::{
     RuntimeStartPermit, require_runtime_start_permit_absent,
 };
-use super::files::{io_error, regular_file_metadata};
+use super::files::io_error;
 use super::model::RemoteSystemdOperationPlan;
 #[path = "unit_contract/identity.rs"]
 mod identity;
@@ -154,8 +154,24 @@ fn validate_environment_file(path: &Path) -> Result<(), CliError> {
 
 fn validate_managed_file(path: &Path, label: &str, executable: bool) -> Result<(), CliError> {
     paths::validate_trusted_ancestors(path, label)?;
-    let metadata = regular_file_metadata(path)
-        .map_err(|error| io_error(format!("managed {label} {}: {error}", path.display())))?;
+    let metadata = fs::symlink_metadata(path).map_err(|error| {
+        io_error(format!(
+            "inspect managed {label} {}: {error}",
+            path.display()
+        ))
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(io_error(format!(
+            "managed {label} {} must not be a symbolic link",
+            path.display()
+        )));
+    }
+    if !metadata.is_file() {
+        return Err(io_error(format!(
+            "managed {label} {} must be a regular file",
+            path.display()
+        )));
+    }
     let (owner_id, group_id) = trusted_owner();
     if metadata.uid() != owner_id || metadata.gid() != group_id {
         return Err(io_error(format!(
