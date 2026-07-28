@@ -35,7 +35,7 @@ MONITOR_LAST_UPGRADE_CHECK="${HARNESS_MONITOR_LAST_UPGRADE_CHECK:-$MONITOR_DEFAU
 MONITOR_LAST_SWIFT_UPDATE_CHECK="${HARNESS_MONITOR_LAST_SWIFT_UPDATE_CHECK:-$MONITOR_LAST_UPGRADE_CHECK}"
 MONITOR_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PROJECT_OBJECT_VERSION:-77}"
 MONITOR_PREFERRED_PROJECT_OBJECT_VERSION="${HARNESS_MONITOR_PREFERRED_PROJECT_OBJECT_VERSION:-$MONITOR_PROJECT_OBJECT_VERSION}"
-SARIF_OUTPUT_RS="$ROOT/src/observe/output.rs"
+SARIF_OUTPUT_RS="$ROOT/crates/harness-observe/src/output.rs"
 
 usage() {
   cat <<'EOF'
@@ -489,7 +489,7 @@ check_sync() {
   fi
 
   if ! grep -q 'env!("CARGO_PKG_VERSION")' "$SARIF_OUTPUT_RS"; then
-    errors+=("src/observe/output.rs must keep SARIF driver.version sourced from env!(\"CARGO_PKG_VERSION\")")
+    errors+=("crates/harness-observe/src/output.rs must keep SARIF driver.version sourced from env!(\"CARGO_PKG_VERSION\")")
   fi
 
   if [ "${#errors[@]}" -gt 0 ]; then

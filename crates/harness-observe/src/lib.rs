@@ -5,9 +5,12 @@
 pub mod classifier;
 pub mod dump;
 mod issue_code;
+pub mod output;
 pub mod patterns;
 pub mod session_event;
 mod text;
+pub mod transport;
+pub mod types;
 
 pub use issue_code::compute_issue_id;
 pub use text::{
