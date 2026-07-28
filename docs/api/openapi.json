@@ -19222,7 +19222,7 @@
       },
       "PolicyApprovalState": {
         "type": "string",
-        "description": "Resolution state of a durable `ApprovalGate` (`crate::task_board::policy_graph`\nin the root crate, which stays there for now) grant, injected into\nevaluation by the caller. `None` on the input means no grant exists yet\nfor the gate.",
+        "description": "Resolution state of a durable `ApprovalGate` (`crate::policy_graph`) grant,\ninjected into evaluation by the caller. `None` on the input means no grant\nexists yet for the gate.",
         "enum": [
           "pending",
           "approved",
