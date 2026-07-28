@@ -2,8 +2,11 @@ use std::path::PathBuf;
 
 use clap::Args;
 
+use crate::infra::io;
 use crate::session::types::SessionRole;
-use crate::session::wire::{AdoptSessionRequest, ObserveSessionRequest, SessionDetail};
+use crate::session::wire::{
+    AdoptSessionRequest, ObserveSessionRequest, SessionDetail, SessionMutationResponse,
+};
 use crate::session::{observe, service};
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::CliError;
@@ -244,6 +247,7 @@ pub struct SessionObserveArgs {
 
 impl Execute for SessionObserveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
@@ -263,8 +267,10 @@ impl Execute for SessionObserveArgs {
         {
             // Daemon-backed observe tasks must go through the dedicated observe
             // mutation so issue metadata survives canonical persistence. Named
-            // `_leaf` because `support::daemon_client()`, imported below, returns
-            // the unrelated root-facade client of the same type name.
+            // `_leaf` only to avoid shadowing the `daemon_client` function
+            // imported below and used by `SessionAdoptArgs`; a `None` here
+            // means fall back to the file-backed path below, not an error, so
+            // this can't reuse that function's error-returning connect.
             let request = ObserveSessionRequest {
                 actor: Some(actor.to_string()),
             };
@@ -480,9 +486,11 @@ impl Execute for SessionAdoptArgs {
             bookmark_id: self.bookmark_id.clone(),
             session_root: self.path.to_string_lossy().into_owned(),
         };
-        let state = daemon_client()?.adopt_session(&request)?;
-        println!("Attached session {}", state.session_id);
-        print_json(&state)?;
+        let response: SessionMutationResponse = daemon_client()?
+            .post("/v1/sessions/adopt", &request)
+            .map_err(|error| daemon_client_error("adopt session", &error))?;
+        println!("Attached session {}", response.state.session_id);
+        print_json(&response.state)?;
         Ok(0)
     }
 }

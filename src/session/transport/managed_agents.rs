@@ -1,11 +1,17 @@
 use clap::Args;
 
+use crate::infra::io;
 use harness_kernel::errors::CliError;
 use harness_workspace::command_context::{AppContext, Execute};
+
+use crate::session::transport::support::daemon_client_error;
+use crate::session::wire::{ManagedAgentListResponse, ManagedAgentSnapshot};
 
 mod acp_sessions;
 mod attach;
 mod codex;
+#[cfg(test)]
+mod daemon_routing_tests;
 mod inspect;
 mod start;
 mod terminal;
@@ -29,7 +35,11 @@ pub struct ManagedAgentListArgs {
 
 impl Execute for ManagedAgentListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = super::support::daemon_client()?.list_managed_agents(&self.session_id)?;
+        io::validate_safe_segment(&self.session_id)?;
+        let url = format!("/v1/sessions/{}/managed-agents", self.session_id);
+        let response: ManagedAgentListResponse = super::support::daemon_client()?
+            .get(&url, &[])
+            .map_err(|error| daemon_client_error("list managed agents", &error))?;
         super::support::print_json(&response)?;
         Ok(0)
     }
@@ -43,7 +53,11 @@ pub struct ManagedAgentShowArgs {
 
 impl Execute for ManagedAgentShowArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = super::support::daemon_client()?.get_managed_agent(&self.agent_id)?;
+        io::validate_safe_segment(&self.agent_id)?;
+        let url = format!("/v1/managed-agents/{}", self.agent_id);
+        let snapshot: ManagedAgentSnapshot = super::support::daemon_client()?
+            .get(&url, &[])
+            .map_err(|error| daemon_client_error("get managed agent", &error))?;
         super::support::print_json(&snapshot)?;
         Ok(0)
     }

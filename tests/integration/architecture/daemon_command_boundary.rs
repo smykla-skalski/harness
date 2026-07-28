@@ -55,9 +55,21 @@ use super::helpers::collect_hits_in_paths;
 /// `daemon::timeline` did not need touching. Both files now join the blanket
 /// check below instead of needing a narrower one of their own.
 ///
-/// `session::transport::support`'s `daemon_client()` helper (still needed by
-/// the managed-agent command surfaces that did not move this round) is not
-/// covered here either.
+/// `session::transport::support`'s `daemon_client()` helper backed the
+/// remaining managed-agent command surfaces (terminal start/attach, Codex
+/// steer/interrupt/approval, ACP session list/close/delete, ACP lifecycle
+/// start/inspect/logout, and session adoption) through the same typed root
+/// facade. It now returns the leaf `harness_daemon_client::DaemonClient`
+/// instead, so every one of those call sites builds its own request against
+/// the generic `get`/`post`/`delete`, verified against the daemon's actual
+/// route registration. `terminal.rs` no longer needs its own private
+/// duplicate of the helper now that `support::daemon_client()` returns the
+/// same leaf type, so it was folded back onto the shared one. Because this
+/// is a text-grep guard and the back-edge lived entirely inside
+/// `support.rs` (its callers never wrote `crate::daemon::` themselves), the
+/// managed-agent surfaces were already grep-clean before the fix; the actual
+/// proof that they now hit the leaf client lives in the fake-daemon-backed
+/// `session::transport::managed_agents::daemon_routing_tests` suite.
 #[test]
 fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -74,7 +86,14 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
             "src/session/service/tasks.rs",
             "src/session/transport/task.rs",
             "src/session/transport/improver.rs",
+            "src/session/transport/recover.rs",
             "src/session/transport/session_commands.rs",
+            "src/session/transport/support.rs",
+            "src/session/transport/managed_agents.rs",
+            "src/session/transport/managed_agents/acp_sessions.rs",
+            "src/session/transport/managed_agents/attach.rs",
+            "src/session/transport/managed_agents/codex.rs",
+            "src/session/transport/managed_agents/start.rs",
             "src/session/transport/managed_agents/terminal.rs",
             "src/task_board/transport.rs",
             "src/task_board/transport/catalog.rs",

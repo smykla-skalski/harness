@@ -2,16 +2,21 @@ use std::collections::BTreeMap;
 
 use clap::{Args, Subcommand};
 
+use crate::infra::io;
 use crate::session::types::SessionRole;
+use crate::session::wire::ManagedAgentSnapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
-use harness_protocol::managed_agents::acp::{AcpAgentStartRequest, AcpEndpoint};
+use harness_protocol::managed_agents::acp::{
+    AcpAgentInspectResponse, AcpAgentStartRequest, AcpEndpoint,
+};
 use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
 use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
 use harness_workspace::command_context::{AppContext, Execute};
 
 use crate::session::transport::support::{
-    agent_to_str, capability_args, daemon_client, print_json, resolve_project_dir,
+    agent_to_str, capability_args, daemon_client, daemon_client_error, print_json,
+    resolve_project_dir,
 };
 
 use super::acp_sessions::{AcpCloseSessionArgs, AcpDeleteSessionArgs, AcpSessionsArgs};
@@ -188,6 +193,7 @@ pub struct AcpAgentStartArgs {
 
 impl Execute for AcpAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let endpoint = self
             .endpoint
             .as_deref()
@@ -219,7 +225,10 @@ impl Execute for AcpAgentStartArgs {
             resume_disabled: self.no_resume,
             endpoint,
         };
-        let snapshot = daemon_client()?.start_acp_managed_agent(&self.session_id, &request)?;
+        let url = format!("/v1/sessions/{}/managed-agents/acp", self.session_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("start managed ACP agent", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
@@ -268,7 +277,13 @@ pub struct AcpInspectArgs {
 
 impl Execute for AcpInspectArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.inspect_acp_managed_agents(self.session_id.as_deref())?;
+        let mut query: Vec<(&str, &str)> = Vec::new();
+        if let Some(session_id) = self.session_id.as_deref() {
+            query.push(("session_id", session_id));
+        }
+        let response: AcpAgentInspectResponse = daemon_client()?
+            .get("/v1/managed-agents/acp/inspect", &query)
+            .map_err(|error| daemon_client_error("inspect managed ACP agents", &error))?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -286,7 +301,11 @@ pub struct AcpLogoutArgs {
 
 impl Execute for AcpLogoutArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let response = daemon_client()?.logout_acp_managed_agent(&self.acp_id)?;
+        io::validate_safe_segment(&self.acp_id)?;
+        let url = format!("/v1/managed-agents/{}/logout", self.acp_id);
+        let response: serde_json::Value = daemon_client()?
+            .post(&url, &serde_json::json!({}))
+            .map_err(|error| daemon_client_error("log out managed ACP agent", &error))?;
         print_json(&response)?;
         Ok(0)
     }
@@ -347,6 +366,7 @@ pub struct TerminalAgentStartArgs {
 
 impl Execute for TerminalAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let request = AgentTuiStartRequest {
             runtime: agent_to_str(self.runtime).to_string(),
             role: self.role,
@@ -369,7 +389,10 @@ impl Execute for TerminalAgentStartArgs {
             effort: self.effort.clone(),
             allow_custom_model: self.allow_custom_model,
         };
-        let snapshot = daemon_client()?.start_terminal_managed_agent(&self.session_id, &request)?;
+        let url = format!("/v1/sessions/{}/managed-agents/terminal", self.session_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("start managed terminal agent", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
@@ -419,6 +442,7 @@ pub struct CodexAgentStartArgs {
 
 impl Execute for CodexAgentStartArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let request = CodexRunRequest {
             actor: None,
             prompt: self.prompt.clone(),
@@ -436,7 +460,10 @@ impl Execute for CodexAgentStartArgs {
             effort: self.effort.clone(),
             allow_custom_model: self.allow_custom_model,
         };
-        let snapshot = daemon_client()?.start_codex_managed_agent(&self.session_id, &request)?;
+        let url = format!("/v1/sessions/{}/managed-agents/codex", self.session_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("start managed Codex agent", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }

@@ -1,12 +1,14 @@
 use clap::Args;
 
+use crate::infra::io;
 use harness_kernel::errors::CliError;
 use harness_protocol::managed_agents::codex::{
     CodexApprovalDecision, CodexApprovalDecisionRequest, CodexSteerRequest,
 };
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::session::transport::support::{daemon_client, print_json};
+use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
+use crate::session::wire::ManagedAgentSnapshot;
 
 #[derive(Debug, Clone, Args)]
 pub struct CodexAgentSteerArgs {
@@ -19,12 +21,14 @@ pub struct CodexAgentSteerArgs {
 
 impl Execute for CodexAgentSteerArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = daemon_client()?.steer_codex_managed_agent(
-            &self.agent_id,
-            &CodexSteerRequest {
-                prompt: self.prompt.clone(),
-            },
-        )?;
+        io::validate_safe_segment(&self.agent_id)?;
+        let request = CodexSteerRequest {
+            prompt: self.prompt.clone(),
+        };
+        let url = format!("/v1/managed-agents/{}/steer", self.agent_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("steer managed Codex agent", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
@@ -38,7 +42,11 @@ pub struct CodexAgentInterruptArgs {
 
 impl Execute for CodexAgentInterruptArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = daemon_client()?.interrupt_codex_managed_agent(&self.agent_id)?;
+        io::validate_safe_segment(&self.agent_id)?;
+        let url = format!("/v1/managed-agents/{}/interrupt", self.agent_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &serde_json::json!({}))
+            .map_err(|error| daemon_client_error("interrupt managed Codex agent", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
@@ -57,13 +65,18 @@ pub struct CodexAgentApprovalArgs {
 
 impl Execute for CodexAgentApprovalArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let snapshot = daemon_client()?.resolve_codex_managed_agent_approval(
-            &self.agent_id,
-            &self.approval_id,
-            &CodexApprovalDecisionRequest {
-                decision: self.decision,
-            },
-        )?;
+        io::validate_safe_segment(&self.agent_id)?;
+        io::validate_safe_segment(&self.approval_id)?;
+        let request = CodexApprovalDecisionRequest {
+            decision: self.decision,
+        };
+        let url = format!(
+            "/v1/managed-agents/{}/approvals/{}",
+            self.agent_id, self.approval_id
+        );
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("resolve managed Codex approval", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }

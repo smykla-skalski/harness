@@ -2,12 +2,16 @@ use std::path::Path;
 
 use clap::Args;
 
+use crate::infra::io;
 use crate::session::service;
+use crate::session::wire::ManagedAgentSnapshot;
 use harness_kernel::errors::CliError;
 use harness_protocol::agent::HookAgent;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use super::support::{agent_to_str, daemon_client, print_json, resolve_project_dir};
+use super::support::{
+    agent_to_str, daemon_client, daemon_client_error, print_json, resolve_project_dir,
+};
 
 #[derive(Debug, Clone, Args)]
 pub struct SessionRecoverLeaderArgs {
@@ -26,6 +30,7 @@ pub struct SessionRecoverLeaderArgs {
 
 impl Execute for SessionRecoverLeaderArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, Path::new(&local_project))?;
@@ -35,7 +40,10 @@ impl Execute for SessionRecoverLeaderArgs {
             agent_to_str(self.runtime),
             &project,
         )?;
-        let snapshot = daemon_client()?.start_terminal_managed_agent(&self.session_id, &request)?;
+        let url = format!("/v1/sessions/{}/managed-agents/terminal", self.session_id);
+        let snapshot: ManagedAgentSnapshot = daemon_client()?
+            .post(&url, &request)
+            .map_err(|error| daemon_client_error("start managed terminal agent", &error))?;
         print_json(&snapshot)?;
         Ok(0)
     }
