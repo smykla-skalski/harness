@@ -259,3 +259,18 @@ fn session_observe_execute_routes_actorful_one_shot_via_daemon_client() {
         );
     });
 }
+
+#[test]
+fn session_observe_rejects_a_session_id_that_would_escape_its_path_segment() {
+    let args = SessionObserveArgs {
+        session_id: "../orchestrator/stop".into(),
+        poll_interval: 0,
+        json: true,
+        actor: Some("observer-1".into()),
+        project_dir: None,
+    };
+    let error = args
+        .execute(&AppContext)
+        .expect_err("a session id with a path separator must be rejected before any request");
+    assert!(error.to_string().contains("../orchestrator/stop"));
+}

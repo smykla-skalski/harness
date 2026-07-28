@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
+use crate::infra::io;
 use crate::session::types::SessionRole;
 use crate::session::wire::{
     AdoptSessionRequest, ObserveSessionRequest, SessionDetail, SessionMutationResponse,
@@ -246,6 +247,7 @@ pub struct SessionObserveArgs {
 
 impl Execute for SessionObserveArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        io::validate_safe_segment(&self.session_id)?;
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
