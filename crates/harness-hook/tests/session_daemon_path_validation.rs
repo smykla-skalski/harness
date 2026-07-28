@@ -34,17 +34,13 @@ fn install_fake_running_daemon(endpoint: &str, token: &str) -> std::fs::File {
     lock_file
         .try_lock_exclusive()
         .expect("hold daemon singleton lock");
-    let token_path = daemon_root.join("auth-token");
+    let token_path = state::auth_token_path();
     std::fs::write(&token_path, token).expect("write token");
     let manifest = DaemonManifest {
         endpoint: endpoint.to_string(),
         token_path: token_path.display().to_string(),
     };
-    std::fs::write(
-        daemon_root.join("manifest.json"),
-        serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
-    )
-    .expect("write manifest");
+    state::write_manifest(&manifest).expect("write manifest");
     lock_file
 }
 

@@ -6,7 +6,7 @@ use std::thread;
 use fs2::FileExt;
 
 use crate::daemon::state;
-use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
+use crate::daemon::state::{DaemonManifest, HostBridgeManifest, ScopedDaemonRootOverride};
 
 pub(crate) fn install_fake_running_xdg_daemon(
     xdg_root: &std::path::Path,
@@ -32,25 +32,27 @@ pub(crate) fn install_fake_running_xdg_daemon(
     lock_file
         .try_lock_exclusive()
         .expect("hold daemon singleton lock");
-    let token_path = daemon_root.join("auth-token");
+
+    // Some callers write these fixture files before the environment even
+    // points `daemon_root()` at `xdg_root` (proving discovery reacts to a
+    // later environment change), so pin the write target explicitly rather
+    // than relying on ambient env state.
+    let _root_override = ScopedDaemonRootOverride::set(Some(daemon_root.clone()));
+    let token_path = state::auth_token_path();
     std::fs::write(&token_path, token).expect("write token");
-    std::fs::write(
-        daemon_root.join("manifest.json"),
-        serde_json::to_string_pretty(&DaemonManifest {
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            pid: std::process::id(),
-            endpoint: endpoint.to_string(),
-            started_at: "2026-04-11T00:00:00Z".to_string(),
-            token_path: token_path.display().to_string(),
-            sandboxed: false,
-            host_bridge: HostBridgeManifest::default(),
-            revision: 0,
-            updated_at: String::new(),
-            binary_stamp: None,
-            ownership: Default::default(),
-        })
-        .expect("serialize manifest"),
-    )
+    state::write_manifest(&DaemonManifest {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        pid: std::process::id(),
+        endpoint: endpoint.to_string(),
+        started_at: "2026-04-11T00:00:00Z".to_string(),
+        token_path: token_path.display().to_string(),
+        sandboxed: false,
+        host_bridge: HostBridgeManifest::default(),
+        revision: 0,
+        updated_at: String::new(),
+        binary_stamp: None,
+        ownership: Default::default(),
+    })
     .expect("write manifest");
 
     lock_file
