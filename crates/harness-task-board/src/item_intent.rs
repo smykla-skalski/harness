@@ -173,17 +173,18 @@ mod tests {
     )]
     fn one_ticket_carries_both_intents_without_collapsing() {
         let both = TaskBoardWorkflowKind::PrFixReview;
-        assert!(both.has_dependency_update_intent());
-        assert!(both.has_review_request_intent());
         assert_eq!(
             both.pr_intents(),
             Some(PrIntentSet::DEPENDENCY_UPDATE.with(PrIntentSet::REVIEW_REQUEST))
         );
-        // The single-intent kinds carry exactly one.
-        assert!(TaskBoardWorkflowKind::PrFix.has_dependency_update_intent());
-        assert!(!TaskBoardWorkflowKind::PrFix.has_review_request_intent());
-        assert!(TaskBoardWorkflowKind::PrReview.has_review_request_intent());
-        assert!(!TaskBoardWorkflowKind::PrReview.has_dependency_update_intent());
+        for (kind, dependency_update, review_request) in [
+            (both, true, true),
+            (TaskBoardWorkflowKind::PrFix, true, false),
+            (TaskBoardWorkflowKind::PrReview, false, true),
+        ] {
+            assert_eq!(kind.has_dependency_update_intent(), dependency_update);
+            assert_eq!(kind.has_review_request_intent(), review_request);
+        }
         assert_eq!(TaskBoardWorkflowKind::DefaultTask.pr_intents(), None);
     }
 

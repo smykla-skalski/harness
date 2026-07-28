@@ -1,0 +1,472 @@
+use std::time::Duration;
+
+use reqwest::Method;
+use serde::Serialize;
+
+use super::*;
+
+const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
+const CODEX_MODEL: &str = "gpt-5.4-mini";
+const SMOKE_TIMEOUT: Duration = Duration::from_secs(180);
+const SMOKE_PROMPT: &str =
+    "Return one short plain-text sentence confirming this headless report turn completed.";
+
+#[derive(Debug, Serialize)]
+struct LiveAgentSmokeReport {
+    correlation_id: String,
+    runtime: String,
+    requested_model: String,
+    effective_model: Option<String>,
+    terminal_status: String,
+    report: Option<String>,
+    failure_stage: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Debug)]
+struct SmokeFailure {
+    correlation_id: String,
+    runtime: &'static str,
+    requested_model: &'static str,
+    stage: &'static str,
+    error: String,
+}
+
+impl SmokeFailure {
+    fn new(
+        correlation_id: impl Into<String>,
+        runtime: &'static str,
+        requested_model: &'static str,
+        stage: &'static str,
+        error: impl Into<String>,
+    ) -> Self {
+        Self {
+            correlation_id: correlation_id.into(),
+            runtime,
+            requested_model,
+            stage,
+            error: error.into(),
+        }
+    }
+
+    fn into_report(self) -> LiveAgentSmokeReport {
+        LiveAgentSmokeReport {
+            correlation_id: self.correlation_id,
+            runtime: self.runtime.to_owned(),
+            requested_model: self.requested_model.to_owned(),
+            effective_model: None,
+            terminal_status: "failed".to_owned(),
+            report: None,
+            failure_stage: Some(self.stage.to_owned()),
+            error: Some(self.error),
+        }
+    }
+}
+
+#[test]
+#[ignore = "explicit live validation; requires OpenRouter and Codex credentials"]
+fn openrouter_and_codex_complete_without_monitor() {
+    let openrouter_token = required_env("OPENROUTER_API_KEY", "openrouter", OPENROUTER_MODEL);
+    let codex_path = required_env("HARNESS_LIVE_CODEX_PATH", "codex", CODEX_MODEL);
+    let tmp = tempdir().expect("stage=fixture: create tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("stage=fixture: create home");
+    std::fs::create_dir_all(&xdg).expect("stage=fixture: create xdg");
+    init_git_repo(&project);
+
+    let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
+    let codex_port = TcpPortLease::acquire().expect("stage=bridge_start: reserve Codex port");
+    let port_text = codex_port.port().to_string();
+    let mut bridge = spawn_bridge_with_port_lease(
+        &home,
+        &xdg,
+        &[
+            "--capability",
+            "codex",
+            "--capability",
+            "acp",
+            "--codex-port",
+            &port_text,
+            "--codex-path",
+            &codex_path,
+        ],
+        codex_port,
+    );
+    let _bridge_ready = wait_for_bridge_capabilities(&home, &xdg, &["codex", "acp"]);
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+
+    let openrouter = run_openrouter(&home, &xdg, &project, &endpoint, &token, &openrouter_token)
+        .unwrap_or_else(SmokeFailure::into_report);
+    let codex = run_codex(&home, &xdg, &project, &endpoint, &token)
+        .unwrap_or_else(SmokeFailure::into_report);
+    let reports = vec![openrouter, codex];
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&reports).expect("stage=output: serialize smoke reports")
+    );
+
+    let bridge_stop = run_harness(&home, &xdg, &["bridge", "stop"]);
+    assert!(
+        bridge_stop.status.success(),
+        "stage=cleanup: bridge stop failed: {}",
+        output_text(&bridge_stop)
+    );
+    wait_for_child_exit(&mut bridge);
+    daemon.kill().expect("stage=cleanup: kill daemon");
+    wait_for_child_exit(&mut daemon);
+
+    assert!(
+        reports.iter().all(|report| report.failure_stage.is_none()),
+        "one or more live agent reports failed"
+    );
+}
+
+fn run_openrouter(
+    home: &Path,
+    xdg: &Path,
+    project: &Path,
+    endpoint: &str,
+    token: &str,
+    openrouter_token: &str,
+) -> Result<LiveAgentSmokeReport, SmokeFailure> {
+    let runtime = "openrouter";
+    request_json(
+        Method::PUT,
+        endpoint,
+        token,
+        "/v1/task-board/orchestrator/openrouter-token",
+        Some(json!({ "token": openrouter_token })),
+    )
+    .map_err(|error| {
+        SmokeFailure::new(
+            "not-started",
+            runtime,
+            OPENROUTER_MODEL,
+            "credential_sync",
+            error,
+        )
+    })?;
+    let project_arg = project.to_str().expect("UTF-8 project");
+    let session = start_session_via_http(
+        home,
+        xdg,
+        project_arg,
+        "headless-live-openrouter",
+        "OpenRouter headless live smoke",
+        SMOKE_PROMPT,
+    );
+    let correlation_id = session.session_id.clone();
+    let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/acp");
+    let started = request_json(
+        Method::POST,
+        endpoint,
+        token,
+        &start_path,
+        Some(json!({
+            "descriptor_id": "openrouter",
+            "role": "worker",
+            "prompt": SMOKE_PROMPT,
+            "project_dir": project_arg,
+            "model": OPENROUTER_MODEL,
+        })),
+    )
+    .map_err(|error| {
+        SmokeFailure::new(
+            &correlation_id,
+            runtime,
+            OPENROUTER_MODEL,
+            "agent_start",
+            error,
+        )
+    })?;
+    let managed_agent_id = started
+        .pointer("/snapshot/managed_agent_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            SmokeFailure::new(
+                &correlation_id,
+                runtime,
+                OPENROUTER_MODEL,
+                "agent_start",
+                format!("response omitted managed agent id: {started}"),
+            )
+        })?;
+    poll_openrouter(endpoint, token, &correlation_id, managed_agent_id)
+}
+
+fn poll_openrouter(
+    endpoint: &str,
+    token: &str,
+    correlation_id: &str,
+    managed_agent_id: &str,
+) -> Result<LiveAgentSmokeReport, SmokeFailure> {
+    let runtime = "openrouter";
+    let deadline = Instant::now() + SMOKE_TIMEOUT;
+    loop {
+        let inspect_path = format!("/v1/managed-agents/acp/inspect?session_id={correlation_id}");
+        let inspect =
+            request_json(Method::GET, endpoint, token, &inspect_path, None).map_err(|error| {
+                SmokeFailure::new(
+                    correlation_id,
+                    runtime,
+                    OPENROUTER_MODEL,
+                    "state_poll",
+                    error,
+                )
+            })?;
+        let agent = inspect["agents"].as_array().and_then(|agents| {
+            agents
+                .iter()
+                .find(|agent| agent["managed_agent_id"] == managed_agent_id)
+        });
+        let stop_reason = agent
+            .and_then(|agent| agent.pointer("/session_state/last_stop_reason"))
+            .and_then(Value::as_str);
+        if let Some(terminal_status) = stop_reason {
+            let effective_model = agent.and_then(openrouter_effective_model);
+            let report = openrouter_report(endpoint, token, correlation_id)?;
+            if effective_model.as_deref() != Some(OPENROUTER_MODEL) {
+                return Err(SmokeFailure::new(
+                    correlation_id,
+                    runtime,
+                    OPENROUTER_MODEL,
+                    "model_selection",
+                    format!("effective model was {effective_model:?}"),
+                ));
+            }
+            if terminal_status != "end_turn" {
+                return Err(SmokeFailure::new(
+                    correlation_id,
+                    runtime,
+                    OPENROUTER_MODEL,
+                    "execution",
+                    format!("terminal status was {terminal_status}"),
+                ));
+            }
+            if let Some(report) = report {
+                return Ok(completed_report(
+                    correlation_id,
+                    runtime,
+                    OPENROUTER_MODEL,
+                    effective_model,
+                    terminal_status,
+                    report,
+                ));
+            }
+        }
+        if Instant::now() >= deadline {
+            let transcript_path =
+                format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
+            let transcript = request_json(Method::GET, endpoint, token, &transcript_path, None)
+                .unwrap_or_else(|error| json!({ "read_error": error }));
+            return Err(SmokeFailure::new(
+                correlation_id,
+                runtime,
+                OPENROUTER_MODEL,
+                "result_collection",
+                format!(
+                    "timed out waiting for terminal state and report; inspect={inspect}; transcript={transcript}"
+                ),
+            ));
+        }
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
+}
+
+fn openrouter_effective_model(agent: &Value) -> Option<String> {
+    agent
+        .pointer("/session_state/config_options")
+        .and_then(Value::as_array)?
+        .iter()
+        .find(|option| option["id"] == "model")?
+        .get("current_value")?
+        .as_str()
+        .map(ToOwned::to_owned)
+}
+
+fn openrouter_report(
+    endpoint: &str,
+    token: &str,
+    correlation_id: &str,
+) -> Result<Option<String>, SmokeFailure> {
+    let path = format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
+    let transcript = request_json(Method::GET, endpoint, token, &path, None).map_err(|error| {
+        SmokeFailure::new(
+            correlation_id,
+            "openrouter",
+            OPENROUTER_MODEL,
+            "result_collection",
+            error,
+        )
+    })?;
+    Ok(transcript["entries"].as_array().and_then(|entries| {
+        entries
+            .iter()
+            .find(|entry| entry["kind"] == "assistant_text")
+            .and_then(|entry| entry["summary"].as_str())
+            .map(ToOwned::to_owned)
+    }))
+}
+
+fn run_codex(
+    home: &Path,
+    xdg: &Path,
+    project: &Path,
+    endpoint: &str,
+    token: &str,
+) -> Result<LiveAgentSmokeReport, SmokeFailure> {
+    let runtime = "codex";
+    let session = start_session_via_http(
+        home,
+        xdg,
+        project.to_str().expect("UTF-8 project"),
+        "headless-live-codex",
+        "Codex headless live smoke",
+        SMOKE_PROMPT,
+    );
+    let correlation_id = session.session_id.clone();
+    let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/codex");
+    let started = request_json(
+        Method::POST,
+        endpoint,
+        token,
+        &start_path,
+        Some(json!({
+            "prompt": SMOKE_PROMPT,
+            "mode": "report",
+            "model": CODEX_MODEL,
+        })),
+    )
+    .map_err(|error| {
+        SmokeFailure::new(&correlation_id, runtime, CODEX_MODEL, "agent_start", error)
+    })?;
+    let run_id = started
+        .pointer("/snapshot/run_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            SmokeFailure::new(
+                &correlation_id,
+                runtime,
+                CODEX_MODEL,
+                "agent_start",
+                format!("response omitted Codex run id: {started}"),
+            )
+        })?;
+    let deadline = Instant::now() + SMOKE_TIMEOUT;
+    loop {
+        let snapshot = request_json(
+            Method::GET,
+            endpoint,
+            token,
+            &format!("/v1/managed-agents/{run_id}"),
+            None,
+        )
+        .map_err(|error| {
+            SmokeFailure::new(&correlation_id, runtime, CODEX_MODEL, "state_poll", error)
+        })?;
+        let run = &snapshot["snapshot"];
+        let status = run["status"].as_str().unwrap_or("unknown");
+        if !matches!(status, "queued" | "running" | "waiting_approval") {
+            let effective_model = run["model"].as_str().map(ToOwned::to_owned);
+            if status != "completed" {
+                return Err(SmokeFailure::new(
+                    &correlation_id,
+                    runtime,
+                    CODEX_MODEL,
+                    "execution",
+                    format!("terminal status={status} error={:?}", run["error"]),
+                ));
+            }
+            let report = run["final_message"]
+                .as_str()
+                .filter(|value| !value.trim().is_empty());
+            let report = report.ok_or_else(|| {
+                SmokeFailure::new(
+                    &correlation_id,
+                    runtime,
+                    CODEX_MODEL,
+                    "result_collection",
+                    "completed run omitted final_message",
+                )
+            })?;
+            return Ok(completed_report(
+                &correlation_id,
+                runtime,
+                CODEX_MODEL,
+                effective_model,
+                status,
+                report.to_owned(),
+            ));
+        }
+        if Instant::now() >= deadline {
+            return Err(SmokeFailure::new(
+                &correlation_id,
+                runtime,
+                CODEX_MODEL,
+                "state_poll",
+                "timed out waiting for terminal status",
+            ));
+        }
+        thread::sleep(DAEMON_WAIT_INTERVAL);
+    }
+}
+
+fn completed_report(
+    correlation_id: &str,
+    runtime: &str,
+    requested_model: &str,
+    effective_model: Option<String>,
+    terminal_status: &str,
+    report: String,
+) -> LiveAgentSmokeReport {
+    LiveAgentSmokeReport {
+        correlation_id: correlation_id.to_owned(),
+        runtime: runtime.to_owned(),
+        requested_model: requested_model.to_owned(),
+        effective_model,
+        terminal_status: terminal_status.to_owned(),
+        report: Some(report),
+        failure_stage: None,
+        error: None,
+    }
+}
+
+fn required_env(name: &str, runtime: &str, model: &str) -> String {
+    let value = std::env::var(name).unwrap_or_default();
+    assert!(
+        !value.trim().is_empty(),
+        "live agent smoke stopped before network: stage=credential runtime={runtime} requested_model={model}: {name} is missing or empty"
+    );
+    value
+}
+
+fn request_json(
+    method: Method,
+    endpoint: &str,
+    token: &str,
+    path: &str,
+    body: Option<Value>,
+) -> Result<Value, String> {
+    let runtime = Runtime::new().map_err(|error| format!("create HTTP runtime: {error}"))?;
+    let client = reqwest::Client::new();
+    let url = format!("{}{}", endpoint.trim_end_matches('/'), path);
+    runtime.block_on(async {
+        let mut request = client
+            .request(method, &url)
+            .bearer_auth(token)
+            .timeout(Duration::from_secs(10));
+        if let Some(body) = body {
+            request = request.json(&body);
+        }
+        let response = request.send().await.map_err(|error| error.to_string())?;
+        let status = response.status();
+        let text = response.text().await.map_err(|error| error.to_string())?;
+        if !status.is_success() {
+            return Err(format!("HTTP {status}: {text}"));
+        }
+        serde_json::from_str(&text).map_err(|error| format!("decode HTTP response: {error}"))
+    })
+}

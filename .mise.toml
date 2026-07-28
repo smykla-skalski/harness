@@ -187,6 +187,10 @@ run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml -
 description = "Explicitly run the live OpenRouter adapter validation (requires OPENROUTER_API_KEY)"
 run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none --manifest-path crates/harness-openrouter-agent/Cargo.toml --test openrouter_live --run-ignored only --success-output immediate --failure-output immediate"
 
+[tasks."test:runtime:live-agents"]
+description = "Run live OpenRouter and Codex report turns through an isolated daemon and bridge without Harness Monitor"
+run = "./scripts/live-agent-smoke.sh"
+
 [tasks."test:architecture"]
 description = "Run dependency-light Task Board architecture checks with native libtest (e.g. -- task_board_storage::task_board_orchestrator_has_one_runner -- --exact)"
 run = "./scripts/cargo-local.sh test -p harness-architecture-tests --lib"

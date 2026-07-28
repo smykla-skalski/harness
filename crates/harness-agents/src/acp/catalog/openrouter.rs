@@ -7,7 +7,8 @@
 //! requests).
 
 use super::{
-    AcpAgentDescriptor, AcpSessionConfiguration, AcpSpawnConfiguration, DoctorProbe, tags,
+    AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
+    AcpSessionModelTransport, AcpSpawnConfiguration, DoctorProbe, tags,
 };
 use crate::runtime::models;
 
@@ -39,7 +40,15 @@ pub fn descriptor() -> AcpAgentDescriptor {
             "OpenRouter ACP ships with Harness. Configure the API key via Harness Monitor → Settings → OpenRouter or `harness setup secrets set --kind openrouter`. The daemon delivers the key to the shim via a per-spawn mode-0600 file, never via environment variables."
                 .to_owned(),
         ),
-        session_configuration: AcpSessionConfiguration::default(),
+        session_configuration: AcpSessionConfiguration {
+            model: AcpSessionModelTransport::ConfigOption {
+                selector: AcpSessionConfigOptionBinding {
+                    option_id: Some("model".to_owned()),
+                    category: None,
+                },
+            },
+            ..Default::default()
+        },
         doctor_probe: DoctorProbe {
             command: "harness-openrouter-agent".to_owned(),
             args: vec!["--probe".to_owned()],
@@ -115,6 +124,16 @@ mod tests {
                 .iter()
                 .any(|model| model.id == catalog.default)
         );
+    }
+
+    #[test]
+    fn requested_model_uses_the_advertised_model_config_option() {
+        let AcpSessionModelTransport::ConfigOption { selector } =
+            descriptor().session_configuration.model
+        else {
+            panic!("OpenRouter model requests must use a config option");
+        };
+        assert_eq!(selector.option_id.as_deref(), Some("model"));
     }
 
     #[test]

@@ -21,6 +21,7 @@ use super::helpers::{ManagedChild, TcpPortLease, test_session_uuid};
 mod bridge;
 mod daemon_api;
 mod lifecycle;
+mod live_agents_headless;
 pub(crate) mod process;
 mod tui;
 mod tui_attach;
