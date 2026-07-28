@@ -18,7 +18,7 @@ Paths are relative to the repository root.
 
 - `crates/harness-kernel/` - unified error and hook-message system, XDG paths, build info, and skill constants.
 - `src/app/cli.rs` - the top-level command tree and its dispatch.
-- `src/hooks/` - tool lifecycle hook handlers, guards, and hook protocol types.
+- `crates/harness-hooks/src/` - tool lifecycle hook handlers, guards, and hook protocol types.
 - `src/workspace/compact/` - file fingerprinting with SHA256 and mtime.
 - `src/session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
 - `src/task_board/` - planning gates, dispatch/evaluate reconciliation, and external sync; reaches the item/query/policy core, the policy pipeline graph, the policy workflow runtime, and the triage/prompt/project/working-copy clusters below through the root crate's own facade. See `docs/agent-guides/task-board-workflow.md` for operator behavior.

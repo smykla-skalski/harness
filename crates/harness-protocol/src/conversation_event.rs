@@ -112,7 +112,7 @@ pub enum ConversationEventKind {
         summary: Option<String>,
     },
     // NOTE: `HookFired` was previously defined here but stays removed.
-    // Hooks in this codebase live in `src/hooks/runtime/mod.rs` and run
+    // Hooks in this codebase live in `crates/harness-hooks/src/runtime/mod.rs` and run
     // CLI-side around shell tool calls; there is no agent-side ACP path
     // that fires a hook on behalf of the model. Reintroduce only when an
     // agent-side hook surface lands with a real producer per the UI shape

@@ -3,12 +3,13 @@ use std::path::{Path, PathBuf};
 
 use tokio::task;
 
-use crate::hooks::adapters::{HookAgent, adapter_for};
+use crate::hooks::adapters::adapter_for;
 use crate::hooks::protocol::context::{NormalizedEvent, NormalizedHookContext};
 use crate::hooks::protocol::result::NormalizedHookResult;
 use crate::session::service as orchestration_service;
 use crate::workspace::{compact, utc_now};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::agent::HookAgent;
 use harness_protocol::session_resolution::{self, resolve_context_cwd, trimmed_env};
 
 use super::storage;

@@ -1,6 +1,3 @@
-#[path = "../../../src/hooks/protocol/payloads.rs"]
-mod payload_types;
-
 pub mod adapters {
     pub use harness_protocol::agent::HookAgent;
 }
@@ -12,7 +9,5 @@ pub mod protocol {
         pub use harness_kernel::errors::hook_result::*;
     }
 
-    pub mod payloads {
-        pub use super::super::payload_types::*;
-    }
+    pub use harness_hooks::protocol::payloads;
 }

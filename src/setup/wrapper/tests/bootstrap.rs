@@ -2,7 +2,7 @@ use fs_err as fs;
 
 use super::super::registrations::lifecycle_command;
 use super::super::{planned_agent_bootstrap_files, write_agent_bootstrap};
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 #[test]
 fn lifecycle_commands_include_project_dirs() {

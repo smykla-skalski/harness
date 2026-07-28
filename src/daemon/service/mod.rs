@@ -13,7 +13,7 @@ use crate::agents::runtime::signal::{
     AckResult, SignalAck, acknowledge_signal as write_signal_ack,
 };
 use crate::agents::service as agents_service;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
 };

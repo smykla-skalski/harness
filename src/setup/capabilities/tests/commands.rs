@@ -4,7 +4,7 @@ use clap::{CommandFactory, Subcommand, ValueEnum};
 
 use crate::app::cli::Cli;
 use crate::hooks::HookCommand;
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 use crate::setup::wrapper::process_agent_registrations;
 
 use super::*;

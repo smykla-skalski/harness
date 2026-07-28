@@ -2,10 +2,11 @@ use std::path::{Path, PathBuf};
 
 use fs_err;
 
-use crate::hooks::adapters::{HookAgent, adapter_for};
+use crate::hooks::adapters::adapter_for;
 use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::agent::HookAgent;
 
 mod install;
 mod registrations;

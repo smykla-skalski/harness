@@ -114,7 +114,7 @@ fn parse_session_agents_start_terminal() {
         panic!("expected Session Agents Start Terminal");
     };
     assert_eq!(args.session_id, "sess-terminal");
-    assert_eq!(args.runtime, crate::hooks::adapters::HookAgent::Codex);
+    assert_eq!(args.runtime, harness_protocol::agent::HookAgent::Codex);
     assert_eq!(args.role, crate::session::types::SessionRole::Worker);
     assert_eq!(
         args.fallback_role,

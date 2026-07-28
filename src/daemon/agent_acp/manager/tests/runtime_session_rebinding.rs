@@ -1,6 +1,6 @@
 use crate::agents::runtime::runtime_for;
 use crate::agents::runtime::signal::{AckResult, read_pending_signals};
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 use super::*;
 

@@ -128,9 +128,9 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
     let hits = super::helpers::collect_hits_in_paths(
         root,
         &[
-            "src/hooks/protocol/context.rs",
-            "src/hooks/adapters/mod.rs",
-            "src/hooks/adapters/codex.rs",
+            "crates/harness-hooks/src/protocol/context.rs",
+            "crates/harness-hooks/src/adapters/mod.rs",
+            "crates/harness-hooks/src/adapters/codex.rs",
         ],
         &["current_dir("],
         |path, _| format!("{path} should not hydrate ambient cwd defaults in hooks transport"),
@@ -143,10 +143,10 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         "crates/harness-kernel/src/hooks/context.rs should preserve missing cwd in normalized transport context"
     );
 
-    let protocol = read_repo_file(root, "src/hooks/protocol/context.rs");
+    let protocol = read_repo_file(root, "crates/harness-hooks/src/protocol/context.rs");
     assert_file_lacks_needles(
         &protocol,
-        "src/hooks/protocol/context.rs should stay transport-only instead of owning",
+        "crates/harness-hooks/src/protocol/context.rs should stay transport-only instead of owning",
         &[
             "HookEnvelopePayload",
             "legacy_tool_context",
@@ -156,10 +156,10 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         ],
     );
 
-    let application = read_repo_file(root, "src/hooks/application/context.rs");
+    let application = read_repo_file(root, "crates/harness-hooks/src/application/context.rs");
     assert_file_lacks_needles(
         &application,
-        "src/hooks/application/context.rs should stay a facade instead of owning",
+        "crates/harness-hooks/src/application/context.rs should stay a facade instead of owning",
         &[
             "fn normalized_from_envelope(",
             "fn hydrate_normalized_context(",
@@ -168,20 +168,20 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         ],
     );
     assert!(
-        root.join("src/hooks/application/context/hydration.rs")
+        root.join("crates/harness-hooks/src/application/context/hydration.rs")
             .exists(),
-        "src/hooks/application/context/hydration.rs should exist after the context split"
+        "crates/harness-hooks/src/application/context/hydration.rs should exist after the context split"
     );
     assert!(
-        root.join("src/hooks/application/context/interaction.rs")
+        root.join("crates/harness-hooks/src/application/context/interaction.rs")
             .exists(),
-        "src/hooks/application/context/interaction.rs should exist after the context split"
+        "crates/harness-hooks/src/application/context/interaction.rs should exist after the context split"
     );
 
-    let hydration = read_repo_file(root, "src/hooks/application/context/hydration.rs");
+    let hydration = read_repo_file(root, "crates/harness-hooks/src/application/context/hydration.rs");
     assert_file_contains_needles(
         &hydration,
-        "src/hooks/application/context/hydration.rs should own",
+        "crates/harness-hooks/src/application/context/hydration.rs should own",
         &[
             "pub(crate) fn prepare_normalized_context(",
             "fn hydrate_normalized_context(",
@@ -189,10 +189,10 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         ],
     );
 
-    let interaction = read_repo_file(root, "src/hooks/application/context/interaction.rs");
+    let interaction = read_repo_file(root, "crates/harness-hooks/src/application/context/interaction.rs");
     assert_file_contains_needles(
         &interaction,
-        "src/hooks/application/context/interaction.rs should own",
+        "crates/harness-hooks/src/application/context/interaction.rs should own",
         &["fn normalized_from_envelope(", "legacy_tool_context("],
     );
 }
@@ -200,10 +200,10 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
 #[test]
 fn hook_application_owns_guard_context_hydration() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let protocol_context = read_repo_file(root, "src/hooks/protocol/context.rs");
+    let protocol_context = read_repo_file(root, "crates/harness-hooks/src/protocol/context.rs");
     assert_file_lacks_needles(
         &protocol_context,
-        "src/hooks/protocol/context.rs should stay transport-only instead of owning",
+        "crates/harness-hooks/src/protocol/context.rs should stay transport-only instead of owning",
         &[
             "pub struct GuardContext",
             "RunContext",
@@ -215,14 +215,14 @@ fn hook_application_owns_guard_context_hydration() {
         ],
     );
 
-    let application_context = read_repo_file(root, "src/hooks/application/context.rs");
+    let application_context = read_repo_file(root, "crates/harness-hooks/src/application/context.rs");
     assert!(
         application_context.contains("pub struct GuardContext"),
-        "src/hooks/application/context.rs should own the hook policy input context"
+        "crates/harness-hooks/src/application/context.rs should own the hook policy input context"
     );
 
     let hits = collect_hits_in_tree(
-        &root.join("src/hooks"),
+        &root.join("crates/harness-hooks/src"),
         root,
         None,
         &["protocol::context::GuardContext"],
@@ -239,26 +239,26 @@ fn hook_application_owns_guard_context_hydration() {
 #[test]
 fn hook_protocol_output_uses_typed_serialization() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let output = read_repo_file(root, "src/hooks/protocol/output.rs");
+    let output = read_repo_file(root, "crates/harness-hooks/src/protocol/output.rs");
 
     assert_file_lacks_needles(
         &output,
-        "src/hooks/protocol/output.rs should not hand-build JSON via",
+        "crates/harness-hooks/src/protocol/output.rs should not hand-build JSON via",
         &["use serde_json::json;", "json!(", "payload[\""],
     );
     assert_file_contains_needles(
         &output,
-        "src/hooks/protocol/output.rs should serialize typed hook DTOs via",
+        "crates/harness-hooks/src/protocol/output.rs should serialize typed hook DTOs via",
         &["#[derive(Serialize)]", "fn render_json<T: Serialize>("],
     );
 }
 
 fn assert_transport_outputs_avoid_manual_json(root: &Path) {
     for path in [
-        "src/hooks/adapters/claude.rs",
-        "src/hooks/adapters/gemini.rs",
-        "src/hooks/adapters/codex.rs",
-        "src/hooks/adapters/opencode/mod.rs",
+        "crates/harness-hooks/src/adapters/claude.rs",
+        "crates/harness-hooks/src/adapters/gemini.rs",
+        "crates/harness-hooks/src/adapters/codex.rs",
+        "crates/harness-hooks/src/adapters/opencode/mod.rs",
         "crates/harness-observe/src/watch.rs",
         "crates/harness-observe/src/scan.rs",
         "crates/harness-observe/src/compare.rs",
@@ -276,10 +276,10 @@ fn assert_transport_outputs_avoid_manual_json(root: &Path) {
 }
 
 fn assert_hook_adapters_use_typed_serialization(root: &Path) {
-    let codex = read_repo_file(root, "src/hooks/adapters/codex.rs");
+    let codex = read_repo_file(root, "crates/harness-hooks/src/adapters/codex.rs");
     assert_file_contains_needles(
         &codex,
-        "src/hooks/adapters/codex.rs should use typed serialization helpers via",
+        "crates/harness-hooks/src/adapters/codex.rs should use typed serialization helpers via",
         &[
             "#[derive(Serialize)]",
             "fn render_json<T: Serialize>(",
@@ -287,24 +287,24 @@ fn assert_hook_adapters_use_typed_serialization(root: &Path) {
         ],
     );
 
-    let opencode = read_repo_file(root, "src/hooks/adapters/opencode/mod.rs");
+    let opencode = read_repo_file(root, "crates/harness-hooks/src/adapters/opencode/mod.rs");
     assert_file_contains_needles(
         &opencode,
-        "src/hooks/adapters/opencode/mod.rs should use typed serialization helpers via",
+        "crates/harness-hooks/src/adapters/opencode/mod.rs should use typed serialization helpers via",
         &["#[derive(Serialize)]", "fn render_json<T: Serialize>("],
     );
 
-    let claude = read_repo_file(root, "src/hooks/adapters/claude.rs");
+    let claude = read_repo_file(root, "crates/harness-hooks/src/adapters/claude.rs");
     assert_file_contains_needles(
         &claude,
-        "src/hooks/adapters/claude.rs should serialize typed hook registrations via",
+        "crates/harness-hooks/src/adapters/claude.rs should serialize typed hook registrations via",
         &["#[derive(Serialize)]", "struct ClaudeConfig"],
     );
 
-    let gemini = read_repo_file(root, "src/hooks/adapters/gemini.rs");
+    let gemini = read_repo_file(root, "crates/harness-hooks/src/adapters/gemini.rs");
     assert_file_contains_needles(
         &gemini,
-        "src/hooks/adapters/gemini.rs should serialize typed hook payloads via",
+        "crates/harness-hooks/src/adapters/gemini.rs should serialize typed hook payloads via",
         &[
             "#[derive(Serialize)]",
             "struct GeminiOutput",
@@ -316,10 +316,10 @@ fn assert_hook_adapters_use_typed_serialization(root: &Path) {
 #[test]
 fn codex_adapter_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let codex = read_repo_file(root, "src/hooks/adapters/codex.rs");
+    let codex = read_repo_file(root, "crates/harness-hooks/src/adapters/codex.rs");
     assert_file_lacks_needles(
         &codex,
-        "src/hooks/adapters/codex.rs should stay focused on production adapter logic instead of owning",
+        "crates/harness-hooks/src/adapters/codex.rs should stay focused on production adapter logic instead of owning",
         &[
             "fn assert_notify_context(",
             "fn assert_notify_agent(",
@@ -328,7 +328,7 @@ fn codex_adapter_root_stays_prod_only() {
         ],
     );
     assert!(
-        root.join("src/hooks/adapters/codex/tests.rs").exists(),
+        root.join("crates/harness-hooks/src/adapters/codex/tests.rs").exists(),
         "codex adapter split test module should exist"
     );
 }
@@ -385,10 +385,10 @@ fn assert_observe_outputs_use_typed_serialization(root: &Path) {
 }
 
 fn assert_wrapper_outputs_use_typed_serialization(root: &Path) {
-    let copilot = read_repo_file(root, "src/hooks/adapters/copilot.rs");
+    let copilot = read_repo_file(root, "crates/harness-hooks/src/adapters/copilot.rs");
     assert_file_contains_needles(
         &copilot,
-        "src/hooks/adapters/copilot.rs should serialize typed hook config DTOs via",
+        "crates/harness-hooks/src/adapters/copilot.rs should serialize typed hook config DTOs via",
         &[
             "#[derive(Serialize)]",
             "struct CopilotConfig",

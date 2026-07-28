@@ -1,5 +1,6 @@
-use crate::hooks::adapters::{HookAgent, HookRegistration, adapter_for};
+use crate::hooks::adapters::{HookRegistration, adapter_for};
 use crate::hooks::protocol::context::NormalizedEvent;
+use harness_protocol::agent::HookAgent;
 
 pub(crate) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     let mut registrations = Vec::new();

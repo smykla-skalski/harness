@@ -8,7 +8,7 @@ use harness_observe::application::{
     ObserveDumpRequest, ObserveFilter, ObserveScanRequest, ObserveWatchRequest,
 };
 
-use crate::hooks::adapters::HookAgent;
+use harness_protocol::agent::HookAgent;
 
 use super::application::{self, ObserveDoctorRequest, ObserveRequest};
 

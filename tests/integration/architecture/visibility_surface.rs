@@ -1,41 +1,6 @@
 use std::path::Path;
 
-use super::helpers::{collect_hits_in_tree, read_repo_file, repo_path_exists};
-
-#[test]
-fn application_submodules_are_not_public_library_surface() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-
-    for (path, needle) in [("src/hooks/mod.rs", "pub mod application;")] {
-        let contents = read_repo_file(root, path);
-        assert!(
-            !contents.contains(needle),
-            "{path} should keep `application` crate-internal instead of exporting `{needle}`"
-        );
-        assert!(
-            contents.contains("pub(crate) mod application;"),
-            "{path} should expose `application` as crate-internal only"
-        );
-    }
-
-    let hooks_root = read_repo_file(root, "src/hooks/mod.rs");
-    assert!(
-        hooks_root.contains("pub use self::application::GuardContext;"),
-        "src/hooks/mod.rs should re-export GuardContext as the stable public hook facade"
-    );
-
-    let private_guard_context_hits = collect_hits_in_tree(
-        &root.join("testkit/src/builders"),
-        root,
-        None,
-        &["harness::hooks::application::GuardContext"],
-        |path, needle| format!("{path} still depends on private hook application via `{needle}`"),
-    );
-    assert!(
-        private_guard_context_hits.is_empty(),
-        "testkit should not depend on the private hooks::application module"
-    );
-}
+use super::helpers::{read_repo_file, repo_path_exists};
 
 #[test]
 fn transport_command_modules_stay_internal_to_domains() {
@@ -76,21 +41,6 @@ fn helper_modules_do_not_leak_publicly() {
             "pub mod types;",
             "pub(crate) mod types {",
         ),
-        (
-            "src/hooks/mod.rs",
-            "pub mod session;",
-            "pub(crate) mod session;",
-        ),
-        (
-            "src/hooks/mod.rs",
-            "pub mod adapters;",
-            "pub(crate) mod adapters;",
-        ),
-        (
-            "src/hooks/mod.rs",
-            "pub mod registry;",
-            "pub(crate) mod registry;",
-        ),
     ] {
         let contents = read_repo_file(root, path);
         assert!(
@@ -102,22 +52,6 @@ fn helper_modules_do_not_leak_publicly() {
             "{path} should keep helper module `{crate_needle}` crate-internal"
         );
     }
-
-    let setup_session = read_repo_file(root, "src/setup/session.rs");
-    assert!(
-        !setup_session.contains("crate::hooks::session::SessionStartHookOutput"),
-        "src/setup/session.rs should not depend on the private hooks::session module"
-    );
-    assert!(
-        setup_session.contains("crate::hooks::SessionStartHookOutput"),
-        "src/setup/session.rs should use the public hooks facade for SessionStartHookOutput"
-    );
-
-    let hooks_root = read_repo_file(root, "src/hooks/mod.rs");
-    assert!(
-        hooks_root.contains("pub use self::session::SessionStartHookOutput;"),
-        "src/hooks/mod.rs should re-export session hook payload types through the hooks facade"
-    );
 }
 
 #[test]
@@ -249,39 +183,6 @@ fn kernel_command_intent_root_stays_a_facade() {
         assert!(
             repo_path_exists(root, path),
             "kernel command_intent split module should exist: {path}"
-        );
-    }
-}
-
-#[test]
-fn hooks_root_stays_a_facade() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hooks_mod = read_repo_file(root, "src/hooks/mod.rs");
-
-    for needle in [
-        "pub enum HookType {",
-        "pub enum HookCommand {",
-        "pub struct HookArgs {",
-        "define_legacy_hook!(",
-        "pub fn run_hook_command(",
-        "fn normalize_path(",
-        "mod tests {",
-    ] {
-        assert!(
-            !hooks_mod.contains(needle),
-            "src/hooks/mod.rs should stay a thin facade instead of owning `{needle}`"
-        );
-    }
-
-    for path in [
-        "src/hooks/catalog.rs",
-        "src/hooks/transport.rs",
-        "src/hooks/runtime.rs",
-        "src/hooks/tests.rs",
-    ] {
-        assert!(
-            repo_path_exists(root, path),
-            "hooks split module should exist: {path}"
         );
     }
 }
