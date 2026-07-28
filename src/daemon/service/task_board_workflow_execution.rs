@@ -12,13 +12,15 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
     TaskBoardRetrySchedule, TaskBoardReviewRoundDecision, TaskBoardTerminalOutcome,
     TaskBoardTerminalOutcomeKind, TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
-    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowRevisionGuard, advance_task_board_workflow,
 };
+// `TaskBoardWorkflowKind` is only read by the `#[cfg(test)]` items below.
 #[cfg(test)]
 use crate::task_board::{
     TaskBoardExecutionOwnership, TaskBoardWorkflowExecutionArtifacts,
-    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowSnapshot, start_task_board_workflow,
+    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
+    start_task_board_workflow,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
