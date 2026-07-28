@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::observe_classification::{FixSafety, IssueCategory, IssueSeverity};
+use crate::observe_classification::{
+    Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole, SourceTool,
+};
 use crate::observe_issue_code::IssueCode;
 
 /// Result of a fix attempt for an open issue.
@@ -10,6 +12,31 @@ pub enum AttemptResult {
     Fixed,
     Failed,
     Escalated,
+}
+
+/// A classified issue found in a session log.
+#[derive(Debug, Clone, Serialize)]
+pub struct Issue {
+    #[serde(rename = "issue_id")]
+    pub id: String,
+    pub line: usize,
+    pub code: IssueCode,
+    pub category: IssueCategory,
+    pub severity: IssueSeverity,
+    pub confidence: Confidence,
+    pub fix_safety: FixSafety,
+    pub summary: String,
+    pub details: String,
+    pub fingerprint: String,
+    pub source_role: MessageRole,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_tool: Option<SourceTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_hint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_excerpt: Option<String>,
 }
 
 /// An open issue tracked across observer cycles.
