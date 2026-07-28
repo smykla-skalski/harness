@@ -4,6 +4,7 @@ use crate::workspace::{
     dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_telemetry::observe_daemon_root_override;
 
 use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};
 use super::{
@@ -18,9 +19,14 @@ use super::{
 /// Panics only if the internal mutex is poisoned, which indicates another
 /// thread panicked while holding the override lock.
 pub fn set_daemon_root_override(path: Option<PathBuf>) {
-    *DAEMON_ROOT_OVERRIDE
+    DAEMON_ROOT_OVERRIDE
         .lock()
-        .expect("daemon root override mutex poisoned") = path;
+        .expect("daemon root override mutex poisoned")
+        .clone_from(&path);
+    // `harness-telemetry` can't depend on this crate to read
+    // `DAEMON_ROOT_OVERRIDE` directly (wrong dependency direction), so its
+    // independent daemon-log path resolution needs this mirrored in.
+    observe_daemon_root_override(path);
 }
 
 pub struct ScopedDaemonRootOverride {
@@ -39,7 +45,9 @@ impl ScopedDaemonRootOverride {
             .lock()
             .expect("daemon root override mutex poisoned");
         let previous = override_root.clone();
-        *override_root = path;
+        override_root.clone_from(&path);
+        drop(override_root);
+        observe_daemon_root_override(path);
         Self { previous }
     }
 }
@@ -50,6 +58,7 @@ impl Drop for ScopedDaemonRootOverride {
             .lock()
             .expect("daemon root override mutex poisoned")
             .clone_from(&self.previous);
+        observe_daemon_root_override(self.previous.clone());
     }
 }
 
