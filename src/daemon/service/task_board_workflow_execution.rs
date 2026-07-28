@@ -40,8 +40,11 @@ pub(crate) async fn create_or_load_workflow_execution(
     request: &TaskBoardWorkflowExecutionCreateRequest,
 ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
     let created_at = canonical_time(&request.created_at)?;
-    if !(matches!(request.snapshot.workflow_kind, TaskBoardWorkflowKind::Review)
-        || request.snapshot.workflow_kind.is_read_only_review()) {
+    if !(matches!(
+        request.snapshot.workflow_kind,
+        TaskBoardWorkflowKind::Review
+    ) || request.snapshot.workflow_kind.is_read_only_review())
+    {
         return Err(invalid_transition(
             "read-only workflow execution requires Review or PrReview",
         ));
