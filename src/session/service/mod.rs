@@ -167,6 +167,10 @@ pub(crate) use runtime_support::*;
 pub(crate) use session_helpers::*;
 #[allow(unused_imports)]
 pub(crate) use session_state::*;
+// The session-index test suite in `harness-session` fixtures sessions
+// through this, so it needs a real `pub` path rather than the crate-only
+// glob above.
+pub use session_state::build_new_session_with_policy;
 #[allow(unused_imports)]
 pub(crate) use signal_support::*;
 #[allow(unused_imports)]

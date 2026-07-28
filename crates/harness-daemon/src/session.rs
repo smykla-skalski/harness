@@ -1,21 +1,15 @@
-#[path = "../../../src/session/adopter.rs"]
-pub mod adopter;
-#[path = "../../../src/session/index/mod.rs"]
-pub mod index;
+pub use harness_session::adopter;
+pub use harness_session::canonicalize;
+pub use harness_session::index;
 #[path = "../../../src/session/observe/mod.rs"]
 pub mod observe;
-#[path = "../../../src/session/ordering.rs"]
-pub mod ordering;
-#[path = "../../../src/session/persona.rs"]
-pub mod persona;
-#[path = "../../../src/session/roles.rs"]
-pub mod roles;
+pub use harness_session::ordering;
+pub use harness_session::persona;
+pub use harness_session::roles;
 #[path = "../../../src/session/service/mod.rs"]
 pub mod service;
-#[path = "../../../src/session/storage/mod.rs"]
-pub mod storage;
+pub use harness_session::storage;
 pub mod types {
     pub use harness_protocol::session::*;
 }
-#[path = "../../../src/session/wire/mod.rs"]
-pub mod wire;
+pub use harness_session::wire;

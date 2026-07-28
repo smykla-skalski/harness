@@ -10,15 +10,13 @@ use serde::de::DeserializeOwned;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::session_wire::{ActiveRegistry, ProjectOriginRecord};
+use harness_session::storage::migrations;
 use crate::infra::io::{read_json_typed, validate_safe_segment};
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::session::types::{CURRENT_VERSION, SessionLogEntry, SessionState, SessionTransition};
 use crate::workspace::layout::{SessionLayout, sessions_root};
 use crate::workspace::{harness_data_root, ids, project_context_dir, utc_now};
-
-#[path = "../../../../src/session/storage/migrations.rs"]
-mod migrations;
 
 pub(super) fn layout_from_project_dir(
     project_dir: &Path,

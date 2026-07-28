@@ -46,7 +46,12 @@ pub(crate) fn build_new_session(
     )
 }
 
-pub(crate) fn build_new_session_with_policy(
+// `pub` rather than `pub(crate)`: the session-index test suite in
+// `harness-session` fixtures sessions through this, and it stays in the
+// root crate as a separate, larger extraction, so its own test binary
+// reaches back into the root crate as a dev-only dependency.
+#[must_use]
+pub fn build_new_session_with_policy(
     context: &str,
     title: &str,
     session_id: &str,

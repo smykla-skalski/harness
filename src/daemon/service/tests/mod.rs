@@ -22,6 +22,7 @@ use harness_testkit::with_isolated_harness_env;
 mod support;
 use support::*;
 
+mod adopted_external;
 mod async_signals;
 mod async_stream;
 mod background_import;

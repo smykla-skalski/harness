@@ -24,6 +24,7 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check --all-targets -p harness-observe
 "$cargo_local" check --all-targets -p harness-protocol
 "$cargo_local" check --all-targets -p harness-run
+"$cargo_local" check --all-targets -p harness-session
 "$cargo_local" check --all-targets -p harness-systemd-protocol
 "$cargo_local" check --all-targets -p harness-task-board
 "$cargo_local" check --all-targets -p harness-telemetry
