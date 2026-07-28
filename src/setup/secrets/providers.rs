@@ -112,15 +112,22 @@ fn provider_upgrade_required() -> CliError {
     .into()
 }
 
-pub(super) fn provider_configured(
+pub(super) fn provider_secret(
     kind: SecretKindArg,
     repository: Option<&str>,
     account: &str,
-) -> Result<bool, CliError> {
+) -> Result<Option<String>, CliError> {
     match kind {
         SecretKindArg::Github => {
             let repository = normalized_repository_scope(repository)?;
-            Ok(load_github_snapshot(account)?.token_configured(repository.as_deref()))
+            let snapshot = load_github_snapshot(account)?;
+            Ok(repository.map_or(snapshot.global_token, |repository| {
+                snapshot
+                    .repository_tokens
+                    .into_iter()
+                    .find(|entry| entry.repository == repository)
+                    .map(|entry| entry.token)
+            }))
         }
         SecretKindArg::OpenRouter => {
             if repository.is_some() {
@@ -128,10 +135,11 @@ pub(super) fn provider_configured(
                     "OpenRouter credentials do not support repository scope".to_string(),
                 ));
             }
-            Ok(load_openrouter_snapshot(account)?.is_configured())
+            Ok(load_openrouter_snapshot(account)?.token)
         }
         _ => unreachable!("provider credential kind required"),
     }
+    .map(|token| token.filter(|token| !token.trim().is_empty()))
 }
 
 fn normalized_repository_scope(repository: Option<&str>) -> Result<Option<String>, CliError> {
