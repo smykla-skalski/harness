@@ -19,29 +19,9 @@ use super::helpers::collect_hits_in_tree;
 /// `crate::hooks::protocol` re-export shims; the canonical definitions live in
 /// `harness_protocol`/`harness_kernel`, so every call site imports from there
 /// directly instead.
-///
-/// `src/session/types/agent_tests.rs` is the one expected survivor. Root's own
-/// `session::types` is an inline re-export module
-/// (`pub mod types { pub use harness_protocol::session::*; }` in
-/// `src/session/mod.rs`) rather than `mod types;` pointing at this file, so it
-/// is not part of root's own build: `harness-protocol` pulls it in verbatim
-/// with `#[path]` (`session/types/mod.rs` - and everything it `mod`-declares,
-/// `agent_tests` included - to back the `session` module) to give those types
-/// a single physical definition, mirroring how `harness-daemon`,
-/// `harness-bridge`, and `harness-hook` already share other root files the
-/// same way. Its `HookAgent` references have to stay on the
-/// `crate::hooks::adapters::HookAgent` shim every one of those `#[path]` hosts
-/// already provides, because a crate cannot name itself in a `use` path -
-/// `harness_protocol::agent::HookAgent`, the direct import every other call
-/// site in this scan now uses, does not resolve when the file is compiled as
-/// part of `harness-protocol` itself (confirmed with a throwaway edit against
-/// `cargo check -p harness-protocol`). Those references never leave
-/// `harness-protocol`'s own compilation, so they are not real cross-crate
-/// edges.
 #[test]
 fn agents_and_session_stay_off_the_hooks_module() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let known_exceptions = ["src/session/types/agent_tests.rs"];
 
     let mut hits = collect_hits_in_tree(
         &root.join("crates/harness-agents/src"),
@@ -78,8 +58,6 @@ fn agents_and_session_stay_off_the_hooks_module() {
         &["crate::hooks::"],
         |path, needle| format!("{path} reaches back into hooks via `{needle}`"),
     ));
-
-    hits.retain(|hit| !known_exceptions.iter().any(|known| hit.starts_with(known)));
 
     assert!(
         hits.is_empty(),
