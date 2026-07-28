@@ -98,11 +98,13 @@ mod tests {
             let count = stream.read(&mut request).expect("read request");
             let request = String::from_utf8_lossy(&request[..count]);
             assert!(request.starts_with(&format!("GET {expected_path} HTTP/1.1")));
-            assert!(
-                request
-                    .to_lowercase()
-                    .contains(&format!("authorization: bearer {expected_secret}"))
-            );
+            let authorization = request
+                .lines()
+                .filter_map(|line| line.split_once(':'))
+                .find(|(name, _)| name.eq_ignore_ascii_case("authorization"))
+                .map(|(_, value)| value.trim());
+            let expected_authorization = format!("Bearer {expected_secret}");
+            assert_eq!(authorization, Some(expected_authorization.as_str()));
             write!(
                 stream,
                 "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -114,8 +116,8 @@ mod tests {
 
     #[test]
     fn github_validation_authenticates_the_selected_secret() {
-        let (base_url, server) = serve_once("200 OK", "/user", "github-secret");
-        validate_at(SecretKindArg::Github, "github-secret", &base_url)
+        let (base_url, server) = serve_once("200 OK", "/user", "GitHub-Secret");
+        validate_at(SecretKindArg::Github, "GitHub-Secret", &base_url)
             .expect("GitHub credential should validate");
         server.join().expect("mock server should finish");
     }
