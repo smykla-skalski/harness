@@ -1,39 +1,18 @@
 use super::helpers::{collect_hits_in_paths, collect_hits_in_tree, repo_root};
 
-const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[
-    (
-        "src/task_board/orchestrator.rs",
-        "pub struct TaskBoardOrchestrator",
-    ),
-    (
-        "src/task_board/policy_runtime/repository.rs",
-        "pub struct PolicyRuntimeRepository",
-    ),
-    (
-        "src/task_board/policy_runtime/inbox.rs",
-        "pub struct PolicyEventInbox",
-    ),
-    (
-        "src/task_board/policy_runtime/handoff_outbox.rs",
-        "pub struct PolicyHandoffOutbox",
-    ),
-    (
-        "src/task_board/policy_runtime/notification.rs",
-        "pub struct PolicyNotificationOutbox",
-    ),
-    (
-        "src/task_board/policy_runtime/task_creation.rs",
-        "pub struct PolicyTaskCreationOutbox",
-    ),
-];
+const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[(
+    "src/task_board/orchestrator.rs",
+    "pub struct TaskBoardOrchestrator",
+)];
 
-/// `store.rs`/`machines.rs` moved into `harness-task-board`, which cannot
-/// share the root crate's `cfg(test)` activation domain: the root crate's own
-/// `#[cfg(test)]` call sites (e.g. `daemon::service::task_board::store()`)
-/// need `TaskBoardStore` visible when the *root* crate is under test, which a
-/// dependency crate's own `cfg(test)` never is. `test-support` is that
-/// crate's escape hatch for exactly this, matching `harness-agents`'s and
-/// `harness-daemon-client`'s own feature of the same name.
+/// `store.rs`/`machines.rs`, and now the `policy_runtime` repositories below,
+/// moved into `harness-task-board`, which cannot share the root crate's
+/// `cfg(test)` activation domain: the root crate's own `#[cfg(test)]` call
+/// sites (e.g. `daemon::service::task_board::store()`) need `TaskBoardStore`
+/// visible when the *root* crate is under test, which a dependency crate's
+/// own `cfg(test)` never is. `test-support` is that crate's escape hatch for
+/// exactly this, matching `harness-agents`'s and `harness-daemon-client`'s
+/// own feature of the same name.
 const LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD: &[(&str, &str)] = &[
     (
         "crates/harness-task-board/src/store.rs",
@@ -42,6 +21,26 @@ const LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD: &[(&str, &str)] = &[
     (
         "crates/harness-task-board/src/machines.rs",
         "pub struct MachineRegistry",
+    ),
+    (
+        "crates/harness-task-board/src/policy_runtime/repository.rs",
+        "pub struct PolicyRuntimeRepository",
+    ),
+    (
+        "crates/harness-task-board/src/policy_runtime/inbox.rs",
+        "pub struct PolicyEventInbox",
+    ),
+    (
+        "crates/harness-task-board/src/policy_runtime/handoff_outbox.rs",
+        "pub struct PolicyHandoffOutbox",
+    ),
+    (
+        "crates/harness-task-board/src/policy_runtime/notification.rs",
+        "pub struct PolicyNotificationOutbox",
+    ),
+    (
+        "crates/harness-task-board/src/policy_runtime/task_creation.rs",
+        "pub struct PolicyTaskCreationOutbox",
     ),
 ];
 
