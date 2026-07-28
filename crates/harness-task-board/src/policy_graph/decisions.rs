@@ -16,7 +16,7 @@ use std::sync::OnceLock;
 
 use uuid::Uuid;
 
-use crate::task_board::{PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode};
+use crate::policy::{PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode};
 
 /// One real policy evaluation captured at the enforced gate.
 ///
@@ -93,7 +93,8 @@ static DECISION_SINK: OnceLock<DecisionSink> = OnceLock::new();
 
 /// Install the process-global decision sink. Called once at daemon boot; a
 /// second call is ignored so tests and re-entrant boots stay safe.
-pub(crate) fn install_decision_sink(sink: DecisionSink) {
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub fn install_decision_sink(sink: DecisionSink) {
     let _ = DECISION_SINK.set(sink);
 }
 
@@ -101,7 +102,7 @@ pub(crate) fn install_decision_sink(sink: DecisionSink) {
 ///
 /// The sink contract is fire-and-forget: it must not block the synchronous
 /// gating path, so the daemon's sink only enqueues onto an unbounded channel.
-pub(crate) fn record_policy_decision(decision: RecordedPolicyDecision) {
+pub fn record_policy_decision(decision: RecordedPolicyDecision) {
     if let Some(sink) = DECISION_SINK.get() {
         sink(decision);
     }
@@ -129,7 +130,8 @@ static PENDING_GRANT_SINK: OnceLock<PendingGrantSink> = OnceLock::new();
 
 /// Install the process-global pending-grant sink. Called once at daemon boot; a
 /// second call is ignored so tests and re-entrant boots stay safe.
-pub(crate) fn install_pending_grant_sink(sink: PendingGrantSink) {
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub fn install_pending_grant_sink(sink: PendingGrantSink) {
     let _ = PENDING_GRANT_SINK.set(sink);
 }
 
@@ -137,7 +139,7 @@ pub(crate) fn install_pending_grant_sink(sink: PendingGrantSink) {
 ///
 /// Fire-and-forget like [`record_policy_decision`]: the daemon's sink only
 /// enqueues, so the synchronous evaluation path never blocks on the database.
-pub(crate) fn record_pending_grant(request: PolicyPendingGrantRequest) {
+pub fn record_pending_grant(request: PolicyPendingGrantRequest) {
     if let Some(sink) = PENDING_GRANT_SINK.get() {
         sink(request);
     }
@@ -148,7 +150,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::task_board::{PolicyAction, PolicyReasonCode};
+    use crate::policy::{PolicyAction, PolicyEvidence, PolicyReasonCode, PolicySubject};
 
     fn allow_decision() -> PolicyDecision {
         PolicyDecision::Allow {
@@ -168,14 +170,18 @@ mod tests {
         PolicyInput {
             workflow: None,
             action: PolicyAction::MergePr,
-            subject: Default::default(),
-            evidence: Default::default(),
+            subject: PolicySubject::default(),
+            evidence: PolicyEvidence::default(),
             evaluated_at: None,
             approvals: Vec::new(),
         }
     }
 
     #[test]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "asserts both branches of one allow/deny provenance invariant; splitting would fragment the comparison"
+    )]
     fn new_marks_allow_as_not_enforced_and_deny_as_enforced() {
         let allow =
             RecordedPolicyDecision::new(7, sample_input(), allow_decision(), vec![], "test");

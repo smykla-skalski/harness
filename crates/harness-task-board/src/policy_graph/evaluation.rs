@@ -11,7 +11,7 @@ use super::{
     PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm,
     PolicySwitchNode,
 };
-use crate::task_board::policy::{PolicyAction, PolicyApprovalState, PolicyInput};
+use crate::policy::{PolicyAction, PolicyApprovalState, PolicyInput};
 
 use decisions::{
     dry_run_only, require_consensus, require_human, supervisor_decision, supervisor_reason_code,

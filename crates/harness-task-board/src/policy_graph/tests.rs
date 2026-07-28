@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde_json::json;
 
 use harness_kernel::errors::CliErrorKind;
-use crate::task_board::policy::{
+use crate::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
     PolicyReasonCode, PolicySubject,
 };
@@ -65,6 +65,10 @@ fn graph_serialization_keeps_empty_policy_trace_ids() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts every seeded node's layout in one pass over the seeded graph"
+)]
 fn seeded_graph_layout_starts_clear_and_non_overlapping() {
     let graph = PolicyGraph::seeded_v2();
     let node_layouts: HashMap<_, _> = graph
@@ -106,6 +110,10 @@ fn seeded_graph_layout_starts_clear_and_non_overlapping() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the automation binding round-trips through both encode and decode in one flow"
+)]
 fn node_automation_binding_round_trips_as_policy_graph_metadata() {
     let mut graph = PolicyGraph::seeded_v2();
     graph.nodes[0].automation = Some(PolicyGraphAutomationBinding {

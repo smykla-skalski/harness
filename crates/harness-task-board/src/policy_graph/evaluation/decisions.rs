@@ -1,5 +1,5 @@
 use super::super::{PolicyGraphDecision, PolicyReasonCode};
-use crate::task_board::policy::{POLICY_VERSION, PolicyDecision};
+use crate::policy::{POLICY_VERSION, PolicyDecision};
 
 pub(super) fn supervisor_decision(
     decision: PolicyGraphDecision,

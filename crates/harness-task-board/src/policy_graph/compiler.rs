@@ -8,7 +8,7 @@
 //! graph-to-runtime seam is no longer Reviews-specific.
 
 use super::{PolicyGraph, PolicyGraphNodeKind, PolicyWaitCondition};
-use crate::task_board::policy::{PolicyDecision, PolicyInput};
+use crate::policy::{PolicyDecision, PolicyInput};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompiledWorkflowStep {

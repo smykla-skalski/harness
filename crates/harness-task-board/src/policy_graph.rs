@@ -14,7 +14,7 @@ mod compiler;
 mod decisions;
 mod defaults;
 mod evaluation;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 mod gate_cache;
 mod graph_impls;
 mod ids;
@@ -35,13 +35,13 @@ pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
-pub(crate) use decisions::{
+pub use decisions::{
     PolicyPendingGrantRequest, RecordedPolicyDecision, record_pending_grant, record_policy_decision,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use decisions::{install_decision_sink, install_pending_grant_sink};
-#[cfg(test)]
-pub(crate) use gate_cache::{
+pub use decisions::{install_decision_sink, install_pending_grant_sink};
+#[cfg(any(test, feature = "test-support"))]
+pub use gate_cache::{
     CachedGatePolicy, cached_gate_policy, resolve_gate_policy, store_database_gate_policy_entry,
     store_gate_policy,
 };
@@ -73,27 +73,27 @@ pub use store_canvas::{
     apply_set_spawn_requires_live_policy,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use workspace::POLICY_CANVAS_WORKSPACE_VERSION;
+pub use workspace::POLICY_CANVAS_WORKSPACE_VERSION;
 pub use workspace::{
     DEFAULT_POLICY_CANVAS_TITLE, MANUAL_OCR_PASTE_CANVAS_TITLE, PolicyCanvasRecord,
     PolicyCanvasWorkspace, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
     REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
-pub(crate) const PORT_IN: &str = "in";
-pub(crate) const PORT_DEFAULT: &str = "default";
+pub const PORT_IN: &str = "in";
+pub const PORT_DEFAULT: &str = "default";
 pub(crate) const PORT_IMAGE: &str = "image";
 pub(crate) const PORT_TEXT: &str = "text";
 pub(crate) const PORT_PULL_REQUESTS: &str = "pull_requests";
 pub(crate) const PORT_MUTATE: &str = "mutate";
 pub(crate) const PORT_MERGE: &str = "merge";
 pub(crate) const PORT_UNSAFE: &str = "unsafe";
-pub(crate) const PORT_PASS: &str = "pass";
-pub(crate) const PORT_FAIL: &str = "fail";
+pub const PORT_PASS: &str = "pass";
+pub const PORT_FAIL: &str = "fail";
 pub(crate) const PORT_CONSENSUS: &str = "consensus";
-pub(crate) const PORT_MISSING: &str = "missing";
-pub(crate) const PORT_THEN: &str = "then";
-pub(crate) const PORT_ELSE: &str = "else";
+pub const PORT_MISSING: &str = "missing";
+pub const PORT_THEN: &str = "then";
+pub const PORT_ELSE: &str = "else";
 pub(crate) const PORT_HIGH: &str = "high";
 pub(crate) const PORT_LOW_OR_EQUAL: &str = "low_or_equal";
 pub(crate) const PORT_APPROVED: &str = "approved";

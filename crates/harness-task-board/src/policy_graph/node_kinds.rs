@@ -290,8 +290,8 @@ impl PolicyGraphNodeKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::policy::PolicyReasonCode;
-    use crate::task_board::policy_graph::{
+    use crate::policy::PolicyReasonCode;
+    use crate::policy_graph::{
         PolicyFinishNode, PolicyGraphDecision, PolicyHandoffStep,
     };
 

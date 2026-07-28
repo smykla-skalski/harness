@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyHandoffStep};
+use crate::policy_graph::{CompiledWorkflowStep, PolicyHandoffStep, PolicyScenario};
 
 #[test]
 fn workflow_entry_matches_reviews_auto_only() {
@@ -248,14 +248,17 @@ fn simulation_marks_wait_nodes_as_runtime_boundaries() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts promote is rejected end to end for a stale boundary-aware simulation"
+)]
 fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let save_response = apply_save_draft(&mut ws, wait_for_checks_graph(), 0, None)
         .expect("save draft should succeed");
     assert!(save_response.persisted, "wait graph should persist");
     ws.scenarios.clear();
-    ws.scenarios
-        .push(crate::task_board::policy_graph::PolicyScenario {
+    ws.scenarios.push(PolicyScenario {
             id: "scenario-reviews-auto".to_owned(),
             name: "reviews auto".to_owned(),
             input: PolicyInput {

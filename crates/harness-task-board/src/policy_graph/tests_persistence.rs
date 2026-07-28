@@ -1,5 +1,7 @@
+use std::collections::HashSet;
+
 use super::*;
-use crate::task_board::policy_graph::{
+use crate::policy_graph::{
     MANUAL_OCR_PASTE_CANVAS_TITLE, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
     REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
@@ -86,7 +88,7 @@ fn evaluate_graph_uses_visited_set_not_counter() {
         other => panic!("unexpected decision: {other:?}"),
     };
     assert_eq!(reason, PolicyReasonCode::DefaultAllow);
-    let mut visited_seen = std::collections::HashSet::new();
+    let mut visited_seen = HashSet::new();
     for node_id in &simulation.visited_node_ids {
         assert!(
             visited_seen.insert(node_id.clone()),
@@ -97,6 +99,10 @@ fn evaluate_graph_uses_visited_set_not_counter() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts every seeded review canvas stays inactive in one pass over the seeded set"
+)]
 fn seeded_workspace_adds_review_canvases_without_activating_them() {
     let workspace = PolicyCanvasWorkspace::seeded();
 
@@ -151,6 +157,10 @@ fn seeded_workspace_adds_review_canvases_without_activating_them() {
     assert_review_screenshot_canvas_only(review_screenshot);
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the full manual-OCR-paste canvas shape as one related invariant"
+)]
 fn assert_manual_ocr_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
     assert!(
@@ -195,6 +205,10 @@ fn assert_manual_ocr_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     );
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the full review-text-paste canvas shape as one related invariant"
+)]
 fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
     assert!(
@@ -239,6 +253,10 @@ fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     );
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the full review-screenshot canvas shape as one related invariant"
+)]
 fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
     assert_eq!(canvas.document.mode, PolicyGraphMode::Draft);
     assert!(

@@ -9,7 +9,7 @@ use super::{
     PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
 };
 
-pub(crate) const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
+pub const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
 pub const MANUAL_OCR_PASTE_CANVAS_TITLE: &str = "Manual OCR Paste";
 pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
@@ -155,7 +155,7 @@ impl PolicyCanvasWorkspace {
     }
 
     #[must_use]
-    pub(crate) fn from_legacy(
+    pub fn from_legacy(
         document: PolicyGraph,
         latest_simulation: Option<PolicyPipelineSimulationResult>,
     ) -> Self {

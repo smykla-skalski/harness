@@ -21,8 +21,8 @@ Paths are relative to the repository root.
 - `src/hooks/` - tool lifecycle hook handlers, guards, and hook protocol types.
 - `src/workspace/compact/` - file fingerprinting with SHA256 and mtime.
 - `src/session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
-- `src/task_board/` - planning gates, dispatch/evaluate reconciliation, external sync, and policy pipeline graph evaluation; reaches the item/query/policy core and the triage/prompt/project/working-copy clusters below through the root crate's own facade. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
-- `crates/harness-task-board/src/` - task-board item types, the query/pagination layer, lane ordering, the built-in policy gate, git-identity defaults, runtime configuration wire types, progress rollups, the legacy file-backed store/machine-registry test doubles, triage and its escalation/override/rules, the prompt catalog and worker-prompt rendering, the project/color/shape cluster, and the working-copy registry and clone runtime.
+- `src/task_board/` - planning gates, dispatch/evaluate reconciliation, and external sync; reaches the item/query/policy core, the policy pipeline graph, and the triage/prompt/project/working-copy clusters below through the root crate's own facade. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
+- `crates/harness-task-board/src/` - task-board item types, the query/pagination layer, lane ordering, the built-in policy gate, git-identity defaults, runtime configuration wire types, progress rollups, the legacy file-backed store/machine-registry test doubles, the policy pipeline graph (compiler, decisions, evaluation, seed, store, validation), triage and its escalation/override/rules, the prompt catalog and worker-prompt rendering, the project/color/shape cluster, and the working-copy registry and clone runtime.
 - `crates/harness-agents/src/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
 
 ## Facade-crate src includes

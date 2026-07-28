@@ -186,6 +186,7 @@ daemon-runtime = [
   "dep:hyper",
   "dep:hyper-util",
   "dep:harness-systemd-protocol",
+  "harness-task-board/daemon-runtime",
   "dep:instant-acme",
   "dep:rcgen",
   "dep:rusqlite",
