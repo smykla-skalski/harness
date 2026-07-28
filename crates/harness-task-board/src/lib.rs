@@ -38,6 +38,7 @@ mod prompt_builtins;
 pub mod prompt_catalog;
 pub mod prompt_config;
 mod prompt_template;
+pub mod provider_credentials;
 pub mod remote_spki_pin;
 pub mod runtime_config;
 pub mod store;
@@ -96,6 +97,9 @@ pub use policy_graph::{
 pub use progress_rollup::{TaskBoardProgressRollup, build_progress_rollups};
 pub use prompt_catalog::install_prompt_catalog;
 pub use prompt_config::resolve_prompt_catalog_from_env;
+pub use provider_credentials::{
+    TaskBoardGitHubCredentialSnapshot, TaskBoardOpenRouterCredentialSnapshot,
+};
 pub use runtime_config::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
