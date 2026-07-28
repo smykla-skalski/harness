@@ -26,6 +26,7 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
             .await
             .expect("restart workflow driver database");
         self.reconcile(&db, now).await;
+        db.pool().close().await;
     }
 
     pub(super) async fn drive_to_phase(

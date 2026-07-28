@@ -108,6 +108,16 @@ async fn dependency_update_review_resumes_every_stage_after_restart() {
             .map(|pull_request| pull_request.number),
         Some(17)
     );
+    let item = fixture
+        .test
+        .db
+        .task_board_item(&fixture.item_id)
+        .await
+        .expect("load projected dependency-update item");
+    assert_eq!(
+        item.workflow.pr_url.as_deref(),
+        Some("https://github.com/example/compass/pull/17")
+    );
     assert_eq!(runtime.start_count(), 3);
     assert_eq!(runtime.publish_count(), 1);
 }
