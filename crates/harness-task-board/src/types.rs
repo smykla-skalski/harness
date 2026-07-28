@@ -199,6 +199,11 @@ impl TaskBoardWorkflowState {
 pub enum TaskBoardWorkflowStatus {
     #[default]
     Idle,
+    /// A dispatch has been reserved for this ticket and one execution now owns
+    /// it, but the worker has not started yet. The ticket stays in Todo through
+    /// this window; the state records which execution admitted it so a repeated
+    /// admission is visibly a no-op rather than a second competing run.
+    Admitting,
     Running,
     Paused,
     Completed,

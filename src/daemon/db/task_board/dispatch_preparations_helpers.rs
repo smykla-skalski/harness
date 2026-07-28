@@ -7,7 +7,9 @@ use super::super::admission_lifecycle::{
 use super::super::dispatch_preparation_claim::{
     TaskBoardPreparationUnavailable, classify_unavailable_preparation_in_tx,
 };
-use super::super::items::load_item_in_tx;
+use super::super::items::{bump_change_in_tx, load_item_in_tx};
+use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
+use super::super::ITEMS_CHANGE_SCOPE;
 use super::{
     ClaimedTaskBoardDispatchPreparation, PREPARATION_LEASE_SECONDS, ReservedTaskBoardDispatch,
     TaskBoardDispatchPreparation, preparation_revision_error,
@@ -411,4 +413,66 @@ pub(super) async fn commit_preparation(
 pub(super) fn decode_preparation(payload: &str) -> Result<TaskBoardDispatchPreparation, CliError> {
     serde_json::from_str(payload)
         .map_err(|error| db_error(format!("decode task board preparation: {error}")))
+}
+
+/// Records the owning execution on the ticket at reservation time and moves its
+/// workflow state to `Admitting`, keeping the item in Todo. Returns the item
+/// revision after the write so the caller can freeze it as the preparation's
+/// source revision (the claim guard compares the two).
+pub(super) async fn stamp_admitting_execution_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: TaskBoardItem,
+    item_revision: i64,
+    workflow_execution_id: &str,
+) -> Result<i64, CliError> {
+    let before = item.clone();
+    let mut admitted = item;
+    admitted.workflow.execution_id = Some(workflow_execution_id.to_string());
+    admitted.workflow.status = TaskBoardWorkflowStatus::Admitting;
+    admitted.updated_at = utc_now();
+    let write = replace_with_lane_transition_in_tx(
+        transaction,
+        before,
+        item_revision,
+        admitted,
+        LaneTransitionKind::Generic,
+    )
+    .await?;
+    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    Ok(write.item_revision)
+}
+
+/// Clears the `Admitting` stamp when a reserved dispatch is retired, so the
+/// ticket does not stay pinned to a dead execution. Only clears when this exact
+/// execution still owns the ticket and it has not advanced past `Admitting`; a
+/// ticket already running under a completed dispatch, or owned by a different
+/// execution, is left untouched.
+pub(super) async fn clear_admitting_execution_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    board_item_id: &str,
+    workflow_execution_id: &str,
+) -> Result<(), CliError> {
+    let Some((item, item_revision)) = load_item_in_tx(transaction, board_item_id).await? else {
+        return Ok(());
+    };
+    let owns = item.workflow.execution_id.as_deref() == Some(workflow_execution_id)
+        && item.workflow.status == TaskBoardWorkflowStatus::Admitting;
+    if !owns {
+        return Ok(());
+    }
+    let before = item.clone();
+    let mut released = item;
+    released.workflow.execution_id = None;
+    released.workflow.status = TaskBoardWorkflowStatus::Idle;
+    released.updated_at = utc_now();
+    replace_with_lane_transition_in_tx(
+        transaction,
+        before,
+        item_revision,
+        released,
+        LaneTransitionKind::Generic,
+    )
+    .await?;
+    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    Ok(())
 }

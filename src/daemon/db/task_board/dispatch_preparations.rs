@@ -29,10 +29,10 @@ const PREPARATION_LEASE_SECONDS: i64 = 30;
 mod helpers;
 use helpers::{
     PREPARATION_MAX_ATTEMPTS, PreparationClaim, active_reservation, apply_preparation_to_item,
-    claim_preparation_intent_in_tx, claimed_attempts_in_tx, commit_preparation,
-    ensure_preparation_claim, fail_preparation_admission_in_tx, insert_preparation,
-    preparation_retry_delay_seconds, rearm_preparation_in_tx, screen_preparation_claim_in_tx,
-    validate_reservable_item,
+    claim_preparation_intent_in_tx, claimed_attempts_in_tx, clear_admitting_execution_in_tx,
+    commit_preparation, ensure_preparation_claim, fail_preparation_admission_in_tx,
+    insert_preparation, preparation_retry_delay_seconds, rearm_preparation_in_tx,
+    screen_preparation_claim_in_tx, stamp_admitting_execution_in_tx, validate_reservable_item,
 };
 
 pub(crate) use helpers::PREPARATION_MAX_ATTEMPTS as TASK_BOARD_PREPARATION_MAX_ATTEMPTS;
@@ -188,6 +188,16 @@ impl AsyncDaemonDb {
             SessionIntent::Existing { session_id } => session_id.clone(),
             SessionIntent::Create { .. } => Uuid::new_v4().to_string(),
         };
+        let workflow_kind = item.workflow_kind;
+        // Stamp the owning execution onto the ticket in the same transaction that
+        // reserves the intent, so the admit window stops being a blind spot: the
+        // ticket exposes exactly one execution and a repeated admission is a
+        // visible no-op rather than a second competing run. The ticket stays in
+        // Todo; only its workflow state moves to Admitting. The stamp bumps the
+        // item revision, so freeze that post-stamp revision as the source below.
+        let admitted_item_revision =
+            stamp_admitting_execution_in_tx(&mut transaction, item, item_revision, &workflow_execution_id)
+                .await?;
         let preparation = TaskBoardDispatchPreparation {
             board_item_id: plan.board_item_id.clone(),
             session_id,
@@ -196,8 +206,8 @@ impl AsyncDaemonDb {
             actor: actor.to_string(),
             project_dir: project_dir.map(ToString::to_string),
             plan: plan.clone(),
-            source_item_revision: (!matches!(item.workflow_kind, TaskBoardWorkflowKind::Unknown))
-                .then_some(item_revision),
+            source_item_revision: (!matches!(workflow_kind, TaskBoardWorkflowKind::Unknown))
+                .then_some(admitted_item_revision),
             hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;
@@ -441,6 +451,15 @@ impl AsyncDaemonDb {
         let attempts = claimed_attempts_in_tx(&mut transaction, claim).await?;
         if attempts >= PREPARATION_MAX_ATTEMPTS {
             fail_preparation_admission_in_tx(&mut transaction, &claim.intent_id, reason).await?;
+            // The intent is retired, so release the Admitting stamp too: clear the
+            // owning execution and drop the ticket back to Idle so a fresh
+            // dispatch mints a new execution instead of finding a dead one.
+            clear_admitting_execution_in_tx(
+                &mut transaction,
+                &claim.preparation.board_item_id,
+                &claim.preparation.workflow_execution_id,
+            )
+            .await?;
             commit_preparation(transaction, "task board preparation give-up").await?;
             return Ok(TaskBoardPreparationRelease::GaveUp { attempts });
         }
