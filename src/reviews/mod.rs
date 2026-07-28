@@ -1,15 +1,33 @@
-mod avatar;
+// `avatar`, `enums`, `file_comment`, `files`, `review_thread_resolve`, and
+// `timeline` moved into `harness-reviews`: they carry no `task_board`
+// dependency. `backports`, `body_update`, `github`, `logic`, `policy`, and
+// `types` stay here — they either reach into `task_board` directly, or hold
+// inherent impls on wire types `task_board` still owns, and task_board's own
+// extraction into a crate isn't finished yet.
+mod avatar {
+    pub use harness_reviews::avatar::*;
+}
 mod backports;
 mod body_update;
-mod enums;
-mod file_comment;
-pub(crate) mod files;
+mod enums {
+    pub use harness_reviews::enums::*;
+}
+mod file_comment {
+    pub use harness_reviews::file_comment::*;
+}
+pub(crate) mod files {
+    pub use harness_reviews::files::*;
+}
 mod github;
 mod logic;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod policy;
-pub(crate) mod review_thread_resolve;
-pub(crate) mod timeline;
+pub(crate) mod review_thread_resolve {
+    pub use harness_reviews::review_thread_resolve::*;
+}
+pub(crate) mod timeline {
+    pub use harness_reviews::timeline::*;
+}
 mod types;
 mod validation;
 

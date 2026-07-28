@@ -3527,6 +3527,7 @@ dependencies = [
  "harness-mcp",
  "harness-observe",
  "harness-protocol",
+ "harness-reviews",
  "harness-run",
  "harness-session",
  "harness-systemd-protocol",
@@ -3705,6 +3706,7 @@ dependencies = [
  "harness-kernel",
  "harness-observe",
  "harness-protocol",
+ "harness-reviews",
  "harness-session",
  "harness-systemd-protocol",
  "harness-task-board",
@@ -3963,6 +3965,30 @@ dependencies = [
  "serde",
  "serde_json",
  "temp-env",
+ "tracing",
+ "utoipa",
+]
+
+[[package]]
+name = "harness-reviews"
+version = "54.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.23.0",
+ "chrono",
+ "gix",
+ "harness-github-api",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-workspace",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "thiserror 2.0.19",
+ "tokio",
  "tracing",
  "utoipa",
 ]
