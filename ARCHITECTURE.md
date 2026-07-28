@@ -96,7 +96,6 @@ These are real roots in the repo, but they are not part of the main public domai
 
 - `src/manifests/` is crate-internal manifest plumbing.
 - `src/suite_defaults/` is crate-internal suite scaffolding and defaults.
-- `src/codec/` is test-only support code and is not part of the public library surface.
 
 ## Public crate surface
 
@@ -104,7 +103,6 @@ The current `src/lib.rs` surface is:
 
 - public: `agents`, `app`, `errors`, `hooks`, `infra`, `kernel`, `observe`, `run`, `session`, `setup`, `workspace`
 - crate-internal: `manifests`, `suite_defaults`
-- test-only: `codec`
 
 That means `manifests` and `suite_defaults` are intentionally not stable library APIs even though they are first-class internal roots.
 
