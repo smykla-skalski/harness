@@ -53,7 +53,10 @@ fn unit_only_reconfigure_commits_without_changing_environment_or_state() {
     assert_eq!(installed.mode(), metadata.mode());
     assert_eq!(installed.uid(), metadata.uid());
     assert_eq!(installed.gid(), metadata.gid());
-    assert_eq!(runner.starts(), 1);
+    // Every committed change restarts twice: activate_candidate starts the
+    // service, then seal_and_reverify_target restarts it again to prove the
+    // database seal survives a real restart before the transaction commits.
+    assert_eq!(runner.starts(), 2);
 }
 
 #[test]

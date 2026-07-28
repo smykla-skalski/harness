@@ -154,7 +154,8 @@ fn validate_environment_file(path: &Path) -> Result<(), CliError> {
 
 fn validate_managed_file(path: &Path, label: &str, executable: bool) -> Result<(), CliError> {
     paths::validate_trusted_ancestors(path, label)?;
-    let metadata = regular_file_metadata(path)?;
+    let metadata = regular_file_metadata(path)
+        .map_err(|error| io_error(format!("managed {label} {}: {error}", path.display())))?;
     let (owner_id, group_id) = trusted_owner();
     if metadata.uid() != owner_id || metadata.gid() != group_id {
         return Err(io_error(format!(
