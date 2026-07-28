@@ -106,7 +106,7 @@ tempfile = "=3.27.0"
 default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]
 bridge-runtime = []
 daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http"]
-standalone-daemon = []
+standalone-daemon = ["harness-observe/standalone-daemon"]
 standalone-worker = []
 tokio-console = ["harness-telemetry/tokio-console"]
 
