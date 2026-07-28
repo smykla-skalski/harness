@@ -179,4 +179,17 @@ mod tests {
         assert_eq!(snapshot.global_token.as_deref(), Some("global"));
         assert!(snapshot.repository_tokens.is_empty());
     }
+
+    #[test]
+    fn repository_only_github_snapshot_is_configured() {
+        let snapshot = TaskBoardGitHubCredentialSnapshot {
+            global_token: None,
+            repository_tokens: vec![TaskBoardGitHubRepositoryToken {
+                repository: "owner/repo".into(),
+                token: "repo".into(),
+            }],
+        };
+        assert!(snapshot.is_configured());
+        assert!(!snapshot.token_configured(None));
+    }
 }

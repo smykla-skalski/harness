@@ -29,8 +29,8 @@ use harness_workspace::command_context::AppContext;
 mod providers;
 #[cfg(target_os = "macos")]
 use providers::{
-    clear_provider_secret, provider_account, provider_configured, provider_service,
-    set_provider_secret,
+    clear_provider_secret, provider_account, provider_any_configured, provider_configured,
+    provider_service, set_provider_secret,
 };
 
 #[cfg(any(target_os = "macos", test))]
@@ -135,7 +135,7 @@ fn run_list() -> Result<i32, CliError> {
     let entries = [
         (
             "GitHub token",
-            provider_configured(SecretKindArg::Github, None, &provider_account)?,
+            provider_any_configured(SecretKindArg::Github, &provider_account)?,
         ),
         (
             "SSH key (global)",
@@ -151,7 +151,7 @@ fn run_list() -> Result<i32, CliError> {
         ),
         (
             "OpenRouter token",
-            provider_configured(SecretKindArg::OpenRouter, None, &provider_account)?,
+            provider_any_configured(SecretKindArg::OpenRouter, &provider_account)?,
         ),
     ];
     println!("Task-board credential status (Keychain):");

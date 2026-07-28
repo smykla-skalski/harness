@@ -109,6 +109,17 @@ pub(super) fn provider_configured(
     }
 }
 
+pub(super) fn provider_any_configured(
+    kind: SecretKindArg,
+    account: &str,
+) -> Result<bool, CliError> {
+    match kind {
+        SecretKindArg::Github => Ok(load_github_snapshot(account)?.is_configured()),
+        SecretKindArg::OpenRouter => Ok(load_openrouter_snapshot(account)?.is_configured()),
+        _ => unreachable!("provider credential kind required"),
+    }
+}
+
 pub(super) fn provider_service(kind: SecretKindArg) -> &'static str {
     match kind {
         SecretKindArg::Github => SERVICE_GITHUB,

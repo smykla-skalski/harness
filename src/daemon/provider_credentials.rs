@@ -71,7 +71,7 @@ fn database_credential_account(instance_id: &str) -> String {
 fn log_load_issue(provider: &str, status: &ProviderCredentialStatus) {
     if let Some(error) = status.error.as_deref() {
         tracing::warn!(provider, %error, "provider credential unavailable");
-    } else {
+    } else if status.source != ProviderCredentialSource::Unavailable {
         tracing::info!(
             provider,
             configured = status.configured,
@@ -122,11 +122,7 @@ fn load_for_instance(instance_id: &str) -> ProviderCredentialLoadReport {
 
 #[cfg(any(not(target_os = "macos"), test))]
 fn load_for_instance(_instance_id: &str) -> ProviderCredentialLoadReport {
-    let error = Some("provider Keychain credentials are unavailable".to_string());
-    ProviderCredentialLoadReport {
-        github: unavailable_status(error.clone()),
-        openrouter: unavailable_status(error),
-    }
+    ProviderCredentialLoadReport::default()
 }
 
 #[cfg(all(target_os = "macos", not(test)))]
