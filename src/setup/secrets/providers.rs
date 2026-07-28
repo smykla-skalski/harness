@@ -88,7 +88,7 @@ pub(super) fn provider_account(client: Option<&DaemonClient>) -> Result<String, 
     };
     let capabilities = client
         .get_optional::<TaskBoardCapabilitiesResponse>("/v1/task-board/capabilities", &[])
-        .map_err(|error| daemon_sync_error("read task-board identity", &error))?
+        .map_err(|error| daemon_sync_error("read task-board capabilities", &error))?
         .ok_or_else(provider_upgrade_required)?;
     scoped_provider_account(&capabilities)
 }
