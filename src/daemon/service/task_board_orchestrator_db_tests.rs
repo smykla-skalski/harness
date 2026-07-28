@@ -1,7 +1,8 @@
-use super::should_sync_github_tasks;
+use super::{github_discovery_request, should_sync_github_tasks};
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::{
-    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings, TaskBoardStatus,
+    ExternalSyncDirection, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
+    TaskBoardStatus,
 };
 
 /// The default settings already enable `SyncTaskBoard`, so this is the
@@ -71,13 +72,13 @@ fn an_item_scoped_run_skips_the_pull() {
 }
 
 #[test]
-fn a_run_scoped_to_another_lane_skips_the_pull() {
+fn a_run_scoped_to_another_lane_still_pulls() {
     let mut input = whole_board_run();
     input.status = Some(TaskBoardStatus::InProgress);
 
     assert!(
-        !should_sync_github_tasks(&input, &syncing_settings()),
-        "a lane the pull does not fill has nothing to sync for"
+        should_sync_github_tasks(&input, &syncing_settings()),
+        "discovery is independent of dispatch status: a lane-scoped run must still fill the Inbox"
     );
 }
 
@@ -101,4 +102,17 @@ fn nothing_configured_means_nothing_to_pull() {
         !should_sync_github_tasks(&whole_board_run(), &settings_without_a_source()),
         "with the automation off and no inbox repository there is no source to sync from"
     );
+}
+
+#[test]
+fn discovery_pulls_every_status_not_the_dispatch_lane() {
+    let request = github_discovery_request(false);
+
+    assert_eq!(
+        request.status, None,
+        "discovery must import every eligible pull request, not only the dispatched lane"
+    );
+    assert!(matches!(request.direction, ExternalSyncDirection::Pull));
+    assert!(!request.dry_run);
+    assert!(github_discovery_request(true).dry_run);
 }
