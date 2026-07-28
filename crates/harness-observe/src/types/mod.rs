@@ -1,6 +1,5 @@
 mod classification;
 mod issue_code;
-#[cfg(not(feature = "standalone-daemon"))]
 mod presets;
 mod state;
 mod tracking;
@@ -10,7 +9,6 @@ pub use classification::{
     Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole, SourceTool,
 };
 pub use issue_code::IssueCode;
-#[cfg(not(feature = "standalone-daemon"))]
 pub use presets::{FOCUS_PRESETS, FocusPreset};
 // Unlike this crate's own `#[cfg(test)]` items, these can't stay test-gated:
 // a `#[cfg(test)]` item never survives crossing a crate boundary, since a
