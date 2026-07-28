@@ -69,8 +69,7 @@ pub enum TaskBoardAutomationRunOutcome {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationScope {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item_id: Option<String>,
@@ -84,8 +83,7 @@ pub struct TaskBoardAutomationScope {
     pub status: Option<TaskBoardStatus>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationQueueSummary {
     pub ready: usize,
     pub awaiting_approval: usize,
@@ -98,8 +96,7 @@ pub struct TaskBoardAutomationQueueSummary {
     pub cleanup_required: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationRunInfo {
     pub run_id: String,
     pub trigger: TaskBoardAutomationRunTrigger,
@@ -114,8 +111,7 @@ pub struct TaskBoardAutomationRunInfo {
     pub completed_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::IntoParams)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct TaskBoardAutomationHistoryRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -131,8 +127,7 @@ impl TaskBoardAutomationHistoryRequest {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationHistoryResponse {
     pub runs: Vec<TaskBoardAutomationRunInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -140,8 +135,7 @@ pub struct TaskBoardAutomationHistoryResponse {
     pub has_older: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationRunStage {
     pub sequence: u64,
     pub stage: String,
@@ -154,8 +148,7 @@ pub struct TaskBoardAutomationRunStage {
     pub payload: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationRunDetail {
     pub run: TaskBoardAutomationRunInfo,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -166,8 +159,7 @@ pub struct TaskBoardAutomationRunDetail {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationMetrics {
     pub runs_total: u64,
     pub runs_running: u64,
@@ -180,8 +172,7 @@ pub struct TaskBoardAutomationMetrics {
     pub captured_at: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationCancelTarget {
     pub execution_id: String,
     pub item_id: String,
@@ -212,8 +203,7 @@ impl TaskBoardAutomationCancelTarget {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationSnapshot {
     #[serde(default = "default_snapshot_schema_version")]
     pub schema_version: u32,

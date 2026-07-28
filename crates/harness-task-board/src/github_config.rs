@@ -7,8 +7,7 @@ use crate::TaskBoardRepositoryAutomationConfig;
 /// This is what gets stored. It deliberately names no repository: publication
 /// targets whatever repository an item came from, so a single configured owner
 /// and repo would only invite values that quietly have no effect.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubAutomationSettings {
     #[serde(default = "default_branch_prefix")]
     pub branch_prefix: String,
@@ -93,8 +92,7 @@ impl GitHubAutomationSettings {
 
 /// One publication's target: the conventions above, plus the repository this
 /// particular change lands in. Built per item, never stored.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubProjectConfig {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub owner: String,
@@ -124,8 +122,7 @@ fn default_branch_prefix() -> String {
     "c/".to_string()
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GitHubMergeMethod {
     #[default]
@@ -134,8 +131,7 @@ pub enum GitHubMergeMethod {
     Rebase,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubAutomationLabels {
     pub managed: String,
     pub auto_merge: String,
@@ -143,15 +139,13 @@ pub struct GitHubAutomationLabels {
     pub protected_path: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubAutomationToggles {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub enabled: Vec<GitHubAutomation>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubRequestedReviewers {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reviewers: Vec<String>,
@@ -171,8 +165,7 @@ pub enum GitHubAutomation {
     AutoMerge,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ProtectedPathRule {
     pub pattern: String,
 }

@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
-use harness_kernel::errors::CliError;
 use crate::{
     TaskBoardAdmissionRequirement, TaskBoardAutomationScope, TaskBoardLifecycleOutcome,
     TaskBoardLifecycleRequest, TaskBoardWorkflowSnapshot,
 };
+use harness_kernel::errors::CliError;
 
 #[async_trait]
 pub trait TaskBoardAdmissionRequirementEvaluator: Send + Sync {

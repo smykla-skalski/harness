@@ -17,13 +17,13 @@ pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullR
 // `config.rs` moved to `harness-task-board` (as `github_config`): its four
 // wire types and `automation::settings` reach into each other, so both had to
 // move in the same slice.
-pub use harness_task_board::github_config::{
-    GitHubAutomation, GitHubAutomationLabels, GitHubAutomationSettings, GitHubAutomationToggles,
-    GitHubMergeMethod, GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
-};
 pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
+};
+pub use harness_task_board::github_config::{
+    GitHubAutomation, GitHubAutomationLabels, GitHubAutomationSettings, GitHubAutomationToggles,
+    GitHubMergeMethod, GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
 };
 pub use publication::GitHubBranchState;
 #[cfg(any(test, feature = "daemon-runtime"))]

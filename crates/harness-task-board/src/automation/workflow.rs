@@ -82,8 +82,7 @@ pub enum TaskBoardPhaseCapabilityProfile {
     EvaluateReadOnly,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardPlanningResult {
     pub plan_markdown: String,
     pub acceptance_criteria: Vec<String>,
@@ -94,8 +93,7 @@ pub struct TaskBoardPlanningResult {
     pub provider_revision: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardReviewResult {
     pub verdict: TaskBoardPhaseVerdict,
     pub head_revision: String,
@@ -116,8 +114,7 @@ pub struct TaskBoardImplementationResult {
     pub evidence: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardEvaluationResult {
     pub verdict: TaskBoardPhaseVerdict,
     pub summary: String,
@@ -129,8 +126,7 @@ pub struct TaskBoardEvaluationResult {
     pub revision_cycle: Option<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardResolvedReviewer {
     pub reviewer_count: u32,
     pub required_approvals: u32,
@@ -224,8 +220,7 @@ pub struct TaskBoardLifecycleRequest {
     pub idempotency_key: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardLifecycleOutcome {
     pub mutated: bool,
     pub terminal: bool,

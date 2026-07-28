@@ -175,9 +175,8 @@ fn review_round_waits_until_quorum_then_approves_exact_head() {
     .expect("resolve reviewers");
     let first = outcome("exact-a", TaskBoardPhaseVerdict::Pass, "abcdef1");
 
-    let pending =
-        evaluate_task_board_review_round(&resolved, "abcdef1", 1, from_ref(&first))
-            .expect("evaluate pending");
+    let pending = evaluate_task_board_review_round(&resolved, "abcdef1", 1, from_ref(&first))
+        .expect("evaluate pending");
     let approved = evaluate_task_board_review_round(
         &resolved,
         "abcdef1",

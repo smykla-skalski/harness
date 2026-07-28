@@ -4,9 +4,7 @@ use super::workflow_execution_write_validation::{
     validate_write_attempt_artifact, validate_write_frozen_contract,
 };
 use super::*;
-use crate::{
-    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOnlyRunContext,
-};
+use crate::{AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOnlyRunContext};
 
 const NOW: &str = "2026-07-18T10:00:00Z";
 

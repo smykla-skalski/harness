@@ -28,8 +28,7 @@ const REVIEW_PHASES: [TaskBoardExecutionPhase; 4] = [
     TaskBoardExecutionPhase::Terminal,
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardPullRequestIdentity {
     pub repository: String,
     pub number: u64,
@@ -37,8 +36,7 @@ pub struct TaskBoardPullRequestIdentity {
     pub head: Option<TaskBoardPullRequestHeadIdentity>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardPullRequestHeadIdentity {
     pub repository: String,
     pub branch: String,

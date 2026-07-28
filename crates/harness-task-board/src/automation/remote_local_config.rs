@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 
-use harness_kernel::errors::CliError;
 use crate::{
     TaskBoardExecutionHostConfig, TaskBoardLocalExecutionHostConfig,
     TaskBoardLocalExecutionRepositoryConfig, TaskBoardRepositoryAutomationConfig,
     normalize_repository_slug,
 };
+use harness_kernel::errors::CliError;
 
 /// Validate controller trust anchors and repository routing as one config.
 ///

@@ -3008,7 +3008,8 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
 ];
-const GITHUB_CONFIG_SOURCE: &str = include_str!("../crates/harness-task-board/src/github_config.rs");
+const GITHUB_CONFIG_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/github_config.rs");
 const GITHUB_CONFIG_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitHubProjectWireTypes.generated.swift";
 // The GitHubAutomationSettings sub-tree nested in
 // TaskBoardOrchestratorSettings.github_project. The structs suffix to *Wire;

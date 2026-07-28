@@ -7,8 +7,8 @@ use crate::github_api::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::GitHubProjectConfig;
+use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 
 mod fresh;
 #[cfg(test)]

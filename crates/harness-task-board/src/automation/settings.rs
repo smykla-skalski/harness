@@ -1,14 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+use crate::{AgentMode, TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile};
 use crate::{
     GitHubAutomationLabels, GitHubAutomationToggles, GitHubRequestedReviewers, ProtectedPathRule,
 };
-use crate::{
-    AgentMode, TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile,
-};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationSchedulingSettings {
     pub max_dispatches_per_run: u32,
     pub max_concurrent_workflows: u32,
@@ -25,8 +22,7 @@ impl Default for TaskBoardAutomationSchedulingSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationRetrySettings {
     pub max_attempts: u32,
     pub base_delay_seconds: u64,
@@ -47,8 +43,7 @@ impl Default for TaskBoardAutomationRetrySettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardReviewerProfile {
     pub id: String,
     pub runtime: String,
@@ -73,8 +68,7 @@ impl Default for TaskBoardReviewerProfile {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardReviewerRule {
     pub workflow: TaskBoardOrchestratorWorkflow,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -84,8 +78,7 @@ pub struct TaskBoardReviewerRule {
     pub profiles: Vec<TaskBoardReviewerProfile>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardReviewerSettings {
     pub reviewer_count: u32,
     pub required_approvals: u32,
@@ -107,8 +100,7 @@ impl Default for TaskBoardReviewerSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardRepositoryAutomationConfig {
     pub repository: String,
     #[serde(default = "default_true")]

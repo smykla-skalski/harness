@@ -1,9 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 
-use crate::{
-    TaskBoardAutomationRetrySettings, TaskBoardFailureClass, TaskBoardRetrySchedule,
-};
+use crate::{TaskBoardAutomationRetrySettings, TaskBoardFailureClass, TaskBoardRetrySchedule};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskBoardAttemptRetryDecision {
