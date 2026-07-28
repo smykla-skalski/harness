@@ -14,9 +14,9 @@ mod repository;
 mod risk;
 
 pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullRequestHandle};
-// `config.rs` moved to `harness-task-board` (as `github_config`): its four
-// wire types and `automation::settings` reach into each other, so both had to
-// move in the same slice.
+// `config.rs` moved to `harness-task-board` (as `github_config`) in full,
+// all eight of its wire types: they and `automation::settings` reach into
+// each other, so both had to move in the same slice.
 pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
