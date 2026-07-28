@@ -5,9 +5,12 @@ use super::helpers::collect_hits_in_tree;
 /// `hooks` may depend on `session` and `agents` - `hooks::runtime` genuinely
 /// needs `agents::runtime` for pending-signal pickup and
 /// `agents::service`/`session::service` to record what happened and resolve a
-/// runtime session - but nothing under `src/agents` or `src/session` may
-/// reach back into `crate::hooks`; a real edge in that direction would block
-/// ever giving either domain its own crate. Every current hit in this scan is
+/// runtime session - but nothing under `src/agents`, `src/session`, or
+/// `src/task_board` may reach back into `crate::hooks`; a real edge in that
+/// direction would block ever giving any of those domains its own crate.
+/// `task_board` is scanned alongside the other two because it sits in the
+/// same daemon-facade layer and would hide the same kind of edge reappearing
+/// there instead. Every current hit in this scan is
 /// a type-only import of `HookAgent`, `NormalizedEvent`/`NormalizedHookContext`,
 /// or `NormalizedHookResult` through the `crate::hooks::adapters`/
 /// `crate::hooks::protocol` re-export shims; the canonical definitions live in
