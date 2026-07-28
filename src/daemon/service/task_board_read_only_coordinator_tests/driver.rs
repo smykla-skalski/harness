@@ -21,14 +21,6 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
         self.reconcile(&self.fixture.test.db, now).await;
     }
 
-    pub(super) async fn restart_and_tick(&self, now: &str) {
-        let db = AsyncDaemonDb::connect(&self.fixture.test.path)
-            .await
-            .expect("restart workflow driver database");
-        self.reconcile(&db, now).await;
-        db.pool().close().await;
-    }
-
     pub(super) async fn drive_to_phase(
         &self,
         phase: TaskBoardExecutionPhase,
@@ -36,12 +28,14 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
         max_ticks: usize,
     ) {
         for _ in 0..max_ticks {
-            self.restart_and_tick(now).await;
-            if self.execution().await.transition.phase == Some(phase) {
+            let db = self.restart(now).await;
+            let reached_phase = self.execution(&db).await.transition.phase == Some(phase);
+            db.pool().close().await;
+            if reached_phase {
                 return;
             }
         }
-        let execution = self.execution().await;
+        let execution = self.persisted_execution().await;
         panic!(
             "workflow {} did not reach {phase:?}; stage={:?}; state={:?}; evidence={:?}",
             execution.execution_id,
@@ -53,19 +47,20 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
 
     pub(super) async fn drive_to_terminal_projection(&self, now: &str, max_ticks: usize) {
         for _ in 0..max_ticks {
-            self.restart_and_tick(now).await;
-            let item = self
-                .fixture
-                .test
-                .db
+            let db = self.restart(now).await;
+            let projected = db
                 .task_board_item_snapshot(&self.fixture.item_id)
                 .await
-                .expect("load workflow driver item");
-            if item.item.status == TaskBoardStatus::Done {
+                .expect("load workflow driver item")
+                .item
+                .status
+                == TaskBoardStatus::Done;
+            db.pool().close().await;
+            if projected {
                 return;
             }
         }
-        let execution = self.execution().await;
+        let execution = self.persisted_execution().await;
         panic!(
             "workflow {} did not project terminal state; stage={:?}; state={:?}; evidence={:?}",
             execution.execution_id,
@@ -75,14 +70,30 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
         );
     }
 
-    pub(super) async fn execution(&self) -> TaskBoardWorkflowExecutionRecord {
-        self.fixture
-            .test
-            .db
-            .task_board_workflow_execution(&self.fixture.execution_id)
+    async fn persisted_execution(&self) -> TaskBoardWorkflowExecutionRecord {
+        let db = self.connect().await;
+        let execution = self.execution(&db).await;
+        db.pool().close().await;
+        execution
+    }
+
+    async fn execution(&self, db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecord {
+        db.task_board_workflow_execution(&self.fixture.execution_id)
             .await
             .expect("load workflow driver execution")
             .expect("workflow driver execution exists")
+    }
+
+    async fn restart(&self, now: &str) -> AsyncDaemonDb {
+        let db = self.connect().await;
+        self.reconcile(&db, now).await;
+        db
+    }
+
+    async fn connect(&self) -> AsyncDaemonDb {
+        AsyncDaemonDb::connect(&self.fixture.test.path)
+            .await
+            .expect("restart workflow driver database")
     }
 
     async fn reconcile(&self, db: &AsyncDaemonDb, now: &str) {

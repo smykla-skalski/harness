@@ -3,9 +3,9 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardPhaseVerdict, TaskBoardTerminalOutcomeKind,
 };
 
+use super::fixture::{seed_write_execution, seed_write_execution_with_retry_limit};
 use super::{
-    BASE_HEAD, FIRST_HEAD, FakeWriteRuntime, PlannedRun, RETRY_AT, load_execution,
-    seed_write_execution, seed_write_execution_with_retry_limit, tick, tick_at,
+    BASE_HEAD, FIRST_HEAD, FakeWriteRuntime, PlannedRun, RETRY_AT, load_execution, tick, tick_at,
 };
 
 #[tokio::test]

@@ -4,12 +4,9 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 
+use self::fixture as write_fixture;
 use super::driver::HeadlessWorkflowDriver;
 use super::fixture::{Fixture, NOW};
-use fixture::{
-    seed_write_execution, seed_write_execution_kind, seed_write_execution_with_retry_limit,
-    seed_write_execution_with_task,
-};
 use runtime::{FakeWriteRuntime, PlannedRun};
 
 mod fixture;
@@ -23,7 +20,7 @@ const RETRY_AT: &str = "2026-07-17T10:05:00Z";
 
 #[tokio::test]
 async fn write_workflow_runs_revision_cycle_publish_cleanup_and_projection() {
-    let fixture = seed_write_execution("write-lifecycle").await;
+    let fixture = write_fixture::seed_write_execution("write-lifecycle").await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::ChangesRequired),
@@ -81,8 +78,11 @@ async fn write_workflow_runs_revision_cycle_publish_cleanup_and_projection() {
 
 #[tokio::test]
 async fn dependency_update_review_resumes_every_stage_after_restart() {
-    let fixture =
-        seed_write_execution_kind("dependency-update", TaskBoardWorkflowKind::PrFixReview).await;
+    let fixture = write_fixture::seed_write_execution_kind(
+        "dependency-update",
+        TaskBoardWorkflowKind::PrFixReview,
+    )
+    .await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
@@ -124,7 +124,7 @@ async fn dependency_update_review_resumes_every_stage_after_restart() {
 
 #[tokio::test]
 async fn transient_publication_verification_recovers_on_bounded_retry() {
-    let fixture = seed_write_execution("write-publication-verification-retry").await;
+    let fixture = write_fixture::seed_write_execution("write-publication-verification-retry").await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
@@ -199,7 +199,7 @@ async fn transient_publication_verification_recovers_on_bounded_retry() {
 
 #[tokio::test]
 async fn ambiguous_write_publication_is_verified_without_a_second_mutation() {
-    let fixture = seed_write_execution("write-publication-ambiguous").await;
+    let fixture = write_fixture::seed_write_execution("write-publication-ambiguous").await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
@@ -219,7 +219,7 @@ async fn ambiguous_write_publication_is_verified_without_a_second_mutation() {
 
 #[tokio::test]
 async fn merged_after_ambiguous_publish_recovers_without_a_second_mutation() {
-    let fixture = seed_write_execution("write-publication-merged-recovery").await;
+    let fixture = write_fixture::seed_write_execution("write-publication-merged-recovery").await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
@@ -251,7 +251,7 @@ async fn merged_after_ambiguous_publish_recovers_without_a_second_mutation() {
 
 #[tokio::test]
 async fn implementation_result_with_unrelated_base_is_rejected_before_review() {
-    let fixture = seed_write_execution("write-unrelated-implementation").await;
+    let fixture = write_fixture::seed_write_execution("write-unrelated-implementation").await;
     let runtime = FakeWriteRuntime::new([PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD)]);
     runtime.reject_implementation_ancestry();
 
@@ -274,7 +274,7 @@ async fn implementation_result_with_unrelated_base_is_rejected_before_review() {
 
 #[tokio::test]
 async fn write_workflow_policy_drift_invalidates_the_approved_plan() {
-    let fixture = seed_write_execution("write-policy-drift").await;
+    let fixture = write_fixture::seed_write_execution("write-policy-drift").await;
     let runtime = FakeWriteRuntime::new([]);
     let mut settings = fixture
         .test
@@ -313,7 +313,7 @@ async fn write_workflow_policy_drift_invalidates_the_approved_plan() {
 
 #[tokio::test]
 async fn legacy_write_execution_without_task_identity_fails_closed() {
-    let fixture = seed_write_execution_with_task("write-missing-task", None).await;
+    let fixture = write_fixture::seed_write_execution_with_task("write-missing-task", None).await;
     let runtime = FakeWriteRuntime::new([]);
 
     tick(&fixture, &runtime).await;
