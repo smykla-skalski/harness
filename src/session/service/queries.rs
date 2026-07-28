@@ -1,8 +1,8 @@
 use super::{
     CliError, CliErrorKind, Path, PathBuf, SessionMetrics, SessionRole, SessionState,
-    SessionStatus, canonicalize_persisted_session_state, daemon_client_error, daemon_index,
-    detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals, storage,
-    summary_to_session_state, validate_policy_preset, wire,
+    SessionStatus, canonicalize_persisted_session_state, daemon_client_error,
+    detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals,
+    session_index, storage, summary_to_session_state, validate_policy_preset, wire,
 };
 use crate::workspace::utc_now;
 use harness_daemon_client::DaemonClient;
@@ -142,8 +142,8 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
 
 /// List sessions across all known project contexts.
 ///
-/// Uses daemon index discovery to find sessions regardless of which project
-/// directory the caller is running from.
+/// Uses `session::index`'s filesystem-scanning discovery to find sessions
+/// regardless of which project directory the caller is running from.
 ///
 /// # Errors
 /// Returns `CliError` on discovery failures.
@@ -163,9 +163,7 @@ pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliE
         return Ok(sessions);
     }
 
-    // Same `daemon::index` back-edge as `resolve_session_project_dir` below;
-    // see its comment.
-    let resolved = daemon_index::discover_sessions(include_all)?;
+    let resolved = session_index::discover_sessions(include_all)?;
     let mut sessions: Vec<SessionState> = resolved
         .into_iter()
         .map(|entry| {
@@ -181,10 +179,11 @@ pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliE
 /// Resolve the effective project directory for a session command.
 ///
 /// Checks the local project directory first (fast path). If the session is
-/// not found there, searches across all project contexts using the daemon
-/// index. Returns `context_root` when the original project directory is
-/// unavailable - this works because `project_context_dir` is idempotent
-/// for paths already under the projects root.
+/// not found there, searches across all project contexts using
+/// `session::index`'s filesystem-scanning discovery. Returns `context_root`
+/// when the original project directory is unavailable - this works because
+/// `project_context_dir` is idempotent for paths already under the projects
+/// root.
 ///
 /// # Errors
 /// Returns `CliError` if the session cannot be found in any project.
@@ -210,11 +209,7 @@ pub fn resolve_session_project_dir(
             .project_dir
             .map_or_else(|| PathBuf::from(detail.session.context_root), PathBuf::from));
     }
-    // This resolves through `daemon::index`'s filesystem-scanning discovery
-    // because `daemon::index` has no HTTP-reachable equivalent: it's a
-    // daemon-internal module that the daemon's own mutation fallbacks also use
-    // directly to resolve a project dir, not a client the leaf transport wraps.
-    let resolved = daemon_index::resolve_session(session_id)?;
+    let resolved = session_index::resolve_session(session_id)?;
     Ok(resolved
         .project
         .project_dir

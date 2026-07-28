@@ -52,7 +52,11 @@ pub mod db;
 pub mod discovery;
 #[cfg(feature = "daemon-runtime")]
 pub mod http;
-pub mod index;
+// Filesystem-scanning session/project discovery lives in `session::index`;
+// re-exported under the old name so the daemon's own DB-import and
+// mutation-fallback call sites across this subtree keep resolving
+// `crate::daemon::index::*` without touching every one of them.
+pub use crate::session::index;
 pub mod launchd;
 pub mod ordering;
 #[cfg(feature = "daemon-runtime")]

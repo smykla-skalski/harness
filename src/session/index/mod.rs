@@ -1,3 +1,13 @@
+//! Filesystem-scanning session and project discovery.
+//!
+//! Lives under `session` rather than `daemon` because it is plain filesystem
+//! scanning with no daemon-only state (no DB handle, no HTTP wire types):
+//! `session::service` can call it directly instead of reaching back into the
+//! daemon. `daemon::mod` re-exports this module as `index` so the daemon's
+//! own DB-import and mutation-fallback call sites across `daemon::db`,
+//! `daemon::service`, `daemon::watch`, `daemon::snapshot`, and
+//! `daemon::timeline` keep resolving `crate::daemon::index::*` unchanged.
+
 use std::path::{Path, PathBuf};
 
 use crate::session::types::SessionState;
