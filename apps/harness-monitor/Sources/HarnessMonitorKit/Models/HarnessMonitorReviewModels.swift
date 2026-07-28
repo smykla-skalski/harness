@@ -263,11 +263,7 @@ public struct ReviewConsensus: Codable, Equatable, Sendable {
   }
 }
 
-public enum ImproverTarget: String, Codable, CaseIterable, Sendable {
-  case skill
-  case plugin
-  case localSkillClaude = "local_skill_claude"
-
+extension ImproverTarget {
   public var title: String {
     switch self {
     case .skill:

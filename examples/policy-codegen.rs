@@ -2531,8 +2531,13 @@ const AGENT_TUI_INPUT_EMIT_ONLY: &[&str] = &["RawAgentTuiInputRequest"];
 // Swift types).
 const CODEX_SOURCE: &str = include_str!("../crates/harness-protocol/src/managed_agents/codex.rs");
 // session_requests: clean serde request/response structs. Seven types are
-// SKIP_TYPES (no Swift mirror); the rest reference session::types enums that
-// already exist hand-written in Swift, so they stay unsuffixed references.
+// SKIP_TYPES (no Swift mirror); most of the rest reference session::types
+// enums that already exist hand-written in Swift, so they stay unsuffixed
+// references. ImproverTarget is the exception: the harness-session extraction
+// moved its definition in from session::service, so the generator now sees it
+// as locally defined and emits it bare+closed, adopted-generated like
+// TaskSeverity/ReviewPointState - its Swift hand mirror was deleted, with
+// .title kept as an extension in HarnessMonitorReviewModels.swift.
 const SESSION_REQUESTS_SOURCE: &str =
     include_str!("../crates/harness-session/src/wire/session_requests.rs");
 // reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named,

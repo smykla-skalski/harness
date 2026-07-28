@@ -4,6 +4,14 @@
 
 import Foundation
 
+public enum ImproverTarget: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case skill = "skill"
+  case plugin = "plugin"
+  case localSkillClaude = "local_skill_claude"
+
+  public var id: String { rawValue }
+}
+
 public struct RoleChangeRequestWire: Codable, Equatable, Sendable {
   public var actor: String
   public var role: SessionRole
