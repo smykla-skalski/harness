@@ -179,6 +179,14 @@ run = "./scripts/run-unit-tests.sh"
 description = "Run one root Harness unit-test process with native libtest for fast iteration (e.g. -- dispatch_retry_budget, or -- full::test::name -- --exact)"
 run = "./scripts/cargo-local.sh test -p harness --lib --features full-runtime"
 
+[tasks."test:openrouter"]
+description = "Run only the deterministic OpenRouter adapter tests"
+run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none --manifest-path crates/harness-openrouter-agent/Cargo.toml --lib --test openrouter_http --test acp_bridge"
+
+[tasks."test:openrouter:live"]
+description = "Explicitly run the live OpenRouter adapter validation (requires OPENROUTER_API_KEY)"
+run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none --manifest-path crates/harness-openrouter-agent/Cargo.toml --test openrouter_live --run-ignored only --success-output immediate --failure-output immediate"
+
 [tasks."test:architecture"]
 description = "Run dependency-light Task Board architecture checks with native libtest (e.g. -- task_board_storage::task_board_orchestrator_has_one_runner -- --exact)"
 run = "./scripts/cargo-local.sh test -p harness-architecture-tests --lib"
