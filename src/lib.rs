@@ -3,14 +3,10 @@
 use tracing::Level;
 
 // Deliberate public API facade, not scaffolding: `harness::agents::policy`,
-// `runtime`, `service`, `storage`, and `kind` stay stable paths for their
-// existing callers across session, daemon, hooks, and observe. `acp` stays
-// declared here rather than moving with the rest of the domain: it is the
-// largest, most self-contained subtree and is tracked as its own extraction.
+// `runtime`, `service`, `storage`, `kind`, and `acp` stay stable paths for
+// their existing callers across session, daemon, hooks, and observe.
 pub mod agents {
     pub use harness_agents::*;
-    #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
-    pub mod acp;
 }
 pub mod app;
 #[cfg(test)]

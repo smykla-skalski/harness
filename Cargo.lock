@@ -3594,6 +3594,7 @@ dependencies = [
 name = "harness-agents"
 version = "54.0.0"
 dependencies = [
+ "agent-client-protocol",
  "chrono",
  "fs-err",
  "harness-infra",
@@ -3601,10 +3602,13 @@ dependencies = [
  "harness-protocol",
  "harness-testkit",
  "harness-workspace",
+ "nix 0.31.3",
+ "portable-pty",
  "serde",
  "serde_json",
  "temp-env",
  "tempfile",
+ "tokio",
  "tracing",
  "walkdir",
 ]

@@ -1,7 +1,6 @@
 use std::path::Path;
 
-#[path = "../../../src/agents/acp/mod.rs"]
-pub mod acp;
+pub use harness_agents::acp;
 pub mod kind {
     pub use harness_protocol::agent::{AcpAgentId, DisconnectReason, RuntimeKind};
 }

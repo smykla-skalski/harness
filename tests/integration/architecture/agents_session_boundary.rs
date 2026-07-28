@@ -6,11 +6,12 @@ use super::helpers::collect_hits_in_tree;
 /// `src/hooks/runtime/` legally spans both domains, and it is where the
 /// hook-observed runtime session gets reconciled against orchestration
 /// state. A `crate::session::` edge from inside `crates/harness-agents/src`
-/// would not even compile, since `session` is not one of its dependencies;
-/// this guard instead covers `src/agents` (the `acp` subtree that stays in
-/// the root crate for now) plus a defense-in-depth scan of
-/// `crates/harness-agents/src` against the same `crate::session::` spelling,
-/// in case that crate ever gains a real `session` dependency of its own.
+/// (which now holds the whole domain, `acp` included) would not even
+/// compile, since `session` is not one of its dependencies; this guard
+/// covers that tree as defense-in-depth against the same `crate::session::`
+/// spelling reappearing, in case it ever gains a real `session` dependency of
+/// its own. `src/agents` is scanned too, for the `kind`/`runtime::event`
+/// stubs `harness-protocol` still pulls in from there with `#[path]`.
 ///
 /// `src/agents/kind/disconnect.rs` is the one expected survivor, for the same
 /// reason `src/agents/kind/mod.rs` is exempt in the sibling

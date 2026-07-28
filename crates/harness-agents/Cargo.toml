@@ -5,15 +5,32 @@ edition = "2024"
 rust-version = "1.95"
 publish = false
 
+[features]
+# `acp` needs its own copy of the ACP client/subprocess-supervision
+# dependencies: `harness-hook` depends on this crate for `storage`/`runtime`
+# alone and has no reason to build them. `harness-daemon` and `harness-bridge`
+# request this explicitly; the root crate forwards its own `bridge-runtime`
+# feature onto it the same way.
+bridge-runtime = ["dep:agent-client-protocol", "dep:nix", "dep:portable-pty", "dep:tokio"]
+# Exposes acp's probe-cache test seams (normally `cfg(test)`-only) to the root
+# crate's own tests, which depend on this crate as an ordinary library and so
+# never see its `cfg(test)` items. Matches `harness-daemon-client`'s
+# `test-support` feature.
+test-support = ["bridge-runtime"]
+
 [dependencies]
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
+agent-client-protocol = { version = "=2.0.0", optional = true }
 chrono = { version = "0.4.44", features = ["serde"] }
 fs-err = "3.3.0"
+nix = { version = "0.31", features = ["signal"], optional = true }
+portable-pty = { version = "0.9.0", optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+tokio = { version = "1.50.0", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "sync", "test-util", "time"], optional = true }
 tracing = "0.1.44"
 walkdir = "2.5.0"
 
