@@ -110,9 +110,13 @@ static DAEMON_OWNERSHIP_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 /// daemon-log path resolution agrees with the rest of the daemon process
 /// about where its root is. `None` clears the override.
 ///
+/// Cross-crate sync plumbing for `src/daemon/state/paths.rs`, not a supported
+/// public API - hidden from docs so it doesn't read as one.
+///
 /// # Panics
 /// Panics only if the mirror mutex is poisoned, which indicates another
 /// thread panicked while holding it.
+#[doc(hidden)]
 pub fn observe_daemon_root_override(path: Option<PathBuf>) {
     *DAEMON_ROOT_OVERRIDE
         .lock()
@@ -122,9 +126,13 @@ pub fn observe_daemon_root_override(path: Option<PathBuf>) {
 /// Mirror the canonical daemon-ownership override the same way `true` means
 /// the external ownership subtree, matching `DaemonOwnership::External`.
 ///
+/// Cross-crate sync plumbing for `src/daemon/state/ownership.rs`, not a
+/// supported public API - hidden from docs so it doesn't read as one.
+///
 /// # Panics
 /// Panics only if the mirror mutex is poisoned, which indicates another
 /// thread panicked while holding it.
+#[doc(hidden)]
 pub fn observe_daemon_ownership_override(external: Option<bool>) {
     *DAEMON_OWNERSHIP_OVERRIDE
         .lock()
