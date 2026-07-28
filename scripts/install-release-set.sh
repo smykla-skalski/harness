@@ -166,6 +166,18 @@ binary_version() {
   printf '%s\n' "$version"
 }
 
+# Binaries that ship on their own version cadence, so their --version must not be
+# held to the release's core version. The two adapters live in their own
+# workspaces; harness-panel is a workspace member that versions independently
+# (see INDEPENDENT_PACKAGE_NAMES in scripts/version.sh). Adding an independent
+# crate here is the counterpart to listing it there.
+binary_versions_independently() {
+  case "$1" in
+    harness-codex-acp | harness-openrouter-agent | harness-panel) return 0 ;;
+  esac
+  return 1
+}
+
 legacy_adapter_probe_is_owned() {
   local name="$1"
   local path="$2"
@@ -858,24 +870,36 @@ validate_selected_sources() {
 }
 
 expected_core_version() {
-  local name path current_harness_path current_aff_path
+  local name path version current_harness_path current_aff_path
   # $target_dir/release persists across invocations, so checking a fixed
   # path like build_path(harness) would pick up a stale artifact left by an
   # earlier "all"/"harness" build even when harness isn't part of this
   # selection. Only consider binaries actually selected this run.
   for name in "${selected_binaries[@]}"; do
-    case "$name" in
-      harness-codex-acp | harness-openrouter-agent) continue ;;
-    esac
+    if binary_versions_independently "$name"; then
+      continue
+    fi
     path="$(build_path "$name")"
     if [[ -x "$path" ]]; then
       binary_version "$path"
       return
     fi
   done
-  # No selected binary carries a version (e.g. a codex/openrouter-only
-  # install); fall back to whichever is already active so the candidate
-  # still gets a meaningful version-derived identity.
+  # No core binary was selected (e.g. a panel-only install). Let an
+  # independently-versioned selection supply the identity before consulting the
+  # current install, so a first-time install of just that binary still derives a
+  # version instead of aborting on an empty one. Adapters, which answer --probe
+  # rather than --version, yield nothing here and fall through.
+  for name in "${selected_binaries[@]}"; do
+    path="$(build_path "$name")"
+    if [[ -x "$path" ]] && version="$(binary_version "$path")"; then
+      printf '%s\n' "$version"
+      return
+    fi
+  done
+  # Nothing selected carries a version (e.g. an adapter-only install); fall back
+  # to whichever is already active so the candidate still gets a meaningful
+  # version-derived identity.
   current_harness_path="$current_link/bin/harness"
   if [[ -x "$current_harness_path" ]]; then
     binary_version "$current_harness_path"
@@ -931,19 +955,14 @@ validate_candidate_set() {
       return 1
     fi
     if binary_is_selected "$name" \
+      && ! binary_versions_independently "$name" \
       && [[ "${HARNESS_INSTALL_TEST_TRUST_ARTIFACTS:-0}" != "1" ]]; then
-      case "$name" in
-        harness-codex-acp|harness-openrouter-agent)
-          ;;
-        *)
-          actual_version="$(binary_version "$path")"
-          if [[ "$actual_version" != "$expected_version" ]]; then
-            printf 'candidate %s version %s != expected %s\n' \
-              "$name" "${actual_version:-unknown}" "$expected_version" >&2
-            return 1
-          fi
-          ;;
-      esac
+      actual_version="$(binary_version "$path")"
+      if [[ "$actual_version" != "$expected_version" ]]; then
+        printf 'candidate %s version %s != expected %s\n' \
+          "$name" "${actual_version:-unknown}" "$expected_version" >&2
+        return 1
+      fi
     fi
     if ! codesign_is_skipped "$name"; then
       command codesign --verify --strict --verbose=2 "$path" >/dev/null
