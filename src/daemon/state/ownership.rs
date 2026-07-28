@@ -48,8 +48,10 @@ impl ScopedOwnershipOverride {
     /// Install a process-local ownership override.
     ///
     /// # Panics
-    /// Panics only if the internal mutex is poisoned, which indicates another
-    /// thread panicked while holding the override lock.
+    /// Panics if the internal mutex is poisoned, which indicates another
+    /// thread panicked while holding the override lock, or if
+    /// `harness-telemetry`'s mirror mutex
+    /// ([`observe_daemon_ownership_override`]) is poisoned the same way.
     pub fn set(value: Option<DaemonOwnership>) -> Self {
         let mut guard = OWNERSHIP_OVERRIDE
             .lock()

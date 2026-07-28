@@ -16,8 +16,9 @@ use super::{
 /// returns `path`. Passing `None` clears the override.
 ///
 /// # Panics
-/// Panics only if the internal mutex is poisoned, which indicates another
-/// thread panicked while holding the override lock.
+/// Panics if the internal mutex is poisoned, which indicates another thread
+/// panicked while holding the override lock, or if `harness-telemetry`'s
+/// mirror mutex ([`observe_daemon_root_override`]) is poisoned the same way.
 pub fn set_daemon_root_override(path: Option<PathBuf>) {
     DAEMON_ROOT_OVERRIDE
         .lock()
@@ -38,8 +39,10 @@ impl ScopedDaemonRootOverride {
     /// Install a process-local override and restore the previous value on drop.
     ///
     /// # Panics
-    /// Panics only if the internal mutex is poisoned, which indicates another
-    /// thread panicked while holding the override lock.
+    /// Panics if the internal mutex is poisoned, which indicates another
+    /// thread panicked while holding the override lock, or if
+    /// `harness-telemetry`'s mirror mutex ([`observe_daemon_root_override`])
+    /// is poisoned the same way.
     pub fn set(path: Option<PathBuf>) -> Self {
         let mut override_root = DAEMON_ROOT_OVERRIDE
             .lock()
