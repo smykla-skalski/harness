@@ -11,6 +11,7 @@ members = [
   "crates/harness-infra",
   "crates/harness-kernel",
   "crates/harness-mcp",
+  "crates/harness-observe",
   "crates/harness-panel",
   "crates/harness-protocol",
   "crates/harness-systemd",
@@ -50,6 +51,7 @@ harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0
 harness-infra = { path = "crates/harness-infra", version = "54.0.0" }
 harness-kernel = { path = "crates/harness-kernel", version = "54.0.0" }
 harness-mcp = { path = "crates/harness-mcp", version = "54.0.0", optional = true }
+harness-observe = { path = "crates/harness-observe", version = "54.0.0" }
 harness-protocol = { path = "crates/harness-protocol", version = "54.0.0" }
 harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "54.0.0", optional = true }
 harness-telemetry = { path = "crates/harness-telemetry", version = "54.0.0" }

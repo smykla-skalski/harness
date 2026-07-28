@@ -237,7 +237,8 @@ fn observe_classifier_tests_stay_split_by_scenario() {
 #[test]
 fn observe_patterns_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let patterns = fs::read_to_string(root.join("src/observe/patterns.rs")).unwrap();
+    let patterns =
+        fs::read_to_string(root.join("crates/harness-observe/src/patterns.rs")).unwrap();
 
     for needle in [
         "fn ksa_codes_count(",
@@ -246,12 +247,13 @@ fn observe_patterns_root_stays_prod_only() {
     ] {
         assert!(
             !patterns.contains(needle),
-            "src/observe/patterns.rs should stay focused on production signal lists instead of owning `{needle}`"
+            "crates/harness-observe/src/patterns.rs should stay focused on production signal lists instead of owning `{needle}`"
         );
     }
 
     assert!(
-        root.join("src/observe/patterns/tests.rs").exists(),
+        root.join("crates/harness-observe/src/patterns/tests.rs")
+            .exists(),
         "observe patterns split test module should exist"
     );
 }

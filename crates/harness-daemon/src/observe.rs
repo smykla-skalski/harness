@@ -20,14 +20,15 @@ pub mod application {
 
 #[path = "../../../src/observe/classifier/mod.rs"]
 pub(crate) mod classifier;
-#[path = "../../../src/observe/patterns.rs"]
-pub(crate) mod patterns;
-#[path = "../../../src/observe/text.rs"]
-mod text;
+// `patterns` and the two text helpers below now live in `harness-observe`;
+// the path-included `classifier` copy above still reaches them as
+// `crate::observe::patterns` / `crate::observe::{redact_details,
+// truncate_details}`, so this re-export keeps those paths resolving without
+// touching classifier's own source.
+pub(crate) use harness_observe::patterns;
+pub(crate) use harness_observe::{redact_details, truncate_details};
 #[path = "../../../src/observe/types/mod.rs"]
 pub(crate) mod types;
-
-pub(crate) use text::{redact_details, truncate_details};
 
 pub mod dump {
     pub(crate) fn tool_result_text(block: &serde_json::Value) -> String {

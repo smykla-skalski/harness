@@ -20,6 +20,7 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check --all-targets -p harness-daemon-client
 "$cargo_local" check --all-targets -p harness-infra
 "$cargo_local" check --all-targets -p harness-kernel
+"$cargo_local" check --all-targets -p harness-observe
 "$cargo_local" check --all-targets -p harness-protocol
 "$cargo_local" check --all-targets -p harness-systemd-protocol
 "$cargo_local" check --all-targets -p harness-telemetry

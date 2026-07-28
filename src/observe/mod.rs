@@ -5,10 +5,13 @@ mod context_cmd;
 mod doctor;
 mod dump;
 pub mod output;
-pub(crate) mod patterns;
+// `patterns` lives in `harness-observe` now; classifier (still here until it
+// moves too) reaches it through this facade, same shape as `crate::infra`.
+pub(crate) mod patterns {
+    pub use harness_observe::patterns::*;
+}
 mod scan;
 pub(crate) mod session;
-mod text;
 pub(crate) mod transport;
 pub(crate) mod types;
 mod watch;
@@ -26,6 +29,6 @@ pub use types::{
 pub(crate) use application::maintenance::{
     is_observer_conflict, load_observer_state, save_observer_state,
 };
-pub(crate) use text::{
+pub(crate) use harness_observe::{
     DUMP_TRUNCATE_LENGTH, MIN_DUMP_TEXT_LENGTH, redact_details, truncate_at, truncate_details,
 };
