@@ -1,3 +1,4 @@
+mod driver;
 mod fixture;
 mod lifecycle_recovery;
 mod prepared_report_fixture;
@@ -15,7 +16,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 
-use super::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows_with_runtime;
+use driver::HeadlessWorkflowDriver;
 use fixture::{FROZEN_HEAD, Fixture, NOW, admission_state, seed_execution};
 use runtime::{FakeReadOnlyRuntime, PlannedReport};
 
@@ -143,11 +144,9 @@ async fn stale_pr_head_before_publish_is_fenced_without_publish_claim() {
 }
 
 async fn tick(fixture: &Fixture, runtime: &FakeReadOnlyRuntime, now: &str) {
-    let report =
-        reconcile_task_board_read_only_workflows_with_runtime(&fixture.test.db, runtime, now, 8)
-            .await
-            .expect("reconcile read-only workflow");
-    assert!(report.failures.is_empty(), "{:?}", report.failures);
+    HeadlessWorkflowDriver::new(fixture, runtime)
+        .tick(now)
+        .await;
 }
 
 async fn drive_to_phase(
@@ -155,29 +154,15 @@ async fn drive_to_phase(
     runtime: &FakeReadOnlyRuntime,
     phase: TaskBoardExecutionPhase,
 ) {
-    for _ in 0..12 {
-        tick(fixture, runtime, NOW).await;
-        if load_execution(fixture).await.transition.phase == Some(phase) {
-            return;
-        }
-    }
-    panic!("workflow did not reach {phase:?}");
+    HeadlessWorkflowDriver::new(fixture, runtime)
+        .drive_to_phase(phase, NOW, 12)
+        .await;
 }
 
 async fn drive_to_terminal_projection(fixture: &Fixture, runtime: &FakeReadOnlyRuntime) {
-    for _ in 0..20 {
-        tick(fixture, runtime, NOW).await;
-        let item = fixture
-            .test
-            .db
-            .task_board_item_snapshot(&fixture.item_id)
-            .await
-            .expect("load item");
-        if item.item.status == TaskBoardStatus::Done {
-            return;
-        }
-    }
-    panic!("workflow did not project terminal state");
+    HeadlessWorkflowDriver::new(fixture, runtime)
+        .drive_to_terminal_projection(NOW, 20)
+        .await;
 }
 
 async fn load_execution(fixture: &Fixture) -> crate::task_board::TaskBoardWorkflowExecutionRecord {

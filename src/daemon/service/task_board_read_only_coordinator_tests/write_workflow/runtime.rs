@@ -350,10 +350,17 @@ fn publication(
     execution: &TaskBoardWorkflowExecutionRecord,
     mutated: bool,
 ) -> TaskBoardLifecycleOutcome {
+    let pull_request_number = execution
+        .transition
+        .pull_request
+        .as_ref()
+        .map_or(42, |pull_request| pull_request.number);
     TaskBoardLifecycleOutcome {
         mutated,
         terminal: false,
         provider_revision: execution.snapshot.provider_revision.clone(),
-        external_url: Some("https://github.com/example/compass/pull/42".into()),
+        external_url: Some(format!(
+            "https://github.com/example/compass/pull/{pull_request_number}"
+        )),
     }
 }

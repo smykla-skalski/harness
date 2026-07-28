@@ -56,7 +56,7 @@ pub(super) async fn load(
                     THEN 1 ELSE 0
             END), 0) AS cleanup_required
          FROM task_board_workflow_executions
-         WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
+         WHERE workflow_kind IN ('default_task', 'pr_fix', 'pr_fix_review', 'review', 'pr_review')
            AND completed_at IS NULL
            AND state IN (
             'pending', 'awaiting_approval', 'blocked', 'preparing', 'retry_wait',
