@@ -27,7 +27,7 @@ Paths are relative to the repository root.
 
 ## Facade-crate src includes
 
-Several `src/` files compile into more than one crate. `crates/harness-daemon`, `crates/harness-bridge`, `crates/harness-hook`, `crates/harness-mcp`, `crates/harness-protocol`, and `crates/harness-telemetry` each pull selected root-crate sources in with `#[path = "../../../src/..."]` (some deeper), so those files compile once per crate that includes them, and every copy resolves `crate::` against that crate's own module tree rather than the root crate's.
+Several `src/` files compile into more than one crate. `crates/harness-daemon`, `crates/harness-bridge`, `crates/harness-hook`, `crates/harness-mcp`, and `crates/harness-protocol` each pull selected root-crate sources in with `#[path = "../../../src/..."]` (some deeper), so those files compile once per crate that includes them, and every copy resolves `crate::` against that crate's own module tree rather than the root crate's. `crates/harness-telemetry` owns its `src/telemetry/` tree as real crate source and no longer appears in this list.
 
 Find every crate that pulls in a given file with `grep -rFn "src/<file>" crates/`, replacing `<file>` with the file's path under `src/` (for example `workspace/adopter.rs`); `-F` matches the substring literally, so a filename's own dots never widen the match. A file reached only through an included `mod.rs` - for example anything under `src/daemon/agent_acp/`, reached via `src/daemon/agent_acp/mod.rs` - does not show up on a direct grep for itself, so also check whether an ancestor module is included.
 
