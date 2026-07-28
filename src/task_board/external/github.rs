@@ -19,6 +19,8 @@ use super::{
 
 mod create_marker;
 mod create_recovery;
+#[cfg(test)]
+mod discovery_tests;
 mod errors;
 mod graphql;
 mod inbox;
