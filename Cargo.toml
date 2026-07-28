@@ -7,6 +7,7 @@ members = [
   "crates/harness-command",
   "crates/harness-daemon-client",
   "crates/harness-daemon",
+  "crates/harness-github-api",
   "crates/harness-hook",
   "crates/harness-infra",
   "crates/harness-kernel",
@@ -50,6 +51,7 @@ include = [
 harness-agents = { path = "crates/harness-agents", version = "54.0.0" }
 harness-command = { path = "crates/harness-command", version = "54.0.0" }
 harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0.0" }
+harness-github-api = { path = "crates/harness-github-api", version = "54.0.0" }
 harness-infra = { path = "crates/harness-infra", version = "54.0.0" }
 harness-kernel = { path = "crates/harness-kernel", version = "54.0.0" }
 harness-mcp = { path = "crates/harness-mcp", version = "54.0.0", optional = true }
@@ -148,6 +150,7 @@ tempfile = "=3.27.0"
 insta = "=1.48.0"
 harness-agents = { path = "crates/harness-agents", version = "54.0.0", features = ["test-support"] }
 harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0.0", features = ["test-support"] }
+harness-github-api = { path = "crates/harness-github-api", version = "54.0.0", features = ["test-support"] }
 harness-task-board = { path = "crates/harness-task-board", version = "54.0.0", features = ["test-support"] }
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }

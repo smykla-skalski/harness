@@ -24,7 +24,7 @@ use super::{
 
 const DEFAULT_BASE_URL: &str = "https://api.github.com";
 #[derive(Clone)]
-pub(crate) struct GitHubProtectedClient {
+pub struct GitHubProtectedClient {
     pub(super) token: String,
     token_hash: String,
     pub(super) base_url: String,
@@ -33,11 +33,24 @@ pub(crate) struct GitHubProtectedClient {
 }
 
 impl GitHubProtectedClient {
-    pub(crate) fn new(token: &str) -> Result<Self, CliError> {
+    /// Build a client against the real GitHub API.
+    ///
+    /// # Errors
+    /// Returns an error when `token` is empty or the shared HTTP client
+    /// failed to build.
+    pub fn new(token: &str) -> Result<Self, CliError> {
         Self::with_base_url(token, DEFAULT_BASE_URL)
     }
 
-    pub(crate) fn with_base_url(token: &str, base_url: &str) -> Result<Self, CliError> {
+    /// Build a client against an arbitrary base URL, bypassing the real
+    /// GitHub API. Exists so other crates in the workspace can drive this
+    /// client against a mock HTTP server in their own tests, the same way
+    /// this crate's own tests do.
+    ///
+    /// # Errors
+    /// Returns an error when `token` is empty or the shared HTTP client
+    /// failed to build.
+    pub fn with_base_url(token: &str, base_url: &str) -> Result<Self, CliError> {
         let token = token.trim();
         if token.is_empty() {
             return Err(CliErrorKind::workflow_io("github token missing").into());
@@ -55,15 +68,17 @@ impl GitHubProtectedClient {
         })
     }
 
-    pub(crate) fn data_revision() -> u64 {
+    #[must_use]
+    pub fn data_revision() -> u64 {
         global_state().data_revision()
     }
 
-    pub(crate) fn data_changes() -> broadcast::Receiver<super::GitHubDataChange> {
+    #[must_use]
+    pub fn data_changes() -> broadcast::Receiver<super::GitHubDataChange> {
         global_state().data_changes()
     }
 
-    pub(crate) async fn status() -> super::types::GitHubApiStatus {
+    pub async fn status() -> super::types::GitHubApiStatus {
         let state = global_state();
         state
             .recorder
@@ -71,7 +86,12 @@ impl GitHubProtectedClient {
             .await
     }
 
-    pub(crate) async fn graphql<T>(
+    /// Run a GraphQL query and decode `data` into `T`.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure, a non-success status, or a
+    /// GraphQL response that can't be decoded into `T`.
+    pub async fn graphql<T>(
         &self,
         descriptor: GitHubRequestDescriptor,
         body: Value,
@@ -103,7 +123,13 @@ impl GitHubProtectedClient {
         })
     }
 
-    pub(crate) async fn graphql_envelope(
+    /// Run a GraphQL query and return the raw response envelope, unlike
+    /// [`Self::graphql`] which decodes `data` into a caller-chosen type.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure, a non-success status, or a
+    /// GraphQL response carrying only errors.
+    pub async fn graphql_envelope(
         &self,
         descriptor: GitHubRequestDescriptor,
         body: Value,
@@ -129,7 +155,12 @@ impl GitHubProtectedClient {
         })
     }
 
-    pub(crate) async fn rest_json<T>(
+    /// Run a REST request and decode the JSON body into `T`.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure, a non-success status, or a
+    /// response body that can't be decoded into `T`.
+    pub async fn rest_json<T>(
         &self,
         method: Method,
         route: impl AsRef<str>,

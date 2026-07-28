@@ -41,6 +41,10 @@ fn main() -> ExitCode {
     if cli.delay > 0.0 {
         thread::sleep(Duration::from_secs_f64(cli.delay));
     }
+    // `github_api` cannot resolve its own daemon root - see the comment on
+    // `configure_daemon_root` - so we resolve it here, once, before any
+    // command has a chance to reach the client.
+    harness_github_api::configure_daemon_root(state::daemon_root());
     harness_daemon::app::run_startup_migrations();
     let result = cli.command.execute(&AppContext::production());
     // launchd runs the daemon with no StandardErrorPath, so the rendered error

@@ -20,7 +20,7 @@ const FALLBACK_COOLDOWN: Duration = Duration::from_mins(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum GitHubRateResource {
+pub enum GitHubRateResource {
     Core,
     Search,
     Graphql,
@@ -55,7 +55,7 @@ impl GitHubRateResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubRateLimitSnapshot {
+pub struct GitHubRateLimitSnapshot {
     pub resource: GitHubRateResource,
     pub remaining: u32,
     pub limit: u32,
@@ -95,7 +95,7 @@ impl CoolingReason {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GitHubBudgetError {
+pub struct GitHubBudgetError {
     pub resource: GitHubRateResource,
     pub retry_after: Duration,
     pub reason: String,
@@ -116,7 +116,7 @@ impl Drop for GitHubBudgetPermit {
     }
 }
 
-pub(crate) struct GitHubRateBudget {
+pub struct GitHubRateBudget {
     states: RwLock<HashMap<GitHubRateResource, RateLimitState>>,
     cooling: RwLock<HashMap<GitHubRateResource, CoolingState>>,
     reservations: Arc<Mutex<HashMap<GitHubRateResource, u32>>>,
@@ -389,7 +389,7 @@ impl GitHubRateBudget {
         reserved_cost(&self.reservations, resource)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) async fn reset_for_test(&self) {
         self.states.write().await.clear();
         self.cooling.write().await.clear();

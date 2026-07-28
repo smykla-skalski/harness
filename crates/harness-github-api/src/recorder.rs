@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
-use crate::daemon::state;
-use crate::workspace::utc_now;
+use harness_workspace::workspace::utc_now;
 
 use super::budget::{GitHubRateBudget, GitHubRateResource};
 use super::cache::GitHubCacheState;
@@ -39,14 +39,28 @@ struct UsageJournalRecord<'a> {
     deferred_budget: bool,
 }
 
-pub(crate) struct GitHubUsageRecorder {
+pub struct GitHubUsageRecorder {
     events: Mutex<VecDeque<UsageEvent>>,
+    journal_path: PathBuf,
 }
 
 impl GitHubUsageRecorder {
-    pub(crate) fn new() -> Self {
+    // Takes the daemon root as a parameter rather than resolving it
+    // internally, for the same reason `GitHubCache::new` does (see that
+    // constructor and the crate-level docs). An empty root - the
+    // placeholder test builds construct this with, see `GitHubCache::new` -
+    // stays an empty `journal_path` rather than joining a bare relative
+    // filename, so `append_journal` has an unambiguous "disabled" signal to
+    // check instead of a path that merely looks wrong.
+    pub(crate) fn new(daemon_root: &Path) -> Self {
+        let journal_path = if daemon_root.as_os_str().is_empty() {
+            PathBuf::new()
+        } else {
+            daemon_root.join("github-usage.jsonl")
+        };
         Self {
             events: Mutex::new(VecDeque::new()),
+            journal_path,
         }
     }
 
@@ -66,7 +80,7 @@ impl GitHubUsageRecorder {
             cache_state: None,
             deferred_budget: false,
         });
-        Self::append_journal(&UsageJournalRecord {
+        self.append_journal(&UsageJournalRecord {
             observed_at: utc_now(),
             operation,
             resource,
@@ -136,15 +150,26 @@ impl GitHubUsageRecorder {
         guard.iter().cloned().collect()
     }
 
-    fn append_journal(record: &UsageJournalRecord<'_>) {
-        let path = state::daemon_root().join("github-usage.jsonl");
-        let Some(parent) = path.parent() else {
+    fn append_journal(&self, record: &UsageJournalRecord<'_>) {
+        // Test builds (this crate's own, or a downstream crate's via
+        // `test-support`) construct the recorder with an empty placeholder
+        // root - see `GitHubCache::new` - so `journal_path` here stays empty
+        // rather than joining a bare relative filename that would land next
+        // to whatever the test process's current directory happens to be.
+        if self.journal_path.as_os_str().is_empty() {
+            return;
+        }
+        let Some(parent) = self.journal_path.parent() else {
             return;
         };
         if fs_err::create_dir_all(parent).is_err() {
             return;
         }
-        let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.journal_path)
+        else {
             return;
         };
         if let Ok(raw) = serde_json::to_string(record) {

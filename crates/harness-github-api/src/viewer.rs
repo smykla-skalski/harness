@@ -26,7 +26,12 @@ struct ViewerLogin {
 }
 
 impl GitHubProtectedClient {
-    pub(crate) async fn viewer_login(&self) -> Result<String, CliError> {
+    /// Fetch the authenticated user's login for the configured token.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure or a malformed GraphQL
+    /// response.
+    pub async fn viewer_login(&self) -> Result<String, CliError> {
         let response: ViewerLoginResponse = self
             .graphql(
                 GitHubRequestDescriptor::graphql(

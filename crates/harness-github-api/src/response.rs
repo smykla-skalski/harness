@@ -8,10 +8,10 @@ use super::budget::GitHubRateLimitSnapshot;
 use super::cache::GitHubCacheState;
 use super::types::{GitHubResponseCacheState, GitHubResponseProvenance};
 
-pub(crate) struct GitHubApiResponse<T> {
-    pub(crate) body: T,
-    pub(crate) provenance: GitHubResponseProvenance,
-    pub(crate) status_code: Option<u16>,
+pub struct GitHubApiResponse<T> {
+    pub body: T,
+    pub provenance: GitHubResponseProvenance,
+    pub status_code: Option<u16>,
 }
 
 pub(super) fn graphql_data(
