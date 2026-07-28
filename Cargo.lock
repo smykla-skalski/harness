@@ -3518,6 +3518,7 @@ dependencies = [
  "futures-util",
  "gix",
  "gray_matter",
+ "harness-agents",
  "harness-command",
  "harness-daemon-client",
  "harness-infra",
@@ -3590,6 +3591,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness-agents"
+version = "54.0.0"
+dependencies = [
+ "chrono",
+ "fs-err",
+ "harness-infra",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-testkit",
+ "harness-workspace",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "harness-architecture-tests"
 version = "54.0.0"
 
@@ -3605,6 +3625,7 @@ dependencies = [
  "crossterm",
  "fs-err",
  "fs2",
+ "harness-agents",
  "harness-hook",
  "harness-infra",
  "harness-kernel",
@@ -3666,6 +3687,7 @@ dependencies = [
  "futures-util",
  "gix",
  "gray_matter",
+ "harness-agents",
  "harness-command",
  "harness-daemon-client",
  "harness-hook",
@@ -3754,6 +3776,7 @@ dependencies = [
  "fs2",
  "gix",
  "gray_matter",
+ "harness-agents",
  "harness-daemon-client",
  "harness-infra",
  "harness-kernel",

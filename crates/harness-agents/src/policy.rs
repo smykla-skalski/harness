@@ -60,7 +60,7 @@ impl WriteDecision {
 
 /// Wrapper for the set of denied binary names.
 ///
-/// The set is produced by `crate::infra::blocks::all_denied_binaries()`,
+/// The set is produced by `harness_infra::blocks::all_denied_binaries()`,
 /// which is the single source the ACP protocol reads.
 #[derive(Debug, Clone)]
 pub struct DeniedBinaries(BTreeSet<String>);
@@ -462,7 +462,10 @@ mod tests {
 
         let link_path = run_dir.join("artifacts/link");
         #[cfg(unix)]
-        std::os::unix::fs::symlink(&outside_file, &link_path).expect("create symlink");
+        {
+            use std::os::unix::fs::symlink;
+            symlink(&outside_file, &link_path).expect("create symlink");
+        }
 
         #[cfg(unix)]
         {

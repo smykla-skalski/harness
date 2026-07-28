@@ -22,7 +22,7 @@ Paths are relative to the repository root.
 - `src/workspace/compact/` - file fingerprinting with SHA256 and mtime.
 - `src/session/` - multi-agent orchestration types, roles, storage, service, transport, and observation.
 - `src/task_board/` - cross-project board state, planning gates, dispatch/evaluate reconciliation, orchestrator state, external sync, and policy pipeline graph evaluation. See `docs/agent-guides/task-board-workflow.md` for operator behavior.
-- `src/agents/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
+- `crates/harness-agents/src/runtime/` - runtime adapters, conversation events, signal protocol, and liveness detection.
 
 ## Facade-crate src includes
 

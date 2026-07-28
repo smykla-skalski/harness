@@ -3,8 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::hooks::adapters::HookAgent;
 use crate::workspace::project_context_dir;
 
-#[path = "../../../../src/agents/runtime/signal/mod.rs"]
-pub mod signal;
+pub use harness_agents::runtime::signal;
 
 pub trait AgentRuntime: Send + Sync {
     fn name(&self) -> &'static str;

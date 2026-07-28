@@ -1,28 +1,24 @@
 use std::path::{Path, PathBuf};
 
 use harness_kernel::errors::CliError;
-use crate::workspace::project_context_dir;
+use harness_workspace::workspace::project_context_dir;
 
-use super::claude::last_activity_from_log;
+use super::claude::{last_activity_from_log, parse_common_jsonl};
 use super::event::ConversationEvent;
 use super::signal::{Signal, SignalAck};
 use super::{AgentRuntime, HookIntegrationPoint};
 
-pub struct CopilotRuntime;
+pub struct OpenCodeRuntime;
 
 const HOOK_POINTS: &[HookIntegrationPoint] = &[HookIntegrationPoint {
-    name: "preToolUse",
+    name: "tool.execute.before",
     typical_latency_seconds: 5,
-    supports_context_injection: false,
+    supports_context_injection: true,
 }];
 
-impl AgentRuntime for CopilotRuntime {
+impl AgentRuntime for OpenCodeRuntime {
     fn name(&self) -> &'static str {
-        "copilot"
-    }
-
-    fn effort_flag(&self) -> Option<&'static str> {
-        Some("--effort")
+        "opencode"
     }
 
     fn discover_native_log(
@@ -30,22 +26,20 @@ impl AgentRuntime for CopilotRuntime {
         session_id: &str,
         project_dir: &Path,
     ) -> Result<Option<PathBuf>, CliError> {
-        // Copilot has no local JSONL transcript; rely on harness ledger only.
         let path = project_context_dir(project_dir)
-            .join("agents/sessions/copilot")
+            .join("agents/sessions/opencode")
             .join(session_id)
             .join("raw.jsonl");
         Ok(path.is_file().then_some(path))
     }
 
-    fn parse_log_entry(&self, _raw_line: &str) -> Option<ConversationEvent> {
-        // Copilot log format is not directly parseable as common JSONL.
-        None
+    fn parse_log_entry(&self, raw_line: &str) -> Option<ConversationEvent> {
+        parse_common_jsonl(raw_line, "opencode")
     }
 
     fn signal_dir(&self, project_dir: &Path, session_id: &str) -> PathBuf {
         project_context_dir(project_dir)
-            .join("agents/signals/copilot")
+            .join("agents/signals/opencode")
             .join(session_id)
     }
 
@@ -76,9 +70,5 @@ impl AgentRuntime for CopilotRuntime {
 
     fn hook_integration_points(&self) -> &[HookIntegrationPoint] {
         HOOK_POINTS
-    }
-
-    fn supports_native_transcript(&self) -> bool {
-        false
     }
 }

@@ -3,11 +3,11 @@
 //! Paradigm note (read this before adding a runtime): harness is moving from
 //! TUI-wrapper to agent-host. The runtimes in this module spawn a vendor TUI
 //! inside a portable-pty terminal and scrape its transcript. The new model
-//! lives in `crate::agents::acp` and speaks Agent Client Protocol over stdio,
-//! with harness servicing `fs/*`, `terminal/*`, and `session/request_permission`
-//! directly. `RuntimeKind` (Chunk 2) joins the two ends. Prefer adding new
-//! agents as ACP descriptors in `agents::acp::catalog` rather than as new TUI
-//! shells here.
+//! lives in the root crate's `agents::acp` and speaks Agent Client Protocol
+//! over stdio, with harness servicing `fs/*`, `terminal/*`, and
+//! `session/request_permission` directly. `RuntimeKind` (Chunk 2) joins the
+//! two ends. Prefer adding new agents as ACP descriptors in
+//! `agents::acp::catalog` rather than as new TUI shells here.
 mod claude;
 mod codex;
 mod copilot;
@@ -40,7 +40,7 @@ pub use harness_protocol::agent::{
 };
 
 #[allow(unused_imports)]
-pub(crate) use self::claude::parse_common_jsonl as parse_canonical_conversation_line;
+pub use self::claude::parse_common_jsonl as parse_canonical_conversation_line;
 
 /// Describes when during an agent's tool-use cycle signals can be intercepted.
 #[derive(Debug, Clone)]
@@ -257,7 +257,7 @@ pub fn runtime_for_name(name: &str) -> Option<&'static dyn AgentRuntime> {
 
 #[cfg(test)]
 mod tests {
-    use super::{hook_agent_for_runtime_name, runtime_for_name};
+    use super::{AgentRuntime, hook_agent_for_runtime_name, runtime_for_name};
     use harness_protocol::agent::HookAgent;
 
     #[test]
@@ -272,11 +272,11 @@ mod tests {
     #[test]
     fn runtime_adapter_resolution_accepts_vibe_and_opencode() {
         assert_eq!(
-            runtime_for_name("vibe").map(crate::agents::runtime::AgentRuntime::name),
+            runtime_for_name("vibe").map(AgentRuntime::name),
             Some("vibe")
         );
         assert_eq!(
-            runtime_for_name("opencode").map(crate::agents::runtime::AgentRuntime::name),
+            runtime_for_name("opencode").map(AgentRuntime::name),
             Some("opencode")
         );
     }

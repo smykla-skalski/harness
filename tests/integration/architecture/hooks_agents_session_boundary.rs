@@ -5,12 +5,14 @@ use super::helpers::collect_hits_in_tree;
 /// `hooks` may depend on `session` and `agents` - `hooks::runtime` genuinely
 /// needs `agents::runtime` for pending-signal pickup and
 /// `agents::service`/`session::service` to record what happened and resolve a
-/// runtime session - but nothing under `src/agents`, `src/session`, or
-/// `src/task_board` may reach back into `crate::hooks`; a real edge in that
-/// direction would block ever giving any of those domains its own crate.
-/// `task_board` is scanned alongside the other two because it sits in the
-/// same daemon-facade layer and would hide the same kind of edge reappearing
-/// there instead. Every current hit in this scan is
+/// runtime session - but nothing under `src/agents`, `crates/harness-agents/src`,
+/// `src/session`, or `src/task_board` may reach back into `crate::hooks`; a
+/// real edge in that direction would block ever giving any of those domains
+/// its own crate (`harness-agents` already is one, and could not depend on
+/// the root crate's `hooks` module even by accident: no such module exists
+/// from inside it). `task_board` is scanned alongside the other two because
+/// it sits in the same daemon-facade layer and would hide the same kind of
+/// edge reappearing there instead. Every current hit in this scan is
 /// a type-only import of `HookAgent`, `NormalizedEvent`/`NormalizedHookContext`,
 /// or `NormalizedHookResult` through the `crate::hooks::adapters`/
 /// `crate::hooks::protocol` re-export shims; the canonical definitions live in
@@ -52,6 +54,13 @@ fn agents_and_session_stay_off_the_hooks_module() {
         &["crate::hooks::"],
         |path, needle| format!("{path} reaches back into hooks via `{needle}`"),
     );
+    hits.extend(collect_hits_in_tree(
+        &root.join("crates/harness-agents/src"),
+        root,
+        None,
+        &["crate::hooks::"],
+        |path, needle| format!("{path} reaches back into hooks via `{needle}`"),
+    ));
     hits.extend(collect_hits_in_tree(
         &root.join("src/session"),
         root,

@@ -6,13 +6,13 @@ use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::workspace::{harness_data_root, project_context_dir, utc_now};
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::hooks::context::{NormalizedEvent, NormalizedHookContext};
 use harness_kernel::hooks::result::NormalizedHookResult;
+use harness_kernel::io::{read_json_typed, write_json_pretty};
 use harness_protocol::agent::HookAgent;
+use harness_workspace::workspace::{harness_data_root, project_context_dir, utc_now};
 
 use super::types::{AgentLedgerEvent, AgentSessionRegistry};
 
@@ -82,7 +82,12 @@ fn with_lock<T>(
     )
 }
 
-pub(crate) fn current_session_id(
+/// Look up the session id currently recorded for an agent in this project.
+///
+/// # Errors
+/// Returns `CliError` when the session registry file exists but cannot be
+/// read or parsed.
+pub fn current_session_id(
     project_dir: &Path,
     agent: HookAgent,
 ) -> Result<Option<String>, CliError> {
@@ -94,7 +99,11 @@ pub(crate) fn current_session_id(
     Ok(registry.current.get(agent_name(agent)).cloned())
 }
 
-pub(crate) fn set_current_session_id(
+/// Record the current session id for an agent in this project.
+///
+/// # Errors
+/// Returns `CliError` when the session registry cannot be read or written.
+pub fn set_current_session_id(
     project_dir: &Path,
     agent: HookAgent,
     session_id: &str,
@@ -114,10 +123,11 @@ pub(crate) fn set_current_session_id(
     })
 }
 
-pub(crate) fn clear_current_session_id(
-    project_dir: &Path,
-    agent: HookAgent,
-) -> Result<(), CliError> {
+/// Clear the recorded current session id for an agent in this project.
+///
+/// # Errors
+/// Returns `CliError` when the session registry cannot be read or written.
+pub fn clear_current_session_id(project_dir: &Path, agent: HookAgent) -> Result<(), CliError> {
     with_lock(project_dir, "sessions", || {
         let path = session_registry_path(project_dir);
         let mut registry = if path.exists() {
@@ -131,7 +141,16 @@ pub(crate) fn clear_current_session_id(
     })
 }
 
-pub(crate) fn append_hook_event(
+/// Append a hook event to the project's canonical agent ledger.
+///
+/// # Errors
+/// Returns `CliError` on filesystem or serialization failures.
+///
+/// # Panics
+/// Panics if the canonical line payload, built from typed hook context and
+/// result values, fails to serialize; that requires a NaN/infinite float or
+/// a non-string map key, neither of which these types produce.
+pub fn append_hook_event(
     project_dir: &Path,
     agent: HookAgent,
     session_id: &str,
@@ -166,16 +185,18 @@ pub(crate) fn append_hook_event(
     })
 }
 
-// This crate has no live session-start/session-stop caller left, but
-// `crates/harness-hook` mirrors this file via `#[path]` and its own
-// session-start/session-stop commands still call this; each crate's
-// dead-code check runs on its own copy, so this shows as unreachable here
-// even though the daemon's timeline still renders the `agent_session_marker`
-// entries it writes for that sibling crate. `expect` cannot stand in for
-// `allow`: harness-hook's compilation of this same line finds the call very
-// much alive, and an unfulfilled `expect` is itself a lint there.
-#[allow(dead_code)]
-pub(crate) fn append_session_marker(
+/// Append a session lifecycle marker (start/stop) to the project's canonical
+/// agent ledger. Only `harness-hook`'s own session-start/session-stop
+/// commands call this; nothing else in this crate does.
+///
+/// # Errors
+/// Returns `CliError` on filesystem or serialization failures.
+///
+/// # Panics
+/// Panics if the marker payload, built entirely from typed values, fails to
+/// serialize; that requires a NaN/infinite float or a non-string map key,
+/// neither of which this payload produces.
+pub fn append_session_marker(
     project_dir: &Path,
     agent: HookAgent,
     session_id: &str,
@@ -223,7 +244,12 @@ pub(crate) fn append_session_marker(
     })
 }
 
-pub(crate) fn find_canonical_session(
+/// Locate the canonical raw transcript for a session id across every
+/// project ledger under the harness data root.
+///
+/// # Errors
+/// Returns `CliError` when the session id matches more than one ledger.
+pub fn find_canonical_session(
     session_id: &str,
     project_hint: Option<&str>,
     agent_hint: Option<HookAgent>,
@@ -292,7 +318,7 @@ fn canonical_session_matches(
     project_hint.is_none_or(|hint| entry.path().display().to_string().contains(hint))
 }
 
-pub(crate) fn project_context_root_from_session_path(path: &Path) -> Option<PathBuf> {
+pub fn project_context_root_from_session_path(path: &Path) -> Option<PathBuf> {
     if path.file_name().and_then(|name| name.to_str()) != Some("raw.jsonl") {
         return None;
     }

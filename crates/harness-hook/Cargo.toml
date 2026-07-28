@@ -14,6 +14,7 @@ test = false
 
 [dependencies]
 clap = { version = "4.6.0", features = ["derive", "env"] }
+harness-agents = { path = "../harness-agents", version = "54.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "54.0.0" }
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
