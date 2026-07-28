@@ -247,10 +247,6 @@ pub trait ExternalSyncClient: Send + Sync {
     /// Absence is fail-closed by the recovery engine; it never authorizes a
     /// create or treats an existing durable attempt as recovered.
     #[must_use]
-    #[allow(
-        private_interfaces,
-        reason = "provider-create recovery is intentionally crate-private"
-    )]
     fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
         None
     }
