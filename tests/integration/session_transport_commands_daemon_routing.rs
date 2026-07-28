@@ -28,6 +28,9 @@ fn read_http_request(stream: &mut TcpStream) -> String {
         .set_read_timeout(Some(Duration::from_secs(1)))
         .expect("read timeout");
     let mut buffer = Vec::new();
+    let mut headers_done = false;
+    let mut content_length = 0_usize;
+    let mut header_end = 0_usize;
     loop {
         let mut chunk = [0_u8; 1024];
         let read = stream.read(&mut chunk).expect("read request");
@@ -35,7 +38,19 @@ fn read_http_request(stream: &mut TcpStream) -> String {
             break;
         }
         buffer.extend_from_slice(&chunk[..read]);
-        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+        if !headers_done
+            && let Some(pos) = buffer.windows(4).position(|window| window == b"\r\n\r\n")
+        {
+            headers_done = true;
+            header_end = pos + 4;
+            let head = String::from_utf8_lossy(&buffer[..pos]);
+            for line in head.split("\r\n") {
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    content_length = value.trim().parse().unwrap_or(0);
+                }
+            }
+        }
+        if headers_done && buffer.len() >= header_end + content_length {
             break;
         }
     }
