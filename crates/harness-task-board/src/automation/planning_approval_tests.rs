@@ -409,7 +409,7 @@ fn all_invalidations_use_fixed_domain_order() {
     let snapshot = snapshot();
     let plan = plan(&snapshot);
     let binding = binding(&plan, &snapshot);
-    let mut changed_snapshot = snapshot.clone();
+    let mut changed_snapshot = snapshot;
     changed_snapshot.workflow_kind = TaskBoardWorkflowKind::PR_FIX;
     changed_snapshot.execution_repository = Some("sample/other".into());
     changed_snapshot.item_revision += 1;
