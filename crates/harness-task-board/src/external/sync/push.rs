@@ -1,7 +1,7 @@
-use harness_github_api::republish_current_data_change;
 use crate::external::ExternalProviderScopeAttempt;
 use crate::store::TaskBoardItemPatch;
 use crate::types::{TaskBoardItem, TaskBoardStatus};
+use harness_github_api::republish_current_data_change;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::conflicts::build_sync_conflicts;

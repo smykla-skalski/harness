@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 
 use crate::external::{ExternalCreateLease, ExternalProviderScopeAttempt};
-use harness_workspace::workspace::utc_now;
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 use super::super::{SyncClientError, TaskBoardSyncStore};
 

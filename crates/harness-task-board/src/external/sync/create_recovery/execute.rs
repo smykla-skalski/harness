@@ -1,12 +1,12 @@
 use crate::external::{
-    ExternalCreateRecoveryClient, ExternalCreateRequest, ExternalProviderScopeAttempt,
-    ExternalProviderScopeIdentity, ExternalSyncClient,
-};
-use crate::external::{
     ExternalCreateOutcome, ExternalProvider, ExternalSyncAction, ExternalSyncOperation,
     ExternalTask, TaskBoardExternalCreateBegin, TaskBoardExternalCreateExisting,
     TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateIntent,
     TaskBoardExternalCreateIntentState, TaskBoardItem,
+};
+use crate::external::{
+    ExternalCreateRecoveryClient, ExternalCreateRequest, ExternalProviderScopeAttempt,
+    ExternalProviderScopeIdentity, ExternalSyncClient,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 

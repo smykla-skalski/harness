@@ -3,13 +3,14 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use super::*;
+use crate::TaskBoardSyncConflict;
+use crate::external::ExternalTaskRef;
 use crate::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     TaskBoardSyncItemSnapshot,
 };
 use crate::store::{TaskBoardItemPatch, apply_patch};
 use crate::types::{ExternalRefProvider, TaskBoardStatus};
-use crate::external::{ExternalTaskRef, TaskBoardSyncConflict};
 
 fn item(id: &str) -> TaskBoardItem {
     TaskBoardItem::new(
@@ -33,10 +34,7 @@ fn item_with_ref(id: &str) -> TaskBoardItem {
 
 fn task(external_id: &str) -> ExternalTask {
     ExternalTask {
-        reference: crate::external::ExternalTaskRef::new(
-            ExternalProvider::GitHub,
-            external_id,
-        ),
+        reference: crate::external::ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: "Title".into(),
         ..Default::default()
     }

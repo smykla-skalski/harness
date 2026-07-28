@@ -4,8 +4,8 @@ use crate::external::{
     ExternalProviderScopeAvailability, ExternalProviderScopeIdentity, ExternalSyncBatch,
     ExternalSyncClient, ExternalSyncScopeOutcome,
 };
-use harness_workspace::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::workspace::utc_now;
 
 use super::create_recovery::{
     ExternalCreateRecoveryPlan, ExternalCreateScopeRecovery, recover_scope_intents,

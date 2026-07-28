@@ -2,11 +2,12 @@ use async_trait::async_trait;
 
 use super::super::merge::sync_state_from_task;
 use super::*;
+use crate::TaskBoardSyncConflict;
+use crate::external::ExternalTaskRef;
 use crate::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     ExternalSyncDirection, TaskBoardSyncItemSnapshot,
 };
-use crate::external::{ExternalTaskRef, TaskBoardSyncConflict};
 use crate::types::{ExternalRefSyncState, TaskBoardStatus};
 use harness_kernel::errors::CliErrorKind;
 

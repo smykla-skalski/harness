@@ -1,11 +1,11 @@
 use std::mem;
 
 use crate::external::{
-    ExternalProviderScopeIdentity, ExternalSyncBatch, ExternalSyncClient, ExternalSyncScopeOutcome,
-};
-use crate::external::{
     ExternalProvider, ExternalSyncOperation, ExternalSyncOptions, TaskBoardExternalCreateIntent,
     TaskBoardExternalCreateIntentState,
+};
+use crate::external::{
+    ExternalProviderScopeIdentity, ExternalSyncBatch, ExternalSyncClient, ExternalSyncScopeOutcome,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 

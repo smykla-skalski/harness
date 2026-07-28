@@ -3,15 +3,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
+use crate::TaskBoardSyncConflict;
 use crate::external::{
     ExternalProvider, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState, ExternalSyncField, TaskBoardSyncItemSnapshot,
 };
+use crate::external::{TaskBoardExternalCreateStore, TaskBoardSyncStore};
 use crate::store::{TaskBoardItemPatch, apply_patch};
-use crate::external::{
-    TaskBoardExternalCreateStore, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict,
-    TaskBoardSyncStore,
-};
+use crate::types::{TaskBoardItem, TaskBoardStatus};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Clone, Copy)]

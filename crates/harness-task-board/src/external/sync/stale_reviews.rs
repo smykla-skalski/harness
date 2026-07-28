@@ -3,8 +3,8 @@ use crate::external::{
 };
 use crate::store::TaskBoardItemPatch;
 use crate::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
-use harness_workspace::workspace::utc_now;
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 use super::super::reconciled_external_status;
 use super::merge::{external_ref_matches, matching_ref};

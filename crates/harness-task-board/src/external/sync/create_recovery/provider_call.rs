@@ -1,6 +1,4 @@
-use crate::external::{
-    ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalSyncOperation,
-};
+use crate::external::{ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalSyncOperation};
 use crate::external::{
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState, TaskBoardItem,
 };

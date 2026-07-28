@@ -1,16 +1,17 @@
 use async_trait::async_trait;
 
+use crate::TaskBoardSyncConflict;
 use crate::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState,
 };
-use crate::store::TaskBoardItemPatch;
 use crate::external::{
-    ExternalProvider, ExternalRef, ExternalSyncField, ProviderExclusionAuditContext,
+    ExternalProvider, ExternalSyncField, ProviderExclusionAuditContext,
     ProviderExclusionRestoreOutcome, TaskBoardExternalCreateBegin,
-    TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent, TaskBoardItem,
-    TaskBoardStatus, TaskBoardSyncConflict,
+    TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent,
 };
+use crate::store::TaskBoardItemPatch;
+use crate::types::{ExternalRef, TaskBoardItem, TaskBoardStatus};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone)]

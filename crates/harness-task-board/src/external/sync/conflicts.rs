@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 
-use crate::external::{TaskBoardConflictState, TaskBoardSyncConflict};
 use crate::types::{ExternalRefSyncState, TaskBoardItem};
+use crate::{TaskBoardConflictState, TaskBoardSyncConflict};
 
 use super::merge::matching_ref;
 use super::{ExternalSyncField, ExternalTask};

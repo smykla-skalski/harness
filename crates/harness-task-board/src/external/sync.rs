@@ -7,8 +7,8 @@ use crate::external::TaskBoardExternalCreateIntent;
 use crate::matched_exclusion_label;
 use crate::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
-use harness_workspace::workspace::utc_now;
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
 
 use super::execution_repository_for_task;
 use super::{
@@ -305,8 +305,7 @@ async fn reconcile_one_pulled_task(
     ambiguous_references: &mut Vec<String>,
 ) -> Result<(), CliError> {
     let resolved_parent_item_id = resolve_parent_item_id(provider_item_index, &task);
-    let matched =
-        provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref());
+    let matched = provider_item_index.active_snapshot(&task.reference, task.project_id.as_deref());
     if matches!(matched, SnapshotMatch::Ambiguous) {
         // Two board items claim this reference, so there is no single item
         // to update. Leaving the rest of the repository unsynced over one

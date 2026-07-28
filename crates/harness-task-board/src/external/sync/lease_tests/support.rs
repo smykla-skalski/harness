@@ -3,20 +3,21 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
+use crate::TaskBoardSyncConflict;
+use crate::external::{
+    ExternalCreateOutcome, ExternalProvider, ExternalRef, ExternalSyncField,
+    TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
+    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
+    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
+    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
+};
 use crate::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     TaskBoardExternalCreateStore, TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot,
     TaskBoardSyncStore,
 };
 use crate::store::{TaskBoardItemPatch, apply_patch};
-use crate::external::{
-    ExternalCreateOutcome, ExternalProvider, ExternalRef, ExternalSyncField,
-    TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
-    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
-    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
-    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot, TaskBoardItem,
-    TaskBoardStatus, TaskBoardSyncConflict,
-};
+use crate::types::{TaskBoardItem, TaskBoardStatus};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) struct DurableCreateStore {

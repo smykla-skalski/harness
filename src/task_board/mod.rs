@@ -54,17 +54,17 @@ pub use external::{
     HARNESS_GITHUB_TOKEN_ENV, ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome,
     configured_sync_clients,
 };
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use external::{
-    TaskBoardExternalCreateStore, TaskBoardSyncStore,
-    configured_sync_clients_without_review_requests, imported_review_references_from_items,
-    reconcile_review_item_from_snapshots, sync_external_tasks,
-};
 pub(crate) use external::{
     TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
     TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
     TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
+};
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub(crate) use external::{
+    TaskBoardExternalCreateStore, TaskBoardSyncStore,
+    configured_sync_clients_without_review_requests, imported_review_references_from_items,
+    reconcile_review_item_from_snapshots, sync_external_tasks,
 };
 #[cfg(test)]
 pub use orchestrator::TaskBoardOrchestrator;
