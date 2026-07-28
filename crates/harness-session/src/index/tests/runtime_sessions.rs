@@ -1,9 +1,9 @@
 use tempfile::tempdir;
 
 use super::*;
+use crate::service as session_service;
 use crate::storage;
 use crate::types::SessionRole;
-use harness::session::service as session_service;
 
 const LEGACY_KEY_SESSION_ID: &str = "00000000-0000-4001-8000-000000000003";
 

@@ -7,8 +7,8 @@ use tempfile::tempdir;
 
 use super::contexts::{infer_checkout_identity, infer_ledger_cwd, repair_context_root};
 use super::*;
+use crate::service as session_service;
 use crate::types::{SessionRole, TaskSeverity};
-use harness::session::service as session_service;
 use harness_agents::runtime::event::ConversationEventKind;
 use harness_kernel::io::write_json_pretty;
 use harness_workspace::workspace::layout::sessions_root as workspace_sessions_root;
