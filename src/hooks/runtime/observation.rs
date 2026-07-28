@@ -1,12 +1,18 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use tokio::task;
 use tracing::field::display;
 
 use crate::agents::runtime;
-use crate::agents::service::record_hook_event;
+use crate::agents::service::project_dir_for_context;
+use crate::agents::storage;
+use crate::infra::exec::RUNTIME;
 use crate::session::service as session_service;
 use crate::telemetry::{current_trace_id, record_hook_metrics};
+use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session_resolution::trimmed_env;
 
 use super::super::adapters::{HookAgent, adapter_for};
 use super::super::application::prepare_normalized_context;
@@ -206,6 +212,140 @@ pub(super) fn record_hook_event_failure(
         ));
     }
     None
+}
+
+/// Record a normalized hook event in the shared agent ledger, reconciling the
+/// hook-observed runtime session against orchestration state along the way.
+///
+/// # Errors
+/// Returns `CliError` when the project directory cannot be resolved or the
+/// shared ledger update fails.
+pub(super) fn record_hook_event(
+    agent: HookAgent,
+    skill: &str,
+    hook_name: &str,
+    context: &NormalizedHookContext,
+    result: &NormalizedHookResult,
+) -> Result<(), CliError> {
+    let project_dir = project_dir_for_context(context)?;
+    let skill_name = skill.to_string();
+    let hook_name = hook_name.to_string();
+    let context = context.clone();
+    let result = result.clone();
+    RUNTIME.block_on(async move {
+        task::spawn_blocking(move || {
+            let observed_session_id = observed_runtime_session_id(&context);
+            let previous_session_id = storage::current_session_id(&project_dir, agent)?;
+            let session_id = observed_session_id.map_or_else(
+                || {
+                    previous_session_id
+                        .clone()
+                        .unwrap_or_else(|| default_session_id(agent))
+                },
+                ToString::to_string,
+            );
+            if observed_session_id.is_some() {
+                storage::set_current_session_id(&project_dir, agent, &session_id)?;
+                reconcile_managed_runtime_session(
+                    &project_dir,
+                    agent,
+                    &session_id,
+                    previous_session_id.as_deref(),
+                )?;
+            }
+            storage::append_hook_event(
+                &project_dir,
+                agent,
+                &session_id,
+                &skill_name,
+                &hook_name,
+                &context,
+                &result,
+            )?;
+            disconnect_managed_runtime_session_if_ended(&project_dir, agent, &context)?;
+            if matches!(context.event, NormalizedEvent::SessionEnd) {
+                storage::clear_current_session_id(&project_dir, agent)?;
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "agent event join error: {error}"
+            )))
+        })?
+    })
+}
+
+fn observed_runtime_session_id(context: &NormalizedHookContext) -> Option<&str> {
+    let session_id = context.session.session_id.trim();
+    (!session_id.is_empty()).then_some(session_id)
+}
+
+fn reconcile_managed_runtime_session(
+    project_dir: &Path,
+    agent: HookAgent,
+    runtime_session_id: &str,
+    previous_session_id: Option<&str>,
+) -> Result<(), CliError> {
+    if previous_session_id == Some(runtime_session_id) {
+        return Ok(());
+    }
+    let Some(orchestration_session_id) = trimmed_env("HARNESS_SESSION_ID") else {
+        return Ok(());
+    };
+    let Some(tui_id) = trimmed_env("HARNESS_AGENT_TUI_ID") else {
+        return Ok(());
+    };
+    let _ = session_service::register_agent_runtime_session(
+        &orchestration_session_id,
+        runtime::runtime_for(agent).name(),
+        &tui_id,
+        runtime_session_id,
+        project_dir,
+    )?;
+    Ok(())
+}
+
+fn disconnect_managed_runtime_session_if_ended(
+    project_dir: &Path,
+    agent: HookAgent,
+    context: &NormalizedHookContext,
+) -> Result<(), CliError> {
+    if context.event != NormalizedEvent::SessionEnd {
+        return Ok(());
+    }
+    let Some(runtime_session_id) = observed_runtime_session_id(context) else {
+        return Ok(());
+    };
+    let Some(resolved) = session_service::resolve_session_agent_for_runtime_session(
+        project_dir,
+        runtime::runtime_for(agent).name(),
+        runtime_session_id,
+    )?
+    else {
+        return Ok(());
+    };
+    if !session_service::session_agent_is_alive(
+        &resolved.orchestration_session_id,
+        &resolved.session_agent_id,
+        project_dir,
+    )? {
+        return Ok(());
+    }
+    session_service::leave_session(
+        &resolved.orchestration_session_id,
+        &resolved.session_agent_id,
+        project_dir,
+    )
+}
+
+fn default_session_id(agent: HookAgent) -> String {
+    format!(
+        "{}-{}",
+        runtime::runtime_for(agent).name(),
+        utc_now().replace([':', '-'], "")
+    )
 }
 
 pub(super) fn record_trace_id(span: &tracing::Span) {

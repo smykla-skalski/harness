@@ -33,6 +33,22 @@ pub fn session_status(session_id: &str, project_dir: &Path) -> Result<SessionSta
     Ok(state)
 }
 
+/// Report whether a session agent is currently alive.
+///
+/// # Errors
+/// Returns `CliError` if the session is not found.
+pub fn session_agent_is_alive(
+    session_id: &str,
+    agent_id: &str,
+    project_dir: &Path,
+) -> Result<bool, CliError> {
+    let state = session_status(session_id, project_dir)?;
+    Ok(state
+        .agents
+        .get(agent_id)
+        .is_some_and(|agent| agent.status.is_alive()))
+}
+
 /// Build the managed TUI start request used for preset-driven leader recovery.
 ///
 /// # Errors

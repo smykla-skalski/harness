@@ -1,4 +1,5 @@
 mod agent_probe_home;
+mod agents_session_boundary;
 mod daemon_command_boundary;
 mod docs_and_policy;
 mod helpers;
