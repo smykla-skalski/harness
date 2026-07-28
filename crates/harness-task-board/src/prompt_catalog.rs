@@ -18,7 +18,7 @@ use super::prompt_template::{PromptConfigError, PromptTemplate};
 /// One configurable prompt. The variants are the render sites: a triage
 /// escalation judgment, an ordinary board worker, and the two workflow agents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum PromptId {
+pub enum PromptId {
     Evaluation,
     ReadOnlyReview,
     TriageEscalation,
@@ -85,7 +85,7 @@ impl PromptId {
 /// operator asked for something impossible, and the render site turns that
 /// into a refused spawn rather than an agent running the wrong prompt.
 #[derive(Debug)]
-pub(crate) struct PromptCatalog {
+pub struct PromptCatalog {
     templates: BTreeMap<PromptId, PromptTemplate>,
     errors: BTreeMap<PromptId, PromptConfigError>,
     customized: BTreeSet<PromptId>,
@@ -111,7 +111,7 @@ impl PromptCatalog {
     /// # Errors
     /// Returns a workflow parse error when the document is not an object of
     /// known prompt names mapped to text.
-    pub(crate) fn from_json(bytes: &[u8]) -> Result<Self, CliError> {
+    pub fn from_json(bytes: &[u8]) -> Result<Self, CliError> {
         let document: BTreeMap<String, serde_json::Value> = serde_json::from_slice(bytes)
             .map_err(|error| parse_error(format!("prompt configuration is not JSON: {error}")))?;
         let mut catalog = Self::builtin();
@@ -205,14 +205,18 @@ static ACTIVE_PROMPT_CATALOG: Mutex<Option<Arc<PromptCatalog>>> = Mutex::new(Non
 /// `cargo test` shares one process across threads, so every test that installs
 /// a scoped catalog holds this first. Under nextest each test already runs in
 /// its own process and the lock is uncontended.
-#[cfg(test)]
+///
+/// `test-support` exposes this to the root crate's and `harness-daemon`'s own
+/// tests, which depend on this crate as an ordinary library and so never see
+/// its `cfg(test)` items; matches `store`'s `TaskBoardStore`/`MachineRegistry`.
+#[cfg(any(test, feature = "test-support"))]
 static PROMPT_CATALOG_TEST_LOCK_SLOT: Mutex<()> = Mutex::new(());
 
 /// Recovers from poisoning the way the production slot does. Sixteen call
 /// sites take this lock, so panicking on a poisoned mutex turns one real test
 /// failure into fifteen misleading ones.
-#[cfg(test)]
-pub(crate) fn prompt_catalog_test_lock() -> MutexGuard<'static, ()> {
+#[cfg(any(test, feature = "test-support"))]
+pub fn prompt_catalog_test_lock() -> MutexGuard<'static, ()> {
     match PROMPT_CATALOG_TEST_LOCK_SLOT.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
@@ -243,15 +247,15 @@ pub(crate) fn active_prompt_catalog() -> Arc<PromptCatalog> {
 
 /// Install the catalog for the rest of the process. Called once, from daemon
 /// startup, after configuration has been resolved.
-pub(crate) fn install_prompt_catalog(catalog: PromptCatalog) {
+pub fn install_prompt_catalog(catalog: PromptCatalog) {
     *active_catalog_slot() = Some(Arc::new(catalog));
 }
 
 /// Install a catalog for the lifetime of the returned guard. Tests use this to
 /// exercise a customized prompt without leaking it into sibling tests.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 #[must_use]
-pub(crate) fn scoped_prompt_catalog(catalog: PromptCatalog) -> PromptCatalogGuard {
+pub fn scoped_prompt_catalog(catalog: PromptCatalog) -> PromptCatalogGuard {
     let mut slot = active_catalog_slot();
     let previous = slot.take();
     *slot = Some(Arc::new(catalog));
@@ -259,12 +263,12 @@ pub(crate) fn scoped_prompt_catalog(catalog: PromptCatalog) -> PromptCatalogGuar
     PromptCatalogGuard { previous }
 }
 
-#[cfg(test)]
-pub(crate) struct PromptCatalogGuard {
+#[cfg(any(test, feature = "test-support"))]
+pub struct PromptCatalogGuard {
     previous: Option<Arc<PromptCatalog>>,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Drop for PromptCatalogGuard {
     fn drop(&mut self) {
         *active_catalog_slot() = self.previous.take();
@@ -277,7 +281,7 @@ impl Drop for PromptCatalogGuard {
 /// Returns an error when the prompt is customized with an unusable template,
 /// or when it references something this item does not have. Both are refusals
 /// the caller turns into a failed spawn, before the agent starts.
-pub(crate) fn render_prompt(
+pub fn render_prompt(
     id: PromptId,
     variables: &BTreeMap<&'static str, String>,
 ) -> Result<String, CliError> {

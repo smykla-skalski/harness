@@ -9,17 +9,45 @@
 
 use tracing::{error, info, warn};
 
-use crate::feature_flags::{
-    task_board_prompt_overrides_enabled_from_env, task_board_prompts_file_from_env,
-};
 use harness_kernel::errors::CliError;
+use harness_workspace::workspace::normalized_env_value;
 
 use super::prompt_catalog::PromptCatalog;
+
+/// Env var that lets a prompt configuration file replace shipped prompts.
+/// Mirrors `HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES` in root's
+/// `src/feature_flags.rs`, which lists every operator-facing flag; this is
+/// the one flag whose implementation lives with its sole consumer instead.
+pub const TASK_BOARD_PROMPT_OVERRIDES_ENV: &str = "HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES";
+/// Env var naming the prompt configuration file to load when overrides are on.
+pub const TASK_BOARD_PROMPTS_FILE_ENV: &str = "HARNESS_TASK_BOARD_PROMPTS_FILE";
 
 /// Ceiling for the prompt configuration file. Every shipped prompt together is
 /// a few kilobytes, so this leaves room for prompts far longer than any model
 /// usefully accepts while keeping the pre-listener read bounded.
 pub(crate) const MAX_PROMPT_CONFIGURATION_BYTES: usize = 512 * 1024;
+
+/// Whether a prompt configuration file may replace the prompts agents run
+/// with. Off by default: with the flag clear the shipped prompts render
+/// exactly as they always have, so nothing customized means nothing changed.
+#[must_use]
+pub fn task_board_prompt_overrides_enabled_from_env() -> bool {
+    normalized_env_value(TASK_BOARD_PROMPT_OVERRIDES_ENV)
+        .is_some_and(|value| env_value_truthy(&value))
+}
+
+/// The prompt configuration file to load, when one is configured.
+#[must_use]
+pub fn task_board_prompts_file_from_env() -> Option<String> {
+    normalized_env_value(TASK_BOARD_PROMPTS_FILE_ENV)
+}
+
+fn env_value_truthy(value: &str) -> bool {
+    matches!(
+        value.to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
 
 /// Read the configuration without trusting the path. This runs before the
 /// daemon binds its listener, so an unbounded read is a way to stop the daemon
@@ -62,7 +90,7 @@ fn read_bounded(path: &str) -> Result<Vec<u8>, String> {
 
 /// Resolve the prompt catalog from the feature flag and the configured file.
 #[must_use]
-pub(crate) fn resolve_prompt_catalog_from_env() -> PromptCatalog {
+pub fn resolve_prompt_catalog_from_env() -> PromptCatalog {
     if !task_board_prompt_overrides_enabled_from_env() {
         return PromptCatalog::builtin();
     }

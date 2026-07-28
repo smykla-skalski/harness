@@ -261,14 +261,15 @@ async fn ensure_root_dir(path: &Path) -> Result<(), WorkingCopyRuntimeError> {
 /// middle of - so reuse keys off this marker, not off the repo's mere shape.
 const COMPLETION_MARKER_NAME: &str = "harness-obtain-complete";
 
-pub(crate) fn completion_marker(checkout_path: &Path) -> PathBuf {
+#[must_use]
+pub fn completion_marker(checkout_path: &Path) -> PathBuf {
     checkout_path.join(".git").join(COMPLETION_MARKER_NAME)
 }
 
 /// A directory is reusable only when the completion marker is present and gix
 /// can open it as a repo with a working tree. A clone interrupted before the
 /// checkout finished has no marker, so it reads as absent and gets recloned.
-pub(crate) async fn is_reusable_checkout(path: &Path) -> bool {
+pub async fn is_reusable_checkout(path: &Path) -> bool {
     if !path.exists() {
         return false;
     }

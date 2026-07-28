@@ -8,13 +8,13 @@ use super::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 pub(crate) const DISPATCH_PLACEHOLDER: &str = "<assigned-at-dispatch>";
 
-pub(crate) struct WorkerPromptContext<'a> {
-    pub(crate) board_item_id: &'a str,
-    pub(crate) work_item_id: &'a str,
-    pub(crate) worktree: Option<&'a str>,
-    pub(crate) session_id: Option<&'a str>,
-    pub(crate) managed_run_id: Option<&'a str>,
-    pub(crate) status: TaskBoardStatus,
+pub struct WorkerPromptContext<'a> {
+    pub board_item_id: &'a str,
+    pub work_item_id: &'a str,
+    pub worktree: Option<&'a str>,
+    pub session_id: Option<&'a str>,
+    pub managed_run_id: Option<&'a str>,
+    pub status: TaskBoardStatus,
 }
 
 /// Render the worker prompt for one item from the active prompt catalog.
@@ -29,7 +29,7 @@ pub(crate) struct WorkerPromptContext<'a> {
 /// Returns an error when the configured prompt cannot be rendered for this
 /// item, so the caller refuses the spawn rather than starting an agent with a
 /// prompt it could not complete.
-pub(crate) fn render_worker_prompt(
+pub fn render_worker_prompt(
     item: &TaskBoardItem,
     context: &WorkerPromptContext<'_>,
 ) -> Result<String, CliError> {
@@ -163,7 +163,7 @@ fn lifecycle_section(session_id: Option<&str>, work_item_id: &str) -> String {
 /// spawn re-renders independently, so a prompt that cannot be rendered for
 /// this item shows the reason rather than substituting text no agent will run.
 #[must_use]
-pub(crate) fn plan_worker_prompt(item: &TaskBoardItem) -> String {
+pub fn plan_worker_prompt(item: &TaskBoardItem) -> String {
     render_worker_prompt(
         item,
         &WorkerPromptContext {

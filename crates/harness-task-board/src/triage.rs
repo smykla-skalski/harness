@@ -104,7 +104,7 @@ pub struct TaskBoardTriageDecisionRecord {
 
 impl TaskBoardTriageDecisionRecord {
     #[must_use]
-    pub(crate) fn from_decision(
+    pub fn from_decision(
         decision_id: String,
         item_id: String,
         generation: u64,

@@ -20,7 +20,7 @@ use super::types::TaskBoardItem;
 /// Returns an error when the configured prompt cannot be rendered for this
 /// item, so the caller refuses the spawn instead of starting an agent with a
 /// prompt it could not complete.
-pub(crate) fn render_triage_escalation_prompt(
+pub fn render_triage_escalation_prompt(
     item: &TaskBoardItem,
     escalation_id: &str,
     verdict_token: &str,

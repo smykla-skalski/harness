@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::types::{ExternalRef, TaskBoardItemKind};
+use crate::types::{ExternalRef, TaskBoardItemKind};
 
 fn item() -> TaskBoardItem {
     TaskBoardItem::new(
@@ -196,6 +196,10 @@ fn canonical_evidence_fingerprint_validator_accepts_only_the_produced_shape() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "a flat run of independent assertions, not real branching complexity"
+)]
 fn canonical_bounded_text_rejects_blank_oversized_and_control_characters() {
     assert!(is_canonical_evaluator_identity(
         BUILTIN_V1_EVALUATOR_IDENTITY
@@ -209,6 +213,10 @@ fn canonical_bounded_text_rejects_blank_oversized_and_control_characters() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "a flat run of independent assertions, not real branching complexity"
+)]
 fn canonical_decided_at_accepts_only_exact_utc_seconds_rfc3339() {
     assert!(is_canonical_decided_at("2026-07-23T00:00:00Z"));
     assert!(is_canonical_decided_at("2024-02-29T12:34:56Z"));

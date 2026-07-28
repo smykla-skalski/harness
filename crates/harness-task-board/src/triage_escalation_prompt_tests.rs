@@ -1,8 +1,6 @@
 use super::render_triage_escalation_prompt;
-use crate::task_board::prompt_catalog::{
-    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
-};
-use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardPriority};
+use crate::prompt_catalog::{prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog};
+use crate::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardPriority};
 
 fn item(title: &str, body: &str, tags: Vec<String>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(

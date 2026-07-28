@@ -1,7 +1,7 @@
 use super::*;
-use crate::task_board::triage::TriageVerdict;
-use crate::task_board::triage_rules::{TriagePriorityAction, TriageRule, TriageRuleOutcome};
-use crate::task_board::types::TaskBoardPriority;
+use crate::triage::TriageVerdict;
+use crate::triage_rules::{TriagePriorityAction, TriageRule, TriageRuleOutcome};
+use crate::types::TaskBoardPriority;
 
 fn outcome(verdict: TriageVerdict) -> TriageRuleOutcome {
     TriageRuleOutcome {
@@ -262,7 +262,7 @@ fn partially_overlapping_rules_are_not_shadowed_first_match_is_intentional_prece
 
 #[test]
 fn too_many_conditions_on_one_rule_is_rejected() {
-    let when = (0..MAX_CONDITIONS_PER_RULE + 1)
+    let when = (0..=MAX_CONDITIONS_PER_RULE)
         .map(|_| TriageRuleCondition::ExecutionRepositoryIsPresent)
         .collect::<Vec<_>>();
     let report = validate_triage_rule_set(&candidate(vec![rule("too-many", when)]));

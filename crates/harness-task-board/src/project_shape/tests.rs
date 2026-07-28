@@ -1,7 +1,7 @@
 use super::{
     TaskBoardProjectShape, allocate, colors_alone_suffice, organization_of,
 };
-use crate::task_board::project_color::TaskBoardProjectColor;
+use crate::project_color::TaskBoardProjectColor;
 
 #[test]
 fn every_shape_round_trips_through_its_wire_name() {

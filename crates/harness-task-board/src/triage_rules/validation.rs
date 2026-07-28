@@ -7,8 +7,8 @@ use super::{
     MAX_TRIAGE_RULES, TRIAGE_RULE_SET_SCHEMA_VERSION, TriageRule, TriageRuleCondition,
     TriageRuleSetV1, is_canonical_rule_id,
 };
-use crate::task_board::triage::{canonicalize_labels, is_canonical_bounded_text};
-use crate::task_board::types::ExternalRefProvider;
+use crate::triage::{canonicalize_labels, is_canonical_bounded_text};
+use crate::types::ExternalRefProvider;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "issue", rename_all = "snake_case")]

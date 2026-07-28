@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::{TriageRuleSetV1, TriageRuleSetValidationReport};
-use crate::task_board::triage::TriageVerdict;
-use crate::task_board::triage_override::TaskBoardTriageEffectiveSource;
+use crate::triage::TriageVerdict;
+use crate::triage_override::TaskBoardTriageEffectiveSource;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[derive(utoipa::ToSchema)]
