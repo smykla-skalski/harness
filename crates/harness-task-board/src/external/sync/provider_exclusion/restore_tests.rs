@@ -1,17 +1,18 @@
 use super::*;
+use crate::types::{ExternalRef, ExternalRefSyncState, TaskBoardTombstoneCause};
 
 #[tokio::test]
 async fn restore_resolves_by_the_stored_snapshot_via_the_index() {
     let store = FakeStore::default();
     let mut stored = item("stored-legacy-id");
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["local-only".into(), "duplicate".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
-        sync_state: Some(crate::types::ExternalRefSyncState {
+        sync_state: Some(ExternalRefSyncState {
             labels: vec!["duplicate".into()],
             ..Default::default()
         }),
@@ -80,9 +81,9 @@ async fn restore_dry_run_reports_the_actual_stored_id_without_mutating() {
     let store = FakeStore::default();
     let mut stored = item("stored-legacy-id");
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["duplicate".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
@@ -124,9 +125,9 @@ async fn restore_fails_closed_when_the_stored_tags_lost_the_matched_label() {
     let store = FakeStore::default();
     let mut stored = item("stored-legacy-id");
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["kind/bug".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
@@ -161,9 +162,9 @@ async fn restore_reports_handled_without_creating_when_the_transaction_finds_a_s
     let store = FakeStore::default();
     let mut stored = item("stored-legacy-id");
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["duplicate".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
@@ -204,9 +205,9 @@ async fn restore_publishes_a_conflict_operation_when_the_store_reports_one() {
     let mut stored = item("stored-legacy-id");
     stored.title = "Stored title".into();
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["duplicate".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
@@ -256,9 +257,9 @@ async fn restore_passes_some_empty_conflicts_to_supersede_stale_rows_when_fields
     let stored_item = item("stored-legacy-id");
     let mut stored = stored_item.clone();
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["duplicate".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
@@ -308,13 +309,13 @@ async fn restore_reports_only_fields_the_pull_applied() {
     stored.body = "Local body".into();
     stored.project_id = Some("local/project".into());
     stored.deleted_at = Some("2026-07-22T00:00:00Z".into());
-    stored.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    stored.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     stored.tags = vec!["duplicate".into()];
-    stored.external_refs = vec![crate::types::ExternalRef {
+    stored.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
-        sync_state: Some(crate::types::ExternalRefSyncState {
+        sync_state: Some(ExternalRefSyncState {
             title: Some("Local title".into()),
             body: Some("Local body".into()),
             project_id: Some("local/project".into()),

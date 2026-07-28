@@ -21,6 +21,7 @@ pub struct TaskBoardSyncItemSnapshot {
 }
 
 impl TaskBoardSyncItemSnapshot {
+    #[must_use]
     pub const fn new(item: TaskBoardItem, item_revision: i64) -> Self {
         Self {
             item,

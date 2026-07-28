@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use super::support::DurableCreateStore;
 use super::*;
-use crate::external::ExternalProviderCapabilities;
+use crate::external::{ExternalProviderCapabilities, ExternalSyncBatch};
 
 #[derive(Default)]
 struct ProviderCalls {
@@ -126,11 +126,7 @@ async fn dry_run_pull_checks_coordinator_without_provider_attempt() {
 async fn cancelled_sync(
     item: TaskBoardItem,
     options: ExternalSyncOptions,
-) -> (
-    DurableCreateStore,
-    Arc<ProviderCalls>,
-    crate::external::ExternalSyncBatch,
-) {
+) -> (DurableCreateStore, Arc<ProviderCalls>, ExternalSyncBatch) {
     let store = DurableCreateStore::coordinator_cancelled(item);
     let calls = Arc::new(ProviderCalls::default());
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FenceClient {
@@ -144,7 +140,7 @@ async fn cancelled_sync(
 
 fn assert_cancelled_scope(
     store: &DurableCreateStore,
-    batch: &crate::external::ExternalSyncBatch,
+    batch: &ExternalSyncBatch,
     expected_releases: usize,
 ) {
     assert!(batch.terminal_error.is_some());

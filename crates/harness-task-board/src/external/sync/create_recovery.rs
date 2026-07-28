@@ -52,6 +52,8 @@ pub struct ExternalCreateScopeRecovery {
     pub(super) touched: bool,
 }
 
+/// # Errors
+/// Returns `CliError` when the store's create-intent lookups fail.
 pub async fn load_external_create_recovery_work(
     board: &dyn TaskBoardSyncStore,
     provider: Option<ExternalProvider>,
@@ -79,6 +81,8 @@ pub async fn load_external_create_recovery_work(
     })
 }
 
+/// # Errors
+/// Returns an `ExternalSyncBatch` recording the outcome when a recovery probe or completion fails.
 pub async fn prepare_external_create_recovery(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
@@ -138,6 +142,9 @@ pub async fn prepare_external_create_recovery(
     clippy::result_large_err,
     reason = "the blocked batch intentionally retains complete operation and scope evidence"
 )]
+/// # Errors
+/// Returns an `ExternalSyncBatch` recording every follow-up when an in-flight intent has no
+/// single owning client.
 pub fn assign_external_create_recovery(
     prepared: PreparedExternalCreateRecovery,
     clients: &[Box<dyn ExternalSyncClient>],
@@ -178,6 +185,7 @@ pub fn assign_external_create_recovery(
     })
 }
 
+#[must_use]
 pub fn blocked_external_create_recovery(
     prepared: PreparedExternalCreateRecovery,
     error: CliError,
@@ -190,6 +198,7 @@ pub fn blocked_external_create_recovery(
     blocked_batch(prepared.operations, prepared.follow_ups, intents, error)
 }
 
+#[must_use]
 pub fn blocked_external_create_follow_ups(
     intents: Vec<TaskBoardExternalCreateIntent>,
     error: CliError,

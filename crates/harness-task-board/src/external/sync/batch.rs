@@ -31,6 +31,8 @@ pub async fn sync_external_tasks(
         .and_then(ExternalSyncBatch::into_operations)
 }
 
+/// # Errors
+/// Returns `CliError` when every attempted provider scope fails or local persistence fails.
 pub async fn sync_external_tasks_scoped(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
@@ -45,6 +47,8 @@ pub async fn sync_external_tasks_scoped(
     .await
 }
 
+/// # Errors
+/// Returns `CliError` when every attempted provider scope fails or local persistence fails.
 pub async fn sync_external_tasks_scoped_with_recovery(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,

@@ -30,10 +30,12 @@ impl ExternalProviderScopeIdentity {
         Self { provider, scope_id }
     }
 
+    #[must_use]
     pub const fn provider(&self) -> ExternalProvider {
         self.provider
     }
 
+    #[must_use]
     pub fn scope_id(&self) -> &str {
         &self.scope_id
     }
@@ -63,6 +65,8 @@ pub struct ExternalProviderScopeState {
 }
 
 impl ExternalProviderScopeState {
+    /// # Errors
+    /// Returns an error when a backoff/attempt deadline or `now` fails to parse as RFC 3339.
     pub fn availability_at(
         &self,
         now: &str,
@@ -117,6 +121,7 @@ pub struct ExternalProviderScopeAttempt {
 }
 
 impl ExternalProviderScopeAttempt {
+    #[must_use]
     pub fn new(
         provider: ExternalProvider,
         scope_id: String,
@@ -131,18 +136,22 @@ impl ExternalProviderScopeAttempt {
         }
     }
 
+    #[must_use]
     pub const fn provider(&self) -> ExternalProvider {
         self.provider
     }
 
+    #[must_use]
     pub fn scope_id(&self) -> &str {
         &self.scope_id
     }
 
+    #[must_use]
     pub fn fence_marker(&self) -> &str {
         &self.fence_marker
     }
 
+    #[must_use]
     pub const fn created_scope(&self) -> bool {
         self.created_scope
     }
@@ -172,6 +181,7 @@ pub struct ExternalSyncScopeOutcome {
 }
 
 impl ExternalSyncScopeOutcome {
+    #[must_use]
     pub fn success(provider: ExternalProvider, scope_id: String) -> Self {
         Self {
             provider,
@@ -182,6 +192,7 @@ impl ExternalSyncScopeOutcome {
         }
     }
 
+    #[must_use]
     pub fn failed(provider: ExternalProvider, scope_id: String, error: &CliError) -> Self {
         let message = error.details().map_or_else(
             || error.message(),
@@ -196,6 +207,7 @@ impl ExternalSyncScopeOutcome {
         }
     }
 
+    #[must_use]
     pub fn backing_off(provider: ExternalProvider, scope_id: String) -> Self {
         Self {
             provider,
@@ -221,6 +233,8 @@ pub struct ExternalSyncBatch {
 }
 
 impl ExternalSyncBatch {
+    /// # Errors
+    /// Returns the batch's terminal error, or its first provider failure when every scope failed.
     pub fn into_completed(mut self) -> Result<Self, CliError> {
         if let Some(error) = self.terminal_error.take() {
             return Err(error);
@@ -233,10 +247,13 @@ impl ExternalSyncBatch {
         Ok(self)
     }
 
+    /// # Errors
+    /// See [`Self::into_completed`].
     pub fn into_operations(self) -> Result<Vec<ExternalSyncOperation>, CliError> {
         self.into_completed().map(|batch| batch.operations)
     }
 
+    #[must_use]
     pub fn attempted_scope_count(&self) -> usize {
         self.scope_outcomes
             .iter()
@@ -244,6 +261,7 @@ impl ExternalSyncBatch {
             .count()
     }
 
+    #[must_use]
     pub fn failed_scope_count(&self) -> usize {
         self.scope_outcomes
             .iter()
@@ -251,6 +269,7 @@ impl ExternalSyncBatch {
             .count()
     }
 
+    #[must_use]
     pub fn succeeded_scope_count(&self) -> usize {
         self.scope_outcomes
             .iter()
@@ -258,10 +277,12 @@ impl ExternalSyncBatch {
             .count()
     }
 
+    #[must_use]
     pub const fn result_scope_count(&self) -> usize {
         self.scope_outcomes.len()
     }
 
+    #[must_use]
     pub fn backing_off_scope_count(&self) -> usize {
         self.scope_outcomes
             .iter()

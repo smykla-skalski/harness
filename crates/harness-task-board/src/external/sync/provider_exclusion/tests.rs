@@ -4,13 +4,12 @@ use async_trait::async_trait;
 
 use super::*;
 use crate::TaskBoardSyncConflict;
-use crate::external::ExternalTaskRef;
 use crate::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
-    TaskBoardSyncItemSnapshot,
+    ExternalTaskRef, TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot,
 };
 use crate::store::{TaskBoardItemPatch, apply_patch};
-use crate::types::{ExternalRefProvider, TaskBoardStatus};
+use crate::types::{ExternalRef, ExternalRefProvider, TaskBoardStatus, TaskBoardTombstoneCause};
 
 fn item(id: &str) -> TaskBoardItem {
     TaskBoardItem::new(
@@ -23,7 +22,7 @@ fn item(id: &str) -> TaskBoardItem {
 
 fn item_with_ref(id: &str) -> TaskBoardItem {
     let mut value = item(id);
-    value.external_refs = vec![crate::types::ExternalRef {
+    value.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "42".into(),
         url: None,
@@ -34,7 +33,7 @@ fn item_with_ref(id: &str) -> TaskBoardItem {
 
 fn task(external_id: &str) -> ExternalTask {
     ExternalTask {
-        reference: crate::external::ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
+        reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id),
         title: "Title".into(),
         ..Default::default()
     }
@@ -48,6 +47,9 @@ fn excluded_task(external_id: &str) -> ExternalTask {
 
 #[derive(Default)]
 struct FakeStore {
+    // Outer: whether the test configured a canned hide result at all; inner:
+    // the `Option<TaskBoardItem>` that canned call itself returns.
+    #[allow(clippy::option_option)]
     hide_result: Mutex<Option<Option<TaskBoardItem>>>,
     hide_seen: Mutex<Option<(TaskBoardItemPatch, Option<Vec<TaskBoardSyncConflict>>)>>,
     restore_result: Mutex<Option<ProviderExclusionRestoreOutcome>>,
@@ -60,7 +62,7 @@ struct FakeStore {
     >,
 }
 
-impl crate::external::TaskBoardExternalCreateStore for FakeStore {}
+impl TaskBoardExternalCreateStore for FakeStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for FakeStore {
@@ -415,7 +417,7 @@ async fn hide_preserves_conflict_baselines_for_a_later_restore() {
     let mut tombstone = matched;
     apply_patch(&mut tombstone, hide_patch);
     tombstone.deleted_at = Some("2026-07-23T00:05:00Z".into());
-    tombstone.tombstone_cause = Some(crate::types::TaskBoardTombstoneCause::ProviderExclusion);
+    tombstone.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     let index = ProviderItemIndex::build(vec![TaskBoardSyncItemSnapshot::new(tombstone, 4)]);
     *store.restore_result.lock().expect("lock") =
         Some(ProviderExclusionRestoreOutcome::ConflictPublished);

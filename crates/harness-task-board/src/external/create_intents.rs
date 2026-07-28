@@ -85,6 +85,7 @@ pub struct TaskBoardExternalCreateFinalizeResult {
 }
 
 impl TaskBoardExternalCreateIntent {
+    #[must_use]
     pub fn created_evidence(&self) -> Option<&TaskBoardExternalCreateEvidence> {
         match &self.state {
             TaskBoardExternalCreateIntentState::InFlight => None,

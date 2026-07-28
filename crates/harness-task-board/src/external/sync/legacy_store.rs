@@ -8,6 +8,7 @@ use crate::external::{
 use crate::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::types::{TaskBoardItem, TaskBoardStatus};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use tokio::task::{JoinError, spawn_blocking};
 
 use super::{TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
 
@@ -49,23 +50,23 @@ impl TaskBoardSyncStore for TaskBoardStore {
         status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
         let board = self.clone();
-        tokio::task::spawn_blocking(move || board.list(status))
+        spawn_blocking(move || board.list(status))
             .await
-            .map_err(|error| sync_join_error("list items", error))?
+            .map_err(|error| sync_join_error("list items", &error))?
     }
 
     async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
         let board = self.clone();
-        tokio::task::spawn_blocking(move || board.list_including_deleted())
+        spawn_blocking(move || board.list_including_deleted())
             .await
-            .map_err(|error| sync_join_error("list tombstones", error))?
+            .map_err(|error| sync_join_error("list tombstones", &error))?
     }
 
     async fn list_item_snapshots_including_deleted(
         &self,
     ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
         let board = self.clone();
-        tokio::task::spawn_blocking(move || {
+        spawn_blocking(move || {
             board.list_including_deleted().map(|items| {
                 items
                     .into_iter()
@@ -74,18 +75,18 @@ impl TaskBoardSyncStore for TaskBoardStore {
             })
         })
         .await
-        .map_err(|error| sync_join_error("list snapshot tombstones", error))?
+        .map_err(|error| sync_join_error("list snapshot tombstones", &error))?
     }
 
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
         let board = self.clone();
-        tokio::task::spawn_blocking(move || {
+        spawn_blocking(move || {
             let title = item.title.clone();
             let body = item.body.clone();
             board.create(&title, &body, item)
         })
         .await
-        .map_err(|error| sync_join_error("create item", error))?
+        .map_err(|error| sync_join_error("create item", &error))?
     }
 
     async fn update_item(
@@ -95,7 +96,7 @@ impl TaskBoardSyncStore for TaskBoardStore {
     ) -> Result<TaskBoardItem, CliError> {
         let board = self.clone();
         let expected_item = expected_item.clone();
-        tokio::task::spawn_blocking(move || {
+        spawn_blocking(move || {
             let item_id = expected_item.id.clone();
             board
                 .update_if(&item_id, |current| {
@@ -108,19 +109,19 @@ impl TaskBoardSyncStore for TaskBoardStore {
                 })
         })
         .await
-        .map_err(|error| sync_join_error("update item", error))?
+        .map_err(|error| sync_join_error("update item", &error))?
     }
 
     async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
         let board = self.clone();
         let item_id = item_id.to_owned();
-        tokio::task::spawn_blocking(move || {
+        spawn_blocking(move || {
             board
                 .get(&item_id)
                 .map(|item| TaskBoardSyncItemSnapshot::new(item, 0))
         })
         .await
-        .map_err(|error| sync_join_error("load item snapshot", error))?
+        .map_err(|error| sync_join_error("load item snapshot", &error))?
     }
 
     async fn provider_scope_state(
@@ -195,7 +196,7 @@ impl TaskBoardSyncStore for TaskBoardStore {
     }
 }
 
-fn sync_join_error(operation: &str, error: tokio::task::JoinError) -> CliError {
+fn sync_join_error(operation: &str, error: &JoinError) -> CliError {
     CliErrorKind::workflow_io(format!(
         "task-board external sync {operation} worker failed: {error}"
     ))

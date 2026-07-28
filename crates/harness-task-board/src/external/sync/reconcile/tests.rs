@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use super::super::merge::sync_state_from_task;
 use super::*;
 use crate::TaskBoardSyncConflict;
-use crate::external::ExternalTaskRef;
 use crate::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
-    ExternalSyncDirection, TaskBoardSyncItemSnapshot,
+    ExternalSyncDirection, ExternalTaskRef, TaskBoardExternalCreateStore,
+    TaskBoardSyncItemSnapshot,
 };
 use crate::types::{ExternalRefSyncState, TaskBoardStatus};
 use harness_kernel::errors::CliErrorKind;
@@ -48,7 +48,7 @@ struct ConcurrentEditStore {
     latest: TaskBoardItem,
 }
 
-impl crate::external::TaskBoardExternalCreateStore for ConcurrentEditStore {}
+impl TaskBoardExternalCreateStore for ConcurrentEditStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for ConcurrentEditStore {

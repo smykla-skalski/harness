@@ -140,6 +140,8 @@ pub fn configured_sync_clients(
     configured_sync_clients_with_review_source(config, provider, true)
 }
 
+/// # Errors
+/// See [`configured_sync_clients`].
 pub fn configured_sync_clients_without_review_requests(
     config: &ExternalSyncConfig,
     provider: Option<ExternalProvider>,

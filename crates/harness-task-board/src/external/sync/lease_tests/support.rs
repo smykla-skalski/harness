@@ -40,6 +40,9 @@ pub(super) struct DurableCreateStore {
     pub(super) tombstone_list_calls: AtomicUsize,
     renew_calls: AtomicUsize,
     pub(super) resolved_fields: Mutex<Vec<ExternalSyncField>>,
+    // Outer: whether the test observed a completion call at all; inner: the
+    // `base_revision` argument that call carried.
+    #[allow(clippy::option_option)]
     pub(super) success_base_revision: Mutex<Option<Option<String>>>,
     pub(super) fence_order: Mutex<Vec<&'static str>>,
 }

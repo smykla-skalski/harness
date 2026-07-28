@@ -6,7 +6,7 @@ use super::*;
 use crate::TaskBoardSyncConflict;
 use crate::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
-    TaskBoardSyncItemSnapshot,
+    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot,
 };
 use crate::store::apply_patch;
 use crate::types::ExternalRefSyncState;
@@ -217,7 +217,7 @@ struct FailingStore {
     conflict_error: Option<&'static str>,
 }
 
-impl crate::external::TaskBoardExternalCreateStore for FailingStore {}
+impl TaskBoardExternalCreateStore for FailingStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for FailingStore {
