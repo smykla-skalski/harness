@@ -1,4 +1,3 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalCreateRecoveryClient, ExternalCreateRequest, ExternalProviderScopeAttempt,
     ExternalProviderScopeIdentity, ExternalSyncClient,
@@ -9,6 +8,7 @@ use crate::task_board::{
     TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateIntent,
     TaskBoardExternalCreateIntentState, TaskBoardItem,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::lookup::{OperationDraft, operation};
 use super::super::merge::sync_state_from_task;

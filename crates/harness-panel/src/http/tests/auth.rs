@@ -7,10 +7,8 @@ use axum::http::{StatusCode, header};
 use chrono::{Duration, Utc};
 use tower::ServiceExt;
 
+use super::super::session::{SESSION_COOKIE_PREFIX, session_cookie_name, sign_in_cookie_name};
 use super::super::{PanelState, router};
-use super::super::session::{
-    SESSION_COOKIE_PREFIX, session_cookie_name, sign_in_cookie_name,
-};
 use super::{BODY_LIMIT, Harness};
 use crate::config::DEFAULT_GITHUB_AUTHORIZE_URL;
 use crate::store::Store;
@@ -120,8 +118,14 @@ async fn nested_mount_reconfiguration_keeps_each_session_cookie_independent() {
             .expect("body"),
     )
     .into_owned();
-    assert!(viewer_body.contains("\"login\":\"new-account\""), "{viewer_body}");
-    assert!(!viewer_body.contains("\"login\":\"old-account\""), "{viewer_body}");
+    assert!(
+        viewer_body.contains("\"login\":\"new-account\""),
+        "{viewer_body}"
+    );
+    assert!(
+        !viewer_body.contains("\"login\":\"old-account\""),
+        "{viewer_body}"
+    );
     let signout = router(new_state.clone())
         .oneshot(
             Harness::request()

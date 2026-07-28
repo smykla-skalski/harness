@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 
-use harness_kernel::errors::CliError;
 use crate::reviews::{
     ReviewItem, ReviewRepositoryLabel, ReviewsGitHubClient, ReviewsPullRequestReference,
     ReviewsPullRequestResolveRequest, ReviewsPullRequestResolveResponse,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::cache_internal::{patch_cached_items, patch_cached_repository_labels};
 use super::policy;

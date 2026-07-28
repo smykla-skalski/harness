@@ -2,10 +2,10 @@ use serde_json::{Value, json};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOperation,
 };
+use harness_kernel::errors::CliError;
 
 use metrics::{add_execution_metrics, add_summary_counts, applied_operation_count, conflict_count};
 use persistence::{SyncAuditClassification, persist_sync_audit_result};

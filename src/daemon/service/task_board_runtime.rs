@@ -8,15 +8,16 @@ use crate::daemon::protocol::{
     TaskBoardGitSigningVerifyResponse,
 };
 use crate::daemon::state;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{SigningVerifyOutcome, verify_signing_for_profile};
 use crate::task_board::{
     ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaults, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOpenRouterTokenSyncResponse, discover_git_identity_defaults, normalize_repository_slug,
+    TaskBoardOpenRouterTokenSyncResponse, discover_git_identity_defaults,
+    normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Load the persisted task-board git runtime config.
 ///

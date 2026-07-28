@@ -9,10 +9,9 @@ use std::time::{Duration, Instant};
 use portable_pty::{Child, ExitStatus, MasterPty, native_pty_system};
 use tokio::sync::broadcast;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::{AgentTuiInput, AgentTuiInputSequence};
 use super::model::{
     AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSizeExt, AgentTuiSnapshot, AgentTuiSpawnSpec,
     AgentTuiStatus,
@@ -21,6 +20,7 @@ use super::readiness::{ReadinessSignal, new_readiness_signal, spawn_reader_threa
 use super::screen::{TerminalScreenParser, TerminalScreenSnapshot};
 use super::spawn::command_builder;
 use super::support::{Shared, lock, persist_transcript};
+use super::{AgentTuiInput, AgentTuiInputSequence};
 
 pub(crate) struct AgentTuiSnapshotContext<'a> {
     pub(crate) session_id: &'a str,

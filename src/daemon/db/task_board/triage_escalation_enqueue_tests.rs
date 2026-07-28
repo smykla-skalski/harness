@@ -30,7 +30,10 @@ fn inbox_item_no_labels(id: &str) -> TaskBoardItem {
     item
 }
 
-async fn active_escalation_row(db: &AsyncDaemonDb, item_id: &str) -> Option<(String, String, String)> {
+async fn active_escalation_row(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Option<(String, String, String)> {
     sqlx::query_as::<_, (String, String, String)>(
         "SELECT escalation_id, evidence_fingerprint, status FROM task_board_triage_escalations
          WHERE item_id = ?1 AND status IN ('pending', 'running')",
@@ -146,7 +149,12 @@ async fn a_fingerprint_change_supersedes_the_still_pending_escalation_and_enqueu
     .expect("load superseded row status");
     assert_eq!(superseded_status, "superseded");
 
-    let shape_ok: (Option<String>, Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+    let shape_ok: (
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = sqlx::query_as(
         "SELECT started_at, verdict_token, managed_run_id, completed_at
          FROM task_board_triage_escalations WHERE escalation_id = ?1",
     )
@@ -154,7 +162,10 @@ async fn a_fingerprint_change_supersedes_the_still_pending_escalation_and_enqueu
     .fetch_one(db.pool())
     .await
     .expect("load superseded row shape");
-    assert_eq!(shape_ok.0, None, "superseded-from-pending keeps started_at NULL");
+    assert_eq!(
+        shape_ok.0, None,
+        "superseded-from-pending keeps started_at NULL"
+    );
     assert_eq!(shape_ok.1, None);
     assert_eq!(shape_ok.2, None);
     assert!(shape_ok.3.is_some(), "completed_at is stamped on supersede");
@@ -175,14 +186,16 @@ async fn an_active_override_suppresses_enqueue() {
         .execute(db.pool())
         .await
         .expect("clear escalations");
-    db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
-        item_id: "item-1".into(),
-        verdict: crate::task_board::TriageVerdict::Undecided,
-        actor: "human".into(),
-        reason: None,
-        expected_item_revision: 1,
-        expected_items_change_seq: 1,
-    })
+    db.set_task_board_triage_override(
+        crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
+            item_id: "item-1".into(),
+            verdict: crate::task_board::TriageVerdict::Undecided,
+            actor: "human".into(),
+            reason: None,
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+        },
+    )
     .await
     .expect("set override");
 
@@ -210,6 +223,9 @@ async fn the_queue_depth_bound_suppresses_enqueue_without_erroring_ingress() {
         .create_task_board_item_with_triage(inbox_item_no_labels("item-2"))
         .await;
 
-    assert!(result.is_ok(), "ingress never errors on a full escalation queue");
+    assert!(
+        result.is_ok(),
+        "ingress never errors on a full escalation queue"
+    );
     assert_eq!(escalation_count(&db).await, 1);
 }

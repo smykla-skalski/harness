@@ -15,8 +15,8 @@ use super::{RemotePairingCode, RemotePairingRecord};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::RemoteAuditEvent;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsQueryRequest;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Resolve a pairing expiry from its creation time and TTL.
 ///

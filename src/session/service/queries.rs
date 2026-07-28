@@ -1,8 +1,8 @@
 use super::{
     CliError, CliErrorKind, Path, PathBuf, SessionMetrics, SessionRole, SessionState,
     SessionStatus, canonicalize_persisted_session_state, daemon_client_error,
-    detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals,
-    session_index, storage, summary_to_session_state, validate_policy_preset, wire,
+    detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals, session_index,
+    storage, summary_to_session_state, validate_policy_preset, wire,
 };
 use crate::infra::io::validate_safe_segment;
 use crate::workspace::utc_now;

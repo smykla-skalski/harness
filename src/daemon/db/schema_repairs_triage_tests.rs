@@ -71,7 +71,9 @@ fn a_v48_shaped_triage_decisions_table_is_accepted_as_a_known_good_shape() {
         )
         .expect("downgrade decisions table to the v48 shape");
 
-    assert!(!shape_needs_repair(db.connection()).expect("v48 shape must be accepted as known-good"));
+    assert!(
+        !shape_needs_repair(db.connection()).expect("v48 shape must be accepted as known-good")
+    );
 }
 
 #[test]

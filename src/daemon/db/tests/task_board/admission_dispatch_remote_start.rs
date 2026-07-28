@@ -8,12 +8,12 @@ use crate::daemon::db::task_board::{TaskBoardRemoteOfferOutcome, TaskBoardRemote
 use crate::daemon::task_board_remote_transport::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardExecutionHostAdvertisement, TaskBoardFailureClass, TaskBoardPhaseCapabilityProfile,
     TaskBoardWorkflowExecutionCas,
 };
+use harness_kernel::errors::CliError;
 
 #[path = "admission_dispatch_remote_start_fixture.rs"]
 mod fixture;

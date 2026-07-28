@@ -74,10 +74,7 @@ fn metrics_with_ambiguous(references: &[&str]) -> SyncExecutionMetrics {
 fn a_skipped_reference_is_named_in_the_payload() {
     let mut payload = json!({ "trigger": "requested" });
 
-    add_execution_metrics(
-        &mut payload,
-        &metrics_with_ambiguous(&["Owner/repo#689"]),
-    );
+    add_execution_metrics(&mut payload, &metrics_with_ambiguous(&["Owner/repo#689"]));
 
     assert_eq!(payload["ambiguous_reference_count"], 1);
     assert_eq!(payload["ambiguous_references"][0], "Owner/repo#689");

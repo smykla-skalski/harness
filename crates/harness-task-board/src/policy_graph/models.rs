@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::defaults;
 use super::{PolicyGraphDecision, PolicyReasonCode};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphAutomationBinding {
     #[serde(default = "defaults::default_automation_enabled")]
     pub is_enabled: bool,
@@ -31,8 +30,7 @@ pub struct PolicyGraphAutomationBinding {
     pub review_pull_request_extraction: Option<PolicyGraphReviewPullRequestExtraction>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphOCRConfiguration {
     #[serde(default = "defaults::default_ocr_recognition_level")]
     pub recognition_level: String,
@@ -42,8 +40,7 @@ pub struct PolicyGraphOCRConfiguration {
     pub uses_language_correction: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyGraphReviewPullRequestExtraction {
     #[serde(default = "defaults::default_review_repository_mode")]
     pub repository_mode: String,
@@ -63,20 +60,17 @@ pub struct PolicyGraphReviewPullRequestExtraction {
     pub show_sheet: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyWorkflowEntry {
     pub workflow_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyActionStep {
     pub action_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyWaitStep {
     pub wait: PolicyWaitCondition,
     pub resume_key: String,
@@ -90,28 +84,24 @@ pub enum PolicyWaitCondition {
     Event { event_key: String },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyRuntimeBoundary {
     pub node_id: String,
     pub resume_key: String,
     pub wait: PolicyWaitCondition,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyEventWait {
     pub event_key: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyHandoffStep {
     pub handoff_key: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyFinishNode {
     pub decision: PolicyGraphDecision,
     pub reason_code: PolicyReasonCode,
@@ -121,8 +111,7 @@ pub struct PolicyFinishNode {
 /// the gate: an approved grant traverses the `approved` output, a denied grant
 /// terminates the route as `Deny`, and no or pending grant blocks the route as
 /// `RequireHuman`. `reason_code` is the human/pending block reason.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyApprovalGate {
     pub reason_code: PolicyReasonCode,
     #[serde(default, skip_serializing_if = "Option::is_none")]

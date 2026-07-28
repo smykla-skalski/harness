@@ -1,17 +1,17 @@
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use harness_kernel::errors::CliErrorKind;
 use crate::infra::io;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageOverride};
+use harness_kernel::errors::CliErrorKind;
 
 use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
+use super::super::projects::resolve_item_project_in_tx;
 use super::super::triage_apply::{
     TriageOutcome, clear_stale_automatic_placement_on_human_status_move, override_implied_status,
     reapply_active_override_outcome_in_tx,
 };
 use super::super::triage_apply_rules::apply_active_triage_in_tx;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
-use super::super::projects::resolve_item_project_in_tx;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress,
     apply_task_board_item_status_transition_in_tx, bump_change_in_tx, clear_children_parent_in_tx,
@@ -196,9 +196,15 @@ async fn apply_update_triage_in_tx(
     }
     let pre_triage_item = item.clone();
     let decided_at = item.updated_at.clone();
-    let outcome =
-        compute_triage_outcome_in_tx(transaction, before, item, ingress, &decided_at, existing_override)
-            .await?;
+    let outcome = compute_triage_outcome_in_tx(
+        transaction,
+        before,
+        item,
+        ingress,
+        &decided_at,
+        existing_override,
+    )
+    .await?;
     // Reasserted for every ingress, not only `ProviderReconcile`: the
     // conflict check above only guards lane outcome, but a non-manual
     // override's *rank* still needs to track current priority ordering,

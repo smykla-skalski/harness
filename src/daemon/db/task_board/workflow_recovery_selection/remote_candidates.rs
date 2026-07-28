@@ -112,9 +112,14 @@ async fn select_workflow_execution_page(
         .map_err(|_| db_error(format!("{} limit is out of range", selection.context)))?;
     let mut transaction = db.begin_immediate_transaction(selection.context).await?;
     let eligible_count = selection_eligible_count(&mut transaction, selection).await?;
-    let rows =
-        load_selection_page(&mut transaction, selection, eligible_count, effective_limit, sql_limit)
-            .await?;
+    let rows = load_selection_page(
+        &mut transaction,
+        selection,
+        eligible_count,
+        effective_limit,
+        sql_limit,
+    )
+    .await?;
     let cursor = rows
         .last()
         .map(|row| (row.updated_at.clone(), row.execution_id.clone()));

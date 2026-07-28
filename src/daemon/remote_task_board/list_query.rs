@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use crate::daemon::db::TaskBoardItemSnapshot;
 use crate::daemon::protocol::{TaskBoardListItemsResponse, TaskBoardListItemsSelection};
 use crate::daemon::service::TaskBoardListSource;
-use crate::task_board::{
-    TaskBoardItem, TaskBoardQueryFields, TaskBoardQueryTarget, select_page,
-};
+use crate::task_board::{TaskBoardItem, TaskBoardQueryFields, TaskBoardQueryTarget, select_page};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
@@ -173,14 +171,10 @@ fn page_items<T>(items: Vec<T>, window: &[usize]) -> Vec<T> {
 fn split_snapshot_page(
     snapshots: Vec<TaskBoardItemSnapshot>,
 ) -> (Vec<TaskBoardItem>, HashMap<String, i64>) {
-    split_revisioned_page(
-        snapshots
-            .into_iter()
-            .map(|snapshot| RevisionedItem {
-                item: snapshot.item,
-                item_revision: snapshot.item_revision,
-            }),
-    )
+    split_revisioned_page(snapshots.into_iter().map(|snapshot| RevisionedItem {
+        item: snapshot.item,
+        item_revision: snapshot.item_revision,
+    }))
 }
 
 fn split_revisioned_page<T: TaskBoardQueryTarget>(
@@ -191,10 +185,7 @@ fn split_revisioned_page<T: TaskBoardQueryTarget>(
     let mut items = Vec::with_capacity(minimum);
     let mut revisions = HashMap::with_capacity(minimum);
     for entry in entries {
-        revisions.insert(
-            entry.item.query_fields().id.to_owned(),
-            entry.item_revision,
-        );
+        revisions.insert(entry.item.query_fields().id.to_owned(), entry.item_revision);
         items.push(entry.item);
     }
     (items, revisions)

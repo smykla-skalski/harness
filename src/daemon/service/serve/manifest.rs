@@ -4,8 +4,8 @@ use std::process::id as process_id;
 
 use crate::daemon::bridge;
 use crate::daemon::state::{self, DaemonManifest};
-use harness_kernel::errors::CliError;
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::binary_stamp::current_binary_stamp;
 

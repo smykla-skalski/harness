@@ -175,10 +175,7 @@ async fn async_standalone_codex_run_persists_a_null_session_and_falls_back_on_lo
         .await
         .expect("open async db");
 
-    let mut standalone = sample_codex_run(
-        "codex-run-standalone-1",
-        "2026-04-09T10:00:00Z",
-    );
+    let mut standalone = sample_codex_run("codex-run-standalone-1", "2026-04-09T10:00:00Z");
     standalone.session_id = "triage-escalation-no-such-session".into();
     standalone.session_agent_id = None;
     async_db

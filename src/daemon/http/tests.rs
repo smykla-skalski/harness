@@ -4,12 +4,12 @@ use std::time::Instant;
 
 use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
 use crate::daemon::state::{ScopedDaemonRootOverride, ensure_daemon_identity};
-use harness_kernel::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
+use harness_kernel::errors::CliErrorKind;
 use serde_json::Value;
 use tracing_subscriber::fmt::writer::MakeWriter;
 use tracing_subscriber::prelude::*;

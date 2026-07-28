@@ -75,7 +75,10 @@ fn hub_simulation_visits_all_compatible_fanout_branches() {
     );
 }
 
-#[expect(clippy::too_many_lines, reason = "one literal fixture graph, not logic")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one literal fixture graph, not logic"
+)]
 fn manual_ocr_hub_graph() -> PolicyGraph {
     PolicyGraph {
         schema_version: POLICY_GRAPH_SCHEMA_VERSION,

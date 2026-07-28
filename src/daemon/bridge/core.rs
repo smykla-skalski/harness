@@ -12,8 +12,8 @@ use crate::daemon::agent_tui::{
     AgentTuiSnapshotContext, AgentTuiStatus,
 };
 use crate::daemon::protocol::StreamEvent;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::types::{AgentTuiStartSpec, BridgeCapability, PersistedBridgeConfig};
 

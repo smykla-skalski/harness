@@ -2,13 +2,13 @@ use std::slice;
 
 use serde_json::json;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubMergeMethod,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::ReviewsGitHubClient;
 use super::mapping::{action_result, github_project_config};

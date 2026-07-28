@@ -52,8 +52,7 @@ impl HarnessMonitorAuditEventsRequest {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HarnessMonitorAuditEvent {
     pub id: String,
     pub recorded_at: String,
@@ -80,8 +79,7 @@ pub struct HarnessMonitorAuditEvent {
     pub related_urls: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HarnessMonitorAuditEventsResponse {
     pub events: Vec<HarnessMonitorAuditEvent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

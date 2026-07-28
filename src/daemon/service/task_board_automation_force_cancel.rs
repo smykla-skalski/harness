@@ -11,7 +11,6 @@ use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, TaskBoardAutomationForceCancelDisposition,
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationForceCancelResponse,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::infra::io::validate_safe_segment;
 use crate::task_board::TaskBoardExecutionAttemptRecord;
@@ -23,6 +22,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, task_board_remote_execution_target,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) async fn force_cancel_task_board_automation_db(
     db: &AsyncDaemonDb,

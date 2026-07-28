@@ -9,7 +9,6 @@ use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
     TaskBoardDispatchClaimAction, TaskBoardPreparationRelease,
 };
-use harness_kernel::errors::CliError;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::service::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows;
@@ -17,6 +16,7 @@ use crate::daemon::task_board_managed_agents::{
     maintain_task_board_dispatch_claim, managed_worker_id, resume_worker_compensation,
     settle_claimed_task_board_worker,
 };
+use harness_kernel::errors::CliError;
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_RECOVERIES_PER_TICK: usize = 16;

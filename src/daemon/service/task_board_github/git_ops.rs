@@ -5,10 +5,10 @@ use std::path::Path;
 use gix::{Id, ObjectId, Repository as GixRepository};
 use tokio::task::spawn_blocking;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::sandbox;
 use crate::task_board::github::{GitHubAutomationClient, GitHubBranchState, GitHubProjectConfig};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(in crate::daemon::service::task_board_github) struct BranchPublication {
     pub needs_push: bool,

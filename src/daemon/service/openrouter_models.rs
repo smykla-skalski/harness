@@ -8,8 +8,8 @@ use crate::daemon::protocol::{
     OpenRouterModelCatalogResponse, OpenRouterModelCatalogSource, OpenRouterModelEntry,
 };
 use crate::daemon::state::task_board_openrouter_token;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 const CACHE_TTL: Duration = Duration::from_mins(30);

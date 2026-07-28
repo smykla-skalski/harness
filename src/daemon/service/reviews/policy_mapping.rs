@@ -1,4 +1,3 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::{
     ReviewsPolicyPreviewStep, ReviewsPolicyRunResponse, ReviewsPolicyRunStatus,
     ReviewsPolicyRunStep, ReviewsPolicyStepType, ReviewsPolicySubject, ReviewsPolicyTrigger,
@@ -8,6 +7,7 @@ use crate::task_board::policy_graph::PolicyWaitCondition;
 use crate::task_board::policy_runtime::models::{
     PolicyRunStatus, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowRun, PolicyWorkflowStepType,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) fn preview_step(step: &PolicyRunStep) -> ReviewsPolicyPreviewStep {
     match step {

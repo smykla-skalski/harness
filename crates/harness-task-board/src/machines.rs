@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[cfg(any(test, feature = "test-support"))]
-use harness_kernel::errors::{CliError, CliErrorKind};
-#[cfg(any(test, feature = "test-support"))]
 use harness_infra::io::{read_json_typed, write_json_pretty};
+#[cfg(any(test, feature = "test-support"))]
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::utc_now;
 
 use super::types::AgentMode;
@@ -26,8 +26,7 @@ const REGISTRY_DIR: &str = "machines";
 #[cfg(any(test, feature = "test-support"))]
 const LOCAL_ID_FILE: &str = "local.json";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Machine {
     pub id: String,
     pub label: String,

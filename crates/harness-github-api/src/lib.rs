@@ -23,7 +23,9 @@ mod transport;
 mod types;
 mod viewer;
 
-pub use budget::{GitHubBudgetError, GitHubRateBudget, GitHubRateLimitSnapshot, GitHubRateResource};
+pub use budget::{
+    GitHubBudgetError, GitHubRateBudget, GitHubRateLimitSnapshot, GitHubRateResource,
+};
 pub use cache::GitHubCache;
 pub use client::GitHubProtectedClient;
 pub use raw::GitHubRestRawResponse;
@@ -59,7 +61,11 @@ pub use state::acquire_global_budget_test_lock;
 mod tests;
 
 #[cfg(test)]
-#[allow(clippy::absolute_paths, clippy::duration_suboptimal_units, clippy::unused_async)]
+#[allow(
+    clippy::absolute_paths,
+    clippy::duration_suboptimal_units,
+    clippy::unused_async
+)]
 mod coherence_tests;
 
 #[cfg(test)]

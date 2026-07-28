@@ -71,10 +71,12 @@ async fn screen_local_execution_target_in_tx(
     else {
         return Ok(LocalTargetScreen::Stopped);
     };
-    let Some((attempt_index, attempt)) = parent.attempts.iter().enumerate().find(|(_, candidate)| {
-        candidate.action_key == expected_attempt.action_key
-            && candidate.attempt == expected_attempt.attempt
-    }) else {
+    let Some((attempt_index, attempt)) =
+        parent.attempts.iter().enumerate().find(|(_, candidate)| {
+            candidate.action_key == expected_attempt.action_key
+                && candidate.attempt == expected_attempt.attempt
+        })
+    else {
         return Ok(LocalTargetScreen::Stopped);
     };
     if local_target_is_stale_in_tx(

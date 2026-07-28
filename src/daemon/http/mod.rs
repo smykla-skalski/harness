@@ -31,13 +31,14 @@ use crate::daemon::remote_pairing::{
     RemotePairingEvent, RemotePairingRateLimiter, RemotePairingStatusRateLimiter,
 };
 use crate::daemon::service::{
-    WakeDispatch, register_local_clone_progress_sender, register_task_board_working_copy_progress_sender,
-    run_local_clone_gc, run_task_board_working_copy_gc,
+    WakeDispatch, register_local_clone_progress_sender,
+    register_task_board_working_copy_progress_sender, run_local_clone_gc,
+    run_task_board_working_copy_gc,
 };
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 mod agents;
 mod audit;

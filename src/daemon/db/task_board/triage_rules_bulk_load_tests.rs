@@ -40,7 +40,9 @@ async fn loads_every_live_inbox_and_todo_item_with_its_decision_and_override() {
         .begin_immediate_transaction("test bulk load")
         .await
         .expect("begin");
-    let entries = load_triage_bulk_entries_in_tx(&mut transaction).await.expect("load entries");
+    let entries = load_triage_bulk_entries_in_tx(&mut transaction)
+        .await
+        .expect("load entries");
     transaction.commit().await.expect("commit");
 
     assert_eq!(entries.len(), 2);
@@ -69,7 +71,9 @@ async fn excludes_deleted_and_non_inbox_todo_items() {
         .begin_immediate_transaction("test bulk load exclusion")
         .await
         .expect("begin");
-    let entries = load_triage_bulk_entries_in_tx(&mut transaction).await.expect("load entries");
+    let entries = load_triage_bulk_entries_in_tx(&mut transaction)
+        .await
+        .expect("load entries");
     transaction.commit().await.expect("commit");
 
     assert_eq!(entries.len(), 1);
@@ -109,7 +113,9 @@ async fn reports_the_current_decision_verdict_when_one_exists() {
         .begin_immediate_transaction("test bulk load with decision")
         .await
         .expect("begin");
-    let entries = load_triage_bulk_entries_in_tx(&mut transaction).await.expect("load entries");
+    let entries = load_triage_bulk_entries_in_tx(&mut transaction)
+        .await
+        .expect("load entries");
     transaction.commit().await.expect("commit");
 
     let entry = entries

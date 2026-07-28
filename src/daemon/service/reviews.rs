@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::retry_stable_read;
 use crate::reviews::{
     ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
@@ -14,6 +13,7 @@ use crate::reviews::{
     ReviewsQueryResponse, ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[path = "reviews_cache.rs"]
 mod cache_internal;

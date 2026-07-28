@@ -354,7 +354,10 @@ mod tests {
             assert_eq!(properties[facet]["type"], json!("string"), "{facet}");
         }
         assert_eq!(properties["tags"]["type"], json!("array"));
-        assert_eq!(properties["tags"]["maxItems"], json!(TASK_BOARD_LIST_MAX_TAGS));
+        assert_eq!(
+            properties["tags"]["maxItems"],
+            json!(TASK_BOARD_LIST_MAX_TAGS)
+        );
         assert_eq!(properties["tags"]["items"]["pattern"], json!("\\S"));
         assert_eq!(
             properties["query"]["maxLength"],

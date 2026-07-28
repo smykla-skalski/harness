@@ -3,16 +3,14 @@ use serde::{Deserialize, Serialize};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::utc_now;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewsFileCommentKind {
     NewThread,
     Reply,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFileCommentRequest {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -29,8 +27,7 @@ pub struct ReviewsFileCommentRequest {
     pub thread_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFileCommentResponse {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

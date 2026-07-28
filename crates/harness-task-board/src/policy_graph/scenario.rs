@@ -7,16 +7,15 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::policy::{PolicyAction, PolicyInput};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::PolicyCanvasWorkspace;
 use super::store_canvas::simulation_inputs;
 
 /// A named simulation case. `seeded` marks the built-in baseline scenarios so the
 /// UI can distinguish them and `reset` can restore them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyScenario {
     pub id: String,
     pub name: String,

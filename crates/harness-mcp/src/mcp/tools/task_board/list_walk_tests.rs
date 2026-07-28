@@ -36,7 +36,9 @@ fn every_page_folds_into_one_response_that_keeps_the_board_wide_fields() {
         Some("cursor-2".to_string())
     );
     assert_eq!(
-        pages.absorb(&page(&["task-3"], None)).expect("a shaped page"),
+        pages
+            .absorb(&page(&["task-3"], None))
+            .expect("a shaped page"),
         None
     );
     let response = pages.into_response();

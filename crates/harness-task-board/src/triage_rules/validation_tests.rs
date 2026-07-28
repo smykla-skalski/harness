@@ -64,11 +64,15 @@ fn duplicate_rule_id_is_rejected() {
     let report = validate_triage_rule_set(&candidate(vec![
         rule(
             "dup",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["a"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["a"]),
+            }],
         ),
         rule(
             "dup",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["b"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["b"]),
+            }],
         ),
     ]));
     assert_eq!(
@@ -99,11 +103,15 @@ fn duplicate_canonical_selector_is_rejected_independent_of_authoring_order_and_c
     let report = validate_triage_rule_set(&candidate(vec![
         rule(
             "first",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["Bug", "P1"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["Bug", "P1"]),
+            }],
         ),
         rule(
             "second",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["p1", "bug"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["p1", "bug"]),
+            }],
         ),
     ]));
     assert_eq!(
@@ -158,8 +166,12 @@ fn requiring_and_excluding_the_same_label_is_self_contradictory() {
     let report = validate_triage_rule_set(&candidate(vec![rule(
         "impossible",
         vec![
-            TriageRuleCondition::LabelsHasAll { labels: labels(&["bug"]) },
-            TriageRuleCondition::LabelsHasNone { labels: labels(&["bug"]) },
+            TriageRuleCondition::LabelsHasAll {
+                labels: labels(&["bug"]),
+            },
+            TriageRuleCondition::LabelsHasNone {
+                labels: labels(&["bug"]),
+            },
         ],
     )]));
     assert_eq!(
@@ -175,8 +187,12 @@ fn has_any_fully_excluded_by_has_none_is_self_contradictory() {
     let report = validate_triage_rule_set(&candidate(vec![rule(
         "impossible",
         vec![
-            TriageRuleCondition::LabelsHasAny { labels: labels(&["bug", "chore"]) },
-            TriageRuleCondition::LabelsHasNone { labels: labels(&["bug", "chore", "extra"]) },
+            TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["bug", "chore"]),
+            },
+            TriageRuleCondition::LabelsHasNone {
+                labels: labels(&["bug", "chore", "extra"]),
+            },
         ],
     )]));
     assert_eq!(
@@ -192,8 +208,12 @@ fn partial_label_overlap_between_has_any_and_has_none_is_not_a_contradiction() {
     let report = validate_triage_rule_set(&candidate(vec![rule(
         "fine",
         vec![
-            TriageRuleCondition::LabelsHasAny { labels: labels(&["bug", "chore"]) },
-            TriageRuleCondition::LabelsHasNone { labels: labels(&["chore"]) },
+            TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["bug", "chore"]),
+            },
+            TriageRuleCondition::LabelsHasNone {
+                labels: labels(&["chore"]),
+            },
         ],
     )]));
     assert!(report.is_valid());
@@ -205,7 +225,9 @@ fn a_catch_all_rule_shadows_every_later_rule() {
         rule("catch-all", Vec::new()),
         rule(
             "unreachable",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["bug"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["bug"]),
+            }],
         ),
     ]));
     assert_eq!(
@@ -222,12 +244,16 @@ fn a_strict_superset_of_an_earlier_rule_is_shadowed() {
     let report = validate_triage_rule_set(&candidate(vec![
         rule(
             "broad",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["bug"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["bug"]),
+            }],
         ),
         rule(
             "narrower",
             vec![
-                TriageRuleCondition::LabelsHasAny { labels: labels(&["bug"]) },
+                TriageRuleCondition::LabelsHasAny {
+                    labels: labels(&["bug"]),
+                },
                 TriageRuleCondition::PriorityEquals {
                     priority: TaskBoardPriority::Critical,
                 },
@@ -254,7 +280,9 @@ fn partially_overlapping_rules_are_not_shadowed_first_match_is_intentional_prece
         ),
         rule(
             "bug-anything",
-            vec![TriageRuleCondition::LabelsHasAny { labels: labels(&["bug"]) }],
+            vec![TriageRuleCondition::LabelsHasAny {
+                labels: labels(&["bug"]),
+            }],
         ),
     ]));
     assert!(report.is_valid());

@@ -52,7 +52,8 @@ async fn ensuring_the_same_scratch_dir_twice_is_idempotent() {
     let db = AsyncDaemonDb::connect(&path).await.expect("connect db");
 
     let first = ensure_escalation_scratch_dir(&db, "triage-escalation-abc").expect("first ensure");
-    let second = ensure_escalation_scratch_dir(&db, "triage-escalation-abc").expect("second ensure");
+    let second =
+        ensure_escalation_scratch_dir(&db, "triage-escalation-abc").expect("second ensure");
 
     assert_eq!(first, second);
 }
@@ -69,7 +70,9 @@ async fn test_state(db_path: &std::path::Path) -> (DaemonHttpState, Arc<AsyncDae
             .await
             .expect("connect async db"),
     );
-    async_db_slot.set(async_db.clone()).expect("install async db");
+    async_db_slot
+        .set(async_db.clone())
+        .expect("install async db");
     let manifest = DaemonManifest {
         version: "0.0.0-test".into(),
         pid: 1,

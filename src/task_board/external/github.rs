@@ -4,10 +4,10 @@ use std::fmt;
 use async_trait::async_trait;
 use serde_json::json;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubProtectedClient, retry_stable_read};
 use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::targeting::github_repository_for_item;
 use super::{

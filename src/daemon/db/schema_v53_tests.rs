@@ -172,7 +172,10 @@ fn migration_backfill_matches_the_shapes() {
         .lines()
         .filter_map(|line| {
             let (slot, rest) = line.trim().strip_prefix('(')?.split_once(", '")?;
-            Some((slot.parse::<usize>().ok()?, rest.split('\'').next()?.to_owned()))
+            Some((
+                slot.parse::<usize>().ok()?,
+                rest.split('\'').next()?.to_owned(),
+            ))
         })
         .collect();
 

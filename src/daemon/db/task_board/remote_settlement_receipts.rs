@@ -46,9 +46,10 @@ impl AsyncDaemonDb {
             screen_settlement_collision_in_tx(&mut transaction, request, authenticated_principal)
                 .await?
         {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed remote settlement: {error}"))
-            })?;
+            transaction
+                .commit()
+                .await
+                .map_err(|error| db_error(format!("commit replayed remote settlement: {error}")))?;
             return Ok(receipt);
         }
         let receipt = write_settlement_receipt_in_tx(

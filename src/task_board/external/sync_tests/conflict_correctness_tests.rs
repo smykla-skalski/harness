@@ -5,9 +5,9 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{ExternalRefProvider, TaskBoardConflictState, TaskBoardSyncConflict};
+use harness_kernel::errors::CliErrorKind;
 
 #[tokio::test]
 async fn push_precondition_failure_persists_three_way_conflict() {

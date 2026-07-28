@@ -2,7 +2,6 @@ use sqlx::error::DatabaseError;
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
 };
@@ -10,6 +9,7 @@ use crate::task_board::project_color::{self, TaskBoardProjectColor};
 use crate::task_board::project_shape::{self, TaskBoardProjectShape};
 use crate::task_board::{TaskBoardItem, TaskBoardOrchestratorSettings};
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliErrorKind;
 
 /// What an edit does to a project's display name. Naming the three states
 /// beats a nested option, where the caller has to remember which nesting
@@ -59,9 +59,8 @@ impl TryFrom<ProjectRow> for TaskBoardProject {
     type Error = CliError;
 
     fn try_from(row: ProjectRow) -> Result<Self, Self::Error> {
-        let source = TaskBoardProjectSource::parse(&row.source).ok_or_else(|| {
-            db_error(format!("parse task board project source '{}'", row.source))
-        })?;
+        let source = TaskBoardProjectSource::parse(&row.source)
+            .ok_or_else(|| db_error(format!("parse task board project source '{}'", row.source)))?;
         // An unreadable source is a corrupt row and fails the read; an
         // unreadable color is not. The palette is a product decision that can
         // drop an entry, and a project that stopped loading because its color
@@ -170,7 +169,11 @@ pub(crate) async fn ensure_project_in_tx(
 
     read_project_id_in_tx(transaction, source, &slug)
         .await?
-        .ok_or_else(|| db_error(format!("task board project '{slug}' vanished after registering")))
+        .ok_or_else(|| {
+            db_error(format!(
+                "task board project '{slug}' vanished after registering"
+            ))
+        })
         .map(Some)
 }
 
@@ -308,11 +311,14 @@ impl AsyncDaemonDb {
     ) -> Result<TaskBoardProject, CliError> {
         // Both of these are the caller naming something wrong, not the store
         // failing. Reporting them as IO would tell an API consumer to retry.
-        let existing = self.get_task_board_project(project_id).await?.ok_or_else(|| {
-            CliError::from(CliErrorKind::usage_error(format!(
-                "task board project '{project_id}' is not registered"
-            )))
-        })?;
+        let existing = self
+            .get_task_board_project(project_id)
+            .await?
+            .ok_or_else(|| {
+                CliError::from(CliErrorKind::usage_error(format!(
+                    "task board project '{project_id}' is not registered"
+                )))
+            })?;
         let slug = resolve_slug_edit(&existing, edit.slug)?;
         let display_name = resolve_display_name_edit(&existing, edit.display_name);
         // The reset reads every held colour to pick the least-used one, so it
@@ -364,7 +370,10 @@ impl AsyncDaemonDb {
     }
 }
 
-fn resolve_slug_edit(existing: &TaskBoardProject, requested: Option<&str>) -> Result<String, CliError> {
+fn resolve_slug_edit(
+    existing: &TaskBoardProject,
+    requested: Option<&str>,
+) -> Result<String, CliError> {
     let Some(raw) = requested else {
         return Ok(existing.slug.clone());
     };

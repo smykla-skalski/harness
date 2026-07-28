@@ -9,8 +9,8 @@ use crate::daemon::task_board_remote_transport::wire::{
     RemoteClaimResponse, RemoteLease, RemoteOfferDisposition, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
+use harness_kernel::errors::CliErrorKind;
 
 const OFFERED_AT: &str = "2026-07-19T10:00:00Z";
 const CLAIMED_AT: &str = "2026-07-19T10:00:05Z";

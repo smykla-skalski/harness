@@ -2,8 +2,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 /// A work item tracked within a session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WorkItem {
     pub task_id: String,
     pub title: String,
@@ -141,8 +140,7 @@ pub enum TaskSource {
 }
 
 /// A note attached to a work item status transition.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskNote {
     pub timestamp: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -163,8 +161,7 @@ pub struct TaskCheckpoint {
 }
 
 /// Snapshot of the latest checkpoint for a task.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskCheckpointSummary {
     pub checkpoint_id: String,
     pub recorded_at: String,
@@ -188,8 +185,7 @@ impl From<&TaskCheckpoint> for TaskCheckpointSummary {
 
 /// Metadata attached when a worker submits a task for review and the task
 /// returns to the queue awaiting a reviewer claim.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AwaitingReview {
     /// ISO-8601 timestamp when the task entered the awaiting-review state.
     pub queued_at: String,
@@ -208,8 +204,7 @@ const fn default_required_consensus() -> u8 {
 }
 
 /// One entry in a task's reviewer claim.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewerEntry {
     pub reviewer_agent_id: String,
     pub reviewer_runtime: String,
@@ -219,8 +214,7 @@ pub struct ReviewerEntry {
 }
 
 /// Set of reviewers currently holding or having completed a claim on the task.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewClaim {
     #[serde(default)]
     pub reviewers: Vec<ReviewerEntry>,
@@ -266,8 +260,7 @@ pub enum ReviewPointState {
 }
 
 /// A single numbered review point the worker may agree to or dispute.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewPoint {
     pub point_id: String,
     pub text: String,
@@ -279,8 +272,7 @@ pub struct ReviewPoint {
 
 /// Aggregated quorum consensus once `required_consensus` distinct-runtime
 /// reviewers have submitted compatible verdicts.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewConsensus {
     pub verdict: ReviewVerdict,
     pub summary: String,
@@ -298,8 +290,7 @@ pub const ARBITRATION_BLOCKED_REASON: &str = "awaiting_arbitration";
 
 /// Leader arbitration result for a task that exhausted the three-round
 /// review cycle with outstanding disputed points.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ArbitrationOutcome {
     pub arbiter_agent_id: String,
     pub verdict: ReviewVerdict,

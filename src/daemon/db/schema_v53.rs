@@ -2,7 +2,8 @@ use rusqlite::Connection;
 
 use super::CliError;
 
-const SHAPE_COLUMN_SQL: &str = include_str!("migrations/0050_daemon_v53_task_board_project_shape.sql");
+const SHAPE_COLUMN_SQL: &str =
+    include_str!("migrations/0050_daemon_v53_task_board_project_shape.sql");
 pub(super) const SHAPE_BACKFILL_SQL: &str =
     include_str!("migrations/0051_daemon_v53_task_board_project_shape_backfill.sql");
 

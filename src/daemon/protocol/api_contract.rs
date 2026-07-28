@@ -38,7 +38,9 @@ pub enum WsExemptionKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HttpRouteParity {
-    Rpc { ws_method: &'static str },
+    Rpc {
+        ws_method: &'static str,
+    },
     Exempt {
         kind: WsExemptionKind,
         reason: &'static str,

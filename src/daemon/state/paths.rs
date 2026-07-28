@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::{
     dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};
 use super::{

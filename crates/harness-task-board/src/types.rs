@@ -43,8 +43,7 @@ impl TaskBoardWorkflowKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardItem {
     pub schema_version: u32,
     pub id: String,
@@ -167,8 +166,7 @@ impl TaskBoardItem {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWorkflowState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_id: Option<String>,

@@ -10,7 +10,6 @@ use tokio::time::interval as tokio_interval;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
-use harness_kernel::errors::CliError;
 use crate::reviews::policy::REVIEWS_CHECKS_PASSED_EVENT;
 #[cfg(test)]
 use crate::reviews::policy::ReviewsPolicyActionExecutor;
@@ -18,6 +17,7 @@ use crate::reviews::{ReviewCheckStatus, ReviewItem, ReviewsPolicyRunResponse};
 #[cfg(test)]
 use crate::task_board::policy_runtime::inbox::PolicyEventInbox;
 use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;
+use harness_kernel::errors::CliError;
 
 #[cfg(test)]
 use super::policy::resume_reviews_policy_event_with_executor;

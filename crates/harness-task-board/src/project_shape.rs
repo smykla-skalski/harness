@@ -49,7 +49,9 @@ impl TaskBoardProjectShape {
 
     #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
-        Self::SHAPES.into_iter().find(|shape| shape.as_str() == value)
+        Self::SHAPES
+            .into_iter()
+            .find(|shape| shape.as_str() == value)
     }
 
     /// The shape an organization wears when its stored one cannot be read.

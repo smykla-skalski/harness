@@ -150,7 +150,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board provider scope release")
             .await?;
-        let updated = release_provider_scope_row_in_tx(&mut transaction, attempt, released_at).await?;
+        let updated =
+            release_provider_scope_row_in_tx(&mut transaction, attempt, released_at).await?;
         if updated != 1 {
             return Err(stale_attempt_error(attempt));
         }

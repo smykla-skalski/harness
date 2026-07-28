@@ -1,10 +1,10 @@
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncField, ExternalTask, ProviderExclusionAuditContext,
     ProviderExclusionRestoreOutcome,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::conflicts::build_sync_conflicts;
 use super::lookup::{ProviderItemIndex, SnapshotMatch};

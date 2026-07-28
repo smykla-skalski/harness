@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::task_board::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState, TaskBoardSyncCoordinatorFence,
@@ -18,6 +17,7 @@ use crate::task_board::{
     TaskBoardExternalCreateStore, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict,
     TaskBoardSyncStore,
 };
+use harness_kernel::errors::CliError;
 
 pub(super) struct ProviderSyncRunStore<'a> {
     db: &'a AsyncDaemonDb,

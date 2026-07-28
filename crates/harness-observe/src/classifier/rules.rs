@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
-use harness_protocol::observe::{Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool};
+use harness_protocol::observe::{
+    Issue, IssueCategory, IssueCode, MessageRole, ScanState, SourceTool,
+};
 
 use super::emitter::{Guidance, IssueBlueprint, IssueEmitter};
 use super::registry::issue_code_meta;

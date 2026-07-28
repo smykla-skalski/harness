@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use serde_json::json;
 
-use harness_kernel::errors::CliErrorKind;
 use crate::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
     PolicyReasonCode, PolicySubject,
 };
+use harness_kernel::errors::CliErrorKind;
 
 use super::{
     DEFAULT_POLICY_CANVAS_TITLE, GraphPolicyGate, MANUAL_OCR_PASTE_CANVAS_TITLE, PORT_IN,

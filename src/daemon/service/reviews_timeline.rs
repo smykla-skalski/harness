@@ -1,12 +1,12 @@
 use std::time::Instant;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsCacheClearResponse;
 use crate::reviews::timeline::{
     self, ReviewsTimelineRequest, ReviewsTimelineResponse, TimelineError, TimelineGitHubClient,
 };
 use crate::task_board::external::ExternalProvider;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::reviews as base_service;
 

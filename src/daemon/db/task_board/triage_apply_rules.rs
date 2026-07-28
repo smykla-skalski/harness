@@ -92,7 +92,9 @@ pub(super) async fn apply_active_triage_in_tx(
         )
         .await;
     };
-    if !triage_eligible(item) || has_active_dispatch_reservation_in_tx(transaction, &item.id).await? {
+    if !triage_eligible(item)
+        || has_active_dispatch_reservation_in_tx(transaction, &item.id).await?
+    {
         return Ok(None);
     }
     let override_active = suppress_placement_for_override(existing_override);

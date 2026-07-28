@@ -12,7 +12,6 @@ use crate::daemon::db::{
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunSnapshot;
 use crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::storage as session_storage;
 use crate::session::types::SessionState;
 use crate::task_board::TaskBoardRemoteAssignmentState;
@@ -22,6 +21,7 @@ use crate::workspace::layout::sessions_root;
 use crate::workspace::project_resolver::resolve_name;
 use crate::workspace::utc_now;
 use crate::workspace::worktree::WorktreeController;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,

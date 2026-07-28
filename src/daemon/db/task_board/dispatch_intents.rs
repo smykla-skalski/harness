@@ -88,7 +88,10 @@ async fn resolve_dispatch_claim_action_in_tx<'c>(
             .filter(|reason| !reason.is_empty())
             .cloned()
             .ok_or_else(|| db_error("compensating task board dispatch has no reason"))?;
-        return Ok((transaction, TaskBoardDispatchClaimAction::Compensate { reason }));
+        return Ok((
+            transaction,
+            TaskBoardDispatchClaimAction::Compensate { reason },
+        ));
     }
     if pending.prior_status == "starting" {
         // A reclaimed `starting` claim can already own the deterministic

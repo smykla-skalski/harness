@@ -4,8 +4,9 @@ use super::triage_rules_bulk_load::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
-    TaskBoardLaneOrigin, TaskBoardTriageEffectiveSource, TriageRuleMatch, TriageRuleSetPreviewDiffEntry,
-    TriageRuleSetPreviewResult, TriageRuleSetV1, evaluate_triage_rule_set, validate_triage_rule_set,
+    TaskBoardLaneOrigin, TaskBoardTriageEffectiveSource, TriageRuleMatch,
+    TriageRuleSetPreviewDiffEntry, TriageRuleSetPreviewResult, TriageRuleSetV1,
+    evaluate_triage_rule_set, validate_triage_rule_set,
 };
 
 impl AsyncDaemonDb {
@@ -29,11 +30,10 @@ impl AsyncDaemonDb {
                 diff: Vec::new(),
             });
         }
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board triage rules preview: {error}")))?;
+        let mut transaction =
+            self.pool().begin().await.map_err(|error| {
+                db_error(format!("begin task board triage rules preview: {error}"))
+            })?;
         let entries = load_triage_bulk_entries_in_tx(&mut transaction).await?;
         let reserved = load_active_dispatch_reservation_item_ids_in_tx(&mut transaction).await?;
         let diff = entries
@@ -54,10 +54,17 @@ fn diff_entry(
         TriageRuleMatch::Rule(id) => Some(id),
         TriageRuleMatch::Default => None,
     };
-    let (live_effective_verdict, live_effective_source) = if let Some(override_) = &entry.override_ {
-        (Some(override_.verdict), Some(TaskBoardTriageEffectiveSource::Override))
+    let (live_effective_verdict, live_effective_source) = if let Some(override_) = &entry.override_
+    {
+        (
+            Some(override_.verdict),
+            Some(TaskBoardTriageEffectiveSource::Override),
+        )
     } else if let Some(decision) = &entry.current_decision {
-        (Some(decision.verdict), Some(TaskBoardTriageEffectiveSource::Automatic))
+        (
+            Some(decision.verdict),
+            Some(TaskBoardTriageEffectiveSource::Automatic),
+        )
     } else {
         (None, None)
     };

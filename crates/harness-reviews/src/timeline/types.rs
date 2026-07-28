@@ -4,16 +4,14 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Actor {
     pub login: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ReviewTimelineEntry {
     IssueComment(IssueCommentEntry),
@@ -40,8 +38,7 @@ impl ReviewTimelineEntry {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct IssueCommentEntry {
     pub id: String,
     #[schema(value_type = String, format = DateTime)]
@@ -68,8 +65,7 @@ pub struct IssueCommentEntry {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewEntry {
     pub id: String,
     #[schema(value_type = String, format = DateTime)]
@@ -87,8 +83,7 @@ pub struct ReviewEntry {
     pub comments_truncated: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewState {
     Pending,
@@ -98,8 +93,7 @@ pub enum ReviewState {
     Dismissed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewInlineCommentEntry {
     pub id: String,
     pub path: String,
@@ -157,8 +151,7 @@ pub struct ReviewThreadEntry {
     pub comments_truncated: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewThreadCommentEntry {
     pub id: String,
     pub body: String,
@@ -170,8 +163,7 @@ pub struct ReviewThreadCommentEntry {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CommitEntry {
     pub id: String,
     #[schema(value_type = String, format = DateTime)]
@@ -192,8 +184,7 @@ pub struct CommitEntry {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HeadRefForcePushedEntry {
     pub id: String,
     #[schema(value_type = String, format = DateTime)]
@@ -208,8 +199,7 @@ pub struct HeadRefForcePushedEntry {
     pub ref_name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SimpleActorEventEntry {
     pub id: String,
     #[schema(value_type = String, format = DateTime)]
@@ -256,8 +246,7 @@ pub struct SimpleActorEventEntry {
     pub destination_repository: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SimpleActorEventKind {
     HeadRefDeleted,
@@ -301,8 +290,7 @@ pub enum SimpleActorEventKind {
     RevisionMarker,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UnknownEntry {
     pub id: String,
     #[schema(value_type = String, format = DateTime)]

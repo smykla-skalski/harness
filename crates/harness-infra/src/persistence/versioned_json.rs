@@ -8,9 +8,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::io;
 use crate::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Minimal struct used to peek at only the `schema_version` field without
 /// deserialising the entire document.

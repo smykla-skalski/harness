@@ -7,8 +7,8 @@ use sha2::{Digest, Sha256};
 
 use crate::daemon::sandboxed_from_env;
 use crate::daemon::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::BridgeClient;
 use super::helpers::remove_if_exists;

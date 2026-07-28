@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use harness_kernel::errors::CliError;
 use crate::hooks::adapters::HookAgent;
 use crate::workspace::compact::compact_latest_path;
+use harness_kernel::errors::CliError;
 
 mod checks;
 

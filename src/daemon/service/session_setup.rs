@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use crate::daemon::index::{self, DiscoveredProject};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::session::types::SessionState;
 use crate::workspace::ids;
@@ -19,6 +18,7 @@ use crate::workspace::layout::{SessionLayout, sessions_root as workspace_session
 use crate::workspace::project_resolver;
 use crate::workspace::worktree::WorktreeController;
 use crate::workspace::{ensure_non_indexable, harness_data_root, project_context_dir, utc_now};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::session_service;
 use super::session_storage;

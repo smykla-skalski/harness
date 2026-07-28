@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubCreatePullRequest, GitHubMergeEvidence,
     GitHubMergeMethod, GitHubProjectConfig, GitHubPullRequestHandle,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{git_ref, git_ref_exists, git_tree, remote_repo_path, run_git};
 

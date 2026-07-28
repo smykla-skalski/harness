@@ -39,8 +39,7 @@ pub use self::policy::{
     ReviewsPolicyWait,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsQueryRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub authors: Vec<String>,
@@ -63,29 +62,25 @@ pub struct ReviewsQueryRequest {
     pub backport_patterns: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRepositoryCatalogRequest {
     pub organization: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRepositoryCatalogResponse {
     pub organization: String,
     #[serde(default)]
     pub repositories: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsPullRequestReference {
     pub repository: String,
     pub number: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsPullRequestResolveRequest {
     #[serde(default)]
     pub references: Vec<ReviewsPullRequestReference>,
@@ -98,8 +93,7 @@ pub struct ReviewsPullRequestResolveRequest {
     pub backport_patterns: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsPullRequestResolveResponse {
     pub fetched_at: String,
     #[serde(default)]
@@ -108,8 +102,7 @@ pub struct ReviewsPullRequestResolveResponse {
     pub missing_references: Vec<ReviewsPullRequestReference>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsQueryResponse {
     pub fetched_at: String,
     pub from_cache: bool,
@@ -123,8 +116,7 @@ pub struct ReviewsQueryResponse {
     pub viewer_login: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewRepositoryLabel {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -133,8 +125,7 @@ pub struct ReviewRepositoryLabel {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsSummary {
     pub total: usize,
     pub review_required: usize,
@@ -149,8 +140,7 @@ pub struct ReviewsSummary {
     clippy::struct_excessive_bools,
     reason = "wire flags map directly to distinct UI toggles and daemon state"
 )]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct ReviewItemFlags {
     #[serde(default)]
     pub is_draft: bool,
@@ -162,8 +152,7 @@ pub struct ReviewItemFlags {
     pub viewer_is_requested_reviewer: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewItem {
     pub pull_request_id: String,
     pub repository_id: String,
@@ -217,16 +206,14 @@ pub struct ReviewItem {
     pub approval_requirement_satisfied_after_viewer_approval: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewBackportSource {
     pub number: u64,
     pub repository: String,
     pub url: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewCheck {
     pub name: String,
     pub status: ReviewCheckRunStatus,
@@ -237,8 +224,7 @@ pub struct ReviewCheck {
     pub details_url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PullRequestReview {
     pub author: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

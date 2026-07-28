@@ -2,11 +2,11 @@ use chrono::Duration;
 
 use crate::daemon::db::TaskBoardRemoteOperationTrustFence;
 use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardExecutionAttemptRecord, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
+use harness_kernel::errors::CliError;
 
 pub(crate) struct PreparedRemoteReassignment {
     pub(crate) request: RemoteOfferRequest,

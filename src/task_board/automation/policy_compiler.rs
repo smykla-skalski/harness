@@ -70,8 +70,7 @@ pub enum TaskBoardOutsideWindowAction {
 }
 
 /// Recurring local-time window using 24-hour `HH:MM` and an IANA timezone.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardPolicyWindow {
     pub scope: TaskBoardPolicyScope,
     pub timezone: String,
@@ -81,8 +80,7 @@ pub struct TaskBoardPolicyWindow {
     pub outside_action: TaskBoardOutsideWindowAction,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAutomationPolicy {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub limits: Vec<TaskBoardPolicyLimit>,

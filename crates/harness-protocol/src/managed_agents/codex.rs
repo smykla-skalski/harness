@@ -44,8 +44,7 @@ pub enum CodexApprovalDecision {
     Cancel,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexRunRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actor: Option<String>,
@@ -89,14 +88,12 @@ fn default_codex_agent_role() -> SessionRole {
     SessionRole::Worker
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexSteerRequest {
     pub prompt: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexApprovalDecisionRequest {
     pub decision: CodexApprovalDecision,
 }
@@ -106,8 +103,7 @@ pub struct CodexRunListResponse {
     pub runs: Vec<CodexRunSnapshot>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexAgentInspectResponse {
     pub agents: Vec<CodexAgentInspectSnapshot>,
     pub daemon_perceived_now: String,
@@ -115,8 +111,7 @@ pub struct CodexAgentInspectResponse {
     pub issue_message: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexAgentInspectSnapshot {
     pub run_id: String,
     pub session_id: String,
@@ -138,14 +133,12 @@ pub struct CodexAgentInspectSnapshot {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexTranscriptResponse {
     pub entries: Vec<TimelineEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexApprovalRequest {
     pub approval_id: String,
     pub request_id: String,
@@ -160,16 +153,14 @@ pub struct CodexApprovalRequest {
     pub file_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexResolvedApproval {
     pub approval_id: String,
     pub decision: CodexApprovalDecision,
     pub resolved_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexRunEvent {
     pub event_id: String,
     pub sequence: u64,
@@ -183,8 +174,7 @@ pub struct CodexRunEvent {
     pub payload: Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CodexRunSnapshot {
     pub run_id: String,
     pub session_id: String,

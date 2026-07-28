@@ -12,8 +12,8 @@ use super::parsing::{
     RestPullFile, detect_drift, is_truncated_patch, parse_next_link, parse_rest_status,
     rest_file_to_patch, select_patches_by_path, split_repo_full_name,
 };
-use harness_github_api::GitHubProtectedClient;
 use crate::files::{ReviewFileChangeType, ReviewFileServedBy};
+use harness_github_api::GitHubProtectedClient;
 
 #[test]
 fn parse_rest_status_known_values() {

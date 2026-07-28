@@ -4,18 +4,21 @@ use crate::daemon::protocol::{
     TaskBoardTriageRulesDraftResponse, TaskBoardTriageRulesRevisionsResponse,
 };
 use crate::daemon::service;
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult,
 };
+use harness_kernel::errors::CliError;
 
 use super::super::{DaemonHttpState, require_async_db};
 
 pub(crate) async fn get_triage_rules_draft(
     state: &DaemonHttpState,
 ) -> Result<TaskBoardTriageRulesDraftResponse, CliError> {
-    service::get_task_board_triage_rules_draft_db(require_async_db(state, "task board triage rules draft get")?)
-        .await
+    service::get_task_board_triage_rules_draft_db(require_async_db(
+        state,
+        "task board triage rules draft get",
+    )?)
+    .await
 }
 
 pub(crate) async fn save_triage_rules_draft(

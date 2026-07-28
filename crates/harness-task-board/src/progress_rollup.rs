@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardProgressRollup {
     pub total: usize,
     pub done: usize,

@@ -5,8 +5,8 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 
-use crate::daemon::protocol::http_paths;
 use crate::daemon::protocol::CodexAgentInspectResponse;
+use crate::daemon::protocol::http_paths;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;

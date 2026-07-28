@@ -366,10 +366,7 @@ fn spawn_cancel(
     request: Arc<TaskBoardAutomationForceCancelRequest>,
     barrier: Arc<Barrier>,
 ) -> tokio::task::JoinHandle<
-    Result<
-        crate::daemon::protocol::TaskBoardAutomationForceCancelResponse,
-        CliError,
-    >,
+    Result<crate::daemon::protocol::TaskBoardAutomationForceCancelResponse, CliError>,
 > {
     tokio::spawn(async move {
         barrier.wait().await;
@@ -433,6 +430,6 @@ async fn initialize_automation_control(db: &crate::daemon::db::AsyncDaemonDb) {
 }
 use std::sync::Arc;
 
+use harness_kernel::errors::CliError;
 use sqlx::query;
 use tokio::sync::Barrier;
-use harness_kernel::errors::CliError;

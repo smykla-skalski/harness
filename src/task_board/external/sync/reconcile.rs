@@ -1,10 +1,10 @@
-use harness_kernel::errors::CliError;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask,
 };
 use crate::task_board::matched_exclusion_label;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, apply_patch};
 use crate::task_board::types::TaskBoardItem;
+use harness_kernel::errors::CliError;
 
 use super::conflicts::build_sync_conflicts;
 use super::merge::{changed_fields, matching_ref, pull_conflict_fields, pull_resolution_fields};

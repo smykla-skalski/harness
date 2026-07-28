@@ -4,7 +4,8 @@ use super::*;
 /// for `task_board_routes_have_complete_ws_parity`, split into its own file
 /// purely to keep `task_board.rs` under the repo's line cap -- this is pure
 /// literal data, not logic.
-pub(super) fn expected_task_board_ws_parity() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+pub(super) fn expected_task_board_ws_parity()
+-> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Get,

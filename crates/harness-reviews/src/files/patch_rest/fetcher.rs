@@ -8,11 +8,11 @@ use std::error::Error;
 use std::fmt;
 
 use super::parsing::{RestPullFile, parse_next_link, select_patches_by_path, split_repo_full_name};
+use crate::files::{FILES_PAGE_CAP, ReviewFilePatch};
 use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubReadStabilityError,
     GitHubRequestDescriptor, retry_stable_read,
 };
-use crate::files::{FILES_PAGE_CAP, ReviewFilePatch};
 
 /// Outcome from a conditional REST fetch. `NotModified` means the server
 /// returned `304` because the caller's `If-None-Match` header matched the

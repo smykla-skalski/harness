@@ -4,8 +4,8 @@ use std::path::Path;
 use crate::agents::runtime::signal::{
     Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
 };
-use harness_kernel::errors::CliError;
 use crate::session::types::SessionState;
+use harness_kernel::errors::CliError;
 
 use super::super::index;
 use super::super::protocol::TimelineEntry;

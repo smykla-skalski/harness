@@ -3,11 +3,11 @@ use std::time::Duration;
 use serde::Deserialize;
 use serde_json::json;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
     retry_stable_read,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{GitHubRepository, assigned_issue_query, author_issue_query, warn_github_message};
 

@@ -143,7 +143,11 @@ pub(super) async fn load_active_dispatch_reservation_item_ids_in_tx(
     )
     .fetch_all(transaction.as_mut())
     .await
-    .map_err(|error| db_error(format!("load active task board dispatch reservations: {error}")))?;
+    .map_err(|error| {
+        db_error(format!(
+            "load active task board dispatch reservations: {error}"
+        ))
+    })?;
     Ok(item_ids.into_iter().collect())
 }
 

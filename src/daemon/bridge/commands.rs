@@ -9,8 +9,8 @@ use serde_json::json;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::discovery::{self, AdoptionOutcome};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::write_text;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// When this env var is set the bridge is being launched against a
 /// dedicated runtime profile (parallel agent lane, personal user lane,

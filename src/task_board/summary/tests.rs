@@ -8,8 +8,10 @@ fn summaries_group_projects_and_modes() {
     let item = ready_item("task-1", &project.project_id, AgentMode::Interactive);
     let second = ready_item("task-2", &project.project_id, AgentMode::Headless);
 
-    let projects =
-        build_project_summaries(&[item.clone(), second.clone()], std::slice::from_ref(&project));
+    let projects = build_project_summaries(
+        &[item.clone(), second.clone()],
+        std::slice::from_ref(&project),
+    );
     let machines = build_machine_summaries(&[item, second]);
 
     assert_eq!(projects[0].project_id, project.project_id);
@@ -25,7 +27,11 @@ fn a_registered_project_with_no_items_still_appears_in_the_catalog() {
 
     let projects = build_project_summaries(&[], std::slice::from_ref(&project));
 
-    assert_eq!(projects.len(), 1, "Settings lists projects, not just busy ones");
+    assert_eq!(
+        projects.len(),
+        1,
+        "Settings lists projects, not just busy ones"
+    );
     assert_eq!(projects[0].item_count, 0);
     assert_eq!(projects[0].ready_count, 0);
 }

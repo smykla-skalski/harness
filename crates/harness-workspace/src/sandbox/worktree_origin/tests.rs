@@ -34,7 +34,12 @@ fn a_session_worktree_grants_its_origin_checkout() {
 
     assert_eq!(
         grant.origin(),
-        Some(origin.canonicalize().expect("canonicalize origin").as_path()),
+        Some(
+            origin
+                .canonicalize()
+                .expect("canonicalize origin")
+                .as_path()
+        ),
         "a linked worktree must grant the origin that holds its gitdir"
     );
 }

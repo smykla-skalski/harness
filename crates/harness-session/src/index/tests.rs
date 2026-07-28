@@ -7,12 +7,14 @@ use tempfile::tempdir;
 
 use super::contexts::{infer_checkout_identity, infer_ledger_cwd, repair_context_root};
 use super::*;
+use crate::types::{SessionRole, TaskSeverity};
+use harness::session::service as session_service;
 use harness_agents::runtime::event::ConversationEventKind;
 use harness_kernel::io::write_json_pretty;
-use harness::session::service as session_service;
-use crate::types::{SessionRole, TaskSeverity};
 use harness_workspace::workspace::layout::sessions_root as workspace_sessions_root;
-use harness_workspace::workspace::{canonical_checkout_root, harness_data_root, project_context_dir, utc_now};
+use harness_workspace::workspace::{
+    canonical_checkout_root, harness_data_root, project_context_dir, utc_now,
+};
 
 mod checkout_identity;
 mod ledger_fallback;

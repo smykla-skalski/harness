@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use super::super::orchestrator::TaskBoardOrchestratorState;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) fn load_orchestrator_state(
     root: &Path,

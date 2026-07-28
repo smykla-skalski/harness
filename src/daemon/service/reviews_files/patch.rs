@@ -2,7 +2,6 @@
 
 use std::fmt;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::files::local_clone::{Sensitive, pat_clone_url};
 use crate::reviews::files::local_clone_diff::compute_unified_patches;
 use crate::reviews::files::local_clone_runtime::diff::LocalCloneFetchRef;
@@ -10,6 +9,7 @@ use crate::reviews::files::patch_rest;
 use crate::reviews::files::service::FilesLargeDiffStrategy;
 use crate::reviews::{ReviewsFilesPatchRequest, ReviewsFilesPatchResponse, ReviewsGitHubClient};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::token::github_token;
 use super::{local_clone_runtime, progress_sink};

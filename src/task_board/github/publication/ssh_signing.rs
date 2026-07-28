@@ -6,9 +6,9 @@ use gix::objs::WriteTo;
 use gix::{ObjectId, objs};
 use ssh_key::{HashAlg, LineEnding, PrivateKey};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::task_board::TaskBoardGitRuntimeProfile;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::signing::unsigned_commit_payload;
 use super::types::{

@@ -4,12 +4,14 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_kernel::io::{read_json_typed, write_json_pretty};
 use crate::storage;
 use crate::types::SessionState;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::{read_json_typed, write_json_pretty};
 use harness_workspace::workspace::layout::sessions_root as workspace_sessions_root;
-use harness_workspace::workspace::{harness_data_root, project_context_dir, resolve_git_checkout_identity};
+use harness_workspace::workspace::{
+    harness_data_root, project_context_dir, resolve_git_checkout_identity,
+};
 
 use super::io::read_last_nonempty_line;
 use super::projects::discovered_project_for_context_root;

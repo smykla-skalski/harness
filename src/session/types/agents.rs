@@ -177,8 +177,7 @@ impl AgentRegistration {
 }
 
 /// A pending leadership transfer initiated by a non-leader actor.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PendingLeaderTransfer {
     pub requested_by: String,
     pub current_leader_id: String,
@@ -393,8 +392,7 @@ pub enum PersonaSymbol {
 }
 
 /// A predefined agent definition that shapes an agent's role and focus.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentPersona {
     /// Unique slug (e.g. `code-reviewer`, `test-writer`).
     pub identifier: String,

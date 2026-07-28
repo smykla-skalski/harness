@@ -409,7 +409,8 @@ fn scrub_checkout_credential(checkout_path: &Path) -> Result<(), WorkingCopyRunt
     };
     let scrubbed = strip_clone_url_credential(&contents);
     if scrubbed != contents {
-        fs::write(&config_path, scrubbed).map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
+        fs::write(&config_path, scrubbed)
+            .map_err(|e| WorkingCopyRuntimeError::Io(e.to_string()))?;
     }
     Ok(())
 }

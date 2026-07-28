@@ -7,13 +7,13 @@ use super::super::super::db::{
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRequest,
 };
 use super::super::super::task_board_remote_transport::wire::RemoteAssignmentWireState;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::bundle::{GitBundleImportEvidence, GitBundleImportPlan};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionPhase, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[expect(
     clippy::cognitive_complexity,

@@ -204,7 +204,9 @@ where
         let _lock = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
         let (handle, captured) = spawn_daemon_server(listener, response_body);
         run();
-        handle.join().expect("fake daemon thread should exit cleanly after one request");
+        handle
+            .join()
+            .expect("fake daemon thread should exit cleanly after one request");
         let mut slot = captured.lock().expect("lock");
         slot.take().expect("daemon must capture a request")
     })

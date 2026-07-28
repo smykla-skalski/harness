@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::observe::types::ObserverState;
 use crate::session::types::SessionState;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::index;
 use super::super::protocol::TimelineEntry;

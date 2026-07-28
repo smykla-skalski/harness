@@ -68,7 +68,12 @@ async fn a_value_that_cannot_name_a_project_registers_nothing() {
             .expect("attempt registration"),
         None
     );
-    assert!(db.list_task_board_projects().await.expect("list").is_empty());
+    assert!(
+        db.list_task_board_projects()
+            .await
+            .expect("list")
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -175,7 +180,10 @@ async fn a_color_can_be_set_and_reset() {
         .await
         .expect("set color");
     assert_eq!(chosen.color, TaskBoardProjectColor::Graphite);
-    assert_eq!(chosen.slug, "acme/widgets", "the edit touched only the color");
+    assert_eq!(
+        chosen.slug, "acme/widgets",
+        "the edit touched only the color"
+    );
 
     let reset = db
         .update_task_board_project(

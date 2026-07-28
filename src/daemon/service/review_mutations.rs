@@ -10,13 +10,13 @@ use crate::daemon::protocol::{
     SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
-use harness_kernel::errors::CliError;
 use crate::session::service::{
     arbitrate as svc_arbitrate, claim_review as svc_claim_review,
     respond_review as svc_respond_review,
     submit_for_review_with_persona as svc_submit_for_review_with_persona,
     submit_review as svc_submit_review,
 };
+use harness_kernel::errors::CliError;
 
 use super::{effective_project_dir, index, project_dir_for_db_session, session_detail};
 

@@ -101,10 +101,7 @@ fn post_tool_use_deny_includes_block() {
 
 #[test]
 fn hook_output_allow_is_always_empty() {
-    for hook_type in [
-        HookType::PreToolUse,
-        HookType::PostToolUse,
-    ] {
+    for hook_type in [HookType::PreToolUse, HookType::PostToolUse] {
         assert!(
             render_hook_output(hook_type, &HookResult::allow()).is_empty(),
             "allow should be empty for {hook_type:?}"

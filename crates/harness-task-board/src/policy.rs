@@ -91,8 +91,7 @@ pub enum PolicyApprovalState {
 /// action, and the canvas revision that authored the gate. Moves pending ->
 /// approved | denied | revoked, then an approved grant is consumed once at
 /// dispatch reservation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyApprovalGrant {
     pub id: String,
     pub board_item_id: String,
@@ -119,15 +118,13 @@ pub struct PolicyApprovalGrant {
 /// resolves durable grants for the (board item, action, revision) key and injects
 /// their state here; simulation and replay supply fixture state so those paths
 /// stay deterministic.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyApprovalGrantState {
     pub node_id: String,
     pub state: PolicyApprovalState,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyEvidence {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checks_green: Option<bool>,
@@ -165,8 +162,7 @@ pub struct PolicyEvidence {
     pub review_required_approvals_satisfied_after_viewer_approval: Option<bool>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicySubject {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_board_item_id: Option<String>,
@@ -195,8 +191,7 @@ pub struct PolicySubject {
     pub target_project_types: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PolicyInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow: Option<String>,

@@ -67,7 +67,10 @@ async fn assert_draft_save_and_get_round_trip() {
         "actor": "spoofed-client",
     });
     let save = client
-        .put(format!("{base_url}{}", http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT))
+        .put(format!(
+            "{base_url}{}",
+            http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT
+        ))
         .bearer_auth("token")
         .json(&save_payload)
         .send()
@@ -82,7 +85,10 @@ async fn assert_draft_save_and_get_round_trip() {
     assert_eq!(save_body["revision"], json!(1));
 
     let get = client
-        .get(format!("{base_url}{}", http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT))
+        .get(format!(
+            "{base_url}{}",
+            http_paths::TASK_BOARD_TRIAGE_RULES_DRAFT
+        ))
         .bearer_auth("token")
         .send()
         .await
@@ -113,7 +119,10 @@ async fn assert_activate_stale_cas_parity() {
     });
 
     let http_response = client
-        .post(format!("{base_url}{}", http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE))
+        .post(format!(
+            "{base_url}{}",
+            http_paths::TASK_BOARD_TRIAGE_RULES_ACTIVATE
+        ))
         .bearer_auth("token")
         .json(&payload)
         .send()
@@ -157,7 +166,11 @@ async fn assert_ws_draft_save_and_get_round_trip() {
         }),
     )
     .await;
-    assert!(save["result"]["persisted"].as_bool().expect("persisted flag"));
+    assert!(
+        save["result"]["persisted"]
+            .as_bool()
+            .expect("persisted flag")
+    );
     assert_eq!(save["result"]["revision"], json!(1));
 
     let get = ws_rpc(
@@ -170,7 +183,10 @@ async fn assert_ws_draft_save_and_get_round_trip() {
     // The get is dispatched through the same real daemon state the save
     // just wrote, not a static or contract-only stub.
     assert_eq!(get["result"]["draft"]["revision"], json!(1));
-    assert_eq!(get["result"]["draft"]["actor"], json!(CONTROL_PLANE_ACTOR_ID));
+    assert_eq!(
+        get["result"]["draft"]["actor"],
+        json!(CONTROL_PLANE_ACTOR_ID)
+    );
 
     server.abort();
     let _ = server.await;

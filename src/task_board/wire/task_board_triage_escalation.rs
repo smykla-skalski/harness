@@ -10,8 +10,7 @@ use crate::task_board::TriageVerdict;
 /// `verdict_token` is the single-use credential minted when the executor
 /// claimed this escalation; it is the entire authentication for this
 /// endpoint, not the control-plane session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageEscalationVerdictRequest {
     pub verdict_token: String,
     pub evidence_fingerprint: String,
@@ -23,8 +22,7 @@ pub struct TaskBoardTriageEscalationVerdictRequest {
 /// Response for the same endpoint. `accepted: false` always means nothing
 /// was written to `task_board_triage_decisions` -- only the escalation
 /// row's own status changed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardTriageEscalationVerdictResponse {
     pub accepted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]

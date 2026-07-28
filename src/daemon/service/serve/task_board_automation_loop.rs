@@ -11,7 +11,6 @@ use tokio::time::{MissedTickBehavior, interval};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TASK_BOARD_AUTOMATION_WAKE_BATCH_LIMIT, TaskBoardAutomationAdmissionState,
     TaskBoardAutomationDesiredMode, TaskBoardAutomationRetrySettings,
@@ -19,6 +18,7 @@ use crate::task_board::{
     TaskBoardAutomationWakeEvent, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_automation_startup::initialize_control_from_legacy_intent;
 

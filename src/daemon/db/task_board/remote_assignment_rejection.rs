@@ -80,7 +80,8 @@ async fn screen_rejected_offer_in_tx(
     record: &TaskBoardRemoteAssignmentRecord,
     reason: &str,
 ) -> Result<RejectedOfferScreen, CliError> {
-    if let Some(replayed) = replay_superseded_local_fallback_in_tx(transaction, record, reason).await?
+    if let Some(replayed) =
+        replay_superseded_local_fallback_in_tx(transaction, record, reason).await?
     {
         return Ok(RejectedOfferScreen::Stopped(Box::new(if replayed {
             TaskBoardRemoteMutationOutcome::Replayed(record.clone())

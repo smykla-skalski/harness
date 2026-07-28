@@ -9,8 +9,8 @@ use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 

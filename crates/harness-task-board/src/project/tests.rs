@@ -247,16 +247,25 @@ fn a_ref_that_names_no_repository_leaves_the_item_unattributed() {
         sync_state: None,
     });
 
-    assert_eq!(item_attribution(&item), ItemProjectAttribution::Unattributed);
+    assert_eq!(
+        item_attribution(&item),
+        ItemProjectAttribution::Unattributed
+    );
 }
 
 #[test]
 fn an_item_with_no_origin_is_unattributed() {
-    assert_eq!(item_attribution(&item()), ItemProjectAttribution::Unattributed);
+    assert_eq!(
+        item_attribution(&item()),
+        ItemProjectAttribution::Unattributed
+    );
 
     let mut blank = item();
     blank.project_id = Some("   ".into());
-    assert_eq!(item_attribution(&blank), ItemProjectAttribution::Unattributed);
+    assert_eq!(
+        item_attribution(&blank),
+        ItemProjectAttribution::Unattributed
+    );
 }
 
 fn item() -> TaskBoardItem {

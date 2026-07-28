@@ -3,7 +3,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProvider, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState, ExternalSyncField, TaskBoardSyncItemSnapshot,
@@ -13,6 +12,7 @@ use crate::task_board::{
     TaskBoardExternalCreateStore, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict,
     TaskBoardSyncStore,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Clone, Copy)]
 pub(super) enum UpdateBehavior {

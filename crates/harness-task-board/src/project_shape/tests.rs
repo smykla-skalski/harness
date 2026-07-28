@@ -1,6 +1,4 @@
-use super::{
-    TaskBoardProjectShape, allocate, colors_alone_suffice, organization_of,
-};
+use super::{TaskBoardProjectShape, allocate, colors_alone_suffice, organization_of};
 use crate::project_color::TaskBoardProjectColor;
 
 #[test]
@@ -73,7 +71,10 @@ fn a_derived_shape_is_stable_for_a_given_organization() {
     let first = TaskBoardProjectShape::derived("acme");
     let second = TaskBoardProjectShape::derived("acme");
 
-    assert_eq!(first, second, "a derived shape that moves is not a fallback");
+    assert_eq!(
+        first, second,
+        "a derived shape that moves is not a fallback"
+    );
 }
 
 #[test]
@@ -81,7 +82,10 @@ fn both_repositories_of_one_owner_derive_the_same_shape() {
     let widgets = TaskBoardProjectShape::derived(organization_of("acme/widgets"));
     let gadgets = TaskBoardProjectShape::derived(organization_of("acme/gadgets"));
 
-    assert_eq!(widgets, gadgets, "the fallback split one organization in two");
+    assert_eq!(
+        widgets, gadgets,
+        "the fallback split one organization in two"
+    );
 }
 
 #[test]

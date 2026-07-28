@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use super::LaneEntry;
 use crate::daemon::db::{CliError, db_error};
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, sort_task_board_items,
 };
+use harness_kernel::errors::CliErrorKind;
 
 pub(super) fn normalize_transition(
     entries: &mut [LaneEntry],

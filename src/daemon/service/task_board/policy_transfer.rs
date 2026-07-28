@@ -8,11 +8,11 @@ use crate::daemon::protocol::{
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
     PolicyTransferWorkspaceMetadata,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph::{
     POLICY_CANVAS_WORKSPACE_VERSION, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraph,
     PolicyGraphMode, PolicyScenario,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache};
 use super::policy_canvas_response::policy_canvas_workspace_response;

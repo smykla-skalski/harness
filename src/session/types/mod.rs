@@ -18,11 +18,11 @@ mod task_tests;
 #[cfg(test)]
 mod test_support;
 
+pub use agents::AgentStatusSchema;
 pub use agents::{
     AgentPersona, AgentRegistration, AgentRegistrationWire, AgentStatus, ManagedAgentKind,
     ManagedAgentRef, PendingLeaderTransfer, PersonaSymbol, SessionRole,
 };
-pub use agents::AgentStatusSchema;
 pub use events::{SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionTransition};
 pub use identity::{
     AgentDescriptorId, HarnessSessionId, ManagedAgentId, RuntimeSessionId, SessionAgentId,

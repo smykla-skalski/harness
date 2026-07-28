@@ -1,7 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::TaskBoardDispatchRequest;
-use harness_kernel::errors::CliError;
 use crate::task_board::{TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings};
+use harness_kernel::errors::CliError;
 
 use super::task_board::pick_task_board_dispatch_async;
 

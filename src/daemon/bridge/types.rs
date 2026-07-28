@@ -95,8 +95,7 @@ pub struct BridgeState {
     pub capabilities: BTreeMap<String, HostBridgeCapabilityManifest>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct BridgeStatusReport {
     pub running: bool,
     pub socket_path: Option<String>,

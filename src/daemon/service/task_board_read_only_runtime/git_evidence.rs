@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use gix::ObjectId;
 use tokio::task::spawn_blocking;
 
-use harness_kernel::errors::CliError;
 use crate::git::GitRepository;
 use crate::sandbox;
 use crate::task_board::{
     TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,
     validate_task_board_read_only_run_context,
 };
+use harness_kernel::errors::CliError;
 
 use super::invalid_transition;
 

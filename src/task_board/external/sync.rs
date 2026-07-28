@@ -3,12 +3,12 @@ use std::slice;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::task_board::matched_exclusion_label;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{TaskBoardItem, TaskBoardItemKind, TaskBoardStatus};
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::targeting::execution_repository_for_task;
 use super::{
@@ -83,8 +83,7 @@ pub enum ExternalSyncAction {
     Delete,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ExternalSyncOperation {
     pub provider: ExternalProvider,
     pub action: ExternalSyncAction,
@@ -237,7 +236,8 @@ async fn prepare_pull_inputs(
 
 #[expect(
     clippy::cognitive_complexity,
-    reason = "pull reconciliation keeps existing, dry-run, and create branches explicit"
+    clippy::too_many_lines,
+    reason = "pull reconciliation keeps existing, dry-run, and create branches explicit; rustfmt wrapping the prepare_pull_inputs call onto multiple lines pushed the line count past the pedantic threshold with no logic change"
 )]
 async fn pull_provider_tasks(
     board: &dyn TaskBoardSyncStore,
@@ -253,7 +253,15 @@ async fn pull_provider_tasks(
         recovered_create,
         board_items,
         provider_item_index,
-    } = prepare_pull_inputs(board, client, tasks, operations, follow_ups, options.dry_run).await?;
+    } = prepare_pull_inputs(
+        board,
+        client,
+        tasks,
+        operations,
+        follow_ups,
+        options.dry_run,
+    )
+    .await?;
     for task in tasks.iter().cloned() {
         let resolved_parent_item_id = resolve_parent_item_id(&provider_item_index, &task);
         let matched =

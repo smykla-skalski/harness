@@ -6,8 +6,8 @@ use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
-use harness_kernel::errors::CliError;
 use crate::telemetry::{apply_current_baggage_to_span, record_daemon_db_operation_metrics};
+use harness_kernel::errors::CliError;
 
 pub(crate) fn trace_sync_db_operation<T, F>(
     operation: &str,

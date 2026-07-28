@@ -1,7 +1,10 @@
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig, TaskBoardTriageEscalationStatus};
+use crate::task_board::{
+    TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig,
+    TaskBoardTriageEscalationStatus,
+};
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");
@@ -41,7 +44,10 @@ async fn claiming_moves_pending_to_running_with_a_token_and_run_id() {
 
     assert_eq!(claimed.len(), 1);
     assert!(!claimed[0].verdict_token.is_empty());
-    assert!(claimed[0].verdict_token.len() >= 16, "token is at least 128 bits");
+    assert!(
+        claimed[0].verdict_token.len() >= 16,
+        "token is at least 128 bits"
+    );
     assert!(!claimed[0].managed_run_id.is_empty());
     let status: String = sqlx::query_scalar(
         "SELECT status FROM task_board_triage_escalations WHERE escalation_id = ?1",
@@ -148,9 +154,12 @@ async fn a_failed_spawn_marks_the_row_failed_with_the_real_reason_not_stuck_runn
         .await
         .expect("claim");
 
-    db.fail_running_task_board_triage_escalation(&claimed[0].escalation_id, "codex_server_unavailable")
-        .await
-        .expect("fail escalation");
+    db.fail_running_task_board_triage_escalation(
+        &claimed[0].escalation_id,
+        "codex_server_unavailable",
+    )
+    .await
+    .expect("fail escalation");
 
     let (status, failure_reason): (String, Option<String>) = sqlx::query_as(
         "SELECT status, failure_reason FROM task_board_triage_escalations WHERE escalation_id = ?1",

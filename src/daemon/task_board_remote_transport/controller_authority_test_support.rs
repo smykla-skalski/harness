@@ -20,13 +20,13 @@ use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteHostTrustFence, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionHostAdvertisement, TaskBoardExecutionHostConfig,
     TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
+use harness_kernel::errors::CliError;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_AUTHORITY_TEST_TOKEN";

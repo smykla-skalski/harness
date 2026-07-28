@@ -4,7 +4,6 @@ use std::sync::{LazyLock, RwLock};
 
 use serde::{Deserialize, Serialize};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
@@ -12,6 +11,7 @@ use crate::task_board::{
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
 

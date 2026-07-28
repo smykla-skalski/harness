@@ -8,8 +8,8 @@ use crate::daemon::protocol::{
     TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
     TaskBoardTriageOverrideMutationResponse,
 };
-use harness_kernel::errors::CliError;
 use crate::infra::io::validate_safe_segment;
+use harness_kernel::errors::CliError;
 
 pub(crate) async fn get_task_board_item_triage_current_db(
     db: &AsyncDaemonDb,

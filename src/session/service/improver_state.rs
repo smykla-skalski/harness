@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use similar::TextDiff;
 
-use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::write_text;
 use crate::session::roles::SessionAction;
+use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 // `ImproverTarget` lives beside the wire request that carries it
 // (`harness-session`) now, since the wire layer moved into its own crate
 // and can't reach back into this domain's service layer; re-exported so
@@ -23,8 +23,7 @@ use crate::session::roles::SessionAction;
 pub use crate::session::wire::ImproverTarget;
 
 /// Result of [`apply_improver_apply`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ImproverApplyOutcome {
     #[schema(value_type = String)]
     pub canonical_path: PathBuf,

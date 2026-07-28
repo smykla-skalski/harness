@@ -8,8 +8,8 @@ use crate::task_board::wire::{
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
 use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
@@ -146,10 +146,7 @@ impl TaskBoardPolicyToggleArgs {
             enabled: self.enabled,
         };
         let workspace: PolicyCanvasWorkspaceResponse = leaf_daemon_client()?
-            .post(
-                "/v1/policy-canvases/spawn-requires-live-policy",
-                &request,
-            )
+            .post("/v1/policy-canvases/spawn-requires-live-policy", &request)
             .map_err(|error| {
                 leaf_daemon_client_error("set policy canvas spawn requires live policy", &error)
             })?;

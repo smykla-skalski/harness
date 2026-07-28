@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use harness_kernel::errors::CliError;
 use crate::reviews::backports::BackportDetector;
+use harness_kernel::errors::CliError;
 
 use super::mapping::{NodeContinuation, RepositoryLabelBundle, convert_node};
 use super::types::SearchNode;

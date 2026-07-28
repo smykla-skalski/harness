@@ -8,7 +8,7 @@
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
 use crate::task_board::AgentMode;
 use crate::task_board::prompt_catalog::{
-    prompt_catalog_test_lock, PromptCatalog, scoped_prompt_catalog,
+    PromptCatalog, prompt_catalog_test_lock, scoped_prompt_catalog,
 };
 
 use super::super::test_support::{applied_task, codex_snapshot};

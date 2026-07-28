@@ -1,10 +1,10 @@
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::external::{
     ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalSyncOperation,
 };
 use crate::task_board::{
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState, TaskBoardItem,
 };
+use harness_kernel::errors::CliErrorKind;
 
 use super::super::{SyncClientError, TaskBoardSyncStore};
 use super::execute::{finish_reloaded_intent, persist_exact_task, request_from_intent};

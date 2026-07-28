@@ -21,8 +21,8 @@ use crate::daemon::http::{self, DaemonConnectInfo, DaemonHttpState};
 #[cfg(test)]
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_identity::RemoteStoredClient;
-use harness_kernel::errors::CliError;
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
+use harness_kernel::errors::CliError;
 
 use super::config::build_config_push_frame;
 use super::connection_metadata::WebSocketHandshakeMetadata;

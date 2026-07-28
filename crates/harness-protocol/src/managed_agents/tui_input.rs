@@ -87,16 +87,14 @@ fn decode_raw_bytes(data: &str) -> Result<Vec<u8>, String> {
 }
 
 /// One timed input step replayed into an active terminal agent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiInputSequenceStep {
     pub delay_before_ms: u64,
     pub input: AgentTuiInput,
 }
 
 /// Ordered keyboard-like input replayed into an active terminal agent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiInputSequence {
     pub steps: Vec<AgentTuiInputSequenceStep>,
 }

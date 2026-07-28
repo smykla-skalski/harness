@@ -288,7 +288,10 @@ mod tests {
 
         assert_eq!(entry.state, "active");
         assert_eq!(
-            entry.device.expect("a claimed pairing names its device").platform,
+            entry
+                .device
+                .expect("a claimed pairing names its device")
+                .platform,
             "macos"
         );
         assert!(entry.revoked_at.is_none());

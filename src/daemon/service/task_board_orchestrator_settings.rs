@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
 use crate::daemon::protocol::TaskBoardOrchestratorSettingsUpdateRequest;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorSettings, normalize_repository_slug,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,

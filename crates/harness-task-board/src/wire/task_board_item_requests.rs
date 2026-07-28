@@ -8,8 +8,7 @@ use crate::{
     validated_limit,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardCreateItemRequest {
     pub title: String,
     #[serde(default)]
@@ -136,8 +135,7 @@ pub struct TaskBoardGetItemRequest {
 }
 
 /// Request an explicit manual position in a canonical task-board lane.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardSetItemPositionRequest {
     pub status: TaskBoardStatus,
     pub lane_position: u32,
@@ -149,8 +147,7 @@ pub struct TaskBoardSetItemPositionRequest {
 }
 
 /// Reset an item from an explicit position to its derived default placement.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardResetItemPositionRequest {
     pub expected_item_revision: i64,
     pub expected_items_change_seq: i64,
@@ -159,8 +156,7 @@ pub struct TaskBoardResetItemPositionRequest {
     pub actor: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardUpdateItemRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -212,8 +208,7 @@ pub struct TaskBoardUpdateItemRequest {
     clippy::struct_excessive_bools,
     reason = "wire contract exposes independent identity-clear switches"
 )]
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardUpdateIdentityClears {
     #[serde(default)]
     pub clear_project_id: bool,
@@ -227,8 +222,7 @@ pub struct TaskBoardUpdateIdentityClears {
     pub clear_parent_item_id: bool,
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardUpdateEstimateClears {
     #[serde(default)]
     pub clear_estimated_tokens: bool,
@@ -236,8 +230,7 @@ pub struct TaskBoardUpdateEstimateClears {
     pub clear_estimated_cost_microusd: bool,
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardUpdateStateClears {
     #[serde(default)]
     pub clear_planning: bool,
@@ -252,8 +245,9 @@ pub struct TaskBoardDeleteItemRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
-        TaskBoardListItemsRequest};
+    use super::{
+        TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardListItemsRequest,
+    };
     use crate::{TASK_BOARD_LIST_DEFAULT_LIMIT, TaskBoardListCursor};
 
     #[test]

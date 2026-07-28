@@ -18,9 +18,6 @@ use crate::daemon::protocol::{
 use crate::daemon::protocol::{
     TaskBoardDispatchPickResponse, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
 };
-use harness_kernel::errors::CliError;
-#[cfg(test)]
-use harness_kernel::errors::CliErrorKind;
 #[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 #[cfg(test)]
@@ -35,6 +32,9 @@ use crate::task_board::{
 };
 #[cfg(test)]
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
+#[cfg(test)]
+use harness_kernel::errors::CliErrorKind;
 #[cfg(test)]
 use tokio::task::spawn_blocking;
 

@@ -42,7 +42,9 @@ fn line_has_clippy_allow(line: &str) -> bool {
 fn plain_allow_attribute_is_flagged() {
     let token = ["allow", "(clippy::"].concat();
     assert!(line_has_clippy_allow(&format!("#[{token}large_futures)]")));
-    assert!(line_has_clippy_allow(&format!("    #[{token}large_futures)]")));
+    assert!(line_has_clippy_allow(&format!(
+        "    #[{token}large_futures)]"
+    )));
 }
 
 #[test]
@@ -67,10 +69,7 @@ fn expect_attributes_are_not_flagged() {
         format!("#![{token}large_futures)]"),
         format!("#[cfg_attr(test, {token}large_futures))]"),
     ] {
-        assert!(
-            !line_has_clippy_allow(&line),
-            "expect is permitted: {line}"
-        );
+        assert!(!line_has_clippy_allow(&line), "expect is permitted: {line}");
     }
 }
 
@@ -80,7 +79,9 @@ fn prose_naming_the_attribute_is_not_flagged() {
     assert!(!line_has_clippy_allow(&format!(
         "/// retired the blanket `{token}large_futures)` the wrapper carried"
     )));
-    assert!(!line_has_clippy_allow(&format!("// see {token}large_futures)")));
+    assert!(!line_has_clippy_allow(&format!(
+        "// see {token}large_futures)"
+    )));
 }
 
 #[test]

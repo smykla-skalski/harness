@@ -344,9 +344,7 @@ mod tests {
 
     #[test]
     fn materialise_skips_config_updates() {
-        let update = SessionUpdate::ConfigOptionUpdate(
-            ConfigOptionUpdate::new(vec![]),
-        );
+        let update = SessionUpdate::ConfigOptionUpdate(ConfigOptionUpdate::new(vec![]));
         let raw = make_raw_update(update);
 
         let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
@@ -450,9 +448,7 @@ mod tests {
 
     #[test]
     fn materialise_skips_available_commands_update() {
-        let update = SessionUpdate::AvailableCommandsUpdate(
-            AvailableCommandsUpdate::new(vec![]),
-        );
+        let update = SessionUpdate::AvailableCommandsUpdate(AvailableCommandsUpdate::new(vec![]));
         let raw = make_raw_update(update);
 
         let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);
@@ -461,9 +457,8 @@ mod tests {
 
     #[test]
     fn materialise_skips_current_mode_update() {
-        let update = SessionUpdate::CurrentModeUpdate(
-            CurrentModeUpdate::new(SessionModeId::new("plan")),
-        );
+        let update =
+            SessionUpdate::CurrentModeUpdate(CurrentModeUpdate::new(SessionModeId::new("plan")));
         let raw = make_raw_update(update);
 
         let (events, _) = materialise_batch(&[raw], "copilot", "sess1", 0);

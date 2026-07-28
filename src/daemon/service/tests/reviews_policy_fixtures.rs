@@ -18,10 +18,10 @@ use crate::task_board::policy_graph::{
     PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep,
     PolicyWorkflowEntry, store_gate_policy,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
+use harness_kernel::errors::CliError;
 
 pub(super) fn test_runtime_root() -> PathBuf {
     let temp = tempdir().expect("create tempdir");

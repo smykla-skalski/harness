@@ -2,8 +2,8 @@
 
 use std::fs;
 
-use harness_kernel::errors::CliError;
 use crate::reviews::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+use harness_kernel::errors::CliError;
 
 use super::clones::{clones_root, load_registry, save_registry};
 

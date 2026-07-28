@@ -1,6 +1,6 @@
 use super::*;
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::policy_graph::apply_duplicate;
+use harness_kernel::errors::CliErrorKind;
 use tempfile::{TempDir, tempdir};
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {

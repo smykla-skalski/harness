@@ -124,14 +124,13 @@ impl AsyncDaemonDb {
         // re-saved (via this UPSERT) after its session was hard-deleted,
         // now silently stores NULL and stays an unbound orphan instead of
         // failing loudly.
-        let session_id: Option<&str> = query_scalar::<_, i64>(
-            "SELECT 1 FROM sessions WHERE session_id = ?1",
-        )
-        .bind(&snapshot.session_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("check async codex run session: {error}")))?
-        .map(|_| snapshot.session_id.as_str());
+        let session_id: Option<&str> =
+            query_scalar::<_, i64>("SELECT 1 FROM sessions WHERE session_id = ?1")
+                .bind(&snapshot.session_id)
+                .fetch_optional(transaction.as_mut())
+                .await
+                .map_err(|error| db_error(format!("check async codex run session: {error}")))?
+                .map(|_| snapshot.session_id.as_str());
         query(UPSERT_CODEX_RUN_SQL)
             .bind(&snapshot.run_id)
             .bind(session_id)

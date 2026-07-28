@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 #[cfg(test)]
-use harness_kernel::errors::{CliError, CliErrorKind};
-#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
+#[cfg(test)]
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[cfg(test)]
 use super::events::run_matches_event;

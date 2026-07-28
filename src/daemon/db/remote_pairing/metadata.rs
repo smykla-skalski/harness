@@ -87,9 +87,8 @@ mod tests {
         let subject =
             RemotePairingSubject::new("github", "4242", "Ada Lovelace").expect("valid subject");
 
-        let encoded =
-            encode_remote_pairing_metadata(None, Some(&subject), Some("panel-1"), None)
-                .expect("encode");
+        let encoded = encode_remote_pairing_metadata(None, Some(&subject), Some("panel-1"), None)
+            .expect("encode");
         let decoded = decode_remote_pairing_metadata(&encoded).expect("decode");
 
         assert_eq!(decoded.minted_for, Some(subject));

@@ -11,8 +11,8 @@ use tokio::task::spawn_blocking;
 mod cleanup;
 use uuid::Uuid;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::protocol::{
     VoiceAudioChunkRequest, VoiceProcessingSink, VoiceSessionFinishReason,

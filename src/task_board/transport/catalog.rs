@@ -51,10 +51,13 @@ fn status_label(status: Option<TaskBoardStatus>) -> Result<Option<String>, CliEr
     };
     let value = serde_json::to_value(status)
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-    value.as_str().map(|label| Some(label.to_string())).ok_or_else(|| {
-        CliErrorKind::workflow_serialize("expected task-board status to serialize as a string")
-            .into()
-    })
+    value
+        .as_str()
+        .map(|label| Some(label.to_string()))
+        .ok_or_else(|| {
+            CliErrorKind::workflow_serialize("expected task-board status to serialize as a string")
+                .into()
+        })
 }
 
 fn status_query(status: Option<&String>) -> Vec<(&str, &str)> {

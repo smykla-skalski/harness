@@ -3,9 +3,9 @@ use serde_json::Value;
 use super::super::index::{self, DiscoveredProject};
 use super::super::protocol::{AgentPendingUserPrompt, AgentToolActivitySummary};
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use harness_kernel::errors::CliError;
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::session::types::SessionState;
+use harness_kernel::errors::CliError;
 
 #[derive(Debug, Clone)]
 struct PendingUserPromptInvocation {

@@ -5,8 +5,8 @@ use crate::agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals, signal_matches_session,
 };
 use crate::daemon::db::DaemonDb;
-use harness_kernel::errors::CliError;
 use crate::session::types::{SessionSignalRecord, SessionSignalStatus, SessionState};
+use harness_kernel::errors::CliError;
 
 pub(super) fn load_signals_for_resolved(
     resolved: &ResolvedSession,

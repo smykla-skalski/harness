@@ -1,11 +1,11 @@
 //! Bounded patch previews for the inline-PR Files section.
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::files::service::FilesLargeDiffStrategy;
 use crate::reviews::{
     ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest, ReviewsFilesPreviewResponse,
     preview_from_patch,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::patch::patch_review_files;
 

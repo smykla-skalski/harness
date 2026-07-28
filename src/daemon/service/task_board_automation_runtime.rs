@@ -8,11 +8,11 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunStage,
     TaskBoardRunAcquireRequest,
 };
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
     TaskBoardAutomationSnapshot,
 };
+use harness_kernel::errors::CliError;
 
 use super::TaskBoardOrchestratorRunGuard;
 use super::task_board_db::TaskBoardSyncRunContext;

@@ -129,4 +129,3 @@ fn the_panels_own_specifiers_stay_bare() {
     assert!(!unit.contains("%%S/"), "{unit}");
     assert!(!unit.contains("%%d/"), "{unit}");
 }
-

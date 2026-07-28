@@ -3,10 +3,10 @@
 use std::fs;
 
 use crate::daemon::state::daemon_root;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::{
     LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::CLONES_SUBDIR;
 

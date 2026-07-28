@@ -16,16 +16,15 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::openapi::DaemonErrorBody;
+use super::super::response::timed_json;
+use super::super::task_board_route_executor;
+use super::items::{authenticated_task_board_read, authorized_control_request_parts};
 use crate::daemon::protocol::{
     TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
     TaskBoardTriageOverrideMutationResponse,
 };
-use super::super::response::timed_json;
-use super::super::task_board_route_executor;
-use super::items::{authenticated_task_board_read, authorized_control_request_parts};
 
-#[derive(Debug, Clone, Default, Deserialize)]
-#[derive(utoipa::IntoParams)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(super) struct TaskBoardTriageHistoryQuery {
     pub before_generation: Option<u64>,

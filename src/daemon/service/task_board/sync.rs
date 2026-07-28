@@ -1,11 +1,11 @@
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
-use harness_kernel::errors::{CliError, CliErrorKind};
 #[cfg(test)]
 use crate::task_board::TaskBoardStore;
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncDirection,
     ExternalSyncOperation, ExternalSyncOptions, TaskBoardItem, build_sync_summary,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
     ExternalSyncOptions {

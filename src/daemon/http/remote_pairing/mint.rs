@@ -26,8 +26,8 @@ use crate::daemon::remote_pairing::{
     RemotePairingChange, RemotePairingCode, RemotePairingCreateParams, RemotePairingSubject,
     create_remote_pairing, pairing_expires_at,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::auth::authenticated_remote_client;

@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 // already names.
 pub use harness_kernel::kernel::naming::{normalize_optional_value, normalize_repository_slug};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct TaskBoardGitRuntimeConfig {
     #[serde(default)]
     pub global: TaskBoardGitRuntimeProfile,
@@ -82,8 +81,7 @@ impl TaskBoardGitRuntimeConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct TaskBoardGitRuntimeProfile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_name: Option<String>,
@@ -327,8 +325,7 @@ pub enum TaskBoardGitSigningMode {
     Gpg,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardGitRepositoryOverride {
     pub repository: String,
     #[serde(default)]
@@ -364,8 +361,7 @@ impl TaskBoardGitRepositoryOverride {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct TaskBoardGitHubTokensSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub global_token: Option<String>,
@@ -373,8 +369,7 @@ pub struct TaskBoardGitHubTokensSyncRequest {
     pub repository_tokens: Vec<TaskBoardGitHubRepositoryToken>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardGitHubRepositoryToken {
     pub repository: String,
     pub token: String,
@@ -389,22 +384,19 @@ impl TaskBoardGitHubRepositoryToken {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardGitHubTokensSyncResponse {
     pub global_token_configured: bool,
     pub repository_token_count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 pub struct TaskBoardOpenRouterTokenSyncRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardOpenRouterTokenSyncResponse {
     pub token_configured: bool,
 }

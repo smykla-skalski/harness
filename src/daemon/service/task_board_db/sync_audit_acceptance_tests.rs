@@ -5,11 +5,11 @@ use super::*;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{ExternalSyncBatch, ExternalSyncScopeOutcome};
 use crate::task_board::{
     ExternalProvider, ExternalSyncAction, ExternalSyncOperation, TaskBoardSyncSummary,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[tokio::test]
 async fn orchestrator_suppresses_successful_scope_poll_without_applied_operations() {

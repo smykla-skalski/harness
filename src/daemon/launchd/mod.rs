@@ -16,8 +16,7 @@ mod tests;
 pub const LAUNCH_AGENT_LABEL: &str = "io.harness.daemon";
 const LEGACY_LAUNCH_AGENT_LABEL: &str = "io.harness.monitor.daemon";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LaunchAgentStatus {
     pub installed: bool,
     pub loaded: bool,

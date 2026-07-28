@@ -24,7 +24,12 @@ fn empty_candidate() -> TriageRuleSetV1 {
 #[tokio::test]
 async fn no_draft_exists_before_any_save() {
     let (_directory, db) = connect().await;
-    assert!(db.load_task_board_triage_rules_draft().await.expect("load draft").is_none());
+    assert!(
+        db.load_task_board_triage_rules_draft()
+            .await
+            .expect("load draft")
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -80,20 +85,27 @@ async fn an_invalid_candidate_is_never_persisted() {
         .expect("save draft call succeeds even when the candidate is rejected");
     assert!(!result.persisted);
     assert!(!result.validation.is_valid());
-    assert!(db.load_task_board_triage_rules_draft().await.expect("load draft").is_none());
+    assert!(
+        db.load_task_board_triage_rules_draft()
+            .await
+            .expect("load draft")
+            .is_none()
+    );
 }
 
 #[tokio::test]
 async fn revisions_and_audit_lists_are_empty_before_any_activation() {
     let (_directory, db) = connect().await;
-    assert!(db
-        .list_task_board_triage_rules_revisions(10)
-        .await
-        .expect("list revisions")
-        .is_empty());
-    assert!(db
-        .list_task_board_triage_rules_audit(10)
-        .await
-        .expect("list audit")
-        .is_empty());
+    assert!(
+        db.list_task_board_triage_rules_revisions(10)
+            .await
+            .expect("list revisions")
+            .is_empty()
+    );
+    assert!(
+        db.list_task_board_triage_rules_audit(10)
+            .await
+            .expect("list audit")
+            .is_empty()
+    );
 }

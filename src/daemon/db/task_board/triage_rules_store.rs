@@ -1,12 +1,12 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::{
     TriageRuleSetAuditEntry, TriageRuleSetAuditKind, TriageRuleSetDraft,
     TriageRuleSetDraftSaveResult, TriageRuleSetRevisionStatus, TriageRuleSetRevisionSummary,
     TriageRuleSetV1, is_canonical_bounded_text, validate_triage_rule_set,
 };
+use harness_kernel::errors::CliErrorKind;
 
 const MAX_TRIAGE_RULE_SET_ACTOR_BYTES: usize = 256;
 pub(super) const TRIAGE_RULE_SET_LIST_MAX_LIMIT: u32 = 100;
@@ -69,11 +69,16 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board triage rules draft save")
             .await?;
-        let current_revision =
-            query_scalar::<_, i64>("SELECT revision FROM task_board_triage_rule_set_draft WHERE singleton = 1")
-                .fetch_optional(transaction.as_mut())
-                .await
-                .map_err(|error| db_error(format!("read task board triage rules draft revision: {error}")))?;
+        let current_revision = query_scalar::<_, i64>(
+            "SELECT revision FROM task_board_triage_rule_set_draft WHERE singleton = 1",
+        )
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "read task board triage rules draft revision: {error}"
+            ))
+        })?;
         if current_revision != expected_revision {
             return Err(CliErrorKind::concurrent_modification(format!(
                 "task board triage rule set draft revision changed from {expected_revision:?} to {current_revision:?}"
@@ -105,10 +110,11 @@ impl AsyncDaemonDb {
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("save task board triage rules draft: {error}")))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board triage rules draft save: {error}")))?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit task board triage rules draft save: {error}"
+            ))
+        })?;
         Ok(TriageRuleSetDraftSaveResult {
             validation,
             persisted: true,

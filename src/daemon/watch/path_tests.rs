@@ -1,9 +1,9 @@
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
-use harness_kernel::errors::CliError;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
+use harness_kernel::errors::CliError;
 
 use super::paths::{
     WatchPathTarget, session_id_from_path, session_id_from_path_with, watch_target_from_path,

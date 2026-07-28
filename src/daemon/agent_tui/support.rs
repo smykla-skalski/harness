@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{ManagedAgentRef, SessionState};
 #[cfg(feature = "daemon-runtime")]
 use crate::workspace::project_context_dir;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) type Shared<T> = Arc<Mutex<T>>;
 

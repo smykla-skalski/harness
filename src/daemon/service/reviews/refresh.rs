@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::slice;
 
-use harness_kernel::errors::CliError;
 use crate::github_api::{
     GitHubProtectedClient, GitHubPullRequestSnapshot, retry_stable_read, stable_data_revision_guard,
 };
@@ -13,6 +12,7 @@ use crate::task_board::{
     TaskBoardItem, imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::super::db::AsyncDaemonDb;
 use super::super::task_board_db::{

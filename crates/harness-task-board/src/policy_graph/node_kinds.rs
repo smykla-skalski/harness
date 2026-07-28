@@ -291,9 +291,7 @@ impl PolicyGraphNodeKind {
 mod tests {
     use super::*;
     use crate::policy::PolicyReasonCode;
-    use crate::policy_graph::{
-        PolicyFinishNode, PolicyGraphDecision, PolicyHandoffStep,
-    };
+    use crate::policy_graph::{PolicyFinishNode, PolicyGraphDecision, PolicyHandoffStep};
 
     #[test]
     fn catalog_has_unique_ids() {

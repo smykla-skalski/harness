@@ -3,11 +3,11 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 #[cfg(test)]
 use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::TaskBoardStatus;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::types::TaskBoardOrchestratorSettings;
 #[cfg(test)]

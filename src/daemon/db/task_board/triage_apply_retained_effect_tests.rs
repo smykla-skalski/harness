@@ -1,6 +1,6 @@
 use super::super::TriageOutcome;
 use super::{
-    apply_builtin_v1_triage_in_tx, inbox_item, connect, load_item_in_tx, replace_item_in_tx,
+    apply_builtin_v1_triage_in_tx, connect, inbox_item, load_item_in_tx, replace_item_in_tx,
     seed_decided_todo_item,
 };
 use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, TaskBoardStatus};

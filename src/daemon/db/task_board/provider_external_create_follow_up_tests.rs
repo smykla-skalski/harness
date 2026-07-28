@@ -331,7 +331,8 @@ async fn attach_in_scope(
     scope: &str,
     external_id: &str,
 ) -> TaskBoardExternalCreateIntent {
-    let intent = super::provider_external_creates_tests::begin_in_scope(db, item_id, provider, scope).await;
+    let intent =
+        super::provider_external_creates_tests::begin_in_scope(db, item_id, provider, scope).await;
     let created = record(db, &intent, external_id).await;
     db.finalize_task_board_external_create_intent(&created)
         .await

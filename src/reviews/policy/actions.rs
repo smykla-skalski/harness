@@ -4,7 +4,6 @@ use std::path::Path;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewTarget;
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::{
@@ -23,6 +22,7 @@ use crate::task_board::policy_runtime::notification::{
 use crate::task_board::policy_runtime::providers::{
     PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::evidence::review_target_policy_evidence;
 const REVIEWS_PROVIDER: &str = "reviews";

@@ -8,8 +8,8 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardAutomationRunFence, TaskBoardAutomationRunLease};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::TaskBoardAutomationRunOutcome;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board_db::{TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision};
 

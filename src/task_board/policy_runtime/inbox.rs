@@ -6,9 +6,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
-use harness_kernel::errors::CliError;
-#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
+#[cfg(test)]
+use harness_kernel::errors::CliError;
 
 use super::models::PolicyWorkflowEvent;
 

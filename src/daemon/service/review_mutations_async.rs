@@ -10,7 +10,6 @@ use crate::daemon::protocol::{
     SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
-use harness_kernel::errors::CliError;
 use crate::session::service::{
     self as session_service, apply_arbitrate, apply_claim_review, apply_respond_review,
     apply_submit_for_review, maybe_emit_spawn_reviewer, validate_submit_review,
@@ -19,6 +18,7 @@ use crate::session::storage as session_storage;
 use crate::session::types::{SessionState, TaskStatus};
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::review_submit_txn::{apply_submit_review_in_txn, prepare_submit_review};
 use super::sessions::session_detail_from_async_daemon_db;

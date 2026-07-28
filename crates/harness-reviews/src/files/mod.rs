@@ -58,8 +58,7 @@ pub(crate) const FILES_PAGE_CAP: u32 = 20;
 pub(crate) const FILES_MAX: u32 = FILES_PAGE_CAP * 100;
 
 /// Request a list of changed files for a single pull request.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFilesListRequest {
     pub pull_request_id: String,
     #[serde(default)]
@@ -74,8 +73,7 @@ impl ReviewsFilesListRequest {
 }
 
 /// Response shape for a files-list call.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFilesListResponse {
     pub pull_request_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -117,8 +115,7 @@ fn default_pagination_complete() -> bool {
 
 /// Metadata for one file inside a PR. No patch body here - patches arrive
 /// via the separate `patch` endpoint (REST or local-clone diff).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewFile {
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -135,8 +132,7 @@ pub struct ReviewFile {
 }
 
 /// GitHub `PullRequestFileChangeType` enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewFileChangeType {
     Added,
@@ -167,8 +163,7 @@ impl ReviewFileChangeType {
 }
 
 /// GitHub `FileViewedState` enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewFileViewedState {
     Dismissed,
@@ -192,8 +187,7 @@ impl ReviewFileViewedState {
 /// Lightweight echo of the rate-limit budget at the time of the response.
 /// The Monitor uses this to surface a cooling banner without polling a
 /// separate endpoint.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsRateLimitSnapshot {
     pub remaining: u32,
     pub limit: u32,
@@ -206,8 +200,7 @@ pub struct ReviewsRateLimitSnapshot {
 /// Batched patch request for one PR. The caller supplies the head ref oid it
 /// believes it's still on; the daemon compares against the current head and
 /// returns `drifted: true` with the fresh oid if a force-push intervened.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFilesPatchRequest {
     pub pull_request_id: String,
     pub head_ref_oid_expected: String,
@@ -266,8 +259,7 @@ impl ReviewsFilesPatchRequest {
 }
 
 /// Response carrying the per-path patches plus drift detection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFilesPatchResponse {
     pub pull_request_id: String,
     pub patches: Vec<ReviewFilePatch>,
@@ -278,8 +270,7 @@ pub struct ReviewsFilesPatchResponse {
     pub rate_limit_snapshot: Option<ReviewsRateLimitSnapshot>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFilesPreviewRequest {
     pub pull_request_id: String,
     pub head_ref_oid_expected: String,
@@ -327,8 +318,7 @@ impl ReviewsFilesPreviewRequest {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewFilePreview {
     pub path: String,
     pub patch: String,
@@ -350,8 +340,7 @@ pub struct ReviewFilePreview {
     pub has_more: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewsFilesPreviewResponse {
     pub pull_request_id: String,
     pub previews: Vec<ReviewFilePreview>,
@@ -363,8 +352,7 @@ pub struct ReviewsFilesPreviewResponse {
 }
 
 /// Annotates which path produced a patch body so the UI can label provenance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewFileServedBy {
     #[default]
@@ -377,8 +365,7 @@ pub enum ReviewFileServedBy {
 }
 
 /// One file's patch body + metadata produced by either REST or local clone.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewFilePatch {
     pub path: String,
     pub patch: String,

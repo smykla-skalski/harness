@@ -8,10 +8,10 @@ use gix::objs::WriteTo;
 use gix::{ObjectId, objs};
 use tokio::task::spawn_blocking;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::begin_external_mutation;
 use crate::sandbox;
 use crate::task_board::github::GitHubProjectConfig;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::signing::{
     native_git_transport_required_error, publication_signature, rest_commit_signature_boundary,

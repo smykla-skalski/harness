@@ -238,7 +238,10 @@ mod tests {
             escape_attribute(r#""><script>alert(1)</script>"#),
             "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
         );
-        assert_eq!(escape_attribute("harness.example.com"), "harness.example.com");
+        assert_eq!(
+            escape_attribute("harness.example.com"),
+            "harness.example.com"
+        );
     }
 
     #[test]

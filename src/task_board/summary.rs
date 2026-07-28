@@ -14,8 +14,7 @@ use super::project_color::TaskBoardProjectColor;
 use super::project_shape::TaskBoardProjectShape;
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardAuditSummary {
     pub total: usize,
     pub ready: usize,
@@ -24,15 +23,13 @@ pub struct TaskBoardAuditSummary {
     pub by_status: Vec<TaskBoardStatusCount>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardStatusCount {
     pub status: TaskBoardStatus,
     pub count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardSyncSummary {
     pub total: usize,
     pub providers: Vec<TaskBoardProviderSyncSummary>,
@@ -40,8 +37,7 @@ pub struct TaskBoardSyncSummary {
     pub operations: Vec<ExternalSyncOperation>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardProviderSyncSummary {
     pub provider: ExternalProvider,
     pub configured: bool,
@@ -51,8 +47,7 @@ pub struct TaskBoardProviderSyncSummary {
     pub token_env: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardProjectSummary {
     pub project_id: String,
     pub source: TaskBoardProjectSource,
@@ -65,8 +60,7 @@ pub struct TaskBoardProjectSummary {
     pub ready_count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardMachineSummary {
     pub mode: AgentMode,
     pub item_count: usize,

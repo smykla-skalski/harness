@@ -45,15 +45,15 @@ pub mod observe {
 
 /// Daemon websocket contracts shared by standalone Harness clients.
 pub mod daemon;
-/// Session observation timeline contracts.
-pub mod timeline;
 /// Managed-agent request and response contracts shared by daemon clients.
 pub mod managed_agents;
+/// Session-id resolution shared by every binary that hosts a `HookAgent`.
+pub mod session_resolution;
 /// Session request/response and on-disk registry contracts shared by daemon
 /// clients that talk to a session directly.
 pub mod session_wire;
-/// Session-id resolution shared by every binary that hosts a `HookAgent`.
-pub mod session_resolution;
+/// Session observation timeline contracts.
+pub mod timeline;
 
 // Compatibility namespaces for the canonical session model sources. They
 // intentionally expose only protocol models, never application/runtime code.

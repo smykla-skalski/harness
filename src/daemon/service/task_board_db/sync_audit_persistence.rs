@@ -4,9 +4,9 @@ use uuid::Uuid;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
 use crate::daemon::service::observe_sender;
-use harness_kernel::errors::CliError;
 use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::TaskBoardSyncAuditTrigger;
 use super::metrics::SyncExecutionMetrics;

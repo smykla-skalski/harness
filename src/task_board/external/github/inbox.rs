@@ -2,7 +2,6 @@ use std::fmt;
 
 use async_trait::async_trait;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::GitHubProtectedClient;
 use crate::task_board::external::targeting::github_repository_for_item;
 use crate::task_board::external::{
@@ -11,6 +10,7 @@ use crate::task_board::external::{
 };
 use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
     GitHubRepository, assigned_issue_query, body_lists_child_issues, github_external_id,

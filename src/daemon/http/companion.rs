@@ -35,8 +35,8 @@ mod tests;
 mod upgrade;
 
 pub(crate) use response_body::bind_response_permits;
-pub(super) use router::companion_routes;
 pub use router::CompanionRouter;
+pub(super) use router::companion_routes;
 
 /// Path segment the daemon's own API owns. A companion prefix may not start
 /// here, or the companion would shadow routes the daemon must keep answering.

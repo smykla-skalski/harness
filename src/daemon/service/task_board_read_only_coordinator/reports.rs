@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptRetryDecision, TaskBoardAttemptState,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
@@ -10,6 +9,7 @@ use crate::task_board::{
     TaskBoardFailureClass, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, task_board_attempt_retry_decision,
 };
+use harness_kernel::errors::CliError;
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human, set_execution_state};

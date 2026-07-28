@@ -7,10 +7,10 @@ use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
 use crate::daemon::task_board_remote_transport::wire::RemoteSourceBundleUploadRequest;
 use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::git::GitError;
 use crate::git::bundle::{GitBundleImportPlan, GitBundleWorktreeState};
 use crate::git::source_bundle_import::GitSourceBundleImportPlan;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn materialize_repository_snapshot(
     db: &AsyncDaemonDb,

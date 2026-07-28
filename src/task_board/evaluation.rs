@@ -6,8 +6,7 @@ use super::types::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardEvaluationSummary {
     pub total: usize,
     pub evaluated: usize,
@@ -23,15 +22,13 @@ pub struct TaskBoardEvaluationSummary {
     pub signal_failures: Vec<EvaluationSignalFailure>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct EvaluationSignalFailure {
     pub board_item_id: String,
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardEvaluationRecord {
     pub board_item_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

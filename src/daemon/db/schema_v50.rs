@@ -30,9 +30,12 @@ fn codex_runs_table_exists(conn: &Connection) -> Result<bool, CliError> {
 }
 
 fn stamp_schema_version(conn: &Connection) -> Result<(), CliError> {
-    conn.execute("UPDATE schema_meta SET value = '50' WHERE key = 'version'", [])
-        .map(|_| ())
-        .map_err(|error| super::db_error(format!("stamp schema v50: {error}")))
+    conn.execute(
+        "UPDATE schema_meta SET value = '50' WHERE key = 'version'",
+        [],
+    )
+    .map(|_| ())
+    .map_err(|error| super::db_error(format!("stamp schema v50: {error}")))
 }
 
 #[cfg(test)]

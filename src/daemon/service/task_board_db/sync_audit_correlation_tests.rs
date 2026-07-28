@@ -4,9 +4,9 @@ use super::*;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::external::{ExternalSyncBatch, ExternalSyncScopeOutcome};
 use crate::task_board::{ExternalProvider, TaskBoardSyncSummary};
+use harness_kernel::errors::CliErrorKind;
 
 #[tokio::test]
 async fn each_orchestrator_run_keeps_its_correlated_sync_evidence() {

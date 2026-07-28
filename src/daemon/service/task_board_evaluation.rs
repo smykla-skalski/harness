@@ -8,7 +8,6 @@ use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::{
     SessionDetail, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 #[cfg(test)]
 use crate::session::storage as session_storage;
@@ -25,6 +24,7 @@ use crate::task_board::{
 #[cfg(test)]
 use crate::task_board::{TaskBoardStore, default_board_root};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::task::spawn_blocking;
 
 #[cfg(test)]

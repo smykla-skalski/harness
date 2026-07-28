@@ -19,9 +19,9 @@ use tracing::warn;
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardTriageEscalation};
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{TaskBoardTriageEscalationConfig, render_triage_escalation_prompt};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const TICK_INTERVAL: Duration = Duration::from_secs(5);
 const SCRATCH_DIR_NAME: &str = "triage-escalation-scratch";
@@ -67,7 +67,11 @@ async fn run_task_board_triage_escalation_loop(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn drain_tick(state: &DaemonHttpState, db: &AsyncDaemonDb, config: &TaskBoardTriageEscalationConfig) {
+async fn drain_tick(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    config: &TaskBoardTriageEscalationConfig,
+) {
     match db
         .sweep_stale_task_board_triage_escalations(config.timeout_seconds)
         .await
@@ -96,7 +100,10 @@ async fn drain_tick(state: &DaemonHttpState, db: &AsyncDaemonDb, config: &TaskBo
     if capacity == 0 {
         return;
     }
-    let claimed = match db.claim_pending_task_board_triage_escalations(capacity).await {
+    let claimed = match db
+        .claim_pending_task_board_triage_escalations(capacity)
+        .await
+    {
         Ok(claimed) => claimed,
         Err(error) => {
             warn!(%error, "triage escalation claim failed");
@@ -112,7 +119,10 @@ async fn drain_tick(state: &DaemonHttpState, db: &AsyncDaemonDb, config: &TaskBo
                 "triage escalation worker spawn failed"
             );
             if let Err(fail_error) = db
-                .fail_running_task_board_triage_escalation(&escalation.escalation_id, &error.to_string())
+                .fail_running_task_board_triage_escalation(
+                    &escalation.escalation_id,
+                    &error.to_string(),
+                )
                 .await
             {
                 warn!(
@@ -193,15 +203,13 @@ fn ensure_escalation_scratch_dir(
     db: &AsyncDaemonDb,
     escalation_id: &str,
 ) -> Result<String, CliError> {
-    let base = db
-        .storage_path()
-        .parent()
-        .map_or_else(|| PathBuf::from(SCRATCH_DIR_NAME), |parent| parent.join(SCRATCH_DIR_NAME));
+    let base = db.storage_path().parent().map_or_else(
+        || PathBuf::from(SCRATCH_DIR_NAME),
+        |parent| parent.join(SCRATCH_DIR_NAME),
+    );
     let dir = base.join(sanitized_escalation_segment(escalation_id));
     fs::create_dir_all(&dir).map_err(|error| {
-        CliErrorKind::workflow_io(format!(
-            "create triage escalation scratch dir: {error}"
-        ))
+        CliErrorKind::workflow_io(format!("create triage escalation scratch dir: {error}"))
     })?;
     Ok(dir.to_string_lossy().into_owned())
 }

@@ -213,7 +213,10 @@ mod tests {
             .arg("60")
             .spawn()
             .expect("spawn child");
-        let supervisor = Arc::new(AcpSessionSupervisor::new(&child, SupervisionConfig::default()));
+        let supervisor = Arc::new(AcpSessionSupervisor::new(
+            &child,
+            SupervisionConfig::default(),
+        ));
         let handle = spawn_notification_batcher(
             "agent".to_string(),
             supervisor,

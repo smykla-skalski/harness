@@ -32,10 +32,14 @@ fn bug_rule_set() -> TriageRuleSetV1 {
         schema_version: crate::task_board::TRIAGE_RULE_SET_SCHEMA_VERSION,
         rules: vec![TriageRule {
             id: "bug".into(),
-            when: vec![TriageRuleCondition::LabelsHasAny { labels: vec!["kind/bug".into()] }],
+            when: vec![TriageRuleCondition::LabelsHasAny {
+                labels: vec!["kind/bug".into()],
+            }],
             outcome: TriageRuleOutcome {
                 verdict: TriageVerdict::Todo,
-                priority_action: TriagePriorityAction::SetTo { priority: TaskBoardPriority::Critical },
+                priority_action: TriagePriorityAction::SetTo {
+                    priority: TaskBoardPriority::Critical,
+                },
             },
         }],
         default_outcome: TriageRuleOutcome {
@@ -235,14 +239,16 @@ async fn an_active_override_still_wins_placement_over_an_active_rule_set_on_upda
     db.create_task_board_item_with_triage(inbox_item("overridden", Vec::new()))
         .await
         .expect("create item");
-    db.set_task_board_triage_override(crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
-        item_id: "overridden".into(),
-        verdict: TriageVerdict::Todo,
-        actor: "human".into(),
-        reason: None,
-        expected_item_revision: 1,
-        expected_items_change_seq: 1,
-    })
+    db.set_task_board_triage_override(
+        crate::daemon::db::task_board::TaskBoardTriageOverrideSetInput {
+            item_id: "overridden".into(),
+            verdict: TriageVerdict::Todo,
+            actor: "human".into(),
+            reason: None,
+            expected_item_revision: 1,
+            expected_items_change_seq: 1,
+        },
+    )
     .await
     .expect("set override");
 

@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
 use crate::daemon::ordering::sort_agent_tui_snapshots;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::manager::AgentTuiManagerHandle;
 use super::model::{

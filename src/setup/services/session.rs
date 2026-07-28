@@ -1,9 +1,9 @@
 use std::env;
 use std::path::Path;
 
-use harness_kernel::errors::CliError;
 use crate::setup::wrapper;
 use crate::workspace::compact;
+use harness_kernel::errors::CliError;
 
 pub(crate) fn bootstrap_project_wrapper(project_dir: &Path) {
     let path_env = env::var("PATH").unwrap_or_default();

@@ -67,8 +67,8 @@ impl RemoteExecutionCredentialResolver {
     ) -> Result<RemoteExecutionCredential, RemoteExecutionCredentialError> {
         match parse_reference(reference)? {
             TaskBoardExecutionCredentialReference::Environment { name } => {
-                let value =
-                    env::var(&name).map_err(|_| RemoteExecutionCredentialError::MissingCredential)?;
+                let value = env::var(&name)
+                    .map_err(|_| RemoteExecutionCredentialError::MissingCredential)?;
                 validated_credential(value)
             }
             TaskBoardExecutionCredentialReference::Keychain { service, account } => {

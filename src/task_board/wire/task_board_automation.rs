@@ -15,8 +15,7 @@ pub struct TaskBoardAutomationRunDetailRequest {
     pub run_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 pub struct TaskBoardAutomationForceCancelRequest {
     pub target: TaskBoardAutomationCancelTarget,
     pub reason: String,
@@ -34,8 +33,7 @@ pub enum TaskBoardAutomationForceCancelDisposition {
     ReplayedCancelled,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 pub struct TaskBoardAutomationForceCancelResponse {
     pub disposition: TaskBoardAutomationForceCancelDisposition,
 }

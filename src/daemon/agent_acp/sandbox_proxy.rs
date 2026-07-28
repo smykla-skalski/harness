@@ -11,8 +11,8 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::state::task_board_openrouter_token;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::manager::{
     AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentReconcileResponse, AcpAgentSnapshot,

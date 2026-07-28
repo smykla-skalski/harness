@@ -10,8 +10,8 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::agent_acp::AcpPermissionDecision;
-use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
+use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
 use harness_kernel::errors::CliError;
 
 use super::super::DaemonHttpState;
@@ -27,8 +27,7 @@ fn acp_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, Cli
     state.acp_agent_manager.get(agent_id).map(|s| s.session_id)
 }
 
-#[derive(serde::Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(serde::Deserialize, utoipa::ToSchema)]
 pub(super) struct AcpPromptRequestBody {
     pub prompt: String,
 }

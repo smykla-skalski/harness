@@ -1,5 +1,4 @@
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
@@ -7,6 +6,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard, normalize_repository_slug,
     restart_task_board_workflow_revision,
 };
+use harness_kernel::errors::CliError;
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human};

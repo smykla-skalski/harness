@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalRefSyncState, ExternalSyncAction,
@@ -10,6 +9,7 @@ use crate::task_board::{
     ExternalTask, ExternalTaskRef, TaskBoardConflictState, TaskBoardItem, TaskBoardStatus,
     TaskBoardSyncConflict,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[tokio::test]
 async fn provider_scope_failure_backoff_is_isolated_and_reset_by_success() {

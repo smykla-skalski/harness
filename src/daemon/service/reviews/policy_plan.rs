@@ -3,7 +3,6 @@ use std::path::Path;
 use std::slice::from_ref;
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 #[cfg(test)]
 use crate::reviews::policy::authored_reviews_policy_plan;
 use crate::reviews::policy::{ReviewsPolicyPlan, authored_reviews_policy_plan_from_document};
@@ -13,6 +12,7 @@ use crate::reviews::{
 };
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy_graph::PolicyGraphMode;
+use harness_kernel::errors::CliError;
 
 use super::policy_mapping::preview_step;
 use super::preview::{preview_action_target, preview_action_warnings};

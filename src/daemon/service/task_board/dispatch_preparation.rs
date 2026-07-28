@@ -14,17 +14,17 @@ use crate::daemon::protocol::{SessionStartRequest, TaskBoardDispatchRequest, Tas
 use crate::daemon::service::{
     build_log_entry, create_task_with_id_async, session_service, start_session_direct_async,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::sandbox;
+use crate::session::adopter::SessionAdopter;
 use crate::session::storage as session_storage;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};
 use crate::task_board::{
     DispatchAppliedTask, DispatchFailureKind, DispatchPlan, SessionIntent,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
 };
-use crate::session::adopter::SessionAdopter;
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::worktree::WorktreeController;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 const PREPARATION_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -102,9 +102,9 @@ fn unavailable_preparation_message(
         ),
         TaskBoardPreparationUnavailable::WaitingToRetry {
             seconds_remaining, ..
-        } => format!(
-            "task-board dispatch preparation '{intent_id}' retries in {seconds_remaining}s"
-        ),
+        } => {
+            format!("task-board dispatch preparation '{intent_id}' retries in {seconds_remaining}s")
+        }
         TaskBoardPreparationUnavailable::Settled { status } => format!(
             "task-board dispatch preparation '{intent_id}' already left preparation with status '{status}'"
         ),

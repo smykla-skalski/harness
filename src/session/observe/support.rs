@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::observe::types::{Issue, IssueCode, IssueSeverity, ObserverState, OpenIssue};
 use crate::observe::{is_observer_conflict, load_observer_state, save_observer_state};
 use crate::session::service::{self, TaskSpec};
 use crate::session::types::{SessionState, TaskSeverity, TaskSource};
 use crate::workspace::{project_context_dir, utc_now};
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) fn emit_watch_issues(issues: &[Issue], json: bool) {
     for issue in issues {

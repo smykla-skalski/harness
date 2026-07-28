@@ -262,12 +262,11 @@ pub(crate) use dispatch_preparations::{
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]
 pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
-pub(crate) use triage_escalation_store::ClaimedTaskBoardTriageEscalation;
 pub(crate) use lane_order::{TaskBoardItemsSnapshot, TaskBoardLaneShift};
-pub(crate) use projects::{ColorEdit, DisplayNameEdit, ProjectEdit};
 pub(crate) use lane_order_api::{
     TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput,
 };
+pub(crate) use projects::{ColorEdit, DisplayNameEdit, ProjectEdit};
 #[allow(unused_imports)]
 pub(crate) use remote_artifacts::{TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput};
 pub(crate) use remote_assignment_controller_scan::{
@@ -341,6 +340,7 @@ pub(crate) use scheduler::{
     TaskBoardAutomationControlRecord, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence,
     TaskBoardAutomationRunLease, TaskBoardAutomationRunStage, TaskBoardRunAcquireRequest,
 };
+pub(crate) use triage_escalation_store::ClaimedTaskBoardTriageEscalation;
 pub(crate) use triage_override::{
     TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideMutationResult,
     TaskBoardTriageOverrideSetInput,

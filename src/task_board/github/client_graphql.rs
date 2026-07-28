@@ -2,10 +2,10 @@ use serde::Deserialize;
 use serde_json::json;
 use std::time::Duration;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::config::GitHubProjectConfig;

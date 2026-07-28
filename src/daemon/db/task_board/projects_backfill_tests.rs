@@ -154,7 +154,12 @@ async fn a_deleted_item_is_not_attributed() {
     );
 
     assert_eq!(stored_project_id(&db, "task-gone").await, None);
-    assert!(db.list_task_board_projects().await.expect("list").is_empty());
+    assert!(
+        db.list_task_board_projects()
+            .await
+            .expect("list")
+            .is_empty()
+    );
 }
 
 /// Attribution is derived metadata, not an edit. Bumping the revision would

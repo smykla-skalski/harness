@@ -5,11 +5,11 @@ use reqwest::Method;
 use serde_json::json;
 use std::time::Duration;
 
-use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use crate::reviews::files::blob::BlobTextProjection;
 use crate::reviews::files::blob::blob_exceeds_cap;
 use crate::reviews::files::patch_rest::split_repo_full_name;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::{ReviewsGitHubClient, normalize_git_blob_base64};
 use super::mapping::parse_timestamp;

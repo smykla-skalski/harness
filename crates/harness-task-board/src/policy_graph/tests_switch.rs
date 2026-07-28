@@ -122,7 +122,10 @@ fn switch_routes_missing_evidence_through_is_missing_cases() {
     );
 }
 
-#[expect(clippy::too_many_lines, reason = "one literal fixture graph, not logic")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one literal fixture graph, not logic"
+)]
 fn switch_graph(arms: &serde_json::Value) -> PolicyGraph {
     let arm_ports: Vec<String> = arms
         .as_array()

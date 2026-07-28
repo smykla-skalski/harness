@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptRetryDecision, TaskBoardAttemptState,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionDiagnostic,
@@ -9,6 +8,7 @@ use crate::task_board::{
     TaskBoardLifecycleOutcome, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, task_board_attempt_retry_decision,
 };
+use harness_kernel::errors::CliError;
 
 use super::invalid_transition;
 

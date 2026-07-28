@@ -14,8 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent::AckResult;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ResolvedRuntimeSessionAgent {
     pub orchestration_session_id: String,
     pub session_agent_id: String,
@@ -27,20 +26,17 @@ pub struct ResolvedRuntimeSessionAgent {
 /// no live agent matches; `Some` carries the single unambiguous match. The
 /// daemon surfaces ambiguity as a `session_ambiguous` error instead of
 /// populating this response with multiple entries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RuntimeSessionResolutionResponse {
     pub resolved: Option<ResolvedRuntimeSessionAgent>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionLeaveRequest {
     pub agent_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SignalAckRequest {
     pub agent_id: String,
     pub signal_id: String,
@@ -48,8 +44,7 @@ pub struct SignalAckRequest {
     pub project_dir: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentRuntimeSessionRegistrationRequest {
     pub managed_agent_id: String,
     pub runtime: String,
@@ -57,8 +52,7 @@ pub struct AgentRuntimeSessionRegistrationRequest {
     pub project_dir: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentRuntimeSessionRegistrationResponse {
     pub registered: bool,
 }
