@@ -59,7 +59,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/dev
-          key: harness-daemon-drift-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          key: harness-daemon-drift-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/**') }}
           restore-keys: |
             harness-daemon-drift-${{ runner.os }}-
 
