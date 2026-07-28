@@ -15,7 +15,6 @@ publish = false
 [[bin]]
 name = "harness-panel"
 path = "src/main.rs"
-test = false
 
 [dependencies]
 axum = { version = "0.8.9", features = ["http2", "ws"] }
