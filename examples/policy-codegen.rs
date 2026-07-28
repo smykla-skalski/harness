@@ -2362,13 +2362,20 @@ fn emit_enum_item(
 }
 
 const POLICY_SOURCE: &str = include_str!("../crates/harness-task-board/src/policy.rs");
-const POLICY_GRAPH_SOURCE: &str = include_str!("../src/task_board/policy_graph.rs");
-const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/models.rs");
-const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
-const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
-const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/store.rs");
-const POLICY_SCENARIO_SOURCE: &str = include_str!("../src/task_board/policy_graph/scenario.rs");
-const POLICY_REPLAY_SOURCE: &str = include_str!("../src/task_board/policy_graph/replay.rs");
+const POLICY_GRAPH_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph.rs");
+const POLICY_MODELS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph/models.rs");
+const POLICY_IDS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph/ids.rs");
+const POLICY_DEFAULTS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph/defaults.rs");
+const POLICY_STORE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph/store.rs");
+const POLICY_SCENARIO_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph/scenario.rs");
+const POLICY_REPLAY_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/policy_graph/replay.rs");
 const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
 const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon.rs");
 // TimelineEntry moved out of summaries.rs into the protocol crate, and this

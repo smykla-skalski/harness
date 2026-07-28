@@ -1,8 +1,10 @@
+use std::iter;
+
 use super::*;
 
 #[test]
 fn switch_routes_to_the_first_matching_case() {
-    let graph = switch_graph(json!([
+    let graph = switch_graph(&json!([
         {
             "port": "case_1",
             "field": "checks_green",
@@ -47,7 +49,7 @@ fn switch_routes_to_the_first_matching_case() {
 
 #[test]
 fn switch_routes_to_default_when_no_case_matches() {
-    let graph = switch_graph(json!([
+    let graph = switch_graph(&json!([
         {
             "port": "case_1",
             "field": "checks_green",
@@ -86,7 +88,7 @@ fn switch_routes_to_default_when_no_case_matches() {
 
 #[test]
 fn switch_routes_missing_evidence_through_is_missing_cases() {
-    let graph = switch_graph(json!([
+    let graph = switch_graph(&json!([
         {
             "port": "case_1",
             "field": "checks_green",
@@ -120,7 +122,8 @@ fn switch_routes_missing_evidence_through_is_missing_cases() {
     );
 }
 
-fn switch_graph(arms: serde_json::Value) -> PolicyGraph {
+#[expect(clippy::too_many_lines, reason = "one literal fixture graph, not logic")]
+fn switch_graph(arms: &serde_json::Value) -> PolicyGraph {
     let arm_ports: Vec<String> = arms
         .as_array()
         .expect("switch arms array")
@@ -142,7 +145,7 @@ fn switch_graph(arms: serde_json::Value) -> PolicyGraph {
                 .expect("switch arm port")
                 .to_owned()
         })
-        .chain(std::iter::once("default".to_owned()))
+        .chain(iter::once("default".to_owned()))
         .collect();
     let mut edges = vec![
         json!({

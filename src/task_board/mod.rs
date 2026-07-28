@@ -2,9 +2,9 @@
 // `item_fields`, `item_query`, `lane`, `policy`, `git_identity_defaults`,
 // `progress_rollup`, `remote_spki_pin`, `runtime_config`, `store`, `machines`,
 // part of `wire`, `project`/`project_color`/`project_shape`, `triage*`,
-// `prompt*`/`worker_prompt`, and `working_copy` moved into the standalone
-// `harness-task-board` crate. Every other task-board subtree below reaches
-// those through this glob re-export exactly the way external callers
+// `prompt*`/`worker_prompt`, `working_copy`, and `policy_graph` moved into the
+// standalone `harness-task-board` crate. Every other task-board subtree below
+// reaches those through this glob re-export exactly the way external callers
 // (`daemon`, `session`, `hooks`) already do, so none of them needed an
 // import change for the move.
 pub use harness_task_board::*;
@@ -20,7 +20,6 @@ pub mod github;
 pub(crate) mod legacy_import;
 pub mod orchestrator;
 pub mod planning;
-pub mod policy_graph;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy_runtime;
 pub mod summary;
@@ -85,22 +84,6 @@ pub use orchestrator::{
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
     begin_planning, revoke_plan, submit_plan,
-};
-pub use policy_graph::{
-    GraphPolicyGate, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PolicyCanvasPoint,
-    PolicyCanvasRect, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate,
-    PolicyGraph, PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
-    PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
-    PolicyGraphNodeLayout, PolicyGraphPortDirection, PolicyGraphSimulation,
-    PolicyGraphValidationIssue, PolicyGraphValidationReport, PolicyPipelineAuditSummary,
-    PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGoLiveDiff,
-    PolicyPipelineGoLiveDiffEntry, PolicyPipelineGroup, PolicyPipelineLayout,
-    PolicyPipelineMakeLiveRequest, PolicyPipelineMakeLiveResponse, PolicyPipelineMode,
-    PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort, PolicyPipelinePromoteRequest,
-    PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
-    PolicyPipelineSimulationResult, PolicyPipelineValidation, PolicyPipelineValidationCode,
-    PolicyPipelineValidationIssue, PolicyScenario, replay::PolicyPipelineReplayDecision,
-    replay::PolicyPipelineReplayResult,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use summary::build_audit_summary_with_policy;

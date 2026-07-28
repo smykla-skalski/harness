@@ -1,6 +1,10 @@
 use super::*;
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the promote-and-enforce transition end to end; splitting would fragment the go-live scenario"
+)]
 fn make_live_promotes_active_canvas_and_enables_global_enforcement() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     // Start from a non-live baseline so the flip is observable.
@@ -97,6 +101,10 @@ fn go_live_diff_reports_parity_when_candidate_matches_live() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the live snapshot survives a subsequent draft save; splitting would fragment the go-live scenario"
+)]
 fn draft_save_after_make_live_preserves_the_live_snapshot() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let revision = ws.active_canvas().expect("active canvas").document.revision;

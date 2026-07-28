@@ -16,13 +16,8 @@ fn switching_active_canvas_changes_active_policy_document() {
     apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
     assert_eq!(ws.active_canvas_id, duplicate.id);
 
-    let saved = apply_save_draft(
-        &mut ws,
-        edited_document.clone(),
-        duplicate.document.revision,
-        None,
-    )
-    .expect("save active duplicate");
+    let saved = apply_save_draft(&mut ws, edited_document, duplicate.document.revision, None)
+        .expect("save active duplicate");
     assert!(saved.persisted, "active duplicate draft should persist");
     assert_eq!(
         ws.active_canvas().expect("active canvas").document,
@@ -213,6 +208,10 @@ fn rename_canvas_updates_title_without_replacing_active_document() {
 }
 
 #[test]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "asserts the enforcement flag toggles independently of canvas state across both directions"
+)]
 fn set_global_enforcement_flips_global_gate_without_mutating_canvases() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     ws.canvases[0].document.mode = PolicyGraphMode::Enforced;
@@ -360,8 +359,8 @@ fn import_canvas_validates_and_creates_new_canvas() {
     let initial_len = ws.canvases.len();
     let doc = PolicyGraph::seeded_v2();
 
-    let imported = apply_import(&mut ws, doc.clone(), Some("Imported".to_string()))
-        .expect("import valid graph");
+    let imported =
+        apply_import(&mut ws, doc, Some("Imported".to_string())).expect("import valid graph");
 
     assert_eq!(ws.canvases.len(), initial_len + 1);
     assert_eq!(imported.title, "Imported");

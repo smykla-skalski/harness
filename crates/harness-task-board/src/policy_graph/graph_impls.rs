@@ -1,4 +1,4 @@
-use crate::task_board::policy::{
+use crate::policy::{
     BuiltInPolicyGate, DEFAULT_AUTO_MERGE_RISK_THRESHOLD, POLICY_VERSION, PolicyGate, PolicyInput,
 };
 

@@ -10,7 +10,7 @@
 //!
 //! The map is keyed by policy root so concurrent tests with distinct roots
 //! never observe each other's writes, mirroring the path-keyed
-//! `task_board::store::parse_cache::BOARD_PARSE_CACHE` idiom.
+//! `crate::store::parse_cache::BOARD_PARSE_CACHE` idiom.
 
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -27,14 +27,14 @@ use super::PolicyGraph;
 /// seam reads `canvas_id` to stamp each decision with its provenance. The type
 /// derefs to the document so existing gating callers read the graph unchanged.
 #[derive(Debug)]
-pub(crate) struct CachedGatePolicy {
+pub struct CachedGatePolicy {
     pub canvas_id: Option<String>,
     pub document: PolicyGraph,
 }
 
 impl CachedGatePolicy {
     /// Build a cached entry tagged with the originating canvas id.
-    pub(crate) fn for_canvas(canvas_id: impl Into<String>, document: PolicyGraph) -> Self {
+    pub fn for_canvas(canvas_id: impl Into<String>, document: PolicyGraph) -> Self {
         Self {
             canvas_id: Some(canvas_id.into()),
             document,
@@ -65,7 +65,7 @@ fn database_policy_key() -> &'static Path {
 /// access and no deserialization. Returns `None` until the root is first
 /// populated by a write or the startup warm.
 #[must_use]
-pub(crate) fn cached_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
+pub fn cached_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
     ACTIVE_GATE_POLICY.load().get(root).cloned()
 }
 
@@ -82,8 +82,8 @@ pub(crate) fn cached_database_gate_policy() -> Option<Arc<CachedGatePolicy>> {
 /// Production write paths use [`store_gate_policy_entry`] so the recording seam
 /// can stamp each decision with the canvas it came from; tests that only
 /// exercise allow/deny do not care about provenance and set a bare graph.
-#[cfg(test)]
-pub(crate) fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
+#[cfg(any(test, feature = "test-support"))]
+pub fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
     store_gate_policy_entry(
         root,
         document.map(|document| CachedGatePolicy {
@@ -113,15 +113,17 @@ pub(crate) fn store_gate_policy_entry(root: &Path, entry: Option<CachedGatePolic
 }
 
 /// Refresh the daemon database's active policy projection.
-pub(crate) fn store_database_gate_policy_entry(entry: Option<CachedGatePolicy>) {
+pub fn store_database_gate_policy_entry(entry: Option<CachedGatePolicy>) {
     store_gate_policy_entry(database_policy_key(), entry);
 }
 
-/// Resolve the active gating policy for `root`: the warm process cache when
-/// present, otherwise a cold read from the durable store. The cold read does
-/// not populate the cache; the policy write path keeps the cache current.
-#[cfg(test)]
-pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
+/// Resolve the active gating policy for `root` from the warm process cache.
+/// Test-only alias for [`cached_gate_policy`]: there is no durable-store
+/// fallback here, so a cold root still returns `None` until a write or the
+/// startup warm populates it.
+#[cfg(any(test, feature = "test-support"))]
+#[must_use]
+pub fn resolve_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
     cached_gate_policy(root)
 }
 

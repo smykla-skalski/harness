@@ -2,17 +2,17 @@
 //! ordering, the built-in policy gate, git-identity defaults, runtime
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
-//! project, and working-copy clusters.
+//! project, working-copy, and policy-graph clusters.
 //!
-//! This is slice 4 of the `task_board` extraction (slice 1 established the
-//! crate; this adds `triage*`, `prompt*`/`worker_prompt`, `project`/
-//! `project_color`/`project_shape`, and `working_copy`). The remaining
-//! domain (`automation`, `dispatch`/`evaluation`/`planning`, `external`,
-//! `github`, `policy_graph`, `policy_runtime`, `transport`, and the
-//! `legacy_import`/`orchestrator`/`summary` files that reach into those)
-//! stays in the root crate's `src/task_board` for later slices, and reaches
-//! back into this crate only through the root crate's own
-//! `pub use harness_task_board::*;` facade.
+//! This is slice 7 of the `task_board` extraction (slice 1 established the
+//! crate; slice 4 added `triage*`, `prompt*`/`worker_prompt`, `project`/
+//! `project_color`/`project_shape`, and `working_copy`; this adds
+//! `policy_graph`). The remaining domain (`automation`, `dispatch`/
+//! `evaluation`/`planning`, `external`, `github`, `policy_runtime`,
+//! `transport`, and the `legacy_import`/`orchestrator`/`summary` files that
+//! reach into those) stays in the root crate's `src/task_board` for later
+//! slices, and reaches back into this crate only through the root crate's
+//! own `pub use harness_task_board::*;` facade.
 //!
 //! `prompt_config`, `prompt_catalog`, `triage_escalation_prompt`, and
 //! `worker_prompt` are unconditionally compiled here rather than gated behind
@@ -29,6 +29,7 @@ pub mod item_query;
 pub mod lane;
 pub mod machines;
 pub mod policy;
+pub mod policy_graph;
 pub mod progress_rollup;
 pub mod project;
 pub mod project_color;
@@ -76,6 +77,22 @@ pub use policy::{
     BuiltInPolicyGate, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
     PolicyApprovalState, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput, PolicyReasonCode,
     PolicySubject,
+};
+pub use policy_graph::{
+    GraphPolicyGate, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PolicyCanvasPoint,
+    PolicyCanvasRect, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate,
+    PolicyGraph, PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
+    PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyGraphNodeLayout, PolicyGraphPortDirection, PolicyGraphSimulation,
+    PolicyGraphValidationIssue, PolicyGraphValidationReport, PolicyPipelineAuditSummary,
+    PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGoLiveDiff,
+    PolicyPipelineGoLiveDiffEntry, PolicyPipelineGroup, PolicyPipelineLayout,
+    PolicyPipelineMakeLiveRequest, PolicyPipelineMakeLiveResponse, PolicyPipelineMode,
+    PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort, PolicyPipelinePromoteRequest,
+    PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
+    PolicyPipelineSimulationResult, PolicyPipelineValidation, PolicyPipelineValidationCode,
+    PolicyPipelineValidationIssue, PolicyScenario, replay::PolicyPipelineReplayDecision,
+    replay::PolicyPipelineReplayResult,
 };
 pub use progress_rollup::{TaskBoardProgressRollup, build_progress_rollups};
 pub use prompt_catalog::install_prompt_catalog;

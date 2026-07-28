@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::task_board::policy::{PolicyAction, PolicyInput};
+use crate::policy::{PolicyAction, PolicyInput};
 
 use super::PolicyCanvasWorkspace;
 use super::store_canvas::simulation_inputs;
@@ -130,7 +130,7 @@ fn unknown_scenario(id: &str) -> CliError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task_board::policy::{PolicyEvidence, PolicySubject};
+    use crate::policy::{PolicyEvidence, PolicySubject};
 
     fn input(action: PolicyAction) -> PolicyInput {
         PolicyInput {

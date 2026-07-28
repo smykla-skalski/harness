@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::policy_graph::{
+use crate::policy_graph::{
     POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_TEXT,
     PolicyActionStep, PolicyGraphLayout,
 };
@@ -75,6 +75,7 @@ fn hub_simulation_visits_all_compatible_fanout_branches() {
     );
 }
 
+#[expect(clippy::too_many_lines, reason = "one literal fixture graph, not logic")]
 fn manual_ocr_hub_graph() -> PolicyGraph {
     PolicyGraph {
         schema_version: POLICY_GRAPH_SCHEMA_VERSION,

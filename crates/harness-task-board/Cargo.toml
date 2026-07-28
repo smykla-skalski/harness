@@ -6,18 +6,25 @@ rust-version = "1.95"
 publish = false
 
 [features]
-# Exposes the legacy file-backed `TaskBoardStore`/`MachineRegistry` test
-# doubles (normally `cfg(test)`-only) to the root crate's and
+# Exposes items normally `cfg(test)`-only (the legacy file-backed
+# `TaskBoardStore`/`MachineRegistry` test doubles, and the policy-graph
+# synchronous gate cache's test hooks) to the root crate's and
 # `harness-daemon`'s own tests, which depend on this crate as an ordinary
 # library and so never see its `cfg(test)` items. Matches `harness-agents`'s
 # and `harness-daemon-client`'s own `test-support` feature.
 test-support = []
+# Compiles the policy-graph decision-recording and legacy-import boundary the
+# daemon binary needs (sink installers, the canvas-workspace schema version)
+# without pulling them into a plain library build. The root crate activates
+# this alongside its own `daemon-runtime` feature.
+daemon-runtime = []
 
 [dependencies]
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
+arc-swap = "1.9.1"
 base64 = "0.23.0"
 caseless = "0.2.2"
 chrono = { version = "0.4.44", features = ["serde"] }

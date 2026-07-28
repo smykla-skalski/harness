@@ -1,5 +1,5 @@
 use super::*;
-use crate::task_board::policy::{PolicyApprovalGrantState, PolicyApprovalState};
+use crate::policy::{PolicyApprovalGrantState, PolicyApprovalState};
 
 /// Build the manual spawn policy `ActionGate[spawn_agent] -> ApprovalGate ->
 /// Finish(allow)`. When `approved_edge` is false the approval gate's `approved`

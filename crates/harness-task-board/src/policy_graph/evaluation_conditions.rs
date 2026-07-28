@@ -7,7 +7,7 @@ use super::{
     PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind, PolicyIfThenElseCondition,
     PolicyReasonCode, PolicySwitchArm, PolicySwitchNode,
 };
-use crate::task_board::policy::PolicyInput;
+use crate::policy::PolicyInput;
 
 pub(super) fn is_workflow_entry_node(node: &PolicyGraphNode) -> bool {
     matches!(
@@ -135,7 +135,7 @@ fn risk_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u8> {
     }
 }
 
-pub(in crate::task_board::policy_graph) const fn predicate_passes(
+pub(in crate::policy_graph) const fn predicate_passes(
     predicate: PolicyEvidencePredicate,
     value: u32,
 ) -> bool {
