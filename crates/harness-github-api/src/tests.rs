@@ -27,9 +27,9 @@ fn cache_key_hashes_secret_material() {
 #[test]
 fn disk_cache_control_reuses_healthy_scope_and_rotates_during_recovery() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let first = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let first = GitHubCache::test_with_root(temp.path());
     first.persist_data_revision(7).expect("persist revision");
-    let second = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let second = GitHubCache::test_with_root(temp.path());
 
     assert_eq!(first.scope(), second.scope());
     assert_eq!(second.data_revision(), 7);
@@ -37,7 +37,7 @@ fn disk_cache_control_reuses_healthy_scope_and_rotates_during_recovery() {
     second
         .disable_disk_after_revision_failure(8)
         .expect("rotate failed cache");
-    let recovered = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let recovered = GitHubCache::test_with_root(temp.path());
     assert_ne!(healthy_scope, recovered.scope());
     assert_eq!(second.scope(), recovered.scope());
     assert_eq!(recovered.data_revision(), 8);
@@ -46,7 +46,7 @@ fn disk_cache_control_reuses_healthy_scope_and_rotates_during_recovery() {
 #[test]
 fn disk_cache_recovery_propagates_control_rotation_failure() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let cache = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let cache = GitHubCache::test_with_root(temp.path());
     cache.persist_data_revision(7).expect("persist revision");
     let blocked_tmp = temp
         .path()
@@ -57,7 +57,7 @@ fn disk_cache_recovery_propagates_control_rotation_failure() {
     let error = cache
         .disable_disk_after_revision_failure(8)
         .expect_err("control rotation must remain observable");
-    let restarted = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let restarted = GitHubCache::test_with_root(temp.path());
 
     assert!(error.to_string().contains("rotate github cache control"));
     assert_eq!(restarted.data_revision(), 7);
@@ -192,7 +192,7 @@ async fn budget_reserves_inflight_predicted_cost_until_permit_drops() {
 #[test]
 fn disk_cache_writes_valid_json_without_tmp_file() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let cache = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let cache = GitHubCache::test_with_root(temp.path());
     let key = GitHubCache::key(&["disk", "atomic"]);
     let policy = GitHubCachePolicy::read_through(Duration::from_secs(60), Duration::from_secs(60));
 
@@ -213,7 +213,7 @@ fn disk_cache_writes_valid_json_without_tmp_file() {
 #[test]
 fn disk_cache_gc_prunes_oldest_entries() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let cache = GitHubCache::test_with_root(temp.path().to_path_buf());
+    let cache = GitHubCache::test_with_root(temp.path());
     let policy = GitHubCachePolicy::read_through(Duration::from_secs(60), Duration::from_secs(60));
 
     for index in 0..20 {

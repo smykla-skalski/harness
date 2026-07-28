@@ -9,7 +9,7 @@ use super::state::global_state;
 const MAX_STABLE_READ_ATTEMPTS: usize = 3;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct GitHubReadStabilityError {
+pub struct GitHubReadStabilityError {
     operation: String,
     attempts: usize,
     final_start_revision: u64,
@@ -34,7 +34,13 @@ impl From<GitHubReadStabilityError> for CliError {
     }
 }
 
-pub(crate) async fn retry_stable_read<T, E, Fetch, FetchFuture>(
+/// Retry `fetch` while the shared data revision changes mid-read, so a
+/// caller never observes a torn view spanning a mutation.
+///
+/// # Errors
+/// Returns `fetch`'s own error, or [`GitHubReadStabilityError`] if the
+/// revision keeps changing until the retry budget is exhausted.
+pub async fn retry_stable_read<T, E, Fetch, FetchFuture>(
     operation: &str,
     fetch: Fetch,
 ) -> Result<(T, u64), E>

@@ -3521,6 +3521,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon-client",
+ "harness-github-api",
  "harness-infra",
  "harness-kernel",
  "harness-mcp",
@@ -3697,6 +3698,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon-client",
+ "harness-github-api",
  "harness-hook",
  "harness-infra",
  "harness-kernel",
@@ -3773,6 +3775,26 @@ dependencies = [
  "tracing",
  "user_dirs",
  "uzers",
+]
+
+[[package]]
+name = "harness-github-api"
+version = "54.0.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "fs-err",
+ "harness-kernel",
+ "harness-workspace",
+ "hex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

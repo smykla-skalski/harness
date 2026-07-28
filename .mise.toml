@@ -376,7 +376,7 @@ run = [
   # selects, so checking both together would build harness-observe's own test
   # target with that feature on and break its FocusPreset-dependent tests.
   "./scripts/cargo-local.sh clippy --all-targets -p harness-observe",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-agents -p harness-command -p harness-daemon-client -p harness-infra -p harness-kernel -p harness-protocol -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-agents -p harness-command -p harness-daemon-client -p harness-github-api -p harness-infra -p harness-kernel -p harness-protocol -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

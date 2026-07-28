@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(any(test, feature = "test-support"))]
+use std::sync::MutexGuard;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
@@ -11,12 +14,48 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_TIMEOUT: Duration = Duration::from_mins(1);
 const DATA_CHANGE_CAPACITY: usize = 128;
 
-#[cfg(test)]
-static GLOBAL_BUDGET_TEST_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+static DAEMON_ROOT: OnceLock<PathBuf> = OnceLock::new();
 
-#[cfg(test)]
-pub(crate) async fn acquire_global_budget_test_lock() -> std::sync::MutexGuard<'static, ()> {
-    let lock = GLOBAL_BUDGET_TEST_LOCK.get_or_init(|| std::sync::Mutex::new(()));
+/// Configure the daemon-data-directory root this crate resolves its cache
+/// and usage journal against. Call once, before any other entry point in
+/// this crate runs - the root `harness` binary and the `harness-daemon`
+/// binary each own `daemon_root()` resolution and must call this early in
+/// their own startup, since this crate cannot depend on either to resolve it
+/// itself. A repeat call after the first is a no-op: first configuration
+/// wins, matching the global client state it feeds below.
+pub fn configure_daemon_root(root: PathBuf) {
+    let _ = DAEMON_ROOT.set(root);
+}
+
+#[cfg(not(any(test, feature = "test-support")))]
+fn daemon_root() -> PathBuf {
+    DAEMON_ROOT
+        .get()
+        .cloned()
+        .expect("harness_github_api::configure_daemon_root must run before first use")
+}
+
+// Test builds (this crate's own, or a downstream crate's via `test-support`)
+// never enable the disk-backed cache or usage journal, so the placeholder
+// root below is never read from or written to; see `GitHubCache::new`.
+#[cfg(any(test, feature = "test-support"))]
+fn daemon_root() -> PathBuf {
+    PathBuf::new()
+}
+
+#[cfg(any(test, feature = "test-support"))]
+static GLOBAL_BUDGET_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+/// Serialize access to the shared rate-budget state across tests that
+/// exercise it directly, so one test's `reset_for_test` can't clobber
+/// another's in-flight assertions.
+///
+/// # Panics
+/// Panics if the lock is poisoned by another test panicking while holding
+/// it.
+#[cfg(any(test, feature = "test-support"))]
+pub async fn acquire_global_budget_test_lock() -> MutexGuard<'static, ()> {
+    let lock = GLOBAL_BUDGET_TEST_LOCK.get_or_init(|| Mutex::new(()));
     let guard = lock.lock().expect("global budget test lock poisoned");
     global_state().budget.reset_for_test().await;
     guard
@@ -47,7 +86,7 @@ pub(super) struct InflightGuard {
     state: Arc<GitHubApiState>,
 }
 
-pub(crate) struct GitHubMutationGuard {
+pub struct GitHubMutationGuard {
     state: Arc<GitHubApiState>,
     operation: String,
     remote_succeeded: bool,
@@ -64,7 +103,7 @@ impl Drop for InflightGuard {
 }
 
 impl GitHubMutationGuard {
-    pub(crate) const fn mark_remote_success(&mut self) {
+    pub const fn mark_remote_success(&mut self) {
         self.remote_succeeded = true;
     }
 
@@ -84,15 +123,16 @@ impl Drop for GitHubMutationGuard {
 pub(super) fn global_state() -> Arc<GitHubApiState> {
     Arc::clone(GLOBAL_STATE.get_or_init(|| {
         let (data_changes, _) = broadcast::channel(DATA_CHANGE_CAPACITY);
-        let cache = GitHubCache::new();
-        #[cfg(not(test))]
+        let daemon_root = daemon_root();
+        let cache = GitHubCache::new(&daemon_root);
+        #[cfg(not(any(test, feature = "test-support")))]
         let data_revision = cache.data_revision();
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         let data_revision = 0;
         Arc::new(GitHubApiState {
             budget: GitHubRateBudget::new(),
             cache,
-            recorder: GitHubUsageRecorder::new(),
+            recorder: GitHubUsageRecorder::new(&daemon_root),
             http: reqwest::Client::builder()
                 .connect_timeout(CONNECT_TIMEOUT)
                 .read_timeout(READ_TIMEOUT)
@@ -166,7 +206,7 @@ impl GitHubApiState {
         });
     }
 
-    #[cfg(not(test))]
+    #[cfg(not(any(test, feature = "test-support")))]
     #[expect(
         clippy::cognitive_complexity,
         reason = "revision persistence quarantines disk data through a nested recovery path"
@@ -180,23 +220,27 @@ impl GitHubApiState {
         }
     }
 
-    #[cfg(test)]
+    // `&self` is unused here but required to match the production branch's
+    // signature above, since both are the same method name behind a cfg
+    // split.
+    #[cfg(any(test, feature = "test-support"))]
+    #[allow(clippy::unused_self)]
     const fn persist_data_revision(&self, _revision: u64) {}
 }
 
-pub(crate) async fn begin_external_mutation(operation: &str) -> GitHubMutationGuard {
+pub async fn begin_external_mutation(operation: &str) -> GitHubMutationGuard {
     global_state().mutation_guard(operation).await
 }
 
-pub(crate) fn republish_current_data_change(operation: &str) {
+pub fn republish_current_data_change(operation: &str) {
     global_state().republish_current_data_change(operation);
 }
 
-pub(crate) async fn refresh_read_generation() {
+pub async fn refresh_read_generation() {
     global_state().refresh_read_generation().await;
 }
 
-pub(crate) async fn stable_data_revision_guard(
+pub async fn stable_data_revision_guard(
     expected_revision: u64,
 ) -> Option<OwnedMutexGuard<()>> {
     let state = global_state();

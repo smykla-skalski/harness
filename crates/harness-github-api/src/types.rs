@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 use super::budget::GitHubRateResource;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubDataChange {
+pub struct GitHubDataChange {
     pub revision: u64,
     pub operation: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitHubPullRequestSnapshot {
+pub struct GitHubPullRequestSnapshot {
     pub repository: String,
     pub number: u64,
     pub is_open: Option<bool>,
@@ -21,7 +21,7 @@ pub(crate) struct GitHubPullRequestSnapshot {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum GitHubPriority {
+pub enum GitHubPriority {
     Background,
     NormalRead,
     FreshRead,
@@ -29,21 +29,24 @@ pub(crate) enum GitHubPriority {
 }
 
 impl GitHubPriority {
-    pub(crate) const fn is_priority(self) -> bool {
+    #[must_use]
+    pub const fn is_priority(self) -> bool {
         matches!(self, Self::FreshRead | Self::Mutation)
     }
 
-    pub(crate) const fn is_background(self) -> bool {
+    #[must_use]
+    pub const fn is_background(self) -> bool {
         matches!(self, Self::Background)
     }
 
-    pub(crate) const fn is_write(self) -> bool {
+    #[must_use]
+    pub const fn is_write(self) -> bool {
         matches!(self, Self::Mutation)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct GitHubCachePolicy {
+pub struct GitHubCachePolicy {
     pub fresh_for: Duration,
     pub stale_for: Duration,
     pub force_refresh: bool,
@@ -51,7 +54,8 @@ pub(crate) struct GitHubCachePolicy {
 }
 
 impl GitHubCachePolicy {
-    pub(crate) const fn no_store() -> Self {
+    #[must_use]
+    pub const fn no_store() -> Self {
         Self {
             fresh_for: Duration::ZERO,
             stale_for: Duration::ZERO,
@@ -60,7 +64,8 @@ impl GitHubCachePolicy {
         }
     }
 
-    pub(crate) const fn read_through(fresh_for: Duration, stale_for: Duration) -> Self {
+    #[must_use]
+    pub const fn read_through(fresh_for: Duration, stale_for: Duration) -> Self {
         Self {
             fresh_for,
             stale_for,
@@ -69,13 +74,14 @@ impl GitHubCachePolicy {
         }
     }
 
-    pub(crate) const fn is_enabled(self) -> bool {
+    #[must_use]
+    pub const fn is_enabled(self) -> bool {
         self.fresh_for.as_secs() > 0 || self.stale_for.as_secs() > 0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitHubRequestDescriptor {
+pub struct GitHubRequestDescriptor {
     pub operation: String,
     pub resource: GitHubRateResource,
     pub priority: GitHubPriority,
@@ -84,7 +90,7 @@ pub(crate) struct GitHubRequestDescriptor {
 }
 
 impl GitHubRequestDescriptor {
-    pub(crate) fn graphql(
+    pub fn graphql(
         operation: impl Into<String>,
         priority: GitHubPriority,
         cache_policy: GitHubCachePolicy,
@@ -98,7 +104,7 @@ impl GitHubRequestDescriptor {
         }
     }
 
-    pub(crate) fn rest_core(
+    pub fn rest_core(
         operation: impl Into<String>,
         priority: GitHubPriority,
         cache_policy: GitHubCachePolicy,
@@ -112,7 +118,8 @@ impl GitHubRequestDescriptor {
         }
     }
 
-    pub(crate) const fn with_expected_cost(mut self, expected_cost: u32) -> Self {
+    #[must_use]
+    pub const fn with_expected_cost(mut self, expected_cost: u32) -> Self {
         self.expected_cost = expected_cost;
         self
     }
@@ -120,7 +127,7 @@ impl GitHubRequestDescriptor {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum GitHubResponseCacheState {
+pub enum GitHubResponseCacheState {
     Fresh,
     Stale,
     Revalidated,
@@ -130,7 +137,7 @@ pub(crate) enum GitHubResponseCacheState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubResponseProvenance {
+pub struct GitHubResponseProvenance {
     pub from_cache: bool,
     pub cache_age_seconds: Option<u64>,
     pub cache_state: GitHubResponseCacheState,
@@ -138,7 +145,8 @@ pub(crate) struct GitHubResponseProvenance {
 }
 
 impl GitHubResponseProvenance {
-    pub(crate) const fn network(snapshot: Option<super::budget::GitHubRateLimitSnapshot>) -> Self {
+    #[must_use]
+    pub const fn network(snapshot: Option<super::budget::GitHubRateLimitSnapshot>) -> Self {
         Self {
             from_cache: false,
             cache_age_seconds: None,
@@ -149,7 +157,7 @@ impl GitHubResponseProvenance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubApiStatus {
+pub struct GitHubApiStatus {
     pub data_revision: u64,
     pub buckets: Vec<GitHubRateBucketStatus>,
     pub cooling: Vec<GitHubCooldownStatus>,
@@ -163,7 +171,7 @@ pub(crate) struct GitHubApiStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubRateBucketStatus {
+pub struct GitHubRateBucketStatus {
     pub resource: GitHubRateResource,
     pub remaining: u32,
     pub limit: u32,
@@ -172,14 +180,14 @@ pub(crate) struct GitHubRateBucketStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubCooldownStatus {
+pub struct GitHubCooldownStatus {
     pub resource: GitHubRateResource,
     pub reason: String,
     pub until_seconds_from_now: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct GitHubOperationSpend {
+pub struct GitHubOperationSpend {
     pub operation: String,
     pub network_requests: u64,
     pub graphql_points: u64,

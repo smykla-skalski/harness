@@ -15,8 +15,9 @@ pub mod daemon;
 #[path = "../../../src/feature_flags.rs"]
 pub mod feature_flags;
 pub(crate) mod git;
-#[path = "../../../src/github_api/mod.rs"]
-pub(crate) mod github_api;
+pub(crate) mod github_api {
+    pub use harness_github_api::*;
+}
 pub mod hooks;
 pub mod infra;
 pub mod observe;

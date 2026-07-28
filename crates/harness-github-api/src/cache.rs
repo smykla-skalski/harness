@@ -12,11 +12,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::daemon::state;
-
 use super::types::GitHubCachePolicy;
 
 const MEMORY_ENTRY_CAP: usize = 512;
+#[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
 const LEGACY_DATA_REVISION_FILE: &str = "data-revision";
 const CACHE_CONTROL_FILE: &str = "github-cache-control.json";
 #[cfg(not(test))]
@@ -59,8 +58,12 @@ struct GitHubCacheControl {
     scope: String,
 }
 
-pub(crate) struct GitHubCache {
+pub struct GitHubCache {
     root: PathBuf,
+    // Unread when a downstream crate builds us under `test-support` without
+    // also being our own `cfg(test)` build: `new` never enables disk in that
+    // combination, so nothing ever revisits this path. See `new` below.
+    #[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
     control_path: PathBuf,
     control: Mutex<GitHubCacheControl>,
     disk_enabled: AtomicBool,
@@ -68,17 +71,20 @@ pub(crate) struct GitHubCache {
 }
 
 impl GitHubCache {
-    pub(crate) fn new() -> Self {
-        let state_root = state::daemon_root();
-        #[cfg(not(test))]
+    // Takes the daemon root as a parameter rather than resolving it
+    // internally: this crate cannot depend on whatever crate owns that
+    // resolution (see the crate-level docs), so the caller resolves it and
+    // passes the result in.
+    pub(crate) fn new(daemon_root: &Path) -> Self {
+        #[cfg(not(any(test, feature = "test-support")))]
         {
-            Self::with_root(&state_root)
+            Self::with_root(daemon_root)
         }
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         {
             Self {
-                root: state_root.join("github-cache").join("v1"),
-                control_path: state_root.join(CACHE_CONTROL_FILE),
+                root: daemon_root.join("github-cache").join("v1"),
+                control_path: daemon_root.join(CACHE_CONTROL_FILE),
                 control: Mutex::new(GitHubCacheControl {
                     data_revision: 0,
                     scope: Uuid::new_v4().to_string(),
@@ -90,10 +96,14 @@ impl GitHubCache {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_with_root(root: PathBuf) -> Self {
-        Self::with_root(&root)
+    pub(crate) fn test_with_root(root: &Path) -> Self {
+        Self::with_root(root)
     }
 
+    // Dead when a downstream crate builds us under `test-support` without
+    // also being our own `cfg(test)` build, since `new` only reaches this
+    // through the production branch in that combination; see `new` above.
+    #[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
     fn with_root(state_root: &Path) -> Self {
         let root = state_root.join("github-cache").join("v1");
         let control_path = state_root.join(CACHE_CONTROL_FILE);
@@ -124,6 +134,7 @@ impl GitHubCache {
             .clone()
     }
 
+    #[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
     pub(crate) fn data_revision(&self) -> u64 {
         self.control
             .lock()
@@ -131,6 +142,7 @@ impl GitHubCache {
             .data_revision
     }
 
+    #[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
     pub(crate) fn persist_data_revision(&self, revision: u64) -> IoResult<()> {
         let mut guard = self.control.lock().unwrap_or_else(PoisonError::into_inner);
         let next = GitHubCacheControl {
@@ -142,6 +154,7 @@ impl GitHubCache {
         Ok(())
     }
 
+    #[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
     pub(crate) fn disable_disk_after_revision_failure(&self, revision: u64) -> IoResult<()> {
         self.disk_enabled.store(false, Ordering::Release);
         let recovery = GitHubCacheControl {
@@ -326,6 +339,7 @@ impl GitHubCache {
     }
 }
 
+#[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
 fn initialize_control(root: &Path, control_path: &Path) -> (GitHubCacheControl, bool) {
     if let Ok(raw) = fs::read_to_string(control_path)
         && let Ok(control) = serde_json::from_str::<GitHubCacheControl>(&raw)
@@ -345,6 +359,7 @@ fn initialize_control(root: &Path, control_path: &Path) -> (GitHubCacheControl, 
     (control, disk_enabled)
 }
 
+#[cfg_attr(all(feature = "test-support", not(test)), allow(dead_code))]
 fn persist_control(path: &Path, control: &GitHubCacheControl) -> IoResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;

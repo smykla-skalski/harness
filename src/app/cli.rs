@@ -4,6 +4,8 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use tracing::field::{Empty, display};
 
+use crate::daemon::state::daemon_root;
+use crate::github_api::configure_daemon_root;
 use crate::observe::ObserveArgs;
 use crate::session::transport::SessionCommand;
 use crate::setup::{BootstrapArgs, CapabilitiesArgs, SecretsArgs};
@@ -80,6 +82,11 @@ pub enum Command {
 /// # Errors
 /// Returns `CliError` when the selected command fails.
 pub fn dispatch(command: &Command) -> Result<i32, CliError> {
+    // `github_api` cannot resolve its own daemon root - it would have to
+    // depend on `daemon` (or on us) to do that, backwards from how leaf
+    // crates relate to this one - so we resolve it and hand it over before
+    // any command has a chance to reach the client.
+    configure_daemon_root(daemon_root());
     if !matches!(command, Command::Daemon { .. } | Command::Bridge { .. }) {
         super::run_startup_migrations();
     }

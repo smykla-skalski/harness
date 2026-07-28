@@ -12,14 +12,21 @@ use super::response::{budget_error, context_error, http_status_error, request_er
 use super::state::GitHubMutationGuard;
 use super::{GitHubRateResource, GitHubRequestDescriptor, retry_stable_read};
 
-pub(crate) struct GitHubRestRawResponse<T> {
-    pub(crate) status: StatusCode,
-    pub(crate) headers: HeaderMap,
-    pub(crate) body: Option<T>,
+pub struct GitHubRestRawResponse<T> {
+    pub status: StatusCode,
+    pub headers: HeaderMap,
+    pub body: Option<T>,
 }
 
 impl GitHubProtectedClient {
-    pub(crate) async fn rest_json_with_headers<T>(
+    /// Run a REST request with extra request headers, returning the status,
+    /// response headers, and decoded body rather than just the body like
+    /// [`GitHubProtectedClient::rest_json`] does.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure or a response body that can't
+    /// be decoded into `T`.
+    pub async fn rest_json_with_headers<T>(
         &self,
         method: Method,
         route: impl AsRef<str>,
@@ -136,7 +143,12 @@ impl GitHubProtectedClient {
         })
     }
 
-    pub(crate) async fn rest_empty(
+    /// Run a REST request whose response body is discarded, for endpoints
+    /// that return no useful body on success.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure or a non-success status.
+    pub async fn rest_empty(
         &self,
         method: Method,
         route: impl AsRef<str>,
