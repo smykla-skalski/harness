@@ -2,27 +2,39 @@
 //! ordering, the built-in policy gate, git-identity defaults, runtime
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
-//! project, working-copy, policy-graph, and external-sync/github clusters.
+//! project, working-copy, policy-graph, external-sync/github, and automation
+//! clusters.
 //!
 //! This is a later slice of the `task_board` extraction, following slice 4's
-//! triage/prompt/project/working-copy cluster and the slice that added
-//! `policy_graph`. It adds `external`: the sync-domain foundation
-//! (`ExternalTask`, `ExternalProvider`, `ExternalSyncClient`, and the
-//! `capabilities`/`config`/`create_recovery`/`targeting` support it needs)
-//! plus the `github` provider-client cluster that implements that
+//! triage/prompt/project/working-copy cluster, the slice that added
+//! `policy_graph`, and the slice that added `external`: the sync-domain
+//! foundation (`ExternalTask`, `ExternalProvider`, `ExternalSyncClient`, and
+//! the `capabilities`/`config`/`create_recovery`/`targeting` support it
+//! needs) plus the `github` provider-client cluster that implements that
 //! foundation. `external::sync`, `external::scopes`, and the
 //! `sync_tests`/`tests` test-only clusters stay in root's own
 //! `src/task_board/external.rs` until a follow-up slice moves them; that
 //! file's doc comment covers the reverse-dependency shape this split
-//! creates. The standalone `task_board::github` module (distinct from this
-//! crate's `external::github`) also stays in root: two of its files need
-//! `automation::TaskBoardRepositoryAutomationConfig`, which hasn't been
-//! extracted yet. The rest of the remaining domain (`automation`,
-//! `dispatch`/`evaluation`/`planning`, `github`, `policy_runtime`,
-//! `transport`, and the `legacy_import`/`orchestrator`/`summary` files that
-//! reach into those) stays in the root crate's `src/task_board` for later
-//! slices, and reaches back into this crate only through the root crate's
-//! own `pub use harness_task_board::*;` facade.
+//! creates.
+//!
+//! This slice adds `automation`. `automation` reaches forward into one root
+//! module that has not moved yet: `orchestrator::types`'s
+//! `TaskBoardOrchestratorWorkflow` enum, which comes here as
+//! `automation::orchestrator_workflow` because the rest of that file also
+//! needs `dispatch`/`evaluation`/`summary` (out of scope for this slice). It
+//! also moves `github::config`'s automation-settings wire types in full
+//! (all eight, as `github_config`), because they and `automation::settings`
+//! depend on each other's types; this closes the reverse dependency an
+//! earlier slice's doc comment flagged, where two files under the standalone
+//! `task_board::github` module (distinct from this crate's
+//! `external::github`) needed `automation::TaskBoardRepositoryAutomationConfig`
+//! before it was extracted. The remaining domain (`dispatch`/`evaluation`/
+//! `planning`, `external`, the rest of `github` (`client`/`client_graphql`/
+//! `evidence`/`evidence_api`/`publication`/`repository`/`risk`),
+//! `policy_runtime`, `transport`, and the `legacy_import`/`orchestrator`/
+//! `summary` files that reach into those) stays in the root crate's
+//! `src/task_board` for later slices, and reaches back into this crate only
+//! through the root crate's own `pub use harness_task_board::*;` facade.
 //!
 //! `prompt_config`, `prompt_catalog`, `triage_escalation_prompt`, and
 //! `worker_prompt` are unconditionally compiled here rather than gated behind
@@ -33,8 +45,10 @@
 
 #![deny(unsafe_code)]
 
+pub mod automation;
 pub mod external;
 pub mod git_identity_defaults;
+pub mod github_config;
 pub mod item_fields;
 pub mod item_query;
 pub mod lane;
@@ -63,10 +77,15 @@ pub mod wire;
 mod worker_prompt;
 pub mod working_copy;
 
+pub use automation::*;
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
     TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
     discover as discover_git_identity_defaults,
+};
+pub use github_config::{
+    GitHubAutomation, GitHubAutomationLabels, GitHubAutomationSettings, GitHubAutomationToggles,
+    GitHubMergeMethod, GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
 };
 pub use item_fields::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,

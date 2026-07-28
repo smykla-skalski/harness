@@ -12,12 +12,12 @@ use crate::task_board::TaskBoardGitRuntimeConfig;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::GitHubAutomationClient;
-use super::config::{GitHubMergeMethod, GitHubProjectConfig};
 use super::evidence::GitHubMergeEvidence;
 use super::evidence_api::pull_request_merge_evidence;
 use super::publication::{
     GitHubBranchState, branch_state_async, publish_branch_from_worktree_async,
 };
+use super::{GitHubMergeMethod, GitHubProjectConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitHubPullRequestHandle {

@@ -7,7 +7,6 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 mod client;
 mod client_graphql;
-mod config;
 mod evidence;
 mod evidence_api;
 mod publication;
@@ -15,13 +14,16 @@ mod repository;
 mod risk;
 
 pub use client::{GitHubApiAutomationClient, GitHubCreatePullRequest, GitHubPullRequestHandle};
-pub use config::{
-    GitHubAutomation, GitHubAutomationLabels, GitHubAutomationSettings, GitHubAutomationToggles,
-    GitHubMergeMethod, GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
-};
+// `config.rs` moved to `harness-task-board` (as `github_config`) in full,
+// all eight of its wire types: they and `automation::settings` reach into
+// each other, so both had to move in the same slice.
 pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
+};
+pub use harness_task_board::github_config::{
+    GitHubAutomation, GitHubAutomationLabels, GitHubAutomationSettings, GitHubAutomationToggles,
+    GitHubMergeMethod, GitHubProjectConfig, GitHubRequestedReviewers, ProtectedPathRule,
 };
 pub use publication::GitHubBranchState;
 #[cfg(any(test, feature = "daemon-runtime"))]
@@ -202,8 +204,5 @@ pub fn build_auto_merge_policy_input(
     evidence.auto_merge_policy_input(config)
 }
 
-#[cfg(test)]
-#[path = "config_overrides_tests.rs"]
-mod config_overrides_tests;
 #[cfg(test)]
 mod tests;
