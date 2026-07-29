@@ -46,9 +46,9 @@ use super::tool_translator::{
 pub const MAX_TOOL_ITERATIONS: u32 = 10;
 const OPENROUTER_TURN_FAILED: i32 = -32092;
 
-/// Drive one ACP `session/prompt` turn to completion. Mutates the session's
-/// history via `store`. Returns the `StopReason` to embed in the
-/// `PromptResponse`.
+/// Drive one ACP `session/prompt` turn to completion and mutate its stored history.
+///
+/// Returns the terminal `StopReason` on success. Provider and stream failures fail the prompt.
 pub async fn drive_turn(
     connection: &ConnectionTo<Client>,
     client: &OpenRouterClient,
