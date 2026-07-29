@@ -290,7 +290,13 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
             if let Ok(mut bindings) = self.lock_bindings() {
                 bindings.remove(&id);
             }
-            let _ = self.manager.stop(id.as_str());
+            if let Err(stop_error) = self.manager.stop(id.as_str()) {
+                tracing::warn!(
+                    turn_id = %id,
+                    %stop_error,
+                    "failed to stop OpenRouter turn after its start could not be recorded; provider work may be orphaned"
+                );
+            }
             return Err(error);
         }
         Ok(id)
