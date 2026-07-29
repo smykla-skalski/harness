@@ -9,9 +9,10 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
     // Safe to repeat: the table create guards with IF NOT EXISTS and the stamp
     // is idempotent, so the repair replay can re-run this step. The file carries
     // the version stamp in the same batch, as the migrations before it do.
-    conn.execute_batch(PULL_REQUEST_ACTIONS_SQL).map_err(|error| {
-        super::db_error(format!(
-            "apply schema v57 pull request actions migration: {error}"
-        ))
-    })
+    conn.execute_batch(PULL_REQUEST_ACTIONS_SQL)
+        .map_err(|error| {
+            super::db_error(format!(
+                "apply schema v57 pull request actions migration: {error}"
+            ))
+        })
 }

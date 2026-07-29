@@ -58,7 +58,9 @@ where
             action.id
         ))
         .into()),
-        ActionAdmission::Proceed => gate_then_issue(store, source, &action, requirement, merge).await,
+        ActionAdmission::Proceed => {
+            gate_then_issue(store, source, &action, requirement, merge).await
+        }
         ActionAdmission::NeedsReconcile => {
             if reconcile_merge(store, source, &action).await? {
                 Ok(MergeLedgerOutcome::AlreadyApplied)

@@ -48,16 +48,13 @@ impl ReviewsGitHubClient {
         let source = GitHubPullRequestEvidenceSource::new(&self.client);
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = match verify_target_gate(
-                &source,
-                target,
-                ActionGateRequirement::for_approval(),
-            )
-            .await
-            {
-                Ok(()) => approve_target(&self.client, target, DIRECT_APPROVAL_OPERATION).await,
-                Err(error) => Err(error),
-            };
+            let result =
+                match verify_target_gate(&source, target, ActionGateRequirement::for_approval())
+                    .await
+                {
+                    Ok(()) => approve_target(&self.client, target, DIRECT_APPROVAL_OPERATION).await,
+                    Err(error) => Err(error),
+                };
             results.push(action_result(target, ReviewActionKind::Approve, result));
         }
         Ok(results)
@@ -84,15 +81,12 @@ impl ReviewsGitHubClient {
         let source = GitHubPullRequestEvidenceSource::new(&self.client);
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = match verify_target_gate(
-                &source,
-                target,
-                ActionGateRequirement::for_comment(),
-            )
-            .await
-            {
-                Ok(()) => {
-                    self.client
+            let result =
+                match verify_target_gate(&source, target, ActionGateRequirement::for_comment())
+                    .await
+                {
+                    Ok(()) => self
+                        .client
                         .graphql_envelope(
                             mutation_descriptor("reviews.comment"),
                             json!({
@@ -104,10 +98,9 @@ impl ReviewsGitHubClient {
                             }),
                         )
                         .await
-                        .map(|response| response.body)
-                }
-                Err(error) => Err(error),
-            };
+                        .map(|response| response.body),
+                    Err(error) => Err(error),
+                };
             results.push(comment_action_result(target, result));
         }
         Ok(results)
@@ -202,16 +195,12 @@ impl ReviewsGitHubClient {
         let source = GitHubPullRequestEvidenceSource::new(&self.client);
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = match verify_target_gate(
-                &source,
-                target,
-                ActionGateRequirement::for_merge(),
-            )
-            .await
-            {
-                Ok(()) => merge_target(&self.automation, target, request.method).await,
-                Err(error) => Err(error),
-            };
+            let result =
+                match verify_target_gate(&source, target, ActionGateRequirement::for_merge()).await
+                {
+                    Ok(()) => merge_target(&self.automation, target, request.method).await,
+                    Err(error) => Err(error),
+                };
             results.push(action_result(target, ReviewActionKind::Merge, result));
         }
         Ok(results)
@@ -504,20 +493,29 @@ mod tests {
         ReviewTargetFlags,
     };
     use harness_task_board::github::{
-        CheckGate, CheckState, InMemoryPullRequestEvidenceSource, Mergeability, PullRequestEvidence,
-        PullRequestLifecycle, PullRequestMergeGates, ReviewDecision, ReviewGate,
+        CheckGate, CheckState, InMemoryPullRequestEvidenceSource, Mergeability,
+        PullRequestEvidence, PullRequestLifecycle, PullRequestMergeGates, ReviewDecision,
+        ReviewGate,
     };
 
     const HEAD: &str = "0123456789abcdef";
 
     #[tokio::test]
     async fn an_approval_proceeds_when_the_head_still_matches() {
-        let source = InMemoryPullRequestEvidenceSource::new()
-            .with_evidence(evidence(HEAD, PullRequestLifecycle::Open, false, minimal_gates()));
+        let source = InMemoryPullRequestEvidenceSource::new().with_evidence(evidence(
+            HEAD,
+            PullRequestLifecycle::Open,
+            false,
+            minimal_gates(),
+        ));
 
-        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_approval())
-            .await
-            .expect("open pull request on the verified head clears the approval gate");
+        verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_approval(),
+        )
+        .await
+        .expect("open pull request on the verified head clears the approval gate");
     }
 
     #[tokio::test]
@@ -529,10 +527,13 @@ mod tests {
             minimal_gates(),
         ));
 
-        let error =
-            verify_target_gate(&source, &review_target(), ActionGateRequirement::for_approval())
-                .await
-                .expect_err("a moved head must refuse the approval");
+        let error = verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_approval(),
+        )
+        .await
+        .expect_err("a moved head must refuse the approval");
         assert!(error.to_string().contains("head moved"));
     }
 
@@ -540,10 +541,13 @@ mod tests {
     async fn an_action_is_refused_when_the_pull_request_is_missing() {
         let source = InMemoryPullRequestEvidenceSource::new();
 
-        let error =
-            verify_target_gate(&source, &review_target(), ActionGateRequirement::for_approval())
-                .await
-                .expect_err("a vanished pull request must refuse the action");
+        let error = verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_approval(),
+        )
+        .await
+        .expect_err("a vanished pull request must refuse the action");
         assert!(error.to_string().contains("no longer present"));
     }
 
@@ -553,22 +557,28 @@ mod tests {
         let mut target = review_target();
         target.head_sha = "  ".to_owned();
 
-        let error =
-            verify_target_gate(&source, &target, ActionGateRequirement::for_comment())
-                .await
-                .expect_err("a blank head must refuse the action before any read");
+        let error = verify_target_gate(&source, &target, ActionGateRequirement::for_comment())
+            .await
+            .expect_err("a blank head must refuse the action before any read");
         assert_eq!(error.code(), "WORKFLOW_PARSE");
     }
 
     #[tokio::test]
     async fn a_merge_is_refused_when_the_gates_are_not_green() {
-        let source = InMemoryPullRequestEvidenceSource::new()
-            .with_evidence(evidence(HEAD, PullRequestLifecycle::Open, false, minimal_gates()));
+        let source = InMemoryPullRequestEvidenceSource::new().with_evidence(evidence(
+            HEAD,
+            PullRequestLifecycle::Open,
+            false,
+            minimal_gates(),
+        ));
 
-        let error =
-            verify_target_gate(&source, &review_target(), ActionGateRequirement::for_merge())
-                .await
-                .expect_err("an unmergeable, unapproved pull request must refuse the merge");
+        let error = verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_merge(),
+        )
+        .await
+        .expect_err("an unmergeable, unapproved pull request must refuse the merge");
         assert!(error.to_string().contains("refused"));
     }
 
@@ -581,19 +591,31 @@ mod tests {
             green_gates(),
         ));
 
-        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_merge())
-            .await
-            .expect("a green pull request clears the merge gate");
+        verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_merge(),
+        )
+        .await
+        .expect("a green pull request clears the merge gate");
     }
 
     #[tokio::test]
     async fn a_comment_proceeds_on_a_draft_as_long_as_the_head_holds() {
-        let source = InMemoryPullRequestEvidenceSource::new()
-            .with_evidence(evidence(HEAD, PullRequestLifecycle::Open, true, minimal_gates()));
+        let source = InMemoryPullRequestEvidenceSource::new().with_evidence(evidence(
+            HEAD,
+            PullRequestLifecycle::Open,
+            true,
+            minimal_gates(),
+        ));
 
-        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_comment())
-            .await
-            .expect("a comment does not require a non-draft, mergeable pull request");
+        verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_comment(),
+        )
+        .await
+        .expect("a comment does not require a non-draft, mergeable pull request");
     }
 
     #[tokio::test]
@@ -605,9 +627,13 @@ mod tests {
             minimal_gates(),
         ));
 
-        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_comment())
-            .await
-            .expect_err("a comment must not post onto a moved head");
+        verify_target_gate(
+            &source,
+            &review_target(),
+            ActionGateRequirement::for_comment(),
+        )
+        .await
+        .expect_err("a comment must not post onto a moved head");
     }
 
     fn evidence(

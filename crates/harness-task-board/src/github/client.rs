@@ -159,8 +159,7 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         config: &GitHubProjectConfig,
         pull_request_number: u64,
     ) -> Result<PullRequestEvidenceRead, CliError> {
-        let identity =
-            PullRequestIdentity::new(&config.owner, &config.repo, pull_request_number);
+        let identity = PullRequestIdentity::new(&config.owner, &config.repo, pull_request_number);
         GitHubPullRequestEvidenceSource::new(&self.client)
             .read_pull_request_evidence(&identity)
             .await
