@@ -303,19 +303,34 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         }
         let state = self.inspect_turn(id)?.session_state.unwrap_or_default();
         if let Some(failure) = state.last_turn_failure {
-            let (status, run_status) =
+            // Keep the cancellation invariant consistent with `cancel()`: a
+            // cancelled run records its reason in `stop_reason` and leaves
+            // `error` NULL, while a genuine failure records the detail in
+            // `error`. Otherwise a turn cancelled through the failure channel
+            // would look like an error to downstream readers.
+            let (status, run_status, stop_reason, error) =
                 if failure.category == AgentTurnFailureCategory::Cancelled {
-                    (AgentTurnStatus::Cancelled, AgentTurnRunStatus::Cancelled)
+                    (
+                        AgentTurnStatus::Cancelled,
+                        AgentTurnRunStatus::Cancelled,
+                        Some(failure.detail),
+                        None,
+                    )
                 } else {
-                    (AgentTurnStatus::Failed, AgentTurnRunStatus::Failed)
+                    (
+                        AgentTurnStatus::Failed,
+                        AgentTurnRunStatus::Failed,
+                        None,
+                        Some(failure.detail),
+                    )
                 };
             self.persist_settlement(
                 id,
                 run_status,
                 effective_model(&state.config_options),
                 None,
-                None,
-                Some(failure.detail),
+                stop_reason,
+                error,
             )
             .await?;
             return Ok(status);
