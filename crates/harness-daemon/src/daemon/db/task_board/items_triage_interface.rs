@@ -21,12 +21,12 @@
 
 use sqlx::{Sqlite, Transaction};
 
-use super::super::lane_order::LaneTransitionWrite;
+use super::super::lane_order::{LaneTransitionKind, LaneTransitionWrite};
 use super::super::rows::ItemRow;
 use crate::daemon::db::CliError;
 use crate::task_board::{
-    TaskBoardItem, TaskBoardTriageDecision, TaskBoardTriageEscalationConfig,
-    TaskBoardTriageOverride,
+    TaskBoardItem, TaskBoardStatus, TaskBoardTriageDecision, TaskBoardTriageEscalationConfig,
+    TaskBoardTriageOverride, TriageVerdict,
 };
 
 /// Distinguishes a freshly recorded decision (a new history generation) from
@@ -49,11 +49,14 @@ impl TriageOutcome {
 }
 
 /// What item mutation needs triage to do inside its own ingress transaction:
-/// evaluate and place (`apply_active_triage_in_tx`), audit whatever that
-/// produced, escalate an undecided verdict, and decode an override already
-/// sitting on a row item mutation just fetched. Every method mirrors an
-/// existing triage function one-to-one -- the production implementation is a
-/// plain forward, not new logic.
+/// evaluate and place (`apply_active_triage_in_tx`), reassert an active
+/// override's rank (`reapply_active_override_outcome_in_tx`), audit whatever
+/// that produced, escalate an undecided verdict, decode an override already
+/// sitting on a row item mutation just fetched, and translate a verdict into
+/// the lane it implies (`override_implied_status`), for item mutation's own
+/// conflicting-write rejection check. Every method mirrors an existing
+/// triage function one-to-one -- the production implementation is a plain
+/// forward, not new logic.
 pub(crate) trait TriageEvaluator {
     async fn apply_active_triage_in_tx(
         &self,
@@ -63,6 +66,14 @@ pub(crate) trait TriageEvaluator {
         suppress_placement: bool,
         existing_override: Option<&TaskBoardTriageOverride>,
     ) -> Result<Option<TriageOutcome>, CliError>;
+
+    async fn reapply_active_override_outcome_in_tx(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+        item: &mut TaskBoardItem,
+        existing_override: Option<&TaskBoardTriageOverride>,
+        decided_at: &str,
+    ) -> Result<Option<LaneTransitionKind>, CliError>;
 
     async fn record_triage_decided_audit_in_tx(
         &self,
@@ -96,4 +107,6 @@ pub(crate) trait TriageEvaluator {
         &self,
         row: &ItemRow,
     ) -> Result<Option<TaskBoardTriageOverride>, CliError>;
+
+    fn override_implied_status(&self, verdict: TriageVerdict) -> TaskBoardStatus;
 }

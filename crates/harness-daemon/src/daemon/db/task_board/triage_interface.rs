@@ -9,13 +9,15 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::items::{TriageEvaluator, TriageOutcome};
-use super::lane_order::LaneTransitionWrite;
+use super::lane_order::{LaneTransitionKind, LaneTransitionWrite};
 use super::rows::ItemRow;
-use super::{triage_apply_rules, triage_audit, triage_escalation_enqueue, triage_override};
+use super::{
+    triage_apply, triage_apply_rules, triage_audit, triage_escalation_enqueue, triage_override,
+};
 use crate::daemon::db::CliError;
 use crate::task_board::{
-    TaskBoardItem, TaskBoardTriageDecision, TaskBoardTriageEscalationConfig,
-    TaskBoardTriageOverride,
+    TaskBoardItem, TaskBoardStatus, TaskBoardTriageDecision, TaskBoardTriageEscalationConfig,
+    TaskBoardTriageOverride, TriageVerdict,
 };
 
 pub(super) struct Triage;
@@ -35,6 +37,22 @@ impl TriageEvaluator for Triage {
             decided_at,
             suppress_placement,
             existing_override,
+        )
+        .await
+    }
+
+    async fn reapply_active_override_outcome_in_tx(
+        &self,
+        transaction: &mut Transaction<'_, Sqlite>,
+        item: &mut TaskBoardItem,
+        existing_override: Option<&TaskBoardTriageOverride>,
+        decided_at: &str,
+    ) -> Result<Option<LaneTransitionKind>, CliError> {
+        triage_apply::reapply_active_override_outcome_in_tx(
+            transaction,
+            item,
+            existing_override,
+            decided_at,
         )
         .await
     }
@@ -100,5 +118,9 @@ impl TriageEvaluator for Triage {
         row: &ItemRow,
     ) -> Result<Option<TaskBoardTriageOverride>, CliError> {
         triage_override::triage_override_from_item_row(row)
+    }
+
+    fn override_implied_status(&self, verdict: TriageVerdict) -> TaskBoardStatus {
+        triage_apply::override_implied_status(verdict)
     }
 }

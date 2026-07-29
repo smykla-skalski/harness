@@ -40,7 +40,7 @@ pub(super) struct LaneTransitionWrite {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum LaneTransitionKind {
+pub(crate) enum LaneTransitionKind {
     Generic,
     Manual,
     Automatic,

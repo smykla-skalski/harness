@@ -383,33 +383,6 @@ fn demote_automatic_todo_to_inbox(item: &mut TaskBoardItem) {
     item.lane_set_at = None;
 }
 
-/// A direct human status move on the general item-update endpoint is never
-/// itself a durable `Manual` lane anchor -- that explicit override control
-/// is a separate feature -- but it still invalidates whatever `Automatic`
-/// placement `BuiltInV1` previously recorded. Clearing that stale
-/// provenance here (rather than suppressing placement while leaving the old
-/// `Automatic` tag attached) keeps the item eligible for a fresh automatic
-/// placement on its next eligible evaluation and stops the audit trail from
-/// misattributing a human-chosen status to the evaluator. An existing
-/// `Manual` anchor is left untouched.
-pub(super) fn clear_stale_automatic_placement_on_human_status_move(
-    before_status: TaskBoardStatus,
-    item: &mut TaskBoardItem,
-) {
-    if before_status == item.status.canonical_persisted_status() {
-        return;
-    }
-    let is_stale_automatic = item
-        .lane_origin
-        .as_ref()
-        .is_some_and(|origin| !origin.is_manual());
-    if is_stale_automatic {
-        item.lane_position = None;
-        item.lane_origin = None;
-        item.lane_set_at = None;
-    }
-}
-
 /// Whether `item`'s current, persisted placement already reflects `verdict`
 /// exactly, i.e. whether `apply_placement_effect_in_tx` would be a genuine
 /// no-op for this verdict. Used to detect a real desync (status reset by
