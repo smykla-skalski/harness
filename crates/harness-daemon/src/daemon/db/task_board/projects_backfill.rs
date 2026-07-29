@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::mapper::item_from_rows;
+use super::project_registry_queries::ProjectRegistryQueries;
 use super::projects::ensure_project_in_tx;
 use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -11,35 +12,45 @@ use crate::task_board::project::{ItemProjectAttribution, item_attribution};
 
 impl AsyncDaemonDb {
     /// Run the attribution rules over every live item that holds no project,
-    /// and return how many gained one.
-    ///
-    /// Attribution otherwise happens only on write, so widening the rules
-    /// reaches a stored item only when something else edits it, and a synced
-    /// item nobody touches upstream may never be rewritten. Widened rules ship
-    /// in a new binary and a new binary means a restart, so re-running them at
-    /// startup closes that gap without a migration per widening.
+    /// and return how many gained one. See
+    /// [`ProjectRegistryQueries::reattribute_unattributed_task_board_items`]
+    /// for the full contract.
     ///
     /// # Errors
     /// Returns [`CliError`] when the board cannot be read or written.
     pub(crate) async fn reattribute_unattributed_task_board_items(
         &self,
     ) -> Result<usize, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board reattribution")
-            .await?;
-        let items = load_unattributed_items_in_tx(&mut transaction).await?;
-        let mut attributed = 0;
-        for item in items {
-            if attribute_item_in_tx(&mut transaction, &item).await? {
-                attributed += 1;
-            }
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board reattribution: {error}")))?;
-        Ok(attributed)
+        <Self as ProjectRegistryQueries>::reattribute_unattributed_task_board_items(self).await
     }
+}
+
+/// Real implementation behind
+/// [`ProjectRegistryQueries::reattribute_unattributed_task_board_items`].
+///
+/// Attribution otherwise happens only on write, so widening the rules
+/// reaches a stored item only when something else edits it, and a synced
+/// item nobody touches upstream may never be rewritten. Widened rules ship
+/// in a new binary and a new binary means a restart, so re-running them at
+/// startup closes that gap without a migration per widening.
+pub(super) async fn reattribute_unattributed_task_board_items(
+    db: &AsyncDaemonDb,
+) -> Result<usize, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board reattribution")
+        .await?;
+    let items = load_unattributed_items_in_tx(&mut transaction).await?;
+    let mut attributed = 0;
+    for item in items {
+        if attribute_item_in_tx(&mut transaction, &item).await? {
+            attributed += 1;
+        }
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board reattribution: {error}")))?;
+    Ok(attributed)
 }
 
 async fn attribute_item_in_tx(

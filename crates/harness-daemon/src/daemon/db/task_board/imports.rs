@@ -5,6 +5,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
 use super::aggregates::upsert_machine_in_tx;
+use super::import_lifecycle_queries::ImportLifecycleQueries;
 use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionWrite, insert_with_lane_transition_in_tx, record_lane_transition_audit_in_tx,
@@ -53,8 +54,8 @@ impl AsyncDaemonDb {
         runtime_config: &TaskBoardGitRuntimeConfig,
         secret_handoff_digest: Option<&str>,
     ) -> Result<TaskBoardImportResult, CliError> {
-        self.import_task_board_snapshot(
-            LEGACY_GLOBAL_SOURCE,
+        <Self as ImportLifecycleQueries>::import_legacy_task_board(
+            self,
             snapshot,
             staged_path,
             runtime_config,
@@ -68,99 +69,133 @@ impl AsyncDaemonDb {
         runtime_config: &TaskBoardGitRuntimeConfig,
         secret_handoff_digest: Option<&str>,
     ) -> Result<TaskBoardImportResult, CliError> {
-        let snapshot = LegacyTaskBoardSnapshot::empty()?;
-        self.import_task_board_snapshot(
-            EMPTY_DATABASE_SOURCE,
-            &snapshot,
-            None,
+        <Self as ImportLifecycleQueries>::initialize_empty_task_board(
+            self,
             runtime_config,
             secret_handoff_digest,
         )
         .await
     }
+}
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "legacy import must verify and record all source state in one transaction"
-    )]
-    async fn import_task_board_snapshot(
-        &self,
-        source_kind: &str,
-        snapshot: &LegacyTaskBoardSnapshot,
-        staged_path: Option<&Path>,
-        runtime_config: &TaskBoardGitRuntimeConfig,
-        secret_handoff_digest: Option<&str>,
-    ) -> Result<TaskBoardImportResult, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("legacy task board import")
-            .await?;
-        if let Some(marker) = load_marker_in_tx(&mut transaction, source_kind).await? {
-            verify_existing_marker(&marker, snapshot)?;
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit existing task board import: {error}")))?;
-            return Ok(TaskBoardImportResult {
-                imported: false,
-                change_revision: self.task_board_revision().await?,
-            });
-        }
-        ensure_import_target_empty(&mut transaction).await?;
-        let lane_writes = insert_snapshot(&mut transaction, snapshot, runtime_config).await?;
-        verify_snapshot(&mut transaction, snapshot, runtime_config).await?;
-        let counts_json = to_json(&snapshot.counts(), "legacy task board counts")?;
-        let imported_at = utc_now();
-        let secret_handoff_phase = if secret_handoff_digest.is_some() {
-            "pending"
-        } else {
-            "complete"
-        };
-        let secret_handoff_id =
-            secret_handoff_digest.map(|_| format!("task-board-secret-{}", Uuid::new_v4().simple()));
-        query(
-            "INSERT INTO task_board_imports (
-            source_kind, source_digest, canonical_model_digest, source_counts_json,
-            staged_path, imported_at, archived_at, archive_path, secret_handoff_id,
-            secret_handoff_digest, secret_handoff_phase, secret_acknowledged_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, ?7, ?8, ?9, NULL)",
-        )
-        .bind(source_kind)
-        .bind(&snapshot.source_digest)
-        .bind(&snapshot.canonical_digest)
-        .bind(counts_json)
-        .bind(staged_path.map(|path| path.to_string_lossy().into_owned()))
-        .bind(imported_at)
-        .bind(secret_handoff_id)
-        .bind(secret_handoff_digest)
-        .bind(secret_handoff_phase)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("record task board import marker: {error}")))?;
-        let mut change_revision = 0;
-        for scope in [
-            ITEMS_CHANGE_SCOPE,
-            MACHINES_CHANGE_SCOPE,
-            ORCHESTRATOR_CHANGE_SCOPE,
-            RUNTIME_CONFIG_CHANGE_SCOPE,
-            POLICY_RUNTIME_CHANGE_SCOPE,
-        ] {
-            change_revision = bump_change_in_tx(&mut transaction, scope).await?;
-            if scope == ITEMS_CHANGE_SCOPE {
-                for write in lane_writes.iter().filter(|write| write.changed) {
-                    record_lane_transition_audit_in_tx(&mut transaction, write, change_revision)
-                        .await?;
-                }
-            }
-        }
+/// Real implementation behind [`ImportLifecycleQueries::import_legacy_task_board`].
+pub(super) async fn import_legacy_task_board(
+    db: &AsyncDaemonDb,
+    snapshot: &LegacyTaskBoardSnapshot,
+    staged_path: Option<&Path>,
+    runtime_config: &TaskBoardGitRuntimeConfig,
+    secret_handoff_digest: Option<&str>,
+) -> Result<TaskBoardImportResult, CliError> {
+    import_task_board_snapshot(
+        db,
+        LEGACY_GLOBAL_SOURCE,
+        snapshot,
+        staged_path,
+        runtime_config,
+        secret_handoff_digest,
+    )
+    .await
+}
+
+/// Real implementation behind [`ImportLifecycleQueries::initialize_empty_task_board`].
+pub(super) async fn initialize_empty_task_board(
+    db: &AsyncDaemonDb,
+    runtime_config: &TaskBoardGitRuntimeConfig,
+    secret_handoff_digest: Option<&str>,
+) -> Result<TaskBoardImportResult, CliError> {
+    let snapshot = LegacyTaskBoardSnapshot::empty()?;
+    import_task_board_snapshot(
+        db,
+        EMPTY_DATABASE_SOURCE,
+        &snapshot,
+        None,
+        runtime_config,
+        secret_handoff_digest,
+    )
+    .await
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "legacy import must verify and record all source state in one transaction"
+)]
+async fn import_task_board_snapshot(
+    db: &AsyncDaemonDb,
+    source_kind: &str,
+    snapshot: &LegacyTaskBoardSnapshot,
+    staged_path: Option<&Path>,
+    runtime_config: &TaskBoardGitRuntimeConfig,
+    secret_handoff_digest: Option<&str>,
+) -> Result<TaskBoardImportResult, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("legacy task board import")
+        .await?;
+    if let Some(marker) = load_marker_in_tx(&mut transaction, source_kind).await? {
+        verify_existing_marker(&marker, snapshot)?;
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit legacy task board import: {error}")))?;
-        Ok(TaskBoardImportResult {
-            imported: true,
-            change_revision,
-        })
+            .map_err(|error| db_error(format!("commit existing task board import: {error}")))?;
+        return Ok(TaskBoardImportResult {
+            imported: false,
+            change_revision: db.task_board_revision().await?,
+        });
     }
+    ensure_import_target_empty(&mut transaction).await?;
+    let lane_writes = insert_snapshot(&mut transaction, snapshot, runtime_config).await?;
+    verify_snapshot(&mut transaction, snapshot, runtime_config).await?;
+    let counts_json = to_json(&snapshot.counts(), "legacy task board counts")?;
+    let imported_at = utc_now();
+    let secret_handoff_phase = if secret_handoff_digest.is_some() {
+        "pending"
+    } else {
+        "complete"
+    };
+    let secret_handoff_id =
+        secret_handoff_digest.map(|_| format!("task-board-secret-{}", Uuid::new_v4().simple()));
+    query(
+        "INSERT INTO task_board_imports (
+        source_kind, source_digest, canonical_model_digest, source_counts_json,
+        staged_path, imported_at, archived_at, archive_path, secret_handoff_id,
+        secret_handoff_digest, secret_handoff_phase, secret_acknowledged_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, ?7, ?8, ?9, NULL)",
+    )
+    .bind(source_kind)
+    .bind(&snapshot.source_digest)
+    .bind(&snapshot.canonical_digest)
+    .bind(counts_json)
+    .bind(staged_path.map(|path| path.to_string_lossy().into_owned()))
+    .bind(imported_at)
+    .bind(secret_handoff_id)
+    .bind(secret_handoff_digest)
+    .bind(secret_handoff_phase)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("record task board import marker: {error}")))?;
+    let mut change_revision = 0;
+    for scope in [
+        ITEMS_CHANGE_SCOPE,
+        MACHINES_CHANGE_SCOPE,
+        ORCHESTRATOR_CHANGE_SCOPE,
+        RUNTIME_CONFIG_CHANGE_SCOPE,
+        POLICY_RUNTIME_CHANGE_SCOPE,
+    ] {
+        change_revision = bump_change_in_tx(&mut transaction, scope).await?;
+        if scope == ITEMS_CHANGE_SCOPE {
+            for write in lane_writes.iter().filter(|write| write.changed) {
+                record_lane_transition_audit_in_tx(&mut transaction, write, change_revision)
+                    .await?;
+            }
+        }
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit legacy task board import: {error}")))?;
+    Ok(TaskBoardImportResult {
+        imported: true,
+        change_revision,
+    })
 }
 
 #[expect(
