@@ -23,10 +23,16 @@ INSERT INTO _sqlx_migrations (version, description, success, checksum, execution
 VALUES (?1, ?2, TRUE, ?3, 0)";
 const UPDATE_SQLX_MIGRATION_METADATA_SQL: &str =
     "UPDATE _sqlx_migrations SET description = ?2, checksum = ?3 WHERE version = ?1";
+// `sqlx::migrate!` resolves relative to `CARGO_MANIFEST_DIR`, which differs
+// between harness-daemon's own build (`standalone-daemon` on by default) and
+// root's `daemon-runtime`-gated test-only mirror of this file (`standalone-daemon`
+// off, since `full-runtime` does not imply it), so the path still needs a
+// feature-gated pair even though both now point under `crates/harness-daemon`.
 #[cfg(not(feature = "standalone-daemon"))]
-static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("./src/daemon/db/migrations");
+static DAEMON_DB_MIGRATOR: Migrator =
+    sqlx::migrate!("crates/harness-daemon/src/daemon/db/migrations");
 #[cfg(feature = "standalone-daemon")]
-static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("../../src/daemon/db/migrations");
+static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("src/daemon/db/migrations");
 
 pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliError> {
     if !table_exists(pool, "schema_meta").await? {

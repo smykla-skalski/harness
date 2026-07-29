@@ -4,9 +4,6 @@ version = "54.0.0"
 edition = "2024"
 rust-version = "1.95"
 
-[lib]
-test = false
-
 [[bin]]
 name = "harness-daemon"
 path = "src/main.rs"
@@ -98,6 +95,9 @@ x509-parser = "=0.18.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
 security-framework = "3"
+
+[lib]
+test = false
 
 [dev-dependencies]
 assert_cmd = "=2.2.2"
