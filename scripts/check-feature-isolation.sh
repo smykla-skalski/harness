@@ -35,6 +35,11 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check -p harness --bin harness
 "$cargo_local" check -p harness-hook --bin harness-hook
 "$cargo_local" check -p harness-bridge --bin harness-bridge
+# harness-bridge declares `daemon-runtime` alongside its default
+# `bridge-runtime`; checked here, `--all-targets` and all, so a future
+# `crate::daemon` change that only compiles under one of the two goes
+# unnoticed the same way #1159 did.
+"$cargo_local" check --all-targets -p harness-bridge --features daemon-runtime
 "$cargo_local" check -p harness-mcp --bin harness-mcp
 "$cargo_local" check -p harness-daemon --bin harness-daemon
 "$cargo_local" check -p harness-panel --bin harness-panel

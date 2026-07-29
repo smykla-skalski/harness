@@ -12,13 +12,41 @@ pub fn sandboxed_from_env() -> bool {
         })
 }
 
+// `agent_acp`, `agent_tui`, and `bridge` swap to a thin re-export over the
+// real `harness-daemon` crate under `daemon-runtime`: their daemon-only
+// branches assume sibling modules (`service`, `db`, `codex_controller`,
+// `session::service`) that only the real daemon crate carries, so the
+// `#[path]`-mirrored copy below can only ever satisfy the default
+// `bridge-runtime` build. `discovery`, `protocol`, and `state` need no such
+// swap: none of their code is gated on `daemon-runtime` in a way this crate
+// can't already satisfy on its own.
+#[cfg(not(feature = "daemon-runtime"))]
 #[path = "../../../../crates/harness-daemon/src/daemon/agent_acp/mod.rs"]
 pub mod agent_acp;
+#[cfg(feature = "daemon-runtime")]
+pub mod agent_acp {
+    pub use harness_daemon::daemon::agent_acp::*;
+}
+#[cfg(not(feature = "daemon-runtime"))]
 pub mod agent_tui;
+#[cfg(feature = "daemon-runtime")]
+pub mod agent_tui {
+    pub use harness_daemon::daemon::agent_tui::*;
+}
+#[cfg(not(feature = "daemon-runtime"))]
 #[path = "../../../../crates/harness-daemon/src/daemon/bridge/mod.rs"]
 pub mod bridge;
+#[cfg(feature = "daemon-runtime")]
+pub mod bridge {
+    pub use harness_daemon::daemon::bridge::*;
+}
 #[path = "../../../../crates/harness-daemon/src/daemon/discovery/mod.rs"]
 pub mod discovery;
+// Real `harness-daemon` is `pub(crate)` on its own `remote_redaction`, so
+// there is nothing to re-export under `daemon-runtime`; this mirrored copy's
+// only caller (`agent_acp`'s `protocol::session_state`) moves to the real
+// crate's own copy of it in that build, leaving this one with none.
+#[cfg(not(feature = "daemon-runtime"))]
 #[path = "../../../../crates/harness-daemon/src/daemon/remote_redaction.rs"]
 pub(crate) mod remote_redaction;
 pub mod protocol {
