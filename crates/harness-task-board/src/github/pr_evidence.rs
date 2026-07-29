@@ -8,8 +8,12 @@ use harness_workspace::workspace::utc_now;
 
 use crate::normalize_repository_slug;
 
+mod gates;
 mod github_source;
 
+pub use gates::{
+    CheckGate, CheckState, Mergeability, PullRequestMergeGates, ReviewDecision, ReviewGate,
+};
 pub use github_source::GitHubPullRequestEvidenceSource;
 
 /// Canonical identity of a pull request: an `owner/repo` slug and number in one
@@ -111,6 +115,8 @@ pub struct PullRequestEvidence {
     pub author: Option<String>,
     pub lifecycle: PullRequestLifecycle,
     pub is_draft: bool,
+    /// Every merge gate read off this same snapshot.
+    pub gates: PullRequestMergeGates,
     /// ISO-8601 instant the evidence was read, so staleness is always visible.
     pub observed_at: String,
 }
