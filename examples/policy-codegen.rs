@@ -2982,7 +2982,7 @@ const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // cluster it nests: the manifest tree (DaemonManifest -> HostBridgeManifest ->
 // HostBridgeCapabilityManifest, plus DaemonBinaryStamp) and the workspace diagnostics
 // (DaemonDiagnostics -> DaemonAuditEvent) moved into the shared protocol crate's daemon.rs
-// (harness-daemon-root's lib.rs now only re-exports them), and the launchd LaunchAgentStatus. health and
+// (harness-daemon-root's lib.rs now only re-exports them), and the launchd LaunchAgentStatus; health and
 // github_api resolve to the already-generated HealthResponseWire/GitHubApiDiagnosticsWire
 // (bare suffixed refs). acp_runtime_probe and DaemonManifest.ownership are dropped via
 // OMITTED_WIRE_FIELDS - the hand DaemonDiagnosticsReport/DaemonManifest never model them.
