@@ -87,7 +87,7 @@ async fn cleaned_unknown_allows_host_replacement_and_clear_without_losing_histor
         .settle_task_board_remote_assignment(&settlement, PRINCIPAL, SETTLED_AT)
         .await
         .expect("persist exact unknown settlement");
-    let TaskBoardRemoteMutationOutcome::Updated(cleaned) = fixture
+    let TaskBoardRemoteMutationOutcome::Updated(cleanup_record) = fixture
         .db
         .complete_task_board_remote_assignment_cleanup(&settlement, PRINCIPAL, CLEANED_AT)
         .await
@@ -95,7 +95,7 @@ async fn cleaned_unknown_allows_host_replacement_and_clear_without_losing_histor
     else {
         panic!("first exact cleanup did not update assignment");
     };
-    assert_eq!(cleaned.assignment_id, unknown.assignment_id);
+    assert_eq!(cleanup_record.assignment_id, unknown.assignment_id);
     fixture
         .db
         .replace_task_board_orchestrator_settings(&replacement)

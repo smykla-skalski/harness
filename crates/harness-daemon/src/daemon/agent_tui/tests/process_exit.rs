@@ -12,6 +12,10 @@ use super::support::{
     WAIT_TIMEOUT, recv_broadcast_events, sample_snapshot, wait_until, with_agent_tui_home,
 };
 
+// `saw_sessions_updated`/`saw_session_updated` deliberately mirror the two
+// event names under test (`sessions_updated_delta` and `session_updated`);
+// renaming either to look less alike would obscure that correspondence.
+#[allow(clippy::similar_names)]
 #[test]
 fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refresh() {
     let db = DaemonDb::open_in_memory().expect("open db");

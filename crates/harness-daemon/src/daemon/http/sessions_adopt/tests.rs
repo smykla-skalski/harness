@@ -52,12 +52,12 @@ fn returns_200_on_valid_session() {
         // data root so external_origin stays None.
         let data_root = tmp.path().join("harness");
         let sessions_dir = data_root.join("sessions");
-        let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
+        let demo_session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let origin = tmp.path().join("src/demo");
-        fs::create_dir_all(&session_dir).unwrap();
+        fs::create_dir_all(&demo_session_dir).unwrap();
         fs::create_dir_all(&origin).unwrap();
         write_valid_session(
-            &session_dir,
+            &demo_session_dir,
             "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
             origin.to_str().unwrap(),
         );
@@ -70,7 +70,7 @@ fn returns_200_on_valid_session() {
                 State(state),
                 Json(AdoptSessionRequest {
                     bookmark_id: None,
-                    session_root: session_dir.to_string_lossy().into_owned(),
+                    session_root: demo_session_dir.to_string_lossy().into_owned(),
                 }),
             )
             .await;
@@ -93,12 +93,12 @@ fn returns_200_on_valid_session_when_sandboxed_without_bookmark() {
         temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
             let data_root = tmp.path().join("harness");
             let sessions_dir = data_root.join("sessions");
-            let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
+            let demo_session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
             let origin = tmp.path().join("src/demo");
-            fs::create_dir_all(&session_dir).unwrap();
+            fs::create_dir_all(&demo_session_dir).unwrap();
             fs::create_dir_all(&origin).unwrap();
             write_valid_session(
-                &session_dir,
+                &demo_session_dir,
                 "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
                 origin.to_str().unwrap(),
             );
@@ -111,7 +111,7 @@ fn returns_200_on_valid_session_when_sandboxed_without_bookmark() {
                     State(state),
                     Json(AdoptSessionRequest {
                         bookmark_id: None,
-                        session_root: session_dir.to_string_lossy().into_owned(),
+                        session_root: demo_session_dir.to_string_lossy().into_owned(),
                     }),
                 )
                 .await;
@@ -137,12 +137,12 @@ fn returns_200_on_valid_session_when_sandboxed_with_bookmark() {
             let data_root = tmp.path().join("harness");
             let bookmarks_path = tmp.path().join("sandbox/bookmarks.json");
             let sessions_dir = data_root.join("sessions");
-            let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
+            let demo_session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
             let origin = tmp.path().join("src/demo");
-            fs::create_dir_all(&session_dir).unwrap();
+            fs::create_dir_all(&demo_session_dir).unwrap();
             fs::create_dir_all(&origin).unwrap();
             write_valid_session(
-                &session_dir,
+                &demo_session_dir,
                 "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
                 origin.to_str().unwrap(),
             );
@@ -154,8 +154,8 @@ fn returns_200_on_valid_session_when_sandboxed_with_bookmark() {
                     id: bookmark_id.into(),
                     kind: Kind::SessionDirectory,
                     display_name: "demo session".into(),
-                    last_resolved_path: session_dir.to_string_lossy().into_owned(),
-                    bookmark_data: synthesize_bookmark(&session_dir),
+                    last_resolved_path: demo_session_dir.to_string_lossy().into_owned(),
+                    bookmark_data: synthesize_bookmark(&demo_session_dir),
                     handoff_bookmark_data: None,
                     created_at: chrono::Utc::now(),
                     last_accessed_at: chrono::Utc::now(),
@@ -194,12 +194,12 @@ fn returns_409_on_duplicate() {
 
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         let sessions_dir = tmp.path().join("harness/sessions");
-        let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
+        let demo_session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let origin = tmp.path().join("src/demo");
-        fs::create_dir_all(&session_dir).unwrap();
+        fs::create_dir_all(&demo_session_dir).unwrap();
         fs::create_dir_all(&origin).unwrap();
         write_valid_session(
-            &session_dir,
+            &demo_session_dir,
             "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
             origin.to_str().unwrap(),
         );
@@ -213,7 +213,7 @@ fn returns_409_on_duplicate() {
                 State(state.clone()),
                 Json(AdoptSessionRequest {
                     bookmark_id: None,
-                    session_root: session_dir.to_string_lossy().into_owned(),
+                    session_root: demo_session_dir.to_string_lossy().into_owned(),
                 }),
             )
             .await;
@@ -226,7 +226,7 @@ fn returns_409_on_duplicate() {
                 State(state),
                 Json(AdoptSessionRequest {
                     bookmark_id: None,
-                    session_root: session_dir.to_string_lossy().into_owned(),
+                    session_root: demo_session_dir.to_string_lossy().into_owned(),
                 }),
             )
             .await;
@@ -245,8 +245,8 @@ fn returns_409_on_duplicate() {
 fn returns_422_on_layout_violation() {
     let tmp = TempDir::new().unwrap();
     // Session directory exists but is missing workspace/ — probe will fail.
-    let session_dir = tmp.path().join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
-    fs::create_dir_all(&session_dir).unwrap();
+    let demo_session_dir = tmp.path().join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
+    fs::create_dir_all(&demo_session_dir).unwrap();
 
     harness_testkit::with_isolated_harness_env(tmp.path(), || {
         let state = test_http_state_with_db();
@@ -257,7 +257,7 @@ fn returns_422_on_layout_violation() {
                 State(state),
                 Json(AdoptSessionRequest {
                     bookmark_id: None,
-                    session_root: session_dir.to_string_lossy().into_owned(),
+                    session_root: demo_session_dir.to_string_lossy().into_owned(),
                 }),
             )
             .await;

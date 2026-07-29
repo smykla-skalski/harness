@@ -240,8 +240,10 @@ async fn task_board_singletons_and_machine_registry_round_trip() {
         settings
     );
 
-    let mut state = TaskBoardOrchestratorState::default();
-    state.enabled = true;
+    let state = TaskBoardOrchestratorState {
+        enabled: true,
+        ..TaskBoardOrchestratorState::default()
+    };
     db.replace_task_board_orchestrator_state(&state)
         .await
         .expect("save state");

@@ -69,8 +69,10 @@ async fn seed_write_execution_configured(
     let test = TestDatabase::open().await;
     let item_id = format!("coordinator-{label}");
     let execution_id = format!("execution-{label}");
-    let mut settings = crate::task_board::TaskBoardOrchestratorSettings::default();
-    settings.policy_version = "policy-v1".into();
+    let mut settings = crate::task_board::TaskBoardOrchestratorSettings {
+        policy_version: "policy-v1".into(),
+        ..crate::task_board::TaskBoardOrchestratorSettings::default()
+    };
     if let Some(max_attempts) = max_attempts {
         settings.retry.max_attempts = max_attempts;
     }

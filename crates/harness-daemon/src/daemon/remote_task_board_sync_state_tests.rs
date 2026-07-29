@@ -127,8 +127,10 @@ fn the_list_materializes_revisions_for_the_returned_page_only() {
         items_change_seq: 7,
         progress_rollups: HashMap::new(),
     };
-    let mut request = TaskBoardListItemsRequest::default();
-    request.limit = Some(1);
+    let request = TaskBoardListItemsRequest {
+        limit: Some(1),
+        ..TaskBoardListItemsRequest::default()
+    };
     let selection = request.validated_selection().expect("a one-item page");
 
     let TaskBoardReadListResponse::Full(response) =

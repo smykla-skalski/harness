@@ -272,12 +272,12 @@ fn session_adopt_reports_poisoned_db_lock_as_ws_error() {
     with_isolated_harness_env(temp.path(), || {
         let data_root = temp.path().join("harness");
         let sessions_dir = data_root.join("sessions");
-        let session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
+        let demo_session_dir = sessions_dir.join("demo/72026b9c-9f8f-5a76-a6cf-a05cbb5741ed");
         let origin = temp.path().join("src/demo");
-        fs::create_dir_all(&session_dir).expect("create session dir");
+        fs::create_dir_all(&demo_session_dir).expect("create session dir");
         fs::create_dir_all(&origin).expect("create origin dir");
         write_valid_session(
-            &session_dir,
+            &demo_session_dir,
             "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed",
             origin.to_str().expect("origin path utf8"),
         );
@@ -298,7 +298,7 @@ fn session_adopt_reports_poisoned_db_lock_as_ws_error() {
                 id: "req-adopt-poisoned-db".into(),
                 method: "session.adopt".into(),
                 params: json!({
-                    "session_root": session_dir.to_string_lossy().into_owned(),
+                    "session_root": demo_session_dir.to_string_lossy().into_owned(),
                 }),
                 trace_context: None,
             },
