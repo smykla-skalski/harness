@@ -4,6 +4,7 @@ use axum::response::Response;
 
 use crate::daemon::http::openapi::DaemonErrorBody;
 use crate::daemon::protocol::{TaskBoardGetItemRequest, http_paths};
+use crate::daemon::remote_task_board::project_task_board_ai_review_report;
 use crate::task_board::TaskBoardAiReviewReportResponse;
 
 use super::super::DaemonHttpState;
@@ -27,19 +28,21 @@ pub(super) async fn get_task_board_item_review_report(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id, _) = match authenticated_task_board_read(&headers, &state) {
+    let (start, request_id, viewer) = match authenticated_task_board_read(&headers, &state) {
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let result = task_board_route_executor::get_item_ai_review_report(
+        &state,
+        &TaskBoardGetItemRequest { id: item_id },
+    )
+    .await
+    .map(|response| project_task_board_ai_review_report(response, viewer));
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEM_REVIEW_REPORT,
         &request_id,
         start,
-        task_board_route_executor::get_item_ai_review_report(
-            &state,
-            &TaskBoardGetItemRequest { id: item_id },
-        )
-        .await,
+        result,
     )
 }

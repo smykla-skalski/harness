@@ -1,6 +1,6 @@
 use crate::task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportResponse};
 
-use super::super::remote_redaction::redact_known_secrets;
+use super::super::remote_redaction::REDACTION_PLACEHOLDER;
 
 #[must_use]
 pub(crate) fn project_task_board_ai_review_report(
@@ -31,17 +31,19 @@ pub(crate) fn project_task_board_ai_review_report(
 }
 
 fn redact_report(mut report: TaskBoardAiReviewReportRecord) -> TaskBoardAiReviewReportRecord {
-    report.summary = report.summary.map(|value| redact_known_secrets(&value));
+    report.summary = report
+        .summary
+        .map(|_| REDACTION_PLACEHOLDER.to_string());
     for finding in &mut report.findings {
-        finding.location.path = redact_known_secrets(&finding.location.path);
-        finding.evidence = redact_known_secrets(&finding.evidence);
+        finding.location.path = REDACTION_PLACEHOLDER.to_string();
+        finding.evidence = REDACTION_PLACEHOLDER.to_string();
     }
     report.partial_output = report
         .partial_output
-        .map(|value| redact_known_secrets(&value));
+        .map(|_| REDACTION_PLACEHOLDER.to_string());
     report.terminal_reason = report
         .terminal_reason
-        .map(|value| redact_known_secrets(&value));
+        .map(|_| REDACTION_PLACEHOLDER.to_string());
     report
 }
 
@@ -56,15 +58,37 @@ mod tests {
     use super::project_task_board_ai_review_report;
 
     #[test]
-    fn remote_viewer_report_redacts_free_text_and_finding_paths() {
+    fn remote_viewer_report_replaces_all_review_content() {
         let projected = project_task_board_ai_review_report(completed_report(), true);
         let TaskBoardAiReviewReportResponse::Completed { report } = projected else {
             panic!("expected completed report");
         };
 
-        let wire = serde_json::to_string(&report).expect("serialize projected report");
-        assert!(!wire.contains("secret-value"));
-        assert_eq!(wire.matches("[redacted]").count(), 4);
+        assert_eq!(report.summary.as_deref(), Some("[redacted]"));
+        assert_eq!(report.findings[0].location.path, "[redacted]");
+        assert_eq!(report.findings[0].evidence, "[redacted]");
+        assert_eq!(report.partial_output.as_deref(), Some("[redacted]"));
+    }
+
+    #[test]
+    fn remote_viewer_terminal_reason_is_replaced() {
+        let TaskBoardAiReviewReportResponse::Completed { mut report } = completed_report() else {
+            panic!("expected completed report");
+        };
+        report.status = TaskBoardAiReviewReportStatus::Failed;
+        report.summary = None;
+        report.findings.clear();
+        report.partial_output = None;
+        report.terminal_reason = Some("ordinary terminal reason".into());
+
+        let projected = project_task_board_ai_review_report(
+            TaskBoardAiReviewReportResponse::Completed { report },
+            true,
+        );
+        let TaskBoardAiReviewReportResponse::Completed { report } = projected else {
+            panic!("expected failed report");
+        };
+        assert_eq!(report.terminal_reason.as_deref(), Some("[redacted]"));
     }
 
     fn completed_report() -> TaskBoardAiReviewReportResponse {
@@ -80,16 +104,16 @@ mod tests {
                 requested_model: "deepseek/deepseek-v4-flash".into(),
                 effective_model: None,
                 status: TaskBoardAiReviewReportStatus::Completed,
-                summary: Some("token=secret-value".into()),
+                summary: Some("ordinary review summary".into()),
                 findings: vec![TaskBoardReportOnlyReviewFinding {
                     severity: TaskBoardReviewFindingSeverity::High,
                     location: TaskBoardReviewFindingLocation {
-                        path: "token=secret-value".into(),
+                        path: "src/private.rs".into(),
                         line: Some(1),
                     },
-                    evidence: "token=secret-value".into(),
+                    evidence: "ordinary review evidence".into(),
                 }],
-                partial_output: Some("token=secret-value".into()),
+                partial_output: Some("ordinary partial output".into()),
                 terminal_reason: None,
                 started_at: "2026-07-29T18:00:00Z".into(),
                 finished_at: "2026-07-29T18:00:01Z".into(),

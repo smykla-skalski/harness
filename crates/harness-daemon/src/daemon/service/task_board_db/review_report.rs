@@ -69,6 +69,19 @@ const fn is_terminal(state: TaskBoardExecutionState) -> bool {
         TaskBoardExecutionState::Completed
             | TaskBoardExecutionState::Failed
             | TaskBoardExecutionState::Cancelled
-            | TaskBoardExecutionState::HumanRequired
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_terminal;
+    use crate::task_board::TaskBoardExecutionState;
+
+    #[test]
+    fn human_required_review_remains_observable_as_running() {
+        assert!(!is_terminal(TaskBoardExecutionState::HumanRequired));
+        assert!(is_terminal(TaskBoardExecutionState::Completed));
+        assert!(is_terminal(TaskBoardExecutionState::Failed));
+        assert!(is_terminal(TaskBoardExecutionState::Cancelled));
+    }
 }
