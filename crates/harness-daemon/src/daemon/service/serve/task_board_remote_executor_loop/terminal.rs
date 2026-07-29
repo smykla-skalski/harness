@@ -10,7 +10,7 @@ use crate::daemon::db::{
     TaskBoardRemoteTerminalArtifact,
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease,
     RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

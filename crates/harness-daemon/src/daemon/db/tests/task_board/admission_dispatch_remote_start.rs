@@ -5,9 +5,7 @@ use super::completion_evidence_tests::{
 use super::*;
 use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
 use crate::daemon::db::task_board::{TaskBoardRemoteOfferOutcome, TaskBoardRemoteOperationKind};
-use crate::daemon::task_board_remote_transport::wire::{
-    RemoteAssignmentWireState, RemoteOfferRequest,
-};
+use crate::daemon::task_board_remote_wire::wire::{RemoteAssignmentWireState, RemoteOfferRequest};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardExecutionHostAdvertisement, TaskBoardFailureClass, TaskBoardPhaseCapabilityProfile,
@@ -304,7 +302,7 @@ fn terminal_status(
     offer: &RemoteOfferRequest,
     state: RemoteAssignmentWireState,
     started: bool,
-) -> crate::daemon::task_board_remote_transport::wire::RemoteStatusResponse {
+) -> crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse {
     let mut response = remote_status(offer, RemoteAssignmentWireState::Running, started);
     response.state = state;
     response.status_sha256.clear();

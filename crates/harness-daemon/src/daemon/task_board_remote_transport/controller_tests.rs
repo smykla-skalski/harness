@@ -14,14 +14,14 @@ use super::client::{
 use super::controller::{
     RemoteExecutionControllerClient, lifecycle_response_may_be_lost, renewal_response_may_be_lost,
 };
-use super::wire::{
-    RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
-    RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
-    RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-};
 use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
+    RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
+    RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionAttemptCas,
@@ -223,7 +223,7 @@ pub(super) async fn prepared_controller_fixture() -> (RemoteControllerFixture, C
 }
 
 fn accepted_offer(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     expires_at: &str,
 ) -> RemoteOfferResponse {
     RemoteOfferResponse {
@@ -239,7 +239,10 @@ fn accepted_offer(
     }
 }
 
-fn claim_request(request: &super::wire::RemoteOfferRequest, lease_id: &str) -> RemoteClaimRequest {
+fn claim_request(
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    lease_id: &str,
+) -> RemoteClaimRequest {
     RemoteClaimRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: request.binding.clone(),
@@ -252,7 +255,7 @@ fn claim_request(request: &super::wire::RemoteOfferRequest, lease_id: &str) -> R
 }
 
 fn claim_response(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     expires_at: &str,
     claimed_at: &str,
 ) -> RemoteClaimResponse {
@@ -269,7 +272,7 @@ fn claim_response(
 }
 
 fn renewal_request(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     lease_id: &str,
 ) -> RemoteLeaseRenewRequest {
     RemoteLeaseRenewRequest {
@@ -285,7 +288,7 @@ fn renewal_request(
 }
 
 fn renewal_response(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     expires_at: &str,
 ) -> RemoteLeaseRenewResponse {
     RemoteLeaseRenewResponse {
@@ -300,7 +303,7 @@ fn renewal_response(
 }
 
 pub(super) fn cancel_request(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     lease_id: &str,
 ) -> RemoteCancelRequest {
     RemoteCancelRequest {
@@ -316,7 +319,7 @@ pub(super) fn cancel_request(
 }
 
 pub(super) fn cancel_response(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     observed_at: &str,
 ) -> RemoteCancelResponse {
     RemoteCancelResponse {
@@ -336,7 +339,7 @@ pub(super) fn cancel_response(
 
 // Cancelling a claimed assignment must echo the observed claim evidence.
 pub(super) fn claimed_cancel_response(
-    request: &super::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     observed_at: &str,
     claimed_at: &str,
 ) -> RemoteCancelResponse {

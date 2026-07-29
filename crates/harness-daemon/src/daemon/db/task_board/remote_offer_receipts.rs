@@ -2,7 +2,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::remote_assignment_model::{canonical_time, nonblank, phase_label, to_i64};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

@@ -1,5 +1,5 @@
 use super::*;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteAttemptBinding,
     RemoteCodexLaunchEnvelope, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     RemoteSourceMaterial, RemoteStatusRequest, RemoteStatusResponse,
@@ -286,12 +286,10 @@ pub(super) fn accepted_offer(offer: &RemoteOfferRequest) -> RemoteOfferResponse 
         binding: offer.binding.clone(),
         offer_request_sha256: offer.request_sha256.clone(),
         disposition: RemoteOfferDisposition::Accepted,
-        lease: Some(
-            crate::daemon::task_board_remote_transport::wire::RemoteLease {
-                lease_id: "lease-admission".into(),
-                expires_at: "2026-07-19T10:01:00Z".into(),
-            },
-        ),
+        lease: Some(crate::daemon::task_board_remote_wire::wire::RemoteLease {
+            lease_id: "lease-admission".into(),
+            expires_at: "2026-07-19T10:01:00Z".into(),
+        }),
         rejection_code: None,
     }
 }
@@ -308,12 +306,10 @@ pub(super) fn remote_status(
         offer_request_sha256: offer.request_sha256.clone(),
         status_sha256: String::new(),
         // A promoting status must echo the accepted lease to reconstruct a lost claim.
-        lease: Some(
-            crate::daemon::task_board_remote_transport::wire::RemoteLease {
-                lease_id: "lease-admission".into(),
-                expires_at: "2026-07-19T10:01:00Z".into(),
-            },
-        ),
+        lease: Some(crate::daemon::task_board_remote_wire::wire::RemoteLease {
+            lease_id: "lease-admission".into(),
+            expires_at: "2026-07-19T10:01:00Z".into(),
+        }),
         result: None,
         output_artifacts: RemoteArtifactManifest::default(),
         claimed_at: Some("2026-07-19T10:00:02Z".into()),

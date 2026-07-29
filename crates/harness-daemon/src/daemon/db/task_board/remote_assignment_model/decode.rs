@@ -1,6 +1,6 @@
 use super::{RemoteAssignmentRow, parse_error, to_i64};
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferRequest, RemoteStatusRequest, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

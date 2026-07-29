@@ -7,7 +7,7 @@ use super::remote_assignment_test_support::{
 };
 use super::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome};
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteCancelRequest, RemoteLease,
     RemoteStatusRequest, RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

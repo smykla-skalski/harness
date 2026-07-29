@@ -6,7 +6,7 @@ use super::super::remote_assignment_test_support::{
     CLAIMED_AT, ControllerFixture, HOST, controller_fixture,
 };
 use super::{HANDOFF_AT as TERMINAL_HANDOFF_AT, restore_parent_to_targetless_preparing};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

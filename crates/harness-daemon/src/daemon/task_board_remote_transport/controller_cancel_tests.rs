@@ -259,20 +259,22 @@ async fn assert_cancelled_workflow_projection(
 
 fn cancelled_status(
     state: &super::controller_prepared_test_support::PreparedLifecycle,
-    cancel: &super::wire::RemoteCancelRequest,
-) -> super::wire::RemoteStatusResponse {
-    super::wire::RemoteStatusResponse {
-        schema_version: super::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    cancel: &crate::daemon::task_board_remote_wire::wire::RemoteCancelRequest,
+) -> crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse {
+    crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse {
+        schema_version:
+            crate::daemon::task_board_remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: cancel.binding.clone(),
-        state: super::wire::RemoteAssignmentWireState::Cancelled,
+        state: crate::daemon::task_board_remote_wire::wire::RemoteAssignmentWireState::Cancelled,
         offer_request_sha256: cancel.offer_request_sha256.clone(),
         status_sha256: String::new(),
-        lease: Some(super::wire::RemoteLease {
+        lease: Some(crate::daemon::task_board_remote_wire::wire::RemoteLease {
             lease_id: cancel.lease_id.clone(),
             expires_at: state.times.l1_expires_at.clone(),
         }),
         result: None,
-        output_artifacts: super::wire::RemoteArtifactManifest::default(),
+        output_artifacts:
+            crate::daemon::task_board_remote_wire::wire::RemoteArtifactManifest::default(),
         claimed_at: None,
         started_at: None,
         workspace_ref: None,

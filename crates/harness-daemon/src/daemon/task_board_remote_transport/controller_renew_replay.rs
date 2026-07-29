@@ -1,9 +1,11 @@
 use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
-use super::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
 };
 
 impl RemoteExecutionControllerClient {

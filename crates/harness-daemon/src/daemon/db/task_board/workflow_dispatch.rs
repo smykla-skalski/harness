@@ -13,11 +13,10 @@ use crate::task_board::{
     TaskBoardExecutionOwnership, TaskBoardExecutionState, TaskBoardReadOnlyWorkflowLaunch,
     TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, advance_task_board_workflow,
-    approval_gate, bind_plan_approval, build_planning_result,
-    confirm_frozen_pull_request_identity, resolve_task_board_pull_request_identity,
-    start_task_board_workflow, task_board_read_only_execution_repository,
-    validate_task_board_read_only_item_revisions, validate_task_board_read_only_run_context,
-    validate_task_board_workflow_execution,
+    approval_gate, bind_plan_approval, build_planning_result, confirm_frozen_pull_request_identity,
+    resolve_task_board_pull_request_identity, start_task_board_workflow,
+    task_board_read_only_execution_repository, validate_task_board_read_only_item_revisions,
+    validate_task_board_read_only_run_context, validate_task_board_workflow_execution,
 };
 
 pub(super) async fn insert_started_read_only_workflow_in_tx(
@@ -224,9 +223,10 @@ fn confirm_write_launch_pull_request(
             Ok(())
         }
         kind if kind.has_dependency_update_intent() => {
-            let frozen = launch.pull_request.as_ref().ok_or_else(|| {
-                db_error("dependency workflow launch has no frozen pull request")
-            })?;
+            let frozen = launch
+                .pull_request
+                .as_ref()
+                .ok_or_else(|| db_error("dependency workflow launch has no frozen pull request"))?;
             confirm_frozen_pull_request_identity(item, frozen, true)
                 .map_err(|error| db_error(error.to_string()))
         }

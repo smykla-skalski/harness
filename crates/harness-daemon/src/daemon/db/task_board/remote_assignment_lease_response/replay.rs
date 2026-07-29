@@ -13,7 +13,7 @@ use crate::daemon::db::task_board::remote_operation_trust::{
     require_generation_replay_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

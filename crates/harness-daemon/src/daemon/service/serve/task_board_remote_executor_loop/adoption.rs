@@ -11,7 +11,7 @@ use crate::daemon::db::{
 };
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunSnapshot;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteOfferRequest,
     RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

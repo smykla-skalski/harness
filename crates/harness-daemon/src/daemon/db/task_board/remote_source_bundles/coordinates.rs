@@ -1,5 +1,5 @@
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{RemoteArtifactEntry, RemoteSourceMaterial};
+use crate::daemon::task_board_remote_wire::wire::{RemoteArtifactEntry, RemoteSourceMaterial};
 
 pub(in super::super) struct SourceBundleCoordinates<'a> {
     pub(in super::super) kind: &'static str,

@@ -18,7 +18,7 @@ use super::remote_source_bundles::{
     load_source_bundle_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteOfferOutcome, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferRequest, RemoteOfferResponse, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,

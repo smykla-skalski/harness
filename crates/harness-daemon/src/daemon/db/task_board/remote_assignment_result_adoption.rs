@@ -17,7 +17,7 @@ use super::workflow_executions::update_execution_in_tx;
 use super::workflow_terminal::{project_terminal_execution_in_tx, settle_prepared_dispatch_in_tx};
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteStatusResponse,
 };
 use crate::task_board::{

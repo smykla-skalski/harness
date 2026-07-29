@@ -3,7 +3,7 @@ use super::remote_assignment_generation_tests::{
     accept_controller, claim_controller, running_status, status_request,
 };
 use super::remote_assignment_test_support::*;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

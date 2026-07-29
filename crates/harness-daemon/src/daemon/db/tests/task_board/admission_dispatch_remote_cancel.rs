@@ -3,7 +3,7 @@ use super::ledger_kind_state;
 use super::remote_start_tests::{
     PreparedRemoteOffer, offer_remote, prepare_remote_offer_with_policy,
 };
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLease, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

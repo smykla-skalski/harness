@@ -1,7 +1,7 @@
 use chrono::Duration;
 
 use crate::daemon::db::TaskBoardRemoteOperationTrustFence;
-use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
+use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{
     TaskBoardExecutionAttemptRecord, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,

@@ -4,11 +4,11 @@ use super::remote_assignment_generation_tests::{accept_controller, claim_control
 use super::remote_assignment_test_support::*;
 use super::workflow_dispatch::workflow_owner;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteOfferRequest,
     RemoteSettledRequest, RemoteSettledResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::task_board_remote_transport::wire_cleanup::{
+use crate::daemon::task_board_remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
 use crate::task_board::{

@@ -1,6 +1,6 @@
 use sha2::{Digest, Sha256};
 
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteClaimRequest, RemoteClaimResponse, RemoteLease, RemoteOfferRequest,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

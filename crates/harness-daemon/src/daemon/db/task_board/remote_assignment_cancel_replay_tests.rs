@@ -1,7 +1,7 @@
 use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_generation_tests::accept_controller;
 use super::remote_assignment_test_support::*;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLease, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

@@ -9,7 +9,7 @@ use super::*;
 use crate::daemon::db::{
     AsyncDaemonDb, DaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteLifecycleTrustSnapshot,
 };
-use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
+use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::TaskBoardExecutionHostConfig;
 
 const REQUEST_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";

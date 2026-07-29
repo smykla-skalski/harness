@@ -3,7 +3,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::remote_assignment_model::{canonical_time, concurrent, to_i64};
 use super::remote_source_bundles::source_bundle_coordinates;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleUploadRequest,
 };
 

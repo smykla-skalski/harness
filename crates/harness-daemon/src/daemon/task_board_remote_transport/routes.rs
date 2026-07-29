@@ -10,23 +10,23 @@ use super::routes_support::{
     active_assignments, assignment_route, concurrent, load_assignment, local_host, map_route_error,
     map_route_result, offer_response, record_lease, route_error, verify_route_identity, wire_error,
 };
-use super::wire::{
+use crate::daemon::db::utc_now;
+use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
     RemoteSourceBundleUploadRequest, RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use super::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
     RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
 };
-use super::wire_conversion::host_wire_advertisement;
-use super::wire_limits::{
+use crate::daemon::task_board_remote_wire::wire_conversion::host_wire_advertisement;
+use crate::daemon::task_board_remote_wire::wire_limits::{
     MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_OFFER_JSON_BYTES,
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
 };
-use crate::daemon::db::utc_now;
-use crate::daemon::http::openapi::DaemonErrorBody;
-use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
 use harness_kernel::errors::CliErrorKind;
 
 pub(crate) const ADVERTISE_PATH: &str = "/v1/task-board-execution/advertise";

@@ -1,7 +1,7 @@
 use crate::daemon::db::{
     REMOTE_EXECUTOR_PRINCIPAL, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_transport::wire::RemoteAssignmentWireState;
+use crate::daemon::task_board_remote_wire::wire::RemoteAssignmentWireState;
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 
 use super::super::disabled_tests::executor_state;

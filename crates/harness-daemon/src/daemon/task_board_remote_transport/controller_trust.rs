@@ -5,12 +5,12 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use super::controller_clock::ControllerClock;
-use super::wire_conversion::domain_host_advertisement;
 use crate::daemon::db::TaskBoardRemoteOperationKind;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
     TaskBoardRemoteOperationTrustFence,
 };
+use crate::daemon::task_board_remote_wire::wire_conversion::domain_host_advertisement;
 use crate::task_board::TaskBoardExecutionHostConfig;
 
 impl RemoteExecutionControllerClient {

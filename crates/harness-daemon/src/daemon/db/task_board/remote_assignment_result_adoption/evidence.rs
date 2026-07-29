@@ -12,7 +12,7 @@ use crate::daemon::db::task_board::remote_assignment_model::{
 };
 use crate::daemon::db::task_board::remote_result_import::load_and_finalize_remote_implementation_import_in_tx;
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{RemoteArtifactEntry, RemoteTypedResult};
+use crate::daemon::task_board_remote_wire::wire::{RemoteArtifactEntry, RemoteTypedResult};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardWorkflowExecutionRecord, task_board_local_attempt_result_expectation,

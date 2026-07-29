@@ -8,9 +8,7 @@ use crate::daemon::task_board_remote_transport::routes::{
     CLAIM_PATH, DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES,
     SOURCE_BUNDLE_RECEIPT_PATH,
 };
-use crate::daemon::task_board_remote_transport::wire::{
-    RemoteArtifactEntry, RemoteArtifactManifest,
-};
+use crate::daemon::task_board_remote_wire::wire::{RemoteArtifactEntry, RemoteArtifactManifest};
 
 const BUNDLE_BASE: &str = "1111111111111111111111111111111111111111";
 const BUNDLE_RESULT: &str = "2222222222222222222222222222222222222222";

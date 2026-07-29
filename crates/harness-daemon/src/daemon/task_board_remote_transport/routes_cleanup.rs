@@ -9,11 +9,13 @@ use super::routes_support::{
     assignment_route, concurrent, load_assignment, map_route_error, map_route_result, route_error,
     wire_error,
 };
-use super::wire::RemoteAssignmentWireState;
-use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservationResponse};
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::daemon::task_board_remote_wire::wire::RemoteAssignmentWireState;
+use crate::daemon::task_board_remote_wire::wire_cleanup::{
+    RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
+};
 use harness_kernel::errors::CliError;
 
 pub(crate) const CLEANUP_OBSERVATION_PATH: &str = "/v1/task-board-execution/cleanup/observe";

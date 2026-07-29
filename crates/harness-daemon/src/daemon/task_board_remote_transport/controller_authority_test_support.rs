@@ -12,13 +12,13 @@ use tokio_rustls::TlsAcceptor;
 
 use super::client::{RemoteExecutionHttpClient, RemoteExecutionHttpClientConfig};
 use super::controller::RemoteExecutionControllerClient;
-use super::wire::{
-    RemoteClaimRequest, RemoteClaimResponse, RemoteLease, RemoteOfferDisposition,
-    RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-};
 use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteHostTrustFence, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteClaimRequest, RemoteClaimResponse, RemoteLease, RemoteOfferDisposition,
+    RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionAttemptCas,

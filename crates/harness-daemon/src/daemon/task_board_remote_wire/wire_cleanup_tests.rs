@@ -1,5 +1,5 @@
 use super::*;
-use crate::daemon::task_board_remote_transport::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
+use crate::daemon::task_board_remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
 const COMPLETED_AT: &str = "2026-07-20T12:00:00Z";

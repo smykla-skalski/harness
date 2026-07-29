@@ -4,13 +4,15 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use super::routes_support::{assignment_route, map_route_result, wire_error};
-use super::wire::{RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest};
-use super::wire::{
-    RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
-};
 use crate::daemon::db::utc_now;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
+};
 
 #[utoipa::path(
     post,

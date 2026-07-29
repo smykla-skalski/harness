@@ -1,7 +1,7 @@
 use sha2::{Digest as _, Sha256};
 
 use super::remote_source_bundle_prior::{TaskBoardRemotePriorPhaseBundle, consistent_bundle};
-use crate::daemon::task_board_remote_transport::wire::RemoteArtifactEntry;
+use crate::daemon::task_board_remote_wire::wire::RemoteArtifactEntry;
 
 #[test]
 fn prior_bundle_loader_accepts_each_single_readable_origin() {

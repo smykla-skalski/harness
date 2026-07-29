@@ -4,9 +4,9 @@ use sqlx::query_as;
 use super::remote_artifacts::validate_artifact_evidence;
 use super::remote_assignment_model::concurrent;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
-use crate::daemon::task_board_remote_transport::wire::RemoteSourceMaterial;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
+use crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial;
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteSourceBundleUploadRequest,
 };
 use crate::task_board::{

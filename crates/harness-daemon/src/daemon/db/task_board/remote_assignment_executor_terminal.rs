@@ -12,7 +12,7 @@ use super::remote_assignment_model::{
 };
 use super::remote_start_receipts::durable_start_receipt_run_matches;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

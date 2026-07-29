@@ -6,11 +6,11 @@ use super::remote_assignment_test_support::{
     CLAIMED_AT, ControllerFixture, HOST, NOW, controller_fixture,
 };
 use super::workflow_execution_rows::{execution_json, label};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteSettledRequest,
     RemoteSettledResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::task_board_remote_transport::wire_cleanup::{
+use crate::daemon::task_board_remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
 use crate::task_board::{TaskBoardExecutionState, TaskBoardWorkflowExecutionCas};

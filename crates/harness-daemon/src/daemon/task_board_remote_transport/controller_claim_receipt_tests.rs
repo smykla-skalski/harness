@@ -2,16 +2,16 @@ use tokio::net::TcpListener;
 
 use super::controller::RemoteExecutionControllerClient;
 use super::controller_tests::{pinned_client, test_tls_material};
-use super::wire::{
-    RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
-    RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
-    RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-};
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteControllerFixture,
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
     accept_remote_executor, remote_controller_fixture, remote_executor_claim_request,
     remote_executor_fixture,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
+    RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
+    RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
 
@@ -262,7 +262,7 @@ async fn assert_claim_replay_rejects_conflicting_evidence(
 }
 
 fn renewal_request(
-    offer: &super::wire::RemoteOfferRequest,
+    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> RemoteLeaseRenewRequest {
     RemoteLeaseRenewRequest {
@@ -278,7 +278,7 @@ fn renewal_request(
 }
 
 fn cancel_request(
-    binding: &super::wire::RemoteAttemptBinding,
+    binding: &crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding,
     lease_id: &str,
     offer_request_sha256: &str,
 ) -> RemoteCancelRequest {
