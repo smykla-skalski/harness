@@ -19,6 +19,7 @@ bridge-runtime = ["dep:agent-client-protocol", "dep:nix", "dep:portable-pty", "d
 test-support = ["bridge-runtime"]
 
 [dependencies]
+async-trait = "0.1.83"
 harness-infra = { path = "../harness-infra", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
