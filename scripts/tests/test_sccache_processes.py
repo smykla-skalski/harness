@@ -10,6 +10,25 @@ from scripts.lib import sccache_processes
 
 
 class SccacheProcessTests(unittest.TestCase):
+    def test_path_ownership_canonicalizes_tmp_aliases(self) -> None:
+        aliases = {
+            "/tmp/hst.fixture": "/private/tmp/hst.fixture",
+            "/private/tmp/hst.fixture/owned.sock": (
+                "/private/tmp/hst.fixture/owned.sock"
+            ),
+        }
+        with patch.object(
+            sccache_processes.os.path,
+            "realpath",
+            side_effect=lambda path: aliases[str(path)],
+        ):
+            owned = sccache_processes._path_is_under(
+                "/private/tmp/hst.fixture/owned.sock",
+                Path("/tmp/hst.fixture"),
+            )
+
+        self.assertTrue(owned)
+
     def test_linux_maps_only_owned_socket_inodes_to_processes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = Path(directory)

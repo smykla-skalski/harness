@@ -11,7 +11,9 @@ from typing import Iterable
 def _path_is_under(path: str, root: Path) -> bool:
     candidate = path.removesuffix(" type=STREAM").removesuffix(" (deleted)")
     try:
-        return Path(candidate).is_relative_to(root)
+        resolved_candidate = Path(os.path.realpath(candidate))
+        resolved_root = Path(os.path.realpath(root))
+        return resolved_candidate.is_relative_to(resolved_root)
     except (OSError, ValueError):
         return False
 
