@@ -305,6 +305,7 @@ pub(super) fn remove_empty_directory(path: &Path, parent: &Path) -> Result<(), C
 }
 
 pub(super) fn validate_trusted_ancestors(path: &Path) -> Result<(), CliError> {
+    let canonical_manifest_dir = canonical_test_boundary(Path::new(env!("CARGO_MANIFEST_DIR")));
     for ancestor in path.ancestors() {
         let metadata = fs::symlink_metadata(ancestor).map_err(|error| {
             io_error(format!(
@@ -325,7 +326,7 @@ pub(super) fn validate_trusted_ancestors(path: &Path) -> Result<(), CliError> {
                 ancestor.display()
             )));
         }
-        if is_test_manifest_dir_boundary(ancestor, &metadata) {
+        if is_test_manifest_dir_boundary(ancestor, &metadata, canonical_manifest_dir.as_deref()) {
             break;
         }
         let sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
@@ -339,11 +340,30 @@ pub(super) fn validate_trusted_ancestors(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+// Resolved once per walk, not per ancestor; `cfg!(test)`-gated because this boundary only ever
+// gates this crate's own test fixtures and production installs shouldn't pay for the syscall.
+fn canonical_test_boundary(path: &Path) -> Option<PathBuf> {
+    if cfg!(test) {
+        path.canonicalize().ok()
+    } else {
+        None
+    }
+}
+
 // `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures sit inside the crate's own checkout, whose
 // mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the developer's
 // or CI's own tree, not attacker controlled, so trust it as a boundary regardless of write bits.
-fn is_test_manifest_dir_boundary(path: &Path, metadata: &Metadata) -> bool {
-    cfg!(test) && path == Path::new(env!("CARGO_MANIFEST_DIR")) && metadata.uid() == trusted_uid()
+// Match the canonical form too: a caller may hand this walk a path already resolved by its own
+// `canonicalize()`, in which case the raw manifest dir never appears as an ancestor even when
+// we're really looking at the same directory.
+fn is_test_manifest_dir_boundary(
+    path: &Path,
+    metadata: &Metadata,
+    canonical_manifest_dir: Option<&Path>,
+) -> bool {
+    cfg!(test)
+        && (path == Path::new(env!("CARGO_MANIFEST_DIR")) || canonical_manifest_dir == Some(path))
+        && metadata.uid() == trusted_uid()
 }
 
 pub(super) fn open_directory(path: &Path) -> Result<File, CliError> {

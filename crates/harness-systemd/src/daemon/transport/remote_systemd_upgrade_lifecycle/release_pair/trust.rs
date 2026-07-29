@@ -44,6 +44,11 @@ pub(super) fn canonical_path(label: &str, path: &Path) -> Result<PathBuf, CliErr
 }
 
 fn validate_trusted_ancestors(label: &str, path: &Path) -> Result<(), CliError> {
+    // `path` reaches here already resolved by `canonical_path`'s `path.canonicalize()`, so a
+    // symlinked manifest dir or temp dir would never equal the raw comparisons below. Resolve
+    // each boundary's own canonical form once, up front, rather than per ancestor.
+    let canonical_manifest_dir = canonical_test_boundary(Path::new(env!("CARGO_MANIFEST_DIR")));
+    let canonical_temp_dir = canonical_test_boundary(&temp_dir());
     for ancestor in path.parent().into_iter().flat_map(Path::ancestors) {
         let metadata = fs::symlink_metadata(ancestor).map_err(|error| {
             io_error(format!(
@@ -70,7 +75,8 @@ fn validate_trusted_ancestors(label: &str, path: &Path) -> Result<(), CliError> 
         // developer's or CI's own tree, not attacker controlled, so trust it before the writability
         // check below would otherwise reject it.
         if cfg!(test)
-            && ancestor == Path::new(env!("CARGO_MANIFEST_DIR"))
+            && (ancestor == Path::new(env!("CARGO_MANIFEST_DIR"))
+                || canonical_manifest_dir.as_deref() == Some(ancestor))
             && metadata.uid() == trusted_uid()
         {
             break;
@@ -82,11 +88,22 @@ fn validate_trusted_ancestors(label: &str, path: &Path) -> Result<(), CliError> 
                 ancestor.display()
             )));
         }
-        if cfg!(test) && ancestor == temp_dir() {
+        if cfg!(test) && (ancestor == temp_dir() || canonical_temp_dir.as_deref() == Some(ancestor))
+        {
             break;
         }
     }
     Ok(())
+}
+
+// Resolved once per walk, not per ancestor; `cfg!(test)`-gated because these boundaries only
+// ever gate this crate's own test fixtures and production installs shouldn't pay for the syscall.
+fn canonical_test_boundary(path: &Path) -> Option<PathBuf> {
+    if cfg!(test) {
+        path.canonicalize().ok()
+    } else {
+        None
+    }
 }
 
 #[cfg(not(test))]

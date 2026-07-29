@@ -11,6 +11,11 @@ use tempfile::NamedTempFile;
 
 use crate::errors::{CliError, CliErrorKind};
 
+#[path = "remote_systemd_inhibitor/trust.rs"]
+mod trust;
+
+use trust::validate_unit_directory;
+
 const INHIBITOR_FILE_NAME: &str = "90-harness-inhibit.conf";
 const INHIBITOR_BYTES: &[u8] = b"[Unit]\nConditionPathExists=!/\n";
 
@@ -110,62 +115,6 @@ fn validate_absolute_normalized(path: &Path) -> Result<(), CliError> {
             path.display()
         )))
     }
-}
-
-fn validate_unit_directory(unit_path: &Path) -> Result<&Path, CliError> {
-    let parent = unit_path.parent().ok_or_else(|| {
-        io_error(format!(
-            "systemd unit path has no parent: {}",
-            unit_path.display()
-        ))
-    })?;
-    for ancestor in parent.ancestors() {
-        if validate_trusted_ancestor(ancestor)? {
-            break;
-        }
-    }
-    Ok(parent)
-}
-
-/// Returns `Ok(true)` once the walk reaches a boundary trusted without a writability check.
-fn validate_trusted_ancestor(path: &Path) -> Result<bool, CliError> {
-    let metadata = fs::symlink_metadata(path).map_err(|error| {
-        io_error(format!(
-            "inspect systemd unit directory ancestor {}: {error}",
-            path.display()
-        ))
-    })?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(io_error(format!(
-            "systemd unit directory ancestor is not a real directory: {}",
-            path.display()
-        )));
-    }
-    if metadata.uid() != 0 && metadata.uid() != trusted_uid() {
-        return Err(io_error(format!(
-            "systemd unit directory ancestor has untrusted owner {}: {}",
-            metadata.uid(),
-            path.display()
-        )));
-    }
-    if is_test_manifest_dir_boundary(path, &metadata) {
-        return Ok(true);
-    }
-    let trusted_sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
-    if metadata.mode() & 0o022 != 0 && !trusted_sticky_root {
-        return Err(io_error(format!(
-            "systemd unit directory ancestor is group- or world-writable: {}",
-            path.display()
-        )));
-    }
-    Ok(false)
-}
-
-// `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures sit inside the crate's own checkout, whose
-// mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the developer's
-// or CI's own tree, not attacker controlled, so trust it as a boundary regardless of write bits.
-fn is_test_manifest_dir_boundary(path: &Path, metadata: &Metadata) -> bool {
-    cfg!(test) && path == Path::new(env!("CARGO_MANIFEST_DIR")) && metadata.uid() == trusted_uid()
 }
 
 fn inspect_managed_directory(path: &Path) -> Result<DirectoryState, CliError> {
