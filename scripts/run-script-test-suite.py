@@ -628,6 +628,8 @@ def _root_python_tasks(host_os: str) -> list[Task]:
         ("root python: parallel script runner", "test_parallel_script_tests.py"),
         ("root python: sccache cleanup audit", "test_sccache_cleanup_audit.py"),
         ("root python: sccache processes", "test_sccache_processes.py"),
+        ("root python: sccache recovery", "test_sccache_recover.py"),
+        ("root python: sccache status", "test_sccache_status.py"),
         ("root python: seed Rust build lane", "test_seed_rust_build_lane.py"),
     )
     task_groups = [

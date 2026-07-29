@@ -369,6 +369,10 @@ run = "./scripts/check-toolchain-pin.sh"
 description = "Stop sccache servers that no longer own the socket; the live server and every client are left alone (Linux only)"
 run = "./scripts/run-linux-only.sh ./scripts/clean-sccache-servers.sh"
 
+[tasks."cargo:cache:recover"]
+description = "Dry-run orphan sccache recovery on macOS/Linux; pass --apply after -- to stop only proven orphan servers"
+run = "python3 scripts/sccache-recover.py"
+
 [tasks."harness:check:version"]
 hide = true
 run = "./scripts/version.sh check"
