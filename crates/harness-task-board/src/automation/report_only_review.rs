@@ -66,8 +66,9 @@ pub enum TaskBoardReportOnlyReviewError {
     #[error("report-only review finding line must be greater than zero")]
     InvalidFindingLine,
     #[error(
-        "report-only review finding path must be a repo-relative path without a leading '/', \
-         '..' traversal, control characters, or leading/trailing whitespace"
+        "report-only review finding path must be a canonical repo-relative POSIX path: no \
+         leading '/', no drive prefix, no '.' or '..' segments, no empty or backslash-separated \
+         segments, no control characters, and no leading/trailing whitespace"
     )]
     InvalidFindingPath,
     #[error("report-only review output is invalid: {detail}")]
@@ -177,23 +178,49 @@ fn parse_output(
     Ok(output)
 }
 
-/// Reject paths that could point outside the repo boundary: absolute paths,
-/// `..` traversal, control characters, and leading/trailing whitespace all
-/// pass a plain non-empty check, so this checks the shape explicitly instead.
+/// Reject paths that could point outside the repo boundary, or that are not
+/// a canonical repo-relative POSIX path: absolute paths, `..`/`.` traversal
+/// segments, drive prefixes, backslashes, control characters, and
+/// leading/trailing whitespace all pass a plain non-empty check, so this
+/// checks the shape explicitly instead.
+///
+/// `Component::Prefix` only fires on Windows: on POSIX hosts (where this
+/// runs today), `C:foo` and `C:\foo` parse as an ordinary `Normal`
+/// component, and repeated slashes such as `src//lib.rs` collapse away
+/// before `components()` ever sees them. The component check stays for
+/// Windows correctness; the string checks are what actually reject those
+/// shapes here.
 fn validate_finding_path(value: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
     validate_nonempty("finding.location.path", value)?;
     let path = Path::new(value);
     let safe = value.trim() == value
         && !value.chars().any(char::is_control)
+        && !value.contains('\\')
+        && !has_drive_prefix(value)
+        && !value.split('/').any(str::is_empty)
         && !path.is_absolute()
-        && !path
-            .components()
-            .any(|component| matches!(component, Component::ParentDir));
+        && !path.components().any(|component| {
+            matches!(
+                component,
+                Component::Prefix(_) | Component::CurDir | Component::ParentDir
+            )
+        });
     if safe {
         Ok(())
     } else {
         Err(TaskBoardReportOnlyReviewError::InvalidFindingPath)
     }
+}
+
+/// `Path::is_absolute` and `Component::Prefix` only recognize a Windows
+/// drive letter on a Windows host; this string check catches `C:foo` and
+/// `C:\foo` on the POSIX hosts this crate actually runs on.
+fn has_drive_prefix(value: &str) -> bool {
+    let mut chars = value.chars();
+    matches!(
+        (chars.next(), chars.next()),
+        (Some(letter), Some(':')) if letter.is_ascii_alphabetic()
+    )
 }
 
 fn validate_head_revision(revision: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
@@ -310,6 +337,10 @@ mod tests {
             finding(r"src/\u0007lib.rs"),
             finding(" src/lib.rs"),
             finding("src/lib.rs "),
+            finding("C:foo"),
+            finding(r"C:\\foo"),
+            finding("./src/lib.rs"),
+            finding("src//lib.rs"),
         ];
 
         for output in cases {
