@@ -1499,9 +1499,10 @@ scenario_sccache_socket_is_shared_across_checkouts() {
   local fake_bin="$SANDBOX/checkout-bin"
   local common_root="$base/main"
   local explicit_target="$base/explicit-target"
+  local socket_tmpdir="$SOCKET_TMPDIR/checkouts"
   local co out a_sock="" b_sock="" a_target="" b_target=""
   local a_bases="" b_bases="" explicit_bases="" expected_bases="" version_socket=""
-  mkdir -p "$fake_bin" "$common_root/.git"
+  mkdir -p "$fake_bin" "$common_root/.git" "$socket_tmpdir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
   cat >"$fake_bin/git" <<EOF
 #!/usr/bin/env bash
@@ -1541,6 +1542,8 @@ EOF
       PATH="$fake_bin:$PATH" \
         SCCACHE_BIN="$fake_bin/sccache" \
         RUSTC_WRAPPER='' \
+        TMPDIR="$socket_tmpdir/" \
+        USER="$TEST_USER" \
         CODEX_SESSION_ID="cargo-local-checkout-$$" \
         HARNESS_CARGO_SKIP_LEASE=1 \
         HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
@@ -1576,6 +1579,8 @@ EOF
     PATH="$fake_bin:$PATH" \
       SCCACHE_BIN="$fake_bin/sccache" \
       RUSTC_WRAPPER='' \
+      TMPDIR="$socket_tmpdir/" \
+      USER="$TEST_USER" \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
       "$base/alpha/scripts/cargo-local.sh" --print-env \
@@ -1594,6 +1599,8 @@ EOF
     PATH="$fake_bin:$PATH" \
       SCCACHE_BIN="$fake_bin/sccache" \
       RUSTC_WRAPPER='' \
+      TMPDIR="$socket_tmpdir/" \
+      USER="$TEST_USER" \
       CARGO_TARGET_DIR="$explicit_target" \
       HARNESS_TEST_EMPTY_WORKTREES=1 \
       HARNESS_CARGO_SKIP_LEASE=1 \
