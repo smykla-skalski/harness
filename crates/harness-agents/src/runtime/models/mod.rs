@@ -114,14 +114,14 @@ mod tests {
     }
 
     #[test]
-    fn openrouter_catalog_contains_headless_smoke_model() {
-        let catalog = catalog_for("openrouter").expect("OpenRouter catalog");
-        assert!(
-            catalog
-                .models
-                .iter()
-                .any(|model| model.id == "deepseek/deepseek-v4-flash")
-        );
+    fn headless_smoke_models_are_catalog_cheapest() {
+        for (runtime, expected) in [
+            ("openrouter", "deepseek/deepseek-v4-flash"),
+            ("codex", "gpt-5.3-codex-spark"),
+        ] {
+            let catalog = catalog_for(runtime).expect("runtime catalog");
+            assert_eq!(catalog.cheapest_fastest, expected);
+        }
     }
 
     #[test]

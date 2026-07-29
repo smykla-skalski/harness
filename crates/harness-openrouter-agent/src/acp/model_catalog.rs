@@ -23,6 +23,7 @@ pub const MODEL_CONFIG_OPTION_ID: &str = "model";
 pub fn curated_models() -> Vec<SessionConfigSelectOption> {
     [
         ("anthropic/claude-haiku-4-5", "Claude Haiku 4.5"),
+        ("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash"),
         ("anthropic/claude-sonnet-4-6", "Claude Sonnet 4.6"),
         ("anthropic/claude-opus-4-7", "Claude Opus 4.7"),
         ("openai/gpt-5.4-mini", "GPT-5.4 mini"),
@@ -115,6 +116,16 @@ mod tests {
             models
                 .iter()
                 .any(|m| m.value.0.as_ref() == DEFAULT_MODEL_ID)
+        );
+    }
+
+    #[test]
+    fn curated_list_includes_deepseek_v4_flash() {
+        let models = curated_models();
+        assert!(
+            models
+                .iter()
+                .any(|model| model.value.0.as_ref() == "deepseek/deepseek-v4-flash")
         );
     }
 

@@ -240,6 +240,6 @@ pub(super) fn openrouter_catalog() -> RuntimeModelCatalog {
             ),
         ],
         default: "anthropic/claude-sonnet-4-6".into(),
-        cheapest_fastest: "anthropic/claude-haiku-4-5".into(),
+        cheapest_fastest: "deepseek/deepseek-v4-flash".into(),
     }
 }

@@ -98,6 +98,8 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
             correlation_id: id.clone(),
             report,
             stop_reason: "end_turn".into(),
+            requested_model: snapshot.model.clone(),
+            effective_model: snapshot.model,
         }))
     }
 

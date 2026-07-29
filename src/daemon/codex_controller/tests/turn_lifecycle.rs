@@ -56,6 +56,8 @@ async fn completed_codex_turn_returns_one_stable_report() {
     assert_eq!(result.correlation_id, id);
     assert_eq!(result.report, "Complete Codex report");
     assert_eq!(result.stop_reason, "end_turn");
+    assert_eq!(result.requested_model.as_deref(), Some("gpt-5.5"));
+    assert_eq!(result.effective_model.as_deref(), Some("gpt-5.5"));
     assert_eq!(
         runtime.result(&id).await.expect("reload result"),
         Some(result)

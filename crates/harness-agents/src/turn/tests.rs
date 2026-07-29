@@ -37,6 +37,7 @@ fn assert_completed_result(runtime: &FakeAgentTurnRuntime, id: &super::AgentTurn
     assert_eq!(&result.correlation_id, id);
     assert_eq!(result.report, "complete report");
     assert_eq!(result.stop_reason, "end_turn");
+    assert_result_models(&result);
     assert_eq!(
         ready(runtime.cancel(id)).expect("cancel completed turn"),
         AgentTurnStatus::Completed
@@ -45,6 +46,11 @@ fn assert_completed_result(runtime: &FakeAgentTurnRuntime, id: &super::AgentTurn
         ready(runtime.result(id)).expect("reload result"),
         Some(result)
     );
+}
+
+fn assert_result_models(result: &super::AgentTurnResult) {
+    assert_eq!(result.requested_model.as_deref(), Some("model-a"));
+    assert_eq!(result.effective_model.as_deref(), Some("model-a"));
 }
 
 #[test]
