@@ -20,16 +20,15 @@
 //!
 //! Resolution order: explicit process-scoped daemon override (when supplied)
 //! wins over env vars, and env vars override each feature's default baseline.
-//! ACP and durable Task Board automation default on; suite hooks and background
-//! Reviews automation default off. Truthy values match the existing harness
-//! convention used by `HARNESS_OTEL_EXPORT`.
+//! ACP and durable Task Board automation default on; Task Board prompt
+//! overrides and background Reviews automation default off. Truthy values
+//! match the existing harness convention used by `HARNESS_OTEL_EXPORT`.
 //!
-//! Removal trigger: drop this whole module, the CLI arg on `BootstrapArgs`,
-//! and the `flags` parameter threaded through
-//! `crates/harness-hooks/src/wrapper/registrations.rs` once the gated family
-//! is useful by default. Project rule: a new hook lands with its handler
-//! doing observable work, or behind a dated flag in this module with a
-//! tracking issue. See
+//! Removal trigger: once a gated family above is useful by default, drop its
+//! env var, its reader function, and its call sites; drop this whole module
+//! once every family has graduated. Project rule: a new hook lands with its
+//! handler doing observable work, or behind a dated flag in this module with
+//! a tracking issue. See
 //! AGENTS.md / CLAUDE.md for the convention statement.
 
 use std::sync::{Mutex, MutexGuard};
