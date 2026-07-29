@@ -522,6 +522,64 @@ PY
   pass
 }
 
+scenario_keeps_cache_when_live_server_binary_is_unidentified() {
+  start_test "sccache cache kept when a live configured server cannot be identified"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output=""
+  local socket="$repo/fake-tmp/unidentified.sock"
+  local ready_fifo="$repo/fake-tmp/server-ready"
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+  cat > "$repo/scripts/cargo-local.sh" <<CARGO_LOCAL
+#!/usr/bin/env bash
+printf 'SCCACHE_BIN=\n'
+printf 'SCCACHE_SERVER_UDS=%s\n' "$socket"
+CARGO_LOCAL
+  chmod +x "$repo/scripts/cargo-local.sh"
+  mkfifo "$ready_fifo"
+  python3 - "$socket" "$ready_fifo" <<'PY' &
+import signal
+import socket
+import sys
+
+listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+listener.bind(sys.argv[1])
+listener.listen(1)
+with open(sys.argv[2], "w", encoding="utf-8") as ready:
+    ready.write("ready\n")
+signal.pause()
+PY
+  local server_pid=$!
+  LIVE_LEASE_PIDS+=("$server_pid")
+  read -r ready < "$ready_fifo"
+  rm "$ready_fifo"
+  [[ "$ready" == "ready" ]] || {
+    fail "socket server did not report readiness"
+    return 1
+  }
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --force 2>&1)" || true
+
+  [[ -e "$repo/fake-home/Library/Caches/Mozilla.sccache/blob" ]] || {
+    fail "cache removed while configured server binary was unidentified"
+    return 1
+  }
+  grep -Fq 'configured sccache server is present but cannot be stopped' <<<"$output" || {
+    fail "missing unidentified-server warning: $output"
+    return 1
+  }
+  local audit="$repo/.cache/diagnostics/sccache-cleanup.jsonl"
+  grep -Fq '"stop_outcome":"server-unidentified"' "$audit" || {
+    fail "unidentified server audit omitted its outcome: $(<"$audit")"
+    return 1
+  }
+  pass
+}
+
 scenario_authorized_removal_is_audited_before_cache_deletion() {
   start_test "authorized sccache removal leaves durable attribution"
   reset_tmp_root
@@ -604,6 +662,7 @@ scenario_dry_run_keeps_small_sccache_cache
 scenario_normal_cleanup_keeps_small_sccache_cache_and_live_server
 scenario_destructive_dry_run_is_write_free
 scenario_keeps_cache_when_stop_fails_even_under_force
+scenario_keeps_cache_when_live_server_binary_is_unidentified
 scenario_authorized_removal_is_audited_before_cache_deletion
 scenario_dedupes_symlinked_sccache_cache_dirs
 

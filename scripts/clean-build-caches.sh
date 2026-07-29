@@ -184,14 +184,19 @@ stop_repo_sccache_server() {
       fi
     done < <(python3 "$ROOT/scripts/lib/sccache_processes.py" --socket "$uds" 2>/dev/null || true)
   fi
-  [[ -n "$uds" && -n "$bin" ]] || {
+  [[ -n "$uds" ]] || {
     SCCACHE_STOP_OUTCOME="server-unidentified"
     return 0
   }
-  [[ -S "$uds" && -x "$bin" ]] || {
+  if [[ ! -S "$uds" && -z "$SCCACHE_SELECTED_PIDS" ]]; then
     SCCACHE_STOP_OUTCOME="server-absent"
     return 0
-  }
+  fi
+  if [[ -z "$bin" || ! -x "$bin" || ! -S "$uds" ]]; then
+    printf '    (warning: configured sccache server is present but cannot be stopped; cache kept)\n'
+    SCCACHE_STOP_OUTCOME="server-unidentified"
+    return 1
+  fi
 
   if (( DRY_RUN )); then
     printf '  · %-46s   (dry-run) %s\n' 'stop sccache server' "--stop-server"
