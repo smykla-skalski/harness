@@ -4,26 +4,11 @@
 //! domain's own types and belong beside it. The daemon re-exports them from
 //! `crate::daemon::protocol`; nothing here may reach back into the daemon.
 //!
-//! `task_board_item_requests` and `task_board_spawn_gate` moved into
-//! `harness-task-board` with the rest of this slice; this glob brings them
-//! back into `crate::task_board::wire::*` for every existing caller. The
-//! other files here reach into `dispatch`/`automation`/`triage*`/
-//! `policy_graph`/`session`, which stay in this crate for later slices, so
-//! they stay here too.
+//! Every file that used to live here (`task_board_item_requests`,
+//! `task_board_spawn_gate`, and now the rest: `policy_transfer`,
+//! `task_board`, `task_board_automation`, `task_board_steps`,
+//! `task_board_triage`, `task_board_triage_escalation`,
+//! `task_board_triage_rules`) has moved into `harness_task_board::wire`.
+//! This glob brings all of it back into `crate::task_board::wire::*` for
+//! every existing caller, matching `external.rs`/`github.rs`'s shape.
 pub use harness_task_board::wire::*;
-
-mod policy_transfer;
-mod task_board;
-mod task_board_automation;
-mod task_board_steps;
-mod task_board_triage;
-mod task_board_triage_escalation;
-mod task_board_triage_rules;
-
-pub use policy_transfer::*;
-pub use task_board::*;
-pub use task_board_automation::*;
-pub use task_board_steps::*;
-pub use task_board_triage::*;
-pub use task_board_triage_escalation::*;
-pub use task_board_triage_rules::*;

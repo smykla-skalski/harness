@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{
+use crate::{
     TriageRuleSetAuditEntry, TriageRuleSetDraft, TriageRuleSetRevisionSummary, TriageRuleSetV1,
 };
 
