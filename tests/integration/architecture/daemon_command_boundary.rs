@@ -156,14 +156,19 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
 }
 
 /// The dead root `daemon::client` facade this file documents above is gone,
-/// not just emptied out - guard against it growing back either under its old
-/// directory or as a same-named struct filed somewhere else under
-/// `daemon::`, rather than as a real caller of the leaf `harness-daemon-client`.
+/// not just emptied out - guard against it growing back as its old directory
+/// module, as a single-file `client.rs` module in its place, or as a
+/// same-named struct filed somewhere else under `daemon::`, rather than as a
+/// real caller of the leaf `harness-daemon-client`.
 #[test]
 fn daemon_client_facade_does_not_come_back() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     assert!(
         !repo_path_exists(root, "crates/harness-daemon/src/daemon/client"),
+        "the dead `daemon::client` facade must stay deleted; use `harness_daemon_client::DaemonClient` instead"
+    );
+    assert!(
+        !repo_path_exists(root, "crates/harness-daemon/src/daemon/client.rs"),
         "the dead `daemon::client` facade must stay deleted; use `harness_daemon_client::DaemonClient` instead"
     );
 
