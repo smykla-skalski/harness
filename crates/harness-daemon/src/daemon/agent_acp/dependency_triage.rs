@@ -96,7 +96,11 @@ fn dependency_triage_prompt() -> String {
          values: patch, minor, major, digest, pin, unknown. Allowed check states: pending, passed, \
          failed, cancelled, skipped. Allowed conflict states: clean, conflicted, unknown. Allowed \
          dispositions: report_only, human_required, wait_for_checks, fix_required, continue_safe. \
-         Unknown fields are rejected.",
+         The ordered action sequence must be record_result followed by exactly one matching action: \
+         complete_report, require_human, wait_for_checks, dispatch_fixer, or continue_workflow. \
+         required_tools must exactly name the application capabilities those actions resolve to: \
+         task_board.audit plus, when required, github.read, codex.dispatch, or task_board.advance. \
+         Unknown fields, actions, tools, and extra steps are rejected.",
     )
 }
 
@@ -189,12 +193,19 @@ mod tests {
             },
             safety_assumption: "green patch update".into(),
             disposition: TaskBoardDependencyTriageDisposition::ContinueSafe,
-            required_tools: vec!["github.read".into()],
-            next_steps: vec![TaskBoardDependencyTriageStep {
-                order: 1,
-                action: "record_result".into(),
-                reason: "retain decision".into(),
-            }],
+            required_tools: vec!["task_board.audit".into(), "task_board.advance".into()],
+            next_steps: vec![
+                TaskBoardDependencyTriageStep {
+                    order: 1,
+                    action: "record_result".into(),
+                    reason: "retain decision".into(),
+                },
+                TaskBoardDependencyTriageStep {
+                    order: 2,
+                    action: "continue_workflow".into(),
+                    reason: "advance the safe result".into(),
+                },
+            ],
         }
     }
 }
