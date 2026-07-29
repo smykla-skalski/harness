@@ -6,12 +6,11 @@ use sqlx::{Sqlite, Transaction};
 
 use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::items::{
-    bump_change_in_tx, clear_children_parent_in_tx, load_item_in_tx, validate_item,
+    TriageOutcome, bump_change_in_tx, clear_children_parent_in_tx, load_item_in_tx, validate_item,
 };
 use super::super::lane_order::{
     LaneTransitionKind, LaneTransitionWrite, replace_with_lane_transition_in_tx,
 };
-use super::super::triage_apply::TriageOutcome;
 use super::super::triage_audit::{
     ProviderExclusionConflictAudit, record_provider_exclusion_hidden_audit_in_tx,
     record_provider_exclusion_restored_audit_in_tx,

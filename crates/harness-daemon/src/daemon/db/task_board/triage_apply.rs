@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
+use super::items::TriageOutcome;
 use super::lane_order::{LaneTransitionKind, load_lane_entries_in_tx};
 use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
@@ -24,24 +25,6 @@ pub(super) fn triage_eligible(item: &TaskBoardItem) -> bool {
             item.status.canonical_persisted_status(),
             TaskBoardStatus::Inbox | TaskBoardStatus::Todo
         )
-}
-
-/// Distinguishes a freshly recorded `BuiltInV1` decision (a new history
-/// generation) from an existing decision whose placement effect was merely
-/// reapplied (no new generation) -- callers must never audit the latter as
-/// `triage_decided`.
-#[derive(Debug)]
-pub(super) enum TriageOutcome {
-    Decided(TaskBoardTriageDecision),
-    RetainedEffect(TaskBoardTriageDecision),
-}
-
-impl TriageOutcome {
-    pub(super) const fn decision(&self) -> &TaskBoardTriageDecision {
-        match self {
-            Self::Decided(decision) | Self::RetainedEffect(decision) => decision,
-        }
-    }
 }
 
 #[derive(Debug)]

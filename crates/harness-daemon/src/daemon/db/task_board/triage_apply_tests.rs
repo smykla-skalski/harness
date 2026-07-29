@@ -1,7 +1,7 @@
 use sqlx::{query, query_scalar};
 use tempfile::tempdir;
 
-use super::super::items::{load_item_in_tx, replace_item_in_tx};
+use super::super::items::test_support::{load_item_in_tx, replace_item_in_tx};
 use super::{apply_builtin_v1_triage_in_tx, triage_cause};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{

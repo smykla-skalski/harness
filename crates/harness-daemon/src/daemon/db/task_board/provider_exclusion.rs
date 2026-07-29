@@ -7,13 +7,13 @@ use self::write::{
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::items::{
-    ParentAssignmentValidation, TaskBoardMutation, bump_change_in_tx,
+    ParentAssignmentValidation, TaskBoardMutation, TriageOutcome, bump_change_in_tx,
     check_parent_assignment_in_tx, load_item_with_triage_override_in_tx, next_child_order_in_tx,
 };
 use super::lane_order::LaneTransitionKind;
 use super::provider_queries::ProviderQueries;
 use super::provider_sync_conflicts::replace_open_sync_conflicts_in_connection;
-use super::triage_apply::{TriageOutcome, reapply_active_override_outcome_in_tx};
+use super::triage_apply::reapply_active_override_outcome_in_tx;
 use super::triage_apply_rules::apply_active_triage_in_tx;
 use super::triage_audit::ProviderExclusionConflictAudit;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};

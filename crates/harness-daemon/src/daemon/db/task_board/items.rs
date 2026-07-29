@@ -1,3 +1,21 @@
+//! Item mutation: the create/update/delete surface for one Task Board item
+//! row, including the CAS revision and item-list change sequence every
+//! write bumps. The seam with triage evaluation is deliberately narrow and
+//! asymmetric, so each side can move into its own crate later without
+//! carrying the other with it. Forward (this module calling into triage):
+//! [`TriageEvaluator`] (declared in the nested `triage_evaluator` module,
+//! implemented by [`super::triage_interface::Triage`]) is the only thing
+//! item mutation depends on -- never triage's files by name. Reverse
+//! (triage calling into this module): triage's own entry points
+//! (`triage_apply_agent.rs`'s agent-verdict endpoint,
+//! `triage_override/mutations.rs`'s override set/clear,
+//! `triage_rules_reevaluation.rs`'s bulk rule-set-activation pass) import
+//! `bump_change_in_tx`, `load_item_with_triage_override_in_tx`, and
+//! [`apply_task_board_item_status_transition_in_tx`] directly instead of
+//! through a trait -- item mutation is the lower layer every task-board
+//! area, triage included, already depends on this way, so that direction
+//! needs no inversion.
+
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
@@ -5,12 +23,7 @@ use super::item_tx_ext::TaskBoardItemTxExt;
 use super::lane_order::{LaneTransitionWrite, record_lane_transition_audit_in_tx};
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
-use super::triage_apply::TriageOutcome;
-use super::triage_audit::{
-    record_triage_decided_audit_in_tx, record_triage_effect_reapplied_audit_in_tx,
-};
-use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
-use super::triage_override::triage_override_from_item_row;
+use super::triage_interface::Triage;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::TaskBoardTombstoneCause;
@@ -24,6 +37,10 @@ use harness_kernel::errors::CliErrorKind;
 #[path = "items_audit.rs"]
 mod audit;
 use audit::{record_item_created_audit_in_tx, record_item_updated_audit_in_tx};
+
+#[path = "items_triage_interface.rs"]
+mod triage_evaluator;
+pub(super) use triage_evaluator::{TriageEvaluator, TriageOutcome};
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
@@ -41,6 +58,16 @@ pub(super) use parent::{
 #[path = "items_write.rs"]
 mod write;
 pub(super) use write::{insert_item_in_tx, replace_item_in_tx};
+
+/// Fixture-only access to the item core's raw row primitives, for triage's
+/// own tests that set up or verify rows directly instead of going through
+/// [`TriageEvaluator`] -- the production boundary triage implements for item
+/// mutation to call into. Production code must go through that trait, not
+/// this module.
+#[cfg(test)]
+pub(super) mod test_support {
+    pub(in super::super) use super::{load_item_in_tx, replace_item_in_tx};
+}
 
 #[path = "items_create.rs"]
 mod create;
@@ -203,33 +230,36 @@ async fn record_triage_or_lane_audit_in_tx(
 ) -> Result<(), CliError> {
     match outcome {
         Some(TriageOutcome::Decided(decision)) => {
-            maybe_enqueue_triage_escalation_in_tx(
-                transaction,
-                &before.id,
-                decision,
-                override_active,
-                escalation_config,
-                &decision.decided_at,
-            )
-            .await?;
-            record_triage_decided_audit_in_tx(
-                transaction,
-                before,
-                decision,
-                write,
-                items_change_seq,
-            )
-            .await
+            Triage
+                .maybe_enqueue_triage_escalation_in_tx(
+                    transaction,
+                    &before.id,
+                    decision,
+                    override_active,
+                    escalation_config,
+                    &decision.decided_at,
+                )
+                .await?;
+            Triage
+                .record_triage_decided_audit_in_tx(
+                    transaction,
+                    before,
+                    decision,
+                    write,
+                    items_change_seq,
+                )
+                .await
         }
         Some(TriageOutcome::RetainedEffect(decision)) => {
-            record_triage_effect_reapplied_audit_in_tx(
-                transaction,
-                before,
-                decision,
-                write,
-                items_change_seq,
-            )
-            .await
+            Triage
+                .record_triage_effect_reapplied_audit_in_tx(
+                    transaction,
+                    before,
+                    decision,
+                    write,
+                    items_change_seq,
+                )
+                .await
         }
         None => {
             record_untriaged_mutation_audit_in_tx(
@@ -342,7 +372,7 @@ pub(super) async fn load_item_with_triage_override_in_tx(
     else {
         return Ok(None);
     };
-    let override_ = triage_override_from_item_row(&row)?;
+    let override_ = Triage.triage_override_from_item_row(&row)?;
     let refs = query_as::<_, ExternalRefRow>(SELECT_REFS)
         .bind(item_id)
         .fetch_all(transaction.as_mut())

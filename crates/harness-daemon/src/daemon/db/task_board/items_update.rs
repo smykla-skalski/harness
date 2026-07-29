@@ -8,14 +8,15 @@ use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::projects::resolve_item_project_in_tx;
 use super::super::triage_apply::{
-    TriageOutcome, clear_stale_automatic_placement_on_human_status_move, override_implied_status,
+    clear_stale_automatic_placement_on_human_status_move, override_implied_status,
     reapply_active_override_outcome_in_tx,
 };
-use super::super::triage_apply_rules::apply_active_triage_in_tx;
+use super::super::triage_interface::Triage;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
 use super::{
-    TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, bump_change_in_tx,
-    record_triage_or_lane_audit_in_tx, resolve_parent_update_in_tx, validate_item,
+    TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, TriageEvaluator,
+    TriageOutcome, bump_change_in_tx, record_triage_or_lane_audit_in_tx,
+    resolve_parent_update_in_tx, validate_item,
 };
 
 impl AsyncDaemonDb {
@@ -245,14 +246,15 @@ async fn compute_triage_outcome_in_tx(
                 || before.lane_origin != item.lane_origin;
             let suppress_placement =
                 ingress == TaskBoardTriageIngress::HumanUpdate && direct_effect_this_call;
-            apply_active_triage_in_tx(
-                transaction,
-                item,
-                decided_at,
-                suppress_placement,
-                existing_override,
-            )
-            .await
+            Triage
+                .apply_active_triage_in_tx(
+                    transaction,
+                    item,
+                    decided_at,
+                    suppress_placement,
+                    existing_override,
+                )
+                .await
         }
     }
 }

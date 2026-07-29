@@ -1,9 +1,10 @@
 use sqlx::{Sqlite, Transaction, query_as};
 
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
+use super::items::TriageOutcome;
 use super::triage_apply::{
-    EnsuredTriageDecision, TriageOutcome, apply_builtin_v1_triage_in_tx,
-    apply_placement_effect_in_tx, ensure_current_triage_decision_in_tx, triage_eligible,
+    EnsuredTriageDecision, apply_builtin_v1_triage_in_tx, apply_placement_effect_in_tx,
+    ensure_current_triage_decision_in_tx, triage_eligible,
 };
 use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};

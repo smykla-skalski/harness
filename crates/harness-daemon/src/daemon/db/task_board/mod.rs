@@ -108,6 +108,7 @@ mod triage_cause;
 mod triage_decisions;
 mod triage_escalation_enqueue;
 mod triage_escalation_store;
+mod triage_interface;
 mod triage_override;
 mod triage_override_audit;
 #[cfg(test)]
