@@ -159,83 +159,87 @@ struct RestoredWrite<'a> {
     decided_at: &'a str,
 }
 
-impl AsyncDaemonDb {
-    /// Revives the screened tombstone, reconciles its triage placement and
-    /// records the one restored audit event. The caller commits.
-    pub(super) async fn write_provider_exclusion_restore_in_tx(
-        &self,
-        transaction: &mut Transaction<'_, Sqlite>,
-        item: TaskBoardItem,
-        revision: i64,
-        patch: TaskBoardItemPatch,
-        audit: &RestoreAudit<'_>,
-    ) -> Result<TaskBoardItem, CliError> {
-        let before = item.clone();
-        let before_parent_item_id = item.parent_item_id.clone();
-        let mut item = item;
-        revive_restored_item_in_tx(transaction, &mut item, patch, &before).await?;
-        let decided_at = item.updated_at.clone();
-        let (outcome, transition_kind) = reconcile_restore_triage_in_tx(
-            transaction,
-            &mut item,
-            audit.existing_override,
-            &decided_at,
-        )
-        .await?;
-        let write = replace_with_lane_transition_in_tx(
-            transaction,
-            before.clone(),
-            revision,
-            item,
-            transition_kind,
-        )
-        .await?;
-        let change_revision = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-        self.record_restore_settlement_in_tx(
-            transaction,
-            audit,
-            &RestoredWrite {
-                before: &before,
-                before_parent_item_id: before_parent_item_id.as_deref(),
-                outcome: outcome.as_ref(),
-                write: &write,
-                change_revision,
-                decided_at: &decided_at,
-            },
-        )
-        .await?;
-        Ok(write.item)
-    }
+/// Revives the screened tombstone, reconciles its triage placement and
+/// records the one restored audit event. The caller commits.
+///
+/// A free function taking `db` explicitly, not a `AsyncDaemonDb` method:
+/// `task_board` doesn't own `AsyncDaemonDb`, and this helper never needs
+/// method-call syntax at any of its call sites (all inside `provider_exclusion`
+/// itself), so there's no reason to route it through `ProviderQueries`.
+pub(super) async fn write_provider_exclusion_restore_in_tx(
+    db: &AsyncDaemonDb,
+    transaction: &mut Transaction<'_, Sqlite>,
+    item: TaskBoardItem,
+    revision: i64,
+    patch: TaskBoardItemPatch,
+    audit: &RestoreAudit<'_>,
+) -> Result<TaskBoardItem, CliError> {
+    let before = item.clone();
+    let before_parent_item_id = item.parent_item_id.clone();
+    let mut item = item;
+    revive_restored_item_in_tx(transaction, &mut item, patch, &before).await?;
+    let decided_at = item.updated_at.clone();
+    let (outcome, transition_kind) = reconcile_restore_triage_in_tx(
+        transaction,
+        &mut item,
+        audit.existing_override,
+        &decided_at,
+    )
+    .await?;
+    let write = replace_with_lane_transition_in_tx(
+        transaction,
+        before.clone(),
+        revision,
+        item,
+        transition_kind,
+    )
+    .await?;
+    let change_revision = bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_restore_settlement_in_tx(
+        db,
+        transaction,
+        audit,
+        &RestoredWrite {
+            before: &before,
+            before_parent_item_id: before_parent_item_id.as_deref(),
+            outcome: outcome.as_ref(),
+            write: &write,
+            change_revision,
+            decided_at: &decided_at,
+        },
+    )
+    .await?;
+    Ok(write.item)
+}
 
-    async fn record_restore_settlement_in_tx(
-        &self,
-        transaction: &mut Transaction<'_, Sqlite>,
-        audit: &RestoreAudit<'_>,
-        settled: &RestoredWrite<'_>,
-    ) -> Result<(), CliError> {
-        if let Some(TriageOutcome::Decided(decision)) = settled.outcome {
-            maybe_enqueue_triage_escalation_in_tx(
-                transaction,
-                &settled.write.item.id,
-                decision,
-                audit.existing_override.is_some(),
-                &self.triage_escalation_config(),
-                settled.decided_at,
-            )
-            .await?;
-        }
-        record_provider_exclusion_restored_audit_in_tx(
+async fn record_restore_settlement_in_tx(
+    db: &AsyncDaemonDb,
+    transaction: &mut Transaction<'_, Sqlite>,
+    audit: &RestoreAudit<'_>,
+    settled: &RestoredWrite<'_>,
+) -> Result<(), CliError> {
+    if let Some(TriageOutcome::Decided(decision)) = settled.outcome {
+        maybe_enqueue_triage_escalation_in_tx(
             transaction,
-            audit.context,
-            audit.conflict_audit,
-            settled.before,
-            settled.before_parent_item_id,
-            settled.outcome,
-            settled.write,
-            settled.change_revision,
+            &settled.write.item.id,
+            decision,
+            audit.existing_override.is_some(),
+            &db.triage_escalation_config(),
+            settled.decided_at,
         )
-        .await
+        .await?;
     }
+    record_provider_exclusion_restored_audit_in_tx(
+        transaction,
+        audit.context,
+        audit.conflict_audit,
+        settled.before,
+        settled.before_parent_item_id,
+        settled.outcome,
+        settled.write,
+        settled.change_revision,
+    )
+    .await
 }
 
 /// Lifts the tombstone and applies the reconciliation patch. `before` is the

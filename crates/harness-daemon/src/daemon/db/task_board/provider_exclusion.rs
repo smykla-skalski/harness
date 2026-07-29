@@ -2,6 +2,7 @@ use sqlx::{Sqlite, Transaction};
 
 use self::write::{
     HidePreparation, RestoreAudit, apply_exclusion_tombstone_in_tx, prepare_hide_in_tx,
+    write_provider_exclusion_restore_in_tx,
 };
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
@@ -10,6 +11,7 @@ use super::items::{
     check_parent_assignment_in_tx, load_item_with_triage_override_in_tx, next_child_order_in_tx,
 };
 use super::lane_order::LaneTransitionKind;
+use super::provider_queries::ProviderQueries;
 use super::provider_sync_conflicts::replace_open_sync_conflicts_in_connection;
 use super::triage_apply::{TriageOutcome, reapply_active_override_outcome_in_tx};
 use super::triage_apply_rules::apply_active_triage_in_tx;
@@ -48,61 +50,24 @@ impl AsyncDaemonDb {
         context: &ProviderExclusionAuditContext,
         conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<Option<TaskBoardMutation>, CliError> {
-        io::validate_safe_segment(item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board provider exclusion hide")
-            .await?;
-        let prepared = match prepare_hide_in_tx(
-            &mut transaction,
+        <Self as ProviderQueries>::hide_task_board_item_for_provider_exclusion(
+            self,
             item_id,
             expected_revision,
             patch,
             context,
-            conflicts.as_deref(),
+            conflicts,
         )
-        .await?
-        {
-            HidePreparation::Ready(prepared) => prepared,
-            HidePreparation::NotApplied => {
-                transaction
-                    .commit()
-                    .await
-                    .map_err(|error| db_error(format!("commit task board hide no-op: {error}")))?;
-                return Ok(None);
-            }
-        };
-        let (write, change_revision) =
-            apply_exclusion_tombstone_in_tx(&mut transaction, *prepared, context).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board hide: {error}")))?;
-        Ok(Some(TaskBoardMutation {
-            item: write.item,
-            item_revision: write.item_revision,
-            change_revision,
-        }))
+        .await
     }
 
     /// Restores a previously provider-exclusion-tombstoned item because the
-    /// provider no longer reports an exclusion label. `expected_revision`
-    /// and `context`'s stored provider ref both CAS against the exact state
-    /// the caller matched by; either moving, or the row no longer carrying
-    /// the `ProviderExclusion` cause, yields `NotApplied`. `patch` is the
-    /// normal reconciliation patch (parent tri-state included) applied the
-    /// same way any other reconcile applies one, so local state it never
-    /// mentions -- planning approval, workflow, session, work item linkage,
-    /// estimates, agent mode, a `Manual` lane anchor -- stays exactly as
-    /// stored. A rejected parent assignment (self, cycle, missing) is
-    /// isolated to that field, same as ordinary reconcile; the rest of the
-    /// patch still applies. A retained `BuiltInV1` decision's placement
-    /// effect is reconciled here too, without duplicating decision history,
-    /// and the whole restore is exactly one typed audit event. `conflicts`
-    /// is `None` outside `Both`+`Report` (conflict state untouched),
-    /// `Some(empty)` to supersede stale open rows in this same transaction
-    /// before the restore proceeds, or `Some(non-empty)` to publish
-    /// conflicts and return `ConflictPublished` without restoring, leaving
-    /// the tombstone in place.
+    /// provider no longer reports an exclusion label. See
+    /// [`ProviderQueries::restore_task_board_item_for_provider_exclusion`]
+    /// for the full contract.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item does not exist or the restore fails.
     pub(crate) async fn restore_task_board_item_for_provider_exclusion(
         &self,
         expected_item_id: &str,
@@ -111,50 +76,135 @@ impl AsyncDaemonDb {
         context: &ProviderExclusionAuditContext,
         conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
-        io::validate_safe_segment(expected_item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board provider exclusion restore")
-            .await?;
-        let (item, revision, existing_override, conflict_audit) = match prepare_restore_in_tx(
-            &mut transaction,
+        <Self as ProviderQueries>::restore_task_board_item_for_provider_exclusion(
+            self,
             expected_item_id,
             expected_revision,
+            patch,
             context,
-            conflicts.as_deref(),
+            conflicts,
         )
-        .await?
-        {
-            RestorePreparation::Ready {
-                item,
-                revision,
-                existing_override,
-                conflict_audit,
-            } => (*item, revision, existing_override, conflict_audit),
-            RestorePreparation::Done(outcome) => {
-                return commit_restore_no_op(transaction, outcome, "no-op").await;
-            }
-        };
-        let restored = self
-            .write_provider_exclusion_restore_in_tx(
-                &mut transaction,
-                item,
-                revision,
-                patch,
-                &RestoreAudit {
-                    context,
-                    conflict_audit: &conflict_audit,
-                    existing_override: existing_override.as_ref(),
-                },
-            )
-            .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board restore: {error}")))?;
-        Ok(ProviderExclusionRestoreOutcome::Restored(Box::new(
-            restored,
-        )))
+        .await
     }
+}
+
+/// Real implementation behind [`ProviderQueries::hide_task_board_item_for_provider_exclusion`],
+/// called from the single consolidated trait impl in `provider_queries.rs`
+/// (a trait's methods can only be implemented in one `impl` block per type,
+/// so the per-area files hand `provider_queries.rs` a plain function instead
+/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+pub(super) async fn hide_task_board_item_for_provider_exclusion(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    expected_revision: i64,
+    patch: TaskBoardItemPatch,
+    context: &ProviderExclusionAuditContext,
+    conflicts: Option<Vec<TaskBoardSyncConflict>>,
+) -> Result<Option<TaskBoardMutation>, CliError> {
+    io::validate_safe_segment(item_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board provider exclusion hide")
+        .await?;
+    let prepared = match prepare_hide_in_tx(
+        &mut transaction,
+        item_id,
+        expected_revision,
+        patch,
+        context,
+        conflicts.as_deref(),
+    )
+    .await?
+    {
+        HidePreparation::Ready(prepared) => prepared,
+        HidePreparation::NotApplied => {
+            transaction
+                .commit()
+                .await
+                .map_err(|error| db_error(format!("commit task board hide no-op: {error}")))?;
+            return Ok(None);
+        }
+    };
+    let (write, change_revision) =
+        apply_exclusion_tombstone_in_tx(&mut transaction, *prepared, context).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board hide: {error}")))?;
+    Ok(Some(TaskBoardMutation {
+        item: write.item,
+        item_revision: write.item_revision,
+        change_revision,
+    }))
+}
+
+/// Real implementation behind [`ProviderQueries::restore_task_board_item_for_provider_exclusion`].
+/// `expected_revision` and `context`'s stored provider ref both CAS against
+/// the exact state the caller matched by; either moving, or the row no
+/// longer carrying the `ProviderExclusion` cause, yields `NotApplied`.
+/// `patch` is the normal reconciliation patch (parent tri-state included)
+/// applied the same way any other reconcile applies one, so local state it
+/// never mentions -- planning approval, workflow, session, work item
+/// linkage, estimates, agent mode, a `Manual` lane anchor -- stays exactly
+/// as stored. A rejected parent assignment (self, cycle, missing) is
+/// isolated to that field, same as ordinary reconcile; the rest of the
+/// patch still applies. A retained `BuiltInV1` decision's placement effect
+/// is reconciled here too, without duplicating decision history, and the
+/// whole restore is exactly one typed audit event. `conflicts` is `None`
+/// outside `Both`+`Report` (conflict state untouched), `Some(empty)` to
+/// supersede stale open rows in this same transaction before the restore
+/// proceeds, or `Some(non-empty)` to publish conflicts and return
+/// `ConflictPublished` without restoring, leaving the tombstone in place.
+pub(super) async fn restore_task_board_item_for_provider_exclusion(
+    db: &AsyncDaemonDb,
+    expected_item_id: &str,
+    expected_revision: i64,
+    patch: TaskBoardItemPatch,
+    context: &ProviderExclusionAuditContext,
+    conflicts: Option<Vec<TaskBoardSyncConflict>>,
+) -> Result<ProviderExclusionRestoreOutcome, CliError> {
+    io::validate_safe_segment(expected_item_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board provider exclusion restore")
+        .await?;
+    let (item, revision, existing_override, conflict_audit) = match prepare_restore_in_tx(
+        &mut transaction,
+        expected_item_id,
+        expected_revision,
+        context,
+        conflicts.as_deref(),
+    )
+    .await?
+    {
+        RestorePreparation::Ready {
+            item,
+            revision,
+            existing_override,
+            conflict_audit,
+        } => (*item, revision, existing_override, conflict_audit),
+        RestorePreparation::Done(outcome) => {
+            return commit_restore_no_op(transaction, outcome, "no-op").await;
+        }
+    };
+    let restored = write_provider_exclusion_restore_in_tx(
+        db,
+        &mut transaction,
+        item,
+        revision,
+        patch,
+        &RestoreAudit {
+            context,
+            conflict_audit: &conflict_audit,
+            existing_override: existing_override.as_ref(),
+        },
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board restore: {error}")))?;
+    Ok(ProviderExclusionRestoreOutcome::Restored(Box::new(
+        restored,
+    )))
 }
 
 #[path = "provider_exclusion_write.rs"]

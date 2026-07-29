@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::provider_external_create_rows::{create_conflict, load_intent_by_id};
+use super::provider_queries::ProviderQueries;
 use crate::daemon::db::audit::UPSERT_AUDIT_EVENT_SQL;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -20,24 +21,37 @@ impl AsyncDaemonDb {
         &self,
         intents: &[TaskBoardExternalCreateIntent],
     ) -> Result<Vec<HarnessMonitorAuditEvent>, CliError> {
-        let mut ordered = intents.to_vec();
-        ordered.sort_by(compare_intents);
-        ordered.dedup_by(|left, right| left.intent_id == right.intent_id);
-        if ordered.is_empty() {
-            return Ok(Vec::new());
-        }
-        let mut transaction = self
-            .begin_immediate_transaction("task board external create follow-ups")
-            .await?;
-        let mut events = Vec::new();
-        for intent in &ordered {
-            if let Some(event) = complete_one(&mut transaction, intent).await? {
-                events.push(event);
-            }
-        }
-        commit(transaction).await?;
-        Ok(events)
+        <Self as ProviderQueries>::complete_task_board_external_create_follow_ups(self, intents)
+            .await
     }
+}
+
+/// Real implementation behind [`ProviderQueries::complete_task_board_external_create_follow_ups`],
+/// called from the single consolidated trait impl in `provider_queries.rs`
+/// (a trait's methods can only be implemented in one `impl` block per type,
+/// so the per-area files hand `provider_queries.rs` a plain function instead
+/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+pub(super) async fn complete_task_board_external_create_follow_ups(
+    db: &AsyncDaemonDb,
+    intents: &[TaskBoardExternalCreateIntent],
+) -> Result<Vec<HarnessMonitorAuditEvent>, CliError> {
+    let mut ordered = intents.to_vec();
+    ordered.sort_by(compare_intents);
+    ordered.dedup_by(|left, right| left.intent_id == right.intent_id);
+    if ordered.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut transaction = db
+        .begin_immediate_transaction("task board external create follow-ups")
+        .await?;
+    let mut events = Vec::new();
+    for intent in &ordered {
+        if let Some(event) = complete_one(&mut transaction, intent).await? {
+            events.push(event);
+        }
+    }
+    commit(transaction).await?;
+    Ok(events)
 }
 
 async fn complete_one(
