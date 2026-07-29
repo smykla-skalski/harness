@@ -10,16 +10,18 @@ pub struct TaskBoardUpdatedPayload {
     pub automation: Option<TaskBoardAutomationSnapshot>,
 }
 
-use crate::task_board::{
-    DispatchExecutionSummary, ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    Machine, PolicyGraphMode, PolicyInput, PolicyPipelineAuditSummary, PolicyPipelineDocument,
-    PolicyPipelineGoLiveDiff, PolicyPipelineReplayResult, PolicyPipelineSaveResponse,
-    PolicyPipelineSimulationResult, PolicyScenario, TaskBoardAuditSummary,
-    TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults,
-    TaskBoardGitRuntimeConfig, TaskBoardItem, TaskBoardMachineSummary,
-    TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus, TaskBoardProgressRollup,
-    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary, planning::PlanningTransition,
-    project::TaskBoardProject, project_color::TaskBoardProjectColor,
+use crate::{
+    DispatchExecutionSummary, Machine, PolicyGraphMode, PolicyInput, PolicyPipelineAuditSummary,
+    PolicyPipelineDocument, PolicyPipelineGoLiveDiff, PolicyPipelineReplayResult,
+    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, PolicyScenario,
+    TaskBoardAuditSummary, TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary,
+    TaskBoardGitIdentityDefaults, TaskBoardGitRuntimeConfig, TaskBoardItem,
+    TaskBoardMachineSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus,
+    TaskBoardProgressRollup, TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
+    external::{ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection},
+    planning::PlanningTransition,
+    project::TaskBoardProject,
+    project_color::TaskBoardProjectColor,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

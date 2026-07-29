@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-use crate::task_board::{
+use crate::{
     TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome,
     TaskBoardTriageEscalationStatus, TaskBoardTriageOverride, TriageVerdict,
 };

@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{DispatchAppliedTask, DispatchPlan, TaskBoardItem};
+use crate::{DispatchAppliedTask, DispatchPlan, TaskBoardItem};
 
-use crate::session::wire::{ManagedAgentSnapshot, ManagedAgentSnapshotSchema};
+use harness_session::wire::{ManagedAgentSnapshot, ManagedAgentSnapshotSchema};
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardDispatchDeliverRequest {

@@ -1,7 +1,7 @@
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::summary::TaskBoardSyncSummary;
 use crate::task_board::wire::TaskBoardSyncRequest;
 use harness_kernel::errors::CliError;
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::{TaskBoardSyncArgs, leaf_daemon_client, leaf_daemon_client_error, print_json};
 

@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use harness_daemon_client::DaemonClient;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::infra::io;
 use crate::task_board::TASK_BOARD_LIST_MAX_LIMIT;
 use crate::task_board::TaskBoardWorkflowKind;
@@ -13,6 +12,7 @@ use crate::task_board::wire::{
     TaskBoardUpdateItemRequest, TaskBoardUpdateStateClears,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::{
     TaskBoardAuditArgs, TaskBoardCreateArgs, TaskBoardDeleteArgs, TaskBoardGetArgs,

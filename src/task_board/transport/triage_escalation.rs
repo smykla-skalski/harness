@@ -1,12 +1,12 @@
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::transport::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 use crate::task_board::wire::{
     TaskBoardTriageEscalationVerdictRequest, TaskBoardTriageEscalationVerdictResponse,
 };
 use crate::task_board::{TriageVerdict, is_canonical_reason_detail};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 /// The daemon-spawned escalation worker's only way to report its judgment
 /// back. Never used interactively -- the escalation prompt

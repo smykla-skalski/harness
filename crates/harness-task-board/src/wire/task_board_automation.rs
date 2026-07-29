@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub use crate::task_board::{
+pub use crate::{
     TaskBoardAutomationCancelTarget, TaskBoardAutomationHistoryRequest,
     TaskBoardAutomationHistoryResponse, TaskBoardAutomationMetrics, TaskBoardAutomationRunDetail,
     TaskBoardAutomationSnapshot,
@@ -40,7 +40,7 @@ pub struct TaskBoardAutomationForceCancelResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::task_board::wire::TaskBoardUpdatedPayload;
+    use crate::wire::TaskBoardUpdatedPayload;
 
     #[test]
     fn legacy_task_board_push_payload_defaults_snapshot_to_none() {

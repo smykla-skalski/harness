@@ -2619,7 +2619,8 @@ const WEBSOCKET_EMIT_ONLY: &[&str] = &[
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
 const SESSION_TASKS_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/session_types/tasks.rs");
-const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/task_board/wire/task_board.rs");
+const TASK_BOARD_PROTOCOL_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/wire/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../crates/harness-task-board/src/types.rs");
 const TASK_BOARD_ITEM_INTENT_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/item_intent.rs");
@@ -2695,7 +2696,7 @@ const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
 const TASK_BOARD_TRIAGE_ESCALATION_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/triage_escalation.rs");
 const TASK_BOARD_TRIAGE_PROTOCOL_SOURCE: &str =
-    include_str!("../src/task_board/wire/task_board_triage.rs");
+    include_str!("../crates/harness-task-board/src/wire/task_board_triage.rs");
 const TASK_BOARD_TRIAGE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageWireTypes.generated.swift";
 // The BuiltInV1 triage decision record and its verdict/reason/cause enums,
 // the durable override and effective-outcome choke point, plus the
@@ -2726,7 +2727,7 @@ const TASK_BOARD_TRIAGE_RULES_VALIDATION_SOURCE: &str =
 const TASK_BOARD_TRIAGE_RULES_STORE_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/triage_rules/store.rs");
 const TASK_BOARD_TRIAGE_RULES_PROTOCOL_SOURCE: &str =
-    include_str!("../src/task_board/wire/task_board_triage_rules.rs");
+    include_str!("../crates/harness-task-board/src/wire/task_board_triage_rules.rs");
 const TASK_BOARD_TRIAGE_RULES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardTriageRulesWireTypes.generated.swift";
 // The runtime-authored TriageRuleSetV1 domain (rule, condition, outcome,
 // priority action, validation report/issue), its store-layer draft/revision/
@@ -2784,7 +2785,8 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_DISPATCH_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/dispatch.rs");
-const TASK_BOARD_STEPS_SOURCE: &str = include_str!("../src/task_board/wire/task_board_steps.rs");
+const TASK_BOARD_STEPS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/wire/task_board_steps.rs");
 const TASK_BOARD_DISPATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardDispatchWireTypes.generated.swift";
 // The dispatch-endpoint execution summary and its plan/intent graph (dispatch.rs).
 // The internally-tagged enums emit as Swift enums with associated values; references
@@ -3058,7 +3060,7 @@ const TASK_BOARD_AUTOMATION_STATUS_SOURCE: &str =
 const TASK_BOARD_AUTOMATION_SETTINGS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/automation/settings.rs");
 const TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE: &str =
-    include_str!("../src/task_board/wire/task_board_automation.rs");
+    include_str!("../crates/harness-task-board/src/wire/task_board_automation.rs");
 const TASK_BOARD_AUTOMATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardAutomationWireTypes.generated.swift";
 // Independent compact status, paged history/detail/metrics reads, local automation
 // settings, and the exact-target force-cancel request/response contract.

@@ -1,12 +1,12 @@
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::infra::io;
 use crate::task_board::wire::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
     TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
 };
 use harness_kernel::errors::CliError;
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 

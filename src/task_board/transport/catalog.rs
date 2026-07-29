@@ -1,7 +1,7 @@
-use crate::app::command_context::AppContext;
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::wire::{TaskBoardMachinesResponse, TaskBoardProjectsResponse};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::AppContext;
 
 use super::{TaskBoardCatalogArgs, leaf_daemon_client, leaf_daemon_client_error, print_json};
 

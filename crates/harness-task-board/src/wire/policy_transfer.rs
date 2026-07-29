@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::policy_graph::{PolicyCanvasRecord, PolicyScenario};
+use crate::policy_graph::{PolicyCanvasRecord, PolicyScenario};
 
 pub const POLICY_TRANSFER_FORMAT: &str = "harness-policy-transfer";
 pub const POLICY_TRANSFER_VERSION: u32 = 1;

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::TriageVerdict;
+use crate::TriageVerdict;
 
 /// Request body for `POST /v1/task-board/triage/escalations/{escalation_id}/verdict`.
 /// HTTP-only, never exposed to remote or Swift clients (see the route
