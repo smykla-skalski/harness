@@ -6,11 +6,6 @@ use tracing::Level;
 
 pub mod agents;
 pub mod app;
-// This crate re-includes the daemon subtree without its test targets (cfg
-// not(test) above), so items reached only from the root crate's tests or a
-// not-yet-wired feature path read as dead here; the root crate lints them.
-#[allow(dead_code, unused_imports)]
-#[path = "../../../src/daemon/mod.rs"]
 pub mod daemon;
 pub use harness_feature_flags::feature_flags;
 pub(crate) mod git;

@@ -9,7 +9,15 @@ pub mod agents {
     pub use harness_agents::*;
 }
 pub mod app;
-#[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
+// `daemon` moved natively into harness-daemon; nothing in this crate needs
+// `crate::daemon::*` any more; only `daemon-runtime` builds (this crate's own
+// unit tests and `tests/integration/**`, never the shipped `harness` binary,
+// which builds with no features) still need the module present, so it is
+// mirrored back in for exactly those builds rather than left to root
+// permanently. Keep this path in step with harness-daemon's own native
+// `src/daemon/` location if that ever moves again.
+#[cfg(feature = "daemon-runtime")]
+#[path = "../crates/harness-daemon/src/daemon/mod.rs"]
 pub mod daemon;
 // Deliberate public API facade, not scaffolding: `harness::errors`,
 // `harness::kernel`, `harness::workspace`, `harness::sandbox` and

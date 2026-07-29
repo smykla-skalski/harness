@@ -170,7 +170,8 @@ fn invalid_project_dir_returns_error_status() {
     let (status, _body) =
         start_session_try(&home, &xdg, &nonexistent, INVALID_PROJECT_SESSION, None)
             .expect_err("start with nonexistent project_dir must fail");
-    // Daemon returns 400 for all validation/workflow errors (see src/daemon/http/response.rs).
+    // Daemon returns 400 for all validation/workflow errors (see
+    // crates/harness-daemon/src/daemon/http/response.rs).
     assert_eq!(
         status, 400,
         "start with nonexistent project_dir must return 400; got {status}"

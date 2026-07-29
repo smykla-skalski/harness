@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-#[path = "../../../../src/daemon/state/audit.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/state/audit.rs"]
 mod audit;
-#[path = "../../../../src/daemon/state/locks.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/state/locks.rs"]
 mod locks;
-#[path = "../../../../src/daemon/state/manifest.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/state/manifest.rs"]
 mod manifest;
-#[path = "../../../../src/daemon/state/ownership.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/state/ownership.rs"]
 mod ownership;
-#[path = "../../../../src/daemon/state/paths.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/state/paths.rs"]
 mod paths;
 
 pub use crate::infra::persistence::flock::FlockGuard;
