@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OPENROUTER_MODEL="deepseek/deepseek-v4-flash"
-CODEX_MODEL="gpt-5.4-mini"
+CODEX_MODEL="gpt-5.3-codex-spark"
 
 if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
   printf 'live agent smoke stopped before network: stage=credential runtime=openrouter requested_model=%s: OPENROUTER_API_KEY is missing or empty\n' "$OPENROUTER_MODEL" >&2

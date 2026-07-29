@@ -6,7 +6,7 @@ use serde::Serialize;
 use super::*;
 
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
-const CODEX_MODEL: &str = "gpt-5.4-mini";
+const CODEX_MODEL: &str = "gpt-5.3-codex-spark";
 const SMOKE_TIMEOUT: Duration = Duration::from_secs(180);
 const SMOKE_PROMPT: &str =
     "Return one short plain-text sentence confirming this headless report turn completed.";
@@ -110,6 +110,7 @@ impl SmokeFailure {
 #[test]
 #[ignore = "explicit live validation; requires OpenRouter and Codex credentials"]
 fn openrouter_and_codex_complete_without_monitor() {
+    assert_live_models_are_catalog_cheapest();
     let openrouter_token = required_env("OPENROUTER_API_KEY", "openrouter", OPENROUTER_MODEL);
     let codex_path = required_env("HARNESS_LIVE_CODEX_PATH", "codex", CODEX_MODEL);
     let tmp = tempdir().expect("stage=fixture: create tempdir");
@@ -166,6 +167,14 @@ fn openrouter_and_codex_complete_without_monitor() {
         reports.iter().all(|report| report.failure_stage.is_none()),
         "one or more live agent reports failed"
     );
+}
+
+fn assert_live_models_are_catalog_cheapest() {
+    for (runtime, expected) in [("openrouter", OPENROUTER_MODEL), ("codex", CODEX_MODEL)] {
+        let catalog = harness::agents::runtime::models::catalog_for(runtime)
+            .expect("live runtime model catalog");
+        assert_eq!(catalog.cheapest_fastest, expected);
+    }
 }
 
 fn run_openrouter(
@@ -344,13 +353,29 @@ fn openrouter_report(
                 error,
             )
         })?;
-    Ok(transcript["entries"].as_array().and_then(|entries| {
-        entries
-            .iter()
-            .find(|entry| entry["kind"] == "assistant_text")
-            .and_then(|entry| entry["summary"].as_str())
-            .map(ToOwned::to_owned)
-    }))
+    transcript["entries"]
+        .as_array()
+        .and_then(|entries| {
+            entries
+                .iter()
+                .find(|entry| entry["kind"] == "assistant_text")
+                .and_then(|entry| entry["summary"].as_str())
+        })
+        .map(|report| validate_openrouter_report(correlation_id, report))
+        .transpose()
+}
+
+fn validate_openrouter_report(correlation_id: &str, report: &str) -> Result<String, SmokeFailure> {
+    if report.trim_start().starts_with("[openrouter error]") {
+        return Err(SmokeFailure::new(
+            correlation_id,
+            "openrouter",
+            OPENROUTER_MODEL,
+            "execution",
+            report,
+        ));
+    }
+    Ok(report.to_owned())
 }
 
 fn run_codex(
@@ -476,4 +501,16 @@ fn required_env(name: &str, runtime: &str, model: &str) -> String {
         "live agent smoke stopped before network: stage=credential runtime={runtime} requested_model={model}: {name} is missing or empty"
     );
     value
+}
+
+#[test]
+fn openrouter_provider_error_is_classified_as_failure() {
+    let error = validate_openrouter_report(
+        "correlation-id",
+        "[openrouter error] openrouter error: authentication failed",
+    )
+    .expect_err("provider error text must not become a successful report");
+
+    assert_eq!(error.stage, "execution");
+    assert!(error.error.contains("authentication failed"));
 }

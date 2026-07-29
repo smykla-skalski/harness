@@ -13,5 +13,7 @@ use self::core::{ChunkLog, build_agent, client_builder_with_chunks, mount_models
 
 #[path = "acp_bridge/core.rs"]
 mod core;
+#[path = "acp_bridge/model_selection.rs"]
+mod model_selection;
 #[path = "acp_bridge/resilience.rs"]
 mod resilience;

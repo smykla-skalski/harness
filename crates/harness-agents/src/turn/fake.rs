@@ -32,6 +32,7 @@ impl FakeAgentTurnPlan {
 struct FakeAgentTurn {
     status: AgentTurnStatus,
     plan: FakeAgentTurnPlan,
+    requested_model: Option<String>,
     result: Option<AgentTurnResult>,
 }
 
@@ -78,6 +79,8 @@ impl FakeAgentTurnRuntime {
                         correlation_id: id.clone(),
                         report: report.clone(),
                         stop_reason: stop_reason.clone(),
+                        requested_model: turn.requested_model.clone(),
+                        effective_model: turn.requested_model.clone(),
                     });
                 }
                 FakeAgentTurnPlan::Fail => turn.status = AgentTurnStatus::Failed,
@@ -102,7 +105,7 @@ impl AgentTurnRuntime for FakeAgentTurnRuntime {
         "fake"
     }
 
-    async fn start(&self, _request: AgentTurnRequest) -> Result<AgentTurnId, CliError> {
+    async fn start(&self, request: AgentTurnRequest) -> Result<AgentTurnId, CliError> {
         let mut state = self.lock_state()?;
         let plan = state.planned.pop_front().ok_or_else(|| {
             CliError::from(CliErrorKind::invalid_transition(
@@ -116,6 +119,7 @@ impl AgentTurnRuntime for FakeAgentTurnRuntime {
             FakeAgentTurn {
                 status: AgentTurnStatus::Queued,
                 plan,
+                requested_model: request.requested_model,
                 result: None,
             },
         );

@@ -71,6 +71,10 @@ pub struct AgentTurnResult {
     pub correlation_id: AgentTurnId,
     pub report: String,
     pub stop_reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_model: Option<String>,
 }
 
 #[async_trait]
