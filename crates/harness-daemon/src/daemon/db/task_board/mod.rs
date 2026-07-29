@@ -25,6 +25,7 @@ mod lane_order_audit;
 mod lane_order_tests;
 mod lane_placement_queries;
 mod mapper;
+mod orchestrator_settings_queries;
 mod policy_queues;
 mod policy_runs;
 mod project_registry_queries;
