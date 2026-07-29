@@ -7,9 +7,13 @@ use serde::{Deserialize, Serialize};
 pub use harness_protocol::managed_agents::runtime_failures::{
     AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
 };
+pub use pull_request::{
+    AgentTurnPullRequest, AgentTurnPullRequestContext, AgentTurnReadOnlyContent,
+};
 
 #[cfg(any(test, feature = "test-support"))]
 pub mod fake;
+mod pull_request;
 
 #[cfg(test)]
 mod tests;
@@ -51,6 +55,38 @@ pub struct AgentTurnRequest {
     pub prompt: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pull_request: Option<AgentTurnPullRequestContext>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidatedAgentTurnRequest {
+    pub prompt: String,
+    pub requested_model: Option<String>,
+    pub pull_request: Option<AgentTurnPullRequest>,
+}
+
+impl AgentTurnRequest {
+    /// Validate and freeze optional source context before a runtime starts work.
+    ///
+    /// # Errors
+    /// Returns `CliError` when pull request identity or content is invalid.
+    pub fn into_validated(self) -> Result<ValidatedAgentTurnRequest, CliError> {
+        let Some(pull_request) = self.pull_request else {
+            return Ok(ValidatedAgentTurnRequest {
+                prompt: self.prompt,
+                requested_model: self.requested_model,
+                pull_request: None,
+            });
+        };
+        pull_request.validate()?;
+        let prompt = pull_request.render_prompt(&self.prompt)?;
+        Ok(ValidatedAgentTurnRequest {
+            prompt,
+            requested_model: self.requested_model,
+            pull_request: Some(pull_request.pull_request),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,6 +115,8 @@ pub struct AgentTurnResult {
     pub requested_model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effective_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_revision: Option<String>,
 }
 
 #[async_trait]

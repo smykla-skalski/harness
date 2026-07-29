@@ -7,6 +7,7 @@ use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
 use crate::agents::runtime::models::validate_model;
+use crate::agents::turn::AgentTurnPullRequest;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{
     CodexAgentInspectResponse, CodexRunEvent, CodexRunListResponse, CodexRunRequest,
@@ -20,6 +21,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::active_runs::{ActiveRunRegistration, ActiveRuns};
 use super::effort::validate_codex_effort;
+use super::queued_run::{QueuedRunIdentity, queued_run_snapshot};
 use super::transcript::codex_transcript_entries;
 use super::worker::CodexRunWorker;
 
@@ -98,7 +100,7 @@ impl CodexControllerHandle {
         let session_id = session_id.to_string();
         let label = session_id.clone();
         self.finish_starting_run(run_id, &label, move |controller, run_id| {
-            controller.prepare_durable_run(&session_id, request, run_id)
+            controller.prepare_durable_run(&session_id, request, None, run_id)
         })
     }
 
@@ -136,7 +138,7 @@ impl CodexControllerHandle {
     /// `session_id` field and what the database load fallback yields for a
     /// persisted NULL `session_id` row, so the comparison holds before and
     /// after a reload.
-    fn finish_starting_run(
+    pub(super) fn finish_starting_run(
         &self,
         run_id: String,
         label: &str,
@@ -173,10 +175,11 @@ impl CodexControllerHandle {
         Ok(snapshot)
     }
 
-    fn prepare_durable_run(
+    pub(super) fn prepare_durable_run(
         &self,
         session_id: &str,
         request: &CodexRunRequest,
+        pull_request: Option<&AgentTurnPullRequest>,
         run_id: String,
     ) -> Result<CodexRunSnapshot, CliError> {
         let prompt = validate_run_request(request)?;
@@ -188,11 +191,14 @@ impl CodexControllerHandle {
         let snapshot = queued_run_snapshot(
             session_id,
             request,
-            run_id,
-            project_dir,
             prompt,
-            Some(registration.agent_id.clone()),
-            display_name,
+            QueuedRunIdentity::for_session(
+                run_id,
+                project_dir,
+                registration.agent_id.clone(),
+                display_name,
+            ),
+            pull_request,
         );
         if let Err(error) = self.save_and_broadcast(&snapshot) {
             self.rollback_orchestration_agent_registration(
@@ -227,11 +233,9 @@ impl CodexControllerHandle {
         let snapshot = queued_run_snapshot(
             &session_id,
             request,
-            run_id,
-            project_dir.to_string(),
             prompt,
+            QueuedRunIdentity::standalone(run_id, project_dir.to_string(), display_name),
             None,
-            display_name,
         );
         self.save_and_broadcast(&snapshot)?;
         log_queued_run(&session_id, &snapshot);
@@ -371,55 +375,6 @@ fn log_queued_run(session_id: &str, snapshot: &CodexRunSnapshot) {
             snapshot.run_id, snapshot.session_id
         ),
     );
-}
-
-fn queued_run_snapshot(
-    session_id: &str,
-    request: &CodexRunRequest,
-    run_id: String,
-    project_dir: String,
-    prompt: &str,
-    session_agent_id: Option<String>,
-    display_name: String,
-) -> CodexRunSnapshot {
-    let now = utc_now();
-    let mut snapshot = CodexRunSnapshot {
-        run_id,
-        session_id: session_id.to_string(),
-        task_id: request.task_id.clone(),
-        board_item_id: request.board_item_id.clone(),
-        workflow_execution_id: request.workflow_execution_id.clone(),
-        session_agent_id,
-        display_name: Some(display_name),
-        project_dir,
-        thread_id: request.resume_thread_id.clone(),
-        turn_id: None,
-        mode: request.mode,
-        status: CodexRunStatus::Queued,
-        prompt: prompt.to_string(),
-        latest_summary: request
-            .actor
-            .as_ref()
-            .map(|actor| format!("Queued by {actor}")),
-        final_message: None,
-        error: None,
-        pending_approvals: Vec::new(),
-        resolved_approvals: Vec::new(),
-        events: Vec::new(),
-        created_at: now.clone(),
-        updated_at: now,
-        model: non_empty_owned(request.model.as_deref()),
-        effort: non_empty_owned(request.effort.as_deref()),
-    };
-    super::completion_evidence::record_clean_worktree_baseline(&mut snapshot);
-    snapshot
-}
-
-fn non_empty_owned(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
 }
 
 fn active_run_attach_failure(mut failed: CodexRunSnapshot, error: &CliError) -> CodexRunSnapshot {
