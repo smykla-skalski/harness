@@ -82,10 +82,10 @@ mod tests {
         report.terminal_reason = Some("ordinary terminal reason".into());
 
         let projected = project_task_board_ai_review_report(
-            TaskBoardAiReviewReportResponse::Completed { report },
+            TaskBoardAiReviewReportResponse::Failed { report },
             true,
         );
-        let TaskBoardAiReviewReportResponse::Completed { report } = projected else {
+        let TaskBoardAiReviewReportResponse::Failed { report } = projected else {
             panic!("expected failed report");
         };
         assert_eq!(report.terminal_reason.as_deref(), Some("[redacted]"));
