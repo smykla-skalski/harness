@@ -34,6 +34,7 @@ mod provider_external_create_finalize;
 mod provider_external_create_follow_up;
 mod provider_external_create_rows;
 mod provider_external_creates;
+mod provider_queries;
 mod provider_sync;
 mod provider_sync_conflicts;
 mod remote_artifact_fetch_response;

@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use sqlx::{SqliteConnection, query, query_as, query_scalar};
 
 use crate::daemon::db::task_board::items::bump_change_in_tx;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncField, TaskBoardSyncConflict,
@@ -42,25 +43,15 @@ impl AsyncDaemonDb {
         item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board sync conflict replace")
-            .await?;
-        let replacement = replace_open_sync_conflicts_in_connection(
-            transaction.as_mut(),
+        <Self as ProviderQueries>::replace_open_task_board_sync_conflicts(
+            self,
             item_id,
             provider,
             external_ref,
             item_revision,
             conflicts,
         )
-        .await?;
-        if replacement.changed() {
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task-board sync conflicts: {error}")))
+        .await
     }
 
     pub(crate) async fn supersede_open_task_board_sync_conflicts(
@@ -71,27 +62,15 @@ impl AsyncDaemonDb {
         item_revision: i64,
         resolved_fields: &[ExternalSyncField],
     ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board sync conflict supersession")
-            .await?;
-        let resolved_at = utc_now();
-        let changed = supersede_open_sync_conflicts_in_connection(
-            transaction.as_mut(),
+        <Self as ProviderQueries>::supersede_open_task_board_sync_conflicts(
+            self,
             item_id,
             provider,
             external_ref,
             item_revision,
             resolved_fields,
-            &resolved_at,
         )
-        .await?;
-        if changed {
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit sync conflict supersession: {error}")))
+        .await
     }
 
     /// # Errors
@@ -105,18 +84,90 @@ impl AsyncDaemonDb {
     pub async fn open_task_board_sync_conflicts(
         &self,
     ) -> Result<Vec<TaskBoardSyncConflict>, CliError> {
-        let rows = query_as::<_, ConflictRow>(
-            "SELECT conflict_id, item_id, provider, external_ref, field,
-                    base_value_json, local_value_json, remote_value_json,
-                    item_revision, provider_revision, state
-             FROM task_board_sync_conflicts WHERE state = 'open'
-             ORDER BY conflict_id",
-        )
-        .fetch_all(self.pool())
-        .await
-        .map_err(|error| db_error(format!("list task-board sync conflicts: {error}")))?;
-        rows.into_iter().map(ConflictRow::into_conflict).collect()
+        <Self as ProviderQueries>::open_task_board_sync_conflicts(self).await
     }
+}
+
+/// Real implementations behind the matching [`ProviderQueries`] methods,
+/// called from the single consolidated trait impl in `provider_queries.rs`
+/// (a trait's methods can only be implemented in one `impl` block per type,
+/// so the per-area files hand `provider_queries.rs` a plain function instead
+/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+pub(super) async fn replace_open_task_board_sync_conflicts(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    provider: ExternalProvider,
+    external_ref: &str,
+    item_revision: i64,
+    conflicts: &[TaskBoardSyncConflict],
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board sync conflict replace")
+        .await?;
+    let replacement = replace_open_sync_conflicts_in_connection(
+        transaction.as_mut(),
+        item_id,
+        provider,
+        external_ref,
+        item_revision,
+        conflicts,
+    )
+    .await?;
+    if replacement.changed() {
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task-board sync conflicts: {error}")))
+}
+
+pub(super) async fn supersede_open_task_board_sync_conflicts(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    provider: ExternalProvider,
+    external_ref: &str,
+    item_revision: i64,
+    resolved_fields: &[ExternalSyncField],
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board sync conflict supersession")
+        .await?;
+    let resolved_at = utc_now();
+    let changed = supersede_open_sync_conflicts_in_connection(
+        transaction.as_mut(),
+        item_id,
+        provider,
+        external_ref,
+        item_revision,
+        resolved_fields,
+        &resolved_at,
+    )
+    .await?;
+    if changed {
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit sync conflict supersession: {error}")))
+}
+
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub(super) async fn open_task_board_sync_conflicts(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskBoardSyncConflict>, CliError> {
+    let rows = query_as::<_, ConflictRow>(
+        "SELECT conflict_id, item_id, provider, external_ref, field,
+                base_value_json, local_value_json, remote_value_json,
+                item_revision, provider_revision, state
+         FROM task_board_sync_conflicts WHERE state = 'open'
+         ORDER BY conflict_id",
+    )
+    .fetch_all(db.pool())
+    .await
+    .map_err(|error| db_error(format!("list task-board sync conflicts: {error}")))?;
+    rows.into_iter().map(ConflictRow::into_conflict).collect()
 }
 
 pub(super) async fn replace_open_sync_conflicts_in_connection(

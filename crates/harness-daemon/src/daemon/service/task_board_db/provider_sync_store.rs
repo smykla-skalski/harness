@@ -161,8 +161,10 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         context: ProviderExclusionAuditContext,
         conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
-        super::provider_sync_exclusion::restore_from_provider_exclusion(
-            self, expected, patch, &context, conflicts,
+        Box::pin(
+            super::provider_sync_exclusion::restore_from_provider_exclusion(
+                self, expected, patch, &context, conflicts,
+            ),
         )
         .await
     }

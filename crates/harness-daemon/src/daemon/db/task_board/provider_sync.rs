@@ -3,6 +3,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
 use crate::daemon::db::task_board::items::bump_change_in_tx;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::ExternalProvider;
 use crate::task_board::external::{
@@ -27,20 +28,7 @@ impl AsyncDaemonDb {
         provider: ExternalProvider,
         scope_id: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        query_as::<_, ProviderScopeRow>(
-            "SELECT base_revision, health, failure_count, backoff_until
-             FROM task_board_provider_scope_state
-             WHERE provider = ?1 AND scope_id = ?2",
-        )
-        .bind(provider_label(provider))
-        .bind(scope_id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| db_error(format!("read task-board provider scope: {error}")))?
-        .map_or_else(
-            || Ok(ExternalProviderScopeState::default()),
-            decode_provider_scope_state,
-        )
+        <Self as ProviderQueries>::task_board_provider_scope_state(self, provider, scope_id).await
     }
 
     pub(crate) async fn begin_task_board_provider_scope_attempt(
@@ -49,71 +37,10 @@ impl AsyncDaemonDb {
         scope_id: &str,
         now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
-        let attempt_deadline = deadline_from_seconds(now, ATTEMPT_LEASE_SECONDS)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board provider scope attempt")
-            .await?;
-        let row = query_as::<_, ProviderScopeRow>(
-            "SELECT base_revision, health, failure_count, backoff_until
-             FROM task_board_provider_scope_state
-             WHERE provider = ?1 AND scope_id = ?2",
+        <Self as ProviderQueries>::begin_task_board_provider_scope_attempt(
+            self, provider, scope_id, now,
         )
-        .bind(provider_label(provider))
-        .bind(scope_id)
-        .fetch_optional(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("read task-board provider attempt: {error}")))?;
-        let created_scope = row.is_none();
-        let state = row.map_or_else(
-            || Ok(ExternalProviderScopeState::default()),
-            decode_provider_scope_state,
-        )?;
-        let decision = match state.availability_at(now)? {
-            ExternalProviderScopeAvailability::Ready => None,
-            ExternalProviderScopeAvailability::BackingOff => {
-                Some(ExternalProviderScopeAttemptDecision::BackingOff)
-            }
-            ExternalProviderScopeAvailability::Fenced => {
-                Some(ExternalProviderScopeAttemptDecision::Fenced)
-            }
-        };
-        if let Some(decision) = decision {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit provider scope admission: {error}")))?;
-            return Ok(decision);
-        }
-        let fence_marker = format!("{ATTEMPT_HEALTH_PREFIX}{}", Uuid::new_v4().simple());
-        query(
-            "INSERT INTO task_board_provider_scope_state (
-                provider, scope_id, health, failure_count, backoff_until, updated_at
-             ) VALUES (?1, ?2, ?3, 0, ?4, ?5)
-             ON CONFLICT(provider, scope_id) DO UPDATE SET
-                health = excluded.health,
-                backoff_until = excluded.backoff_until,
-                updated_at = excluded.updated_at",
-        )
-        .bind(provider_label(provider))
-        .bind(scope_id)
-        .bind(&fence_marker)
-        .bind(attempt_deadline)
-        .bind(now)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("begin task-board provider attempt: {error}")))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task-board provider attempt: {error}")))?;
-        Ok(ExternalProviderScopeAttemptDecision::Started(
-            ExternalProviderScopeAttempt::new(
-                provider,
-                scope_id.to_owned(),
-                fence_marker,
-                created_scope,
-            ),
-        ))
     }
 
     pub(crate) async fn renew_task_board_provider_scope_attempt(
@@ -121,26 +48,7 @@ impl AsyncDaemonDb {
         attempt: &ExternalProviderScopeAttempt,
         now: &str,
     ) -> Result<(), CliError> {
-        let attempt_deadline = deadline_from_seconds(now, ATTEMPT_LEASE_SECONDS)?;
-        let updated = query(
-            "UPDATE task_board_provider_scope_state SET
-                backoff_until = ?4, updated_at = ?5
-             WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
-        )
-        .bind(provider_label(attempt.provider()))
-        .bind(attempt.scope_id())
-        .bind(attempt.fence_marker())
-        .bind(attempt_deadline)
-        .bind(now)
-        .execute(self.pool())
-        .await
-        .map_err(|error| db_error(format!("renew task-board provider attempt: {error}")))?
-        .rows_affected();
-        if updated == 1 {
-            Ok(())
-        } else {
-            Err(stale_attempt_error(attempt))
-        }
+        <Self as ProviderQueries>::renew_task_board_provider_scope_attempt(self, attempt, now).await
     }
 
     pub(crate) async fn release_task_board_provider_scope_attempt(
@@ -148,23 +56,12 @@ impl AsyncDaemonDb {
         attempt: &ExternalProviderScopeAttempt,
         released_at: &str,
     ) -> Result<(), CliError> {
-        parse_timestamp(released_at)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board provider scope release")
-            .await?;
-        let updated =
-            release_provider_scope_row_in_tx(&mut transaction, attempt, released_at).await?;
-        if updated != 1 {
-            return Err(stale_attempt_error(attempt));
-        }
-        if !attempt.created_scope() {
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task-board provider attempt release: {error}"
-            ))
-        })
+        <Self as ProviderQueries>::release_task_board_provider_scope_attempt(
+            self,
+            attempt,
+            released_at,
+        )
+        .await
     }
 
     pub(crate) async fn complete_task_board_provider_scope_success(
@@ -173,52 +70,13 @@ impl AsyncDaemonDb {
         base_revision: Option<&str>,
         completed_at: &str,
     ) -> Result<(), CliError> {
-        parse_timestamp(completed_at)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board provider scope success")
-            .await?;
-        let current = query_as::<_, (Option<String>, i64)>(
-            "SELECT base_revision, failure_count FROM task_board_provider_scope_state
-             WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+        <Self as ProviderQueries>::complete_task_board_provider_scope_success(
+            self,
+            attempt,
+            base_revision,
+            completed_at,
         )
-        .bind(provider_label(attempt.provider()))
-        .bind(attempt.scope_id())
-        .bind(attempt.fence_marker())
-        .fetch_optional(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("read task-board provider success fence: {error}")))?;
-        let Some((current_revision, failure_count)) = current else {
-            return Err(stale_attempt_error(attempt));
-        };
-        let changed = attempt.created_scope()
-            || failure_count != 0
-            || base_revision.is_some_and(|revision| current_revision.as_deref() != Some(revision));
-        let updated = query(
-            "UPDATE task_board_provider_scope_state SET
-                base_revision = COALESCE(?4, base_revision),
-                health = 'healthy', failure_count = 0,
-                backoff_until = NULL, updated_at = ?5
-             WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
-        )
-        .bind(provider_label(attempt.provider()))
-        .bind(attempt.scope_id())
-        .bind(attempt.fence_marker())
-        .bind(base_revision)
-        .bind(completed_at)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("record task-board provider success: {error}")))?
-        .rows_affected();
-        if updated != 1 {
-            return Err(stale_attempt_error(attempt));
-        }
-        if changed {
-            bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task-board provider success: {error}")))
     }
 
     pub(crate) async fn complete_task_board_provider_scope_failure(
@@ -226,57 +84,273 @@ impl AsyncDaemonDb {
         attempt: &ExternalProviderScopeAttempt,
         completed_at: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board provider scope failure")
-            .await?;
-        let current = query_as::<_, (Option<String>, i64)>(
-            "SELECT base_revision, failure_count FROM task_board_provider_scope_state
-             WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+        <Self as ProviderQueries>::complete_task_board_provider_scope_failure(
+            self,
+            attempt,
+            completed_at,
         )
-        .bind(provider_label(attempt.provider()))
-        .bind(attempt.scope_id())
-        .bind(attempt.fence_marker())
-        .fetch_optional(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("read task-board provider failure fence: {error}")))?;
-        let Some((base_revision, failure_count)) = current else {
-            return Err(stale_attempt_error(attempt));
-        };
-        let failure_count = u32::try_from(failure_count)
-            .map_err(|error| db_error(format!("decode provider failure count: {error}")))?
-            .saturating_add(1);
-        let backoff_until = backoff_deadline(completed_at, failure_count)?;
-        let updated = query(
-            "UPDATE task_board_provider_scope_state SET
-                health = 'backing_off', failure_count = ?4,
-                backoff_until = ?5, updated_at = ?6
-             WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
-        )
-        .bind(provider_label(attempt.provider()))
-        .bind(attempt.scope_id())
-        .bind(attempt.fence_marker())
-        .bind(i64::from(failure_count))
-        .bind(&backoff_until)
-        .bind(completed_at)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("record task-board provider failure: {error}")))?
-        .rows_affected();
-        if updated != 1 {
-            return Err(stale_attempt_error(attempt));
+    }
+}
+
+/// Real implementations behind the matching [`ProviderQueries`] methods,
+/// called from the single consolidated trait impl in `provider_queries.rs`
+/// (a trait's methods can only be implemented in one `impl` block per type,
+/// so the per-area files hand `provider_queries.rs` a plain function instead
+/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+pub(super) async fn task_board_provider_scope_state(
+    db: &AsyncDaemonDb,
+    provider: ExternalProvider,
+    scope_id: &str,
+) -> Result<ExternalProviderScopeState, CliError> {
+    query_as::<_, ProviderScopeRow>(
+        "SELECT base_revision, health, failure_count, backoff_until
+         FROM task_board_provider_scope_state
+         WHERE provider = ?1 AND scope_id = ?2",
+    )
+    .bind(provider_label(provider))
+    .bind(scope_id)
+    .fetch_optional(db.pool())
+    .await
+    .map_err(|error| db_error(format!("read task-board provider scope: {error}")))?
+    .map_or_else(
+        || Ok(ExternalProviderScopeState::default()),
+        decode_provider_scope_state,
+    )
+}
+
+pub(super) async fn begin_task_board_provider_scope_attempt(
+    db: &AsyncDaemonDb,
+    provider: ExternalProvider,
+    scope_id: &str,
+    now: &str,
+) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+    let attempt_deadline = deadline_from_seconds(now, ATTEMPT_LEASE_SECONDS)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board provider scope attempt")
+        .await?;
+    let row = query_as::<_, ProviderScopeRow>(
+        "SELECT base_revision, health, failure_count, backoff_until
+         FROM task_board_provider_scope_state
+         WHERE provider = ?1 AND scope_id = ?2",
+    )
+    .bind(provider_label(provider))
+    .bind(scope_id)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("read task-board provider attempt: {error}")))?;
+    let created_scope = row.is_none();
+    let state = row.map_or_else(
+        || Ok(ExternalProviderScopeState::default()),
+        decode_provider_scope_state,
+    )?;
+    let decision = match state.availability_at(now)? {
+        ExternalProviderScopeAvailability::Ready => None,
+        ExternalProviderScopeAvailability::BackingOff => {
+            Some(ExternalProviderScopeAttemptDecision::BackingOff)
         }
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        ExternalProviderScopeAvailability::Fenced => {
+            Some(ExternalProviderScopeAttemptDecision::Fenced)
+        }
+    };
+    if let Some(decision) = decision {
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit task-board provider failure: {error}")))?;
-        Ok(ExternalProviderScopeState {
-            base_revision,
-            health: ExternalProviderScopeHealth::BackingOff,
-            failure_count,
-            backoff_until: Some(backoff_until),
-        })
+            .map_err(|error| db_error(format!("commit provider scope admission: {error}")))?;
+        return Ok(decision);
     }
+    let fence_marker = format!("{ATTEMPT_HEALTH_PREFIX}{}", Uuid::new_v4().simple());
+    query(
+        "INSERT INTO task_board_provider_scope_state (
+            provider, scope_id, health, failure_count, backoff_until, updated_at
+         ) VALUES (?1, ?2, ?3, 0, ?4, ?5)
+         ON CONFLICT(provider, scope_id) DO UPDATE SET
+            health = excluded.health,
+            backoff_until = excluded.backoff_until,
+            updated_at = excluded.updated_at",
+    )
+    .bind(provider_label(provider))
+    .bind(scope_id)
+    .bind(&fence_marker)
+    .bind(attempt_deadline)
+    .bind(now)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("begin task-board provider attempt: {error}")))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task-board provider attempt: {error}")))?;
+    Ok(ExternalProviderScopeAttemptDecision::Started(
+        ExternalProviderScopeAttempt::new(
+            provider,
+            scope_id.to_owned(),
+            fence_marker,
+            created_scope,
+        ),
+    ))
+}
+
+pub(super) async fn renew_task_board_provider_scope_attempt(
+    db: &AsyncDaemonDb,
+    attempt: &ExternalProviderScopeAttempt,
+    now: &str,
+) -> Result<(), CliError> {
+    let attempt_deadline = deadline_from_seconds(now, ATTEMPT_LEASE_SECONDS)?;
+    let updated = query(
+        "UPDATE task_board_provider_scope_state SET
+            backoff_until = ?4, updated_at = ?5
+         WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+    )
+    .bind(provider_label(attempt.provider()))
+    .bind(attempt.scope_id())
+    .bind(attempt.fence_marker())
+    .bind(attempt_deadline)
+    .bind(now)
+    .execute(db.pool())
+    .await
+    .map_err(|error| db_error(format!("renew task-board provider attempt: {error}")))?
+    .rows_affected();
+    if updated == 1 {
+        Ok(())
+    } else {
+        Err(stale_attempt_error(attempt))
+    }
+}
+
+pub(super) async fn release_task_board_provider_scope_attempt(
+    db: &AsyncDaemonDb,
+    attempt: &ExternalProviderScopeAttempt,
+    released_at: &str,
+) -> Result<(), CliError> {
+    parse_timestamp(released_at)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board provider scope release")
+        .await?;
+    let updated = release_provider_scope_row_in_tx(&mut transaction, attempt, released_at).await?;
+    if updated != 1 {
+        return Err(stale_attempt_error(attempt));
+    }
+    if !attempt.created_scope() {
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task-board provider attempt release: {error}"
+        ))
+    })
+}
+
+pub(super) async fn complete_task_board_provider_scope_success(
+    db: &AsyncDaemonDb,
+    attempt: &ExternalProviderScopeAttempt,
+    base_revision: Option<&str>,
+    completed_at: &str,
+) -> Result<(), CliError> {
+    parse_timestamp(completed_at)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board provider scope success")
+        .await?;
+    let current = query_as::<_, (Option<String>, i64)>(
+        "SELECT base_revision, failure_count FROM task_board_provider_scope_state
+         WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+    )
+    .bind(provider_label(attempt.provider()))
+    .bind(attempt.scope_id())
+    .bind(attempt.fence_marker())
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("read task-board provider success fence: {error}")))?;
+    let Some((current_revision, failure_count)) = current else {
+        return Err(stale_attempt_error(attempt));
+    };
+    let changed = attempt.created_scope()
+        || failure_count != 0
+        || base_revision.is_some_and(|revision| current_revision.as_deref() != Some(revision));
+    let updated = query(
+        "UPDATE task_board_provider_scope_state SET
+            base_revision = COALESCE(?4, base_revision),
+            health = 'healthy', failure_count = 0,
+            backoff_until = NULL, updated_at = ?5
+         WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+    )
+    .bind(provider_label(attempt.provider()))
+    .bind(attempt.scope_id())
+    .bind(attempt.fence_marker())
+    .bind(base_revision)
+    .bind(completed_at)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("record task-board provider success: {error}")))?
+    .rows_affected();
+    if updated != 1 {
+        return Err(stale_attempt_error(attempt));
+    }
+    if changed {
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task-board provider success: {error}")))
+}
+
+pub(super) async fn complete_task_board_provider_scope_failure(
+    db: &AsyncDaemonDb,
+    attempt: &ExternalProviderScopeAttempt,
+    completed_at: &str,
+) -> Result<ExternalProviderScopeState, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board provider scope failure")
+        .await?;
+    let current = query_as::<_, (Option<String>, i64)>(
+        "SELECT base_revision, failure_count FROM task_board_provider_scope_state
+         WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+    )
+    .bind(provider_label(attempt.provider()))
+    .bind(attempt.scope_id())
+    .bind(attempt.fence_marker())
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("read task-board provider failure fence: {error}")))?;
+    let Some((base_revision, failure_count)) = current else {
+        return Err(stale_attempt_error(attempt));
+    };
+    let failure_count = u32::try_from(failure_count)
+        .map_err(|error| db_error(format!("decode provider failure count: {error}")))?
+        .saturating_add(1);
+    let backoff_until = backoff_deadline(completed_at, failure_count)?;
+    let updated = query(
+        "UPDATE task_board_provider_scope_state SET
+            health = 'backing_off', failure_count = ?4,
+            backoff_until = ?5, updated_at = ?6
+         WHERE provider = ?1 AND scope_id = ?2 AND health = ?3",
+    )
+    .bind(provider_label(attempt.provider()))
+    .bind(attempt.scope_id())
+    .bind(attempt.fence_marker())
+    .bind(i64::from(failure_count))
+    .bind(&backoff_until)
+    .bind(completed_at)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("record task-board provider failure: {error}")))?
+    .rows_affected();
+    if updated != 1 {
+        return Err(stale_attempt_error(attempt));
+    }
+    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task-board provider failure: {error}")))?;
+    Ok(ExternalProviderScopeState {
+        base_revision,
+        health: ExternalProviderScopeHealth::BackingOff,
+        failure_count,
+        backoff_until: Some(backoff_until),
+    })
 }
 
 fn decode_provider_scope_state(

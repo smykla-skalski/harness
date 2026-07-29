@@ -11,6 +11,7 @@ use super::provider_external_create_rows::{
     create_conflict, load_intent_by_id, next_timestamp, provider_label, require_same_intent,
     update_attached_receipt,
 };
+use super::provider_queries::ProviderQueries;
 use super::provider_sync_conflicts::supersede_open_sync_conflicts_in_connection;
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -23,81 +24,78 @@ use crate::task_board::{
 use crate::workspace::utc_now;
 
 impl AsyncDaemonDb {
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "finalization keeps evidence, identity, item CAS, and receipt persistence atomic"
-    )]
     pub(crate) async fn finalize_task_board_external_create_intent(
         &self,
         intent: &TaskBoardExternalCreateIntent,
     ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
-        let expected = intent
-            .created_evidence()
-            .ok_or_else(|| create_conflict(intent, "outcome is absent"))?;
-        validate_create_evidence(intent, &expected.outcome, &expected.provider_baseline)?;
-        let provider_target = normalized_evidence_target(intent, &expected.outcome)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board external create finalize")
-            .await?;
-        let stored = load_intent_by_id(&mut transaction, &intent.intent_id)
-            .await?
-            .ok_or_else(|| create_conflict(intent, "create intent is missing"))?;
-        require_same_intent(&stored, intent)?;
-        let stored_evidence = stored
-            .created_evidence()
-            .ok_or_else(|| create_conflict(&stored, "outcome is absent"))?;
-        require_same_evidence(&stored, stored_evidence, expected)?;
-        if matches!(
-            &stored.state,
-            TaskBoardExternalCreateIntentState::Attached(_)
-        ) {
-            commit(transaction, "already attached task-board external create").await?;
-            return Ok(finalize_result(
-                stored,
-                None,
-                None,
-                TaskBoardExternalCreateFinalizeDisposition::AlreadyAttached,
-            ));
-        }
-        if !matches!(
-            &stored.state,
-            TaskBoardExternalCreateIntentState::Created(_)
-        ) {
-            return Err(create_conflict(&stored, "intent is not ready to finalize"));
-        }
-        let Some((item, item_revision)) =
-            load_item_in_tx(&mut transaction, &stored.item_id).await?
-        else {
-            commit(transaction, "missing-item task-board external create").await?;
-            return Ok(finalize_result(
-                stored,
-                None,
-                None,
-                TaskBoardExternalCreateFinalizeDisposition::RetainedMissingItem,
-            ));
-        };
-        require_identity_not_linked_elsewhere(
-            &mut transaction,
-            &stored,
-            &expected.provider_baseline,
-        )
+        <Self as ProviderQueries>::finalize_task_board_external_create_intent(self, intent).await
+    }
+}
+
+/// Real implementation behind [`ProviderQueries::finalize_task_board_external_create_intent`],
+/// called from the single consolidated trait impl in `provider_queries.rs`
+/// (a trait's methods can only be implemented in one `impl` block per type,
+/// so the per-area files hand `provider_queries.rs` a plain function instead
+/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "finalization keeps evidence, identity, item CAS, and receipt persistence atomic"
+)]
+pub(super) async fn finalize_task_board_external_create_intent(
+    db: &AsyncDaemonDb,
+    intent: &TaskBoardExternalCreateIntent,
+) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
+    let expected = intent
+        .created_evidence()
+        .ok_or_else(|| create_conflict(intent, "outcome is absent"))?;
+    validate_create_evidence(intent, &expected.outcome, &expected.provider_baseline)?;
+    let provider_target = normalized_evidence_target(intent, &expected.outcome)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board external create finalize")
         .await?;
-        let already_linked =
-            require_compatible_provider_refs(&item, &stored, &expected.provider_baseline)?;
-        let attached_at = next_timestamp(&stored.updated_at)?;
-        if already_linked {
-            return finalize_existing_link(
-                transaction,
-                stored,
-                item,
-                item_revision,
-                &attached_at,
-                provider_target.as_deref(),
-                &expected.provider_baseline,
-            )
-            .await;
-        }
-        finalize_new_link(
+    let stored = load_intent_by_id(&mut transaction, &intent.intent_id)
+        .await?
+        .ok_or_else(|| create_conflict(intent, "create intent is missing"))?;
+    require_same_intent(&stored, intent)?;
+    let stored_evidence = stored
+        .created_evidence()
+        .ok_or_else(|| create_conflict(&stored, "outcome is absent"))?;
+    require_same_evidence(&stored, stored_evidence, expected)?;
+    if matches!(
+        &stored.state,
+        TaskBoardExternalCreateIntentState::Attached(_)
+    ) {
+        commit(transaction, "already attached task-board external create").await?;
+        return Ok(finalize_result(
+            stored,
+            None,
+            None,
+            TaskBoardExternalCreateFinalizeDisposition::AlreadyAttached,
+        ));
+    }
+    if !matches!(
+        &stored.state,
+        TaskBoardExternalCreateIntentState::Created(_)
+    ) {
+        return Err(create_conflict(&stored, "intent is not ready to finalize"));
+    }
+    let Some((item, item_revision)) = load_item_in_tx(&mut transaction, &stored.item_id).await?
+    else {
+        commit(transaction, "missing-item task-board external create").await?;
+        return Ok(finalize_result(
+            stored,
+            None,
+            None,
+            TaskBoardExternalCreateFinalizeDisposition::RetainedMissingItem,
+        ));
+    };
+    require_identity_not_linked_elsewhere(&mut transaction, &stored, &expected.provider_baseline)
+        .await?;
+    let already_linked =
+        require_compatible_provider_refs(&item, &stored, &expected.provider_baseline)?;
+    let attached_at = next_timestamp(&stored.updated_at)?;
+    if already_linked {
+        return finalize_existing_link(
             transaction,
             stored,
             item,
@@ -106,8 +104,18 @@ impl AsyncDaemonDb {
             provider_target.as_deref(),
             &expected.provider_baseline,
         )
-        .await
+        .await;
     }
+    finalize_new_link(
+        transaction,
+        stored,
+        item,
+        item_revision,
+        &attached_at,
+        provider_target.as_deref(),
+        &expected.provider_baseline,
+    )
+    .await
 }
 
 async fn finalize_new_link(
