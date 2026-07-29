@@ -25,11 +25,11 @@ pub enum TaskBoardTriageEscalationStatus {
 /// Bounded, off-by-default configuration for the escalation feature.
 /// Resolved once at daemon startup from `HARNESS_FEATURE_TASK_BOARD_TRIAGE_ESCALATION`
 /// and the `HARNESS_TASK_BOARD_TRIAGE_ESCALATION_*` env vars (see
-/// `src/feature_flags.rs`), then threaded by value into both the enqueue
-/// choke point (`enabled`, `max_pending`) and the background executor
-/// (`max_concurrent`, `timeout_seconds`). Deliberately not a persisted
-/// settings table -- this is a deploy-time tuning surface, not a product
-/// surface.
+/// `harness_feature_flags::feature_flags`), then threaded by value into both
+/// the enqueue choke point (`enabled`, `max_pending`) and the background
+/// executor (`max_concurrent`, `timeout_seconds`). Deliberately not a
+/// persisted settings table -- this is a deploy-time tuning surface, not a
+/// product surface.
 #[derive(Debug, Clone, Copy)]
 pub struct TaskBoardTriageEscalationConfig {
     pub enabled: bool,

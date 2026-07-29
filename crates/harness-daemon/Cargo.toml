@@ -33,6 +33,7 @@ gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"]
 harness-agents = { path = "../harness-agents", version = "54.0.0", features = ["bridge-runtime"] }
 harness-command = { path = "../harness-command", version = "54.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "54.0.0" }
+harness-feature-flags = { path = "../harness-feature-flags", version = "54.0.0" }
 harness-github-api = { path = "../harness-github-api", version = "54.0.0" }
 harness-hook = { path = "../harness-hook", version = "54.0.0" }
 harness-hooks = { path = "../harness-hooks", version = "54.0.0" }

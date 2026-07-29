@@ -15,9 +15,10 @@ use harness_workspace::workspace::normalized_env_value;
 use super::prompt_catalog::PromptCatalog;
 
 /// Env var that lets a prompt configuration file replace shipped prompts.
-/// Mirrors `HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES` in root's
-/// `src/feature_flags.rs`, which lists every operator-facing flag; this is
-/// the one flag whose implementation lives with its sole consumer instead.
+/// Mirrors `HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES` in
+/// `harness_feature_flags::feature_flags`, which lists every operator-facing
+/// flag; this is the one flag whose implementation lives with its sole
+/// consumer instead.
 pub const TASK_BOARD_PROMPT_OVERRIDES_ENV: &str = "HARNESS_FEATURE_TASK_BOARD_PROMPT_OVERRIDES";
 /// Env var naming the prompt configuration file to load when overrides are on.
 pub const TASK_BOARD_PROMPTS_FILE_ENV: &str = "HARNESS_TASK_BOARD_PROMPTS_FILE";

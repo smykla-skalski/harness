@@ -132,7 +132,7 @@ The hook binary's tool-lifecycle surface is `tool-guard` and `tool-result`, plus
 
 Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep harness-owned setup (`setup:bootstrap`) separate from the manual `aff:*` tasks.
 
-Hook landing rule: a new hook lands with observable handler behavior, or behind a dated feature flag in `src/feature_flags.rs` with a tracking issue.
+Hook landing rule: a new hook lands with observable handler behavior, or behind a dated feature flag in `crates/harness-feature-flags/src/feature_flags.rs` with a tracking issue.
 
 ## Code conventions
 

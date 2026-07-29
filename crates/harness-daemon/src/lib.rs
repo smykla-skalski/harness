@@ -12,8 +12,7 @@ pub mod app;
 #[allow(dead_code, unused_imports)]
 #[path = "../../../src/daemon/mod.rs"]
 pub mod daemon;
-#[path = "../../../src/feature_flags.rs"]
-pub mod feature_flags;
+pub use harness_feature_flags::feature_flags;
 pub(crate) mod git;
 pub(crate) mod github_api {
     pub use harness_github_api::*;

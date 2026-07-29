@@ -33,8 +33,8 @@
 
 use std::sync::{Mutex, MutexGuard};
 
-use crate::task_board::TaskBoardTriageEscalationConfig;
-use crate::workspace::normalized_env_value;
+use harness_task_board::TaskBoardTriageEscalationConfig;
+use harness_workspace::workspace::normalized_env_value;
 
 /// Env var that re-enables suite-lifecycle hooks in generated configs.
 /// Env var that enables ACP managed-agent runtime routes before the modal ships.
@@ -135,7 +135,7 @@ fn env_u64(name: &str, default: u64) -> u64 {
 /// can explicitly opt in or out without mutating the caller's shell env. The
 /// override wins over `HARNESS_FEATURE_ACP` while the guard is alive.
 #[must_use]
-pub(crate) fn scoped_acp_enabled_override(value: Option<bool>) -> AcpRuntimeOverrideGuard {
+pub fn scoped_acp_enabled_override(value: Option<bool>) -> AcpRuntimeOverrideGuard {
     let mut slot = acp_runtime_override_slot();
     let previous = *slot;
     *slot = value;
@@ -150,7 +150,7 @@ fn acp_runtime_override_slot() -> MutexGuard<'static, Option<bool>> {
     }
 }
 
-pub(crate) struct AcpRuntimeOverrideGuard {
+pub struct AcpRuntimeOverrideGuard {
     previous: Option<bool>,
 }
 

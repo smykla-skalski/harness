@@ -179,7 +179,7 @@ impl AsyncDaemonDb {
     }
 
     /// Set once at daemon startup from the resolved feature flag and env
-    /// vars (see `src/feature_flags.rs`). Idempotent by construction
+    /// vars (see `harness_feature_flags::feature_flags`). Idempotent by construction
     /// (`OnceLock::set`): a second call is a silent no-op rather than a
     /// panic, since the daemon has exactly one startup path in practice but
     /// nothing here depends on that staying true.

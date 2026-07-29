@@ -1,0 +1,29 @@
+[package]
+name = "harness-feature-flags"
+version = "54.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+harness-task-board = { path = "../harness-task-board", version = "54.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
+
+[dev-dependencies]
+temp-env = "=0.3.6"
+
+# Matches the root crate's lint set rather than the lighter one the facade
+# crates carry, for the same reason harness-kernel, harness-workspace, and
+# harness-github-api do: a crate extracted from src/ keeps the rules its
+# sources were written under.
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+absolute_paths = { level = "deny", priority = 2 }
+cognitive_complexity = { level = "deny", priority = 2 }
+needless_pass_by_value = { level = "deny", priority = 2 }
+ptr_arg = { level = "deny", priority = 2 }
+redundant_clone = { level = "deny", priority = 2 }
+unnecessary_to_owned = { level = "deny", priority = 2 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }
