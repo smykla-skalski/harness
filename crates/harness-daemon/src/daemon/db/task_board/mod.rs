@@ -15,6 +15,7 @@ mod dispatch_workflow_start;
 mod held_dispatch;
 mod import_lifecycle;
 mod imports;
+mod item_tx_ext;
 mod items;
 mod items_reads;
 mod lane_order;

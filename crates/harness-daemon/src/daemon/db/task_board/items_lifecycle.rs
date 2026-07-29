@@ -8,12 +8,15 @@ use harness_kernel::errors::CliErrorKind;
 use super::super::admission_lifecycle::{
     ensure_item_admission_can_terminate_in_tx, release_item_admission_in_tx,
 };
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 
 pub(crate) async fn apply_task_board_item_status_transition_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: &TaskBoardItem,
 ) -> Result<(), CliError> {
-    ensure_workflow_item_mutation_allowed_in_tx(transaction, &item.id).await?;
+    transaction
+        .ensure_workflow_item_mutation_allowed_in_tx(&item.id)
+        .await?;
     if task_board_item_is_terminal(item) {
         ensure_item_admission_can_terminate_in_tx(transaction, &item.id).await?;
         cancel_prestart_dispatch_for_terminal_item_in_tx(transaction, &item.id).await?;

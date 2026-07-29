@@ -4,6 +4,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageOverride}
 use harness_kernel::errors::CliErrorKind;
 
 use super::super::ITEMS_CHANGE_SCOPE;
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::projects::resolve_item_project_in_tx;
 use super::super::triage_apply::{
@@ -13,10 +14,8 @@ use super::super::triage_apply::{
 use super::super::triage_apply_rules::apply_active_triage_in_tx;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
 use super::{
-    TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress,
-    apply_task_board_item_status_transition_in_tx, bump_change_in_tx, clear_children_parent_in_tx,
-    load_item_with_triage_override_in_tx, record_triage_or_lane_audit_in_tx,
-    resolve_parent_update_in_tx, validate_item,
+    TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, bump_change_in_tx,
+    record_triage_or_lane_audit_in_tx, resolve_parent_update_in_tx, validate_item,
 };
 
 impl AsyncDaemonDb {
@@ -89,10 +88,10 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board item update")
             .await?;
-        let (mut item, revision, existing_override) =
-            load_item_with_triage_override_in_tx(&mut transaction, item_id)
-                .await?
-                .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+        let (mut item, revision, existing_override) = transaction
+            .load_item_with_triage_override_in_tx(item_id)
+            .await?
+            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
         let before = item.clone();
         let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
         if !mutate(&mut item)? {
@@ -123,9 +122,11 @@ impl AsyncDaemonDb {
             return Ok(None);
         }
         item.updated_at = utc_now();
-        apply_task_board_item_status_transition_in_tx(&mut transaction, &item).await?;
+        transaction
+            .apply_task_board_item_status_transition_in_tx(&item)
+            .await?;
         if item.deleted_at.is_some() {
-            clear_children_parent_in_tx(&mut transaction, item_id).await?;
+            transaction.clear_children_parent_in_tx(item_id).await?;
         }
         let (outcome, transition_kind) = apply_update_triage_in_tx(
             &mut transaction,

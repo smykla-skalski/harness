@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::item_tx_ext::TaskBoardItemTxExt;
 use super::lane_order::{LaneTransitionWrite, record_lane_transition_audit_in_tx};
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
@@ -111,7 +112,8 @@ impl AsyncDaemonDb {
             .begin()
             .await
             .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
-        let (item, item_revision) = load_item_in_tx(&mut transaction, item_id)
+        let (item, item_revision) = transaction
+            .load_item_in_tx(item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
         transaction
@@ -140,7 +142,7 @@ impl AsyncDaemonDb {
             .begin()
             .await
             .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
-        let found = load_item_in_tx(&mut transaction, item_id).await?;
+        let found = transaction.load_item_in_tx(item_id).await?;
         transaction
             .commit()
             .await
@@ -278,9 +280,12 @@ async fn resolve_parent_update_in_tx(
         item.child_order = 0;
         return Ok(());
     };
-    match check_parent_assignment_in_tx(transaction, &item.id, &parent_id).await? {
+    match transaction
+        .check_parent_assignment_in_tx(&item.id, &parent_id)
+        .await?
+    {
         ParentAssignmentValidation::Valid => {
-            item.child_order = next_child_order_in_tx(transaction, &parent_id).await?;
+            item.child_order = transaction.next_child_order_in_tx(&parent_id).await?;
             Ok(())
         }
         ParentAssignmentValidation::Invalid(reason)
