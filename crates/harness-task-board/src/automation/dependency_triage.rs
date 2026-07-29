@@ -200,6 +200,7 @@ fn validate_pull_request_identity(
     }
     if expected_repository.is_none()
         || actual_repository != expected_repository
+        || actual_repository.as_deref() != Some(result.repository.as_str())
         || number == 0
         || result.pull_request_number != number
         || result.exact_head_revision != head
@@ -358,6 +359,13 @@ mod tests {
         assert_eq!(
             validate(&malformed),
             Err(TaskBoardDependencyTriageError::InvalidHeadRevision)
+        );
+
+        let mut noncanonical = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
+        noncanonical.repository = " Acme/Widgets ".into();
+        assert_eq!(
+            validate(&noncanonical),
+            Err(TaskBoardDependencyTriageError::PullRequestMismatch)
         );
 
         let mut stale = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
