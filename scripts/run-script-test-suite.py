@@ -207,12 +207,12 @@ def _signal_and_wait_for_pid_exits(
                 registered.add(pid)
             _signal_pids(pids, sent_signal)
             if not registered:
-                return set()
+                return set(pids)
             events = queue.control(None, len(registered), timeout_seconds)
             exited = {event.ident for event in events}
         finally:
             queue.close()
-        return registered - exited
+        return set(pids) - exited
     if platform.system() == "Linux" and hasattr(os, "pidfd_open"):
         selector = select.poll()
         descriptors = {}
@@ -220,7 +220,7 @@ def _signal_and_wait_for_pid_exits(
             for pid in pids:
                 try:
                     descriptor = os.pidfd_open(pid)
-                except ProcessLookupError:
+                except OSError:
                     continue
                 descriptors[descriptor] = pid
                 selector.register(descriptor, select.POLLIN)

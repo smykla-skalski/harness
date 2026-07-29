@@ -435,6 +435,49 @@ print(tmp)
 
         self.assertNotEqual(process.returncode, 0)
 
+    def test_darwin_wait_keeps_process_when_exit_watch_registration_fails(
+        self,
+    ) -> None:
+        runner = load_runner()
+
+        class RegistrationFailureQueue:
+            def control(self, changes, _max_events, _timeout):
+                if changes is not None:
+                    raise PermissionError
+                return ()
+
+            def close(self):
+                return None
+
+        with (
+            patch.object(runner.platform, "system", return_value="Darwin"),
+            patch.object(runner.select, "kqueue", return_value=RegistrationFailureQueue()),
+            patch.object(runner, "_signal_pids"),
+        ):
+            remaining = runner._signal_and_wait_for_pid_exits(
+                (123,),
+                signal.SIGTERM,
+                0,
+            )
+
+        self.assertEqual(remaining, {123})
+
+    def test_linux_wait_keeps_process_when_pidfd_open_fails(self) -> None:
+        runner = load_runner()
+
+        with (
+            patch.object(runner.platform, "system", return_value="Linux"),
+            patch.object(runner.os, "pidfd_open", side_effect=PermissionError, create=True),
+            patch.object(runner, "_signal_pids"),
+        ):
+            remaining = runner._signal_and_wait_for_pid_exits(
+                (123,),
+                signal.SIGTERM,
+                0,
+            )
+
+        self.assertEqual(remaining, {123})
+
     def test_teardown_stops_daemonized_production_sccache_by_owned_socket(
         self,
     ) -> None:
