@@ -9,28 +9,27 @@ pub mod agents {
     pub use harness_agents::*;
 }
 pub mod app;
-// `daemon` moved natively into harness-daemon; nothing in this crate needs
-// `crate::daemon::*` any more; only `daemon-runtime` builds (this crate's own
-// unit tests and `tests/integration/**`, never the shipped `harness` binary,
-// which builds with no features) still need the module present, so it is
-// mirrored back in for exactly those builds rather than left to root
-// permanently. Keep this path in step with harness-daemon's own native
-// `src/daemon/` location if that ever moves again.
+// `daemon` moved natively into harness-daemon, which now owns and runs its
+// own unit tests directly (`cargo test -p harness-daemon --lib`); nothing in
+// this crate needs `crate::daemon::*` any more except `tests/integration/**`,
+// never the shipped `harness` binary, which builds with no features. A thin
+// re-export over the real dependency, rather than the former `#[path]`
+// mirror, keeps those integration tests unchanged while letting a
+// daemon-only edit skip recompiling this crate entirely.
 #[cfg(feature = "daemon-runtime")]
-#[path = "../crates/harness-daemon/src/daemon/mod.rs"]
-pub mod daemon;
+pub mod daemon {
+    pub use harness_daemon::daemon::*;
+}
 // Deliberate public API facade, not scaffolding: `harness::errors`,
 // `harness::kernel`, `harness::workspace`, `harness::sandbox` and
 // `harness::feature_flags` stay stable paths for consumers of this crate.
 // Code inside the workspace names `harness_kernel::`, `harness_workspace::`
 // and `harness_feature_flags::` directly, so do not add uses of
-// `crate::errors`, `crate::kernel`, `crate::workspace`, `crate::sandbox`,
-// `crate::git` or `crate::feature_flags` on the strength of these.
+// `crate::errors`, `crate::kernel`, `crate::workspace`, `crate::sandbox`
+// or `crate::feature_flags` on the strength of these.
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub use harness_feature_flags::feature_flags;
 pub use harness_kernel::errors;
-#[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
-pub(crate) use harness_workspace::git;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub(crate) mod github_api {
     pub use harness_github_api::*;

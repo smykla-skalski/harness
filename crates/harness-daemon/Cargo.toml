@@ -96,13 +96,22 @@ x509-parser = "=0.18.1"
 core-foundation = "0.10"
 security-framework = "3"
 
-[lib]
-test = false
-
 [dev-dependencies]
+# Superset of the optional `[dependencies]` entry above: adds the `server`
+# feature the test-only ACP HTTP transport tests need, matching root's own
+# dev-dependency override of the same crate.
+agent-client-protocol-http = { version = "=2.0.0", default-features = false, features = ["client", "server"] }
 assert_cmd = "=2.2.2"
+harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["test-support"] }
+harness-github-api = { path = "../harness-github-api", version = "55.0.0", features = ["test-support"] }
+harness-reviews = { path = "../harness-reviews", version = "55.0.0", features = ["test-support"] }
+harness-task-board = { path = "../harness-task-board", version = "55.0.0", features = ["test-support"] }
+harness-testkit = { path = "../../testkit" }
+opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "=0.32.1", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 tempfile = "=3.27.0"
+tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 
 [features]
 default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]

@@ -284,11 +284,10 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
 
 #[test]
 fn shipped_daemon_async_migration_checksums_remain_stable() {
-    // This test only ever runs compiled into the root crate (harness-daemon's
-    // own `--lib` test target stays disabled), so `CARGO_MANIFEST_DIR` here is
-    // always the workspace root, not this file's own `crates/harness-daemon`.
-    let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("crates/harness-daemon/src/daemon/db/migrations");
+    // This test runs in harness-daemon's own `--lib` test target, so
+    // `CARGO_MANIFEST_DIR` is this crate's own root (`crates/harness-daemon`).
+    let migrations_dir =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");
 
     for &(filename, expected_checksum) in SHIPPED_MIGRATION_CHECKSUMS {
         let bytes = std::fs::read(migrations_dir.join(filename)).expect("read migration");

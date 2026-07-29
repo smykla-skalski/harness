@@ -54,6 +54,10 @@ static GLOBAL_BUDGET_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 /// Panics if the lock is poisoned by another test panicking while holding
 /// it.
 #[cfg(any(test, feature = "test-support"))]
+// Held across the `reset_for_test` await deliberately: that is the
+// exclusivity guarantee this lock exists for, not an accidental hold in
+// production async code that could stall a scheduler.
+#[allow(clippy::await_holding_lock)]
 pub async fn acquire_global_budget_test_lock() -> MutexGuard<'static, ()> {
     let lock = GLOBAL_BUDGET_TEST_LOCK.get_or_init(|| Mutex::new(()));
     let guard = lock.lock().expect("global budget test lock poisoned");

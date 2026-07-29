@@ -27,11 +27,6 @@ fn helper_modules_do_not_leak_publicly() {
 
     for (path, public_needle, crate_needle) in [
         (
-            "src/app/mod.rs",
-            "pub use harness_workspace::command_context;",
-            "pub(crate) use harness_workspace::command_context;",
-        ),
-        (
             "src/setup/mod.rs",
             "pub use harness_hooks::wrapper;",
             "pub(crate) use harness_hooks::wrapper;",

@@ -379,7 +379,7 @@ fn session_summaries_default_visibility_includes_awaiting_leader_active_and_lead
             )
         })
         .expect("join ended leader");
-        session_service::end_session(
+        session_service::end_session_local(
             &ended.session_id,
             ended.leader_id.as_deref().expect("ended leader"),
             &project_dir,

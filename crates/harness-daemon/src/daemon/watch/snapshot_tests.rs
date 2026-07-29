@@ -58,7 +58,7 @@ fn refresh_watch_snapshot_detects_timeline_only_changes() {
         )
         .expect("create task");
         append_project_ledger_entry(project);
-        let signal = session_service::send_signal(
+        let signal = session_service::send_signal_local(
             "ae60b5c5-37cf-5a50-a816-8f454bb9e92e",
             &worker_id,
             "inject_context",
