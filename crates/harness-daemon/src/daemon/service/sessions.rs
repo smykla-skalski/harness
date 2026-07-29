@@ -1,14 +1,14 @@
-#[cfg(test)]
-use super::TimelineCursor;
 use super::{
     CliError, CliErrorKind, ProjectSummary, SessionDetail, SessionExtensionsPayload,
-    SessionSummary, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse, index,
-    reconcile_expired_pending_signals_for_async_db, reconcile_expired_pending_signals_for_db,
-    session_not_found, snapshot, timeline,
+    SessionSummary, TimelineEntry, index, reconcile_expired_pending_signals_for_async_db,
+    reconcile_expired_pending_signals_for_db, session_not_found, snapshot, timeline,
 };
 use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::AcpTranscriptResponse;
 use crate::session::service::ResolvedRuntimeSessionAgent;
+#[cfg(test)]
+use harness_protocol::timeline::TimelineCursor;
+use harness_protocol::timeline::{TimelineWindowRequest, TimelineWindowResponse};
 
 mod liveness;
 mod snapshot_resolve;

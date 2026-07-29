@@ -23,8 +23,7 @@ pub(crate) use crate::daemon::agent_tui::{
 };
 pub(crate) use crate::daemon::index::DiscoveredProject;
 pub(crate) use crate::daemon::protocol::{
-    CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineCursor, TimelineEntry,
-    TimelineWindowRequest, TimelineWindowResponse,
+    CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineEntry,
 };
 pub(crate) use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,

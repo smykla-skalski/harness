@@ -1,6 +1,7 @@
 pub(super) use super::*;
 pub(super) use crate::agents::runtime::event::ConversationEventKind;
 pub(super) use crate::daemon::{index as daemon_index, protocol as daemon_protocol};
+pub(super) use harness_protocol::timeline::TimelineWindowRequest;
 pub(super) use std::path::{Path, PathBuf};
 pub(super) use std::time::{Duration, Instant};
 

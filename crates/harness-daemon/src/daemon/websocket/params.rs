@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::daemon::protocol::TimelineCursor;
+use harness_protocol::timeline::TimelineCursor;
 
 pub(crate) fn extract_session_id(params: &Value) -> Option<String> {
     extract_string_param(params, "session_id")

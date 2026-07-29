@@ -39,8 +39,6 @@ use super::http::{
 };
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
-#[cfg(test)]
-use super::protocol::TimelineCursor;
 use super::protocol::{
     AgentRemoveRequest, DAEMON_WIRE_VERSION, DaemonControlResponse, DaemonDiagnosticsReport,
     HealthResponse, LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
@@ -49,7 +47,7 @@ use super::protocol::{
     SessionsUpdatedDeltaPayload, SessionsUpdatedPayload, SetLogLevelRequest, SignalAckRequest,
     SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
     TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskUpdateRequest, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
+    TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};

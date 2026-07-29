@@ -17,6 +17,7 @@ use crate::session::{
 };
 use crate::workspace::project_context_dir;
 use harness_protocol::agent::HookAgent;
+use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest};
 use harness_testkit::with_isolated_harness_env;
 
 mod support;

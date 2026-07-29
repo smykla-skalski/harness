@@ -1,9 +1,10 @@
 use sqlx::query_as;
 
 use super::{
-    AsyncDaemonDb, CliError, StoredTimelineEntry, TimelineCursor, TimelineEntry,
-    TimelineWindowRequest, TimelineWindowResponse, daemon_timeline, db_error, usize_from_i64,
+    AsyncDaemonDb, CliError, StoredTimelineEntry, TimelineEntry, daemon_timeline, db_error,
+    usize_from_i64,
 };
+use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
 
 const TIMELINE_STATE_SQL: &str = "SELECT revision, entry_count
     FROM session_timeline_state

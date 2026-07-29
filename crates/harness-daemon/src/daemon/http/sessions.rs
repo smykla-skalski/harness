@@ -7,12 +7,11 @@ use axum::routing::get;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::daemon::protocol::{
-    SessionDetail, TimelineCursor, TimelineWindowRequest, TimelineWindowResponse, http_paths,
-};
+use crate::daemon::protocol::{SessionDetail, http_paths};
 use crate::daemon::service;
 use crate::daemon::timeline::TimelinePayloadScope;
 use harness_kernel::errors::CliError;
+use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};

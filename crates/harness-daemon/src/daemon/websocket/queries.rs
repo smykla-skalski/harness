@@ -10,12 +10,12 @@ use crate::daemon::http::{
     managed_agent_snapshot_async, require_async_db, run_acp_agent_blocking,
 };
 use crate::daemon::protocol::{
-    HarnessMonitorAuditEventsRequest, StreamEvent, TimelineWindowRequest, WsRequest, WsResponse,
-    ws_methods,
+    HarnessMonitorAuditEventsRequest, StreamEvent, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::remote_diagnostics::{project_audit_events, project_diagnostics_report};
 use crate::daemon::service;
 use harness_kernel::errors::CliError;
+use harness_protocol::timeline::TimelineWindowRequest;
 
 use super::config::build_config_payload;
 use super::connection::ConnectionState;
