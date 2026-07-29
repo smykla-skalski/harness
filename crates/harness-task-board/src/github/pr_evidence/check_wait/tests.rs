@@ -30,6 +30,7 @@ fn evidence(head: &str, checks: &[(&str, CheckState)], required: &[&str]) -> Pul
                 .map(|(name, state)| CheckGate {
                     name: (*name).to_string(),
                     state: *state,
+                    details_url: None,
                 })
                 .collect(),
             required_check_names: required.iter().map(|name| (*name).to_string()).collect(),
