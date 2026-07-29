@@ -27,7 +27,9 @@ def _cargo_environment() -> dict[str, str]:
         text=True,
     )
     if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "cargo-local --print-env failed")
+        raise RuntimeError(
+            completed.stderr.strip() or "scripts/cargo-local.sh --print-env failed"
+        )
     return dict(
         line.split("=", maxsplit=1)
         for line in completed.stdout.splitlines()
