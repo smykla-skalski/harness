@@ -14,6 +14,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::GitHubAutomationClient;
 use super::evidence::GitHubMergeEvidence;
 use super::evidence_api::pull_request_merge_evidence;
+use super::pr_evidence::{
+    GitHubPullRequestEvidenceSource, PullRequestEvidenceRead, PullRequestEvidenceSource,
+    PullRequestIdentity,
+};
 use super::publication::{
     GitHubBranchState, branch_state_async, publish_branch_from_worktree_async,
 };
@@ -148,6 +152,18 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         pull_request_number: u64,
     ) -> Result<GitHubMergeEvidence, CliError> {
         pull_request_merge_evidence(&self.client, config, pull_request_number).await
+    }
+
+    async fn read_pull_request_evidence(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+    ) -> Result<PullRequestEvidenceRead, CliError> {
+        let identity =
+            PullRequestIdentity::new(&config.owner, &config.repo, pull_request_number);
+        GitHubPullRequestEvidenceSource::new(&self.client)
+            .read_pull_request_evidence(&identity)
+            .await
     }
 
     async fn get_pull_request(

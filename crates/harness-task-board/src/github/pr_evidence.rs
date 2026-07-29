@@ -13,6 +13,7 @@ mod action_ledger;
 mod check_wait;
 mod gates;
 mod github_source;
+mod merge_ledger;
 
 pub use action_gate::{
     ActionGateBlock, ActionGateDecision, ActionGateRequirement, evaluate_action_gates,
@@ -30,6 +31,7 @@ pub use gates::{
     CheckGate, CheckState, Mergeability, PullRequestMergeGates, ReviewDecision, ReviewGate,
 };
 pub use github_source::GitHubPullRequestEvidenceSource;
+pub use merge_ledger::{MergeLedgerOutcome, merge_with_ledger};
 
 /// Canonical identity of a pull request: an `owner/repo` slug and number in one
 /// normalized shape. It is the shared vocabulary discovery and execution are
