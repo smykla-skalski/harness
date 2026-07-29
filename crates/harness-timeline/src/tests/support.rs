@@ -4,19 +4,19 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
-use crate::agents::runtime::RuntimeCapabilities;
-use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::agents::runtime::signal::{
+use harness_agents::runtime::RuntimeCapabilities;
+use harness_agents::runtime::event::{ConversationEvent, ConversationEventKind};
+use harness_agents::runtime::signal::{
     AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
     acknowledge_signal, write_signal_file,
 };
-use crate::observe::types::{
+use harness_observe::types::{
     ActiveWorker, FixSafety, IssueCategory, IssueCode, IssueSeverity, ObserverState, OpenIssue,
 };
-use crate::session::types::{
-    AgentRegistration, AgentStatus, CURRENT_VERSION, SessionLogEntry, SessionMetrics, SessionRole,
-    SessionState, SessionStatus, SessionTransition, TaskCheckpoint, TaskQueuePolicy, TaskSeverity,
-    TaskStatus, WorkItem,
+use harness_protocol::session::{
+    AgentRegistration, AgentStatus, CURRENT_VERSION, SessionLogEntry, SessionMetrics,
+    SessionPolicy, SessionRole, SessionState, SessionStatus, SessionTransition, TaskCheckpoint,
+    TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
 };
 
 const OBSERVE_ID: &str = "observe-7d8914ed-1073-56a6-85c1-0582a49cf5ce";
@@ -26,7 +26,6 @@ const SIGNAL_ID: &str = "sig-acked";
 
 pub(super) struct TimelineFixture {
     pub(super) log_entry: SessionLogEntry,
-    pub(super) signal_sent: SessionLogEntry,
     pub(super) checkpoint: TaskCheckpoint,
     pub(super) db_events: Vec<ConversationEvent>,
 }
@@ -71,14 +70,13 @@ pub(super) fn write_standard_timeline_fixture(
     write_json(&state_path, &sample_state(session_id));
 
     let log_entry = sample_log_entry(session_id);
-    let signal_sent = sample_signal_sent_entry(session_id);
     let log_path = context_root
         .join("orchestration")
         .join("sessions")
         .join(session_id)
         .join("log.jsonl");
     write_json_line(&log_path, &log_entry);
-    write_json_line(&log_path, &signal_sent);
+    write_json_line(&log_path, &sample_signal_sent_entry(session_id));
 
     let checkpoint = sample_checkpoint();
     let checkpoint_path = context_root
@@ -104,7 +102,6 @@ pub(super) fn write_standard_timeline_fixture(
 
     TimelineFixture {
         log_entry,
-        signal_sent,
         checkpoint,
         db_events,
     }
@@ -228,7 +225,7 @@ fn sample_state_for_runtime(
             created_by: Some("leader-claude".into()),
             notes: Vec::new(),
             suggested_fix: None,
-            source: crate::session::types::TaskSource::Manual,
+            source: TaskSource::Manual,
             observe_issue_id: None,
             blocked_reason: None,
             completed_at: None,
@@ -256,7 +253,7 @@ fn sample_state_for_runtime(
         title: "test session".into(),
         context: "test goal".into(),
         status: SessionStatus::Active,
-        policy: crate::session::types::SessionPolicy::default(),
+        policy: SessionPolicy::default(),
         created_at: "2026-03-28T14:00:00Z".into(),
         updated_at: "2026-03-28T14:05:00Z".into(),
         agents,

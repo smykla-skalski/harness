@@ -14,15 +14,17 @@
 //! arm in `conversation_entry` and any future arm. Assert that contract in a
 //! mapper-level test before the producer ships.
 
-use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::session::types::{SessionLogEntry, TaskCheckpoint};
+use harness_agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use harness_kernel::errors::CliError;
+use harness_protocol::session::{SessionLogEntry, TaskCheckpoint};
+use harness_protocol::timeline::TimelineEntry;
 
-use super::super::protocol::TimelineEntry;
 use super::summary::transition_summary;
 use super::{TimelinePayloadScope, timeline_payload};
 
-pub(crate) fn log_entry_timeline_entry(
+/// # Errors
+/// Returns [`CliError`] when the transition payload cannot be serialized.
+pub fn log_entry_timeline_entry(
     log_entry: &SessionLogEntry,
     payload_scope: TimelinePayloadScope,
 ) -> Result<TimelineEntry, CliError> {
@@ -40,7 +42,9 @@ pub(crate) fn log_entry_timeline_entry(
     })
 }
 
-pub(crate) fn checkpoint_entry(
+/// # Errors
+/// Returns [`CliError`] when the checkpoint payload cannot be serialized.
+pub fn checkpoint_entry(
     session_id: &str,
     checkpoint: &TaskCheckpoint,
     payload_scope: TimelinePayloadScope,
@@ -61,7 +65,9 @@ pub(crate) fn checkpoint_entry(
     })
 }
 
-pub(crate) fn conversation_entry(
+/// # Errors
+/// Returns [`CliError`] when the event payload cannot be serialized.
+pub fn conversation_entry(
     session_id: &str,
     agent_id: &str,
     runtime: &str,

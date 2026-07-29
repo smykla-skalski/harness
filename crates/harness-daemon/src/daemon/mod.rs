@@ -139,8 +139,12 @@ mod task_board_read_only_coordinator_tests;
 pub(crate) mod task_board_read_only_runtime;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_remote_transport;
+// Session-timeline construction lives in `harness_timeline`; re-exported
+// under the old name so the daemon's own `db`, `service`, and `http` call
+// sites keep resolving `crate::daemon::timeline::*` without touching every
+// one of them.
 #[cfg(feature = "daemon-runtime")]
-pub mod timeline;
+pub use crate::timeline;
 #[cfg(feature = "daemon-runtime")]
 pub mod transport;
 #[cfg(feature = "daemon-runtime")]

@@ -1,3 +1,13 @@
+//! Voice-session recording and persistence: writes session metadata, audio
+//! chunks, and transcript segments to disk under a caller-supplied base
+//! directory, and optionally forwards chunks to a remote processor.
+//!
+//! Callers resolve the storage root themselves (`daemon_root()` in the
+//! daemon's own `daemon::state` module) and pass it in as `base_dir`, rather
+//! than this crate resolving it: `daemon_root()` depends on the daemon's own
+//! process ownership model (managed vs. standalone, macOS app group), which
+//! belongs with the daemon, not with a leaf storage crate.
+
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 
@@ -7,12 +17,10 @@ use chrono::Utc;
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
-
-mod cleanup;
 use uuid::Uuid;
 
-use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::workspace::utc_now;
 
 use harness_protocol::daemon::voice::{
     VoiceAudioChunkRequest, VoiceAudioFormatDescriptor, VoiceProcessingSink, VoiceRouteTarget,
@@ -20,7 +28,9 @@ use harness_protocol::daemon::voice::{
     VoiceSessionStartRequest, VoiceSessionStartResponse, VoiceTranscriptUpdateRequest,
 };
 
-use super::state;
+mod cleanup;
+#[cfg(test)]
+mod tests;
 
 use cleanup::{cleanup_abandoned_sessions_at, remove_session_dir};
 
@@ -60,10 +70,11 @@ struct StoredVoiceChunk {
 /// # Errors
 /// Returns `CliError` when the sink request is invalid or the metadata cannot be persisted.
 pub fn start_session(
+    base_dir: &Path,
     harness_session_id: &str,
     request: &VoiceSessionStartRequest,
 ) -> Result<VoiceSessionStartResponse, CliError> {
-    cleanup_abandoned_sessions()?;
+    cleanup_abandoned_sessions(base_dir)?;
     let voice_session_id = format!("voice-{}", Uuid::new_v4());
     let accepted_sinks = accepted_sinks(request)?;
     let now = utc_now();
@@ -81,11 +92,11 @@ pub fn start_session(
         last_sequence: 0,
     };
 
-    let dir = session_dir(&voice_session_id);
+    let dir = session_dir(base_dir, &voice_session_id);
     fs::create_dir_all(&dir).map_err(|error| {
         CliErrorKind::workflow_io(format!("create voice session directory: {error}"))
     })?;
-    if let Err(error) = write_record(&record) {
+    if let Err(error) = write_record(base_dir, &record) {
         let _ = remove_session_dir(&dir);
         return Err(error);
     }
@@ -102,13 +113,15 @@ pub fn start_session(
 /// # Errors
 /// Returns `CliError` when the sink request is invalid or the metadata cannot be persisted.
 pub async fn start_session_async(
+    base_dir: &Path,
     harness_session_id: &str,
     request: &VoiceSessionStartRequest,
 ) -> Result<VoiceSessionStartResponse, CliError> {
+    let base_dir = base_dir.to_path_buf();
     let harness_session_id = harness_session_id.to_string();
     let request = request.clone();
     run_voice_blocking("start voice session", move || {
-        start_session(&harness_session_id, &request)
+        start_session(&base_dir, &harness_session_id, &request)
     })
     .await
 }
@@ -118,21 +131,24 @@ pub async fn start_session_async(
 /// # Errors
 /// Returns `CliError` for invalid ordering, oversized payloads, decode failures, or sink failures.
 pub async fn append_audio_chunk(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
     cleanup_session_after_error_async(
+        base_dir,
         voice_session_id,
-        append_audio_chunk_inner(voice_session_id, request).await,
+        append_audio_chunk_inner(base_dir, voice_session_id, request).await,
     )
     .await
 }
 
 async fn append_audio_chunk_inner(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
-    let record = persist_audio_chunk_async(voice_session_id, request).await?;
+    let record = persist_audio_chunk_async(base_dir, voice_session_id, request).await?;
 
     if record
         .accepted_sinks
@@ -148,22 +164,25 @@ async fn append_audio_chunk_inner(
 }
 
 async fn persist_audio_chunk_async(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionRecord, CliError> {
+    let base_dir = base_dir.to_path_buf();
     let voice_session_id = voice_session_id.to_string();
     let request = request.clone();
     run_voice_blocking("append voice audio chunk", move || {
-        persist_audio_chunk(&voice_session_id, &request)
+        persist_audio_chunk(&base_dir, &voice_session_id, &request)
     })
     .await
 }
 
 fn persist_audio_chunk(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceAudioChunkRequest,
 ) -> Result<VoiceSessionRecord, CliError> {
-    let mut record = read_record(voice_session_id)?;
+    let mut record = read_record(base_dir, voice_session_id)?;
     if request.sequence != record.last_sequence + 1 {
         return Err(CliErrorKind::workflow_parse(format!(
             "voice chunk sequence out of order: expected {}, got {}",
@@ -183,8 +202,9 @@ fn persist_audio_chunk(
         .into());
     }
 
-    append_chunk_bytes(voice_session_id, &bytes)?;
+    append_chunk_bytes(base_dir, voice_session_id, &bytes)?;
     append_chunk_metadata(
+        base_dir,
         voice_session_id,
         &StoredVoiceChunk {
             sequence: request.sequence,
@@ -200,7 +220,7 @@ fn persist_audio_chunk(
 
     record.last_sequence = request.sequence;
     record.updated_at = Some(utc_now());
-    write_record(&record)?;
+    write_record(base_dir, &record)?;
     Ok(record)
 }
 
@@ -209,23 +229,26 @@ fn persist_audio_chunk(
 /// # Errors
 /// Returns `CliError` when the transcript file cannot be updated.
 pub fn append_transcript(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceTranscriptUpdateRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
     cleanup_session_after_error(
+        base_dir,
         voice_session_id,
-        append_transcript_inner(voice_session_id, request),
+        append_transcript_inner(base_dir, voice_session_id, request),
     )
 }
 
 fn append_transcript_inner(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceTranscriptUpdateRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
-    let mut record = read_record(voice_session_id)?;
-    append_json_line(&transcript_path(voice_session_id), request)?;
+    let mut record = read_record(base_dir, voice_session_id)?;
+    append_json_line(&transcript_path(base_dir, voice_session_id), request)?;
     record.updated_at = Some(utc_now());
-    write_record(&record)?;
+    write_record(base_dir, &record)?;
     Ok(VoiceSessionMutationResponse {
         voice_session_id: voice_session_id.to_string(),
         status: "recording".into(),
@@ -237,13 +260,15 @@ fn append_transcript_inner(
 /// # Errors
 /// Returns `CliError` when the transcript file cannot be updated.
 pub async fn append_transcript_async(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceTranscriptUpdateRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
+    let base_dir = base_dir.to_path_buf();
     let voice_session_id = voice_session_id.to_string();
     let request = request.clone();
     run_voice_blocking("append voice transcript", move || {
-        append_transcript(&voice_session_id, &request)
+        append_transcript(&base_dir, &voice_session_id, &request)
     })
     .await
 }
@@ -253,15 +278,16 @@ pub async fn append_transcript_async(
 /// # Errors
 /// Returns `CliError` when cleanup fails.
 pub fn finish_session(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceSessionFinishRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
-    let _record = read_record(voice_session_id)?;
+    let _record = read_record(base_dir, voice_session_id)?;
     let status = match request.reason {
         VoiceSessionFinishReason::Completed => "completed",
         VoiceSessionFinishReason::Cancelled => "cancelled",
     };
-    remove_session_dir(&session_dir(voice_session_id))?;
+    remove_session_dir(&session_dir(base_dir, voice_session_id))?;
     Ok(VoiceSessionMutationResponse {
         voice_session_id: voice_session_id.to_string(),
         status: status.into(),
@@ -273,13 +299,15 @@ pub fn finish_session(
 /// # Errors
 /// Returns `CliError` when cleanup fails.
 pub async fn finish_session_async(
+    base_dir: &Path,
     voice_session_id: &str,
     request: &VoiceSessionFinishRequest,
 ) -> Result<VoiceSessionMutationResponse, CliError> {
+    let base_dir = base_dir.to_path_buf();
     let voice_session_id = voice_session_id.to_string();
     let request = request.clone();
     run_voice_blocking("finish voice session", move || {
-        finish_session(&voice_session_id, &request)
+        finish_session(&base_dir, &voice_session_id, &request)
     })
     .await
 }
@@ -288,8 +316,8 @@ pub async fn finish_session_async(
 ///
 /// # Errors
 /// Returns `CliError` when cleanup cannot enumerate or delete session directories.
-pub fn cleanup_abandoned_sessions() -> Result<(), CliError> {
-    cleanup_abandoned_sessions_at(&Utc::now())
+pub fn cleanup_abandoned_sessions(base_dir: &Path) -> Result<(), CliError> {
+    cleanup_abandoned_sessions_at(base_dir, &Utc::now())
 }
 
 fn accepted_sinks(
@@ -352,32 +380,32 @@ async fn forward_chunk_to_remote(
     Ok(())
 }
 
-fn voice_root() -> PathBuf {
-    state::daemon_root().join("voice")
+fn voice_root(base_dir: &Path) -> PathBuf {
+    base_dir.join("voice")
 }
 
-fn session_dir(voice_session_id: &str) -> PathBuf {
-    voice_root().join(voice_session_id)
+fn session_dir(base_dir: &Path, voice_session_id: &str) -> PathBuf {
+    voice_root(base_dir).join(voice_session_id)
 }
 
-fn session_record_path(voice_session_id: &str) -> PathBuf {
-    session_dir(voice_session_id).join("session.json")
+fn session_record_path(base_dir: &Path, voice_session_id: &str) -> PathBuf {
+    session_dir(base_dir, voice_session_id).join("session.json")
 }
 
-fn chunks_path(voice_session_id: &str) -> PathBuf {
-    session_dir(voice_session_id).join("chunks.pcm")
+fn chunks_path(base_dir: &Path, voice_session_id: &str) -> PathBuf {
+    session_dir(base_dir, voice_session_id).join("chunks.pcm")
 }
 
-fn chunks_metadata_path(voice_session_id: &str) -> PathBuf {
-    session_dir(voice_session_id).join("chunks.jsonl")
+fn chunks_metadata_path(base_dir: &Path, voice_session_id: &str) -> PathBuf {
+    session_dir(base_dir, voice_session_id).join("chunks.jsonl")
 }
 
-fn transcript_path(voice_session_id: &str) -> PathBuf {
-    session_dir(voice_session_id).join("transcript.jsonl")
+fn transcript_path(base_dir: &Path, voice_session_id: &str) -> PathBuf {
+    session_dir(base_dir, voice_session_id).join("transcript.jsonl")
 }
 
-fn read_record(voice_session_id: &str) -> Result<VoiceSessionRecord, CliError> {
-    let path = session_record_path(voice_session_id);
+fn read_record(base_dir: &Path, voice_session_id: &str) -> Result<VoiceSessionRecord, CliError> {
+    let path = session_record_path(base_dir, voice_session_id);
     read_record_from_path(&path)?.ok_or_else(|| {
         CliErrorKind::workflow_io(format!("missing voice session {}", path.display())).into()
     })
@@ -401,8 +429,8 @@ fn read_record_from_path(path: &Path) -> Result<Option<VoiceSessionRecord>, CliE
     })
 }
 
-fn write_record(record: &VoiceSessionRecord) -> Result<(), CliError> {
-    let path = session_record_path(&record.voice_session_id);
+fn write_record(base_dir: &Path, record: &VoiceSessionRecord) -> Result<(), CliError> {
+    let path = session_record_path(base_dir, &record.voice_session_id);
     let json = serde_json::to_string_pretty(record)
         .map_err(|error| CliErrorKind::workflow_parse(format!("encode voice session: {error}")))?;
     fs::write(&path, json).map_err(|error| {
@@ -411,8 +439,12 @@ fn write_record(record: &VoiceSessionRecord) -> Result<(), CliError> {
     Ok(())
 }
 
-fn append_chunk_bytes(voice_session_id: &str, bytes: &[u8]) -> Result<(), CliError> {
-    let path = chunks_path(voice_session_id);
+fn append_chunk_bytes(
+    base_dir: &Path,
+    voice_session_id: &str,
+    bytes: &[u8],
+) -> Result<(), CliError> {
+    let path = chunks_path(base_dir, voice_session_id);
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -426,8 +458,12 @@ fn append_chunk_bytes(voice_session_id: &str, bytes: &[u8]) -> Result<(), CliErr
     Ok(())
 }
 
-fn append_chunk_metadata(voice_session_id: &str, chunk: &StoredVoiceChunk) -> Result<(), CliError> {
-    append_json_line(&chunks_metadata_path(voice_session_id), chunk)
+fn append_chunk_metadata(
+    base_dir: &Path,
+    voice_session_id: &str,
+    chunk: &StoredVoiceChunk,
+) -> Result<(), CliError> {
+    append_json_line(&chunks_metadata_path(base_dir, voice_session_id), chunk)
 }
 
 fn append_json_line<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
@@ -447,21 +483,23 @@ fn append_json_line<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError
 }
 
 fn cleanup_session_after_error<T>(
+    base_dir: &Path,
     voice_session_id: &str,
     result: Result<T, CliError>,
 ) -> Result<T, CliError> {
     if result.is_err() {
-        let _ = remove_session_dir(&session_dir(voice_session_id));
+        let _ = remove_session_dir(&session_dir(base_dir, voice_session_id));
     }
     result
 }
 
 async fn cleanup_session_after_error_async<T: Send>(
+    base_dir: &Path,
     voice_session_id: &str,
     result: Result<T, CliError>,
 ) -> Result<T, CliError> {
     if result.is_err() {
-        let dir = session_dir(voice_session_id);
+        let dir = session_dir(base_dir, voice_session_id);
         let _ = run_voice_blocking("clean up failed voice session", move || {
             remove_session_dir(&dir)
         })
@@ -479,6 +517,3 @@ where
         Err(CliErrorKind::workflow_io(format!("{operation} worker failed: {error}")).into())
     })
 }
-
-#[cfg(test)]
-mod tests;

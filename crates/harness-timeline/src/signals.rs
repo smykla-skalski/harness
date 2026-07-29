@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-use crate::agents::runtime::signal::{
+use harness_agents::runtime::signal::{
     Signal, SignalAck, read_acknowledged_signals, read_acknowledgments,
 };
-use crate::session::types::SessionState;
 use harness_kernel::errors::CliError;
+use harness_protocol::session::SessionState;
+use harness_protocol::timeline::TimelineEntry;
+use harness_session::index;
 
-use super::super::index;
-use super::super::protocol::TimelineEntry;
 use super::summary::signal_ack_summary;
 use super::{TimelinePayloadScope, timeline_payload};
 

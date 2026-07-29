@@ -7,8 +7,11 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{VOICE_SESSION_TTL_SECS, VoiceSessionRecord, read_record_from_path, voice_root};
 
-pub(super) fn cleanup_abandoned_sessions_at(now: &DateTime<Utc>) -> Result<(), CliError> {
-    for dir in voice_session_dirs()? {
+pub(super) fn cleanup_abandoned_sessions_at(
+    base_dir: &Path,
+    now: &DateTime<Utc>,
+) -> Result<(), CliError> {
+    for dir in voice_session_dirs(base_dir)? {
         if voice_session_has_expired(&dir, now)? {
             remove_session_dir(&dir)?;
         }
@@ -16,8 +19,8 @@ pub(super) fn cleanup_abandoned_sessions_at(now: &DateTime<Utc>) -> Result<(), C
     Ok(())
 }
 
-fn voice_session_dirs() -> Result<Vec<PathBuf>, CliError> {
-    let root = voice_root();
+fn voice_session_dirs(base_dir: &Path) -> Result<Vec<PathBuf>, CliError> {
+    let root = voice_root(base_dir);
     if !root.exists() {
         return Ok(Vec::new());
     }

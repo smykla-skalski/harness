@@ -1,15 +1,25 @@
+//! Session-timeline construction: merges session-log transitions, task
+//! checkpoints, agent conversation events, signal acknowledgments, and
+//! observer snapshots into one ordered [`TimelineEntry`] feed.
+//!
+//! Two data sources feed the same merge: the filesystem session index
+//! (`harness_session::index`), used when no database is available, and a
+//! caller-supplied [`TimelineDbSource`] implementation, used when the
+//! daemon's database is the canonical store. The [`TimelineDbSource`] trait
+//! exists so this crate never depends on `harness-daemon`'s own database
+//! type: the daemon implements the trait for its `DaemonDb` and calls back
+//! in through a `&dyn` reference instead.
+
 use std::collections::{BTreeMap, HashSet};
 
 use serde_json::{Map, Value, to_value};
 
-use crate::session::types::{SessionLogEntry, SessionState, SessionTransition, TaskCheckpoint};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session::{SessionLogEntry, SessionState, SessionTransition, TaskCheckpoint};
+use harness_protocol::timeline::TimelineEntry;
+use harness_session::index;
 
-use super::index;
-use super::protocol::TimelineEntry;
-use observer::observer_snapshot_entry;
-use signals::{LoggedSignal, signal_ack_entries};
-
+mod db_source;
 mod entries;
 mod observer;
 mod signals;
@@ -17,10 +27,14 @@ mod summary;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use entries::{checkpoint_entry, conversation_entry, log_entry_timeline_entry};
+pub use db_source::TimelineDbSource;
+pub use entries::{checkpoint_entry, conversation_entry, log_entry_timeline_entry};
+
+use observer::observer_snapshot_entry;
+use signals::{LoggedSignal, signal_ack_entries};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TimelinePayloadScope {
+pub enum TimelinePayloadScope {
     Full,
     Summary,
 }
@@ -37,7 +51,7 @@ pub fn session_timeline(session_id: &str) -> Result<Vec<TimelineEntry>, CliError
 ///
 /// # Errors
 /// Returns [`CliError`] on discovery or parse failures.
-pub(crate) fn session_timeline_with_scope(
+pub fn session_timeline_with_scope(
     session_id: &str,
     payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
@@ -68,7 +82,7 @@ fn session_timeline_from_resolved_with_scope(
 /// Returns [`CliError`] on parse failures.
 pub fn session_timeline_from_resolved_with_db(
     resolved: &index::ResolvedSession,
-    db: &super::db::DaemonDb,
+    db: &dyn TimelineDbSource,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     session_timeline_from_resolved_with_db_scope(resolved, db, TimelinePayloadScope::Full)
 }
@@ -77,9 +91,9 @@ pub fn session_timeline_from_resolved_with_db(
 ///
 /// # Errors
 /// Returns [`CliError`] on parse failures.
-pub(crate) fn session_timeline_from_resolved_with_db_scope(
+pub fn session_timeline_from_resolved_with_db_scope(
     resolved: &index::ResolvedSession,
-    db: &super::db::DaemonDb,
+    db: &dyn TimelineDbSource,
     payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     build_timeline(resolved, Some(db), payload_scope)
@@ -87,7 +101,7 @@ pub(crate) fn session_timeline_from_resolved_with_db_scope(
 
 fn build_timeline(
     resolved: &index::ResolvedSession,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&dyn TimelineDbSource>,
     payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     let session_id = &resolved.state.session_id;
@@ -152,7 +166,7 @@ fn build_timeline(
 }
 
 fn load_log_entries_hybrid(
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&dyn TimelineDbSource>,
     project: &index::DiscoveredProject,
     session_id: &str,
 ) -> Result<Vec<SessionLogEntry>, CliError> {
@@ -163,7 +177,7 @@ fn load_log_entries_hybrid(
 }
 
 fn load_checkpoints_hybrid(
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&dyn TimelineDbSource>,
     project: &index::DiscoveredProject,
     session_id: &str,
     task_id: &str,
@@ -175,7 +189,7 @@ fn load_checkpoints_hybrid(
 }
 
 fn load_conversation_entries_hybrid(
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&dyn TimelineDbSource>,
     project: &index::DiscoveredProject,
     state: &SessionState,
     payload_scope: TimelinePayloadScope,
@@ -187,7 +201,7 @@ fn load_conversation_entries_hybrid(
 }
 
 fn conversation_entries_from_db(
-    db: &super::db::DaemonDb,
+    db: &dyn TimelineDbSource,
     state: &SessionState,
     payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
@@ -241,7 +255,7 @@ fn conversation_entries(
     Ok(entries)
 }
 
-pub(super) fn timeline_payload(
+pub(crate) fn timeline_payload(
     value: &impl serde::Serialize,
     label: &str,
     payload_scope: TimelinePayloadScope,

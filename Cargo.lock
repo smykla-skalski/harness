@@ -3725,6 +3725,8 @@ dependencies = [
  "harness-task-board-remote-viewer",
  "harness-telemetry",
  "harness-testkit",
+ "harness-timeline",
+ "harness-voice",
  "harness-workspace",
  "hex",
  "hickory-resolver",
@@ -4316,6 +4318,43 @@ version = "55.0.0"
 dependencies = [
  "temp-env",
  "tempfile",
+]
+
+[[package]]
+name = "harness-timeline"
+version = "55.0.0"
+dependencies = [
+ "fs-err",
+ "harness-agents",
+ "harness-kernel",
+ "harness-observe",
+ "harness-protocol",
+ "harness-session",
+ "harness-testkit",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+]
+
+[[package]]
+name = "harness-voice"
+version = "55.0.0"
+dependencies = [
+ "base64 0.23.0",
+ "chrono",
+ "fs-err",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-testkit",
+ "harness-workspace",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]
