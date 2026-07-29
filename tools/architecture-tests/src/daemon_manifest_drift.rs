@@ -366,6 +366,10 @@ fn used_cfg_feature_names(contents: &str) -> BTreeSet<String> {
 /// filtered to a lowercase-or-`_` leading character to drop most of the
 /// latter), but the caller only acts on a name that already matches a real
 /// dependency in one of the two manifests, so that noise never surfaces.
+/// Also separately covers `use <crate> as <alias>;`, a whole-crate rename
+/// with no `::` anywhere in the statement (`use fs_err as fs;`, common in
+/// this tree) that the scan above cannot see at all: everything after it
+/// only ever mentions the alias, never the real crate name.
 fn used_crate_idents(contents: &str) -> BTreeSet<String> {
     let mut idents = BTreeSet::new();
     for line in contents.lines() {
@@ -385,8 +389,33 @@ fn used_crate_idents(contents: &str) -> BTreeSet<String> {
                 idents.insert(ident.to_string());
             }
         }
+        if let Some(name) = renamed_use_ident(line) {
+            idents.insert(name.to_string());
+        }
     }
     idents
+}
+
+fn renamed_use_ident(line: &str) -> Option<&str> {
+    let mut rest = line.trim_start();
+    if let Some(after_paren) = rest.strip_prefix("pub(") {
+        let close = after_paren.find(')')?;
+        rest = after_paren[close + 1..].trim_start();
+    } else if let Some(after_pub) = rest.strip_prefix("pub ") {
+        rest = after_pub.trim_start();
+    }
+    let rest = rest.strip_prefix("use ")?.trim_start();
+    let rest = rest.strip_suffix(';')?.trim_end();
+    let (name, _alias) = rest.split_once(" as ")?;
+    let name = name.trim();
+    // `use foo::bar as baz;` renames one item, not the crate root, and the
+    // `::` scan above already covers it; only a bare, single-segment name
+    // here (no `::`) is the whole-crate rename this helper exists for.
+    let is_plain_ident = !name.is_empty()
+        && name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_');
+    is_plain_ident.then_some(name)
 }
 
 fn manifest_dependency_idents(manifest: &str) -> BTreeSet<String> {
