@@ -17,8 +17,8 @@
 //!
 //! This covers the cluster's two heavily-shared types
 //! ([`TaskBoardRemoteAssignmentRecord`] and [`TaskBoardRemoteMutationOutcome`],
-//! reached through nearly every method below) and the roughly twenty
-//! lifecycle operations that account for the bulk of real caller traffic,
+//! reached through nearly every method below) and the seventeen lifecycle
+//! operations that account for the bulk of real caller traffic,
 //! verified by reference count against `service` and
 //! `task_board_remote_transport`. The cluster's much longer tail of
 //! narrowly-used internal accessors -- io-authority-fencing variants, source
@@ -43,7 +43,7 @@ use super::remote_hosts::TaskBoardRemoteHostTrustFence;
 use super::remote_result_import::TaskBoardRemoteResultImportRecord;
 use super::remote_settlement_receipts::TaskBoardRemoteSettlementReceipt;
 use crate::daemon::db::{AsyncDaemonDb, CliError};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteClaimRequest, RemoteClaimResponse, RemoteOfferRequest, RemoteOfferResponse,
     RemoteSettledRequest, RemoteStatusRequest, RemoteStatusResponse,
 };

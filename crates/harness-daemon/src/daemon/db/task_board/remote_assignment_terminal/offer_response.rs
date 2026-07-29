@@ -8,7 +8,7 @@ use crate::daemon::db::task_board::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferResponse;
+use crate::task_board::remote_wire::wire::RemoteOfferResponse;
 
 pub(crate) async fn record_task_board_remote_offer_response(
     db: &AsyncDaemonDb,
