@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::super::ITEMS_CHANGE_SCOPE;
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{
     LaneTransitionKind, LaneTransitionWrite, insert_with_lane_transition_in_tx,
     replace_with_lane_transition_in_tx,
@@ -10,7 +11,7 @@ use super::super::triage_apply::TriageOutcome;
 use super::super::triage_apply_rules::apply_active_triage_in_tx;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, bump_change_in_tx,
-    load_item_in_tx, record_triage_or_lane_audit_in_tx, validate_item,
+    record_triage_or_lane_audit_in_tx, validate_item,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::TaskBoardItem;
@@ -122,7 +123,7 @@ async fn reject_if_item_exists_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
 ) -> Result<(), CliError> {
-    if load_item_in_tx(transaction, item_id).await?.is_some() {
+    if transaction.load_item_in_tx(item_id).await?.is_some() {
         return Err(db_error(format!(
             "task-board item '{item_id}' already exists"
         )));
