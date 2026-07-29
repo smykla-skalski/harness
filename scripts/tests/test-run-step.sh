@@ -97,7 +97,7 @@ scenario_accepted_status_suppresses_failure_output() {
 
 scenario_cargo_local_reports_failed_cargo_command() {
   start_test "cargo-local reports failed cargo command"
-  if [[ "${SCCACHE_BIN+x}" != "x" ]] || [[ -n "$SCCACHE_BIN" ]]; then
+  if [[ "${SCCACHE_BIN+x}" != "x" ]] || [[ -n "${SCCACHE_BIN-}" ]]; then
     fail "isolated run-step fixture must receive an explicit empty SCCACHE_BIN"
     return
   fi
