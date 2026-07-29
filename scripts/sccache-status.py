@@ -289,17 +289,14 @@ def main() -> int:
     else:
         effectiveness = "normal"
     state = _overall_status(server_state, effectiveness)
-    dominant_reason = (
-        max(reasons.items(), key=lambda item: (item[1], item[0]))
-        if reasons
-        else None
+    ordered_reasons = sorted(
+        reasons.items(),
+        key=lambda item: (-item[1], item[0]),
     )
+    dominant_reason = ordered_reasons[0] if ordered_reasons else None
     reason_summary = ",".join(
         f"{reason}:{count}"
-        for reason, count in sorted(
-            reasons.items(),
-            key=lambda item: (-item[1], item[0]),
-        )
+        for reason, count in ordered_reasons
     )
     paths = _cache_paths(values)
 

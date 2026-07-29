@@ -165,9 +165,9 @@ multiple input files                20
                         "Compile requests": "101",
                         "Cache hits": "1",
                         "Cache misses": "100",
-                        "Non-cacheable calls": "60",
+                        "Non-cacheable calls": "80",
                     },
-                    {"incremental": 40, "multiple input files": 20},
+                    {"incremental": 40, "multiple input files": 40},
                     "ok",
                 ),
             ),
@@ -181,13 +181,13 @@ multiple input files                20
         self.assertIn("sccache_server_status=healthy", output.getvalue())
         self.assertIn("cache_effectiveness=low", output.getvalue())
         self.assertIn("historical_cache_reuse=low", output.getvalue())
-        self.assertIn("non_cacheable_rate=59.41%", output.getvalue())
+        self.assertIn("non_cacheable_rate=79.21%", output.getvalue())
         self.assertIn(
             "dominant_non_cacheable_reason=incremental:40",
             output.getvalue(),
         )
         self.assertIn(
-            "non_cacheable_reasons=incremental:40,multiple input files:20",
+            "non_cacheable_reasons=incremental:40,multiple input files:40",
             output.getvalue(),
         )
 
