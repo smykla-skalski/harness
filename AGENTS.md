@@ -69,7 +69,7 @@ Keep compilation and test progress visible during diagnosis by running the selec
 
 - Reuse the session worktree and Cargo lane, and run the smallest relevant `mise` gate.
 - Query `mise run cargo:cache:status`; its configured `SCCACHE_SERVER_UDS`, `CACHE_MODE`, and status are authoritative. An empty printed `RUSTC_WRAPPER` is expected when `.cargo/config.toml` owns `scripts/rustc-cache-wrapper.sh`.
-- Do not infer a cache failure from hit rate alone. Separate cold and warm compilation, copy-on-write lane seeding, incremental non-cacheable calls, build contention, and test execution, and never compare elapsed benchmarks while other `cargo-local` leases are active.
+- Do not infer current warmth or cache failure from lifetime hit rate; status reports low historical reuse separately from server health. Separate cold and warm compilation, copy-on-write lane seeding, incremental non-cacheable calls, build contention, and test execution, and never compare elapsed benchmarks while other `cargo-local` leases are active.
 - Isolated script fixtures that do not test caching must set `SCCACHE_BIN` empty; cargo-local cache tests enable it explicitly.
 - Never delete cache data or stop the configured server as a routine speed fix. Use `mise run cargo:cache:status` and the documented `mise run cargo:cache:recover` dry-run/apply flow, which acts only on exact socket ownership.
 

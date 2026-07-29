@@ -65,33 +65,94 @@ class SccacheStatusTests(unittest.TestCase):
         self.assertIn("rustc_wrapper_env=unset", output.getvalue())
         self.assertIn("sccache_status=disabled", output.getvalue())
 
-    def test_inventory_excludes_sccache_compiler_clients(self) -> None:
+    def test_inventory_distinguishes_other_live_orphan_and_client(self) -> None:
         configured = Path("/tmp/harness-sccache/repo.sock")
         owners = {
             41: (str(configured),),
             42: (str(configured),),
-            43: ("/tmp/harness-sccache/orphan.sock (deleted)",),
+            43: ("/tmp/harness-sccache/other.sock",),
+            44: ("/tmp/harness-sccache/orphan.sock (deleted)",),
         }
         commands = {
             41: "/tools/sccache",
             42: "/tools/sccache /tools/rustc --crate-name harness",
-            43: "/tools/sccache",
+            43: "/other/sccache",
+            44: "/tools/sccache",
+        }
+        peers = {
+            str(configured): ("live", 41),
+            "/tmp/harness-sccache/other.sock": ("live", 43),
+            "/tmp/harness-sccache/orphan.sock": ("absent", None),
         }
         with (
             patch.object(status, "socket_owners_under", return_value=owners),
-            patch.object(status, "pids_for_socket", return_value=(41, 42)),
+            patch.object(status, "peer_pid", side_effect=lambda path: peers[str(path)]),
             patch.object(
                 status,
                 "process_command",
                 side_effect=lambda pid: commands[pid],
             ),
         ):
-            inventory, live, orphan, paths = status._server_inventory(configured)
+            inventory = status._server_inventory(configured)
 
-        self.assertEqual(inventory, "available")
-        self.assertEqual(live, 1)
-        self.assertEqual(orphan, 1)
-        self.assertEqual(paths, ("/tmp/harness-sccache/orphan.sock",))
+        self.assertEqual(inventory.availability, "available")
+        self.assertEqual(inventory.configured, 1)
+        self.assertEqual(inventory.other_live, 1)
+        self.assertEqual(inventory.orphan, 1)
+        self.assertEqual(inventory.unknown, 0)
+        self.assertEqual(
+            inventory.other_live_paths,
+            ("/tmp/harness-sccache/other.sock",),
+        )
+        self.assertEqual(
+            inventory.orphan_paths,
+            ("/tmp/harness-sccache/orphan.sock",),
+        )
+
+    def test_low_lifetime_hit_rate_is_historical_not_current_health(self) -> None:
+        output = io.StringIO()
+        inventory = status.ServerInventory(
+            availability="available",
+            configured=1,
+            other_live=0,
+            orphan=0,
+            unknown=0,
+            other_live_paths=(),
+            orphan_paths=(),
+        )
+        with (
+            patch.object(
+                status,
+                "_cargo_environment",
+                return_value={
+                    "CACHE_MODE": "sccache",
+                    "RUSTC_WRAPPER": "",
+                    "SCCACHE_BIN": "/tools/sccache",
+                    "SCCACHE_SERVER_UDS": "/tmp/repo.sock",
+                },
+            ),
+            patch.object(status, "_configured_wrapper", return_value="wrapper"),
+            patch.object(status, "_socket_accepts", return_value=True),
+            patch.object(
+                status,
+                "_stats",
+                return_value=(
+                    {
+                        "Compile requests": "101",
+                        "Cache hits": "1",
+                        "Cache misses": "100",
+                    },
+                    "ok",
+                ),
+            ),
+            patch.object(status, "_server_inventory", return_value=inventory),
+            patch.object(status, "_cache_paths", return_value=()),
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(status.main(), 0)
+
+        self.assertIn("sccache_status=healthy", output.getvalue())
+        self.assertIn("historical_cache_reuse=low", output.getvalue())
 
 
 if __name__ == "__main__":

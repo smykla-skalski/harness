@@ -6,6 +6,7 @@ import re
 import socket
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,7 +15,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 from lib.sccache_processes import (
     is_sccache_server_command,
-    pids_for_socket,
+    peer_pid,
     process_command,
     sccache_socket_roots,
     socket_owners_under,
@@ -22,6 +23,17 @@ from lib.sccache_processes import (
 
 
 ROOT = SCRIPT_ROOT.parent
+
+
+@dataclass(frozen=True)
+class ServerInventory:
+    availability: str
+    configured: int
+    other_live: int
+    orphan: int
+    unknown: int
+    other_live_paths: tuple[str, ...]
+    orphan_paths: tuple[str, ...]
 
 
 def _configured_wrapper() -> str:
@@ -147,7 +159,7 @@ def _normalized(path: str) -> str:
     return path.removesuffix(" type=STREAM").removesuffix(" (deleted)")
 
 
-def _server_inventory(configured: Path) -> tuple[str, int, int, tuple[str, ...]]:
+def _server_inventory(configured: Path) -> ServerInventory:
     owners: dict[int, set[str]] = {}
     for root in sccache_socket_roots(configured):
         for pid, paths in socket_owners_under(root).items():
@@ -162,8 +174,32 @@ def _server_inventory(configured: Path) -> tuple[str, int, int, tuple[str, ...]]
         if is_sccache_server_command(process_command(pid))
     }
     server_paths = {pid: paths for pid, paths in server_paths.items() if paths}
-    configured_pids = set(server_paths) & set(pids_for_socket(configured))
-    orphan_pids = set(server_paths) - configured_pids
+    states = {
+        path: peer_pid(path)
+        for paths in server_paths.values()
+        for path in paths
+    }
+    configured_state = peer_pid(configured)
+    configured_pids = (
+        {configured_state[1]}
+        if configured_state[0] == "live" and configured_state[1] in server_paths
+        else set()
+    )
+    remaining = set(server_paths) - configured_pids
+    other_live_pids = {
+        pid
+        for pid in remaining
+        if any(states[path] == ("live", pid) for path in server_paths[pid])
+    }
+    unknown_pids = {
+        pid
+        for pid in remaining - other_live_pids
+        if any(states[path][0] == "unknown" for path in server_paths[pid])
+    }
+    orphan_pids = remaining - other_live_pids - unknown_pids
+    other_live_paths = tuple(
+        sorted(path for pid in other_live_pids for path in server_paths[pid])
+    )
     orphan_paths = tuple(
         sorted(path for pid in orphan_pids for path in server_paths[pid])
     )
@@ -171,11 +207,14 @@ def _server_inventory(configured: Path) -> tuple[str, int, int, tuple[str, ...]]
         sys.platform.startswith("linux")
         or (sys.platform == "darwin" and Path("/usr/sbin/lsof").exists())
     )
-    return (
-        "available" if supported else "unavailable",
-        len(configured_pids),
-        len(orphan_pids),
-        orphan_paths,
+    return ServerInventory(
+        availability="available" if supported else "unavailable",
+        configured=len(configured_pids),
+        other_live=len(other_live_pids),
+        orphan=len(orphan_pids),
+        unknown=len(unknown_pids),
+        other_live_paths=other_live_paths,
+        orphan_paths=orphan_paths,
     )
 
 
@@ -198,20 +237,26 @@ def main() -> int:
     configured = Path(uds)
     reachable = _socket_accepts(configured)
     values, stats_outcome = _stats(binary, uds) if reachable else ({}, "socket unreachable")
-    inventory, live_count, orphan_count, orphan_paths = _server_inventory(configured)
+    inventory = _server_inventory(configured)
     requests = _integer(values, "Compile requests")
     hits = _integer(values, "Cache hits")
     misses = _integer(values, "Cache misses")
     non_cacheable = _integer(values, "Non-cacheable calls")
     hit_rate = 100 * hits / max(1, hits + misses)
-    if orphan_count:
+    if inventory.orphan:
         state = "leaking"
     elif not reachable:
         state = "unavailable"
-    elif misses >= 20 and hit_rate < 5:
-        state = "cold"
     else:
         state = "healthy"
+    if stats_outcome != "ok":
+        historical_reuse = "unavailable"
+    elif hits + misses < 20:
+        historical_reuse = "insufficient-data"
+    elif hit_rate < 5:
+        historical_reuse = "low"
+    else:
+        historical_reuse = "normal"
     paths = _cache_paths(values)
 
     print(f"sccache_status={state}")
@@ -221,15 +266,20 @@ def main() -> int:
     print(f"cache_hits={hits}")
     print(f"cache_misses={misses}")
     print(f"cache_hit_rate={hit_rate:.2f}%")
+    print(f"historical_cache_reuse={historical_reuse}")
     print(f"non_cacheable_calls={non_cacheable}")
     print(f"cache_paths={','.join(str(path) for path in paths) or 'unavailable'}")
     print(f"cache_birth={_birth(paths)}")
     print(f"cache_size_kb={_size_kb(paths)}")
-    print(f"socket_inventory={inventory}")
-    print(f"live_servers={live_count}")
-    print(f"orphan_servers={orphan_count}")
-    if orphan_paths:
-        print(f"orphan_sockets={','.join(orphan_paths)}")
+    print(f"socket_inventory={inventory.availability}")
+    print(f"live_servers={inventory.configured}")
+    print(f"other_live_servers={inventory.other_live}")
+    print(f"unknown_servers={inventory.unknown}")
+    print(f"orphan_servers={inventory.orphan}")
+    if inventory.other_live_paths:
+        print(f"other_live_sockets={','.join(inventory.other_live_paths)}")
+    if inventory.orphan_paths:
+        print(f"orphan_sockets={','.join(inventory.orphan_paths)}")
     return 0
 
 

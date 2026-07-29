@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import argparse
+import contextlib
 import importlib.util
+import io
 import os
 import shutil
 import signal
@@ -12,6 +15,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+from scripts.lib import sccache_processes
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "sccache-recover.py"
@@ -68,7 +73,7 @@ class SccacheRecoverTests(unittest.TestCase):
             )
             owned_pids = tuple(recover.socket_owners_under(sandbox))
             self.assertEqual(started.returncode, 0, started.stderr)
-            state, pid = recover._peer_pid(str(orphan_socket))
+            state, pid = recover.peer_pid(str(orphan_socket))
             self.assertEqual(state, "live")
             self.assertIsNotNone(pid)
             orphan_socket.unlink()
@@ -103,10 +108,10 @@ class SccacheRecoverTests(unittest.TestCase):
             os.close(ready_write)
             try:
                 self.assertEqual(os.read(ready_read, 1), b"1")
-                self.assertEqual(recover._peer_pid(str(socket_path)), ("live", pid))
+                self.assertEqual(recover.peer_pid(str(socket_path)), ("live", pid))
                 socket_path.unlink()
                 self.assertEqual(
-                    recover._peer_pid(str(socket_path)),
+                    recover.peer_pid(str(socket_path)),
                     ("absent", None),
                 )
             finally:
@@ -134,13 +139,17 @@ class SccacheRecoverTests(unittest.TestCase):
 
         fake = FakeSocket()
         with (
-            patch.object(recover.sys, "platform", "linux"),
-            patch.object(recover.socket, "socket", return_value=fake),
+            patch.object(sccache_processes.sys, "platform", "linux"),
+            patch.object(sccache_processes.socket, "socket", return_value=fake),
         ):
-            self.assertEqual(recover._peer_pid("/tmp/repo.sock"), ("live", 321))
+            self.assertEqual(recover.peer_pid("/tmp/repo.sock"), ("live", 321))
         self.assertEqual(
             fake.assertion,
-            (socket.SOL_SOCKET, recover.SO_PEERCRED, struct.calcsize("3i")),
+            (
+                socket.SOL_SOCKET,
+                sccache_processes.SO_PEERCRED,
+                struct.calcsize("3i"),
+            ),
         )
 
     def test_server_command_excludes_compiler_clients(self) -> None:
@@ -203,6 +212,85 @@ class SccacheRecoverTests(unittest.TestCase):
                 pass
             os.waitpid(pid, 0)
 
+    def test_terminate_closes_watch_when_process_already_exited(self) -> None:
+        class FakeQueue:
+            def control(self, *_arguments):
+                return ()
+
+            def close(self) -> None:
+                self.closed = True
+
+        queue = FakeQueue()
+        queue.closed = False
+        owner = recover.Owner(
+            123,
+            ("/tmp/harness-sccache/orphan.sock",),
+            "/tools/sccache",
+            "stop-orphan",
+        )
+        with (
+            patch.object(recover.sys, "platform", "darwin"),
+            patch.object(recover.select, "kqueue", return_value=queue),
+            patch.object(recover.select, "kevent", return_value=object()),
+            patch.object(recover, "process_command", return_value="/tools/sccache"),
+            patch.object(recover, "pids_for_socket", return_value=(123,)),
+            patch.object(recover.os, "kill", side_effect=ProcessLookupError),
+        ):
+            self.assertEqual(recover._terminate(owner), "already-exited")
+
+        self.assertTrue(queue.closed)
+
+    def test_apply_returns_failure_for_every_unverified_outcome(self) -> None:
+        owner = recover.Owner(
+            123,
+            ("/tmp/harness-sccache/orphan.sock",),
+            "/tools/sccache",
+            "stop-orphan",
+        )
+        for outcome in (
+            "still-running",
+            "signal-sent",
+            "identity-changed",
+            "ownership-lost",
+        ):
+            output = io.StringIO()
+            with (
+                self.subTest(outcome=outcome),
+                patch.object(recover, "_arguments", return_value=argparse.Namespace(apply=True)),
+                patch.object(
+                    recover,
+                    "_cargo_environment",
+                    return_value={"SCCACHE_SERVER_UDS": "/tmp/repo.sock"},
+                ),
+                patch.object(recover, "_owners", return_value=(owner,)),
+                patch.object(recover, "_terminate", return_value=outcome),
+                contextlib.redirect_stdout(output),
+            ):
+                self.assertEqual(recover.main(), 1)
+                self.assertIn("unresolved:1", output.getvalue())
+
+    def test_apply_success_and_dry_run_return_zero(self) -> None:
+        owner = recover.Owner(
+            123,
+            ("/tmp/harness-sccache/orphan.sock",),
+            "/tools/sccache",
+            "stop-orphan",
+        )
+        for apply, outcome in ((True, "stopped"), (True, "already-exited"), (False, "")):
+            with (
+                self.subTest(apply=apply, outcome=outcome),
+                patch.object(recover, "_arguments", return_value=argparse.Namespace(apply=apply)),
+                patch.object(
+                    recover,
+                    "_cargo_environment",
+                    return_value={"SCCACHE_SERVER_UDS": "/tmp/repo.sock"},
+                ),
+                patch.object(recover, "_owners", return_value=(owner,)),
+                patch.object(recover, "_terminate", return_value=outcome),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(recover.main(), 0)
+
     def test_planner_preserves_live_and_unknown_servers(self) -> None:
         configured = Path("/tmp/harness-sccache/repo.sock")
         inventory = {
@@ -225,7 +313,7 @@ class SccacheRecoverTests(unittest.TestCase):
         }
         with (
             patch.object(recover, "socket_owners_under", return_value=inventory),
-            patch.object(recover, "_peer_pid", side_effect=lambda path: peers[path]),
+            patch.object(recover, "peer_pid", side_effect=lambda path: peers[path]),
             patch.object(
                 recover,
                 "process_command",

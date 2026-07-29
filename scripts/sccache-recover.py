@@ -5,8 +5,6 @@ import argparse
 import os
 import select
 import signal
-import socket
-import struct
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -17,6 +15,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 from lib.sccache_processes import (
     is_sccache_server_command,
+    peer_pid,
     pids_for_socket,
     process_command,
     sccache_socket_roots,
@@ -24,9 +23,6 @@ from lib.sccache_processes import (
 )
 
 ROOT = SCRIPT_ROOT.parent
-SOL_LOCAL = 0
-LOCAL_PEERPID = 2
-SO_PEERCRED = 17
 
 
 @dataclass(frozen=True)
@@ -70,31 +66,6 @@ def _normalized(path: str) -> str:
     return path.removesuffix(" type=STREAM").removesuffix(" (deleted)")
 
 
-def _peer_pid(path: str) -> tuple[str, int | None]:
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client.settimeout(0.5)
-    try:
-        client.connect(path)
-        if sys.platform == "darwin":
-            raw = client.getsockopt(SOL_LOCAL, LOCAL_PEERPID, struct.calcsize("i"))
-        elif sys.platform.startswith("linux"):
-            raw = client.getsockopt(
-                socket.SOL_SOCKET,
-                SO_PEERCRED,
-                struct.calcsize("3i"),
-            )
-        else:
-            return "unknown", None
-    except (ConnectionRefusedError, FileNotFoundError):
-        return "absent", None
-    except OSError:
-        return "unknown", None
-    finally:
-        client.close()
-    values = struct.unpack("i" if sys.platform == "darwin" else "3i", raw)
-    return "live", values[0]
-
-
 def _owners(configured: Path) -> tuple[Owner, ...]:
     owned: dict[int, set[str]] = {}
     for root in sccache_socket_roots(configured):
@@ -106,7 +77,7 @@ def _owners(configured: Path) -> tuple[Owner, ...]:
         for path in paths
         if Path(path).parent.name.startswith("harness-sccache")
     }
-    states = {path: _peer_pid(path) for path in socket_paths}
+    states = {path: peer_pid(path) for path in socket_paths}
     result = []
     for pid, paths in sorted(owned.items()):
         relevant = tuple(sorted(set(paths) & socket_paths))
@@ -158,21 +129,40 @@ def _terminate(owner: Owner) -> str:
         except OSError:
             pass
     try:
-        os.kill(owner.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return "already-exited"
-    if watch is None:
-        return "signal-sent"
-    kind, descriptor = watch
-    if kind == "kqueue":
-        queue = descriptor
         try:
-            return "stopped" if queue.control(None, 1, 2) else "still-running"
-        finally:
-            queue.close()
-    ready, _, _ = select.select((descriptor,), (), (), 2)
-    os.close(descriptor)
-    return "stopped" if ready else "still-running"
+            os.kill(owner.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return "already-exited"
+        if watch is None:
+            return "signal-sent"
+        kind, descriptor = watch
+        if kind == "kqueue":
+            return (
+                "stopped"
+                if descriptor.control(None, 1, 2)
+                else "still-running"
+            )
+        ready, _, _ = select.select((descriptor,), (), (), 2)
+        return "stopped" if ready else "still-running"
+    finally:
+        if watch is None:
+            pass
+        elif watch[0] == "kqueue":
+            watch[1].close()
+        else:
+            os.close(watch[1])
+
+
+def _outcome(owner: Owner, apply: bool) -> str:
+    if owner.action != "stop-orphan":
+        return owner.action
+    if apply:
+        return _terminate(owner)
+    return "would-stop-orphan"
+
+
+def _recovery_succeeded(outcome: str) -> bool:
+    return outcome in {"stopped", "already-exited"}
 
 
 def main() -> int:
@@ -189,21 +179,24 @@ def main() -> int:
     print(f"configured_socket={configured}")
     print(f"mode={'apply' if arguments.apply else 'dry-run'}")
     owners = _owners(Path(configured))
+    unresolved = 0
     for owner in owners:
+        outcome = _outcome(owner, arguments.apply)
+        if (
+            arguments.apply
+            and owner.action == "stop-orphan"
+            and not _recovery_succeeded(outcome)
+        ):
+            unresolved += 1
         sockets = ",".join(owner.sockets)
-        if owner.action != "stop-orphan":
-            outcome = owner.action
-        elif arguments.apply:
-            outcome = _terminate(owner)
-        else:
-            outcome = "would-stop-orphan"
         print(f"pid={owner.pid} action={outcome} sockets={sockets}")
     print(
         "summary="
         f"owners:{len(owners)},"
-        f"orphans:{sum(owner.action == 'stop-orphan' for owner in owners)}"
+        f"orphans:{sum(owner.action == 'stop-orphan' for owner in owners)},"
+        f"unresolved:{unresolved}"
     )
-    return 0
+    return 1 if arguments.apply and unresolved else 0
 
 
 if __name__ == "__main__":
