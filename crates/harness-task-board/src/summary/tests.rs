@@ -1,6 +1,10 @@
+use std::slice::from_ref;
+
 use super::*;
-use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::{PolicyAction, PolicyApprovalState, PolicyReasonCode};
+use crate::planning::{approve_plan, submit_plan};
+use crate::project_color::TaskBoardProjectColor;
+use crate::project_shape::TaskBoardProjectShape;
+use crate::{PolicyAction, PolicyApprovalState, PolicyReasonCode};
 
 #[test]
 fn summaries_group_projects_and_modes() {
@@ -8,10 +12,7 @@ fn summaries_group_projects_and_modes() {
     let item = ready_item("task-1", &project.project_id, AgentMode::Interactive);
     let second = ready_item("task-2", &project.project_id, AgentMode::Headless);
 
-    let projects = build_project_summaries(
-        &[item.clone(), second.clone()],
-        std::slice::from_ref(&project),
-    );
+    let projects = build_project_summaries(&[item.clone(), second.clone()], from_ref(&project));
     let machines = build_machine_summaries(&[item, second]);
 
     assert_eq!(projects[0].project_id, project.project_id);
@@ -25,7 +26,7 @@ fn summaries_group_projects_and_modes() {
 fn a_registered_project_with_no_items_still_appears_in_the_catalog() {
     let project = registered_project("owner/quiet");
 
-    let projects = build_project_summaries(&[], std::slice::from_ref(&project));
+    let projects = build_project_summaries(&[], from_ref(&project));
 
     assert_eq!(
         projects.len(),
@@ -42,8 +43,8 @@ fn registered_project(slug: &str) -> TaskBoardProject {
         source: TaskBoardProjectSource::GitHub,
         slug: slug.into(),
         display_name: None,
-        color: crate::task_board::project_color::TaskBoardProjectColor::Blue,
-        shape: crate::task_board::project_shape::TaskBoardProjectShape::DEFAULT,
+        color: TaskBoardProjectColor::Blue,
+        shape: TaskBoardProjectShape::DEFAULT,
         created_at: "2026-05-14T00:00:00Z".into(),
         updated_at: "2026-05-14T00:00:00Z".into(),
     }

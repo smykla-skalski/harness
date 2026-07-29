@@ -3,8 +3,9 @@
 //! configuration wire types, progress rollups, and the legacy file-backed
 //! store/machine-registry test doubles, plus the triage, prompt/worker-prompt,
 //! project, working-copy, policy-graph, policy-runtime, external-sync/github,
-//! automation, dispatch/evaluation/planning, and the standalone `github`
-//! REST/GraphQL automation-client clusters.
+//! automation, dispatch/evaluation/planning, the standalone `github`
+//! REST/GraphQL automation-client clusters, and the orchestrator/summary/
+//! legacy-import cluster that ties them together.
 //!
 //! This is a later slice of the `task_board` extraction, following slice 4's
 //! triage/prompt/project/working-copy cluster, the slice that added
@@ -75,6 +76,32 @@
 //! default build by ~3,426 lines for no reason, so this crate defines its
 //! own `daemon-runtime` feature (matching `harness-reviews`'s) and
 //! `harness-daemon` forwards its own feature of the same name onto it.
+//!
+//! This is the true final slice: `orchestrator`, `summary`, and
+//! `legacy_import`, the three files that reach across every earlier slice
+//! (`dispatch`/`evaluation`/`external` for `orchestrator`; `dispatch`/
+//! `external`/`project*` for `summary`; `policy_graph`/`policy_runtime` for
+//! `legacy_import`) and so had to wait for all of them to land first.
+//! `legacy_import` keeps the `daemon-runtime` gate `policy_runtime` already
+//! established, since it exists only to feed the one-time file-to-database
+//! migration the daemon runs; its `LegacyTaskBoardSnapshot` struct, its
+//! fields, and its `load`/`empty`/`counts` methods widen from `pub(crate)`
+//! to `pub` so the daemon's migration and import code, still in
+//! `src/daemon/`, can keep reaching them across the new crate boundary.
+//! `TaskBoardOrchestrator` and `summary`'s `build_audit_summary`/
+//! `build_dispatch_summary`/`build_dispatch_summary_with_policy_root` widen
+//! their bare `#[cfg(test)]` to `#[cfg(any(test, feature = "test-support"))]`
+//! for the same reason `store`/`machines`/`dispatch` already needed it:
+//! root's own `#[cfg(test)]` call sites need them visible when the *root*
+//! crate is under test. `summary`'s `build_audit_summary_with_policy` stays
+//! `pub(crate)`-narrowed from root's own `src/task_board/mod.rs`, matching
+//! `external`'s `TaskBoardExternalCreateBegin` cluster, because it was
+//! `pub(crate)` in root before the move and nothing outside root's own
+//! daemon service code needs it. What remains in root's `src/task_board`
+//! after this slice is `external::sync`/`external::scopes` and their
+//! test-only clusters, the standalone `transport`/`wire` layers, and
+//! `github`'s own root-side facade; `transport` is the one true remaining
+//! slice.
 
 #![deny(unsafe_code)]
 
@@ -89,7 +116,10 @@ pub mod item_fields;
 pub mod item_intent;
 pub mod item_query;
 pub mod lane;
+#[cfg(feature = "daemon-runtime")]
+pub mod legacy_import;
 pub mod machines;
+pub mod orchestrator;
 pub mod planning;
 pub mod policy;
 pub mod policy_graph;
@@ -107,6 +137,7 @@ pub mod provider_credentials;
 pub mod remote_spki_pin;
 pub mod runtime_config;
 pub mod store;
+pub mod summary;
 pub mod triage;
 pub mod triage_escalation;
 mod triage_escalation_prompt;
@@ -165,6 +196,17 @@ pub use lane::{
 pub use machines::Machine;
 #[cfg(any(test, feature = "test-support"))]
 pub use machines::MachineRegistry;
+#[cfg(any(test, feature = "test-support"))]
+pub use orchestrator::TaskBoardOrchestrator;
+pub use orchestrator::{
+    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardHeldDispatchItem,
+    TaskBoardHeldDispatchSummary, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
+    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
+    TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
+    TaskBoardWorkflowExecutionCount,
+};
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
     begin_planning, revoke_plan, submit_plan,
@@ -206,6 +248,21 @@ pub use runtime_config::{
 #[cfg(any(test, feature = "test-support"))]
 pub use store::TaskBoardStore;
 pub use store::default_board_root;
+// Gated to match root's own re-narrowing import in `src/task_board/mod.rs`
+// exactly: an unconditional export here would make the glob re-export leak
+// this as public API whenever root's narrowing line's condition is false,
+// defeating the narrowing.
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub use summary::build_audit_summary_with_policy;
+pub use summary::{
+    TaskBoardAuditSummary, TaskBoardMachineSummary, TaskBoardProjectSummary,
+    TaskBoardProviderSyncSummary, TaskBoardStatusCount, TaskBoardSyncSummary,
+    build_machine_summaries, build_project_summaries, build_sync_summary,
+};
+#[cfg(any(test, feature = "test-support"))]
+pub use summary::{
+    build_audit_summary, build_dispatch_summary, build_dispatch_summary_with_policy_root,
+};
 pub use triage::{
     BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, OVERRIDE_PLACEMENT_PRODUCER,
     TaskBoardTriageDecision, TaskBoardTriageDecisionRecord, TriageCause, TriageOutcome,

@@ -2,10 +2,11 @@ use fs_err as fs;
 use tempfile::tempdir;
 
 use super::*;
-use crate::task_board::{
-    DispatchAppliedTask, ExternalProvider, ExternalSyncAction, ExternalSyncOperation,
-    TaskBoardAutomationPolicy, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary,
-    TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus, build_dispatch_plan,
+use crate::external::{ExternalProvider, ExternalSyncAction, ExternalSyncOperation};
+use crate::{
+    DispatchAppliedTask, TaskBoardAutomationPolicy, TaskBoardEvaluationRecord,
+    TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
+    build_dispatch_plan,
 };
 
 #[test]
@@ -165,7 +166,7 @@ fn complete_run_records_evaluation_and_trace_ids() {
             board_item_id: "task-1".to_string(),
             session_id: Some("session-1".to_string()),
             work_item_id: Some("work-1".to_string()),
-            outcome: crate::task_board::TaskBoardEvaluationOutcome::Completed,
+            outcome: crate::TaskBoardEvaluationOutcome::Completed,
             task_status: None,
             board_status: Some(TaskBoardStatus::Done),
             workflow_status: Some(TaskBoardWorkflowStatus::Completed),

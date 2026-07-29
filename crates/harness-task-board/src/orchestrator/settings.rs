@@ -1,16 +1,24 @@
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 use std::collections::BTreeSet;
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 use std::path::Path;
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 use serde_json::Value;
 
-use crate::infra::io::{read_json_typed, write_json_pretty};
-#[cfg(test)]
-use crate::task_board::normalize_repository_slug;
-use crate::task_board::types::TaskBoardStatus;
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
+use harness_infra::io::{read_json_typed, write_json_pretty};
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+#[cfg(any(test, feature = "test-support"))]
+use crate::normalize_repository_slug;
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
+use crate::types::TaskBoardStatus;
+
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 use super::types::TaskBoardOrchestratorSettings;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use super::types::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
@@ -28,7 +36,7 @@ use super::types::{
 ///
 /// # Errors
 /// Returns `CliError` when the file is malformed JSON or cannot be rewritten.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn migrate_persisted_settings(
     path: &Path,
 ) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
@@ -37,12 +45,14 @@ pub(super) fn migrate_persisted_settings(
 
 /// Parse legacy settings with the same canonicalization as the live loader,
 /// without rewriting the source. Used by the one-time database importer.
+#[cfg(feature = "daemon-runtime")]
 pub(crate) fn parse_persisted_settings_read_only(
     path: &Path,
 ) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
     load_normalized_settings(path, false)
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn load_normalized_settings(
     path: &Path,
     persist_repairs: bool,
@@ -63,6 +73,7 @@ fn load_normalized_settings(
     Ok(Some(settings))
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn normalize_enabled_workflows(document: &mut Value) -> bool {
     let Some(workflows) = document
         .as_object_mut()
@@ -95,6 +106,7 @@ fn normalize_enabled_workflows(document: &mut Value) -> bool {
     changed
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn repair_dispatch_status_filter(document: &mut Value) -> bool {
     let Some(status_value) = document
         .as_object()
@@ -121,7 +133,7 @@ fn repair_dispatch_status_filter(document: &mut Value) -> bool {
     true
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
@@ -134,6 +146,21 @@ pub(super) fn apply_settings_update(
     }
     apply_status_filter_update(settings, update);
     apply_project_update(settings, update);
+    apply_automation_update(settings, update);
+}
+
+// Split from `apply_settings_update` alongside `apply_status_filter_update`/
+// `apply_project_update`, and further split between the two functions below:
+// the automation-facing fields (GitHub project/inbox, scheduling, retry,
+// reviewers, repositories, execution hosts, admission policy, policy
+// version) are the bulk of the update and pushed clippy's
+// cognitive-complexity threshold past 7 once test-support widened this test
+// double to run under a plain library build too.
+#[cfg(any(test, feature = "test-support"))]
+fn apply_automation_update(
+    settings: &mut TaskBoardOrchestratorSettings,
+    update: &TaskBoardOrchestratorSettingsUpdateRequest,
+) {
     if let Some(github_project) = &update.github_project {
         settings.github_project.clone_from(github_project);
     }
@@ -149,6 +176,14 @@ pub(super) fn apply_settings_update(
     if let Some(reviewers) = &update.reviewers {
         settings.reviewers.clone_from(reviewers);
     }
+    apply_execution_update(settings, update);
+}
+
+#[cfg(any(test, feature = "test-support"))]
+fn apply_execution_update(
+    settings: &mut TaskBoardOrchestratorSettings,
+    update: &TaskBoardOrchestratorSettingsUpdateRequest,
+) {
     if let Some(repositories) = &update.repositories {
         settings.repositories.clone_from(repositories);
     }
@@ -168,7 +203,7 @@ pub(super) fn apply_settings_update(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn normalize_github_inbox(
     inbox: &TaskBoardGitHubInboxConfig,
 ) -> Result<TaskBoardGitHubInboxConfig, CliError> {
@@ -190,7 +225,7 @@ pub(super) fn normalize_github_inbox(
     })
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn normalize_trimmed_unique(values: &[String]) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::with_capacity(values.len());
@@ -206,7 +241,7 @@ fn normalize_trimmed_unique(values: &[String]) -> Vec<String> {
     out
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn apply_status_filter_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
@@ -218,7 +253,7 @@ fn apply_status_filter_update(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn apply_project_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
@@ -230,7 +265,7 @@ fn apply_project_update(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn dispatch_input(
     request: &TaskBoardOrchestratorRunOnceRequest,
     settings: &TaskBoardOrchestratorSettings,
@@ -247,7 +282,7 @@ pub(super) fn dispatch_input(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn canonical_status_filter(status: Option<TaskBoardStatus>) -> Option<TaskBoardStatus> {
     status.map(TaskBoardStatus::canonical_persisted_status)
 }

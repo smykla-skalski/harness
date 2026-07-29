@@ -7,19 +7,22 @@ publish = false
 
 [features]
 # Exposes items normally `cfg(test)`-only (the legacy file-backed
-# `TaskBoardStore`/`MachineRegistry` test doubles, and the policy-graph
-# synchronous gate cache's test hooks) to the root crate's and
+# `TaskBoardStore`/`MachineRegistry`/`TaskBoardOrchestrator` test doubles, the
+# policy-graph synchronous gate cache's test hooks, and `summary`'s
+# `build_audit_summary`/`build_dispatch_summary`/
+# `build_dispatch_summary_with_policy_root` builders) to the root crate's and
 # `harness-daemon`'s own tests, which depend on this crate as an ordinary
 # library and so never see its `cfg(test)` items. Matches `harness-agents`'s
 # and `harness-daemon-client`'s own `test-support` feature.
 test-support = []
 # Compiles the policy-graph decision-recording pieces the daemon binary needs
-# (sink installers, the canvas-workspace schema version) plus the whole
+# (sink installers, the canvas-workspace schema version), the whole
 # `policy_runtime` module (the workflow-run store, scheduler, event inbox, and
-# handoff/notification/task-creation outboxes) without pulling either into a
-# plain library build. The root crate activates this alongside its own
-# `daemon-runtime` feature, and `harness-daemon` forwards its own feature of
-# the same name onto it.
+# handoff/notification/task-creation outboxes), and `legacy_import` (the
+# one-time file-to-database Task Board migration reader) without pulling any
+# of them into a plain library build. The root crate activates this alongside
+# its own `daemon-runtime` feature, and `harness-daemon` forwards its own
+# feature of the same name onto it.
 daemon-runtime = []
 
 [dependencies]

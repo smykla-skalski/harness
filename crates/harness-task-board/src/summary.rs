@@ -1,13 +1,19 @@
 use std::collections::HashMap;
-#[cfg(test)]
+#[cfg(any(test, feature = "daemon-runtime"))]
+use std::hash::BuildHasher;
+#[cfg(any(test, feature = "test-support"))]
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::dispatch::{DispatchPlan, build_dispatch_plans_with_policy};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
+use super::dispatch::DispatchPlan;
+#[cfg(any(test, feature = "daemon-runtime"))]
+use super::dispatch::build_dispatch_plans_with_policy;
+#[cfg(any(test, feature = "test-support"))]
 use super::dispatch::{build_dispatch_plans, build_dispatch_plans_with_policy_root};
 use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
+#[cfg(any(test, feature = "daemon-runtime"))]
 use super::policy::PolicyApprovalGrant;
 use super::project::{TaskBoardProject, TaskBoardProjectSource};
 use super::project_color::TaskBoardProjectColor;
@@ -68,25 +74,27 @@ pub struct TaskBoardMachineSummary {
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
     let plans = build_dispatch_plans(items);
     audit_summary(items, &plans)
 }
 
 #[must_use]
-pub(crate) fn build_audit_summary_with_policy(
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub fn build_audit_summary_with_policy<S: BuildHasher>(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: &str,
     switches: super::dispatch::SpawnGateSwitches,
-    grants: &HashMap<String, PolicyApprovalGrant>,
+    grants: &HashMap<String, PolicyApprovalGrant, S>,
 ) -> TaskBoardAuditSummary {
     let plans =
         build_dispatch_plans_with_policy(items, policy, Some(evaluated_at), switches, grants);
     audit_summary(items, &plans)
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn audit_summary(items: &[TaskBoardItem], plans: &[DispatchPlan]) -> TaskBoardAuditSummary {
     TaskBoardAuditSummary {
         total: items.iter().filter(|item| !item.is_deleted()).count(),
@@ -114,13 +122,13 @@ pub fn build_sync_summary(
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_summary(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     build_dispatch_plans(items)
 }
 
 #[must_use]
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn build_dispatch_summary_with_policy_root(
     items: &[TaskBoardItem],
     policy_root: &Path,
@@ -269,6 +277,7 @@ fn is_github_repo(project_id: &str) -> bool {
     )
 }
 
+#[cfg(any(test, feature = "test-support", feature = "daemon-runtime"))]
 fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
     let statuses = [
         TaskBoardStatus::Inbox,
