@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::task_board::{
+use harness_task_board::{
     TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer,
@@ -14,7 +14,7 @@ use crate::task_board::{
     TaskBoardWorkflowTransitionState,
 };
 
-use crate::task_board::prompt_catalog::{
+use harness_task_board::prompt_catalog::{
     PromptCatalog, prompt_catalog_test_lock, scoped_prompt_catalog,
 };
 

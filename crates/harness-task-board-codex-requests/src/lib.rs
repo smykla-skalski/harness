@@ -3,16 +3,16 @@
 //!
 //! `db` needs this to freeze the exact launch envelope a remote offer commits
 //! to, and `service` needs it to actually dispatch the run. The computation
-//! touches neither side's own state, so it lives here as a sibling of both
-//! under `crate::daemon` instead of behind either one, keeping `db` from
-//! depending on `service` for it.
+//! touches neither side's own state, so it lives in its own crate as a sibling
+//! of both, keeping `db` from depending on `service` for it.
 
 use std::collections::BTreeMap;
 
-use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
-use crate::task_board::prompt_catalog::{PromptId, render_prompt};
-use crate::task_board::{
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
+use harness_protocol::session::{CONTROL_PLANE_ACTOR_ID, SessionRole};
+use harness_task_board::prompt_catalog::{PromptId, render_prompt};
+use harness_task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardImplementationResult, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
@@ -21,16 +21,27 @@ use crate::task_board::{
     TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord,
     validate_task_board_read_only_run_context,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 
-pub(crate) fn codex_attempt_request(
+/// Build the local Codex run request for a durable task-board attempt.
+///
+/// # Errors
+///
+/// Returns an error when the frozen execution or attempt has no phase-appropriate
+/// prompt inputs, such as a missing run context, reviewer profile, exact head, or plan.
+pub fn codex_attempt_request(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<CodexRunRequest, CliError> {
     codex_attempt_request_for_target(execution, attempt, TaskBoardCodexLaunchTarget::Local)
 }
 
-pub(crate) fn remote_codex_attempt_request(
+/// Build the remote Codex run request a remote offer's launch envelope freezes.
+///
+/// # Errors
+///
+/// Returns the same errors as [`codex_attempt_request`], plus an error when the
+/// configured prompt names the local worktree, which a remote executor has none of.
+pub fn remote_codex_attempt_request(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<CodexRunRequest, CliError> {
@@ -102,7 +113,13 @@ fn codex_report_request_for_target(
     })
 }
 
-pub(crate) fn attempt_profile<'a>(
+/// Resolve the reviewer profile a report-only attempt's action key names.
+///
+/// # Errors
+///
+/// Returns an error when the action key has no recognizable review or evaluate
+/// form, or when it names a profile outside the workflow's frozen profile set.
+pub fn attempt_profile<'a>(
     execution: &'a TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<&'a TaskBoardReviewerProfile, CliError> {
@@ -159,9 +176,12 @@ fn write_implementation_request(
     })
 }
 
-pub(crate) fn write_task_id(
-    execution: &TaskBoardWorkflowExecutionRecord,
-) -> Result<&str, CliError> {
+/// Return the task id a write workflow's frozen ownership resources carry.
+///
+/// # Errors
+///
+/// Returns an error when the execution has no non-blank `task_id` resource.
+pub fn write_task_id(execution: &TaskBoardWorkflowExecutionRecord) -> Result<&str, CliError> {
     execution
         .ownership
         .resources
@@ -379,7 +399,13 @@ fn workspace_directive(
     }
 }
 
-pub(crate) fn run_context(
+/// Return the execution's validated, immutable run context.
+///
+/// # Errors
+///
+/// Returns an error when the execution has no frozen run context, or when the
+/// context fails its own validation.
+pub fn run_context(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<&TaskBoardReadOnlyRunContext, CliError> {
     let context = execution
@@ -401,10 +427,9 @@ fn exact_head(execution: &TaskBoardWorkflowExecutionRecord) -> Result<&str, CliE
         .ok_or_else(|| invalid_transition("read-only workflow has no frozen exact head"))
 }
 
-pub(crate) fn invalid_transition(detail: impl Into<String>) -> CliError {
+pub fn invalid_transition(detail: impl Into<String>) -> CliError {
     CliErrorKind::invalid_transition(detail.into()).into()
 }
 
 #[cfg(test)]
-#[path = "task_board_codex_requests_tests.rs"]
 mod tests;

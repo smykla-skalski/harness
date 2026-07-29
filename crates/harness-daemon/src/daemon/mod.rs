@@ -130,8 +130,6 @@ pub mod state {
     pub use harness_daemon_state::*;
 }
 #[cfg(feature = "daemon-runtime")]
-pub(crate) mod task_board_codex_requests;
-#[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_managed_agents;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_remote_transport;

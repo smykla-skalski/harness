@@ -1,12 +1,12 @@
 use crate::daemon::protocol::CodexRunMode;
-use crate::daemon::task_board_codex_requests::{attempt_profile, invalid_transition};
-pub(crate) use crate::daemon::task_board_codex_requests::{
-    codex_attempt_request, remote_codex_attempt_request, run_context, write_task_id,
-};
 use crate::task_board::{
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::CliError;
+use harness_task_board_codex_requests::{attempt_profile, invalid_transition};
+pub(crate) use harness_task_board_codex_requests::{
+    codex_attempt_request, remote_codex_attempt_request, run_context, write_task_id,
+};
 
 /// What a durable workflow attempt's Codex run is, apart from its prompt.
 ///
