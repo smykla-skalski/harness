@@ -111,12 +111,14 @@ async fn run_model_connection(
     Option<crate::daemon::agent_acp::AcpAgentSessionState>,
 ) {
     let project = tempfile::tempdir().expect("project tempdir");
-    let mut supervisor_child = Command::new("sleep")
-        .arg("60")
-        .spawn()
-        .expect("spawn supervisor child");
+    let supervisor_child = ChildGuard(
+        Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .expect("spawn supervisor child"),
+    );
     let supervisor = Arc::new(AcpSessionSupervisor::new(
-        &supervisor_child,
+        &supervisor_child.0,
         SupervisionConfig {
             initialize_timeout: Duration::from_secs(1),
             prompt_timeout: Duration::from_secs(1),
@@ -179,8 +181,6 @@ async fn run_model_connection(
     })
     .await
     .expect("model protocol must complete");
-    let _ = supervisor_child.kill();
-    let _ = supervisor_child.wait();
     agent_task.abort();
     let _ = agent_task.await;
     let recorded = operations.lock().expect("recorded operations").clone();
