@@ -2,9 +2,10 @@
 //! startup and per-request, plus the triage escalation config they resolve
 //! for `harness-task-board`.
 //!
-//! This is a dependency-free leaf whose only consumer is the daemon; it sat
-//! in the root crate for historical reasons, not architectural ones. Both
-//! the root crate and `harness-daemon` depend on it as a normal crate.
+//! Every reader of these flags runs inside the daemon; it sat in the root
+//! crate for historical reasons, not architectural ones. The root crate and
+//! `harness-daemon` both depend on it as a normal crate and re-export it,
+//! rather than one owning the module and the other mirroring its source.
 
 #![deny(unsafe_code)]
 
