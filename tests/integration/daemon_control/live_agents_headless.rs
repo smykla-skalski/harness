@@ -6,6 +6,7 @@ use serde::Serialize;
 use super::*;
 
 mod permissions;
+mod transcript;
 
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
 const CODEX_MODEL: &str = "gpt-5.3-codex-spark";
@@ -331,21 +332,9 @@ fn poll_openrouter(
                 )
             })?;
         }
+        transcript::fail_on_openrouter_error(http, correlation_id)?;
         if Instant::now() >= deadline {
-            let transcript_path =
-                format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
-            let transcript = http
-                .request_json(Method::GET, &transcript_path, None)
-                .unwrap_or_else(|error| json!({ "read_error": error }));
-            return Err(SmokeFailure::new(
-                correlation_id,
-                runtime,
-                OPENROUTER_MODEL,
-                "result_collection",
-                format!(
-                    "timed out waiting for terminal state and report; inspect={inspect}; transcript={transcript}"
-                ),
-            ));
+            return Err(transcript::timeout_failure(http, correlation_id, &inspect));
         }
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
