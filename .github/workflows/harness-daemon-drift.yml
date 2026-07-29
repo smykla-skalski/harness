@@ -1,12 +1,13 @@
 # Harness Daemon Drift workflow
 #
-# `harness-daemon` re-includes root source modules via #[path] instead of
-# depending on the root `harness` package, but it declares its Cargo
-# dependencies and features separately in its own Cargo.toml. A root change
-# that adds a dependency or enables a feature used by that shared source
-# leaves harness-daemon's manifest behind, and nothing catches it until
-# someone builds harness-daemon specifically (see #551, #559, #581). This
-# workflow runs that build on every PR that could cause it.
+# `harness-daemon` still re-includes two root source modules (`reviews`,
+# `task_board`) via #[path] instead of depending on the root `harness`
+# package, but it declares its Cargo dependencies and features separately in
+# its own Cargo.toml. A root change that adds a dependency or enables a
+# feature used by that shared source leaves harness-daemon's manifest behind,
+# and nothing catches it until someone builds harness-daemon specifically
+# (see #551, #559, #581). This workflow runs that build on every PR that
+# could cause it.
 
 name: Harness Daemon Drift
 

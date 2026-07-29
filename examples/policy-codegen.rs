@@ -2375,7 +2375,8 @@ const POLICY_SCENARIO_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/scenario.rs");
 const POLICY_REPLAY_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/replay.rs");
-const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
+const SUMMARIES_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/protocol/summaries.rs");
 const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon.rs");
 // TimelineEntry moved out of summaries.rs into the protocol crate, and this
 // generator parses source text rather than types, so the summaries module has
@@ -2499,14 +2500,16 @@ const SESSION_STATE_EMIT_ONLY: &[&str] =
     &["SessionStatus", "SessionMetrics", "PendingLeaderTransfer"];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/git_identity_defaults.rs");
-const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
-const VOICE_SOURCE: &str = include_str!("../src/daemon/protocol/voice.rs");
-const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
+const OPENROUTER_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/protocol/openrouter_models.rs");
+const VOICE_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/protocol/voice.rs");
+const AUDIT_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/protocol/audit.rs");
 // The shared protocol package owns the managed terminal snapshot/request types
 // and their defaults. Runtime-only PTY behavior remains in daemon/agent_tui.
 const AGENT_TUI_MODEL_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/managed_agents/tui.rs");
-const AGENT_TUI_RUNTIME_MODEL_SOURCE: &str = include_str!("../src/daemon/agent_tui/model.rs");
+const AGENT_TUI_RUNTIME_MODEL_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/agent_tui/model.rs");
 const AGENT_TUI_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift";
 const AGENT_TUI_EMIT_ONLY: &[&str] = &[
     "TerminalScreenSnapshot",
@@ -2600,7 +2603,8 @@ const REVIEWS_LOGIC_SOURCE: &str = include_str!("../crates/harness-reviews/src/l
 // inspect payloads reference unmigrated persona/runtime/acp types and are SKIP'd
 // until those subsystems land. serde_json::Value -> JSONValue, the request's
 // trace_context is a String dict.
-const WEBSOCKET_SOURCE: &str = include_str!("../src/daemon/protocol/websocket.rs");
+const WEBSOCKET_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/protocol/websocket.rs");
 const WEBSOCKET_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift";
 const WEBSOCKET_EMIT_ONLY: &[&str] = &[
     "WsRequest",
@@ -2932,8 +2936,9 @@ const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // AcpAgentSnapshotWire (TYPE_RENAMES from the public no-derive AcpAgentSnapshot). The return
 // type of nearly every managed-agent endpoint.
 const MANAGED_AGENTS_EMIT_ONLY: &[&str] = &["ManagedAgentSnapshot", "ManagedAgentListResponse"];
-const DAEMON_STATE_SOURCE: &str = include_str!("../src/daemon/state/mod.rs");
-const DAEMON_LAUNCHD_SOURCE: &str = include_str!("../src/daemon/launchd/mod.rs");
+const DAEMON_STATE_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/state/mod.rs");
+const DAEMON_LAUNCHD_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/launchd/mod.rs");
 const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/DaemonStateWireTypes.generated.swift";
 // The /v1/diagnostics report (DaemonDiagnosticsReport from summaries.rs) and the daemon-state
 // cluster it nests: the manifest tree (DaemonManifest -> HostBridgeManifest ->
@@ -2999,7 +3004,8 @@ const TASK_BOARD_CREDENTIAL_EMIT_ONLY: &[&str] = &[
     "TaskBoardGitHubTokensSyncResponse",
     "TaskBoardOpenRouterTokenSyncResponse",
 ];
-const BRIDGE_STATUS_SOURCE: &str = include_str!("../src/daemon/bridge/types.rs");
+const BRIDGE_STATUS_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/bridge/types.rs");
 const BRIDGE_STATUS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/BridgeStatusWireTypes.generated.swift";
 // The host-bridge reconfigure response (reconfigureHostBridge). capabilities reuses the
 // already-generated HostBridgeCapabilityManifestWire (daemon-state cluster) bare; pid/uptime
@@ -3108,7 +3114,8 @@ const GIT_SIGNING_VERIFY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMon
 // a unit variant (skipped), a two-field struct variant (signed: mode + signature_kind) and a
 // single-field struct variant (failed: message); the generator emits a Swift associated-value enum.
 const GIT_SIGNING_VERIFY_EMIT_ONLY: &[&str] = &["TaskBoardGitSigningVerifyResponse"];
-const ACP_EVENT_FRAME_SOURCE: &str = include_str!("../src/daemon/agent_acp/event_frame.rs");
+const ACP_EVENT_FRAME_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/agent_acp/event_frame.rs");
 const ACP_CONVERSATION_EVENT_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/conversation_event.rs");
 const ACP_EVENT_BATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpEventBatchWireTypes.generated.swift";
@@ -3117,10 +3124,12 @@ const ACP_EVENT_BATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonito
 // tagged ConversationEventKind the Swift side keeps opaque, so it rides through as JSONValue
 // (JSON_PASSTHROUGH_FIELDS) and the event kind enum is never emitted.
 const ACP_EVENT_BATCH_EMIT_ONLY: &[&str] = &["AcpEventBatchPayload", "ConversationEvent"];
-const ACP_ACTIVE_SOURCE: &str = include_str!("../src/daemon/agent_acp/active.rs");
+const ACP_ACTIVE_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/agent_acp/active.rs");
 const ACP_INCIDENTS_SOURCE: &str =
-    include_str!("../src/daemon/agent_acp/sandbox_proxy/incidents.rs");
-const ACP_SANDBOX_PROXY_SOURCE: &str = include_str!("../src/daemon/agent_acp/sandbox_proxy.rs");
+    include_str!("../crates/harness-daemon/src/daemon/agent_acp/sandbox_proxy/incidents.rs");
+const ACP_SANDBOX_PROXY_SOURCE: &str =
+    include_str!("../crates/harness-daemon/src/daemon/agent_acp/sandbox_proxy.rs");
 const ACP_INCIDENT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpIncidentWireTypes.generated.swift";
 // The ACP process/bridge incident + agents-reconciled push payloads (daemon-internal Serialize
 // structs the daemon broadcasts). The reconciled payload nests AcpAgentSnapshotWire (TYPE_RENAMES)

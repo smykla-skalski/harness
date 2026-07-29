@@ -12,12 +12,12 @@ pub fn sandboxed_from_env() -> bool {
         })
 }
 
-#[path = "../../../../src/daemon/agent_acp/mod.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/agent_acp/mod.rs"]
 pub mod agent_acp;
 pub mod agent_tui;
-#[path = "../../../../src/daemon/bridge/mod.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/bridge/mod.rs"]
 pub mod bridge;
-#[path = "../../../../src/daemon/discovery/mod.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/discovery/mod.rs"]
 pub mod discovery;
 pub mod protocol {
     pub use harness_protocol::daemon::StreamEvent;

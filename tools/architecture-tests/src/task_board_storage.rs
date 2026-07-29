@@ -14,12 +14,12 @@ const LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD: &[(&str, &str)] = &[
         "pub struct TaskBoardStore",
     ),
     (
-        "crates/harness-task-board/src/machines.rs",
-        "pub struct MachineRegistry",
-    ),
-    (
         "crates/harness-task-board/src/orchestrator.rs",
         "pub struct TaskBoardOrchestrator",
+    ),
+    (
+        "crates/harness-task-board/src/machines.rs",
+        "pub struct MachineRegistry",
     ),
     (
         "crates/harness-task-board/src/policy_runtime/repository.rs",
@@ -97,29 +97,29 @@ fn task_board_cli_transport_is_daemon_only() {
 fn live_task_board_consumers_do_not_reopen_legacy_storage() {
     let root = repo_root();
     let paths = [
-        "src/daemon/service/task_board_db.rs",
-        "src/daemon/service/task_board_orchestrator_db.rs",
-        "src/daemon/service/reviews/github_projection.rs",
-        "src/daemon/service/reviews.rs",
-        "src/daemon/service/reviews/refresh.rs",
-        "src/daemon/service/serve/machine_heartbeat_loop.rs",
-        "src/daemon/service/serve/task_board_dispatch_loop.rs",
-        "src/daemon/service/serve/task_board_orchestrator_loop.rs",
-        "src/daemon/http/task_board_route_executor.rs",
-        "src/daemon/http/task_board_route_executor/item_ops.rs",
-        "src/daemon/http/task_board_route_executor/orchestrator_ops.rs",
-        "src/daemon/service/task_board/policy_canvas.rs",
-        "src/daemon/service/task_board_runtime.rs",
-        "src/daemon/service/task_board_github/support.rs",
-        "src/daemon/service/task_board_github/workflow.rs",
+        "crates/harness-daemon/src/daemon/service/task_board_db.rs",
+        "crates/harness-daemon/src/daemon/service/task_board_orchestrator_db.rs",
+        "crates/harness-daemon/src/daemon/service/reviews/github_projection.rs",
+        "crates/harness-daemon/src/daemon/service/reviews.rs",
+        "crates/harness-daemon/src/daemon/service/reviews/refresh.rs",
+        "crates/harness-daemon/src/daemon/service/serve/machine_heartbeat_loop.rs",
+        "crates/harness-daemon/src/daemon/service/serve/task_board_dispatch_loop.rs",
+        "crates/harness-daemon/src/daemon/service/serve/task_board_orchestrator_loop.rs",
+        "crates/harness-daemon/src/daemon/http/task_board_route_executor.rs",
+        "crates/harness-daemon/src/daemon/http/task_board_route_executor/item_ops.rs",
+        "crates/harness-daemon/src/daemon/http/task_board_route_executor/orchestrator_ops.rs",
+        "crates/harness-daemon/src/daemon/service/task_board/policy_canvas.rs",
+        "crates/harness-daemon/src/daemon/service/task_board_runtime.rs",
+        "crates/harness-daemon/src/daemon/service/task_board_github/support.rs",
+        "crates/harness-daemon/src/daemon/service/task_board_github/workflow.rs",
     ];
     let mut hits = collect_hits_in_paths(root, &paths, FILE_STORAGE_SYMBOLS, |path, symbol| {
         format!("{path} reaches retired Task Board file storage via `{symbol}`")
     });
     for tree in [
-        "src/daemon/client",
-        "src/daemon/http",
-        "src/daemon/websocket",
+        "crates/harness-daemon/src/daemon/client",
+        "crates/harness-daemon/src/daemon/http",
+        "crates/harness-daemon/src/daemon/websocket",
         "crates/harness-mcp/src/mcp/tools/task_board",
     ] {
         hits.extend(collect_hits_in_tree(

@@ -1,14 +1,14 @@
 use std::time::Duration;
 
-#[path = "../../../../src/daemon/agent_tui/model.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/model.rs"]
 mod model;
-#[path = "../../../../src/daemon/agent_tui/process.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/process.rs"]
 mod process;
-#[path = "../../../../src/daemon/agent_tui/readiness.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/readiness.rs"]
 mod readiness;
-#[path = "../../../../src/daemon/agent_tui/screen.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/screen.rs"]
 mod screen;
-#[path = "../../../../src/daemon/agent_tui/spawn.rs"]
+#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/spawn.rs"]
 mod spawn;
 mod support;
 

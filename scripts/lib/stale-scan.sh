@@ -584,7 +584,8 @@ stale_scan_swarm_e2e_branches() {
 }
 
 # Resolve the Codex WS port the daemon is expected to bind.
-# HARNESS_CODEX_WS_PORT mirrors src/daemon/bridge/types.rs::CODEX_BRIDGE_PORT_ENV.
+# HARNESS_CODEX_WS_PORT mirrors
+# crates/harness-daemon/src/daemon/bridge/types.rs::CODEX_BRIDGE_PORT_ENV.
 stale_scan_codex_ws_port() {
   printf '%s\n' "${HARNESS_CODEX_WS_PORT:-4500}"
 }
