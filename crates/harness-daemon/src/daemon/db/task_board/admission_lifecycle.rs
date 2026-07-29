@@ -1,7 +1,7 @@
 use sqlx::{Sqlite, Transaction, query, query_scalar};
 
 mod compensation;
-mod start;
+pub(in crate::daemon::db::task_board) mod start;
 mod validation;
 
 pub(super) use self::compensation::{
@@ -18,6 +18,8 @@ use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_adm
 use super::admission_reservations::{
     clear_current_admission_in_tx, persist_admission_snapshot_in_tx,
 };
+use super::dispatch_admission_queries::DispatchAdmissionQueries;
+use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::task_board::{TaskBoardItem, TaskBoardLaunchCapability};
@@ -120,7 +122,8 @@ pub(super) async fn renew_dispatch_admission_in_tx(
     };
     ensure_recorded_reservation_is_complete(transaction, intent_id, &recorded).await?;
     let (item, item_revision) = intent_item_in_tx(transaction, intent_id).await?;
-    revalidate_dispatch_admission_in_tx(transaction, intent_id, &item, item_revision)
+    transaction
+        .revalidate_dispatch_admission_in_tx(intent_id, &item, item_revision)
         .await?
         .ensure_allowed()?;
     Ok(())
@@ -398,16 +401,36 @@ impl AsyncDaemonDb {
         &self,
         managed_worker_id: &str,
     ) -> Result<bool, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("managed worker admission release")
-            .await?;
-        let changed =
-            release_managed_worker_admission_in_tx(&mut transaction, managed_worker_id).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit managed worker admission release: {error}"))
-        })?;
-        Ok(changed)
+        <Self as DispatchAdmissionQueries>::release_task_board_admission_for_managed_worker(
+            self,
+            managed_worker_id,
+        )
+        .await
     }
+}
+
+/// Real implementation behind
+/// [`DispatchAdmissionQueries::release_task_board_admission_for_managed_worker`],
+/// called from the single consolidated trait impl in
+/// `dispatch_admission_queries.rs` (a trait's methods can only be implemented
+/// in one `impl` block per type, so the per-area files hand it a plain
+/// function instead of each declaring their own `impl DispatchAdmissionQueries
+/// for AsyncDaemonDb`).
+pub(super) async fn release_task_board_admission_for_managed_worker(
+    db: &AsyncDaemonDb,
+    managed_worker_id: &str,
+) -> Result<bool, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("managed worker admission release")
+        .await?;
+    let changed = transaction
+        .release_managed_worker_admission_in_tx(managed_worker_id)
+        .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit managed worker admission release: {error}")))?;
+    Ok(changed)
 }
 
 async fn active_reserved_row_count(

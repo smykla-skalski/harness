@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
-use super::admission_lifecycle::release_managed_worker_admission_in_tx;
+use super::dispatch_admission_queries::DispatchAdmissionQueries;
+use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::dispatch_intents::decode_applied;
 use super::items::load_item_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, SessionState, db_error, utc_now};
@@ -51,15 +52,7 @@ impl AsyncDaemonDb {
     pub(crate) async fn task_board_admission_worker_recoveries(
         &self,
     ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError> {
-        let rows = query_as::<_, AdmissionRecoveryRow>(ADMISSION_RECOVERY_SQL)
-            .fetch_all(self.pool())
-            .await
-            .map_err(|error| {
-                db_error(format!(
-                    "load committed task board admission workers: {error}"
-                ))
-            })?;
-        recoveries_from_rows(rows)
+        <Self as DispatchAdmissionQueries>::task_board_admission_worker_recoveries(self).await
     }
 
     pub(crate) async fn reconcile_missing_task_board_admission_worker(
@@ -67,34 +60,65 @@ impl AsyncDaemonDb {
         expected: &TaskBoardAdmissionWorkerRecovery,
         reason: &str,
     ) -> Result<Option<TaskBoardAdmissionMissingRunRecovery>, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("missing task board admission worker recovery")
-            .await?;
-        if !screen_missing_worker_recovery_in_tx(&mut transaction, expected).await? {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit no-op task board admission worker recovery: {error}"
-                ))
-            })?;
-            return Ok(None);
-        }
+        <Self as DispatchAdmissionQueries>::reconcile_missing_task_board_admission_worker(
+            self, expected, reason,
+        )
+        .await
+    }
+}
 
-        let concurrency_released =
-            release_managed_worker_admission_in_tx(&mut transaction, &expected.managed_worker_id)
-                .await?;
-        let session_changed = block_linked_session_task(&mut transaction, expected, reason).await?;
-        transaction.commit().await.map_err(|error| {
+/// Real implementations behind the matching [`DispatchAdmissionQueries`]
+/// methods, called from the single consolidated trait impl in
+/// `dispatch_admission_queries.rs` (a trait's methods can only be implemented
+/// in one `impl` block per type, so the per-area files hand it plain
+/// functions instead of each declaring their own `impl DispatchAdmissionQueries
+/// for AsyncDaemonDb`).
+pub(super) async fn task_board_admission_worker_recoveries(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError> {
+    let rows = query_as::<_, AdmissionRecoveryRow>(ADMISSION_RECOVERY_SQL)
+        .fetch_all(db.pool())
+        .await
+        .map_err(|error| {
             db_error(format!(
-                "commit missing task board admission worker recovery: {error}"
+                "load committed task board admission workers: {error}"
             ))
         })?;
-        Ok(Some(TaskBoardAdmissionMissingRunRecovery {
-            item_id: expected.item_id.clone(),
-            session_id: expected.session_id.clone(),
-            session_changed,
-            concurrency_released,
-        }))
+    recoveries_from_rows(rows)
+}
+
+pub(super) async fn reconcile_missing_task_board_admission_worker(
+    db: &AsyncDaemonDb,
+    expected: &TaskBoardAdmissionWorkerRecovery,
+    reason: &str,
+) -> Result<Option<TaskBoardAdmissionMissingRunRecovery>, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("missing task board admission worker recovery")
+        .await?;
+    if !screen_missing_worker_recovery_in_tx(&mut transaction, expected).await? {
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit no-op task board admission worker recovery: {error}"
+            ))
+        })?;
+        return Ok(None);
     }
+
+    let concurrency_released = transaction
+        .release_managed_worker_admission_in_tx(&expected.managed_worker_id)
+        .await?;
+    let session_changed = block_linked_session_task(&mut transaction, expected, reason).await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit missing task board admission worker recovery: {error}"
+        ))
+    })?;
+    Ok(Some(TaskBoardAdmissionMissingRunRecovery {
+        item_id: expected.item_id.clone(),
+        session_id: expected.session_id.clone(),
+        session_changed,
+        concurrency_released,
+    }))
 }
 
 const ADMISSION_RECOVERY_SQL: &str =

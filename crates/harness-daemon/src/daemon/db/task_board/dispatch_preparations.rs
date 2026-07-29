@@ -1,38 +1,27 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as};
 use uuid::Uuid;
 
-use super::ITEMS_CHANGE_SCOPE;
 use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_admission_in_tx};
-use super::admission_lifecycle::renew_dispatch_admission_in_tx;
 use super::admission_reservations::persist_admission_snapshot_in_tx;
+use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_preparation_claim::TaskBoardPreparationClaim;
-use super::dispatch_workflow_launch::{
-    prepare_workflow_launches_for_publication, rebind_write_launch,
-};
-use super::items::{bump_change_in_tx, load_item_in_tx};
-use super::lane_order::{
-    LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
-};
+use super::dispatch_workflow_launch::rebind_write_launch;
+use super::items::load_item_in_tx;
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
 use crate::task_board::{
     DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
 };
-use harness_kernel::errors::CliErrorKind;
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
 
 #[path = "dispatch_preparations_helpers.rs"]
 mod helpers;
 use helpers::{
-    PREPARATION_MAX_ATTEMPTS, PreparationClaim, active_reservation, apply_preparation_to_item,
-    claim_preparation_intent_in_tx, claimed_attempts_in_tx, commit_preparation,
-    ensure_preparation_claim, fail_preparation_admission_in_tx, insert_preparation,
-    preparation_retry_delay_seconds, rearm_preparation_in_tx, screen_preparation_claim_in_tx,
-    stamp_admitting_execution_in_tx, validate_reservable_item,
+    active_reservation, insert_preparation, stamp_admitting_execution_in_tx,
+    validate_reservable_item,
 };
 
 pub(crate) use helpers::PREPARATION_MAX_ATTEMPTS as TASK_BOARD_PREPARATION_MAX_ATTEMPTS;
@@ -136,10 +125,6 @@ async fn consume_prepared_approval_grant(
 
 impl AsyncDaemonDb {
     /// Reserve one dispatch before creating its session or task side effects.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "dispatch reservation must validate and insert under one transaction"
-    )]
     pub(crate) async fn reserve_task_board_dispatch(
         &self,
         plan: &DispatchPlan,
@@ -147,90 +132,14 @@ impl AsyncDaemonDb {
         project_dir: Option<&str>,
         hold_worker: bool,
     ) -> Result<ReservedTaskBoardDispatch, CliError> {
-        io::validate_safe_segment(&plan.board_item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch reservation")
-            .await?;
-        if let Some(reserved) = active_reservation(&mut transaction, &plan.board_item_id).await? {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit existing task board reservation: {error}"))
-            })?;
-            return Ok(reserved);
-        }
-        let (item, item_revision) = load_item_in_tx(&mut transaction, &plan.board_item_id)
-            .await?
-            .ok_or_else(|| {
-                db_error(format!(
-                    "task-board item '{}' not found",
-                    plan.board_item_id
-                ))
-            })?;
-        validate_reservable_item(&item, plan)?;
-        let mut admission =
-            evaluate_dispatch_admission_in_tx(&mut transaction, &item, item_revision, None).await?;
-        if admission.as_ref().is_some_and(|value| !value.is_allowed()) {
-            let mut admission = admission.take().expect("checked task board admission");
-            persist_admission_snapshot_in_tx(
-                &mut transaction,
-                &plan.board_item_id,
-                None,
-                &mut admission,
-            )
-            .await?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit refused task board admission: {error}"))
-            })?;
-            return Ok(ReservedTaskBoardDispatch::Blocked(Box::new(admission)));
-        }
-        let intent_id = format!("dispatch-intent-{}", Uuid::new_v4().simple());
-        let workflow_execution_id = format!("workflow-{}", Uuid::new_v4().simple());
-        let session_id = match &plan.session {
-            SessionIntent::Existing { session_id } => session_id.clone(),
-            SessionIntent::Create { .. } => Uuid::new_v4().to_string(),
-        };
-        let workflow_kind = item.workflow_kind;
-        // Stamp the owning execution onto the ticket in the same transaction that
-        // reserves the intent, so the admit window stops being a blind spot: the
-        // ticket exposes exactly one execution and a repeated admission is a
-        // visible no-op rather than a second competing run. The ticket stays in
-        // Todo and at the same revision; only its workflow content moves to
-        // Admitting, so the claim guard and launch bindings are unaffected.
-        stamp_admitting_execution_in_tx(
-            &mut transaction,
-            item,
-            item_revision,
-            &workflow_execution_id,
-        )
-        .await?;
-        let preparation = TaskBoardDispatchPreparation {
-            board_item_id: plan.board_item_id.clone(),
-            session_id,
-            work_item_id: format!("task-board-{}", Uuid::new_v4().simple()),
-            workflow_execution_id,
-            actor: actor.to_string(),
-            project_dir: project_dir.map(ToString::to_string),
-            plan: plan.clone(),
-            source_item_revision: (!matches!(workflow_kind, TaskBoardWorkflowKind::Unknown))
-                .then_some(item_revision),
+        <Self as DispatchAdmissionQueries>::reserve_task_board_dispatch(
+            self,
+            plan,
+            actor,
+            project_dir,
             hold_worker,
-        };
-        insert_preparation(&mut transaction, &intent_id, &preparation).await?;
-        if let Some(mut admission) = admission {
-            persist_admission_snapshot_in_tx(
-                &mut transaction,
-                &plan.board_item_id,
-                Some(&intent_id),
-                &mut admission,
-            )
-            .await?;
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board dispatch reservation: {error}"))
-        })?;
-        Ok(ReservedTaskBoardDispatch::Preparing {
-            intent_id,
-            preparation: Box::new(preparation),
-        })
+        )
+        .await
     }
 
     /// Claims a preparation, or reports why it could not be claimed.
@@ -238,29 +147,10 @@ impl AsyncDaemonDb {
         &self,
         intent_id: &str,
     ) -> Result<TaskBoardPreparationClaim, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch preparation claim")
-            .await?;
-        let preparation = match screen_preparation_claim_in_tx(&mut transaction, intent_id).await? {
-            PreparationClaim::Ready(preparation) => *preparation,
-            PreparationClaim::Unavailable(reason) => {
-                commit_preparation(transaction, "unclaimable task board preparation").await?;
-                return Ok(TaskBoardPreparationClaim::Unavailable(reason));
-            }
-            PreparationClaim::Refused { context, reason } => {
-                commit_preparation(transaction, context).await?;
-                return Err(CliErrorKind::invalid_transition(reason).into());
-            }
-        };
-        let claim_token = claim_preparation_intent_in_tx(&mut transaction, intent_id).await?;
-        commit_preparation(transaction, "task board preparation claim").await?;
-        Ok(TaskBoardPreparationClaim::Claimed(Box::new(
-            ClaimedTaskBoardDispatchPreparation {
-                intent_id: intent_id.to_string(),
-                claim_token,
-                preparation,
-            },
-        )))
+        <Self as DispatchAdmissionQueries>::attempt_task_board_dispatch_preparation_claim(
+            self, intent_id,
+        )
+        .await
     }
 
     /// For callers that only act on the claim itself. Anything reported to a
@@ -269,31 +159,14 @@ impl AsyncDaemonDb {
         &self,
         intent_id: &str,
     ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
-        Ok(self
-            .attempt_task_board_dispatch_preparation_claim(intent_id)
-            .await?
-            .claimed())
+        <Self as DispatchAdmissionQueries>::claim_task_board_dispatch_preparation(self, intent_id)
+            .await
     }
 
     pub(crate) async fn claim_next_task_board_dispatch_preparation(
         &self,
     ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
-        let intent_id = query_as::<_, (String,)>(
-            "SELECT intent_id FROM task_board_dispatch_intents
-             WHERE (status = 'preparing' AND datetime(available_at) <= datetime('now'))
-                OR (status = 'preparing_claimed'
-                    AND datetime(claimed_at) <= datetime('now', ?1))
-             ORDER BY created_at, intent_id LIMIT 1",
-        )
-        .bind(format!("-{PREPARATION_LEASE_SECONDS} seconds"))
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| db_error(format!("load next task board preparation: {error}")))?
-        .map(|row| row.0);
-        match intent_id {
-            Some(intent_id) => self.claim_task_board_dispatch_preparation(&intent_id).await,
-            None => Ok(None),
-        }
+        <Self as DispatchAdmissionQueries>::claim_next_task_board_dispatch_preparation(self).await
     }
 
     /// Renew a claimed preparation while its session or worktree is being created.
@@ -301,32 +174,7 @@ impl AsyncDaemonDb {
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
     ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch preparation renewal")
-            .await?;
-        let changed = query(
-            "UPDATE task_board_dispatch_intents
-             SET claimed_at = ?3, updated_at = ?3
-             WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
-        )
-        .bind(&claim.intent_id)
-        .bind(&claim.claim_token)
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("renew task board preparation: {error}")))?
-        .rows_affected();
-        if changed != 1 {
-            return Err(db_error(format!(
-                "task board preparation '{}' lost its claim",
-                claim.intent_id
-            )));
-        }
-        renew_dispatch_admission_in_tx(&mut transaction, &claim.intent_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board preparation renewal: {error}")))
+        <Self as DispatchAdmissionQueries>::renew_task_board_dispatch_preparation(self, claim).await
     }
 
     pub(crate) async fn complete_task_board_dispatch_preparation(
@@ -335,110 +183,30 @@ impl AsyncDaemonDb {
         branch: &str,
         worktree: &str,
     ) -> Result<DispatchAppliedTask, CliError> {
-        self.complete_task_board_dispatch_preparation_with_workflow(
-            claim, branch, worktree, None, None,
+        <Self as DispatchAdmissionQueries>::complete_task_board_dispatch_preparation(
+            self, claim, branch, worktree,
         )
         .await
     }
 
     /// Atomically link a prepared session task and expose it for worker startup.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "dispatch completion must keep item linking and intent publication atomic"
-    )]
     pub(crate) async fn complete_task_board_dispatch_preparation_with_workflow(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
         branch: &str,
         worktree: &str,
-        mut read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
-        mut write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
+        read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
+        write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
     ) -> Result<DispatchAppliedTask, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch preparation completion")
-            .await?;
-        ensure_preparation_claim(&mut transaction, claim).await?;
-        let preparation = &claim.preparation;
-        let (mut item, revision) = load_item_in_tx(&mut transaction, &preparation.board_item_id)
-            .await?
-            .ok_or_else(|| {
-                db_error(format!(
-                    "task-board item '{}' not found",
-                    preparation.board_item_id
-                ))
-            })?;
-        let before = item.clone();
-        validate_reservable_item(&item, &preparation.plan)?;
-        (read_only_workflow, write_workflow) = prepare_workflow_launches_for_publication(
-            preparation,
-            &item,
-            revision,
+        <Self as DispatchAdmissionQueries>::complete_task_board_dispatch_preparation_with_workflow(
+            self,
+            claim,
+            branch,
             worktree,
             read_only_workflow,
             write_workflow,
-        )?;
-        apply_preparation_to_item(&mut item, preparation, branch, worktree);
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Generic,
         )
-        .await?;
-        let prepared_item_revision = write.item_revision;
-        let item = write.item.clone();
-        rebind_prepared_workflow_launches(
-            &item,
-            prepared_item_revision,
-            &preparation.workflow_execution_id,
-            &mut read_only_workflow,
-            &mut write_workflow,
-        )?;
-        consume_prepared_approval_grant(&mut transaction, preparation).await?;
-        let applied = DispatchAppliedTask {
-            board_item_id: preparation.board_item_id.clone(),
-            session_id: preparation.session_id.clone(),
-            work_item_id: preparation.work_item_id.clone(),
-            lifecycle: preparation.plan.applied_lifecycle(),
-            item,
-            read_only_workflow,
-            write_workflow,
-        };
-        let payload = serde_json::to_string(&applied).map_err(|error| {
-            db_error(format!("serialize prepared task board dispatch: {error}"))
-        })?;
-        let published_status = if preparation.hold_worker {
-            "held"
-        } else {
-            "pending"
-        };
-        query(
-            "UPDATE task_board_dispatch_intents
-             SET payload_json = ?3, status = ?4, claim_token = NULL,
-                 claimed_at = NULL, last_error = NULL, updated_at = ?5,
-                 consumed_approval_grant_id = ?6
-             WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
-        )
-        .bind(&claim.intent_id)
-        .bind(&claim.claim_token)
-        .bind(payload)
-        .bind(published_status)
-        .bind(utc_now())
-        .bind(if preparation.hold_worker {
-            None
-        } else {
-            preparation.plan.consumed_approval_grant_id.as_deref()
-        })
-        .execute(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("complete task board preparation: {error}")))?;
-        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board preparation completion: {error}"))
-        })?;
-        Ok(applied)
     }
 
     /// Hands a failed preparation back to the queue, or retires it once its
@@ -449,22 +217,110 @@ impl AsyncDaemonDb {
         claim: &ClaimedTaskBoardDispatchPreparation,
         reason: &str,
     ) -> Result<TaskBoardPreparationRelease, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch preparation release")
-            .await?;
-        let attempts = claimed_attempts_in_tx(&mut transaction, claim).await?;
-        if attempts >= PREPARATION_MAX_ATTEMPTS {
-            // Retiring the intent clears the Admitting stamp inside
-            // `fail_preparation_admission_in_tx`, so the ticket drops back to
-            // Idle and a fresh dispatch mints a new execution instead of finding
-            // a dead one.
-            fail_preparation_admission_in_tx(&mut transaction, &claim.intent_id, reason).await?;
-            commit_preparation(transaction, "task board preparation give-up").await?;
-            return Ok(TaskBoardPreparationRelease::GaveUp { attempts });
-        }
-        let delay_seconds = preparation_retry_delay_seconds(attempts);
-        rearm_preparation_in_tx(&mut transaction, claim, reason, delay_seconds).await?;
-        commit_preparation(transaction, "task board preparation release").await?;
-        Ok(TaskBoardPreparationRelease::Retrying { delay_seconds })
+        <Self as DispatchAdmissionQueries>::release_task_board_dispatch_preparation(
+            self, claim, reason,
+        )
+        .await
     }
 }
+
+/// Real implementations behind the matching [`DispatchAdmissionQueries`]
+/// methods, called from the single consolidated trait impl in
+/// `dispatch_admission_queries.rs` (a trait's methods can only be implemented
+/// in one `impl` block per type, so the per-area files hand it plain
+/// functions instead of each declaring their own `impl DispatchAdmissionQueries
+/// for AsyncDaemonDb`).
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "dispatch reservation must validate and insert under one transaction"
+)]
+pub(super) async fn reserve_task_board_dispatch(
+    db: &AsyncDaemonDb,
+    plan: &DispatchPlan,
+    actor: &str,
+    project_dir: Option<&str>,
+    hold_worker: bool,
+) -> Result<ReservedTaskBoardDispatch, CliError> {
+    io::validate_safe_segment(&plan.board_item_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board dispatch reservation")
+        .await?;
+    if let Some(reserved) = active_reservation(&mut transaction, &plan.board_item_id).await? {
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit existing task board reservation: {error}"))
+        })?;
+        return Ok(reserved);
+    }
+    let (item, item_revision) = load_item_in_tx(&mut transaction, &plan.board_item_id)
+        .await?
+        .ok_or_else(|| {
+            db_error(format!(
+                "task-board item '{}' not found",
+                plan.board_item_id
+            ))
+        })?;
+    validate_reservable_item(&item, plan)?;
+    let mut admission =
+        evaluate_dispatch_admission_in_tx(&mut transaction, &item, item_revision, None).await?;
+    if admission.as_ref().is_some_and(|value| !value.is_allowed()) {
+        let mut admission = admission.take().expect("checked task board admission");
+        persist_admission_snapshot_in_tx(&mut transaction, &plan.board_item_id, None, &mut admission)
+            .await?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit refused task board admission: {error}"))
+        })?;
+        return Ok(ReservedTaskBoardDispatch::Blocked(Box::new(admission)));
+    }
+    let intent_id = format!("dispatch-intent-{}", Uuid::new_v4().simple());
+    let workflow_execution_id = format!("workflow-{}", Uuid::new_v4().simple());
+    let session_id = match &plan.session {
+        SessionIntent::Existing { session_id } => session_id.clone(),
+        SessionIntent::Create { .. } => Uuid::new_v4().to_string(),
+    };
+    let workflow_kind = item.workflow_kind;
+    // Stamp the owning execution onto the ticket in the same transaction that
+    // reserves the intent, so the admit window stops being a blind spot: the
+    // ticket exposes exactly one execution and a repeated admission is a
+    // visible no-op rather than a second competing run. The ticket stays in
+    // Todo and at the same revision; only its workflow content moves to
+    // Admitting, so the claim guard and launch bindings are unaffected.
+    stamp_admitting_execution_in_tx(&mut transaction, item, item_revision, &workflow_execution_id)
+        .await?;
+    let preparation = TaskBoardDispatchPreparation {
+        board_item_id: plan.board_item_id.clone(),
+        session_id,
+        work_item_id: format!("task-board-{}", Uuid::new_v4().simple()),
+        workflow_execution_id,
+        actor: actor.to_string(),
+        project_dir: project_dir.map(ToString::to_string),
+        plan: plan.clone(),
+        source_item_revision: (!matches!(workflow_kind, TaskBoardWorkflowKind::Unknown))
+            .then_some(item_revision),
+        hold_worker,
+    };
+    insert_preparation(&mut transaction, &intent_id, &preparation).await?;
+    if let Some(mut admission) = admission {
+        persist_admission_snapshot_in_tx(
+            &mut transaction,
+            &plan.board_item_id,
+            Some(&intent_id),
+            &mut admission,
+        )
+        .await?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board dispatch reservation: {error}")))?;
+    Ok(ReservedTaskBoardDispatch::Preparing {
+        intent_id,
+        preparation: Box::new(preparation),
+    })
+}
+
+
+// The remaining `DispatchAdmissionQueries` real implementations live in
+// `queries` (split into its own file to keep this one under the repo's line
+// budget); they stay part of the `dispatch_preparations` module.
+#[path = "dispatch_preparations_queries.rs"]
+pub(in crate::daemon::db::task_board) mod queries;

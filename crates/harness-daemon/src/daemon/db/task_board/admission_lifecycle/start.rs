@@ -1,6 +1,8 @@
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
 use super::TaskBoardAdmissionCheck;
+use super::super::dispatch_admission_queries::DispatchAdmissionQueries;
+use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
     AgentMode, TaskBoardItem, TaskBoardLaunchCapability, validate_launch_capability,
@@ -14,24 +16,48 @@ impl AsyncDaemonDb {
         actual_capability: Option<TaskBoardLaunchCapability>,
         expected_read_only_fence: Option<(i64, u64)>,
     ) -> Result<(), CliError> {
-        let transaction = self
-            .begin_immediate_transaction("task board admission start validation")
-            .await?;
-        let (transaction, item, expected) = resolve_dispatch_admission_start_in_tx(
-            transaction,
+        <Self as DispatchAdmissionQueries>::validate_task_board_dispatch_admission_start(
+            self,
             intent_id,
             claim_token,
+            actual_capability,
             expected_read_only_fence,
         )
-        .await?;
-        if let Some(expected) = expected {
-            ensure_launch_capability_matches(item.agent_mode, expected, actual_capability)?;
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board admission validation: {error}")))
+        .await
     }
+}
+
+/// Real implementation behind
+/// [`DispatchAdmissionQueries::validate_task_board_dispatch_admission_start`],
+/// called from the single consolidated trait impl in
+/// `dispatch_admission_queries.rs` (a trait's methods can only be implemented
+/// in one `impl` block per type, so the per-area files hand it a plain
+/// function instead of each declaring their own `impl DispatchAdmissionQueries
+/// for AsyncDaemonDb`).
+pub(in crate::daemon::db::task_board) async fn validate_task_board_dispatch_admission_start(
+    db: &AsyncDaemonDb,
+    intent_id: &str,
+    claim_token: &str,
+    actual_capability: Option<TaskBoardLaunchCapability>,
+    expected_read_only_fence: Option<(i64, u64)>,
+) -> Result<(), CliError> {
+    let transaction = db
+        .begin_immediate_transaction("task board admission start validation")
+        .await?;
+    let (transaction, item, expected) = resolve_dispatch_admission_start_in_tx(
+        transaction,
+        intent_id,
+        claim_token,
+        expected_read_only_fence,
+    )
+    .await?;
+    if let Some(expected) = expected {
+        ensure_launch_capability_matches(item.agent_mode, expected, actual_capability)?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board admission validation: {error}")))
 }
 
 async fn resolve_dispatch_admission_start_in_tx<'c>(
@@ -57,25 +83,18 @@ async fn resolve_dispatch_admission_start_in_tx<'c>(
             "task board admission item revision changed while loading",
         ));
     }
-    super::validate_worker_start_fence_in_tx(
-        &mut transaction,
-        expected_read_only_fence,
-        loaded_revision,
-    )
-    .await?;
+    transaction
+        .validate_worker_start_fence_in_tx(expected_read_only_fence, loaded_revision)
+        .await?;
     super::super::dispatch_intents::ensure_dispatch_item_startable(
         &item,
         &session_id,
         &work_item_id,
         Some(&execution_id),
     )?;
-    let admission = super::revalidate_dispatch_admission_in_tx(
-        &mut transaction,
-        intent_id,
-        &item,
-        loaded_revision,
-    )
-    .await?;
+    let admission = transaction
+        .revalidate_dispatch_admission_in_tx(intent_id, &item, loaded_revision)
+        .await?;
     let expected = match admission {
         TaskBoardAdmissionCheck::Blocked(snapshot) => {
             let error = CliErrorKind::invalid_transition(snapshot.refusal_message()).into();

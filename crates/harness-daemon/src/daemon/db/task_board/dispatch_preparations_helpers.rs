@@ -1,9 +1,8 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
-use super::super::admission_lifecycle::{
-    TaskBoardAdmissionCheck, release_dispatch_admission_in_tx, revalidate_dispatch_admission_in_tx,
-};
+use super::super::admission_lifecycle::TaskBoardAdmissionCheck;
+use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::dispatch_preparation_claim::{
     TaskBoardPreparationUnavailable, classify_unavailable_preparation_in_tx,
 };
@@ -156,7 +155,9 @@ pub(super) async fn fail_preparation_admission_in_tx(
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("refuse task board preparation admission: {error}")))?;
-    release_dispatch_admission_in_tx(transaction, intent_id).await?;
+    transaction
+        .release_dispatch_admission_in_tx(intent_id)
+        .await?;
     // A failed preparation releases its admission records but used to leave the
     // ticket pinned to the execution it admitted, stuck in Admitting until a
     // later dispatch overwrote it. Clear that stamp here so every terminal
@@ -373,8 +374,9 @@ pub(super) async fn screen_preparation_claim_in_tx(
         .await;
     }
     validate_reservable_item(&item, &preparation.plan)?;
-    if let TaskBoardAdmissionCheck::Blocked(admission) =
-        revalidate_dispatch_admission_in_tx(transaction, intent_id, &item, item_revision).await?
+    if let TaskBoardAdmissionCheck::Blocked(admission) = transaction
+        .revalidate_dispatch_admission_in_tx(intent_id, &item, item_revision)
+        .await?
     {
         return refuse_preparation_in_tx(
             transaction,
