@@ -4,14 +4,11 @@ use std::fmt::{self, Display, Formatter};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Canonical daemon HTTP paths used by standalone clients.
+/// Canonical daemon HTTP paths used by standalone clients, re-exported from
+/// `api_contract::http_paths`'s full route-path list so this crate carries
+/// one definition of each path instead of a hand-synced subset.
 pub mod http_paths {
-    /// Authenticated daemon websocket endpoint.
-    pub const WS: &str = "/v1/ws";
-    /// Headless execution readiness check, mirroring
-    /// `src/daemon/protocol/api_contract/http_paths.rs`'s own copy the same
-    /// way `WS` above already does.
-    pub const HEADLESS_READINESS: &str = "/v1/headless/readiness";
+    pub use super::api_contract::http_paths::{HEADLESS_READINESS, WS};
 }
 
 /// Daemon HTTP/WS wire-protocol version. Canonical here rather than in
@@ -108,6 +105,12 @@ pub use task_board_list_bounds::{
 /// own doc comment for why).
 pub mod reviews;
 
+/// The whole-API HTTP<->WS route contract, relocated from `harness-daemon`'s
+/// `daemon::protocol::api_contract` (zero internal dependencies made it
+/// relocatable; that crate re-exports every item unchanged at the original
+/// path).
+pub mod api_contract;
+
 /// Harness Monitor audit-event DTOs. Pure data with no dependency beyond
 /// `serde`/`serde_json`, so they live here rather than in the daemon crate
 /// that used to define them, letting `db` and the rest of the daemon share
@@ -135,8 +138,8 @@ pub mod summaries;
 /// module's own doc comment for why).
 pub mod task_board;
 
-// Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
-// route-table-derived `task_board_mcp_methods()`, which never chains in
+// Kept in sync by hand with `api_contract`'s route-table-derived
+// `task_board_mcp_methods()`, which never chains in
 // `routes_task_board_orchestrator` or `routes_task_board_working_copies` --
 // those routes are deliberately absent from the MCP surface.
 const NON_AGENT_FACING_TASK_BOARD_METHODS: &[&str] = &[
