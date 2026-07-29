@@ -6,7 +6,6 @@ use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
 use super::triage_apply::TriageOutcome;
 use super::triage_audit::{
-    record_item_created_audit_in_tx, record_item_updated_audit_in_tx,
     record_triage_decided_audit_in_tx, record_triage_effect_reapplied_audit_in_tx,
 };
 use super::triage_escalation_enqueue::maybe_enqueue_triage_escalation_in_tx;
@@ -20,6 +19,10 @@ use crate::task_board::{
     validate_lane_placement,
 };
 use harness_kernel::errors::CliErrorKind;
+
+#[path = "items_audit.rs"]
+mod audit;
+use audit::{record_item_created_audit_in_tx, record_item_updated_audit_in_tx};
 
 #[path = "items_lifecycle.rs"]
 mod lifecycle;
