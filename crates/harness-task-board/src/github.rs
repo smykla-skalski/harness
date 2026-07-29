@@ -9,6 +9,7 @@ mod client;
 mod client_graphql;
 mod evidence;
 mod evidence_api;
+mod pr_evidence;
 mod publication;
 mod repository;
 mod risk;
@@ -24,6 +25,10 @@ pub use crate::github_config::{
 pub use evidence::{
     GitHubBranchProtectionEvidence, GitHubCheckConclusion, GitHubCheckEvidence, GitHubCheckStatus,
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
+};
+pub use pr_evidence::{
+    GitHubPullRequestEvidenceSource, InMemoryPullRequestEvidenceSource, PullRequestEvidence,
+    PullRequestEvidenceRead, PullRequestEvidenceSource, PullRequestIdentity, PullRequestLifecycle,
 };
 pub use publication::GitHubBranchState;
 pub use publication::{SigningVerifyOutcome, verify_signing_for_profile};
