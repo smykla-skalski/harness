@@ -403,10 +403,12 @@ impl CodexRunWorker {
 }
 
 fn validate_effective_model(requested: Option<&str>, effective: &str) -> Result<(), CliError> {
-    if requested.is_none_or(|requested| requested == effective) {
+    let Some(requested) = requested else {
+        return Ok(());
+    };
+    if requested == effective {
         return Ok(());
     }
-    let requested = requested.unwrap_or_default();
     Err(CliErrorKind::workflow_parse(format!(
         "{}: requested '{requested}', effective '{effective}'",
         wire::MODEL_MISMATCH_DETAIL

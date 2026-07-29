@@ -14,7 +14,7 @@ pub(super) const METHOD_TURN_START: &str = "turn/start";
 pub(super) const METHOD_TURN_STEER: &str = "turn/steer";
 pub(super) const METHOD_TURN_INTERRUPT: &str = "turn/interrupt";
 pub(super) const MODEL_MISMATCH_DETAIL: &str =
-    "codex app-server reported unsupported model selection";
+    "codex app-server model mismatch: unsupported model selection";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum AppServerNotification {

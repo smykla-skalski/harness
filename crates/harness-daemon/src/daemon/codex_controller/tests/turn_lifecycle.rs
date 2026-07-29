@@ -164,7 +164,7 @@ async fn failed_codex_turns_use_shared_recovery_categories() {
             AgentTurnFailureStage::Execution,
         ),
         (
-            "codex app-server reported unsupported model selection: requested 'gpt-5.3-codex-spark', effective 'gpt-5.5'",
+            "codex app-server model mismatch: unsupported model selection: requested 'gpt-5.3-codex-spark', effective 'gpt-5.5'",
             AgentTurnFailureCategory::UnsupportedModel,
             false,
             AgentTurnFailureStage::Start,
