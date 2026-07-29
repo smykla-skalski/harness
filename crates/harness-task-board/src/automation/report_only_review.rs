@@ -20,6 +20,7 @@ pub enum TaskBoardReviewFindingSeverity {
 pub struct TaskBoardReviewFindingLocation {
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(minimum = 1)]
     pub line: Option<u32>,
 }
 
