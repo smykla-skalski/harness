@@ -7,8 +7,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use agent_client_protocol::schema::v1::{
-    CancelNotification, ContentBlock, ListSessionsRequest, LogoutRequest, PromptRequest, SessionId,
-    TextContent,
+    CancelNotification, ListSessionsRequest, LogoutRequest, SessionId,
 };
 use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
@@ -28,15 +27,18 @@ use crate::daemon::agent_acp::prompt_gate::PromptLease;
 pub(super) type ProtocolCommandResult<T> = Result<T, String>;
 
 /// How long a detach waits for the agent to confirm the session is closed.
+///
 /// Short because someone is stopping one agent and waiting on the reply, and
 /// the process-lifecycle lock is held for the whole call. The lifecycle budget
 /// would bound it too, but at a latency nobody wants on an interactive stop.
 const DETACH_CLOSE_BUDGET: Duration = Duration::from_secs(2);
 
 mod handle;
+mod prompt;
 
 pub(in crate::daemon::agent_acp) use handle::AcpProtocolHandle;
 pub(super) use handle::response_timeout_for;
+use prompt::send_prompt;
 
 pub(super) enum ProtocolCommand {
     AttachSession {
@@ -383,34 +385,6 @@ fn spawn_prompt_task(
         drop(prompt_lease);
         result
     })
-}
-
-async fn send_prompt(
-    supervisor: &AcpSessionSupervisor,
-    connection: &ConnectionTo<Agent>,
-    session_id: SessionId,
-    prompt_timeout: Duration,
-    prompt: String,
-) -> AcpResult<()> {
-    let _guard = supervisor.enter_pending_request_with_reason(Some("session/prompt"));
-    super::session_state::begin_turn(supervisor);
-    let request = PromptRequest::new(
-        session_id,
-        vec![ContentBlock::Text(TextContent::new(prompt))],
-    );
-    let response = timeout(
-        prompt_timeout,
-        connection.send_request(request).block_task(),
-    )
-    .await
-    .map_err(|_| super::deadline_error("session/prompt", prompt_timeout))
-    .and_then(std::convert::identity);
-    if let Ok(response) = &response {
-        super::session_state::record_stop_reason(supervisor, response);
-    } else {
-        super::session_state::discard_turn(supervisor);
-    }
-    response.map(drop)
 }
 
 async fn detach_protocol_session(

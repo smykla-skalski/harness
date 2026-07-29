@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, InitializeRequest, InitializeResponse, NewSessionRequest,
-    NewSessionResponse, PromptResponse, SessionConfigOption, SessionConfigOptionCategory,
-    SessionConfigSelectOption, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
-    StopReason,
+    NewSessionResponse, PromptRequest, PromptResponse, SessionConfigOption,
+    SessionConfigOptionCategory, SessionConfigSelectOption, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse, StopReason,
 };
 use agent_client_protocol::{Channel, Client};
 
