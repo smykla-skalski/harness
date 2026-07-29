@@ -54,6 +54,10 @@ struct OpenRouterTurnBinding {
     requested_model: Option<String>,
     source_revision: Option<String>,
     cancelled: bool,
+    /// Set once the terminal outcome has been written durably, so repeated
+    /// polling of `result`/`failure` stays side-effect free after the first
+    /// observed transition.
+    terminal_persisted: bool,
 }
 
 #[derive(Clone)]
@@ -206,9 +210,10 @@ impl OpenRouterAgentTurnRuntime {
             .map(|_| ())
     }
 
-    /// Persist an observed settlement. Only the columns learned here are set;
-    /// the store preserves earlier identity and enrichment and keeps a terminal
-    /// status sticky, so repeated polls converge on one durable outcome.
+    /// Persist an observed terminal settlement exactly once per turn. Only the
+    /// columns learned here are set; the store preserves earlier identity and
+    /// enrichment and keeps a terminal status sticky. The once-guard keeps
+    /// repeated polling of `result`/`failure` side-effect free.
     async fn persist_settlement(
         &self,
         id: &AgentTurnId,
@@ -221,6 +226,13 @@ impl OpenRouterAgentTurnRuntime {
         let Some(store) = &self.store else {
             return Ok(());
         };
+        if self
+            .lock_bindings()?
+            .get(id)
+            .is_some_and(|binding| binding.terminal_persisted)
+        {
+            return Ok(());
+        }
         let now = utc_now();
         store
             .save_agent_turn_run(&AgentTurnRunSnapshot {
@@ -242,7 +254,13 @@ impl OpenRouterAgentTurnRuntime {
                 created_at: now.clone(),
                 updated_at: now,
             })
-            .await
+            .await?;
+        if let Ok(mut bindings) = self.lock_bindings()
+            && let Some(binding) = bindings.get_mut(id)
+        {
+            binding.terminal_persisted = true;
+        }
+        Ok(())
     }
 }
 
@@ -279,6 +297,7 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
                 requested_model: requested_model.clone(),
                 source_revision: source_revision.clone(),
                 cancelled: false,
+                terminal_persisted: false,
             },
         );
         if let Err(error) = self.persist_start(&id, requested_model, source_revision).await {
@@ -307,50 +326,18 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         if binding.cancelled {
             return Ok(AgentTurnStatus::Cancelled);
         }
+        // Read-only, like the Codex turn runtime: durable terminal state is
+        // written once by `result`/`failure`/`cancel`, so status polling never
+        // touches the database.
         let state = self.inspect_turn(id)?.session_state.unwrap_or_default();
         if let Some(failure) = state.last_turn_failure {
-            // Keep the cancellation invariant consistent with `cancel()`: a
-            // cancelled run records its reason in `stop_reason` and leaves
-            // `error` NULL, while a genuine failure records the detail in
-            // `error`. Otherwise a turn cancelled through the failure channel
-            // would look like an error to downstream readers.
-            let (status, run_status, stop_reason, error) =
-                if failure.category == AgentTurnFailureCategory::Cancelled {
-                    (
-                        AgentTurnStatus::Cancelled,
-                        AgentTurnRunStatus::Cancelled,
-                        Some(failure.detail),
-                        None,
-                    )
-                } else {
-                    (
-                        AgentTurnStatus::Failed,
-                        AgentTurnRunStatus::Failed,
-                        None,
-                        Some(failure.detail),
-                    )
-                };
-            self.persist_settlement(
-                id,
-                run_status,
-                effective_model(&state.config_options),
-                None,
-                stop_reason,
-                error,
-            )
-            .await?;
-            return Ok(status);
+            return Ok(if failure.category == AgentTurnFailureCategory::Cancelled {
+                AgentTurnStatus::Cancelled
+            } else {
+                AgentTurnStatus::Failed
+            });
         }
         if state.last_turn_result.is_some() {
-            self.persist_settlement(
-                id,
-                AgentTurnRunStatus::Completed,
-                effective_model(&state.config_options),
-                None,
-                None,
-                None,
-            )
-            .await?;
             Ok(AgentTurnStatus::Completed)
         } else {
             Ok(AgentTurnStatus::Running)
@@ -390,14 +377,27 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
     async fn failure(&self, id: &AgentTurnId) -> Result<Option<AgentTurnFailure>, CliError> {
         let binding = self.binding(id)?;
         if binding.cancelled {
+            // `cancel()` already persisted the terminal cancellation.
             return Ok(Some(AgentTurnFailure::cancelled(
                 "OpenRouter turn cancelled",
             )));
         }
-        Ok(self
+        let Some(failure) = self
             .inspect_turn(id)?
             .session_state
-            .and_then(|state| state.last_turn_failure))
+            .and_then(|state| state.last_turn_failure)
+        else {
+            return Ok(None);
+        };
+        let (run_status, stop_reason, error) =
+            if failure.category == AgentTurnFailureCategory::Cancelled {
+                (AgentTurnRunStatus::Cancelled, Some(failure.detail.clone()), None)
+            } else {
+                (AgentTurnRunStatus::Failed, None, Some(failure.detail.clone()))
+            };
+        self.persist_settlement(id, run_status, None, None, stop_reason, error)
+            .await?;
+        Ok(Some(failure))
     }
 
     async fn cancel(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {

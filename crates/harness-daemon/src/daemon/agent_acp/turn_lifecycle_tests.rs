@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
 use crate::agents::turn::{
-    AgentTurnPullRequest, AgentTurnPullRequestContext, AgentTurnReadOnlyContent, AgentTurnRequest,
-    AgentTurnRuntime, AgentTurnStatus,
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnPullRequest,
+    AgentTurnPullRequestContext, AgentTurnReadOnlyContent, AgentTurnRequest, AgentTurnRuntime,
+    AgentTurnStatus,
 };
 use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
@@ -41,6 +42,15 @@ impl FakeManager {
             report: report.into(),
             stop_reason: "end_turn".into(),
         });
+    }
+
+    fn fail(&self, detail: &str) {
+        let mut state = self.state.lock().expect("state lock");
+        state.last_turn_failure = Some(AgentTurnFailure::new(
+            AgentTurnFailureCategory::ProviderRejected,
+            AgentTurnFailureStage::Execution,
+            detail,
+        ));
     }
 }
 
@@ -263,6 +273,75 @@ async fn completion_records_terminal_outcome_and_actual_model() {
         stored.report.as_deref(),
         Some(r#"{"summary":"Reviewed.","findings":[]}"#)
     );
+}
+
+#[tokio::test]
+async fn status_polling_leaves_terminal_persistence_to_result() {
+    let (_dir, store) = open_store().await;
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_and_store(
+        manager.clone(),
+        "session-a".into(),
+        None,
+        store.clone(),
+    );
+    let id = runtime.start(request()).await.expect("start");
+    manager.complete(r#"{"summary":"Reviewed."}"#);
+
+    // Polling status must not touch the durable row: it stays Running until the
+    // caller retrieves the result.
+    for _ in 0..3 {
+        assert_eq!(
+            runtime.status(&id).await.expect("status"),
+            AgentTurnStatus::Completed
+        );
+    }
+    let mid = store
+        .agent_turn_run(id.as_str())
+        .await
+        .expect("load")
+        .expect("run exists");
+    assert_eq!(mid.status, AgentTurnRunStatus::Running);
+
+    runtime.result(&id).await.expect("result").expect("result");
+    let after = store
+        .agent_turn_run(id.as_str())
+        .await
+        .expect("load")
+        .expect("run exists");
+    assert_eq!(after.status, AgentTurnRunStatus::Completed);
+}
+
+#[tokio::test]
+async fn failure_records_a_terminal_failure() {
+    let (_dir, store) = open_store().await;
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_and_store(
+        manager.clone(),
+        "session-a".into(),
+        None,
+        store.clone(),
+    );
+    let id = runtime.start(request()).await.expect("start");
+    manager.fail("provider rejected the request");
+
+    assert_eq!(
+        runtime.status(&id).await.expect("status"),
+        AgentTurnStatus::Failed
+    );
+    runtime.failure(&id).await.expect("failure").expect("failure present");
+
+    let stored = store
+        .agent_turn_run(id.as_str())
+        .await
+        .expect("load")
+        .expect("run exists");
+    assert_eq!(stored.status, AgentTurnRunStatus::Failed);
+    assert_eq!(
+        stored.error.as_deref(),
+        Some("provider rejected the request")
+    );
+    assert!(stored.stop_reason.is_none());
 }
 
 #[tokio::test]
