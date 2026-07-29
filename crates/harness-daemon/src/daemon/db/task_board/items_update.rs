@@ -7,15 +7,12 @@ use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::projects::resolve_item_project_in_tx;
-use super::super::triage_apply::{
-    TriageOutcome, clear_stale_automatic_placement_on_human_status_move, override_implied_status,
-    reapply_active_override_outcome_in_tx,
-};
-use super::super::triage_apply_rules::apply_active_triage_in_tx;
+use super::super::triage_interface::Triage;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
 use super::{
-    TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, bump_change_in_tx,
-    record_triage_or_lane_audit_in_tx, resolve_parent_update_in_tx, validate_item,
+    TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, TriageEvaluator,
+    TriageOutcome, bump_change_in_tx, record_triage_or_lane_audit_in_tx,
+    resolve_parent_update_in_tx, validate_item,
 };
 
 impl AsyncDaemonDb {
@@ -212,9 +209,9 @@ async fn apply_update_triage_in_tx(
     // and automatic re-ranking is suppressed the whole time an override is
     // active. `triage_eligible` inside this call already leaves a terminal
     // exit dormant and never touches a Manual anchor's rank.
-    let override_reapply_transition =
-        reapply_active_override_outcome_in_tx(transaction, item, existing_override, &decided_at)
-            .await?;
+    let override_reapply_transition = Triage
+        .reapply_active_override_outcome_in_tx(transaction, item, existing_override, &decided_at)
+        .await?;
     let changed_placement = item.status != pre_triage_item.status
         || item.lane_position != pre_triage_item.lane_position
         || item.lane_origin != pre_triage_item.lane_origin
@@ -225,6 +222,34 @@ async fn apply_update_triage_in_tx(
         LaneTransitionKind::Generic
     });
     Ok((outcome, transition_kind))
+}
+
+/// A direct human status move on the general item-update endpoint is never
+/// itself a durable `Manual` lane anchor -- that explicit override control
+/// is a separate feature -- but it still invalidates whatever `Automatic`
+/// placement `BuiltInV1` previously recorded. Clearing that stale
+/// provenance here (rather than suppressing placement while leaving the old
+/// `Automatic` tag attached) keeps the item eligible for a fresh automatic
+/// placement on its next eligible evaluation and stops the audit trail from
+/// misattributing a human-chosen status to the evaluator. An existing
+/// `Manual` anchor is left untouched. Pure item-struct bookkeeping, not a
+/// triage evaluation, so it lives here rather than behind `TriageEvaluator`.
+fn clear_stale_automatic_placement_on_human_status_move(
+    before_status: TaskBoardStatus,
+    item: &mut TaskBoardItem,
+) {
+    if before_status == item.status.canonical_persisted_status() {
+        return;
+    }
+    let is_stale_automatic = item
+        .lane_origin
+        .as_ref()
+        .is_some_and(|origin| !origin.is_manual());
+    if is_stale_automatic {
+        item.lane_position = None;
+        item.lane_origin = None;
+        item.lane_set_at = None;
+    }
 }
 
 /// Decides the triage outcome for this write, applying an active triage's
@@ -245,14 +270,15 @@ async fn compute_triage_outcome_in_tx(
                 || before.lane_origin != item.lane_origin;
             let suppress_placement =
                 ingress == TaskBoardTriageIngress::HumanUpdate && direct_effect_this_call;
-            apply_active_triage_in_tx(
-                transaction,
-                item,
-                decided_at,
-                suppress_placement,
-                existing_override,
-            )
-            .await
+            Triage
+                .apply_active_triage_in_tx(
+                    transaction,
+                    item,
+                    decided_at,
+                    suppress_placement,
+                    existing_override,
+                )
+                .await
         }
     }
 }
@@ -279,7 +305,7 @@ fn reject_if_conflicts_with_active_override(
     ) {
         return Ok(());
     }
-    if requested_status == override_implied_status(existing_override.verdict) {
+    if requested_status == Triage.override_implied_status(existing_override.verdict) {
         return Ok(());
     }
     Err(CliErrorKind::invalid_transition(

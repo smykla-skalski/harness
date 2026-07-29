@@ -85,7 +85,7 @@ async fn audit_actor(db: &AsyncDaemonDb, kind: &str, item_id: &str) -> Option<St
 /// Seed a genuinely decided `BuiltInV1` Todo verdict (a real decision row,
 /// real placement) so later reads see a congruent starting point.
 async fn seed_decided_todo(db: &AsyncDaemonDb, item_id: &str) {
-    use super::super::items::{load_item_in_tx, replace_item_in_tx};
+    use super::super::items::test_support::{load_item_in_tx, replace_item_in_tx};
     use super::super::triage_apply::apply_builtin_v1_triage_in_tx;
 
     db.create_task_board_item(inbox_item(item_id))

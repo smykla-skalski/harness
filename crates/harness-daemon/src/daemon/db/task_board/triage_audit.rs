@@ -2,8 +2,8 @@ use serde_json::json;
 use sqlx::{Sqlite, Transaction};
 use uuid::Uuid;
 
+use super::items::TriageOutcome;
 use super::lane_order::LaneTransitionWrite;
-use super::triage_apply::TriageOutcome;
 use crate::daemon::db::audit::upsert_audit_event_in_tx;
 use crate::daemon::db::{CliError, utc_now};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;

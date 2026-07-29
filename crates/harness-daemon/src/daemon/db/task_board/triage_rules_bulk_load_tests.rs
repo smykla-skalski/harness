@@ -90,10 +90,11 @@ async fn reports_the_current_decision_verdict_when_one_exists() {
         .begin_immediate_transaction("test seed decision")
         .await
         .expect("begin");
-    let (mut item, revision) = super::super::items::load_item_in_tx(&mut transaction, "triaged")
-        .await
-        .expect("load item")
-        .expect("item exists");
+    let (mut item, revision) =
+        super::super::items::test_support::load_item_in_tx(&mut transaction, "triaged")
+            .await
+            .expect("load item")
+            .expect("item exists");
     super::super::triage_apply::apply_builtin_v1_triage_in_tx(
         &mut transaction,
         &mut item,
@@ -104,7 +105,7 @@ async fn reports_the_current_decision_verdict_when_one_exists() {
     .await
     .expect("apply triage")
     .expect("decision recorded");
-    super::super::items::replace_item_in_tx(&mut transaction, &item, revision + 1)
+    super::super::items::test_support::replace_item_in_tx(&mut transaction, &item, revision + 1)
         .await
         .expect("persist");
     transaction.commit().await.expect("commit seed");

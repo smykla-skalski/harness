@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction};
 
-use super::triage_apply::{TriageOutcome, apply_placement_effect_in_tx, placement_matches_verdict};
+use super::items::TriageOutcome;
+use super::triage_apply::{apply_placement_effect_in_tx, placement_matches_verdict};
 use crate::daemon::db::CliError;
 use crate::task_board::{TaskBoardItem, TaskBoardLaneOrigin, TaskBoardTriageDecision};
 

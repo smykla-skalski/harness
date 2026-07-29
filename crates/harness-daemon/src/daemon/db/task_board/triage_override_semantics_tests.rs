@@ -1,6 +1,6 @@
 use sqlx::query;
 
-use super::super::super::items::{load_item_in_tx, replace_item_in_tx};
+use super::super::super::items::test_support::{load_item_in_tx, replace_item_in_tx};
 use super::super::super::triage_apply::apply_builtin_v1_triage_in_tx;
 use super::super::{
     TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideSetInput,

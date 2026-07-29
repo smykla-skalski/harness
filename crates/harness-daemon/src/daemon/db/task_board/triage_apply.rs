@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
+use super::items::TriageOutcome;
 use super::lane_order::{LaneTransitionKind, load_lane_entries_in_tx};
 use super::triage_cause::triage_cause;
 use super::triage_decisions::{current_triage_decision_in_tx, record_triage_decision_in_tx};
@@ -24,24 +25,6 @@ pub(super) fn triage_eligible(item: &TaskBoardItem) -> bool {
             item.status.canonical_persisted_status(),
             TaskBoardStatus::Inbox | TaskBoardStatus::Todo
         )
-}
-
-/// Distinguishes a freshly recorded `BuiltInV1` decision (a new history
-/// generation) from an existing decision whose placement effect was merely
-/// reapplied (no new generation) -- callers must never audit the latter as
-/// `triage_decided`.
-#[derive(Debug)]
-pub(super) enum TriageOutcome {
-    Decided(TaskBoardTriageDecision),
-    RetainedEffect(TaskBoardTriageDecision),
-}
-
-impl TriageOutcome {
-    pub(super) const fn decision(&self) -> &TaskBoardTriageDecision {
-        match self {
-            Self::Decided(decision) | Self::RetainedEffect(decision) => decision,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -398,33 +381,6 @@ fn demote_automatic_todo_to_inbox(item: &mut TaskBoardItem) {
     item.lane_position = None;
     item.lane_origin = None;
     item.lane_set_at = None;
-}
-
-/// A direct human status move on the general item-update endpoint is never
-/// itself a durable `Manual` lane anchor -- that explicit override control
-/// is a separate feature -- but it still invalidates whatever `Automatic`
-/// placement `BuiltInV1` previously recorded. Clearing that stale
-/// provenance here (rather than suppressing placement while leaving the old
-/// `Automatic` tag attached) keeps the item eligible for a fresh automatic
-/// placement on its next eligible evaluation and stops the audit trail from
-/// misattributing a human-chosen status to the evaluator. An existing
-/// `Manual` anchor is left untouched.
-pub(super) fn clear_stale_automatic_placement_on_human_status_move(
-    before_status: TaskBoardStatus,
-    item: &mut TaskBoardItem,
-) {
-    if before_status == item.status.canonical_persisted_status() {
-        return;
-    }
-    let is_stale_automatic = item
-        .lane_origin
-        .as_ref()
-        .is_some_and(|origin| !origin.is_manual());
-    if is_stale_automatic {
-        item.lane_position = None;
-        item.lane_origin = None;
-        item.lane_set_at = None;
-    }
 }
 
 /// Whether `item`'s current, persisted placement already reflects `verdict`
