@@ -38,6 +38,7 @@ pub(super) async fn route_session_notification(
         log_replayed_notification(&routed.notification.session_id);
         return Ok(());
     }
+    session_state::apply_live_turn_update(supervisor, &routed.notification.update);
     notifications
         .send(routed)
         .await

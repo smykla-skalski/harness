@@ -314,7 +314,10 @@ async fn a_failed_admission_clears_the_dead_execution_owner() {
             intent_id: retry_intent,
             preparation,
         } => {
-            assert_ne!(retry_intent, intent_id, "a retry must not reuse the dead intent");
+            assert_ne!(
+                retry_intent, intent_id,
+                "a retry must not reuse the dead intent"
+            );
             preparation.workflow_execution_id
         }
         ReservedTaskBoardDispatch::Applied(_) | ReservedTaskBoardDispatch::Blocked(_) => {

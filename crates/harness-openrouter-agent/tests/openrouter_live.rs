@@ -1,9 +1,7 @@
 //! Explicit live validation for the OpenRouter HTTP adapter.
 
 use futures_util::StreamExt;
-use harness_openrouter_agent::openrouter::{
-    ChatMessage, ChatRequest, ChatRole, OpenRouterClient,
-};
+use harness_openrouter_agent::openrouter::{ChatMessage, ChatRequest, ChatRole, OpenRouterClient};
 
 const DEFAULT_BASE_URL: &str = "https://openrouter.ai/api/v1";
 const DEFAULT_MODEL: &str = "deepseek/deepseek-v4-flash";
@@ -79,7 +77,5 @@ fn request(model: &str) -> ChatRequest {
 }
 
 fn fail(stage: &str, model: &str, error: impl std::fmt::Display) -> ! {
-    panic!(
-        "OpenRouter live validation failed: stage={stage} requested_model={model}: {error}"
-    )
+    panic!("OpenRouter live validation failed: stage={stage} requested_model={model}: {error}")
 }

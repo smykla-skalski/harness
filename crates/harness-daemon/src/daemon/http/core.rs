@@ -170,10 +170,9 @@ pub(super) async fn post_headless_readiness(
         })??;
         let orchestrator = orchestrator?;
         let probe_snapshot = cached_probe_snapshot();
-        let runtime_probe = probe_snapshot.as_ref().map_or(
-            service::RuntimeProbe::Pending,
-            service::RuntimeProbe::Ready,
-        );
+        let runtime_probe = probe_snapshot
+            .as_ref()
+            .map_or(service::RuntimeProbe::Pending, service::RuntimeProbe::Ready);
         let (credential, model_available) = assess_headless_provider(&request).await;
         Ok(service::build_headless_readiness_report(
             &service::HeadlessReadinessInputs {

@@ -117,6 +117,10 @@ impl OpenRouterClient {
                     yield chunk;
                 }
             }
+            if trim_trailing_ascii(&buffer) == b"data: [DONE]" {
+                return;
+            }
+            Err(OpenRouterError::IncompleteStream)?;
         };
         Ok(Box::pin(stream))
     }

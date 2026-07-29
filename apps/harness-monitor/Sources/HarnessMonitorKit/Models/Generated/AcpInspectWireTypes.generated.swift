@@ -73,6 +73,21 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
   }
 }
 
+public struct AcpAgentTurnResult: Codable, Equatable, Sendable {
+  public var report: String
+  public var stopReason: String
+
+  public init(report: String, stopReason: String) {
+    self.report = report
+    self.stopReason = stopReason
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case report
+    case stopReason = "stop_reason"
+  }
+}
+
 public struct AcpAgentSessionState: Codable, Equatable, Sendable {
   public var configOptions: [AcpSessionConfigOptionState]
   public var currentModeId: String?
@@ -80,14 +95,16 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
   public var title: String?
   public var updatedAt: String?
   public var lastStopReason: String?
+  public var lastTurnResult: AcpAgentTurnResult?
 
-  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil, lastStopReason: String? = nil) {
+  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil, lastStopReason: String? = nil, lastTurnResult: AcpAgentTurnResult? = nil) {
     self.configOptions = configOptions
     self.currentModeId = currentModeId
     self.availableCommands = availableCommands
     self.title = title
     self.updatedAt = updatedAt
     self.lastStopReason = lastStopReason
+    self.lastTurnResult = lastTurnResult
   }
 
   public init(from decoder: Decoder) throws {
@@ -98,6 +115,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     title = try container.decodeIfPresent(String.self, forKey: .title)
     updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
     lastStopReason = try container.decodeIfPresent(String.self, forKey: .lastStopReason)
+    lastTurnResult = try container.decodeIfPresent(AcpAgentTurnResult.self, forKey: .lastTurnResult)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -107,6 +125,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     case title
     case updatedAt = "updated_at"
     case lastStopReason = "last_stop_reason"
+    case lastTurnResult = "last_turn_result"
   }
 }
 

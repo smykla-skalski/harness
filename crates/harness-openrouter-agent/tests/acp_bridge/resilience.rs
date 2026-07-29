@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn http_error_surfaces_as_end_turn_with_diagnostic_chunk() {
+async fn http_error_fails_the_prompt_with_a_separate_diagnostic() {
     let server = MockServer::start().await;
     mount_models(&server).await;
     Mock::given(method("POST"))
@@ -22,26 +22,147 @@ async fn http_error_surfaces_as_end_turn_with_diagnostic_chunk() {
                 .send_request(NewSessionRequest::new(std::env::temp_dir()))
                 .block_task()
                 .await?;
-            let response = cx
+            let error = cx
                 .send_request(PromptRequest::new(
                     session.session_id,
                     vec![ContentBlock::Text(TextContent::new("Hi"))],
                 ))
                 .block_task()
-                .await?;
-            assert!(matches!(response.stop_reason, StopReason::EndTurn));
+                .await
+                .expect_err("provider failure must fail the prompt");
+            assert!(
+                error.message.contains("rate limit"),
+                "unexpected prompt error: {error:?}"
+            );
             Ok(())
         })
         .await
         .expect("connection drives to completion");
-    let chunks = log_for_assert.snapshot().join("");
+    assert!(log_for_assert.snapshot().is_empty());
+    let chunks = log_for_assert.diagnostic_snapshot().join("");
     assert!(
         chunks.contains("openrouter error"),
         "expected diagnostic chunk, got {chunks:?}",
     );
     assert!(
+        chunks.matches("openrouter error").count() == 1,
+        "diagnostic repeated its error prefix: {chunks:?}",
+    );
+    assert!(
         chunks.to_lowercase().contains("rate limit"),
         "expected rate-limit phrasing, got {chunks:?}",
+    );
+}
+
+#[tokio::test]
+async fn malformed_stream_fails_after_preserving_only_diagnostics_and_partial_output() {
+    let server = MockServer::start().await;
+    mount_models(&server).await;
+    let body = concat!(
+        "data: {\"id\":\"partial\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n",
+        "data: {not-json}\n\n",
+        "data: [DONE]\n\n",
+    );
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(body),
+        )
+        .mount(&server)
+        .await;
+
+    let (agent, _key_tmp) = build_agent(&server.uri());
+    let log = ChunkLog::default();
+    let log_for_assert = log.clone();
+    client_builder_with_chunks(log)
+        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
+            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
+                .block_task()
+                .await?;
+            let session = cx
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
+                .block_task()
+                .await?;
+            let error = cx
+                .send_request(PromptRequest::new(
+                    session.session_id,
+                    vec![ContentBlock::Text(TextContent::new("Hi"))],
+                ))
+                .block_task()
+                .await
+                .expect_err("malformed stream must fail the prompt");
+            assert!(
+                error
+                    .message
+                    .contains("failed to parse OpenRouter response"),
+                "unexpected prompt error: {error:?}"
+            );
+            Ok(())
+        })
+        .await
+        .expect("connection drives to completion");
+
+    assert_eq!(log_for_assert.snapshot(), vec!["partial"]);
+    assert!(
+        log_for_assert
+            .diagnostic_snapshot()
+            .join("")
+            .contains("failed to parse OpenRouter response")
+    );
+}
+
+#[tokio::test]
+async fn truncated_stream_without_done_fails_instead_of_returning_partial_success() {
+    let server = MockServer::start().await;
+    mount_models(&server).await;
+    let body = "data: {\"id\":\"partial\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n";
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(body),
+        )
+        .mount(&server)
+        .await;
+
+    let (agent, _key_tmp) = build_agent(&server.uri());
+    let log = ChunkLog::default();
+    let log_for_assert = log.clone();
+    client_builder_with_chunks(log)
+        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
+            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
+                .block_task()
+                .await?;
+            let session = cx
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
+                .block_task()
+                .await?;
+            let error = cx
+                .send_request(PromptRequest::new(
+                    session.session_id,
+                    vec![ContentBlock::Text(TextContent::new("Hi"))],
+                ))
+                .block_task()
+                .await
+                .expect_err("truncated stream must fail the prompt");
+            assert!(
+                error.message.contains("ended before [DONE]"),
+                "unexpected prompt error: {error:?}"
+            );
+            Ok(())
+        })
+        .await
+        .expect("connection drives to completion");
+
+    assert_eq!(log_for_assert.snapshot(), vec!["partial"]);
+    assert!(
+        log_for_assert
+            .diagnostic_snapshot()
+            .join("")
+            .contains("ended before [DONE]")
     );
 }
 

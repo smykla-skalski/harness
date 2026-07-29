@@ -20,12 +20,12 @@ use std::sync::Mutex;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     ContentBlock, CreateTerminalRequest, CreateTerminalResponse, InitializeRequest,
-    KillTerminalRequest, KillTerminalResponse, NewSessionRequest,
-    PromptRequest, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
-    ReleaseTerminalResponse, RequestPermissionRequest, RequestPermissionResponse,
-    SessionConfigKind, SessionNotification, SessionUpdate, StopReason, TerminalId,
-    TerminalOutputRequest, TerminalOutputResponse, TextContent, WaitForTerminalExitRequest,
-    WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
+    KillTerminalRequest, KillTerminalResponse, NewSessionRequest, PromptRequest,
+    ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest, ReleaseTerminalResponse,
+    RequestPermissionRequest, RequestPermissionResponse, SessionConfigKind, SessionNotification,
+    SessionUpdate, StopReason, TerminalId, TerminalOutputRequest, TerminalOutputResponse,
+    TextContent, WaitForTerminalExitRequest, WaitForTerminalExitResponse, WriteTextFileRequest,
+    WriteTextFileResponse,
 };
 use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, Client, ConnectionTo};
 use tokio::process::Command;
@@ -37,6 +37,7 @@ const BIN_PATH: &str = env!("CARGO_BIN_EXE_harness-openrouter-agent");
 #[derive(Debug, Default, Clone)]
 pub(super) struct ChunkLog {
     inner: Arc<Mutex<Vec<String>>>,
+    diagnostics: Arc<Mutex<Vec<String>>>,
 }
 
 impl ChunkLog {
@@ -46,6 +47,14 @@ impl ChunkLog {
 
     pub(super) fn snapshot(&self) -> Vec<String> {
         self.inner.lock().expect("lock").clone()
+    }
+
+    pub(super) fn push_diagnostic(&self, text: String) {
+        self.diagnostics.lock().expect("lock").push(text);
+    }
+
+    pub(super) fn diagnostic_snapshot(&self) -> Vec<String> {
+        self.diagnostics.lock().expect("lock").clone()
     }
 }
 
@@ -95,10 +104,18 @@ pub(super) fn client_builder_with_chunks(
         .name("test-client")
         .on_receive_notification(
             async move |notif: SessionNotification, _cx| {
-                if let SessionUpdate::AgentMessageChunk(chunk) = notif.update
-                    && let ContentBlock::Text(text) = chunk.content
-                {
-                    log.push(text.text);
+                match notif.update {
+                    SessionUpdate::AgentMessageChunk(chunk) => {
+                        if let ContentBlock::Text(text) = chunk.content {
+                            log.push(text.text);
+                        }
+                    }
+                    SessionUpdate::AgentThoughtChunk(chunk) => {
+                        if let ContentBlock::Text(text) = chunk.content {
+                            log.push_diagnostic(text.text);
+                        }
+                    }
+                    _ => {}
                 }
                 Ok(())
             },

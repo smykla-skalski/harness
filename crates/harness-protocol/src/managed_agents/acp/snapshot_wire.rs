@@ -252,7 +252,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::models::AcpSessionConfigOptionState;
+    use super::super::models::{AcpAgentTurnResult, AcpSessionConfigOptionState};
     use super::{
         AcpAgentHandshake, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
     };
@@ -364,6 +364,10 @@ mod tests {
             title: Some("Renamed".into()),
             updated_at: None,
             last_stop_reason: Some("refusal".into()),
+            last_turn_result: Some(AcpAgentTurnResult {
+                report: "complete report".into(),
+                stop_reason: "refusal".into(),
+            }),
         });
         let value = serde_json::to_value(&snapshot).expect("serialize inspect snapshot");
         assert_eq!(value["handshake"]["protocol_version"], 1);

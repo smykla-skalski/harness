@@ -61,10 +61,7 @@ pub(crate) async fn probe_openrouter_readiness(
 
 async fn probe_at(base_url: &str, token: &str, requested_model: &str) -> OpenRouterReadiness {
     let url = format!("{}/models/user", base_url.trim_end_matches('/'));
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(REQUEST_TIMEOUT)
-        .build()
-    else {
+    let Ok(client) = reqwest::Client::builder().timeout(REQUEST_TIMEOUT).build() else {
         return unverified("could not build HTTP client");
     };
     let response = match client

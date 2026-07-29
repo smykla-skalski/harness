@@ -5,6 +5,9 @@ use serde::Serialize;
 
 use super::*;
 
+mod permissions;
+mod transcript;
+
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
 const CODEX_MODEL: &str = "gpt-5.3-codex-spark";
 const SMOKE_TIMEOUT: Duration = Duration::from_secs(180);
@@ -271,12 +274,23 @@ fn poll_openrouter(
                 .iter()
                 .find(|agent| agent["managed_agent_id"] == managed_agent_id)
         });
-        let stop_reason = agent
-            .and_then(|agent| agent.pointer("/session_state/last_stop_reason"))
-            .and_then(Value::as_str);
-        if let Some(terminal_status) = stop_reason {
+        let terminal_result =
+            agent.and_then(|agent| agent.pointer("/session_state/last_turn_result"));
+        if let Some(terminal_result) = terminal_result {
+            let terminal_status = terminal_result["stop_reason"].as_str().unwrap_or("unknown");
             let effective_model = agent.and_then(openrouter_effective_model);
-            let report = openrouter_report(http, correlation_id)?;
+            let report = terminal_result["report"]
+                .as_str()
+                .filter(|report| !report.trim().is_empty())
+                .ok_or_else(|| {
+                    SmokeFailure::new(
+                        correlation_id,
+                        runtime,
+                        OPENROUTER_MODEL,
+                        "result_collection",
+                        "terminal result omitted a complete report",
+                    )
+                })?;
             if effective_model.as_deref() != Some(OPENROUTER_MODEL) {
                 return Err(SmokeFailure::new(
                     correlation_id,
@@ -295,32 +309,32 @@ fn poll_openrouter(
                     format!("terminal status was {terminal_status}"),
                 ));
             }
-            if let Some(report) = report {
-                return Ok(completed_report(
-                    correlation_id,
-                    runtime,
-                    OPENROUTER_MODEL,
-                    effective_model,
-                    terminal_status,
-                    report,
-                ));
-            }
-        }
-        if Instant::now() >= deadline {
-            let transcript_path =
-                format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
-            let transcript = http
-                .request_json(Method::GET, &transcript_path, None)
-                .unwrap_or_else(|error| json!({ "read_error": error }));
-            return Err(SmokeFailure::new(
+            return Ok(completed_report(
                 correlation_id,
                 runtime,
                 OPENROUTER_MODEL,
-                "result_collection",
-                format!(
-                    "timed out waiting for terminal state and report; inspect={inspect}; transcript={transcript}"
-                ),
+                effective_model,
+                terminal_status,
+                report.to_owned(),
             ));
+        }
+        if agent
+            .and_then(|agent| agent["pending_permissions"].as_u64())
+            .is_some_and(|count| count > 0)
+        {
+            permissions::reject_pending_permissions(http, managed_agent_id).map_err(|error| {
+                SmokeFailure::new(
+                    correlation_id,
+                    runtime,
+                    OPENROUTER_MODEL,
+                    "permission_resolution",
+                    error,
+                )
+            })?;
+        }
+        transcript::fail_on_openrouter_error(http, correlation_id)?;
+        if Instant::now() >= deadline {
+            return Err(transcript::timeout_failure(http, correlation_id, &inspect));
         }
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
@@ -335,47 +349,6 @@ fn openrouter_effective_model(agent: &Value) -> Option<String> {
         .get("current_value")?
         .as_str()
         .map(ToOwned::to_owned)
-}
-
-fn openrouter_report(
-    http: &DaemonHttpClient,
-    correlation_id: &str,
-) -> Result<Option<String>, SmokeFailure> {
-    let path = format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
-    let transcript = http
-        .request_json(Method::GET, &path, None)
-        .map_err(|error| {
-            SmokeFailure::new(
-                correlation_id,
-                "openrouter",
-                OPENROUTER_MODEL,
-                "result_collection",
-                error,
-            )
-        })?;
-    transcript["entries"]
-        .as_array()
-        .and_then(|entries| {
-            entries
-                .iter()
-                .find(|entry| entry["kind"] == "assistant_text")
-                .and_then(|entry| entry["summary"].as_str())
-        })
-        .map(|report| validate_openrouter_report(correlation_id, report))
-        .transpose()
-}
-
-fn validate_openrouter_report(correlation_id: &str, report: &str) -> Result<String, SmokeFailure> {
-    if report.trim_start().starts_with("[openrouter error]") {
-        return Err(SmokeFailure::new(
-            correlation_id,
-            "openrouter",
-            OPENROUTER_MODEL,
-            "execution",
-            report,
-        ));
-    }
-    Ok(report.to_owned())
 }
 
 fn run_codex(
@@ -501,16 +474,4 @@ fn required_env(name: &str, runtime: &str, model: &str) -> String {
         "live agent smoke stopped before network: stage=credential runtime={runtime} requested_model={model}: {name} is missing or empty"
     );
     value
-}
-
-#[test]
-fn openrouter_provider_error_is_classified_as_failure() {
-    let error = validate_openrouter_report(
-        "correlation-id",
-        "[openrouter error] openrouter error: authentication failed",
-    )
-    .expect_err("provider error text must not become a successful report");
-
-    assert_eq!(error.stage, "execution");
-    assert!(error.error.contains("authentication failed"));
 }

@@ -288,11 +288,8 @@ fn catalogued_but_live_unavailable_model_is_rejected() {
     assert!(!report.ready);
     assert!(!report.model.available);
     assert!(
-        report
-            .unmet_requirements
-            .iter()
-            .any(|reason| reason
-                .contains("model 'deepseek/deepseek-v4-flash' is unavailable for runtime")),
+        report.unmet_requirements.iter().any(|reason| reason
+            .contains("model 'deepseek/deepseek-v4-flash' is unavailable for runtime")),
         "expected a live model-unavailable reason, got {:?}",
         report.unmet_requirements
     );

@@ -3,12 +3,12 @@
 
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::schema::v1::{
-    PromptResponse, SessionConfigKind, SessionConfigOption, SessionModeState, SessionUpdate,
-    SetSessionConfigOptionResponse, StopReason,
+    ContentBlock, PromptResponse, SessionConfigKind, SessionConfigOption, SessionModeState,
+    SessionUpdate, SetSessionConfigOptionResponse, StopReason,
 };
 
 use crate::agents::acp::supervision::AcpSessionSupervisor;
-use crate::daemon::agent_acp::AcpSessionConfigOptionState;
+use crate::daemon::agent_acp::{AcpAgentTurnResult, AcpSessionConfigOptionState};
 
 use super::session_config::session_config_category_name;
 
@@ -42,12 +42,43 @@ pub(super) fn record_config_snapshot(
     });
 }
 
+pub(super) fn begin_turn(supervisor: &AcpSessionSupervisor) {
+    supervisor.begin_turn_report();
+    supervisor.mutate_session_state(|state| {
+        state.last_stop_reason = None;
+        state.last_turn_result = None;
+    });
+}
+
+pub(super) fn discard_turn(supervisor: &AcpSessionSupervisor) {
+    supervisor.discard_turn_report();
+    supervisor.mutate_session_state(|state| {
+        state.last_stop_reason = None;
+        state.last_turn_result = None;
+    });
+}
+
+pub(super) fn apply_live_turn_update(supervisor: &AcpSessionSupervisor, update: &SessionUpdate) {
+    if let SessionUpdate::AgentMessageChunk(chunk) = update
+        && let ContentBlock::Text(text) = &chunk.content
+    {
+        supervisor.append_turn_report(&text.text);
+    }
+}
+
 /// Record why a prompt turn stopped, both on the inspectable session state and
 /// as a timeline event so a refusal is visible without reading the daemon log.
 pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &PromptResponse) {
     let label = stop_reason_label(response.stop_reason);
+    let report = supervisor.take_turn_report();
     supervisor.mutate_session_state(|state| {
         state.last_stop_reason = Some(label.to_owned());
+        if let Some(report) = report {
+            state.last_turn_result = Some(AcpAgentTurnResult {
+                report,
+                stop_reason: label.to_owned(),
+            });
+        }
     });
     if let Some(emitter) = supervisor.event_emitter() {
         emitter.emit_turn_ended(label.to_owned());
