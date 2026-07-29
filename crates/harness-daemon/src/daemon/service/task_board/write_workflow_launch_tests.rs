@@ -5,7 +5,113 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::daemon::service::sync_task_board_github_tokens;
-use crate::task_board::{TaskBoardGitHubTokensSyncRequest, TaskBoardOrchestratorSettings};
+use crate::task_board::{
+    TaskBoardGitHubTokensSyncRequest, TaskBoardOrchestratorSettings,
+    TaskBoardPullRequestHeadIdentity, TaskBoardWorkflowKind,
+};
+
+fn dependency_item() -> TaskBoardItem {
+    let mut item = approved_item("dep-item", Some("acme/widgets"));
+    item.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    item
+}
+
+fn frozen_identity(revision: &str) -> TaskBoardPullRequestIdentity {
+    TaskBoardPullRequestIdentity {
+        repository: "acme/widgets".into(),
+        number: 17,
+        head: Some(TaskBoardPullRequestHeadIdentity {
+            repository: "acme/widgets".into(),
+            branch: "renovate/dependency-update".into(),
+            revision: revision.into(),
+        }),
+    }
+}
+
+/// The frozen pull request head, not the session worktree HEAD, is the dependency base. The
+/// worktree starts on the default branch, so demanding they match rejected every real launch.
+#[test]
+fn dependency_identity_freezes_the_pull_request_head_over_the_worktree() {
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    runtime.block_on(async {
+        let item = dependency_item();
+        let (pull_request, base_head_revision) = resolve_write_identity(
+            &item,
+            "/nonexistent/worktree",
+            Some(frozen_identity("cafef00d")),
+        )
+        .await
+        .expect("dependency identity resolves without a worktree checkout");
+
+        assert_eq!(base_head_revision, "cafef00d");
+        assert_eq!(
+            pull_request
+                .and_then(|identity| identity.head)
+                .map(|head| head.revision),
+            Some("cafef00d".to_string())
+        );
+    });
+}
+
+#[test]
+fn dependency_identity_requires_a_frozen_head() {
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    runtime.block_on(async {
+        let item = dependency_item();
+        let mut identity = frozen_identity("cafef00d");
+        identity.head = None;
+
+        let error = resolve_write_identity(&item, "/nonexistent/worktree", Some(identity))
+            .await
+            .expect_err("a dependency launch without a frozen head must fail");
+
+        assert!(
+            error.to_string().contains("no frozen pull request head"),
+            "unexpected error: {error}"
+        );
+    });
+}
+
+#[test]
+fn stale_pull_request_head_stops_before_agent_work() {
+    let error = stop_on_stale_pull_request_head(
+        Some(&frozen_identity("deadbeef")),
+        Some(&frozen_identity("cafef00d")),
+    )
+    .expect_err("a changed head must stop the launch");
+
+    let message = error.to_string();
+    assert!(
+        message.contains("stale head")
+            && message.contains("cafef00d")
+            && message.contains("deadbeef"),
+        "stale head reason must name both revisions: {message}"
+    );
+}
+
+#[test]
+fn a_changed_pull_request_number_reports_an_identity_change_not_a_stale_head() {
+    let mut fresh = frozen_identity("cafef00d");
+    fresh.number = 18;
+
+    let error = stop_on_stale_pull_request_head(Some(&fresh), Some(&frozen_identity("cafef00d")))
+        .expect_err("a changed pull request number must stop the launch");
+
+    let message = error.to_string();
+    assert!(
+        message.contains("identity changed") && !message.contains("stale head"),
+        "a changed number must not be reported as a stale head: {message}"
+    );
+}
+
+#[test]
+fn unchanged_pull_request_head_is_not_stale() {
+    stop_on_stale_pull_request_head(
+        Some(&frozen_identity("cafef00d")),
+        Some(&frozen_identity("cafef00d")),
+    )
+    .expect("an unchanged head must not be reported stale");
+}
 
 fn run_git(path: &std::path::Path, args: &[&str]) {
     let output = Command::new("git")
