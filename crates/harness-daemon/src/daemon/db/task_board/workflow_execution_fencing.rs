@@ -39,8 +39,12 @@ use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardWorkflowCasMismatch,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
 };
-use workflow_first_start_admission::TaskBoardFirstStartAdmission;
 use workflow_terminal::{PreparedDispatchSettlement, TaskBoardWorkflowTerminalProjection};
+
+/// Re-exported so remote never imports `TaskBoardFirstStartAdmission` from
+/// `workflow_first_start_admission` directly: the admission bridge's return
+/// type comes through this one door along with the trait that produces it.
+pub(in crate::daemon::db::task_board) use workflow_first_start_admission::TaskBoardFirstStartAdmission;
 
 pub(in crate::daemon::db::task_board) trait WorkflowExecutionFencing:
     Send + Sync

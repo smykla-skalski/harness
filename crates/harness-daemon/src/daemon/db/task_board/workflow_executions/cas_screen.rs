@@ -4,8 +4,9 @@ use super::{
     cas_mismatch, ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,
     validate_phase_change,
 };
-use crate::daemon::db::task_board::remote_assignment_fencing::RemoteAssignmentFencing;
-use crate::daemon::db::task_board::remote_assignment_stop_fence::RemoteTargetStopPlan;
+use crate::daemon::db::task_board::remote_assignment_fencing::{
+    RemoteAssignmentFencing, RemoteTargetStopPlan,
+};
 use crate::daemon::db::task_board::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{

@@ -4,8 +4,7 @@ use super::super::audit::insert_audit_event_if_absent_in_tx;
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::automation_cancel_targets::cancel_target_in_tx;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_fencing::RemoteAssignmentFencing;
-use super::remote_assignment_stop_fence::RemoteTargetStopPlan;
+use super::remote_assignment_fencing::{RemoteAssignmentFencing, RemoteTargetStopPlan};
 use super::workflow_execution_attempts::{
     attempt_cas_matches, validate_atomic_execution_attempt_update,
 };

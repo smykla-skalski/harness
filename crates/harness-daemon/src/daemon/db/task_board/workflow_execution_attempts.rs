@@ -3,7 +3,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use self::atomic::{AtomicCasExpectation, apply_atomic_cas_in_tx, decide_atomic_cas_in_tx};
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_model::concurrent;
+use super::remote_assignment_fencing::concurrent;
 use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json, label};
 use super::workflow_executions::{
     ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,

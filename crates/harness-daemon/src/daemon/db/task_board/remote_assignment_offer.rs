@@ -15,9 +15,8 @@ use super::remote_outbound_sources::{
     persist_outbound_source_in_tx, require_outbound_source_in_tx,
 };
 use super::workflow_execution_attempts::update_attempt_in_tx;
-use super::workflow_execution_fencing::WorkflowExecutionFencing;
+use super::workflow_execution_fencing::{TaskBoardFirstStartAdmission, WorkflowExecutionFencing};
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
-use super::workflow_first_start_admission::TaskBoardFirstStartAdmission;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_codex_requests::remote_codex_attempt_request;
 use crate::task_board::TaskBoardExecutionPhase;

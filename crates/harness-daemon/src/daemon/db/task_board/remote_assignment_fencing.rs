@@ -22,18 +22,27 @@
 //! `settle_prepared_dispatch_in_tx`/`project_terminal_execution_in_tx` (see
 //! `workflow_execution_fencing`).
 //!
+//! `RemoteTargetStopPlan` and `concurrent` are re-exported here rather than
+//! trait methods: the former is `remote_target_stop_plan_in_tx`'s return
+//! type, needed by callers to match on it, not a decision of its own; the
+//! latter is a generic `CliError` constructor with no fencing behavior. Both
+//! still cross the same boundary, so they get the same one door rather than
+//! a second, undocumented way in.
+//!
 //! No method takes `&self`, for the same reason as the workflow-execution
 //! side of this interface: every real call site already holds an open
 //! transaction and nothing else from `AsyncDaemonDb`.
 
 use sqlx::{Sqlite, Transaction};
 
-use super::remote_assignment_stop_fence::RemoteTargetStopPlan;
 use super::{remote_assignment_active_fence, remote_assignment_io_authority};
 use super::{remote_assignment_model, remote_assignment_stop_fence};
 use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use remote_assignment_model::TaskBoardRemoteAssignmentRecord;
+
+pub(in crate::daemon::db::task_board) use remote_assignment_model::concurrent;
+pub(in crate::daemon::db::task_board) use remote_assignment_stop_fence::RemoteTargetStopPlan;
 
 pub(in crate::daemon::db::task_board) trait RemoteAssignmentFencing:
     Send + Sync

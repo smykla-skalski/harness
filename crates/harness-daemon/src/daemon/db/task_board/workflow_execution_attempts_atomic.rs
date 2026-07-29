@@ -6,8 +6,7 @@ use sqlx::{Sqlite, Transaction};
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
-use super::super::remote_assignment_fencing::RemoteAssignmentFencing;
-use super::super::remote_assignment_stop_fence::RemoteTargetStopPlan;
+use super::super::remote_assignment_fencing::{RemoteAssignmentFencing, RemoteTargetStopPlan};
 use super::super::workflow_executions::{
     cas_mismatch, load_execution_in_tx, update_execution_in_tx,
 };
