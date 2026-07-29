@@ -382,6 +382,10 @@ mod tests {
         let wait = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         assert_contradiction(&wait);
 
+        let mut pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
+        pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
+        assert_eq!(validate(&pending), Ok(()));
+
         let mut failed_while_pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         failed_while_pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
         failed_while_pending.checks.push(TaskBoardDependencyCheck {
