@@ -12,8 +12,10 @@ use crate::agents::acp::catalog::{
     AcpSessionEffortTransport, AcpSessionModelTransport,
 };
 use crate::agents::acp::supervision::AcpSessionSupervisor;
-use crate::daemon::agent_acp::AcpMcpServer;
 use crate::daemon::agent_acp::manager::AcpAgentStartRequest;
+use crate::daemon::agent_acp::{
+    AcpMcpServer, AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::daemon::agent_acp) struct AcpSessionRequestConfig {
@@ -229,14 +231,14 @@ async fn apply_config_option_value(
 ) -> AcpResult<()> {
     let option =
         find_config_option(config_options, selector, default_category).ok_or_else(|| {
-            AcpError::new(
-                -32603,
+            configuration_error(
+                field_name,
                 format!("ACP session config option for {field_name} is not advertised"),
             )
         })?;
     let value = config_request_value(option, requested_value).ok_or_else(|| {
-        AcpError::new(
-            -32603,
+        configuration_error(
+            field_name,
             format!(
                 "ACP session config option '{}' does not accept '{}'",
                 option.id, requested_value
@@ -244,6 +246,19 @@ async fn apply_config_option_value(
         )
     })?;
     send_set_config_option(supervisor, connection, session_id, option, value).await
+}
+
+fn configuration_error(field_name: &str, message: String) -> AcpError {
+    let error = AcpError::new(-32603, message);
+    if field_name != "model" {
+        return error;
+    }
+    let failure = AgentTurnFailure::new(
+        AgentTurnFailureCategory::UnsupportedModel,
+        AgentTurnFailureStage::Start,
+        "requested model is not supported by the agent",
+    );
+    error.data(serde_json::to_value(failure).ok())
 }
 
 fn find_config_option<'a>(

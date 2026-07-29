@@ -4,6 +4,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use super::super::runtime_failures::AgentTurnFailure;
 use super::super::runtime_models::RuntimeModelCatalog;
 use super::mcp::{AcpMcpServer, serialize_mcp_servers_redacted};
 use crate::session::{AgentStatus, SessionRole};
@@ -382,6 +383,9 @@ pub struct AcpAgentSessionState {
     /// Atomic terminal result for the most recent completed prompt turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_turn_result: Option<AcpAgentTurnResult>,
+    /// Structured terminal failure for the most recent unsuccessful prompt turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_turn_failure: Option<AgentTurnFailure>,
 }
 
 /// One session an agent reports from `session/list`.

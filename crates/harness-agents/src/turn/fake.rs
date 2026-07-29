@@ -5,12 +5,15 @@ use std::sync::{Mutex, MutexGuard};
 use async_trait::async_trait;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::{AgentTurnId, AgentTurnRequest, AgentTurnResult, AgentTurnRuntime, AgentTurnStatus};
+use super::{
+    AgentTurnFailure, AgentTurnFailureStage, AgentTurnId, AgentTurnRequest, AgentTurnResult,
+    AgentTurnRuntime, AgentTurnStatus,
+};
 
 #[derive(Debug, Clone)]
 pub enum FakeAgentTurnPlan {
     Complete { report: String, stop_reason: String },
-    Fail,
+    Fail { failure: AgentTurnFailure },
 }
 
 impl FakeAgentTurnPlan {
@@ -23,8 +26,16 @@ impl FakeAgentTurnPlan {
     }
 
     #[must_use]
-    pub const fn fail() -> Self {
-        Self::Fail
+    pub fn fail() -> Self {
+        Self::failed(AgentTurnFailure::unknown(
+            AgentTurnFailureStage::Execution,
+            "scripted fake failure",
+        ))
+    }
+
+    #[must_use]
+    pub const fn failed(failure: AgentTurnFailure) -> Self {
+        Self::Fail { failure }
     }
 }
 
@@ -34,6 +45,7 @@ struct FakeAgentTurn {
     plan: FakeAgentTurnPlan,
     requested_model: Option<String>,
     result: Option<AgentTurnResult>,
+    failure: Option<AgentTurnFailure>,
 }
 
 #[derive(Debug, Default)]
@@ -83,7 +95,10 @@ impl FakeAgentTurnRuntime {
                         effective_model: turn.requested_model.clone(),
                     });
                 }
-                FakeAgentTurnPlan::Fail => turn.status = AgentTurnStatus::Failed,
+                FakeAgentTurnPlan::Fail { failure } => {
+                    turn.status = AgentTurnStatus::Failed;
+                    turn.failure = Some(failure.clone());
+                }
             },
             AgentTurnStatus::Completed | AgentTurnStatus::Failed | AgentTurnStatus::Cancelled => {}
         }
@@ -121,6 +136,7 @@ impl AgentTurnRuntime for FakeAgentTurnRuntime {
                 plan,
                 requested_model: request.requested_model,
                 result: None,
+                failure: None,
             },
         );
         Ok(id)
@@ -142,12 +158,21 @@ impl AgentTurnRuntime for FakeAgentTurnRuntime {
             .ok_or_else(|| unknown_turn(id))
     }
 
+    async fn failure(&self, id: &AgentTurnId) -> Result<Option<AgentTurnFailure>, CliError> {
+        self.lock_state()?
+            .turns
+            .get(id)
+            .map(|turn| turn.failure.clone())
+            .ok_or_else(|| unknown_turn(id))
+    }
+
     async fn cancel(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {
         let mut state = self.lock_state()?;
         let turn = state.turns.get_mut(id).ok_or_else(|| unknown_turn(id))?;
         if !turn.status.is_terminal() {
             turn.status = AgentTurnStatus::Cancelled;
             turn.result = None;
+            turn.failure = Some(AgentTurnFailure::cancelled("turn cancelled"));
         }
         Ok(turn.status)
     }

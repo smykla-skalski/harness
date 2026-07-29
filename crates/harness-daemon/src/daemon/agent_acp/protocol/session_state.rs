@@ -1,6 +1,7 @@
 //! Live session-state tap: session notifications and config responses feed
 //! the supervisor's [`AcpAgentSessionState`] surfaced through inspect.
 
+use agent_client_protocol::Error as AcpError;
 use agent_client_protocol::schema::MaybeUndefined;
 use agent_client_protocol::schema::v1::{
     ContentBlock, PromptResponse, SessionConfigKind, SessionConfigOption, SessionModeState,
@@ -8,7 +9,11 @@ use agent_client_protocol::schema::v1::{
 };
 
 use crate::agents::acp::supervision::AcpSessionSupervisor;
-use crate::daemon::agent_acp::{AcpAgentTurnResult, AcpSessionConfigOptionState};
+use crate::daemon::agent_acp::{
+    AcpAgentTurnResult, AcpSessionConfigOptionState, AgentTurnFailure, AgentTurnFailureCategory,
+    AgentTurnFailureStage,
+};
+use crate::daemon::remote_redaction::redact_known_secrets;
 
 use super::session_config::session_config_category_name;
 
@@ -47,14 +52,7 @@ pub(super) fn begin_turn(supervisor: &AcpSessionSupervisor) {
     supervisor.mutate_session_state(|state| {
         state.last_stop_reason = None;
         state.last_turn_result = None;
-    });
-}
-
-pub(super) fn discard_turn(supervisor: &AcpSessionSupervisor) {
-    supervisor.discard_turn_report();
-    supervisor.mutate_session_state(|state| {
-        state.last_stop_reason = None;
-        state.last_turn_result = None;
+        state.last_turn_failure = None;
     });
 }
 
@@ -71,9 +69,13 @@ pub(super) fn apply_live_turn_update(supervisor: &AcpSessionSupervisor, update: 
 pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &PromptResponse) {
     let label = stop_reason_label(response.stop_reason);
     let report = supervisor.take_turn_report();
+    let failure = stop_reason_failure(response.stop_reason);
     supervisor.mutate_session_state(|state| {
         state.last_stop_reason = Some(label.to_owned());
-        if let Some(report) = report {
+        state.last_turn_failure = failure;
+        if state.last_turn_failure.is_none()
+            && let Some(report) = report
+        {
             state.last_turn_result = Some(AcpAgentTurnResult {
                 report,
                 stop_reason: label.to_owned(),
@@ -82,6 +84,49 @@ pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &P
     });
     if let Some(emitter) = supervisor.event_emitter() {
         emitter.emit_turn_ended(label.to_owned());
+    }
+}
+
+pub(super) fn record_prompt_error(supervisor: &AcpSessionSupervisor, error: &AcpError) {
+    supervisor.discard_turn_report();
+    let mut failure = error
+        .data
+        .clone()
+        .and_then(|data| serde_json::from_value::<AgentTurnFailure>(data).ok())
+        .unwrap_or_else(|| unknown_acp_failure(error));
+    failure.stage = AgentTurnFailureStage::Execution;
+    failure.automatic_retry_safe = failure.category.automatic_retry_safe();
+    failure.detail = bounded_redacted_detail(&failure.detail);
+    supervisor.mutate_session_state(|state| {
+        state.last_stop_reason = None;
+        state.last_turn_result = None;
+        state.last_turn_failure = Some(failure);
+    });
+}
+
+fn bounded_redacted_detail(detail: &str) -> String {
+    redact_known_secrets(detail).chars().take(512).collect()
+}
+
+fn unknown_acp_failure(error: &AcpError) -> AgentTurnFailure {
+    let category = AgentTurnFailureCategory::from_message(&error.message);
+    let code = i32::from(error.code);
+    AgentTurnFailure::new(
+        category,
+        AgentTurnFailureStage::Execution,
+        format!("ACP session/prompt failed with error code {code}"),
+    )
+}
+
+fn stop_reason_failure(stop_reason: StopReason) -> Option<AgentTurnFailure> {
+    match stop_reason {
+        StopReason::Refusal => Some(AgentTurnFailure::new(
+            AgentTurnFailureCategory::ProviderRejected,
+            AgentTurnFailureStage::Execution,
+            "agent refused the prompt",
+        )),
+        StopReason::Cancelled => Some(AgentTurnFailure::cancelled("agent turn cancelled")),
+        _ => None,
     }
 }
 

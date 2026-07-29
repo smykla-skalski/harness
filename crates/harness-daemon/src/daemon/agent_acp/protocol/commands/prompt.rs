@@ -28,8 +28,8 @@ pub(super) async fn send_prompt(
     .and_then(std::convert::identity);
     if let Ok(response) = &response {
         super::super::session_state::record_stop_reason(supervisor, response);
-    } else {
-        super::super::session_state::discard_turn(supervisor);
+    } else if let Err(error) = &response {
+        super::super::session_state::record_prompt_error(supervisor, error);
     }
     response.map(drop)
 }

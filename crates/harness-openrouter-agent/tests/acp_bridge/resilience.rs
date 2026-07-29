@@ -34,6 +34,10 @@ async fn http_error_fails_the_prompt_with_a_separate_diagnostic() {
                 error.message.contains("rate limit"),
                 "unexpected prompt error: {error:?}"
             );
+            let failure = decode_failure(&error);
+            assert_eq!(failure.category, AgentTurnFailureCategory::RateLimited);
+            assert_eq!(failure.stage, AgentTurnFailureStage::Execution);
+            assert!(failure.automatic_retry_safe);
             Ok(())
         })
         .await
@@ -51,6 +55,53 @@ async fn http_error_fails_the_prompt_with_a_separate_diagnostic() {
     assert!(
         chunks.to_lowercase().contains("rate limit"),
         "expected rate-limit phrasing, got {chunks:?}",
+    );
+}
+
+#[tokio::test]
+async fn authentication_failure_does_not_expose_provider_body() {
+    let server = MockServer::start().await;
+    mount_models(&server).await;
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(401).set_body_string("token=super-secret"))
+        .mount(&server)
+        .await;
+
+    let (agent, _key_tmp) = build_agent(&server.uri());
+    let log = ChunkLog::default();
+    let diagnostics = log.clone();
+    client_builder_with_chunks(log)
+        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
+            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
+                .block_task()
+                .await?;
+            let session = cx
+                .send_request(NewSessionRequest::new(std::env::temp_dir()))
+                .block_task()
+                .await?;
+            let error = cx
+                .send_request(PromptRequest::new(
+                    session.session_id,
+                    vec![ContentBlock::Text(TextContent::new("Hi"))],
+                ))
+                .block_task()
+                .await
+                .expect_err("authentication failure must fail the prompt");
+            assert_eq!(
+                decode_failure(&error).category,
+                AgentTurnFailureCategory::Authentication
+            );
+            assert!(!error.message.contains("super-secret"));
+            Ok(())
+        })
+        .await
+        .expect("connection drives to completion");
+    assert!(
+        !diagnostics
+            .diagnostic_snapshot()
+            .join("")
+            .contains("super-secret")
     );
 }
 
@@ -94,10 +145,12 @@ async fn malformed_stream_fails_after_preserving_only_diagnostics_and_partial_ou
                 .await
                 .expect_err("malformed stream must fail the prompt");
             assert!(
-                error
-                    .message
-                    .contains("failed to parse OpenRouter response"),
+                error.message.contains("response stream was malformed"),
                 "unexpected prompt error: {error:?}"
+            );
+            assert_eq!(
+                decode_failure(&error).category,
+                AgentTurnFailureCategory::Transport
             );
             Ok(())
         })
@@ -109,7 +162,7 @@ async fn malformed_stream_fails_after_preserving_only_diagnostics_and_partial_ou
         log_for_assert
             .diagnostic_snapshot()
             .join("")
-            .contains("failed to parse OpenRouter response")
+            .contains("response stream was malformed")
     );
 }
 
@@ -152,6 +205,10 @@ async fn truncated_stream_without_done_fails_instead_of_returning_partial_succes
                 error.message.contains("ended before [DONE]"),
                 "unexpected prompt error: {error:?}"
             );
+            assert_eq!(
+                decode_failure(&error).category,
+                AgentTurnFailureCategory::Transport
+            );
             Ok(())
         })
         .await
@@ -164,6 +221,11 @@ async fn truncated_stream_without_done_fails_instead_of_returning_partial_succes
             .join("")
             .contains("ended before [DONE]")
     );
+}
+
+fn decode_failure(error: &agent_client_protocol::Error) -> AgentTurnFailure {
+    serde_json::from_value(error.data.clone().expect("structured failure data"))
+        .expect("decode structured failure")
 }
 
 #[tokio::test]

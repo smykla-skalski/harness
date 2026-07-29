@@ -14030,6 +14030,17 @@
             ],
             "description": "Why the most recent prompt turn stopped, as reported by the agent."
           },
+          "last_turn_failure": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTurnFailure",
+                "description": "Structured terminal failure for the most recent unsuccessful prompt turn."
+              }
+            ]
+          },
           "last_turn_result": {
             "oneOf": [
               {
@@ -15673,6 +15684,52 @@
           "exited",
           "failed",
           "stopped"
+        ]
+      },
+      "AgentTurnFailure": {
+        "type": "object",
+        "description": "Structured terminal failure used by every agent runtime.",
+        "required": [
+          "category",
+          "stage",
+          "automatic_retry_safe",
+          "detail"
+        ],
+        "properties": {
+          "automatic_retry_safe": {
+            "type": "boolean"
+          },
+          "category": {
+            "$ref": "#/components/schemas/AgentTurnFailureCategory"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/AgentTurnFailureStage"
+          }
+        }
+      },
+      "AgentTurnFailureCategory": {
+        "type": "string",
+        "description": "Provider-neutral reason an agent turn did not complete successfully.",
+        "enum": [
+          "provider_rejected",
+          "authentication",
+          "rate_limited",
+          "unsupported_model",
+          "transport",
+          "cancelled",
+          "unknown"
+        ]
+      },
+      "AgentTurnFailureStage": {
+        "type": "string",
+        "description": "Shared lifecycle boundary where a turn failed.",
+        "enum": [
+          "start",
+          "execution",
+          "cancellation"
         ]
       },
       "ArbitrationOutcome": {

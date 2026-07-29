@@ -1,9 +1,11 @@
 use async_trait::async_trait;
 
 use crate::agents::turn::{
-    AgentTurnId, AgentTurnRequest, AgentTurnResult, AgentTurnRuntime, AgentTurnStatus,
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnId,
+    AgentTurnRequest, AgentTurnResult, AgentTurnRuntime, AgentTurnStatus,
 };
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::remote_redaction::redact_known_secrets;
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -103,10 +105,38 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
         }))
     }
 
+    async fn failure(&self, id: &AgentTurnId) -> Result<Option<AgentTurnFailure>, CliError> {
+        let snapshot = self.snapshot(id)?;
+        match snapshot.status {
+            CodexRunStatus::Failed => Ok(Some(codex_failure(snapshot.error.as_deref()))),
+            CodexRunStatus::Cancelled => {
+                Ok(Some(AgentTurnFailure::cancelled("Codex turn cancelled")))
+            }
+            CodexRunStatus::Queued
+            | CodexRunStatus::Running
+            | CodexRunStatus::WaitingApproval
+            | CodexRunStatus::Completed => Ok(None),
+        }
+    }
+
     async fn cancel(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {
         self.bound_snapshot(id)?;
         Ok(shared_status(self.controller.stop(id.as_str())?.status))
     }
+}
+
+fn codex_failure(error: Option<&str>) -> AgentTurnFailure {
+    let raw_detail = error.unwrap_or("Codex execution failed without an error detail");
+    let category = AgentTurnFailureCategory::from_message(raw_detail);
+    AgentTurnFailure::new(
+        category,
+        AgentTurnFailureStage::Execution,
+        bounded_redacted_detail(raw_detail),
+    )
+}
+
+fn bounded_redacted_detail(detail: &str) -> String {
+    redact_known_secrets(detail).chars().take(512).collect()
 }
 
 const fn shared_status(status: CodexRunStatus) -> AgentTurnStatus {

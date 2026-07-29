@@ -2,6 +2,7 @@
 
 pub mod acp;
 pub mod codex;
+pub mod runtime_failures;
 pub mod runtime_models;
 pub mod tui;
 pub mod tui_input;

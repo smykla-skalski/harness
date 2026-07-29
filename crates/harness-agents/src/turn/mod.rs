@@ -4,6 +4,10 @@ use async_trait::async_trait;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 
+pub use harness_protocol::managed_agents::runtime_failures::{
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
+};
+
 #[cfg(any(test, feature = "test-support"))]
 pub mod fake;
 
@@ -81,6 +85,20 @@ pub struct AgentTurnResult {
 pub trait AgentTurnRuntime: Send + Sync {
     fn runtime(&self) -> &str;
 
+    #[must_use]
+    fn classify_error(&self, stage: AgentTurnFailureStage, error: &CliError) -> AgentTurnFailure {
+        AgentTurnFailure::new(
+            AgentTurnFailureCategory::from_message(&error.to_string()),
+            stage,
+            format!(
+                "{} {} failed with {}",
+                self.runtime(),
+                stage.as_str(),
+                error.code()
+            ),
+        )
+    }
+
     /// Start one turn and return its stable correlation identifier.
     ///
     /// # Errors
@@ -98,6 +116,12 @@ pub trait AgentTurnRuntime: Send + Sync {
     /// # Errors
     /// Returns `CliError` when the turn is unknown or its result cannot be read.
     async fn result(&self, id: &AgentTurnId) -> Result<Option<AgentTurnResult>, CliError>;
+
+    /// Read the structured terminal failure, if the turn failed or was cancelled.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the turn is unknown or its failure cannot be read.
+    async fn failure(&self, id: &AgentTurnId) -> Result<Option<AgentTurnFailure>, CliError>;
 
     /// Cancel a turn.
     ///

@@ -256,6 +256,9 @@ mod tests {
     use super::{
         AcpAgentHandshake, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
     };
+    use crate::managed_agents::runtime_failures::{
+        AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
+    };
 
     #[test]
     fn acp_agent_snapshot_serializes_explicit_identity_fields() {
@@ -368,6 +371,11 @@ mod tests {
                 report: "complete report".into(),
                 stop_reason: "refusal".into(),
             }),
+            last_turn_failure: Some(AgentTurnFailure::new(
+                AgentTurnFailureCategory::ProviderRejected,
+                AgentTurnFailureStage::Execution,
+                "agent refused the prompt",
+            )),
         });
         let value = serde_json::to_value(&snapshot).expect("serialize inspect snapshot");
         assert_eq!(value["handshake"]["protocol_version"], 1);

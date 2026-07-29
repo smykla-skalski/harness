@@ -1,3 +1,4 @@
+use crate::daemon::agent_acp::{AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage};
 use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, PromptResponse, SessionId, SessionNotification, SessionUpdate,
     StopReason, TextContent,
@@ -102,7 +103,7 @@ async fn terminal_result_joins_text_and_keeps_diagnostics_separate() {
 
 #[tokio::test]
 #[cfg(unix)]
-async fn discarded_turn_does_not_publish_partial_or_stale_result() {
+async fn beginning_a_turn_clears_the_prior_terminal_result() {
     let child = ChildGuard(
         Command::new("sleep")
             .arg("60")
@@ -122,13 +123,108 @@ async fn discarded_turn_does_not_publish_partial_or_stale_result() {
     );
 
     session_state::begin_turn(&supervisor);
-    session_state::apply_live_turn_update(&supervisor, &text_update("partial"));
-    session_state::discard_turn(&supervisor);
-
     assert!(
         supervisor
             .session_state()
             .and_then(|state| state.last_turn_result)
             .is_none()
     );
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn prompt_error_records_structured_failure_without_partial_report() {
+    let child = ChildGuard(
+        Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .expect("spawn supervisor child"),
+    );
+    let supervisor = AcpSessionSupervisor::new(&child.0, SupervisionConfig::default());
+    let mut expected = AgentTurnFailure::new(
+        AgentTurnFailureCategory::RateLimited,
+        AgentTurnFailureStage::Start,
+        "provider token=super-secret rate limit",
+    );
+    expected.automatic_retry_safe = false;
+    let error = agent_client_protocol::Error::new(-32092, "provider failed")
+        .data(serde_json::to_value(&expected).expect("encode failure"));
+
+    session_state::begin_turn(&supervisor);
+    session_state::apply_live_turn_update(&supervisor, &text_update("partial"));
+    session_state::record_prompt_error(&supervisor, &error);
+
+    let state = supervisor.session_state().expect("session state");
+    let failure = state.last_turn_failure.expect("structured failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::RateLimited);
+    assert_eq!(failure.stage, AgentTurnFailureStage::Execution);
+    assert!(failure.automatic_retry_safe);
+    assert!(!failure.detail.contains("super-secret"));
+    assert!(state.last_turn_result.is_none());
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn refusal_uses_provider_rejection_failure() {
+    let child = ChildGuard(
+        Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .expect("spawn supervisor child"),
+    );
+    let supervisor = AcpSessionSupervisor::new(&child.0, SupervisionConfig::default());
+
+    session_state::begin_turn(&supervisor);
+    session_state::record_stop_reason(&supervisor, &PromptResponse::new(StopReason::Refusal));
+
+    let state = supervisor.session_state().expect("session state");
+    let failure = state.last_turn_failure.expect("refusal failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::ProviderRejected);
+    assert!(!failure.automatic_retry_safe);
+    assert!(state.last_turn_result.is_none());
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn cancelled_stop_reason_uses_shared_cancellation_failure() {
+    let child = ChildGuard(
+        Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .expect("spawn supervisor child"),
+    );
+    let supervisor = AcpSessionSupervisor::new(&child.0, SupervisionConfig::default());
+
+    session_state::begin_turn(&supervisor);
+    session_state::record_stop_reason(&supervisor, &PromptResponse::new(StopReason::Cancelled));
+
+    let state = supervisor.session_state().expect("session state");
+    let failure = state.last_turn_failure.expect("cancellation failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::Cancelled);
+    assert_eq!(failure.stage, AgentTurnFailureStage::Cancellation);
+    assert!(!failure.automatic_retry_safe);
+    assert!(state.last_turn_result.is_none());
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn unrecognized_acp_error_uses_unknown_without_exposing_message() {
+    let child = ChildGuard(
+        Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .expect("spawn supervisor child"),
+    );
+    let supervisor = AcpSessionSupervisor::new(&child.0, SupervisionConfig::default());
+    let error = agent_client_protocol::Error::new(-32099, "token=super-secret peculiar failure");
+
+    session_state::begin_turn(&supervisor);
+    session_state::record_prompt_error(&supervisor, &error);
+
+    let failure = supervisor
+        .session_state()
+        .and_then(|state| state.last_turn_failure)
+        .expect("unknown failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::Unknown);
+    assert!(!failure.detail.contains("super-secret"));
 }

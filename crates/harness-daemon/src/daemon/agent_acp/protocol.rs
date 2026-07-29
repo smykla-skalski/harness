@@ -459,7 +459,7 @@ async fn send_prompt_or_cancel(
             Ok(cancelled)
         }
         Err(error) => {
-            session_state::discard_turn(supervisor);
+            session_state::record_prompt_error(supervisor, &error);
             Err(error)
         }
     }

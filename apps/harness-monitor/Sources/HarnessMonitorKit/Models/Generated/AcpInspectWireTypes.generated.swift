@@ -96,8 +96,9 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
   public var updatedAt: String?
   public var lastStopReason: String?
   public var lastTurnResult: AcpAgentTurnResult?
+  public var lastTurnFailure: AgentTurnFailure?
 
-  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil, lastStopReason: String? = nil, lastTurnResult: AcpAgentTurnResult? = nil) {
+  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil, lastStopReason: String? = nil, lastTurnResult: AcpAgentTurnResult? = nil, lastTurnFailure: AgentTurnFailure? = nil) {
     self.configOptions = configOptions
     self.currentModeId = currentModeId
     self.availableCommands = availableCommands
@@ -105,6 +106,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     self.updatedAt = updatedAt
     self.lastStopReason = lastStopReason
     self.lastTurnResult = lastTurnResult
+    self.lastTurnFailure = lastTurnFailure
   }
 
   public init(from decoder: Decoder) throws {
@@ -116,6 +118,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
     lastStopReason = try container.decodeIfPresent(String.self, forKey: .lastStopReason)
     lastTurnResult = try container.decodeIfPresent(AcpAgentTurnResult.self, forKey: .lastTurnResult)
+    lastTurnFailure = try container.decodeIfPresent(AgentTurnFailure.self, forKey: .lastTurnFailure)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -126,6 +129,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     case updatedAt = "updated_at"
     case lastStopReason = "last_stop_reason"
     case lastTurnResult = "last_turn_result"
+    case lastTurnFailure = "last_turn_failure"
   }
 }
 
@@ -265,5 +269,46 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
     case promptDeadlineRemainingMs = "prompt_deadline_remaining_ms"
     case handshake
     case sessionState = "session_state"
+  }
+}
+
+public enum AgentTurnFailureCategory: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case providerRejected = "provider_rejected"
+  case authentication = "authentication"
+  case rateLimited = "rate_limited"
+  case unsupportedModel = "unsupported_model"
+  case transport = "transport"
+  case cancelled = "cancelled"
+  case unknown = "unknown"
+
+  public var id: String { rawValue }
+}
+
+public enum AgentTurnFailureStage: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case start = "start"
+  case execution = "execution"
+  case cancellation = "cancellation"
+
+  public var id: String { rawValue }
+}
+
+public struct AgentTurnFailure: Codable, Equatable, Sendable {
+  public var category: AgentTurnFailureCategory
+  public var stage: AgentTurnFailureStage
+  public var automaticRetrySafe: Bool
+  public var detail: String
+
+  public init(category: AgentTurnFailureCategory, stage: AgentTurnFailureStage, automaticRetrySafe: Bool, detail: String) {
+    self.category = category
+    self.stage = stage
+    self.automaticRetrySafe = automaticRetrySafe
+    self.detail = detail
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case category
+    case stage
+    case automaticRetrySafe = "automatic_retry_safe"
+    case detail
   }
 }
