@@ -38,6 +38,24 @@ async fn pull_request_review_runs_review_cleanup_and_terminal_without_publicatio
     assert_eq!(actions, ["cleanup", "review:reviewer-amber"].into());
     assert_eq!(runtime.start_count(), 1);
     assert_eq!(runtime.publish_count(), 0);
+    let reports = fixture
+        .test
+        .db
+        .task_board_ai_review_reports(&fixture.item_id)
+        .await
+        .expect("load retained review report");
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].head_revision, super::fixture::FROZEN_HEAD);
+    assert_eq!(reports[0].runtime, "runtime-shared");
+    assert_eq!(reports[0].requested_model, "model-reviewer-amber");
+    assert_eq!(
+        reports[0].effective_model.as_deref(),
+        Some("model-reviewer-amber")
+    );
+    assert_eq!(
+        reports[0].summary.as_deref(),
+        Some("exact-head review passed")
+    );
     super::assert_terminal_projection(
         &fixture,
         TaskBoardStatus::Done,

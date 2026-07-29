@@ -44,6 +44,16 @@ pub(super) async fn accept_completed_run(
             return Ok(());
         }
     };
+    if let crate::task_board::TaskBoardAttemptResultArtifact::Review(outcome) = &result.artifact {
+        super::review_report_retention::retain_completed_review_run(
+            db,
+            execution,
+            attempt,
+            run,
+            &outcome.result,
+        )
+        .await?;
+    }
     transition_attempt(
         db,
         attempt,

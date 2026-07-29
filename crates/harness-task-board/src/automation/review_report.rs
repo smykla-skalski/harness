@@ -33,7 +33,9 @@ impl TaskBoardAiReviewReportStatus {
             "completed" => Ok(Self::Completed),
             "failed" => Ok(Self::Failed),
             "cancelled" => Ok(Self::Cancelled),
-            _ => Err(TaskBoardAiReviewReportError::InvalidStatus),
+            _ => Err(TaskBoardAiReviewReportError::InvalidStatus {
+                value: value.to_owned(),
+            }),
         }
     }
 }
@@ -70,8 +72,8 @@ pub enum TaskBoardAiReviewReportError {
     InvalidReview(#[from] TaskBoardReportOnlyReviewError),
     #[error("AI review pull request number must be greater than zero")]
     InvalidPullRequestNumber,
-    #[error("AI review report status is invalid")]
-    InvalidStatus,
+    #[error("AI review report status '{value}' is invalid")]
+    InvalidStatus { value: String },
     #[error("AI review report timestamps must be RFC 3339 and finish no earlier than start")]
     InvalidTimestamps,
     #[error("completed AI review reports require a summary and forbid a terminal reason")]
@@ -179,6 +181,12 @@ mod tests {
         assert_eq!(
             TaskBoardAiReviewReportStatus::parse("cancelled").expect("known status"),
             TaskBoardAiReviewReportStatus::Cancelled
+        );
+        assert_eq!(
+            TaskBoardAiReviewReportStatus::parse("abandoned"),
+            Err(TaskBoardAiReviewReportError::InvalidStatus {
+                value: "abandoned".into()
+            })
         );
     }
 

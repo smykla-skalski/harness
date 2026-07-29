@@ -21,6 +21,7 @@ mod report_evidence;
 mod report_starts;
 mod reports;
 pub(crate) mod requests;
+mod review_report_retention;
 mod revision_validation;
 
 const MAX_RECONCILIATIONS_PER_CLASS_PER_TICK: usize = 16;
