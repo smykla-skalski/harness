@@ -10,6 +10,9 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 use crate::daemon::protocol::{http_paths, ws_methods};
+use crate::task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus};
+
+use super::task_board_review_report_support::{clear_active_execution, seed_running_execution};
 
 #[test]
 fn task_board_http_and_ws_item_payloads_and_errors_match() {
@@ -22,6 +25,7 @@ fn task_board_http_and_ws_item_payloads_and_errors_match() {
 
 async fn run_task_board_transport_parity() {
     let state = super::test_http_state_with_db();
+    let db = state.async_db.get().expect("test async database").clone();
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
     let shared_payload = json!({
@@ -90,6 +94,119 @@ async fn run_task_board_transport_parity() {
     .await;
     assert_eq!(normalized_item(&http_loaded), normalized_item(&ws_loaded));
 
+    let http_review = get_json(
+        &client,
+        &base_url,
+        "/v1/task-board/items/parity-http/review-report",
+    )
+    .await;
+    let ws_review = ws_result(
+        &base_url,
+        "req-task-board-review-report-not-started",
+        ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+        json!({ "id": "parity-ws" }),
+    )
+    .await;
+    assert_eq!(http_review, json!({ "status": "not_started" }));
+    assert_eq!(http_review, ws_review);
+
+    let http_execution = seed_running_execution(&db, "parity-http").await;
+    let ws_execution = seed_running_execution(&db, "parity-ws").await;
+    let http_review = get_json(
+        &client,
+        &base_url,
+        "/v1/task-board/items/parity-http/review-report",
+    )
+    .await;
+    let ws_review = ws_result(
+        &base_url,
+        "req-task-board-review-report-running",
+        ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+        json!({ "id": "parity-ws" }),
+    )
+    .await;
+    assert_eq!(
+        normalized_running_review(&http_review),
+        normalized_running_review(&ws_review)
+    );
+    assert_eq!(http_review["status"], "running");
+    assert_eq!(http_review["runtime"], "codex");
+    assert_eq!(http_review["requested_model"], "gpt-5.3-codex-spark");
+    assert_eq!(
+        http_review["head_revision"],
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+    clear_active_execution(&db, http_execution).await;
+    clear_active_execution(&db, ws_execution).await;
+
+    db.append_task_board_ai_review_report(&completed_report("parity-http"))
+        .await
+        .expect("append HTTP review report");
+    db.append_task_board_ai_review_report(&completed_report("parity-ws"))
+        .await
+        .expect("append WebSocket review report");
+    let http_review = get_json(
+        &client,
+        &base_url,
+        "/v1/task-board/items/parity-http/review-report",
+    )
+    .await;
+    let ws_review = ws_result(
+        &base_url,
+        "req-task-board-review-report-completed",
+        ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+        json!({ "id": "parity-ws" }),
+    )
+    .await;
+    assert_eq!(
+        normalized_review(&http_review),
+        normalized_review(&ws_review)
+    );
+    assert_eq!(http_review["status"], "completed");
+    assert_eq!(
+        http_review["report"]["head_revision"],
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+    for (status, finished_at) in [
+        (
+            TaskBoardAiReviewReportStatus::Failed,
+            "2026-07-29T18:00:02Z",
+        ),
+        (
+            TaskBoardAiReviewReportStatus::Cancelled,
+            "2026-07-29T18:00:03Z",
+        ),
+    ] {
+        db.append_task_board_ai_review_report(&terminal_report("parity-http", status, finished_at))
+            .await
+            .expect("append HTTP terminal report");
+        db.append_task_board_ai_review_report(&terminal_report("parity-ws", status, finished_at))
+            .await
+            .expect("append WebSocket terminal report");
+        let http_review = get_json(
+            &client,
+            &base_url,
+            "/v1/task-board/items/parity-http/review-report",
+        )
+        .await;
+        let ws_review = ws_result(
+            &base_url,
+            "req-task-board-review-report-terminal",
+            ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+            json!({ "id": "parity-ws" }),
+        )
+        .await;
+        assert_eq!(
+            normalized_review(&http_review),
+            normalized_review(&ws_review)
+        );
+        assert_eq!(http_review["status"], status.as_str());
+        assert_eq!(
+            http_review["report"]["terminal_reason"],
+            "provider stopped after partial output"
+        );
+    }
+
     let update_payload = json!({
         "status": "in_progress",
         "priority": "critical",
@@ -145,8 +262,95 @@ async fn run_task_board_transport_parity() {
     assert_eq!(ws_error["error"]["message"], http_error["error"]["message"]);
     assert_eq!(ws_error["error"]["data"], http_error);
 
+    let (http_status, http_error) = get_json_status(
+        &client,
+        &base_url,
+        "/v1/task-board/items/parity-missing/review-report",
+    )
+    .await;
+    let ws_error = ws_rpc(
+        &base_url,
+        "req-task-board-review-report-missing",
+        ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+        json!({ "id": "parity-missing" }),
+    )
+    .await;
+    assert_eq!(http_status, StatusCode::BAD_REQUEST);
+    assert_eq!(ws_error["error"]["status_code"].as_u64(), Some(400));
+    assert_eq!(ws_error["error"]["code"], http_error["error"]["code"]);
+    assert_eq!(ws_error["error"]["message"], http_error["error"]["message"]);
+
+    let (http_status, http_error) = get_json_status(
+        &client,
+        &base_url,
+        "/v1/task-board/items/bad..id/review-report",
+    )
+    .await;
+    let ws_error = ws_rpc(
+        &base_url,
+        "req-task-board-review-report-malformed",
+        ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+        json!({ "id": "bad..id" }),
+    )
+    .await;
+    assert_eq!(http_status, StatusCode::BAD_REQUEST);
+    assert_eq!(ws_error["error"]["status_code"].as_u64(), Some(400));
+    assert_eq!(ws_error["error"]["code"], http_error["error"]["code"]);
+    assert_eq!(ws_error["error"]["message"], http_error["error"]["message"]);
+
     server.abort();
     let _ = server.await;
+}
+
+fn completed_report(item_id: &str) -> TaskBoardAiReviewReportRecord {
+    TaskBoardAiReviewReportRecord {
+        report_id: format!("report-{item_id}"),
+        item_id: item_id.into(),
+        correlation_id: format!("correlation-{item_id}"),
+        repository: "smykla-skalski/harness".into(),
+        pull_request_number: 1147,
+        head_revision: "0123456789abcdef0123456789abcdef01234567".into(),
+        runtime: "openrouter".into(),
+        requested_model: "deepseek/deepseek-v4-flash".into(),
+        effective_model: Some("deepseek/deepseek-v4-flash".into()),
+        status: TaskBoardAiReviewReportStatus::Completed,
+        summary: Some("No findings.".into()),
+        findings: Vec::new(),
+        partial_output: None,
+        terminal_reason: None,
+        started_at: "2026-07-29T18:00:00Z".into(),
+        finished_at: "2026-07-29T18:00:01Z".into(),
+    }
+}
+
+fn terminal_report(
+    item_id: &str,
+    status: TaskBoardAiReviewReportStatus,
+    finished_at: &str,
+) -> TaskBoardAiReviewReportRecord {
+    let mut report = completed_report(item_id);
+    report.report_id = format!("report-{item_id}-{}", status.as_str());
+    report.correlation_id = format!("correlation-{item_id}-{}", status.as_str());
+    report.status = status;
+    report.summary = None;
+    report.partial_output = Some("Partial structured review output.".into());
+    report.terminal_reason = Some("provider stopped after partial output".into());
+    report.finished_at = finished_at.into();
+    report
+}
+
+fn normalized_running_review(value: &Value) -> Value {
+    let mut normalized = value.clone();
+    normalized["execution_id"] = json!("execution");
+    normalized
+}
+
+fn normalized_review(value: &Value) -> Value {
+    let mut normalized = value.clone();
+    normalized["report"]["report_id"] = json!("report");
+    normalized["report"]["item_id"] = json!("item");
+    normalized["report"]["correlation_id"] = json!("correlation");
+    normalized
 }
 
 async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {

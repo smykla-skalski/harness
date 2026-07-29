@@ -14,8 +14,10 @@ use crate::task_board::{
 use super::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
 
 mod list_query;
+mod review_report;
 
 pub(crate) use list_query::project_task_board_list;
+pub(crate) use review_report::project_task_board_ai_review_report;
 
 const BODY_PREVIEW_CHAR_LIMIT: usize = 180;
 const BODY_PREVIEW_PREFIX_LIMIT: usize = BODY_PREVIEW_CHAR_LIMIT - 3;

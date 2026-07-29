@@ -66,6 +66,46 @@ pub struct TaskBoardAiReviewReportRecord {
     pub finished_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum TaskBoardAiReviewReportResponse {
+    /// No review execution or retained terminal report exists for the item.
+    NotStarted,
+    /// The current review execution has not reached a terminal state.
+    Running {
+        execution_id: String,
+        runtime: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        requested_model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        head_revision: Option<String>,
+        started_at: String,
+    },
+    /// The latest review completed and the full immutable report is available.
+    Completed {
+        report: TaskBoardAiReviewReportRecord,
+    },
+    /// The latest review failed after retaining all available output.
+    Failed {
+        report: TaskBoardAiReviewReportRecord,
+    },
+    /// The latest review was cancelled after retaining all available output.
+    Cancelled {
+        report: TaskBoardAiReviewReportRecord,
+    },
+}
+
+impl TaskBoardAiReviewReportResponse {
+    #[must_use]
+    pub fn from_terminal_report(report: TaskBoardAiReviewReportRecord) -> Self {
+        match report.status {
+            TaskBoardAiReviewReportStatus::Completed => Self::Completed { report },
+            TaskBoardAiReviewReportStatus::Failed => Self::Failed { report },
+            TaskBoardAiReviewReportStatus::Cancelled => Self::Cancelled { report },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TaskBoardAiReviewReportError {
     #[error(transparent)]
@@ -178,6 +218,10 @@ mod tests {
 
         validate_task_board_ai_review_report(&report).expect("valid completed report");
         assert_eq!(report.status.as_str(), "completed");
+        assert!(matches!(
+            TaskBoardAiReviewReportResponse::from_terminal_report(report.clone()),
+            TaskBoardAiReviewReportResponse::Completed { report: retained } if retained == report
+        ));
         assert_eq!(
             TaskBoardAiReviewReportStatus::parse("cancelled").expect("known status"),
             TaskBoardAiReviewReportStatus::Cancelled
@@ -191,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_state_and_chronology_fail_closed() {
+    fn terminal_state_fail_closed() {
         let mut report = completed_report();
         report.summary = None;
         assert_eq!(
@@ -204,7 +248,13 @@ mod tests {
             validate_task_board_ai_review_report(&report),
             Err(TaskBoardAiReviewReportError::InvalidFailureState)
         );
+    }
 
+    #[test]
+    fn terminal_chronology_fails_closed() {
+        let mut report = completed_report();
+        report.status = TaskBoardAiReviewReportStatus::Failed;
+        report.summary = None;
         report.terminal_reason = Some("provider rejected the request".into());
         report.started_at = "2026-07-29T16:00:01Z".into();
         report.finished_at = "2026-07-29T16:00:00Z".into();
@@ -212,6 +262,22 @@ mod tests {
             validate_task_board_ai_review_report(&report),
             Err(TaskBoardAiReviewReportError::InvalidTimestamps)
         );
+    }
+
+    #[test]
+    fn terminal_reports_map_to_failure_responses() {
+        let mut report = completed_report();
+        report.status = TaskBoardAiReviewReportStatus::Cancelled;
+        assert!(matches!(
+            TaskBoardAiReviewReportResponse::from_terminal_report(report.clone()),
+            TaskBoardAiReviewReportResponse::Cancelled { report: retained }
+                if retained == report
+        ));
+        report.status = TaskBoardAiReviewReportStatus::Failed;
+        assert!(matches!(
+            TaskBoardAiReviewReportResponse::from_terminal_report(report.clone()),
+            TaskBoardAiReviewReportResponse::Failed { report: retained } if retained == report
+        ));
     }
 
     fn completed_report() -> TaskBoardAiReviewReportRecord {

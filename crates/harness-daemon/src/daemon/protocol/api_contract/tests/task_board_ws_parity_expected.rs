@@ -30,6 +30,12 @@ fn task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static
             true,
         ),
         (
+            HttpRouteMethod::Get,
+            http_paths::TASK_BOARD_ITEM_REVIEW_REPORT,
+            ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+            true,
+        ),
+        (
             HttpRouteMethod::Put,
             http_paths::TASK_BOARD_ITEM,
             ws_methods::TASK_BOARD_UPDATE,

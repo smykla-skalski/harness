@@ -34,6 +34,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_ITEM_REVIEW_REPORT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Put,
         path: http_paths::TASK_BOARD_ITEM,
         parity: HttpRouteParity::Rpc {
