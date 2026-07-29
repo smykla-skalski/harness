@@ -55,6 +55,23 @@ impl ActionGateRequirement {
             write_permission: false,
         }
     }
+
+    /// What a comment must satisfy: nothing beyond the pull request still being
+    /// present on the verified head. A comment is not a merge, so it does not
+    /// require an open, mergeable, or approved state; it only refuses to post
+    /// onto a vanished pull request or a moved head, which the head check in
+    /// [`evaluate_action_gates`] enforces regardless of these flags.
+    #[must_use]
+    pub fn for_comment() -> Self {
+        Self {
+            open: false,
+            not_draft: false,
+            mergeable: false,
+            required_checks: false,
+            approvals: false,
+            write_permission: false,
+        }
+    }
 }
 
 /// A single reason an action was refused. Every variant renders a clear message,

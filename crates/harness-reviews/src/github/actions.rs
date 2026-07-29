@@ -7,7 +7,9 @@ use harness_github_api::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board::github::{
-    GitHubApiAutomationClient, GitHubAutomationClient, GitHubMergeMethod,
+    ActionGateBlock, ActionGateDecision, ActionGateRequirement, GitHubApiAutomationClient,
+    GitHubAutomationClient, GitHubMergeMethod, GitHubPullRequestEvidenceSource,
+    PullRequestEvidenceSource, PullRequestIdentity, verify_action_gates,
 };
 
 use super::client::ReviewsGitHubClient;
@@ -43,9 +45,19 @@ impl ReviewsGitHubClient {
         &self,
         request: &ReviewsApproveRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
+        let source = GitHubPullRequestEvidenceSource::new(&self.client);
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = approve_target(&self.client, target, DIRECT_APPROVAL_OPERATION).await;
+            let result = match verify_target_gate(
+                &source,
+                target,
+                ActionGateRequirement::for_approval(),
+            )
+            .await
+            {
+                Ok(()) => approve_target(&self.client, target, DIRECT_APPROVAL_OPERATION).await,
+                Err(error) => Err(error),
+            };
             results.push(action_result(target, ReviewActionKind::Approve, result));
         }
         Ok(results)
@@ -53,9 +65,11 @@ impl ReviewsGitHubClient {
 
     /// # Errors
     ///
-    /// Returns an error if the target has no exact head commit or the
-    /// GitHub GraphQL mutation fails.
+    /// Returns an error if the target has no exact head commit, a fresh read
+    /// blocks the approval, or the GitHub GraphQL mutation fails.
     pub async fn policy_approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
+        let source = GitHubPullRequestEvidenceSource::new(&self.client);
+        verify_target_gate(&source, target, ActionGateRequirement::for_approval()).await?;
         approve_target(&self.client, target, POLICY_APPROVAL_OPERATION).await
     }
 
@@ -67,22 +81,33 @@ impl ReviewsGitHubClient {
         &self,
         request: &ReviewsCommentRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
+        let source = GitHubPullRequestEvidenceSource::new(&self.client);
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = self
-                .client
-                .graphql_envelope(
-                    mutation_descriptor("reviews.comment"),
-                    json!({
-                        "query": ADD_COMMENT_MUTATION,
-                        "variables": {
-                            "id": target.pull_request_id,
-                            "body": request.body,
-                        },
-                    }),
-                )
-                .await
-                .map(|response| response.body);
+            let result = match verify_target_gate(
+                &source,
+                target,
+                ActionGateRequirement::for_comment(),
+            )
+            .await
+            {
+                Ok(()) => {
+                    self.client
+                        .graphql_envelope(
+                            mutation_descriptor("reviews.comment"),
+                            json!({
+                                "query": ADD_COMMENT_MUTATION,
+                                "variables": {
+                                    "id": target.pull_request_id,
+                                    "body": request.body,
+                                },
+                            }),
+                        )
+                        .await
+                        .map(|response| response.body)
+                }
+                Err(error) => Err(error),
+            };
             results.push(comment_action_result(target, result));
         }
         Ok(results)
@@ -174,9 +199,19 @@ impl ReviewsGitHubClient {
         &self,
         request: &ReviewsMergeRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
+        let source = GitHubPullRequestEvidenceSource::new(&self.client);
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = merge_target(&self.automation, target, request.method).await;
+            let result = match verify_target_gate(
+                &source,
+                target,
+                ActionGateRequirement::for_merge(),
+            )
+            .await
+            {
+                Ok(()) => merge_target(&self.automation, target, request.method).await,
+                Err(error) => Err(error),
+            };
             results.push(action_result(target, ReviewActionKind::Merge, result));
         }
         Ok(results)
@@ -184,13 +219,15 @@ impl ReviewsGitHubClient {
 
     /// # Errors
     ///
-    /// Returns an error if the repository has no automation config or the
-    /// GitHub merge mutation fails.
+    /// Returns an error if the repository has no automation config, a fresh
+    /// read blocks the merge, or the GitHub merge mutation fails.
     pub async fn policy_merge(
         &self,
         target: &ReviewTarget,
         method: GitHubMergeMethod,
     ) -> Result<(), CliError> {
+        let source = GitHubPullRequestEvidenceSource::new(&self.client);
+        verify_target_gate(&source, target, ActionGateRequirement::for_merge()).await?;
         merge_target(&self.automation, target, method).await
     }
 
@@ -383,6 +420,43 @@ fn approval_request(
     ))
 }
 
+/// Refuse an action unless a fresh read still clears its gates on the head the
+/// target was captured on. Every approve, merge, and comment path runs this
+/// immediately before its mutation, so a decision made on a stale list never
+/// acts once the head, gates, or permissions have moved.
+async fn verify_target_gate(
+    source: &dyn PullRequestEvidenceSource,
+    target: &ReviewTarget,
+    requirement: ActionGateRequirement,
+) -> Result<(), CliError> {
+    if target.head_sha.trim().is_empty() {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "cannot act on {}/pull/{} without an exact head commit",
+            target.repository, target.number
+        ))
+        .into());
+    }
+    let identity = PullRequestIdentity::from_slug(target.repository.clone(), target.number)
+        .with_url(Some(target.url.clone()));
+    match verify_action_gates(source, &identity, &target.head_sha, requirement).await? {
+        ActionGateDecision::Proceed(_) => Ok(()),
+        ActionGateDecision::Blocked(blocks) => Err(gate_refusal_error(target, &blocks)),
+    }
+}
+
+fn gate_refusal_error(target: &ReviewTarget, blocks: &[ActionGateBlock]) -> CliError {
+    let reasons = blocks
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("; ");
+    CliErrorKind::workflow_io(format!(
+        "refused {}/pull/{}: {reasons}",
+        target.repository, target.number
+    ))
+    .into()
+}
+
 async fn merge_target(
     automation: &GitHubApiAutomationClient,
     target: &ReviewTarget,
@@ -413,6 +487,162 @@ mod tests {
         ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
         ReviewTargetFlags,
     };
+    use harness_task_board::github::{
+        CheckGate, CheckState, InMemoryPullRequestEvidenceSource, Mergeability, PullRequestEvidence,
+        PullRequestLifecycle, PullRequestMergeGates, ReviewDecision, ReviewGate,
+    };
+
+    const HEAD: &str = "0123456789abcdef";
+
+    #[tokio::test]
+    async fn an_approval_proceeds_when_the_head_still_matches() {
+        let source = InMemoryPullRequestEvidenceSource::new()
+            .with_evidence(evidence(HEAD, PullRequestLifecycle::Open, false, minimal_gates()));
+
+        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_approval())
+            .await
+            .expect("open pull request on the verified head clears the approval gate");
+    }
+
+    #[tokio::test]
+    async fn an_approval_is_refused_when_the_head_moved() {
+        let source = InMemoryPullRequestEvidenceSource::new().with_evidence(evidence(
+            "feeddeadbeef",
+            PullRequestLifecycle::Open,
+            false,
+            minimal_gates(),
+        ));
+
+        let error =
+            verify_target_gate(&source, &review_target(), ActionGateRequirement::for_approval())
+                .await
+                .expect_err("a moved head must refuse the approval");
+        assert!(error.to_string().contains("head moved"));
+    }
+
+    #[tokio::test]
+    async fn an_action_is_refused_when_the_pull_request_is_missing() {
+        let source = InMemoryPullRequestEvidenceSource::new();
+
+        let error =
+            verify_target_gate(&source, &review_target(), ActionGateRequirement::for_approval())
+                .await
+                .expect_err("a vanished pull request must refuse the action");
+        assert!(error.to_string().contains("no longer present"));
+    }
+
+    #[tokio::test]
+    async fn an_action_is_refused_without_an_exact_head() {
+        let source = InMemoryPullRequestEvidenceSource::new();
+        let mut target = review_target();
+        target.head_sha = "  ".to_owned();
+
+        let error =
+            verify_target_gate(&source, &target, ActionGateRequirement::for_comment())
+                .await
+                .expect_err("a blank head must refuse the action before any read");
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+    }
+
+    #[tokio::test]
+    async fn a_merge_is_refused_when_the_gates_are_not_green() {
+        let source = InMemoryPullRequestEvidenceSource::new()
+            .with_evidence(evidence(HEAD, PullRequestLifecycle::Open, false, minimal_gates()));
+
+        let error =
+            verify_target_gate(&source, &review_target(), ActionGateRequirement::for_merge())
+                .await
+                .expect_err("an unmergeable, unapproved pull request must refuse the merge");
+        assert!(error.to_string().contains("refused"));
+    }
+
+    #[tokio::test]
+    async fn a_merge_proceeds_when_every_gate_is_green() {
+        let source = InMemoryPullRequestEvidenceSource::new().with_evidence(evidence(
+            HEAD,
+            PullRequestLifecycle::Open,
+            false,
+            green_gates(),
+        ));
+
+        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_merge())
+            .await
+            .expect("a green pull request clears the merge gate");
+    }
+
+    #[tokio::test]
+    async fn a_comment_proceeds_on_a_draft_as_long_as_the_head_holds() {
+        let source = InMemoryPullRequestEvidenceSource::new()
+            .with_evidence(evidence(HEAD, PullRequestLifecycle::Open, true, minimal_gates()));
+
+        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_comment())
+            .await
+            .expect("a comment does not require a non-draft, mergeable pull request");
+    }
+
+    #[tokio::test]
+    async fn a_comment_is_refused_when_the_head_moved() {
+        let source = InMemoryPullRequestEvidenceSource::new().with_evidence(evidence(
+            "feeddeadbeef",
+            PullRequestLifecycle::Open,
+            false,
+            minimal_gates(),
+        ));
+
+        verify_target_gate(&source, &review_target(), ActionGateRequirement::for_comment())
+            .await
+            .expect_err("a comment must not post onto a moved head");
+    }
+
+    fn evidence(
+        head: &str,
+        lifecycle: PullRequestLifecycle,
+        is_draft: bool,
+        gates: PullRequestMergeGates,
+    ) -> PullRequestEvidence {
+        PullRequestEvidence {
+            identity: PullRequestIdentity::from_slug("example/widgets", 42),
+            head_revision: head.to_owned(),
+            author: None,
+            lifecycle,
+            is_draft,
+            gates,
+            observed_at: "2026-07-29T00:00:00Z".to_owned(),
+        }
+    }
+
+    fn minimal_gates() -> PullRequestMergeGates {
+        PullRequestMergeGates {
+            mergeability: Mergeability::Unknown,
+            viewer_can_update: false,
+            viewer_can_merge_as_admin: false,
+            checks: Vec::new(),
+            required_check_names: Vec::new(),
+            review: ReviewGate {
+                decision: ReviewDecision::ReviewRequired,
+                current_approvals: 0,
+                required_approvals: 1,
+            },
+        }
+    }
+
+    fn green_gates() -> PullRequestMergeGates {
+        PullRequestMergeGates {
+            mergeability: Mergeability::Mergeable,
+            viewer_can_update: true,
+            viewer_can_merge_as_admin: false,
+            checks: vec![CheckGate {
+                name: "build".to_owned(),
+                state: CheckState::Success,
+            }],
+            required_check_names: vec!["build".to_owned()],
+            review: ReviewGate {
+                decision: ReviewDecision::Approved,
+                current_approvals: 1,
+                required_approvals: 1,
+            },
+        }
+    }
 
     #[test]
     fn approval_mutation_requires_commit_oid() {
