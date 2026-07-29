@@ -39,7 +39,13 @@ fn create_imported_pull_request(
     body
 }
 
-fn request_json(method: &str, endpoint: &str, token: &str, path: &str, body: Value) -> (u16, Value) {
+fn request_json(
+    method: &str,
+    endpoint: &str,
+    token: &str,
+    path: &str,
+    body: Value,
+) -> (u16, Value) {
     let url = format!(
         "{}/{}",
         endpoint.trim_end_matches('/'),
@@ -168,7 +174,11 @@ fn moving_an_imported_review_to_todo_admits_it_read_only_without_a_second_approv
     assert_eq!(plan["worker"]["mode"], json!("evaluate"));
 
     let output = run_harness(&home, &xdg, &["daemon", "stop"]);
-    assert!(output.status.success(), "stop failed: {}", output_text(&output));
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
     wait_for_child_exit(&mut daemon);
 }
 
@@ -194,7 +204,11 @@ fn moving_a_dependency_update_to_todo_admits_it_write() {
     assert_eq!(plan["worker"]["mode"], json!("headless"));
 
     let output = run_harness(&home, &xdg, &["daemon", "stop"]);
-    assert!(output.status.success(), "stop failed: {}", output_text(&output));
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
     wait_for_child_exit(&mut daemon);
 }
 
@@ -220,7 +234,11 @@ fn a_combined_ticket_keeps_both_intents_through_admission() {
     assert_not_blocked_on_approval(&plan);
 
     let output = run_harness(&home, &xdg, &["daemon", "stop"]);
-    assert!(output.status.success(), "stop failed: {}", output_text(&output));
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
     wait_for_child_exit(&mut daemon);
 }
 
@@ -340,6 +358,10 @@ fn repeated_transitions_and_a_refresh_stamp_no_duplicate_execution() {
     );
 
     let output = run_harness(&home, &xdg, &["daemon", "stop"]);
-    assert!(output.status.success(), "stop failed: {}", output_text(&output));
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
     wait_for_child_exit(&mut daemon);
 }

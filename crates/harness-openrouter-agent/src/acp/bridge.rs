@@ -101,9 +101,7 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
                         )
                         .await;
                         match outcome {
-                            Ok(stop_reason) => {
-                                responder.respond(PromptResponse::new(stop_reason))
-                            }
+                            Ok(stop_reason) => responder.respond(PromptResponse::new(stop_reason)),
                             Err(error) => responder.respond_with_error(error),
                         }
                     }
@@ -124,11 +122,11 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
                         _connection: ConnectionTo<agent_client_protocol::Client>| {
                 let method = message.method().to_owned();
                 match message {
-                    Dispatch::Request(_, responder) => responder.respond_with_error(
-                        internal_error(format!(
+                    Dispatch::Request(_, responder) => {
+                        responder.respond_with_error(internal_error(format!(
                             "harness-openrouter-agent: method '{method}' not handled"
-                        )),
-                    ),
+                        )))
+                    }
                     Dispatch::Notification(_) | Dispatch::Response(_, _) => Ok(()),
                 }
             },

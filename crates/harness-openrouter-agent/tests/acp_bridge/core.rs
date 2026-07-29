@@ -20,12 +20,12 @@ use std::sync::Mutex;
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     ContentBlock, CreateTerminalRequest, CreateTerminalResponse, InitializeRequest,
-    KillTerminalRequest, KillTerminalResponse, NewSessionRequest,
-    PromptRequest, ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest,
-    ReleaseTerminalResponse, RequestPermissionRequest, RequestPermissionResponse,
-    SessionConfigKind, SessionNotification, SessionUpdate, StopReason, TerminalId,
-    TerminalOutputRequest, TerminalOutputResponse, TextContent, WaitForTerminalExitRequest,
-    WaitForTerminalExitResponse, WriteTextFileRequest, WriteTextFileResponse,
+    KillTerminalRequest, KillTerminalResponse, NewSessionRequest, PromptRequest,
+    ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest, ReleaseTerminalResponse,
+    RequestPermissionRequest, RequestPermissionResponse, SessionConfigKind, SessionNotification,
+    SessionUpdate, StopReason, TerminalId, TerminalOutputRequest, TerminalOutputResponse,
+    TextContent, WaitForTerminalExitRequest, WaitForTerminalExitResponse, WriteTextFileRequest,
+    WriteTextFileResponse,
 };
 use agent_client_protocol::{AcpAgent, AcpAgentConfig, Agent, Client, ConnectionTo};
 use tokio::process::Command;

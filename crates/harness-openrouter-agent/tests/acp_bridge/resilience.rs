@@ -94,7 +94,9 @@ async fn malformed_stream_fails_after_preserving_only_diagnostics_and_partial_ou
                 .await
                 .expect_err("malformed stream must fail the prompt");
             assert!(
-                error.message.contains("failed to parse OpenRouter response"),
+                error
+                    .message
+                    .contains("failed to parse OpenRouter response"),
                 "unexpected prompt error: {error:?}"
             );
             Ok(())
@@ -115,8 +117,7 @@ async fn malformed_stream_fails_after_preserving_only_diagnostics_and_partial_ou
 async fn truncated_stream_without_done_fails_instead_of_returning_partial_success() {
     let server = MockServer::start().await;
     mount_models(&server).await;
-    let body =
-        "data: {\"id\":\"partial\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n";
+    let body = "data: {\"id\":\"partial\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n";
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
         .respond_with(

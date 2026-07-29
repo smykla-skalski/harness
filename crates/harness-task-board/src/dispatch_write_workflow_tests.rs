@@ -54,7 +54,11 @@ fn imported_pull_requests_dispatch_from_todo_without_a_second_approval() {
 
 fn assert_ready_with_mode(kind: TaskBoardWorkflowKind, mode: AgentMode) {
     let plan = build_dispatch_plan(&imported_pull_request_item(kind));
-    assert_eq!(plan.readiness, DispatchReadiness::Ready, "{kind:?} readiness");
+    assert_eq!(
+        plan.readiness,
+        DispatchReadiness::Ready,
+        "{kind:?} readiness"
+    );
     assert_eq!(plan.worker.mode, mode, "{kind:?} worker mode");
 }
 
