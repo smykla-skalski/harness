@@ -9,6 +9,7 @@ use harness_workspace::workspace::utc_now;
 use crate::normalize_repository_slug;
 
 mod action_gate;
+mod action_ledger;
 mod check_wait;
 mod gates;
 mod github_source;
@@ -16,6 +17,11 @@ mod github_source;
 pub use action_gate::{
     ActionGateBlock, ActionGateDecision, ActionGateRequirement, evaluate_action_gates,
     verify_action_gates,
+};
+pub use action_ledger::{
+    ActionAdmission, ActionOutcome, ActionState, InMemoryPullRequestActionStore, PullRequestAction,
+    PullRequestActionFailureClass, PullRequestActionKind, PullRequestActionStore, RecordedAction,
+    action_effect_observed, begin_action, finish_action, reconcile_action,
 };
 pub use check_wait::{
     CheckWait, CheckWaitControls, CheckWaitOutcome, CheckWaitProgress, poll_check_wait,
