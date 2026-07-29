@@ -11,6 +11,20 @@
 //! the same cycle once `db` was slated to become its own crate, so
 //! `wire.rs`/`wire_*.rs` moved into the task-board domain crate both `db`
 //! and this module's `controller`/`routes` code already depend on.
+//!
+//! The `routes*` files need `crate::daemon::http`'s `DaemonHttpState` type to
+//! make `utoipa_axum::OpenApiRouter::merge` type-check against `http`'s own
+//! routes, which used to mean importing it from `http` - and `http` merges
+//! this module's routes into its own `OpenApiRouter`, so that import was a
+//! real cycle. Naming the concrete type locally from the generic
+//! `crate::daemon::server_state::DaemonHttpState` instead breaks it: this
+//! alias resolves to the exact same monomorphized type `http`'s own alias
+//! does, so `OpenApiRouter::merge` still type-checks, without this module
+//! reaching into `http` to get there.
+pub(crate) type DaemonHttpState = crate::daemon::server_state::DaemonHttpState<
+    crate::daemon::db::DaemonDb,
+    crate::daemon::db::AsyncDaemonDb,
+>;
 
 pub(crate) mod client;
 mod client_cleanup;

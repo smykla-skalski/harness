@@ -5,6 +5,7 @@ use axum::response::Response;
 use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouterExt};
 use utoipa_axum::routes;
 
+use super::DaemonHttpState;
 use super::routes_status::{mutation_record, status_response, verify_operation_record};
 use super::routes_support::{
     active_assignments, assignment_route, concurrent, load_assignment, local_host, map_route_error,
@@ -12,7 +13,7 @@ use super::routes_support::{
 };
 use crate::daemon::db::utc_now;
 use crate::daemon::http::openapi::DaemonErrorBody;
-use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
+use crate::daemon::http::{require_async_db, require_execution_remote_client};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,

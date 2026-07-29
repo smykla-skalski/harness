@@ -116,6 +116,8 @@ pub mod remote_tls;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_viewer;
 #[cfg(feature = "daemon-runtime")]
+pub(crate) mod server_state;
+#[cfg(feature = "daemon-runtime")]
 pub mod service;
 #[cfg(feature = "daemon-runtime")]
 pub mod snapshot;

@@ -1,5 +1,3 @@
-use std::sync::PoisonError;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::body::Body;
@@ -9,7 +7,7 @@ use axum::http::{Request, StatusCode, header::CONTENT_LENGTH};
 use axum::middleware::Next;
 use axum::response::Response;
 use http_body_util::{BodyExt as _, Limited};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, TryAcquireError};
+use tokio::sync::OwnedSemaphorePermit;
 use tokio::time::timeout;
 
 use responses::{limit_response, overloaded_response, unavailable_response, with_retry_after};
@@ -18,17 +16,14 @@ use super::auth::RemoteHttpLimitAudit;
 use super::auth_audit::RemoteHttpAuditMarker;
 use super::task_board::{POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES, policy_transfer_http_body_limit};
 use super::{DaemonHttpAuthMode, DaemonHttpState};
-use crate::daemon::remote_request_audit::{
-    RemoteUnauthenticatedAuditAdmission, RemoteUnauthenticatedAuditLimiter,
-};
 use crate::daemon::remote_tls::{
     DEFAULT_MAX_CONCURRENT_TLS_HANDSHAKES, DEFAULT_TLS_HANDSHAKE_TIMEOUT,
 };
+use crate::daemon::server_state::{RemoteRequestLimitConfig, RemoteRequestLimits};
 use crate::daemon::task_board_remote_transport::routes::{
     DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES, MAX_EXECUTION_HTTP_BODY_LIMIT_BYTES,
     execution_http_body_limit,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) const DEFAULT_REMOTE_NON_BULK_HTTP_BODY_LIMIT_BYTES: usize =
     DEFAULT_EXECUTION_HTTP_BODY_LIMIT_BYTES;
@@ -39,24 +34,11 @@ pub(crate) const MAX_REMOTE_HTTP_BODY_LIMIT_BYTES: usize =
         POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES
     };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RemoteRequestLimitConfig {
-    pub max_http_body_bytes: usize,
-    pub max_http_header_bytes: usize,
-    pub max_http_uri_bytes: usize,
-    pub max_http_concurrency: usize,
-    pub max_unauthenticated_audit_attempts: u32,
-    pub max_unauthenticated_audit_attempts_per_remote_addr: u32,
-    pub unauthenticated_audit_window: Duration,
-    pub request_timeout: Duration,
-    pub max_concurrent_tls_handshakes: usize,
-    pub tls_handshake_timeout: Duration,
-    pub max_websocket_message_bytes: usize,
-    pub max_websocket_frame_bytes: usize,
-    pub max_websocket_connections: usize,
-    pub max_websocket_in_flight_requests: usize,
-}
-
+// `RemoteRequestLimitConfig`/`RemoteRequestLimits` themselves live in
+// `crate::daemon::server_state`, generic-decoupled from `db`. Their `Default`
+// impls stay here because they need `MAX_REMOTE_HTTP_BODY_LIMIT_BYTES`, which
+// in turn needs route-owned body-size constants that `server_state` must not
+// reach back into.
 impl Default for RemoteRequestLimitConfig {
     fn default() -> Self {
         Self {
@@ -75,133 +57,6 @@ impl Default for RemoteRequestLimitConfig {
             max_websocket_connections: 64,
             max_websocket_in_flight_requests: 16,
         }
-    }
-}
-
-impl RemoteRequestLimitConfig {
-    /// Validate every remote resource boundary before opening a listener.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when a boundary is disabled or internally inconsistent.
-    pub fn validate(self) -> Result<(), CliError> {
-        let values = [
-            ("HTTP body bytes", self.max_http_body_bytes),
-            ("HTTP header bytes", self.max_http_header_bytes),
-            ("HTTP URI bytes", self.max_http_uri_bytes),
-            ("HTTP concurrency", self.max_http_concurrency),
-            (
-                "concurrent TLS handshakes",
-                self.max_concurrent_tls_handshakes,
-            ),
-            ("WebSocket message bytes", self.max_websocket_message_bytes),
-            ("WebSocket frame bytes", self.max_websocket_frame_bytes),
-            ("WebSocket connections", self.max_websocket_connections),
-            (
-                "WebSocket in-flight requests",
-                self.max_websocket_in_flight_requests,
-            ),
-        ];
-        if let Some((name, _)) = values.into_iter().find(|(_, value)| *value == 0) {
-            return Err(CliErrorKind::workflow_parse(format!(
-                "remote request limits require non-zero {name}"
-            ))
-            .into());
-        }
-        if self.request_timeout.is_zero() {
-            return Err(CliErrorKind::workflow_parse(
-                "remote request limits require a non-zero timeout",
-            )
-            .into());
-        }
-        if self.max_unauthenticated_audit_attempts == 0
-            || self.max_unauthenticated_audit_attempts_per_remote_addr == 0
-        {
-            return Err(CliErrorKind::workflow_parse(
-                "remote request limits require non-zero unauthenticated audit attempt limits",
-            )
-            .into());
-        }
-        if self.unauthenticated_audit_window.is_zero() {
-            return Err(CliErrorKind::workflow_parse(
-                "remote request limits require a non-zero unauthenticated audit window",
-            )
-            .into());
-        }
-        if self.tls_handshake_timeout.is_zero() {
-            return Err(CliErrorKind::workflow_parse(
-                "remote request limits require a non-zero TLS handshake timeout",
-            )
-            .into());
-        }
-        if self.max_websocket_frame_bytes > self.max_websocket_message_bytes {
-            return Err(CliErrorKind::workflow_parse(
-                "remote request limits require the WebSocket frame limit to fit within the message limit",
-            )
-            .into());
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RemoteRequestLimits {
-    config: RemoteRequestLimitConfig,
-    http_permits: Arc<Semaphore>,
-    websocket_permits: Arc<Semaphore>,
-    unauthenticated_audit_limiter: Arc<Mutex<RemoteUnauthenticatedAuditLimiter>>,
-}
-
-impl RemoteRequestLimits {
-    /// Build runtime limit state from validated configuration.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the configuration disables a required limit.
-    pub fn new(config: RemoteRequestLimitConfig) -> Result<Self, CliError> {
-        config.validate()?;
-        Ok(Self {
-            config,
-            http_permits: Arc::new(Semaphore::new(config.max_http_concurrency)),
-            websocket_permits: Arc::new(Semaphore::new(config.max_websocket_connections)),
-            unauthenticated_audit_limiter: Arc::new(Mutex::new(
-                RemoteUnauthenticatedAuditLimiter::new(
-                    config.max_unauthenticated_audit_attempts,
-                    config.max_unauthenticated_audit_attempts_per_remote_addr,
-                    config.unauthenticated_audit_window,
-                ),
-            )),
-        })
-    }
-
-    #[must_use]
-    pub const fn config(&self) -> RemoteRequestLimitConfig {
-        self.config
-    }
-
-    fn try_http_permit(&self) -> Result<OwnedSemaphorePermit, TryAcquireError> {
-        Arc::clone(&self.http_permits).try_acquire_owned()
-    }
-
-    fn try_websocket_permit(&self) -> Result<OwnedSemaphorePermit, TryAcquireError> {
-        Arc::clone(&self.websocket_permits).try_acquire_owned()
-    }
-
-    pub(crate) fn admit_unauthenticated_audit(
-        &self,
-        remote_addr: &str,
-    ) -> RemoteUnauthenticatedAuditAdmission {
-        self.unauthenticated_audit_limiter
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .admit(remote_addr)
-    }
-
-    #[must_use]
-    pub(crate) fn unauthenticated_audit_retry_after_seconds(&self) -> u64 {
-        let window = self.config.unauthenticated_audit_window;
-        window
-            .as_secs()
-            .saturating_add(u64::from(window.subsec_nanos() != 0))
-            .max(1)
     }
 }
 

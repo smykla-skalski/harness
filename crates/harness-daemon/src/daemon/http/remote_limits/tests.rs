@@ -44,22 +44,6 @@ fn unauthenticated_audit_retry_after_rounds_up_to_the_full_window() {
 }
 
 #[test]
-fn unauthenticated_audit_limiter_recovers_from_mutex_poisoning() {
-    let limits = RemoteRequestLimits::default();
-    let limiter = Arc::clone(&limits.unauthenticated_audit_limiter);
-    let poisoned = std::panic::catch_unwind(move || {
-        let _guard = limiter.lock().expect("lock limiter before poisoning");
-        panic!("poison the test limiter");
-    });
-
-    assert!(poisoned.is_err());
-    assert_eq!(
-        limits.admit_unauthenticated_audit("127.0.0.1"),
-        RemoteUnauthenticatedAuditAdmission::Audit,
-    );
-}
-
-#[test]
 fn concurrency_rejection_preserves_a_longer_audit_retry_interval() {
     let response = Response::builder()
         .status(StatusCode::TOO_MANY_REQUESTS)
