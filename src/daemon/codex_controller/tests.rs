@@ -16,6 +16,7 @@ mod registration_recovery;
 mod request_validation;
 mod task_lifecycle;
 mod test_support;
+mod turn_lifecycle;
 
 use self::test_support::{
     codex_approval_request, codex_run_snapshot, controller_with_db, controller_with_session_state,
