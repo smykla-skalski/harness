@@ -316,7 +316,15 @@ depends = [
   "harness:check:binary-contracts",
   "harness:check:source-size",
   "harness:check:rust",
+  "sybra:check",
   "panel:frontend:lint",
+]
+
+[tasks."sybra:check"]
+description = "Run standalone Sybra service tests and pedantic Rust lint"
+run = [
+  "./scripts/cargo-local.sh test -p harness-sybra --all-targets",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-sybra",
 ]
 
 [tasks."panel:frontend:install"]

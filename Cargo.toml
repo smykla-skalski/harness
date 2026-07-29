@@ -20,6 +20,7 @@ members = [
   "crates/harness-reviews",
   "crates/harness-run",
   "crates/harness-session",
+  "crates/harness-sybra",
   "crates/harness-systemd",
   "crates/harness-systemd-protocol",
   "crates/harness-task-board",
