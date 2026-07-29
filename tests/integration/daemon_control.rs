@@ -24,6 +24,7 @@ mod headless_readiness;
 mod lifecycle;
 mod live_agents_headless;
 pub(crate) mod process;
+mod task_board_admission;
 mod tui;
 mod tui_attach;
 

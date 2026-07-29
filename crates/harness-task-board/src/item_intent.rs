@@ -14,6 +14,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::types::AgentMode;
+
 /// The reasons a pull request ticket exists, held as an intent set so a single
 /// ticket can carry a dependency update, a review request, or both.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -171,6 +173,24 @@ impl TaskBoardWorkflowKind {
         matches!(self, Self::PrReview)
     }
 
+    /// The agent mode an imported pull-request ticket adopts when it is admitted
+    /// to Todo, derived from the intents the import carried. A pure review
+    /// request routes read-only, so it runs in `Evaluate`; a dependency update -
+    /// alone or combined with a review in one `PrFixReview` ticket - performs
+    /// publishing side effects, so it runs headless with write access. Every
+    /// non-pull-request kind returns `None`, leaving the item's own mode
+    /// untouched. Admission uses this so moving an imported ticket from Inbox to
+    /// Todo no longer leaves a review carrying the write-oriented default that
+    /// read-only preparation later rejects.
+    #[must_use]
+    pub const fn imported_admission_agent_mode(self) -> Option<AgentMode> {
+        match self {
+            Self::PrReview => Some(AgentMode::Evaluate),
+            Self::PrFix | Self::PrFixReview => Some(AgentMode::Headless),
+            _ => None,
+        }
+    }
+
     /// The `snake_case` wire value, matching the derived serde representation.
     #[must_use]
     pub const fn as_wire_str(self) -> &'static str {
@@ -260,6 +280,34 @@ mod tests {
         assert!(TaskBoardWorkflowKind::PrReview.is_read_only_review());
         assert!(!TaskBoardWorkflowKind::PrReview.is_write());
         assert!(!TaskBoardWorkflowKind::Review.is_read_only_review());
+    }
+
+    #[test]
+    fn imported_admission_mode_follows_intent() {
+        // A review runs read-only; a dependency update - alone or combined -
+        // writes headless; a combined ticket keeps its write mode without
+        // shedding its review intent.
+        assert_eq!(
+            TaskBoardWorkflowKind::PrReview.imported_admission_agent_mode(),
+            Some(AgentMode::Evaluate)
+        );
+        assert_eq!(
+            TaskBoardWorkflowKind::PrFix.imported_admission_agent_mode(),
+            Some(AgentMode::Headless)
+        );
+        assert_eq!(
+            TaskBoardWorkflowKind::PrFixReview.imported_admission_agent_mode(),
+            Some(AgentMode::Headless)
+        );
+        assert!(TaskBoardWorkflowKind::PrFixReview.has_review_request_intent());
+        // Non-pull-request kinds keep whatever mode the item already carries.
+        for kind in [
+            TaskBoardWorkflowKind::Unknown,
+            TaskBoardWorkflowKind::DefaultTask,
+            TaskBoardWorkflowKind::Review,
+        ] {
+            assert_eq!(kind.imported_admission_agent_mode(), None);
+        }
     }
 
     #[test]

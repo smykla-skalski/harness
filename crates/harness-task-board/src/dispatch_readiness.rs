@@ -18,7 +18,15 @@ pub(super) fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> Dispat
             work_item_id: work_item_id.to_string(),
         });
     }
-    if let PlanApprovalGate::Blocked { reason } = approval_gate(item) {
+    // Pull-request tickets never pass through the human planning flow, so they
+    // carry no plan-approval evidence: their admission comes from the pull
+    // request itself, not a plan a human approved. Keying on the workflow kind
+    // rather than import origin, requiring approval evidence here would strand
+    // every pull-request ticket the moment it reaches Todo. Every other kind
+    // still needs a real approval before it dispatches.
+    if !item.workflow_kind.is_pull_request()
+        && let PlanApprovalGate::Blocked { reason } = approval_gate(item)
+    {
         return blocked(DispatchBlockReason::PlanApproval { reason });
     }
     if item.status != TaskBoardStatus::Todo {
