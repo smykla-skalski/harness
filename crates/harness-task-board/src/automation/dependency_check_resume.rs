@@ -9,10 +9,18 @@ use crate::github::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskBoardDependencyCheckConclusion {
+    Success,
+    Failure,
+    Skipped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskBoardDependencySettledCheck {
     pub name: String,
-    pub conclusion: CheckState,
+    pub conclusion: TaskBoardDependencyCheckConclusion,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details_url: Option<String>,
 }
@@ -215,13 +223,23 @@ fn settled_status(
             })?;
         checks.push(TaskBoardDependencySettledCheck {
             name: gate.name.clone(),
-            conclusion: gate.state,
+            conclusion: match gate.state {
+                CheckState::Success => TaskBoardDependencyCheckConclusion::Success,
+                CheckState::Failure => TaskBoardDependencyCheckConclusion::Failure,
+                CheckState::Skipped => TaskBoardDependencyCheckConclusion::Skipped,
+                CheckState::Pending => {
+                    return Err(CliErrorKind::workflow_parse(format!(
+                        "settled dependency check is still pending: {name}"
+                    ))
+                    .into());
+                }
+            },
             details_url: gate.details_url.clone(),
         });
     }
     let failed = checks
         .iter()
-        .filter(|check| check.conclusion == CheckState::Failure)
+        .filter(|check| check.conclusion == TaskBoardDependencyCheckConclusion::Failure)
         .cloned()
         .collect::<Vec<_>>();
     if failed.is_empty() {

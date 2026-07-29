@@ -47,7 +47,7 @@ async fn successful_checks_resume_exactly_once() {
         TaskBoardDependencyCheckResumeStatus::ChecksPassed {
             checks: vec![settled(
                 "build",
-                CheckState::Success,
+                TaskBoardDependencyCheckConclusion::Success,
                 Some("https://checks/build")
             )]
         }
@@ -72,11 +72,19 @@ async fn failed_checks_resume_with_names_conclusions_and_links() {
         TaskBoardDependencyCheckResumeStatus::ChecksFailed {
             checks: vec![settled(
                 "build",
-                CheckState::Failure,
+                TaskBoardDependencyCheckConclusion::Failure,
                 Some("https://checks/build")
             )]
         }
     );
+}
+
+#[test]
+fn pending_checks_cannot_be_recorded_as_terminal_conclusions() {
+    let error = settled_status(&evidence(CheckState::Pending, None), &["build".into()])
+        .expect_err("pending check must not settle");
+
+    assert!(error.to_string().contains("still pending"));
 }
 
 #[tokio::test]
@@ -326,7 +334,7 @@ fn found(evidence: PullRequestEvidence) -> PullRequestEvidenceRead {
 
 fn settled(
     name: &str,
-    conclusion: CheckState,
+    conclusion: TaskBoardDependencyCheckConclusion,
     details_url: Option<&str>,
 ) -> TaskBoardDependencySettledCheck {
     TaskBoardDependencySettledCheck {
