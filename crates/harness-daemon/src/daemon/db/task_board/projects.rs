@@ -1,6 +1,7 @@
 use sqlx::error::DatabaseError;
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
+use super::project_registry_queries::ProjectRegistryQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
@@ -238,7 +239,9 @@ pub(crate) async fn register_configured_repositories_in_tx(
 }
 
 impl AsyncDaemonDb {
-    /// Register `raw_slug` if needed and return its project identifier.
+    /// Register `raw_slug` if needed and return its project identifier. See
+    /// [`ProjectRegistryQueries::ensure_task_board_project`] for the full
+    /// contract.
     ///
     /// # Errors
     /// Returns [`CliError`] when the registry cannot be read or written.
@@ -247,17 +250,7 @@ impl AsyncDaemonDb {
         source: TaskBoardProjectSource,
         raw_slug: &str,
     ) -> Result<Option<String>, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board project write: {error}")))?;
-        let project_id = ensure_project_in_tx(&mut transaction, source, raw_slug).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board project write: {error}")))?;
-        Ok(project_id)
+        <Self as ProjectRegistryQueries>::ensure_task_board_project(self, source, raw_slug).await
     }
 
     /// Every registered project, ordered so callers render a stable list.
@@ -265,17 +258,7 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] when the registry cannot be read.
     pub(crate) async fn list_task_board_projects(&self) -> Result<Vec<TaskBoardProject>, CliError> {
-        query_as::<_, ProjectRow>(
-            "SELECT project_id, source, slug, display_name, color, shape, created_at, updated_at
-             FROM task_board_projects
-             ORDER BY source ASC, slug ASC",
-        )
-        .fetch_all(self.pool())
-        .await
-        .map_err(|error| db_error(format!("list task board projects: {error}")))?
-        .into_iter()
-        .map(TaskBoardProject::try_from)
-        .collect()
+        <Self as ProjectRegistryQueries>::list_task_board_projects(self).await
     }
 
     /// Read one project by identifier.
@@ -286,20 +269,12 @@ impl AsyncDaemonDb {
         &self,
         project_id: &str,
     ) -> Result<Option<TaskBoardProject>, CliError> {
-        query_as::<_, ProjectRow>(
-            "SELECT project_id, source, slug, display_name, color, shape, created_at, updated_at
-             FROM task_board_projects WHERE project_id = ?1",
-        )
-        .bind(project_id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| db_error(format!("read task board project: {error}")))?
-        .map(TaskBoardProject::try_from)
-        .transpose()
+        <Self as ProjectRegistryQueries>::get_task_board_project(self, project_id).await
     }
 
-    /// Rename a project and/or set its display name. The identifier never
-    /// changes, so every attached item survives the edit untouched.
+    /// Rename a project and/or set its display name. See
+    /// [`ProjectRegistryQueries::update_task_board_project`] for the full
+    /// contract.
     ///
     /// # Errors
     /// Returns [`CliError`] when the project is unknown, the slug is unusable,
@@ -309,65 +284,127 @@ impl AsyncDaemonDb {
         project_id: &str,
         edit: ProjectEdit<'_>,
     ) -> Result<TaskBoardProject, CliError> {
-        // Both of these are the caller naming something wrong, not the store
-        // failing. Reporting them as IO would tell an API consumer to retry.
-        let existing = self
-            .get_task_board_project(project_id)
-            .await?
-            .ok_or_else(|| {
-                CliError::from(CliErrorKind::usage_error(format!(
-                    "task board project '{project_id}' is not registered"
-                )))
-            })?;
-        let slug = resolve_slug_edit(&existing, edit.slug)?;
-        let display_name = resolve_display_name_edit(&existing, edit.display_name);
-        // The reset reads every held colour to pick the least-used one, so it
-        // has to write in the same transaction it read in. Allocating first and
-        // committing separately lets a registration in between take the colour
-        // this one just chose.
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board project update: {error}")))?;
-        let color =
-            resolve_color_edit_in_tx(&mut transaction, project_id, edit.color, existing.color)
-                .await?;
-        query(
-            "UPDATE task_board_projects
-             SET slug = ?2, display_name = ?3, color = ?4, updated_at = ?5
-             WHERE project_id = ?1",
-        )
-        .bind(project_id)
-        .bind(&slug)
-        .bind(display_name.as_deref())
-        .bind(color.as_str())
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| {
-            // The UNIQUE(source, slug) violation is the caller asking for a
-            // name another project of the same source already holds. Retrying
-            // it, which is what an IO code invites, can never succeed.
-            if error
-                .as_database_error()
-                .is_some_and(DatabaseError::is_unique_violation)
-            {
-                return CliError::from(CliErrorKind::usage_error(format!(
-                    "another {} project already uses the slug '{slug}'",
-                    existing.source.as_str()
-                )));
-            }
-            db_error(format!("update task board project '{project_id}': {error}"))
-        })?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board project update: {error}")))?;
-        self.get_task_board_project(project_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task board project '{project_id}' vanished")))
+        <Self as ProjectRegistryQueries>::update_task_board_project(self, project_id, edit).await
     }
+}
+
+/// Real implementation behind
+/// [`ProjectRegistryQueries::ensure_task_board_project`], called from the
+/// single consolidated trait impl in `project_registry_queries.rs`.
+pub(super) async fn ensure_task_board_project(
+    db: &AsyncDaemonDb,
+    source: TaskBoardProjectSource,
+    raw_slug: &str,
+) -> Result<Option<String>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board project write: {error}")))?;
+    let project_id = ensure_project_in_tx(&mut transaction, source, raw_slug).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board project write: {error}")))?;
+    Ok(project_id)
+}
+
+/// Real implementation behind [`ProjectRegistryQueries::list_task_board_projects`].
+pub(super) async fn list_task_board_projects(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskBoardProject>, CliError> {
+    query_as::<_, ProjectRow>(
+        "SELECT project_id, source, slug, display_name, color, shape, created_at, updated_at
+         FROM task_board_projects
+         ORDER BY source ASC, slug ASC",
+    )
+    .fetch_all(db.pool())
+    .await
+    .map_err(|error| db_error(format!("list task board projects: {error}")))?
+    .into_iter()
+    .map(TaskBoardProject::try_from)
+    .collect()
+}
+
+/// Real implementation behind [`ProjectRegistryQueries::get_task_board_project`].
+pub(super) async fn get_task_board_project(
+    db: &AsyncDaemonDb,
+    project_id: &str,
+) -> Result<Option<TaskBoardProject>, CliError> {
+    query_as::<_, ProjectRow>(
+        "SELECT project_id, source, slug, display_name, color, shape, created_at, updated_at
+         FROM task_board_projects WHERE project_id = ?1",
+    )
+    .bind(project_id)
+    .fetch_optional(db.pool())
+    .await
+    .map_err(|error| db_error(format!("read task board project: {error}")))?
+    .map(TaskBoardProject::try_from)
+    .transpose()
+}
+
+/// Real implementation behind [`ProjectRegistryQueries::update_task_board_project`].
+pub(super) async fn update_task_board_project(
+    db: &AsyncDaemonDb,
+    project_id: &str,
+    edit: ProjectEdit<'_>,
+) -> Result<TaskBoardProject, CliError> {
+    // Both of these are the caller naming something wrong, not the store
+    // failing. Reporting them as IO would tell an API consumer to retry.
+    let existing = get_task_board_project(db, project_id)
+        .await?
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::usage_error(format!(
+                "task board project '{project_id}' is not registered"
+            )))
+        })?;
+    let slug = resolve_slug_edit(&existing, edit.slug)?;
+    let display_name = resolve_display_name_edit(&existing, edit.display_name);
+    // The reset reads every held colour to pick the least-used one, so it
+    // has to write in the same transaction it read in. Allocating first and
+    // committing separately lets a registration in between take the colour
+    // this one just chose.
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board project update: {error}")))?;
+    let color =
+        resolve_color_edit_in_tx(&mut transaction, project_id, edit.color, existing.color).await?;
+    query(
+        "UPDATE task_board_projects
+         SET slug = ?2, display_name = ?3, color = ?4, updated_at = ?5
+         WHERE project_id = ?1",
+    )
+    .bind(project_id)
+    .bind(&slug)
+    .bind(display_name.as_deref())
+    .bind(color.as_str())
+    .bind(utc_now())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| {
+        // The UNIQUE(source, slug) violation is the caller asking for a
+        // name another project of the same source already holds. Retrying
+        // it, which is what an IO code invites, can never succeed.
+        if error
+            .as_database_error()
+            .is_some_and(DatabaseError::is_unique_violation)
+        {
+            return CliError::from(CliErrorKind::usage_error(format!(
+                "another {} project already uses the slug '{slug}'",
+                existing.source.as_str()
+            )));
+        }
+        db_error(format!("update task board project '{project_id}': {error}"))
+    })?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board project update: {error}")))?;
+    get_task_board_project(db, project_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task board project '{project_id}' vanished")))
 }
 
 fn resolve_slug_edit(

@@ -26,6 +26,7 @@ mod lane_order_tests;
 mod mapper;
 mod policy_queues;
 mod policy_runs;
+mod project_registry_queries;
 mod project_shapes;
 mod projects;
 mod projects_backfill;
