@@ -118,7 +118,10 @@ impl TaskBoardWorkflowKind {
     /// to `DefaultTask`.
     #[must_use]
     pub const fn from_pr_intents(intents: PrIntentSet) -> Self {
-        match (intents.has_dependency_update(), intents.has_review_request()) {
+        match (
+            intents.has_dependency_update(),
+            intents.has_review_request(),
+        ) {
             (true, true) => Self::PrFixReview,
             (true, false) => Self::PrFix,
             (false, true) => Self::PrReview,

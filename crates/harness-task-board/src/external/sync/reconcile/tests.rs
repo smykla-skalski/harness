@@ -191,7 +191,9 @@ fn reconcile_backfills_missing_pull_request_head_and_author() {
 
     let patch = reconciliation_patch(&item, &discovered_pull_request_task(), false, None);
 
-    let workflow = patch.workflow.expect("head and author backfill onto the ticket");
+    let workflow = patch
+        .workflow
+        .expect("head and author backfill onto the ticket");
     assert_eq!(workflow.pr_head_revision.as_deref(), Some("abc123"));
     assert_eq!(workflow.pr_author.as_deref(), Some("renovate[bot]"));
 }

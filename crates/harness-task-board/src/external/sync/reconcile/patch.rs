@@ -94,7 +94,10 @@ fn backfill_pull_request_identity(
     if head.is_none() && author.is_none() {
         return;
     }
-    let mut workflow = patch.workflow.clone().unwrap_or_else(|| item.workflow.clone());
+    let mut workflow = patch
+        .workflow
+        .clone()
+        .unwrap_or_else(|| item.workflow.clone());
     if let Some(head) = head {
         workflow.pr_head_revision = Some(head.clone());
     }

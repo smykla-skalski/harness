@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use harness_agents::runtime;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_session::service as session_service;
 use harness_workspace::workspace::utc_now;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use tracing::callsite::Identifier as CallsiteIdentifier;
 use tracing::field::Empty;
 

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use harness_protocol::agent::HookAgent;
 use crate::workspace::project_context_dir;
+use harness_protocol::agent::HookAgent;
 
 pub use harness_agents::runtime::signal;
 

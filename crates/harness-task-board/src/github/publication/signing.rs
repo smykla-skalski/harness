@@ -122,9 +122,7 @@ pub(super) fn publication_signature(
 /// daemon can confirm the key, passphrase, and mode all line up without
 /// pushing a real commit.
 #[must_use]
-pub fn verify_signing_for_profile(
-    profile: &TaskBoardGitRuntimeProfile,
-) -> SigningVerifyOutcome {
+pub fn verify_signing_for_profile(profile: &TaskBoardGitRuntimeProfile) -> SigningVerifyOutcome {
     const PAYLOAD: &[u8] = b"harness-signing-verify\n";
     match profile.signing.mode {
         TaskBoardGitSigningMode::None => SigningVerifyOutcome::Skipped,

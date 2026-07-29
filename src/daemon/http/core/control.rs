@@ -32,7 +32,10 @@ use super::super::response::{extract_request_id, timed_json};
         (status = 200, description = "Initial configuration payload: personas, per-runtime model catalogs, ACP agents, and the ACP runtime probe", body = WsConfigPayload),
     ),
 )]
-pub(super) async fn get_config(headers: HeaderMap, State(state): State<DaemonHttpState>) -> Response {
+pub(super) async fn get_config(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
     if let Err(response) = require_auth(&headers, &state) {

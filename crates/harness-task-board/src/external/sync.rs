@@ -468,7 +468,9 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
     item.external_refs = vec![reference];
     item.imported_from_provider = Some(task.reference.provider.into());
     item.workflow_kind = task.workflow_kind;
-    item.workflow.pr_head_revision.clone_from(&task.pr_head_revision);
+    item.workflow
+        .pr_head_revision
+        .clone_from(&task.pr_head_revision);
     item.workflow.pr_author.clone_from(&task.pr_author);
     if let Some(planning) = imported_external_planning(task) {
         item.planning = planning;

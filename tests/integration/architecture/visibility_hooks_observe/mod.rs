@@ -12,7 +12,8 @@ fn assert_split_modules_exist(root: &Path, paths: &[&str], message: &str) {
 #[test]
 fn hooks_application_context_root_stays_prod_only() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let context = fs::read_to_string(root.join("crates/harness-hooks/src/application/context.rs")).unwrap();
+    let context =
+        fs::read_to_string(root.join("crates/harness-hooks/src/application/context.rs")).unwrap();
 
     for needle in [
         "struct HookInteraction {",

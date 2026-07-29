@@ -177,7 +177,8 @@ pub fn restart_task_board_workflow_revision(
         || !matches!(
             state.phase,
             Some(TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate)
-        ) {
+        )
+    {
         return Err(TaskBoardWorkflowTransitionError::RevisionCycleUnsupported);
     }
     validate_state_invariants(
