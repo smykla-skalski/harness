@@ -6,7 +6,7 @@ use super::admission_reservations::persist_admission_snapshot_in_tx;
 use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_preparation_claim::TaskBoardPreparationClaim;
 use super::dispatch_workflow_launch::rebind_write_launch;
-use super::items::load_item_in_tx;
+use super::item_tx_ext::TaskBoardItemTxExt;
 use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
@@ -251,7 +251,8 @@ pub(super) async fn reserve_task_board_dispatch(
         })?;
         return Ok(reserved);
     }
-    let (item, item_revision) = load_item_in_tx(&mut transaction, &plan.board_item_id)
+    let (item, item_revision) = transaction
+        .load_item_in_tx(&plan.board_item_id)
         .await?
         .ok_or_else(|| {
             db_error(format!(

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use crate::daemon::db::{CliError, CliErrorKind, db_error, utc_now};
 use crate::task_board::{
     TaskBoardAdmissionRequirement, TaskBoardAdmissionRequirementKind, TaskBoardItem,
@@ -47,7 +48,8 @@ pub(super) async fn intent_item_in_tx(
             "task board dispatch intent '{intent_id}' not found"
         ))
     })?;
-    super::super::items::load_item_in_tx(transaction, &item_id)
+    transaction
+        .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))
 }

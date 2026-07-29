@@ -59,16 +59,6 @@ pub(super) use parent::{
 mod write;
 pub(super) use write::{insert_item_in_tx, replace_item_in_tx};
 
-/// Fixture-only access to the item core's raw row primitives, for triage's
-/// own tests that set up or verify rows directly instead of going through
-/// [`TriageEvaluator`] -- the production boundary triage implements for item
-/// mutation to call into. Production code must go through that trait, not
-/// this module.
-#[cfg(test)]
-pub(super) mod test_support {
-    pub(in super::super) use super::{load_item_in_tx, replace_item_in_tx};
-}
-
 #[path = "items_create.rs"]
 mod create;
 

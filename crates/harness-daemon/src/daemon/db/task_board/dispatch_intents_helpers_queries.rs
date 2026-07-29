@@ -13,7 +13,8 @@ use sqlx::{Sqlite, Transaction, query, query_scalar};
 use super::super::super::ITEMS_CHANGE_SCOPE;
 use super::super::super::admission_lifecycle::finalize_compensating_dispatch_admission_in_tx;
 use super::super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
-use super::super::super::items::{bump_change_in_tx, load_item_in_tx};
+use super::super::super::item_tx_ext::TaskBoardItemTxExt;
+use super::super::super::items::bump_change_in_tx;
 use super::super::super::lane_order::{
     LaneTransitionKind, LaneTransitionWrite, record_lane_transition_audit_in_tx,
     replace_with_lane_transition_in_tx,
@@ -243,7 +244,8 @@ async fn finish_failed_task_board_dispatch(
         restore_consumed_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &utc_now())
             .await?;
     }
-    let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
+    let (mut item, revision) = transaction
+        .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     let still_linked = item.session_id.as_deref() == Some(session_id.as_str())

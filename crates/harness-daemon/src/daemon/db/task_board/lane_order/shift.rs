@@ -3,7 +3,7 @@
 
 use sqlx::{Sqlite, Transaction};
 
-use super::super::items::{insert_item_in_tx, replace_item_in_tx};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::{LaneEntry, TaskBoardLaneShift, clear_changed_anchors_in_tx, next_item_revision};
 use crate::daemon::db::CliError;
 use crate::task_board::TaskBoardItem;
@@ -17,9 +17,9 @@ pub(super) async fn store_item_in_tx(
     replacing: bool,
 ) -> Result<(), CliError> {
     if replacing {
-        replace_item_in_tx(transaction, item, item_revision).await
+        transaction.replace_item_in_tx(item, item_revision).await
     } else {
-        insert_item_in_tx(transaction, item, item_revision).await
+        transaction.insert_item_in_tx(item, item_revision).await
     }
 }
 
@@ -36,7 +36,9 @@ pub(super) async fn shift_lane_entries_in_tx(
     let mut shifted = Vec::new();
     for entry in entries.iter().filter(|entry| entry.before != entry.item) {
         let item_revision = next_item_revision(entry.revision)?;
-        replace_item_in_tx(transaction, &entry.item, item_revision).await?;
+        transaction
+            .replace_item_in_tx(&entry.item, item_revision)
+            .await?;
         shifted.push(TaskBoardLaneShift {
             item_id: entry.item.id.clone(),
             item_revision,

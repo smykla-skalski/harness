@@ -1,7 +1,6 @@
 use super::super::TriageOutcome;
 use super::{
-    apply_builtin_v1_triage_in_tx, connect, inbox_item, load_item_in_tx, replace_item_in_tx,
-    seed_decided_todo_item,
+    TaskBoardItemTxExt, apply_builtin_v1_triage_in_tx, connect, inbox_item, seed_decided_todo_item,
 };
 use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, TaskBoardStatus};
 
@@ -14,7 +13,8 @@ async fn same_evidence_with_missing_builtin_placement_reapplies_and_reports_reta
         .begin_immediate_transaction("test missing placement")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, item_id)
+    let (mut item, _) = transaction
+        .load_item_in_tx(item_id)
         .await
         .expect("load item")
         .expect("item exists");
@@ -49,7 +49,8 @@ async fn same_evidence_with_wrong_automatic_producer_reapplies_and_reports_retai
         .begin_immediate_transaction("test wrong producer")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, item_id)
+    let (mut item, _) = transaction
+        .load_item_in_tx(item_id)
         .await
         .expect("load item")
         .expect("item exists");
@@ -88,7 +89,8 @@ async fn same_evidence_with_stale_inbox_placement_reports_retained_effect() {
         .begin_immediate_transaction("seed undecided")
         .await
         .expect("begin transaction");
-    let (mut item, revision) = load_item_in_tx(&mut first_transaction, "item-1")
+    let (mut item, revision) = first_transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -103,7 +105,8 @@ async fn same_evidence_with_stale_inbox_placement_reports_retained_effect() {
     .await
     .expect("apply triage")
     .expect("decision recorded");
-    replace_item_in_tx(&mut first_transaction, &item, revision + 1)
+    first_transaction
+        .replace_item_in_tx(&item, revision + 1)
         .await
         .expect("persist");
     first_transaction.commit().await.expect("commit first");
@@ -114,7 +117,8 @@ async fn same_evidence_with_stale_inbox_placement_reports_retained_effect() {
         .begin_immediate_transaction("test stale inbox placement")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, _) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -150,7 +154,8 @@ async fn human_suppressed_status_move_produces_no_retained_effect_audit() {
         .begin_immediate_transaction("test suppressed move")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, item_id)
+    let (mut item, _) = transaction
+        .load_item_in_tx(item_id)
         .await
         .expect("load item")
         .expect("item exists");
@@ -197,7 +202,8 @@ async fn manual_anchor_produces_no_retained_effect_audit_on_a_later_pass() {
         .begin_immediate_transaction("test manual first pass")
         .await
         .expect("begin transaction");
-    let (mut item, revision) = load_item_in_tx(&mut first_transaction, "item-1")
+    let (mut item, revision) = first_transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -212,7 +218,8 @@ async fn manual_anchor_produces_no_retained_effect_audit_on_a_later_pass() {
     .await
     .expect("apply triage")
     .expect("decision recorded even though placement is suppressed");
-    replace_item_in_tx(&mut first_transaction, &item, revision + 1)
+    first_transaction
+        .replace_item_in_tx(&item, revision + 1)
         .await
         .expect("persist");
     first_transaction.commit().await.expect("commit first");
@@ -221,7 +228,8 @@ async fn manual_anchor_produces_no_retained_effect_audit_on_a_later_pass() {
         .begin_immediate_transaction("test manual second pass")
         .await
         .expect("begin transaction");
-    let (mut reloaded, _) = load_item_in_tx(&mut second_transaction, "item-1")
+    let (mut reloaded, _) = second_transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");

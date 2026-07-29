@@ -85,7 +85,7 @@ async fn audit_actor(db: &AsyncDaemonDb, kind: &str, item_id: &str) -> Option<St
 /// Seed a genuinely decided `BuiltInV1` Todo verdict (a real decision row,
 /// real placement) so later reads see a congruent starting point.
 async fn seed_decided_todo(db: &AsyncDaemonDb, item_id: &str) {
-    use super::super::items::test_support::{load_item_in_tx, replace_item_in_tx};
+    use super::super::item_tx_ext::TaskBoardItemTxExt;
     use super::super::triage_apply::apply_builtin_v1_triage_in_tx;
 
     db.create_task_board_item(inbox_item(item_id))
@@ -95,7 +95,8 @@ async fn seed_decided_todo(db: &AsyncDaemonDb, item_id: &str) {
         .begin_immediate_transaction("seed decided todo")
         .await
         .expect("begin transaction");
-    let (mut item, revision) = load_item_in_tx(&mut transaction, item_id)
+    let (mut item, revision) = transaction
+        .load_item_in_tx(item_id)
         .await
         .expect("load item")
         .expect("item exists");
@@ -110,7 +111,8 @@ async fn seed_decided_todo(db: &AsyncDaemonDb, item_id: &str) {
     .await
     .expect("apply triage")
     .expect("decision recorded");
-    replace_item_in_tx(&mut transaction, &item, revision + 1)
+    transaction
+        .replace_item_in_tx(&item, revision + 1)
         .await
         .expect("persist triaged placement");
     transaction.commit().await.expect("commit");

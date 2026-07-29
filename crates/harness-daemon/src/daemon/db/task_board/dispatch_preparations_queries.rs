@@ -16,7 +16,8 @@ use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::dispatch_preparation_claim::TaskBoardPreparationClaim;
 use super::super::dispatch_workflow_launch::prepare_workflow_launches_for_publication;
-use super::super::items::{bump_change_in_tx, load_item_in_tx};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
+use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -154,7 +155,8 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
         .await?;
     ensure_preparation_claim(&mut transaction, claim).await?;
     let preparation = &claim.preparation;
-    let (mut item, revision) = load_item_in_tx(&mut transaction, &preparation.board_item_id)
+    let (mut item, revision) = transaction
+        .load_item_in_tx(&preparation.board_item_id)
         .await?
         .ok_or_else(|| {
             db_error(format!(

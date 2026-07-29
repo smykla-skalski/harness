@@ -3,7 +3,7 @@ use sqlx::{Sqlite, Transaction, query_as};
 use super::admission_lifecycle::{TaskBoardAdmissionCheck, revalidate_dispatch_admission_in_tx};
 use super::dispatch_intents::ensure_dispatch_item_startable;
 use super::dispatch_intents::helpers::refuse_pending_admission_in_tx;
-use super::items::load_item_in_tx;
+use super::item_tx_ext::TaskBoardItemTxExt;
 use super::workflow_dispatch::{
     insert_started_read_only_workflow_in_tx, insert_started_write_workflow_in_tx,
 };
@@ -80,7 +80,8 @@ pub(super) async fn validate_pending_dispatch(
     applied: &DispatchAppliedTask,
     consumed_approval_grant_id: Option<&str>,
 ) -> Result<(), CliError> {
-    let (item, item_revision) = load_item_in_tx(transaction, board_item_id)
+    let (item, item_revision) = transaction
+        .load_item_in_tx(board_item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
     if let Some((prepared_item_revision, _)) = workflow_start_fence(applied)?

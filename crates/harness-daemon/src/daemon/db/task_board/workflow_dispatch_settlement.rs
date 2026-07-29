@@ -8,7 +8,8 @@ use super::dispatch_intents::{claimed_intent_identity, ensure_dispatch_item_star
 use super::dispatch_workflow_start::{
     insert_started_workflow_in_tx, load_claimed_applied, workflow_start_fence,
 };
-use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::bump_change_in_tx;
 use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_dispatch::workflow_owner;
 use super::workflow_executions::load_execution_in_tx;
@@ -297,7 +298,8 @@ async fn screen_workflow_dispatch_in_tx(
         claimed_intent_identity(transaction, intent_id, claim_token).await?;
     let applied = load_claimed_applied(transaction, intent_id, claim_token).await?;
     ensure_workflow_launch(&applied)?;
-    let (mut item, revision) = load_item_in_tx(transaction, &item_id)
+    let (mut item, revision) = transaction
+        .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     validate_claimed_identity(&item, &session_id, &work_item_id, &execution_id, &applied)?;
@@ -330,7 +332,9 @@ async fn persist_prepared_workflow_dispatch_in_tx(
     claim_token: &str,
     prepared: &PreparedWorkflowDispatch,
 ) -> Result<(), CliError> {
-    replace_item_in_tx(transaction, &prepared.item, prepared.started_revision).await?;
+    transaction
+        .replace_item_in_tx(&prepared.item, prepared.started_revision)
+        .await?;
     insert_started_workflow_in_tx(
         transaction,
         &prepared.item,
