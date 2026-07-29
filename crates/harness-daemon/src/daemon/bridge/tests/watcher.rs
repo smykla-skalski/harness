@@ -6,7 +6,7 @@ use serde_json::json;
 
 fn bridge_manifest_fixture(
     revision: u64,
-    host_bridge: HostBridgeManifest,
+    host_bridge: &HostBridgeManifest,
 ) -> state::DaemonManifest {
     serde_json::from_value(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -26,7 +26,7 @@ fn bridge_manifest_fixture(
 fn compute_bridge_manifest_update_returns_none_when_host_bridge_unchanged() {
     with_temp_daemon_root(|| {
         // No bridge running: host_bridge_manifest() returns default.
-        let current = bridge_manifest_fixture(1, HostBridgeManifest::default());
+        let current = bridge_manifest_fixture(1, &HostBridgeManifest::default());
         // No bridge.json exists so host_bridge_manifest returns default.
         // current.host_bridge is already default, so no update needed.
         assert!(
@@ -46,7 +46,7 @@ fn compute_bridge_manifest_update_returns_some_when_lock_held_and_manifest_stale
         let _flock = hold_bridge_lock();
 
         // Manifest currently shows bridge as not running.
-        let current = bridge_manifest_fixture(2, HostBridgeManifest::default());
+        let current = bridge_manifest_fixture(2, &HostBridgeManifest::default());
         let updated = compute_bridge_manifest_update(&current)
             .expect("update should be produced when lock held and manifest stale");
         assert!(

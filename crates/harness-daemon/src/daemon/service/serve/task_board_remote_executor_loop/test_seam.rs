@@ -227,7 +227,7 @@ async fn runtime_snapshot(
     outcome: &RuntimeSeamOutcome,
 ) -> Result<CodexRunSnapshot, CliError> {
     match outcome {
-        RuntimeSeamOutcome::Start => deterministic_start_snapshot(offer, identity, workspace),
+        RuntimeSeamOutcome::Start => Ok(deterministic_start_snapshot(offer, identity, workspace)),
         RuntimeSeamOutcome::Probe { final_message } => {
             let mut snapshot = db
                 .codex_run(&identity.run_id)
@@ -262,10 +262,10 @@ fn deterministic_start_snapshot(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
-) -> Result<CodexRunSnapshot, CliError> {
+) -> CodexRunSnapshot {
     let request = offer.launch.codex_request();
     let observed_at = utc_now();
-    Ok(CodexRunSnapshot {
+    CodexRunSnapshot {
         run_id: identity.run_id.clone(),
         session_id: identity.session_id.clone(),
         task_id: request.task_id,
@@ -289,7 +289,7 @@ fn deterministic_start_snapshot(
         updated_at: observed_at,
         model: request.model,
         effort: request.effort,
-    })
+    }
 }
 
 fn runtime_seam_slot() -> &'static Mutex<Option<Arc<AsyncMutex<RuntimeSeamState>>>> {

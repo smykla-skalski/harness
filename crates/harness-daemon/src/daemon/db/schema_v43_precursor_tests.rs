@@ -71,7 +71,9 @@ fn derive_precursor_sql(current_sql: &str) -> String {
 }
 
 fn paren_delta(line: &str) -> i64 {
-    line.matches('(').count() as i64 - line.matches(')').count() as i64
+    let open = i64::try_from(line.matches('(').count()).expect("open paren count fits in i64");
+    let close = i64::try_from(line.matches(')').count()).expect("close paren count fits in i64");
+    open - close
 }
 
 fn seed_child_recovery_quarantine(conn: &Connection) {

@@ -55,6 +55,21 @@ fn fresh_schema_includes_v43_remote_execution_evidence() {
     );
 }
 
+/// `(state, legacy_migrated, action_key, attempt, request_json,
+/// executor_configuration_revision, executor_checkout_path, last_mutation_kind,
+/// last_mutation_sha256)` from `task_board_remote_assignments`.
+type LegacyMigratedAssignmentRow = (
+    String,
+    i64,
+    Option<String>,
+    Option<i64>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+    Option<String>,
+);
+
 #[test]
 fn migration_supersedes_legacy_rows_and_sources_trust_from_settings() {
     let db = legacy_v40_fixture();
@@ -96,17 +111,7 @@ fn migration_supersedes_legacy_rows_and_sources_trust_from_settings() {
         )
     );
 
-    let assignment: (
-        String,
-        i64,
-        Option<String>,
-        Option<i64>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<i64>,
-        Option<String>,
-    ) = db
+    let assignment: LegacyMigratedAssignmentRow = db
         .connection()
         .query_row(
             "SELECT state, legacy_migrated, action_key, attempt, request_json,

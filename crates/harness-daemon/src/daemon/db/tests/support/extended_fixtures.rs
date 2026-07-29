@@ -216,12 +216,12 @@ pub(crate) fn performance_session_state(
             idle_agent_count: 0,
             awaiting_review_agent_count: 0,
             open_task_count: 1,
-            in_progress_task_count: (token % 3) as u32,
+            in_progress_task_count: u32::try_from(token % 3).expect("modulo 3 fits in u32"),
             awaiting_review_task_count: 0,
             in_review_task_count: 0,
             arbitration_task_count: 0,
-            blocked_task_count: (token % 2) as u32,
-            completed_task_count: (token % 4) as u32,
+            blocked_task_count: u32::try_from(token % 2).expect("modulo 2 fits in u32"),
+            completed_task_count: u32::try_from(token % 4).expect("modulo 4 fits in u32"),
         },
     }
 }

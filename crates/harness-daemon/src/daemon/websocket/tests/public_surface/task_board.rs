@@ -222,7 +222,7 @@ async fn mark_ws_task_done(
     work_item_id: &str,
 ) {
     assert_ok(
-        dispatch(
+        &dispatch(
             &request(
                 "req-task-board-task-update",
                 ws_methods::TASK_UPDATE,
@@ -273,7 +273,7 @@ fn request(id: &str, method: &str, params: Value) -> WsRequest {
     }
 }
 
-fn assert_ok(response: WsResponse) {
+fn assert_ok(response: &WsResponse) {
     assert!(
         response.error.is_none(),
         "unexpected error: {:?}",

@@ -102,29 +102,35 @@ fn seed_one_codex_run(db: &DaemonDb) {
         .expect("seed one codex run");
 }
 
+/// `(run_id, session_id, task_id, board_item_id, workflow_execution_id,
+/// session_agent_id, display_name, project_dir, thread_id, turn_id, mode,
+/// status, prompt, latest_summary, final_message, error, model, effort,
+/// created_at, updated_at)` from `codex_runs`.
+type CodexRunRoundTripRow = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+);
+
 fn assert_seeded_codex_run_round_tripped(db: &DaemonDb) {
-    let row: (
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        String,
-        Option<String>,
-        Option<String>,
-        String,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        String,
-        String,
-    ) = db
+    let row: CodexRunRoundTripRow = db
         .connection()
         .query_row(
             "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,

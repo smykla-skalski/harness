@@ -421,7 +421,7 @@ fn failure_status(
         state: RemoteAssignmentWireState::Failed,
         offer_request_sha256: request.offer_request_sha256.clone(),
         status_sha256: String::new(),
-        lease: current_lease(request, assignment),
+        lease: Some(current_lease(request, assignment)),
         result: None,
         output_artifacts: RemoteArtifactManifest::default(),
         claimed_at: Some(CLAIMED_AT.into()),
@@ -446,7 +446,7 @@ fn superseded_status(
         state: RemoteAssignmentWireState::Superseded,
         offer_request_sha256: request.offer_request_sha256.clone(),
         status_sha256: String::new(),
-        lease: current_lease(request, assignment),
+        lease: Some(current_lease(request, assignment)),
         result: None,
         output_artifacts: RemoteArtifactManifest::default(),
         claimed_at: claimed.then(|| CLAIMED_AT.into()),
@@ -475,9 +475,9 @@ fn ambiguous_terminal_status(
 fn current_lease(
     request: &RemoteStatusRequest,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
-) -> Option<RemoteLease> {
-    Some(RemoteLease {
+) -> RemoteLease {
+    RemoteLease {
         lease_id: request.lease_id.clone(),
         expires_at: assignment.lease_expires_at.clone().expect("lease expiry"),
-    })
+    }
 }

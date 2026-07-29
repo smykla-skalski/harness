@@ -258,6 +258,9 @@ impl RemotePairingRecord {
         )
     }
 
+    /// # Errors
+    /// Returns [`RemotePairingError`] for blank ids/codes and requested scopes
+    /// that exceed the selected role.
     #[cfg(test)]
     pub fn new_for_tests(
         pairing_id: impl Into<String>,
@@ -386,6 +389,9 @@ impl RemotePairingClaimRequest {
         })
     }
 
+    /// # Errors
+    /// Returns [`RemotePairingError`] when the domains, client id, display name,
+    /// platform, or audit event id are blank.
     #[cfg(test)]
     pub fn new_for_tests(
         expected_domain: impl Into<String>,

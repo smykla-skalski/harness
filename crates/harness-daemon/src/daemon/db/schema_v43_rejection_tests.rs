@@ -55,7 +55,7 @@ fn accepted_offer_receipt_freezes_the_initial_lease() {
         db.connection(),
         &receipt,
         &receipt.request_json(),
-        Outcome::Accepted {
+        &Outcome::Accepted {
             lease_id: "lease-l1",
             expires_at: "2026-07-19T09:05:00Z",
         },
@@ -92,7 +92,7 @@ fn accepted_offer_receipt_freezes_the_initial_lease() {
             ..receipt
         }
         .request_json(),
-        Outcome::Accepted {
+        &Outcome::Accepted {
             lease_id: "",
             expires_at: "2026-07-19T09:05:00Z",
         },
@@ -125,7 +125,7 @@ fn rejection_receipt_preserves_bounded_code_and_rejects_malformed_evidence() {
         db.connection(),
         &bounded,
         &bounded.request_json(),
-        Outcome::Rejected("capacity_changed"),
+        &Outcome::Rejected("capacity_changed"),
     )
     .expect("persist bounded provider rejection code");
     let code: String = db
@@ -159,7 +159,7 @@ fn rejection_receipt_preserves_bounded_code_and_rejects_malformed_evidence() {
             isolated.connection(),
             &malformed,
             &malformed.request_json(),
-            Outcome::Rejected(invalid),
+            &Outcome::Rejected(invalid),
         )
         .expect_err("malformed rejection code must fail");
         assert!(error.to_string().contains("CHECK constraint failed"));
@@ -341,7 +341,7 @@ fn insert_receipt(
         conn,
         receipt,
         request_json,
-        Outcome::Rejected("executor_unavailable"),
+        &Outcome::Rejected("executor_unavailable"),
     )
 }
 
@@ -349,7 +349,7 @@ fn insert_receipt_with_outcome(
     conn: &Connection,
     receipt: &Receipt,
     request_json: &str,
-    outcome: Outcome<'_>,
+    outcome: &Outcome<'_>,
 ) -> rusqlite::Result<usize> {
     let (disposition, lease_id, lease_expires_at, rejection_code) = match outcome {
         Outcome::Accepted {

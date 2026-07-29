@@ -22,7 +22,7 @@ fn remote_pairing_reviews_query_survives_persistence_and_claim() {
         code.expose(),
         "2026-07-12T18:00:00Z",
         "2026-07-12T18:10:00Z",
-        Some(query.clone()),
+        Some(&query),
     )
     .expect("pairing record");
 

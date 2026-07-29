@@ -11,6 +11,11 @@ use crate::task_board::{
 const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const CURRENT_HOST_ID: &str = "executor-b";
 
+/// `(host_id, reason, source_settings_revision, source_settings_updated_at,
+/// legacy_endpoint, legacy_leaf_sha256, legacy_credential_reference,
+/// legacy_enabled)` from `task_board_remote_host_quarantines`.
+type QuarantineLedgerRow = (String, String, i64, String, String, String, String, i64);
+
 #[test]
 fn synchronous_upgrade_quarantines_legacy_leaf_pin_and_survives_restart() {
     let temp = tempdir().expect("schema fixture directory");
@@ -129,7 +134,7 @@ fn assert_sync_quarantine(db: &DaemonDb) -> String {
         .expect("decode migrated hosts");
     assert_current_hosts(&hosts);
     assert_foreign_keys_clean_sync(db);
-    let ledger: Vec<(String, String, i64, String, String, String, String, i64)> = db
+    let ledger: Vec<QuarantineLedgerRow> = db
         .connection()
         .prepare(
             "SELECT host_id, reason, source_settings_revision, source_settings_updated_at,
@@ -227,9 +232,7 @@ fn assert_quarantine_json(settings_json: &str) {
     );
 }
 
-// Rows are (host_id, reason, source_settings_revision, source_settings_updated_at,
-// legacy_endpoint, legacy_leaf_sha256, legacy_credential_reference, legacy_enabled).
-fn assert_quarantine_ledger(rows: &[(String, String, i64, String, String, String, String, i64)]) {
+fn assert_quarantine_ledger(rows: &[QuarantineLedgerRow]) {
     assert_eq!(
         rows.len(),
         1,
