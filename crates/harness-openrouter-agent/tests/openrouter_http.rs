@@ -223,3 +223,29 @@ async fn done_terminator_ends_stream_cleanly() {
     }
     assert_eq!(chunk_count, 1);
 }
+
+#[tokio::test]
+async fn done_terminator_at_eof_ends_stream_cleanly() {
+    let server = MockServer::start().await;
+    let body = concat!(
+        "data: {\"id\":\"gen-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n",
+        "data: [DONE]",
+    );
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(body),
+        )
+        .mount(&server)
+        .await;
+    let client = build_client(&server).await;
+    let mut stream = client.stream_chat(sample_request()).await.expect("stream");
+    let mut chunk_count = 0;
+    while let Some(chunk) = stream.next().await {
+        chunk.expect("ok");
+        chunk_count += 1;
+    }
+    assert_eq!(chunk_count, 1);
+}
