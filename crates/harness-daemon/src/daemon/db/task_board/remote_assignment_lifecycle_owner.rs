@@ -12,6 +12,7 @@ use super::remote_assignment_start_authority::{
     executor_lifecycle_settings_still_compatible, remote_executor_identity,
 };
 use super::remote_start_receipts::durable_start_receipt_run_matches;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -50,14 +51,13 @@ impl AsyncDaemonDb {
         owner_instance_id: &str,
         acquired_at: &str,
     ) -> Result<Option<TaskBoardRemoteExecutorLifecycleOwner>, CliError> {
-        Ok(self
-            .claim_task_board_remote_executor_lifecycle_owner_with_settings(
-                assignment_id,
-                owner_instance_id,
-                acquired_at,
-            )
-            .await?
-            .map(|claim| claim.owner))
+        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_lifecycle_owner(
+            self,
+            assignment_id,
+            owner_instance_id,
+            acquired_at,
+        )
+        .await
     }
 
     #[expect(
@@ -115,6 +115,22 @@ impl AsyncDaemonDb {
         })?;
         Ok(Some(claim))
     }
+}
+
+pub(super) async fn claim_task_board_remote_executor_lifecycle_owner(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    owner_instance_id: &str,
+    acquired_at: &str,
+) -> Result<Option<TaskBoardRemoteExecutorLifecycleOwner>, CliError> {
+    Ok(db
+        .claim_task_board_remote_executor_lifecycle_owner_with_settings(
+            assignment_id,
+            owner_instance_id,
+            acquired_at,
+        )
+        .await?
+        .map(|claim| claim.owner))
 }
 
 async fn lifecycle_claim(

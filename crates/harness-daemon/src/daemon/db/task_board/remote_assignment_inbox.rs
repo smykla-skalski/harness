@@ -17,6 +17,7 @@ use super::remote_offer_receipts::{
 };
 use super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx;
 use super::remote_source_bundles::require_source_bundle_in_tx;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{
@@ -46,29 +47,46 @@ impl AsyncDaemonDb {
         host_instance_id: &str,
         accepted_at: &str,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        validate_host_offer(
+        <Self as RemoteExecutionQueries>::accept_task_board_remote_assignment_offer(
+            self,
             request,
             authenticated_principal,
             host_instance_id,
             accepted_at,
-        )?;
-        let accepted = canonical_time(accepted_at, "remote host offer acceptance time")?;
-        let transaction = self
-            .begin_immediate_transaction("task board remote host inbox offer")
-            .await?;
-        match screen_offer_admission_in_tx(transaction, request, authenticated_principal).await? {
-            OfferAdmissionScreen::Resolved(outcome) => Ok(*outcome),
-            OfferAdmissionScreen::Continue(transaction) => {
-                accept_new_host_offer(
-                    transaction,
-                    request,
-                    authenticated_principal,
-                    host_instance_id,
-                    accepted,
-                    accepted_at,
-                )
-                .await
-            }
+        )
+        .await
+    }
+}
+
+pub(super) async fn accept_task_board_remote_assignment_offer(
+    db: &AsyncDaemonDb,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+    host_instance_id: &str,
+    accepted_at: &str,
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
+    validate_host_offer(
+        request,
+        authenticated_principal,
+        host_instance_id,
+        accepted_at,
+    )?;
+    let accepted = canonical_time(accepted_at, "remote host offer acceptance time")?;
+    let transaction = db
+        .begin_immediate_transaction("task board remote host inbox offer")
+        .await?;
+    match screen_offer_admission_in_tx(transaction, request, authenticated_principal).await? {
+        OfferAdmissionScreen::Resolved(outcome) => Ok(*outcome),
+        OfferAdmissionScreen::Continue(transaction) => {
+            accept_new_host_offer(
+                transaction,
+                request,
+                authenticated_principal,
+                host_instance_id,
+                accepted,
+                accepted_at,
+            )
+            .await
         }
     }
 }

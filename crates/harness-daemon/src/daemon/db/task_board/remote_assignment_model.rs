@@ -2,6 +2,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use sqlx::{Sqlite, Transaction, query_as};
 
 use super::remote_claim_receipts::TaskBoardRemoteClaimReceipt;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest, RemoteStatusResponse,
@@ -108,19 +109,26 @@ impl AsyncDaemonDb {
         &self,
         assignment_id: &str,
     ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
-        nonblank(assignment_id, "remote assignment id")?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin remote assignment read: {error}")))?;
-        let assignment = load_assignment_in_tx(&mut transaction, assignment_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote assignment read: {error}")))?;
-        Ok(assignment)
+        <Self as RemoteExecutionQueries>::task_board_remote_assignment(self, assignment_id).await
     }
+}
+
+pub(super) async fn task_board_remote_assignment(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
+    nonblank(assignment_id, "remote assignment id")?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote assignment read: {error}")))?;
+    let assignment = load_assignment_in_tx(&mut transaction, assignment_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote assignment read: {error}")))?;
+    Ok(assignment)
 }
 
 #[derive(sqlx::FromRow)]

@@ -1,6 +1,7 @@
 use sha2::{Digest, Sha256};
 
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, nonblank};
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteLease;
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
@@ -34,21 +35,32 @@ impl AsyncDaemonDb {
         request: &RemoteClaimRequest,
         principal: &str,
     ) -> Result<Option<(RemoteClaimResponse, TaskBoardRemoteAssignmentRecord)>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote claim replay: {error}")))?;
-        nonblank(principal, "remote claim replay principal")?;
-        let Some(record) = self
-            .task_board_remote_assignment(&request.binding.assignment_id)
-            .await?
-        else {
-            return Ok(None);
-        };
-        match exact_claim_response(&record, request, principal) {
-            Some(response) => Ok(Some((response, record))),
-            None if record.claim_receipt.is_none() => Ok(None),
-            None => Err(concurrent("remote claim receipt conflicts with replay")),
-        }
+        <Self as RemoteExecutionQueries>::exact_task_board_remote_claim_receipt(
+            self, request, principal,
+        )
+        .await
+    }
+}
+
+pub(super) async fn exact_task_board_remote_claim_receipt(
+    db: &AsyncDaemonDb,
+    request: &RemoteClaimRequest,
+    principal: &str,
+) -> Result<Option<(RemoteClaimResponse, TaskBoardRemoteAssignmentRecord)>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote claim replay: {error}")))?;
+    nonblank(principal, "remote claim replay principal")?;
+    let Some(record) = db
+        .task_board_remote_assignment(&request.binding.assignment_id)
+        .await?
+    else {
+        return Ok(None);
+    };
+    match exact_claim_response(&record, request, principal) {
+        Some(response) => Ok(Some((response, record))),
+        None if record.claim_receipt.is_none() => Ok(None),
+        None => Err(concurrent("remote claim receipt conflicts with replay")),
     }
 }
 

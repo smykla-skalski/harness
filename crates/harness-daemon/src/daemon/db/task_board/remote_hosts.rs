@@ -5,6 +5,7 @@ use sqlx::{query, query_as};
 use super::items::bump_change_in_tx;
 use super::mapper::{parse_json, to_json};
 use super::remote_assignment_cleanup::active_remote_assignments_in_tx;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRepositoryAutomationConfig;
 use crate::task_board::{
@@ -50,13 +51,7 @@ impl AsyncDaemonDb {
         &self,
         host_id: &str,
     ) -> Result<TaskBoardRemoteHostTrustFence, CliError> {
-        let row = query_as::<_, HostRow>(HostRow::SELECT_BY_ID)
-            .bind(host_id)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| db_error(format!("load configured remote host: {error}")))?
-            .ok_or_else(|| permission_denied(host_id))?;
-        row.trust_fence()
+        <Self as RemoteExecutionQueries>::task_board_remote_host_trust_fence(self, host_id).await
     }
 
     pub(crate) async fn record_task_board_execution_host_observation_fenced(
@@ -276,6 +271,19 @@ impl AsyncDaemonDb {
         });
         Ok(eligible.into_iter().next().map(|(host, _)| host))
     }
+}
+
+pub(super) async fn task_board_remote_host_trust_fence(
+    db: &AsyncDaemonDb,
+    host_id: &str,
+) -> Result<TaskBoardRemoteHostTrustFence, CliError> {
+    let row = query_as::<_, HostRow>(HostRow::SELECT_BY_ID)
+        .bind(host_id)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| db_error(format!("load configured remote host: {error}")))?
+        .ok_or_else(|| permission_denied(host_id))?;
+    row.trust_fence()
 }
 
 fn observed_state_label(state: TaskBoardRemoteHostState) -> Result<&'static str, CliError> {

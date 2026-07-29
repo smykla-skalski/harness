@@ -13,6 +13,7 @@ use super::remote_operation_trust::{
 };
 use super::workflow_executions::load_execution_in_tx;
 use super::{ORCHESTRATOR_CHANGE_SCOPE, items::bump_change_in_tx};
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteClaimRequest;
 use crate::task_board::remote_wire::wire::{RemoteStatusRequest, RemoteStatusResponse};
@@ -82,44 +83,59 @@ impl AsyncDaemonDb {
         response: &RemoteStatusResponse,
         authenticated_principal: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        validate_status_exchange(request, response, authenticated_principal)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote assignment status")
-            .await?;
-        let record = status_record_in_tx(&mut transaction, request).await?;
-        let settlement = match screen_status_exchange_in_tx(
-            &mut transaction,
-            &record,
+        <Self as RemoteExecutionQueries>::record_task_board_remote_assignment_status(
+            self,
             request,
             response,
             authenticated_principal,
         )
-        .await?
-        {
-            Some(settlement) => settlement,
-            None => {
-                apply_status_update_in_tx(
-                    &mut transaction,
-                    &record,
-                    request,
-                    response,
-                    authenticated_principal,
-                )
-                .await?
-            }
-        };
-        // Same 16384-byte `clippy::large_futures` threshold: awaited inline this
-        // settlement is 23648 bytes, because every arm carries the record and
-        // the whole exchange by value.
-        Box::pin(settle_status_exchange(
-            transaction,
-            record,
-            request,
-            response,
-            settlement,
-        ))
         .await
     }
+}
+
+pub(super) async fn record_task_board_remote_assignment_status(
+    db: &AsyncDaemonDb,
+    request: &RemoteStatusRequest,
+    response: &RemoteStatusResponse,
+    authenticated_principal: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    validate_status_exchange(request, response, authenticated_principal)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote assignment status")
+        .await?;
+    let record = status_record_in_tx(&mut transaction, request).await?;
+    let settlement = match screen_status_exchange_in_tx(
+        &mut transaction,
+        &record,
+        request,
+        response,
+        authenticated_principal,
+    )
+    .await?
+    {
+        Some(settlement) => settlement,
+        None => {
+            apply_status_update_in_tx(
+                &mut transaction,
+                &record,
+                request,
+                response,
+                authenticated_principal,
+            )
+            .await?
+        }
+    };
+    // Same 16384-byte `clippy::large_futures` threshold: awaited inline this
+    // settlement is 23648 bytes, because every arm carries the record and
+    // the whole exchange by value.
+    Box::pin(settle_status_exchange(
+        transaction,
+        record,
+        request,
+        response,
+        settlement,
+    ))
+    .await
 }
 
 /// The status request must echo the exact offer, lease and principal the record

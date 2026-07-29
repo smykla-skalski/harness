@@ -3,6 +3,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::remote_assignment_lease::require_assignment;
 use super::remote_assignment_model::{canonical_time, concurrent, nonblank, phase_label, to_i64};
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse,
@@ -34,37 +35,52 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         settled_at: &str,
     ) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote settlement request: {error}")))?;
-        nonblank(authenticated_principal, "remote settlement principal")?;
-        canonical_time(settled_at, "remote settlement time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote settlement receipt")
-            .await?;
-        if let Some(receipt) =
-            screen_settlement_collision_in_tx(&mut transaction, request, authenticated_principal)
-                .await?
-        {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit replayed remote settlement: {error}")))?;
-            return Ok(receipt);
-        }
-        let receipt = write_settlement_receipt_in_tx(
-            &mut transaction,
+        <Self as RemoteExecutionQueries>::settle_task_board_remote_assignment(
+            self,
             request,
             authenticated_principal,
             settled_at,
         )
+        .await
+    }
+}
+
+pub(super) async fn settle_task_board_remote_assignment(
+    db: &AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    settled_at: &str,
+) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote settlement request: {error}")))?;
+    nonblank(authenticated_principal, "remote settlement principal")?;
+    canonical_time(settled_at, "remote settlement time")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote settlement receipt")
         .await?;
+    if let Some(receipt) =
+        screen_settlement_collision_in_tx(&mut transaction, request, authenticated_principal)
+            .await?
+    {
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit remote settlement receipt: {error}")))?;
-        Ok(receipt)
+            .map_err(|error| db_error(format!("commit replayed remote settlement: {error}")))?;
+        return Ok(receipt);
     }
+    let receipt = write_settlement_receipt_in_tx(
+        &mut transaction,
+        request,
+        authenticated_principal,
+        settled_at,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote settlement receipt: {error}")))?;
+    Ok(receipt)
 }
 
 /// Writes the immutable settlement receipt for the exact current generation,
@@ -114,19 +130,27 @@ impl AsyncDaemonDb {
         &self,
         assignment_id: &str,
     ) -> Result<Option<TaskBoardRemoteSettlementReceipt>, CliError> {
-        nonblank(assignment_id, "remote settlement assignment")?;
-        let mut transaction = self
-            .pool()
-            .begin()
+        <Self as RemoteExecutionQueries>::task_board_remote_settlement_receipt(self, assignment_id)
             .await
-            .map_err(|error| db_error(format!("begin remote settlement read: {error}")))?;
-        let receipt = load_settlement_in_tx(&mut transaction, assignment_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote settlement read: {error}")))?;
-        Ok(receipt)
     }
+}
+
+pub(super) async fn task_board_remote_settlement_receipt(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+) -> Result<Option<TaskBoardRemoteSettlementReceipt>, CliError> {
+    nonblank(assignment_id, "remote settlement assignment")?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote settlement read: {error}")))?;
+    let receipt = load_settlement_in_tx(&mut transaction, assignment_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote settlement read: {error}")))?;
+    Ok(receipt)
 }
 
 pub(super) fn require_current_settlement_window(

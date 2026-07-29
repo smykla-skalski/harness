@@ -21,6 +21,7 @@ pub(crate) use failed_at_claimed::{
 pub(super) use settings_fence::refuse_settings_replacement_during_executor_start_io;
 use settings_fence::revoke_unpermitted_start_in_tx;
 use start_adoption::persist_start_adoption_in_tx;
+pub(super) use start_io_permit::claim_task_board_remote_executor_start_io_permit;
 pub(super) use start_io_permit::start_io_permit_digest_from_evidence;
 pub(crate) use start_io_permit::{
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
@@ -41,6 +42,7 @@ use super::remote_assignment_model::{
 use super::remote_start_receipts::{
     durable_start_receipt_run_matches, receipt_matches_permit, start_receipt,
 };
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -61,90 +63,19 @@ pub(crate) struct TaskBoardRemoteExecutorStartAuthority {
 }
 
 impl AsyncDaemonDb {
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
-    )]
     pub(crate) async fn claim_task_board_remote_executor_start_authority(
         &self,
         assignment_id: &str,
         host_instance_id: &str,
         authority_at: &str,
     ) -> Result<Option<TaskBoardRemoteExecutorStartAuthority>, CliError> {
-        nonblank(assignment_id, "remote executor start assignment id")?;
-        nonblank(host_instance_id, "remote executor start host instance")?;
-        canonical_time(authority_at, "remote executor start authority time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote executor start authority")
-            .await?;
-        let record = require_assignment(&mut transaction, assignment_id).await?;
-        if record.executor_stop_pending.is_some() {
-            commit_noop(transaction, "remote executor is permanently stop-only").await?;
-            return Ok(None);
-        }
-        if let Some(authority) = executor_start_authority(&record)? {
-            if record.claimed_host_instance_id.as_deref() != Some(host_instance_id) {
-                return Err(concurrent(
-                    "remote executor start authority belongs to another host instance",
-                ));
-            }
-            commit_noop(transaction, "replayed remote executor start authority").await?;
-            return Ok(Some(authority));
-        }
-        if !start_authority_eligible(&record, host_instance_id, authority_at)? {
-            commit_noop(transaction, "stale remote executor start authority").await?;
-            return Ok(None);
-        }
-        let identity = remote_executor_identity(&record)?;
-        if !executor_settings_still_match(&mut transaction, &record).await? {
-            revoke_unpermitted_start_in_tx(transaction, &record, &identity, authority_at).await?;
-            return Ok(None);
-        }
-        let sha256 = start_authority_digest(&record, &identity, authority_at)?;
-        let claim_receipt_sha256 = record
-            .claim_receipt
-            .as_ref()
-            .ok_or_else(|| db_error("remote executor start has no claim receipt"))?
-            .sha256
-            .as_str();
-        let rows = query(
-            "UPDATE task_board_remote_assignments
-             SET executor_start_authority_sha256 = ?2,
-                 executor_start_authority_at = ?3, updated_at = ?3
-             WHERE assignment_id = ?1 AND fencing_epoch = ?4 AND state = 'claimed'
-               AND target_host_instance_id = ?5 AND claimed_host_instance_id = ?5
-               AND lease_id = ?6 AND lease_expires_at = ?7
-               AND claim_receipt_sha256 = ?8
-               AND executor_start_authority_sha256 IS NULL
-               AND executor_start_authority_at IS NULL
-               AND executor_stop_pending_sha256 IS NULL",
+        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_start_authority(
+            self,
+            assignment_id,
+            host_instance_id,
+            authority_at,
         )
-        .bind(assignment_id)
-        .bind(&sha256)
-        .bind(authority_at)
-        .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
-        .bind(host_instance_id)
-        .bind(record.lease_id.as_deref())
-        .bind(record.lease_expires_at.as_deref())
-        .bind(claim_receipt_sha256)
-        .execute(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("claim remote executor start authority: {error}")))?
-        .rows_affected();
-        if rows != 1 {
-            return Err(concurrent("remote executor start authority lost its fence"));
-        }
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote executor start authority: {error}"))
-        })?;
-        Ok(Some(TaskBoardRemoteExecutorStartAuthority {
-            assignment_id: assignment_id.into(),
-            fencing_epoch: record.fencing_epoch,
-            sha256,
-            acquired_at: authority_at.into(),
-            identity,
-        }))
     }
 
     pub(crate) async fn adopt_task_board_remote_executor_start(
@@ -354,6 +285,93 @@ impl AsyncDaemonDb {
         }
         finish_mutation(transaction, &record.assignment_id, "executor start expiry").await
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+)]
+pub(super) async fn claim_task_board_remote_executor_start_authority(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    host_instance_id: &str,
+    authority_at: &str,
+) -> Result<Option<TaskBoardRemoteExecutorStartAuthority>, CliError> {
+    nonblank(assignment_id, "remote executor start assignment id")?;
+    nonblank(host_instance_id, "remote executor start host instance")?;
+    canonical_time(authority_at, "remote executor start authority time")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote executor start authority")
+        .await?;
+    let record = require_assignment(&mut transaction, assignment_id).await?;
+    if record.executor_stop_pending.is_some() {
+        commit_noop(transaction, "remote executor is permanently stop-only").await?;
+        return Ok(None);
+    }
+    if let Some(authority) = executor_start_authority(&record)? {
+        if record.claimed_host_instance_id.as_deref() != Some(host_instance_id) {
+            return Err(concurrent(
+                "remote executor start authority belongs to another host instance",
+            ));
+        }
+        commit_noop(transaction, "replayed remote executor start authority").await?;
+        return Ok(Some(authority));
+    }
+    if !start_authority_eligible(&record, host_instance_id, authority_at)? {
+        commit_noop(transaction, "stale remote executor start authority").await?;
+        return Ok(None);
+    }
+    let identity = remote_executor_identity(&record)?;
+    if !executor_settings_still_match(&mut transaction, &record).await? {
+        revoke_unpermitted_start_in_tx(transaction, &record, &identity, authority_at).await?;
+        return Ok(None);
+    }
+    let sha256 = start_authority_digest(&record, &identity, authority_at)?;
+    let claim_receipt_sha256 = record
+        .claim_receipt
+        .as_ref()
+        .ok_or_else(|| db_error("remote executor start has no claim receipt"))?
+        .sha256
+        .as_str();
+    let rows = query(
+        "UPDATE task_board_remote_assignments
+         SET executor_start_authority_sha256 = ?2,
+             executor_start_authority_at = ?3, updated_at = ?3
+         WHERE assignment_id = ?1 AND fencing_epoch = ?4 AND state = 'claimed'
+           AND target_host_instance_id = ?5 AND claimed_host_instance_id = ?5
+           AND lease_id = ?6 AND lease_expires_at = ?7
+           AND claim_receipt_sha256 = ?8
+           AND executor_start_authority_sha256 IS NULL
+           AND executor_start_authority_at IS NULL
+           AND executor_stop_pending_sha256 IS NULL",
+    )
+    .bind(assignment_id)
+    .bind(&sha256)
+    .bind(authority_at)
+    .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
+    .bind(host_instance_id)
+    .bind(record.lease_id.as_deref())
+    .bind(record.lease_expires_at.as_deref())
+    .bind(claim_receipt_sha256)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("claim remote executor start authority: {error}")))?
+    .rows_affected();
+    if rows != 1 {
+        return Err(concurrent("remote executor start authority lost its fence"));
+    }
+    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote executor start authority: {error}")))?;
+    Ok(Some(TaskBoardRemoteExecutorStartAuthority {
+        assignment_id: assignment_id.into(),
+        fencing_epoch: record.fencing_epoch,
+        sha256,
+        acquired_at: authority_at.into(),
+        identity,
+    }))
 }
 
 pub(super) fn validate_executor_start_authority(

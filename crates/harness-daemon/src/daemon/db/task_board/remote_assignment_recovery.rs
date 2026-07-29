@@ -10,6 +10,7 @@ use super::remote_assignment_recovery_queue::{
     RawRecoveryCandidate, clear_recovery_quarantine_in_tx, due_assignment_page,
 };
 use super::remote_operation_trust::abandon_controller_operation_trust_in_tx;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -40,28 +41,7 @@ impl AsyncDaemonDb {
         &self,
         now: &str,
     ) -> Result<TaskBoardRemoteRecoveryBatch, CliError> {
-        canonical_time(now, "remote assignment recovery time")?;
-        let (due, incomplete) = due_assignment_page(self, now).await?;
-        let mut batch = TaskBoardRemoteRecoveryBatch {
-            incomplete,
-            ..TaskBoardRemoteRecoveryBatch::default()
-        };
-        for candidate in due {
-            match Box::pin(self.recover_one_remote_assignment(&candidate, now)).await {
-                Ok(Some(assignment)) => batch.recovered.push(assignment),
-                Ok(None) => {}
-                Err(error) => {
-                    self.quarantine_remote_recovery_failure(&candidate, now, &error)
-                        .await?;
-                    batch.failures.push(TaskBoardRemoteRecoveryFailure {
-                        assignment_id: candidate.assignment_id,
-                        code: error.code().to_string(),
-                        message: error.to_string(),
-                    });
-                }
-            }
-        }
-        Ok(batch)
+        <Self as RemoteExecutionQueries>::recover_task_board_remote_assignments(self, now).await
     }
 
     pub(crate) async fn task_board_remote_assignment_recovery_deadline(
@@ -174,6 +154,34 @@ impl AsyncDaemonDb {
         };
         settle_recovered_assignment(transaction, &candidate.assignment_id, changed).await
     }
+}
+
+pub(super) async fn recover_task_board_remote_assignments(
+    db: &AsyncDaemonDb,
+    now: &str,
+) -> Result<TaskBoardRemoteRecoveryBatch, CliError> {
+    canonical_time(now, "remote assignment recovery time")?;
+    let (due, incomplete) = due_assignment_page(db, now).await?;
+    let mut batch = TaskBoardRemoteRecoveryBatch {
+        incomplete,
+        ..TaskBoardRemoteRecoveryBatch::default()
+    };
+    for candidate in due {
+        match Box::pin(db.recover_one_remote_assignment(&candidate, now)).await {
+            Ok(Some(assignment)) => batch.recovered.push(assignment),
+            Ok(None) => {}
+            Err(error) => {
+                db.quarantine_remote_recovery_failure(&candidate, now, &error)
+                    .await?;
+                batch.failures.push(TaskBoardRemoteRecoveryFailure {
+                    assignment_id: candidate.assignment_id,
+                    code: error.code().to_string(),
+                    message: error.to_string(),
+                });
+            }
+        }
+    }
+    Ok(batch)
 }
 
 /// Settles a recovery that already ran. An unchanged recovery still clears the

@@ -127,6 +127,7 @@ pub(crate) use remote_assignment_terminal_handoff::{
 mod remote_assignment_trusted_authority;
 mod remote_claim_receipts;
 mod remote_evidence_retention;
+mod remote_execution_queries;
 mod remote_hosts;
 mod remote_lifecycle_trust;
 mod remote_offer_receipts;

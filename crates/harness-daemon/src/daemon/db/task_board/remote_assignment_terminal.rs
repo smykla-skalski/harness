@@ -13,8 +13,9 @@ use super::remote_assignment_rejection::apply_unclaimable_offer;
 use super::remote_offer_receipts::ensure_accepted_offer_receipt_in_tx;
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
-    consume_controller_operation_trust_in_tx, consume_successor_recovery_operation_trust_in_tx,
+    consume_successor_recovery_operation_trust_in_tx,
 };
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
@@ -23,10 +24,11 @@ use crate::task_board::remote_wire::wire::{
 };
 use sqlx::{Sqlite, Transaction, query};
 
+mod offer_response;
 mod offer_screen;
+pub(super) use offer_response::record_task_board_remote_offer_response;
 use offer_screen::{
-    OfferScreen, OfferScreenLabels, apply_offer_disposition, screen_offer_response_in_tx,
-    validate_offer_request,
+    OfferScreen, OfferScreenLabels, screen_offer_response_in_tx, validate_offer_request,
 };
 
 const OFFER_RESPONSE_LABELS: OfferScreenLabels = OfferScreenLabels {
@@ -54,35 +56,13 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         observed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        validate_offer_request(authenticated_principal, observed_at, &OFFER_RESPONSE_LABELS)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote offer response")
-            .await?;
-        let record = require_assignment(&mut transaction, &response.binding.assignment_id).await?;
-        let (mut transaction, record) = match screen_offer_response_in_tx(
-            transaction,
-            record,
+        <Self as RemoteExecutionQueries>::record_task_board_remote_offer_response(
+            self,
             response,
             authenticated_principal,
-            &OFFER_RESPONSE_LABELS,
+            observed_at,
         )
-        .await?
-        {
-            OfferScreen::Settled(outcome) => return Ok(outcome),
-            OfferScreen::Proceed(transaction, record) => (transaction, record),
-        };
-        if !response_binding_matches(&record, &response.binding, authenticated_principal) {
-            commit_noop(transaction, "stale offer response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        consume_controller_operation_trust_in_tx(
-            &mut transaction,
-            &record,
-            TaskBoardRemoteOperationKind::Offer,
-            &response.offer_request_sha256,
-        )
-        .await?;
-        apply_offer_disposition(transaction, record, response, observed_at).await
+        .await
     }
     pub(crate) async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
@@ -278,6 +258,7 @@ impl AsyncDaemonDb {
         finish_mutation(transaction, &record.assignment_id, "supersede").await
     }
 }
+
 async fn apply_accepted_offer(
     mut transaction: Transaction<'_, Sqlite>,
     record: TaskBoardRemoteAssignmentRecord,
