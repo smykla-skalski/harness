@@ -86,55 +86,6 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardOrchestratorStatusWire: Codable, Equatable, Sendable {
-  public var enabled: Bool
-  public var running: Bool
-  public var stepMode: Bool
-  public var heldDispatches: TaskBoardHeldDispatchSummary
-  public var currentTick: TaskBoardOrchestratorTickInfoWire?
-  public var lastRun: TaskBoardOrchestratorRunSummaryWire?
-  public var workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire]
-  public var automation: TaskBoardAutomationSnapshot?
-  public var settings: TaskBoardOrchestratorSettingsWire
-
-  public init(enabled: Bool, running: Bool, stepMode: Bool = false, heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary(), currentTick: TaskBoardOrchestratorTickInfoWire? = nil, lastRun: TaskBoardOrchestratorRunSummaryWire? = nil, workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire], automation: TaskBoardAutomationSnapshot? = nil, settings: TaskBoardOrchestratorSettingsWire) {
-    self.enabled = enabled
-    self.running = running
-    self.stepMode = stepMode
-    self.heldDispatches = heldDispatches
-    self.currentTick = currentTick
-    self.lastRun = lastRun
-    self.workflowExecutionCounts = workflowExecutionCounts
-    self.automation = automation
-    self.settings = settings
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    enabled = try container.decode(Bool.self, forKey: .enabled)
-    running = try container.decode(Bool.self, forKey: .running)
-    stepMode = try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false
-    heldDispatches = try container.decodeIfPresent(TaskBoardHeldDispatchSummary.self, forKey: .heldDispatches) ?? TaskBoardHeldDispatchSummary()
-    currentTick = try container.decodeIfPresent(TaskBoardOrchestratorTickInfoWire.self, forKey: .currentTick)
-    lastRun = try container.decodeIfPresent(TaskBoardOrchestratorRunSummaryWire.self, forKey: .lastRun)
-    workflowExecutionCounts = try container.decode([TaskBoardWorkflowExecutionCountWire].self, forKey: .workflowExecutionCounts)
-    automation = try container.decodeIfPresent(TaskBoardAutomationSnapshot.self, forKey: .automation)
-    settings = try container.decode(TaskBoardOrchestratorSettingsWire.self, forKey: .settings)
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case enabled
-    case running
-    case stepMode = "step_mode"
-    case heldDispatches = "held_dispatches"
-    case currentTick = "current_tick"
-    case lastRun = "last_run"
-    case workflowExecutionCounts = "workflow_execution_counts"
-    case automation
-    case settings
-  }
-}
-
 public struct TaskBoardHeldDispatchSummary: Codable, Equatable, Sendable {
   public var count: UInt
   public var items: [TaskBoardHeldDispatchItem]
@@ -201,7 +152,71 @@ public struct TaskBoardOrchestratorTickInfoWire: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardOrchestratorRunSummaryWire: Codable, Equatable, Sendable {
+public struct TaskBoardWorkflowExecutionCountWire: Codable, Equatable, Sendable {
+  public var status: TaskBoardWorkflowStatusWire
+  public var count: UInt
+
+  public init(status: TaskBoardWorkflowStatusWire, count: UInt) {
+    self.status = status
+    self.count = count
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case status
+    case count
+  }
+}
+
+public struct TaskBoardOrchestratorStatusWire: Codable, Equatable, Sendable {
+  public var enabled: Bool
+  public var running: Bool
+  public var stepMode: Bool
+  public var heldDispatches: TaskBoardHeldDispatchSummary
+  public var currentTick: TaskBoardOrchestratorTickInfoWire?
+  public var lastRun: TaskBoardOrchestratorRunOutcomeWire?
+  public var workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire]
+  public var automation: TaskBoardAutomationSnapshot?
+  public var settings: TaskBoardOrchestratorSettingsWire
+
+  public init(enabled: Bool, running: Bool, stepMode: Bool = false, heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary(), currentTick: TaskBoardOrchestratorTickInfoWire? = nil, lastRun: TaskBoardOrchestratorRunOutcomeWire? = nil, workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire], automation: TaskBoardAutomationSnapshot? = nil, settings: TaskBoardOrchestratorSettingsWire) {
+    self.enabled = enabled
+    self.running = running
+    self.stepMode = stepMode
+    self.heldDispatches = heldDispatches
+    self.currentTick = currentTick
+    self.lastRun = lastRun
+    self.workflowExecutionCounts = workflowExecutionCounts
+    self.automation = automation
+    self.settings = settings
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    enabled = try container.decode(Bool.self, forKey: .enabled)
+    running = try container.decode(Bool.self, forKey: .running)
+    stepMode = try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false
+    heldDispatches = try container.decodeIfPresent(TaskBoardHeldDispatchSummary.self, forKey: .heldDispatches) ?? TaskBoardHeldDispatchSummary()
+    currentTick = try container.decodeIfPresent(TaskBoardOrchestratorTickInfoWire.self, forKey: .currentTick)
+    lastRun = try container.decodeIfPresent(TaskBoardOrchestratorRunOutcomeWire.self, forKey: .lastRun)
+    workflowExecutionCounts = try container.decode([TaskBoardWorkflowExecutionCountWire].self, forKey: .workflowExecutionCounts)
+    automation = try container.decodeIfPresent(TaskBoardAutomationSnapshot.self, forKey: .automation)
+    settings = try container.decode(TaskBoardOrchestratorSettingsWire.self, forKey: .settings)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case enabled
+    case running
+    case stepMode = "step_mode"
+    case heldDispatches = "held_dispatches"
+    case currentTick = "current_tick"
+    case lastRun = "last_run"
+    case workflowExecutionCounts = "workflow_execution_counts"
+    case automation
+    case settings
+  }
+}
+
+public struct TaskBoardOrchestratorRunOutcomeWire: Codable, Equatable, Sendable {
   public var runId: String
   public var startedAt: String
   public var completedAt: String
@@ -209,12 +224,12 @@ public struct TaskBoardOrchestratorRunSummaryWire: Codable, Equatable, Sendable 
   public var dryRun: Bool
   public var sync: TaskBoardSyncSummaryWire
   public var audit: TaskBoardAuditSummaryWire
-  public var dispatch: DispatchExecutionSummaryWire?
-  public var evaluation: TaskBoardEvaluationSummaryWire?
+  public var dispatch: TaskBoardOrchestratorDispatchOutcomeWire?
+  public var evaluation: TaskBoardOrchestratorEvaluationOutcomeWire?
   public var error: String?
   public var policyTraceIds: [String]
 
-  public init(runId: String, startedAt: String, completedAt: String, status: TaskBoardOrchestratorRunStatus, dryRun: Bool, sync: TaskBoardSyncSummaryWire, audit: TaskBoardAuditSummaryWire, dispatch: DispatchExecutionSummaryWire? = nil, evaluation: TaskBoardEvaluationSummaryWire? = nil, error: String? = nil, policyTraceIds: [String] = []) {
+  public init(runId: String, startedAt: String, completedAt: String, status: TaskBoardOrchestratorRunStatus, dryRun: Bool, sync: TaskBoardSyncSummaryWire, audit: TaskBoardAuditSummaryWire, dispatch: TaskBoardOrchestratorDispatchOutcomeWire? = nil, evaluation: TaskBoardOrchestratorEvaluationOutcomeWire? = nil, error: String? = nil, policyTraceIds: [String] = []) {
     self.runId = runId
     self.startedAt = startedAt
     self.completedAt = completedAt
@@ -237,8 +252,8 @@ public struct TaskBoardOrchestratorRunSummaryWire: Codable, Equatable, Sendable 
     dryRun = try container.decode(Bool.self, forKey: .dryRun)
     sync = try container.decode(TaskBoardSyncSummaryWire.self, forKey: .sync)
     audit = try container.decode(TaskBoardAuditSummaryWire.self, forKey: .audit)
-    dispatch = try container.decodeIfPresent(DispatchExecutionSummaryWire.self, forKey: .dispatch)
-    evaluation = try container.decodeIfPresent(TaskBoardEvaluationSummaryWire.self, forKey: .evaluation)
+    dispatch = try container.decodeIfPresent(TaskBoardOrchestratorDispatchOutcomeWire.self, forKey: .dispatch)
+    evaluation = try container.decodeIfPresent(TaskBoardOrchestratorEvaluationOutcomeWire.self, forKey: .evaluation)
     error = try container.decodeIfPresent(String.self, forKey: .error)
     policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
   }
@@ -258,18 +273,159 @@ public struct TaskBoardOrchestratorRunSummaryWire: Codable, Equatable, Sendable 
   }
 }
 
-public struct TaskBoardWorkflowExecutionCountWire: Codable, Equatable, Sendable {
-  public var status: TaskBoardWorkflowStatusWire
-  public var count: UInt
+public struct TaskBoardOrchestratorDispatchOutcomeWire: Codable, Equatable, Sendable {
+  public var plans: [DispatchPlanWire]
+  public var applied: [TaskBoardOrchestratorAppliedTaskWire]
+  public var failures: [DispatchFailureWire]
 
-  public init(status: TaskBoardWorkflowStatusWire, count: UInt) {
-    self.status = status
-    self.count = count
+  public init(plans: [DispatchPlanWire] = [], applied: [TaskBoardOrchestratorAppliedTaskWire], failures: [DispatchFailureWire] = []) {
+    self.plans = plans
+    self.applied = applied
+    self.failures = failures
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    plans = try container.decodeIfPresent([DispatchPlanWire].self, forKey: .plans) ?? []
+    applied = try container.decode([TaskBoardOrchestratorAppliedTaskWire].self, forKey: .applied)
+    failures = try container.decodeIfPresent([DispatchFailureWire].self, forKey: .failures) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
-    case status
-    case count
+    case plans
+    case applied
+    case failures
+  }
+}
+
+public struct TaskBoardOrchestratorAppliedTaskWire: Codable, Equatable, Sendable {
+  public var boardItemId: String
+  public var sessionId: String
+  public var workItemId: String
+  public var itemTitle: String
+
+  public init(boardItemId: String, sessionId: String, workItemId: String, itemTitle: String) {
+    self.boardItemId = boardItemId
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+    self.itemTitle = itemTitle
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case boardItemId = "board_item_id"
+    case sessionId = "session_id"
+    case workItemId = "work_item_id"
+    case itemTitle = "item_title"
+  }
+}
+
+public struct TaskBoardOrchestratorEvaluationOutcomeWire: Codable, Equatable, Sendable {
+  public var total: UInt
+  public var evaluated: UInt
+  public var updated: UInt
+  public var skipped: UInt
+  public var completed: UInt
+  public var running: UInt
+  public var reviewing: UInt
+  public var blocked: UInt
+  public var failed: UInt
+  public var records: [TaskBoardOrchestratorEvaluationRecordWire]
+  public var signalFailures: [EvaluationSignalFailureWire]
+
+  public init(total: UInt, evaluated: UInt, updated: UInt, skipped: UInt, completed: UInt, running: UInt, reviewing: UInt, blocked: UInt, failed: UInt, records: [TaskBoardOrchestratorEvaluationRecordWire], signalFailures: [EvaluationSignalFailureWire] = []) {
+    self.total = total
+    self.evaluated = evaluated
+    self.updated = updated
+    self.skipped = skipped
+    self.completed = completed
+    self.running = running
+    self.reviewing = reviewing
+    self.blocked = blocked
+    self.failed = failed
+    self.records = records
+    self.signalFailures = signalFailures
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    total = try container.decode(UInt.self, forKey: .total)
+    evaluated = try container.decode(UInt.self, forKey: .evaluated)
+    updated = try container.decode(UInt.self, forKey: .updated)
+    skipped = try container.decode(UInt.self, forKey: .skipped)
+    completed = try container.decode(UInt.self, forKey: .completed)
+    running = try container.decode(UInt.self, forKey: .running)
+    reviewing = try container.decode(UInt.self, forKey: .reviewing)
+    blocked = try container.decode(UInt.self, forKey: .blocked)
+    failed = try container.decode(UInt.self, forKey: .failed)
+    records = try container.decode([TaskBoardOrchestratorEvaluationRecordWire].self, forKey: .records)
+    signalFailures = try container.decodeIfPresent([EvaluationSignalFailureWire].self, forKey: .signalFailures) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case total
+    case evaluated
+    case updated
+    case skipped
+    case completed
+    case running
+    case reviewing
+    case blocked
+    case failed
+    case records
+    case signalFailures = "signal_failures"
+  }
+}
+
+public struct TaskBoardOrchestratorEvaluationRecordWire: Codable, Equatable, Sendable {
+  public var boardItemId: String
+  public var sessionId: String?
+  public var workItemId: String?
+  public var outcome: TaskBoardEvaluationOutcomeWire
+  public var taskStatus: TaskStatus?
+  public var boardStatus: TaskBoardStatus?
+  public var workflowStatus: TaskBoardWorkflowStatusWire?
+  public var updated: Bool
+  public var reason: String?
+  public var itemTitle: String?
+
+  public init(boardItemId: String, sessionId: String? = nil, workItemId: String? = nil, outcome: TaskBoardEvaluationOutcomeWire, taskStatus: TaskStatus? = nil, boardStatus: TaskBoardStatus? = nil, workflowStatus: TaskBoardWorkflowStatusWire? = nil, updated: Bool = false, reason: String? = nil, itemTitle: String? = nil) {
+    self.boardItemId = boardItemId
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+    self.outcome = outcome
+    self.taskStatus = taskStatus
+    self.boardStatus = boardStatus
+    self.workflowStatus = workflowStatus
+    self.updated = updated
+    self.reason = reason
+    self.itemTitle = itemTitle
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    boardItemId = try container.decode(String.self, forKey: .boardItemId)
+    sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+    workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
+    outcome = try container.decode(TaskBoardEvaluationOutcomeWire.self, forKey: .outcome)
+    taskStatus = try container.decodeIfPresent(TaskStatus.self, forKey: .taskStatus)
+    boardStatus = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .boardStatus)
+    workflowStatus = try container.decodeIfPresent(TaskBoardWorkflowStatusWire.self, forKey: .workflowStatus)
+    updated = try container.decodeIfPresent(Bool.self, forKey: .updated) ?? false
+    reason = try container.decodeIfPresent(String.self, forKey: .reason)
+    itemTitle = try container.decodeIfPresent(String.self, forKey: .itemTitle)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case boardItemId = "board_item_id"
+    case sessionId = "session_id"
+    case workItemId = "work_item_id"
+    case outcome
+    case taskStatus = "task_status"
+    case boardStatus = "board_status"
+    case workflowStatus = "workflow_status"
+    case updated
+    case reason
+    case itemTitle = "item_title"
   }
 }
 
