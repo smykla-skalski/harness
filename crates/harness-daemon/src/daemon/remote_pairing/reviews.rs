@@ -38,6 +38,9 @@ impl RemotePairingRecord {
         })
     }
 
+    /// # Errors
+    /// Returns [`RemotePairingError`] when pairing identity, scopes, or the
+    /// Reviews query is invalid.
     #[cfg(test)]
     pub fn new_with_reviews_query_for_tests(
         pairing_id: impl Into<String>,
@@ -46,7 +49,7 @@ impl RemotePairingRecord {
         code: &str,
         created_at: impl Into<String>,
         expires_at: impl Into<String>,
-        reviews_query: Option<ReviewsQueryRequest>,
+        reviews_query: Option<&ReviewsQueryRequest>,
     ) -> Result<Self, RemotePairingError> {
         Self::new_with_reviews_query(
             pairing_id,
@@ -55,7 +58,7 @@ impl RemotePairingRecord {
             code,
             created_at,
             expires_at,
-            reviews_query.as_ref(),
+            reviews_query,
         )
     }
 }

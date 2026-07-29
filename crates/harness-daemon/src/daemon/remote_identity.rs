@@ -84,6 +84,9 @@ impl RemoteTokenHash {
         Ok(Self { storage_value })
     }
 
+    /// # Errors
+    /// Returns [`RemoteIdentityError::InvalidStoredTokenHash`] when the value is
+    /// not a `sha256:`-prefixed 32-byte digest encoded as 64 hex characters.
     #[cfg(test)]
     pub fn try_from_storage_value_for_tests(
         value: impl Into<String>,
@@ -185,6 +188,9 @@ impl RemoteClientRegistration {
         })
     }
 
+    /// # Errors
+    /// Returns [`RemoteIdentityError`] when the client id/token is blank or a
+    /// requested scope is not allowed by the role.
     #[cfg(test)]
     pub fn new_for_tests(
         client_id: impl Into<String>,

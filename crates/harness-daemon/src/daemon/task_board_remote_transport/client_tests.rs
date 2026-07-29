@@ -202,7 +202,7 @@ fn test_tls_material() -> TestTlsMaterial {
         .expect("leaf params")
         .signed_by(&leaf_key, &issuer)
         .expect("leaf certificate");
-    test_tls_material_from_leaf(&ca, &leaf_key, leaf)
+    test_tls_material_from_leaf(&ca, &leaf_key, &leaf)
 }
 
 fn renewed_tls_materials() -> (TestTlsMaterial, TestTlsMaterial) {
@@ -221,8 +221,8 @@ fn renewed_tls_materials() -> (TestTlsMaterial, TestTlsMaterial) {
         .signed_by(&leaf_key, &issuer)
         .expect("renewed leaf certificate");
     (
-        test_tls_material_from_leaf(&ca, &leaf_key, initial),
-        test_tls_material_from_leaf(&ca, &leaf_key, renewed),
+        test_tls_material_from_leaf(&ca, &leaf_key, &initial),
+        test_tls_material_from_leaf(&ca, &leaf_key, &renewed),
     )
 }
 
@@ -235,7 +235,7 @@ fn leaf_params(serial: u64) -> Result<CertificateParams, rcgen::Error> {
 fn test_tls_material_from_leaf(
     ca: &rcgen::Certificate,
     leaf_key: &KeyPair,
-    leaf: rcgen::Certificate,
+    leaf: &rcgen::Certificate,
 ) -> TestTlsMaterial {
     let leaf_der = CertificateDer::from(leaf.der().to_vec());
     let ca_der = CertificateDer::from(ca.der().to_vec());

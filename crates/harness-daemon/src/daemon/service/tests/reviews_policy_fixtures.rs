@@ -58,7 +58,7 @@ pub(super) fn review_target_fixture() -> ReviewTarget {
 }
 
 pub(super) fn reviews_policy_run_request(
-    target: ReviewTarget,
+    target: &ReviewTarget,
     method: GitHubMergeMethod,
     wait: PolicyWaitCondition,
 ) -> PolicyRunRequest {
@@ -149,7 +149,7 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
         let node_id = node.id.clone();
         graph.layout.nodes.push(PolicyGraphNodeLayout {
             node_id: node_id.clone(),
-            x: graph.layout.nodes.len() as i32 * 160 + 24,
+            x: i32::try_from(graph.layout.nodes.len()).expect("node count fits in i32") * 160 + 24,
             y: 24,
             source: None,
         });
@@ -180,7 +180,7 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
     });
     graph.layout.nodes.push(PolicyGraphNodeLayout {
         node_id: "finish-allow".into(),
-        x: graph.layout.nodes.len() as i32 * 160 + 24,
+        x: i32::try_from(graph.layout.nodes.len()).expect("node count fits in i32") * 160 + 24,
         y: 24,
         source: None,
     });

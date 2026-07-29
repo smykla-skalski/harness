@@ -260,7 +260,7 @@ async fn reviews_policy_resume_timer_executes_remaining_steps() {
     let recorded_actions = Arc::new(Mutex::new(Vec::new()));
     let target = review_target_fixture();
     let run_request = reviews_policy_run_request(
-        target,
+        &target,
         GitHubMergeMethod::Squash,
         PolicyWaitCondition::Timer {
             duration_seconds: 60,

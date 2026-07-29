@@ -194,7 +194,7 @@ pub(super) async fn assert_run_once_routes_match(
         }),
     )
     .await;
-    assert_run_once_parity(http, ws);
+    assert_run_once_parity(&http, &ws);
 }
 
 pub(super) async fn assert_no_durable_runs(state: &crate::daemon::http::DaemonHttpState) {
@@ -205,7 +205,7 @@ pub(super) async fn assert_no_durable_runs(state: &crate::daemon::http::DaemonHt
     assert_eq!(count, 0, "flag-off routes must stay on legacy state");
 }
 
-fn assert_run_once_parity(http: Value, ws: Value) {
+fn assert_run_once_parity(http: &Value, ws: &Value) {
     assert_eq!(http["dry_run"], ws["dry_run"]);
     assert_eq!(http["sync"]["operations"], ws["sync"]["operations"]);
     assert_eq!(

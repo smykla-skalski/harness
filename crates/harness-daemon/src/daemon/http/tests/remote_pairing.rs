@@ -97,7 +97,7 @@ async fn remote_pair_claim_returns_server_owned_reviews_query() {
         "http-reviews-secret",
         "2026-07-12T18:00:00Z",
         "2099-07-12T18:10:00Z",
-        Some(query),
+        Some(&query),
     );
     let (base_url, server) = serve_http(state).await;
 
@@ -360,7 +360,7 @@ fn seed_pairing_code_with_reviews_query(
     code: &str,
     created_at: &str,
     expires_at: &str,
-    reviews_query: Option<ReviewsQueryRequest>,
+    reviews_query: Option<&ReviewsQueryRequest>,
 ) -> RemotePairingCode {
     let code = RemotePairingCode::from_value_for_tests(code);
     let record = RemotePairingRecord::new_with_reviews_query_for_tests(

@@ -187,7 +187,7 @@ impl FakeWriteRuntime {
             artifact: plan.artifact,
         };
         *self.head.lock().expect("head lock") = plan.exact_head;
-        let run = completed_run(session_id, request, run_id, result)?;
+        let run = completed_run(session_id, request, run_id, &result)?;
         self.runs
             .lock()
             .expect("runs lock")
@@ -200,7 +200,7 @@ fn completed_run(
     session_id: &str,
     request: &CodexRunRequest,
     run_id: &str,
-    result: TaskBoardLocalAttemptResult,
+    result: &TaskBoardLocalAttemptResult,
 ) -> Result<CodexRunSnapshot, CliError> {
     Ok(CodexRunSnapshot {
         run_id: run_id.into(),

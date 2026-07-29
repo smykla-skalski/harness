@@ -87,7 +87,7 @@ fn remote_pairing_record_normalizes_reviews_query_profile() {
         "pairing-secret",
         "2026-07-12T18:00:00Z",
         "2026-07-12T18:10:00Z",
-        Some(query),
+        Some(&query),
     )
     .expect("pairing record with reviews query");
     let query = record.reviews_query.expect("reviews query");
@@ -114,7 +114,7 @@ fn remote_pairing_record_rejects_author_only_reviews_query() {
         "pairing-secret",
         "2026-07-12T18:00:00Z",
         "2026-07-12T18:10:00Z",
-        Some(query),
+        Some(&query),
     )
     .expect_err("author-only reviews query must fail");
 

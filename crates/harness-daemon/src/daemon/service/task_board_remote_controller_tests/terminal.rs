@@ -257,6 +257,10 @@ async fn corrupt_active_attempt(
     }
 }
 
+// `calls` must stay owned, not borrowed: the returned future is built inline
+// inside a `move` closure and outlives this call, so it needs its own `Arc`
+// rather than one tied to a caller-local reference.
+#[allow(clippy::needless_pass_by_value)]
 fn counted_terminal_operation(
     calls: Arc<AtomicUsize>,
 ) -> impl std::future::Future<Output = Result<(), CliError>> {
@@ -264,6 +268,7 @@ fn counted_terminal_operation(
     ready(Ok(()))
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn counted_cleanup_operation(
     calls: Arc<AtomicUsize>,
 ) -> impl std::future::Future<Output = Result<bool, CliError>> {

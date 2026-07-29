@@ -190,7 +190,13 @@ async fn assert_other_executor_mutations_are_stale(
         )
         .await
         .expect("stop-only generic unknown");
-    for outcome in [renewal, cancellation, unknown] {
+    // A plain array here trips `clippy::large_stack_arrays` (each outcome
+    // variant already carries a full assignment record); `vec!` moves the
+    // three onto the heap instead, which is exactly what `clippy::useless_vec`
+    // would otherwise ask to undo.
+    #[allow(clippy::useless_vec)]
+    let outcomes = vec![renewal, cancellation, unknown];
+    for outcome in outcomes {
         assert!(matches!(
             outcome,
             TaskBoardRemoteMutationOutcome::Stale(ref record)
