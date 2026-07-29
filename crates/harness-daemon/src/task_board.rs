@@ -1,10 +1,13 @@
 //! `harness-daemon`'s own view of the task-board domain: everything the
 //! daemon's service/db/http code needs, minus the CLI-facing `transport`
 //! surface, which dials the daemon directly and must never be part of the
-//! daemon's own build. Mirrors `session.rs`'s hand-written re-export list
-//! rather than `#[path]`-including root's `src/task_board/mod.rs`, so
-//! declaring `pub mod transport;` here is exactly the mistake this file
-//! exists to make impossible.
+//! daemon's own build. Hand-written, like `session.rs`, rather than
+//! `#[path]`-including root's `src/task_board/mod.rs`, so declaring
+//! `pub mod transport;` here is exactly the mistake this file exists to make
+//! impossible. Unlike `session.rs`'s enumerated per-submodule list, this
+//! file leads with a glob: `harness_task_board`'s own crate root already
+//! re-exports almost everything root's facade used to shadow, so curating
+//! that list a second time here would just restate it.
 pub use harness_task_board::*;
 
 // `harness_task_board::external`'s items aren't re-exported flat at that
