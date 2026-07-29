@@ -3601,6 +3601,7 @@ name = "harness-agents"
 version = "54.0.0"
 dependencies = [
  "agent-client-protocol",
+ "async-trait",
  "chrono",
  "fs-err",
  "harness-infra",
