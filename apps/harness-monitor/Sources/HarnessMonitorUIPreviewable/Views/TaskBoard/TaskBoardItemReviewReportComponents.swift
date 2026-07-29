@@ -317,6 +317,8 @@ struct TaskBoardReviewMessageCard<Accessory: View>: View {
       Image(systemName: icon)
         .font(captionSemibold)
         .foregroundStyle(tint)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
           .font(captionSemibold)

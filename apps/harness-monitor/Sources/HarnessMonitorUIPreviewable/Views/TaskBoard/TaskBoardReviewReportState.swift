@@ -35,11 +35,15 @@ final class TaskBoardReviewReportState {
   }
 
   func load(item: TaskBoardItem, actions: TaskBoardOverviewActions) async {
+    await load(item: item, store: actions.store)
+  }
+
+  func load(item: TaskBoardItem, store: HarnessMonitorStore?) async {
     itemID = item.id
     token += 1
     let loadToken = token
     loadState = .loading
-    let response = await actions.store?.taskBoardItemReviewReport(id: item.id)
+    let response = await store?.taskBoardItemReviewReport(id: item.id)
     guard itemID == item.id, token == loadToken else { return }
     guard !Task.isCancelled else {
       loadState = .idle

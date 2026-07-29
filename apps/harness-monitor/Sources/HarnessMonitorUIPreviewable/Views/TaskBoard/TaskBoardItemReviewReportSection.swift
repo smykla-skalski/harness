@@ -111,7 +111,7 @@ struct TaskBoardItemReviewReportSection: View {
         tint: HarnessMonitorTheme.caution
       ) {
         Button("Retry") {
-          Task { await state.load(item: item, actions: actions) }
+          reloadReviewReport()
         }
         .font(captionSemibold)
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
@@ -170,6 +170,15 @@ struct TaskBoardItemReviewReportSection: View {
       TaskBoardReviewFindingsSection(findings: report.findings)
     }
     .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private func reloadReviewReport() {
+    let store = actions.store
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Reloading task board review report") {
+        await state.load(item: item, store: store)
+      }
+    )
   }
 }
 
