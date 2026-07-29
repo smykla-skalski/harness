@@ -107,7 +107,7 @@ pub struct TaskBoardDependencyTriageResult {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum TaskBoardDependencyTriageError {
-    #[error("dependency triage result is not valid JSON: {0}")]
+    #[error("dependency triage result is not valid JSON for the required schema: {0}")]
     InvalidJson(String),
     #[error("dependency triage result uses an unsupported schema version")]
     UnsupportedSchemaVersion,
@@ -347,7 +347,11 @@ mod tests {
         let invalid_json =
             parse_task_board_dependency_triage_result("not-json", "acme/widgets", 17, HEAD)
                 .expect_err("invalid JSON");
-        assert!(invalid_json.to_string().contains("not valid JSON"));
+        assert!(
+            invalid_json
+                .to_string()
+                .contains("not valid JSON for the required schema")
+        );
 
         let mut stale = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         stale.exact_head_revision = "abcdefabcdefabcdefabcdefabcdefabcdefabcd".into();
