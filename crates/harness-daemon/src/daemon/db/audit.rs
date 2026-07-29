@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use serde_json::Value;
 use sqlx::{QueryBuilder, Sqlite, Transaction, query};
 
@@ -119,7 +118,6 @@ impl AsyncDaemonDb {
 // The only place `AsyncDaemonDb` is named as the recorder's storage
 // contract - keeping it here, next to the concrete type, means the
 // recorder itself never has to import `db`.
-#[async_trait]
 impl AuditEventStore for AsyncDaemonDb {
     async fn upsert_audit_event(&self, event: &HarnessMonitorAuditEvent) -> Result<(), CliError> {
         Self::upsert_audit_event(self, event).await

@@ -1,6 +1,5 @@
 use std::sync::{Arc, OnceLock};
 
-use async_trait::async_trait;
 use serde_json::{Map, Value};
 use tokio::sync::broadcast;
 use uuid::Uuid;
@@ -17,7 +16,6 @@ use harness_kernel::errors::CliError;
 /// connection type. `db` implements it once, next to that concrete type
 /// (`daemon/db/audit.rs`); every consumer here keeps passing a plain
 /// `&AsyncDaemonDb` and the compiler infers the rest.
-#[async_trait]
 pub(crate) trait AuditEventStore: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on persistence failure.
