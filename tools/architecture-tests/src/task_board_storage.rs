@@ -117,7 +117,6 @@ fn live_task_board_consumers_do_not_reopen_legacy_storage() {
         format!("{path} reaches retired Task Board file storage via `{symbol}`")
     });
     for tree in [
-        "crates/harness-daemon/src/daemon/client",
         "crates/harness-daemon/src/daemon/http",
         "crates/harness-daemon/src/daemon/websocket",
         "crates/harness-mcp/src/mcp/tools/task_board",

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 use tempfile::tempdir;
 
-use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::daemon::state::test_support::install_fake_running_xdg_daemon;
 use harness::session::service::{self, build_new_session_with_policy};
 use harness::session::transport::{SessionObserveArgs, SessionTitleArgs};
 use harness::session::types::SessionState;
@@ -17,7 +17,7 @@ use harness::workspace::utc_now;
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 use harness_workspace::command_context::{AppContext, Execute};
 
-// `harness::daemon::client::test_support`'s own `read_http_request`/
+// `harness::daemon::state::test_support`'s own `read_http_request`/
 // `write_http_response` stay `#[cfg(test)]`-gated to the root crate's own
 // unit tests; this scenario runs from `tests/integration_daemon.rs` instead,
 // so it carries its own copies, matching every other daemon-fixture test

@@ -2,15 +2,14 @@ use std::fs::OpenOptions;
 #[cfg(test)]
 use std::io::{Read, Write};
 #[cfg(test)]
-use std::net::{TcpListener, TcpStream};
-#[cfg(test)]
-use std::thread;
+use std::net::TcpStream;
 
 use fs2::FileExt;
 
-use crate::daemon::state;
-use crate::daemon::state::{
-    DaemonManifest, DaemonOwnership, HostBridgeManifest, ScopedDaemonRootOverride,
+use super::{
+    DAEMON_LOCK_FILE, DaemonManifest, DaemonOwnership, HostBridgeManifest,
+    ScopedDaemonRootOverride, auth_token_path, daemon_ownership_from_env_or_default,
+    write_manifest,
 };
 
 /// # Panics
@@ -30,14 +29,14 @@ pub fn install_fake_running_xdg_daemon(
     let daemon_root = xdg_root
         .join("harness")
         .join("daemon")
-        .join(state::daemon_ownership_from_env_or_default().as_str());
+        .join(daemon_ownership_from_env_or_default().as_str());
     std::fs::create_dir_all(&daemon_root).expect("create daemon root");
     let lock_file = OpenOptions::new()
         .create(true)
         .read(true)
         .write(true)
         .truncate(false)
-        .open(daemon_root.join(state::DAEMON_LOCK_FILE))
+        .open(daemon_root.join(DAEMON_LOCK_FILE))
         .expect("open daemon lock");
     lock_file
         .try_lock_exclusive()
@@ -48,9 +47,9 @@ pub fn install_fake_running_xdg_daemon(
     // later environment change), so pin the write target explicitly rather
     // than relying on ambient env state.
     let _root_override = ScopedDaemonRootOverride::set(Some(daemon_root.clone()));
-    let token_path = state::auth_token_path();
+    let token_path = auth_token_path();
     std::fs::write(&token_path, token).expect("write token");
-    state::write_manifest(&DaemonManifest {
+    write_manifest(&DaemonManifest {
         version: env!("CARGO_PKG_VERSION").to_string(),
         pid: std::process::id(),
         endpoint: endpoint.to_string(),
@@ -68,55 +67,11 @@ pub fn install_fake_running_xdg_daemon(
     lock_file
 }
 
-// Only this crate's own `#[cfg(test)]` unit tests call these three; the
-// `tests/integration_daemon.rs` scenarios that need the module in a
-// non-test, `daemon-runtime` build only reach `install_fake_running_xdg_daemon`
-// above and bring their own request/response helpers.
-#[cfg(test)]
-pub(crate) fn fake_running_xdg_daemon(
-    xdg_root: &std::path::Path,
-    token: &str,
-) -> (String, std::fs::File, thread::JoinHandle<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-    let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
-    let token_value = token.to_string();
-    let server = thread::spawn(move || {
-        for _ in 0..2 {
-            let (mut stream, _) = listener.accept().expect("accept");
-            let request = read_http_request(&mut stream);
-            let request_lower = request.to_ascii_lowercase();
-            assert!(
-                request_lower.contains(&format!(
-                    "authorization: bearer {}",
-                    token_value.to_ascii_lowercase()
-                )),
-                "missing bearer auth: {request}"
-            );
-            if request.starts_with("GET /v1/health ") {
-                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
-                continue;
-            }
-            if request.starts_with("GET /v1/ready ") {
-                write_http_response(
-                    &mut stream,
-                    "200 OK",
-                    "application/json",
-                    "{\"ready\":true,\"daemon_epoch\":\"test\"}",
-                );
-                continue;
-            }
-            assert!(
-                request.starts_with("GET /v1/sessions "),
-                "unexpected probe request: {request}"
-            );
-            write_http_response(&mut stream, "200 OK", "application/json", "[]");
-        }
-    });
-
-    let lock_file = install_fake_running_xdg_daemon(xdg_root, &endpoint, token);
-    (endpoint, lock_file, server)
-}
-
+// Only this crate's own `#[cfg(test)]` unit test (`direct_session_start`)
+// calls these two; the `tests/integration_daemon.rs` scenarios that need this
+// fixture in a non-test, `daemon-runtime` build only reach
+// `install_fake_running_xdg_daemon` above and bring their own request/response
+// helpers.
 #[cfg(test)]
 pub(crate) fn read_http_request(stream: &mut TcpStream) -> String {
     stream.set_nonblocking(false).expect("blocking stream");

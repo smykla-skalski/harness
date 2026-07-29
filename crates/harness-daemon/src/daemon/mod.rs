@@ -45,7 +45,6 @@ pub mod agent_tui;
 pub(crate) mod audit_events;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub mod bridge;
-pub mod client;
 #[cfg(feature = "daemon-runtime")]
 pub mod codex_controller;
 #[cfg(feature = "daemon-runtime")]

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::helpers::collect_hits_in_paths;
+use super::helpers::{collect_hits_in_paths, collect_hits_in_tree, repo_path_exists};
 
 /// A domain command surface should not decide for itself whether to
 /// delegate to a live daemon by reaching into the root crate's typed
@@ -40,8 +40,8 @@ use super::helpers::collect_hits_in_paths;
 /// outright rather than left as an unused duplicate of the ported logic
 /// above. That in turn left the facade's own `put` (in `daemon::client::http`)
 /// with no caller either, since only the deleted task-board methods ever used
-/// it; `get`/`get_optional`/`post`/`delete` there still back the managed-agent
-/// and session methods in `daemon::client::api` and stay.
+/// it; `get`/`get_optional`/`post`/`delete` there still backed the
+/// managed-agent and session methods in `daemon::client::api`.
 ///
 /// `session::service::queries` and its parent `mod.rs` used to keep a second,
 /// narrower back-edge into `crate::daemon::index` for cross-project session
@@ -83,6 +83,23 @@ use super::helpers::collect_hits_in_paths;
 /// halves keep using the leaf `harness_daemon_client::DaemonClient` instead
 /// of this root crate's own typed `daemon::client` facade, so the new files
 /// join the same guard below.
+///
+/// With `session::transport::support::daemon_client()` moved off it too, the
+/// remaining `daemon::client::api`, `daemon::client::connection`, and
+/// `daemon::client::http` (plus their dedicated test files) had zero callers
+/// left anywhere in the workspace - confirmed the same way as the task-board
+/// modules above, by checking every other construction site of
+/// `daemon::client::DaemonClient` - so the whole `daemon::client` module was
+/// deleted. One fixture it exported, `install_fake_running_xdg_daemon`, still
+/// had real callers across a wide range of integration tests that fake a
+/// running daemon, plus this crate's own `direct_session_start` test; it
+/// moved to `daemon::state::test_support` along with the two `#[cfg(test)]`
+/// HTTP helpers `direct_session_start` also needs, since every type and
+/// constant it fabricates (`DaemonManifest`, `DaemonOwnership`,
+/// `ScopedDaemonRootOverride`, `DAEMON_LOCK_FILE`, `auth_token_path`,
+/// `write_manifest`) belongs to `daemon::state`, not to the deleted facade.
+/// [`daemon_client_facade_does_not_come_back`] guards against this module
+/// growing back under its old name.
 #[test]
 fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -134,6 +151,34 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
     assert!(
         hits.is_empty(),
         "these command surfaces should stay off `crate::daemon`, using `harness_daemon_client` instead:\n{}",
+        hits.join("\n")
+    );
+}
+
+/// The dead root `daemon::client` facade this file documents above is gone,
+/// not just emptied out - guard against it growing back either under its old
+/// directory or as a same-named struct filed somewhere else under
+/// `daemon::`, rather than as a real caller of the leaf `harness-daemon-client`.
+#[test]
+fn daemon_client_facade_does_not_come_back() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    assert!(
+        !repo_path_exists(root, "crates/harness-daemon/src/daemon/client"),
+        "the dead `daemon::client` facade must stay deleted; use `harness_daemon_client::DaemonClient` instead"
+    );
+
+    let hits = collect_hits_in_tree(
+        &root.join("crates/harness-daemon/src/daemon"),
+        root,
+        None,
+        &["struct DaemonClient"],
+        |path, needle| {
+            format!("{path} reintroduces the dead root daemon client facade via `{needle}`")
+        },
+    );
+    assert!(
+        hits.is_empty(),
+        "the dead root `DaemonClient` facade must stay deleted; use `harness_daemon_client::DaemonClient` instead:\n{}",
         hits.join("\n")
     );
 }

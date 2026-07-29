@@ -75,7 +75,7 @@ impl AsyncDaemonDb {
 
     /// # Errors
     /// Returns [`CliError`] when the read fails.
-    // `pub`, not `pub(crate)`, and gated the same way as `daemon::client::test_support`:
+    // `pub`, not `pub(crate)`, and gated the same way as `daemon::state::test_support`:
     // `tests/integration_daemon.rs`'s task-board sync scenarios read open
     // conflicts back after a sync the same way this crate's own unit tests do,
     // and that binary links `harness` as an ordinary dependency where

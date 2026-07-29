@@ -13,7 +13,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::daemon::state::test_support::install_fake_running_xdg_daemon;
 use harness::session::service::{
     assign_role, join_session_with_fallback, record_task_checkpoint,
     register_agent_runtime_session, session_status,
