@@ -61,7 +61,7 @@ fn an_admitted_review_resumes_exactly_once_across_a_real_daemon_restart() {
     let mut driver = RestartDriver::start(tmp.path(), Box::new(FakeRuntime));
 
     driver
-        .import_todo_seed("restart-review", "pr_review")
+        .import_inbox_ticket("restart-review", "pr_review")
         .or_report();
     let admitted = driver.admit_to_todo("restart-review").or_report();
     assert_eq!(admitted["agent_mode"], json!("evaluate"), "{admitted}");
@@ -114,7 +114,9 @@ fn a_failed_admission_stays_cleared_across_a_real_daemon_restart() {
     std::fs::create_dir_all(&project).expect("create project");
     let mut driver = RestartDriver::start(tmp.path(), Box::new(FakeRuntime));
 
-    driver.import_todo_seed("restart-dep", "pr_fix").or_report();
+    driver
+        .import_inbox_ticket("restart-dep", "pr_fix")
+        .or_report();
     driver.admit_to_todo("restart-dep").or_report();
     driver.open_spawn_gate();
 

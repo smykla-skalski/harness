@@ -169,7 +169,7 @@ impl RestartDriver {
         }
     }
 
-    pub(super) fn import_todo_seed(
+    pub(super) fn import_inbox_ticket(
         &self,
         id: &str,
         workflow_kind: &str,
