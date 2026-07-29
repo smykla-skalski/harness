@@ -18,7 +18,7 @@ pub mod http_paths {
 /// `harness-daemon`: `harness-session::transport` needs it for the
 /// headless-readiness request without depending back on the daemon crate, and
 /// the daemon itself now resolves this constant from here directly instead of
-/// carrying its own hand-synced copy (see `summaries`'s own doc comment).
+/// carrying its own hand-synced copy.
 pub const DAEMON_WIRE_VERSION: u32 = 5;
 
 /// Wire request for a headless execution readiness check.
