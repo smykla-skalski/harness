@@ -225,6 +225,87 @@ fn a_combined_ticket_keeps_both_intents_through_admission() {
 }
 
 #[test]
+fn a_failed_preparation_does_not_strand_the_ticket_admitting() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    // An existing directory that is not a git repository: the reservation
+    // succeeds, then preparation fails when it tries to cut a session worktree.
+    let project = tmp.path().join("not-a-git-project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    std::fs::create_dir_all(&project).expect("create project");
+
+    let mut daemon = spawn_daemon_serve(&home, &xdg);
+    let _status = wait_for_daemon_ready(&home, &xdg);
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+
+    // Open the fail-closed spawn gate so a spawn is permitted under the built-in
+    // policy; without this the dispatch is denied before it ever reserves.
+    let (gate_code, gate_body) = post_json(
+        &endpoint,
+        &token,
+        "/v1/policy-canvases/spawn-requires-live-policy",
+        json!({ "enabled": false }),
+    );
+    assert_eq!(gate_code, 200, "open spawn gate: {gate_body}");
+
+    create_imported_pull_request(&endpoint, &token, "stranded-pr", "pr_fix");
+    move_to_status(&endpoint, &token, "stranded-pr", "todo");
+    let plan = dispatch_plan(&endpoint, &token, "stranded-pr");
+    assert_eq!(
+        plan["readiness"]["state"],
+        json!("ready"),
+        "the imported write ticket must be dispatch-ready before we run it: {plan}"
+    );
+
+    // A real dispatch reserves the ticket - stamping one Admitting execution -
+    // then fails during preparation because the project is not a git repository.
+    let (code, body) = post_json(
+        &endpoint,
+        &token,
+        "/v1/task-board/dispatch",
+        json!({
+            "item_id": "stranded-pr",
+            "dry_run": false,
+            "project_dir": project.to_string_lossy(),
+        }),
+    );
+    assert_eq!(code, 200, "dispatch stranded-pr: {body}");
+    let failures = body["failures"].as_array().expect("failures array");
+    assert_eq!(
+        failures.len(),
+        1,
+        "an unusable project must fail preparation: {body}"
+    );
+    assert_eq!(failures[0]["board_item_id"], json!("stranded-pr"), "{body}");
+    assert!(
+        body["applied"]
+            .as_array()
+            .is_none_or(|applied| applied.is_empty()),
+        "a failed preparation must not apply the dispatch: {body}"
+    );
+
+    // The failed preparation must return the ticket to a clean, retryable state
+    // rather than leave it pinned to the dead execution it admitted.
+    let item = get_item(&endpoint, &token, "stranded-pr");
+    let workflow = &item["workflow"];
+    assert_ne!(
+        workflow["status"],
+        json!("admitting"),
+        "a failed preparation must not strand the ticket in Admitting: {item}"
+    );
+    assert!(
+        workflow["execution_id"].is_null(),
+        "the dead execution must not remain named as the ticket's owner: {item}"
+    );
+
+    let output = run_harness(&home, &xdg, &["daemon", "stop"]);
+    assert!(output.status.success(), "stop failed: {}", output_text(&output));
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
 fn repeated_transitions_and_a_refresh_stamp_no_duplicate_execution() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().join("home");

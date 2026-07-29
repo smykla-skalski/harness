@@ -86,6 +86,17 @@ pub(super) async fn rearm_preparation_in_tx(
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("release task board preparation: {error}")))?;
+    // The re-armed preparation keeps its execution id and reuses it on the next
+    // attempt, but the ticket must not read as actively admitting while it waits
+    // out the backoff. Drop the Admitting stamp back to Idle so the ticket
+    // exposes the retry rather than a run that has not started; completion
+    // re-stamps the execution when the retry finally starts.
+    clear_admitting_execution_in_tx(
+        transaction,
+        &claim.preparation.board_item_id,
+        &claim.preparation.workflow_execution_id,
+    )
+    .await?;
     Ok(())
 }
 
@@ -146,7 +157,35 @@ pub(super) async fn fail_preparation_admission_in_tx(
     .await
     .map_err(|error| db_error(format!("refuse task board preparation admission: {error}")))?;
     release_dispatch_admission_in_tx(transaction, intent_id).await?;
+    // A failed preparation releases its admission records but used to leave the
+    // ticket pinned to the execution it admitted, stuck in Admitting until a
+    // later dispatch overwrote it. Clear that stamp here so every terminal
+    // failure - a stale-revision refusal or a spent retry budget - returns the
+    // ticket to Idle and a fresh dispatch mints a new execution.
+    if let Some((board_item_id, workflow_execution_id)) =
+        intent_ticket_ownership_in_tx(transaction, intent_id).await?
+    {
+        clear_admitting_execution_in_tx(transaction, &board_item_id, &workflow_execution_id)
+            .await?;
+    }
     Ok(())
+}
+
+/// The ticket and execution a preparation intent admitted, read straight from
+/// its row so a terminal failure can clear the ticket's Admitting stamp without
+/// the caller having to thread the ids through.
+async fn intent_ticket_ownership_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    intent_id: &str,
+) -> Result<Option<(String, String)>, CliError> {
+    query_as::<_, (String, String)>(
+        "SELECT item_id, workflow_execution_id FROM task_board_dispatch_intents
+         WHERE intent_id = ?1",
+    )
+    .bind(intent_id)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load task board intent ticket ownership: {error}")))
 }
 
 pub(super) async fn active_reservation(
