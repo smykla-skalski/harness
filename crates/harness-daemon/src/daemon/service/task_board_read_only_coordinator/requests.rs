@@ -55,4 +55,3 @@ pub(super) fn attempt_run_identity(
         effort: profile.effort.clone(),
     })
 }
-

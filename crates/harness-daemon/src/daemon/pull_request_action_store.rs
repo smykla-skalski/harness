@@ -80,7 +80,9 @@ mod tests {
             state: ActionState::Succeeded,
             ..pending
         };
-        db.upsert(succeeded.clone()).await.expect("upsert succeeded");
+        db.upsert(succeeded.clone())
+            .await
+            .expect("upsert succeeded");
         assert_eq!(db.load("merge").await.expect("load"), Some(succeeded));
     }
 
@@ -166,7 +168,9 @@ mod tests {
 
         // Restart: a fresh process reconnects the same database and observes the
         // pull request already merged - the lost request had in fact applied.
-        let db = AsyncDaemonDb::connect(&path).await.expect("reopen database");
+        let db = AsyncDaemonDb::connect(&path)
+            .await
+            .expect("reopen database");
         let after = InMemoryPullRequestEvidenceSource::new().with_evidence(merged_evidence());
         let outcome = merge_with_ledger(
             &db,
