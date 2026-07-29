@@ -3722,6 +3722,7 @@ dependencies = [
  "harness-task-board",
  "harness-task-board-codex-requests",
  "harness-task-board-provider-sync",
+ "harness-task-board-remote-viewer",
  "harness-telemetry",
  "harness-testkit",
  "harness-workspace",
@@ -4270,6 +4271,17 @@ dependencies = [
  "serde_json",
  "sqlx",
  "uuid",
+]
+
+[[package]]
+name = "harness-task-board-remote-viewer"
+version = "55.0.0"
+dependencies = [
+ "harness-kernel",
+ "harness-task-board",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

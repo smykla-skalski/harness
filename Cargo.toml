@@ -29,6 +29,7 @@ members = [
   "crates/harness-task-board",
   "crates/harness-task-board-codex-requests",
   "crates/harness-task-board-provider-sync",
+  "crates/harness-task-board-remote-viewer",
   "crates/harness-telemetry",
   "crates/harness-workspace",
   "testkit",

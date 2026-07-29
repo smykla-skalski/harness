@@ -2,6 +2,7 @@ use crate::daemon::db::{AsyncDaemonDb, TaskBoardItemSnapshot};
 use crate::task_board::TaskBoardProgressRollup;
 use crate::task_board::progress_rollup::build_progress_rollups_from;
 use harness_kernel::errors::CliError;
+use harness_task_board_remote_viewer::{RevisionedTaskBoardItem, TaskBoardListProjectionSource};
 use std::collections::HashMap;
 
 /// The whole live board, in board order, that one list read selects from.
@@ -17,6 +18,26 @@ pub(crate) struct TaskBoardListSource {
     pub items: Vec<TaskBoardItemSnapshot>,
     pub items_change_seq: i64,
     pub progress_rollups: HashMap<String, TaskBoardProgressRollup>,
+}
+
+/// `harness-task-board-remote-viewer` never depends on `harness-daemon` --
+/// its HTTP list-read call site converts this into its own mirrored shape
+/// here, at the one place a `TaskBoardListSource` becomes a wire response.
+impl From<TaskBoardListSource> for TaskBoardListProjectionSource {
+    fn from(source: TaskBoardListSource) -> Self {
+        Self {
+            items: source
+                .items
+                .into_iter()
+                .map(|snapshot| RevisionedTaskBoardItem {
+                    item: snapshot.item,
+                    item_revision: snapshot.item_revision,
+                })
+                .collect(),
+            items_change_seq: source.items_change_seq,
+            progress_rollups: source.progress_rollups,
+        }
+    }
 }
 
 pub(crate) async fn read_task_board_items_db(

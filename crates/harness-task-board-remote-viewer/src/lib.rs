@@ -1,50 +1,82 @@
+//! Task-board's remote-viewer layer: projects and redacts task-board item,
+//! list, triage, and AI review report read responses for a remote pairing
+//! client with viewer-only access -- truncating bodies, nulling triage
+//! reason/evidence and review findings, and swapping a full item for a
+//! smaller viewer-safe shape.
+//!
+//! Extracted from `harness-daemon`'s `daemon::remote_task_board` module
+//! (part of the #571 crate-extraction umbrella). The projection logic only
+//! ever reaches `harness-task-board`'s own wire and domain types plus the
+//! caller-supplied list source in [`list_query`], so it builds without the
+//! daemon's much larger dependency tree.
+//!
+//! `harness-daemon` depends on this crate for the HTTP and WebSocket
+//! task-board read handlers that call into it, not the other way around:
+//! [`TaskBoardListProjectionSource`] mirrors the daemon's own
+//! `service::TaskBoardListSource` shape rather than naming it, so this crate
+//! never depends back on `harness-daemon` -- the same kind of seam
+//! `harness-task-board-provider-sync`'s `ProviderSyncStore` uses for its own
+//! boundary onto the daemon, just carrying a data shape across it instead of
+//! a store trait.
+//!
+//! `remote_redaction`'s ownership stays with `harness-daemon`: the helper is
+//! shared with the remote-trust area and the agent-execution runtime, both
+//! out of scope here, so this crate pulls in the same physical file with
+//! `#[path]` that `harness-bridge` already carries for it instead of taking
+//! ownership.
+
 use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::daemon::protocol::{
+use harness_task_board::wire::{
     TaskBoardItemPositionSnapshot, TaskBoardListItemsResponse, TaskBoardTriageCurrentResponse,
     TaskBoardTriageHistoryResponse,
 };
-use crate::task_board::{
+use harness_task_board::{
     AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardTriageDecisionRecord,
     TaskBoardTriageOverride,
 };
 
-use super::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
-
 mod list_query;
 mod review_report;
 
-pub(crate) use list_query::project_task_board_list;
-pub(crate) use review_report::project_task_board_ai_review_report;
+#[path = "../../harness-daemon/src/daemon/remote_redaction.rs"]
+mod remote_redaction;
+
+use crate::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
+
+pub use list_query::{
+    RevisionedTaskBoardItem, TaskBoardListProjectionSource, project_task_board_list,
+};
+pub use review_report::project_task_board_ai_review_report;
 
 const BODY_PREVIEW_CHAR_LIMIT: usize = 180;
 const BODY_PREVIEW_PREFIX_LIMIT: usize = BODY_PREVIEW_CHAR_LIMIT - 3;
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub(crate) enum TaskBoardReadItemResponse {
+pub enum TaskBoardReadItemResponse {
     Full(Box<TaskBoardItem>),
     Viewer(Box<RemoteViewerTaskBoardItem>),
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub(crate) enum TaskBoardReadListResponse {
+pub enum TaskBoardReadListResponse {
     Full(TaskBoardListItemsResponse),
     Viewer(RemoteViewerTaskBoardListResponse),
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
-pub(crate) enum TaskBoardPositionSnapshotResponse {
+pub enum TaskBoardPositionSnapshotResponse {
     Full(Box<TaskBoardItemPositionSnapshot>),
     Viewer(Box<RemoteViewerTaskBoardPositionSnapshot>),
 }
 
 #[derive(Serialize)]
-pub(crate) struct RemoteViewerTaskBoardListResponse {
+pub struct RemoteViewerTaskBoardListResponse {
     items: Vec<RemoteViewerTaskBoardItem>,
     items_change_seq: i64,
     item_revisions: HashMap<String, i64>,
@@ -54,7 +86,7 @@ pub(crate) struct RemoteViewerTaskBoardListResponse {
 }
 
 #[derive(Serialize)]
-pub(crate) struct RemoteViewerTaskBoardItem {
+pub struct RemoteViewerTaskBoardItem {
     schema_version: u32,
     id: String,
     title: String,
@@ -77,7 +109,7 @@ pub(crate) struct RemoteViewerTaskBoardItem {
 }
 
 #[derive(Serialize)]
-pub(crate) struct RemoteViewerTaskBoardPositionSnapshot {
+pub struct RemoteViewerTaskBoardPositionSnapshot {
     item: RemoteViewerTaskBoardItem,
     item_revision: i64,
     items_change_seq: i64,
@@ -90,7 +122,7 @@ pub(crate) struct RemoteViewerTaskBoardPositionSnapshot {
 /// client's sync-state model carries `status` alone, so the text is decoded
 /// straight into nothing. Read a single item when the cached title or body is
 /// wanted.
-pub(super) fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
+pub(crate) fn drop_cached_provider_text(response: &mut TaskBoardListItemsResponse) {
     for reference in response
         .items
         .iter_mut()
@@ -104,10 +136,7 @@ pub(super) fn drop_cached_provider_text(response: &mut TaskBoardListItemsRespons
 }
 
 #[must_use]
-pub(crate) fn project_task_board_item(
-    item: TaskBoardItem,
-    viewer: bool,
-) -> TaskBoardReadItemResponse {
+pub fn project_task_board_item(item: TaskBoardItem, viewer: bool) -> TaskBoardReadItemResponse {
     if viewer {
         TaskBoardReadItemResponse::Viewer(Box::new(item.into()))
     } else {
@@ -116,7 +145,7 @@ pub(crate) fn project_task_board_item(
 }
 
 #[must_use]
-pub(crate) fn project_task_board_position_snapshot(
+pub fn project_task_board_position_snapshot(
     snapshot: TaskBoardItemPositionSnapshot,
     viewer: bool,
 ) -> TaskBoardPositionSnapshotResponse {
@@ -137,7 +166,7 @@ pub(crate) fn project_task_board_position_snapshot(
 /// a remote viewer as-is, so a second mirrored type would only double the
 /// generated Swift surface for no redaction benefit.
 #[must_use]
-pub(crate) fn project_task_board_triage_current(
+pub fn project_task_board_triage_current(
     response: TaskBoardTriageCurrentResponse,
     viewer: bool,
 ) -> TaskBoardTriageCurrentResponse {
@@ -154,7 +183,7 @@ pub(crate) fn project_task_board_triage_current(
 }
 
 #[must_use]
-pub(crate) fn project_task_board_triage_history(
+pub fn project_task_board_triage_history(
     response: TaskBoardTriageHistoryResponse,
     viewer: bool,
 ) -> TaskBoardTriageHistoryResponse {
@@ -237,7 +266,7 @@ fn body_preview(body: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "remote_task_board_sync_state_tests.rs"]
+#[path = "sync_state_tests.rs"]
 mod sync_state_tests;
 
 #[cfg(test)]
@@ -246,7 +275,7 @@ mod tests {
         TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse, body_preview,
         project_task_board_triage_current, project_task_board_triage_history,
     };
-    use crate::task_board::{
+    use harness_task_board::{
         TaskBoardTriageDecisionRecord, TaskBoardTriageOverride, TriageCause, TriageReasonCode,
         TriageVerdict, is_canonical_override_actor,
     };
