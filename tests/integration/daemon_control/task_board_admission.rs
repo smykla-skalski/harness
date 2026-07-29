@@ -52,19 +52,19 @@ fn request_json(method: &str, endpoint: &str, token: &str, path: &str, body: Val
     loop {
         let request_body = body.clone();
         let client = reqwest::Client::new();
-        let builder = match method.as_str() {
+        let mut builder = match method.as_str() {
             "PUT" => client.put(&url),
             "GET" => client.get(&url),
             other => panic!("unsupported method {other}"),
-        };
-        let response = runtime.block_on(async {
-            builder
-                .bearer_auth(token.clone())
-                .json(&request_body)
-                .timeout(Duration::from_secs(1))
-                .send()
-                .await
-        });
+        }
+        .bearer_auth(token.clone())
+        .timeout(Duration::from_secs(1));
+        // Only methods that carry a payload attach one; a GET body is
+        // non-standard and some intermediaries reject it.
+        if method != "GET" {
+            builder = builder.json(&request_body);
+        }
+        let response = runtime.block_on(async { builder.send().await });
         match response {
             Ok(response) => {
                 let status = response.status().as_u16();
