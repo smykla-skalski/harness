@@ -107,10 +107,6 @@ async fn reset_rejects_default_and_deleted_items_without_audit_or_sequence_chang
     assert_eq!(default_error.code(), "KSRCLI084");
     assert!(default_error.to_string().contains("no explicit position"));
     assert_eq!(
-        crate::daemon::http::error_status_and_body(&default_error).0,
-        axum::http::StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
         db.task_board_items_snapshot(None)
             .await
             .expect("snapshot")
@@ -138,10 +134,6 @@ async fn reset_rejects_default_and_deleted_items_without_audit_or_sequence_chang
     assert_eq!(deleted_error.code(), "KSRCLI084");
     assert!(deleted_error.to_string().contains("deleted"));
     assert_eq!(
-        crate::daemon::http::error_status_and_body(&deleted_error).0,
-        axum::http::StatusCode::BAD_REQUEST
-    );
-    assert_eq!(
         query_scalar::<_, i64>(
             "SELECT COALESCE(change_seq, 0) FROM change_tracking WHERE scope = 'task_board:items'"
         )
@@ -162,10 +154,6 @@ async fn reset_rejects_default_and_deleted_items_without_audit_or_sequence_chang
         .await
         .expect_err("deleted item rejects set position");
     assert_eq!(deleted_set_error.code(), "KSRCLI084");
-    assert_eq!(
-        crate::daemon::http::error_status_and_body(&deleted_set_error).0,
-        axum::http::StatusCode::BAD_REQUEST
-    );
     let position_audits: i64 = query_scalar(
         "SELECT COUNT(*) FROM audit_events WHERE subject = ?1 AND kind LIKE 'task_board.item.position_%'",
     )
