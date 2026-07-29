@@ -2,7 +2,8 @@ use sqlx::{Sqlite, Transaction, query_scalar};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::admission_lifecycle::{TaskBoardAdmissionCheck, revalidate_dispatch_admission_in_tx};
-use super::items::{bump_change_in_tx, load_item_in_tx};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::bump_change_in_tx;
 use super::workflow_execution_attempts::{update_attempt_in_tx, validate_attempt_phase};
 use super::workflow_executions::update_execution_in_tx;
 use super::workflow_start_admission::{
@@ -46,7 +47,8 @@ pub(super) async fn revalidate_first_start_admission_in_tx(
     if frozen_unconfigured_start_admission_in_tx(transaction, &intent_id).await? {
         return Ok(TaskBoardFirstStartAdmission::Ready);
     }
-    let (item, item_revision) = load_item_in_tx(transaction, &parent.item_id)
+    let (item, item_revision) = transaction
+        .load_item_in_tx(&parent.item_id)
         .await?
         .ok_or_else(|| db_error("workflow first-start item disappeared"))?;
     match revalidate_dispatch_admission_in_tx(transaction, &intent_id, &item, item_revision).await?

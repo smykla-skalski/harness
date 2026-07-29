@@ -11,7 +11,8 @@ use super::dispatch_intents::{
 };
 use super::dispatch_workflow_launch::rebind_write_launch;
 use super::dispatch_workflow_start::workflow_start_fence;
-use super::items::{bump_change_in_tx, load_item_in_tx};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -163,7 +164,8 @@ async fn load_held_claim_state_in_tx(
 ) -> Result<HeldClaimState, CliError> {
     let (intent_id, payload_json) = load_held_delivery(transaction.as_mut(), board_item_id).await?;
     let applied = decode_applied(&payload_json)?;
-    let (item, revision) = load_item_in_tx(transaction, board_item_id)
+    let (item, revision) = transaction
+        .load_item_in_tx(board_item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
     ensure_held_linkage(&applied, &item)?;

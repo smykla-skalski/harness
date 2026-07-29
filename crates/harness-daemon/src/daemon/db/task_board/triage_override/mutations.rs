@@ -3,10 +3,8 @@ use sqlx::{Sqlite, Transaction};
 
 use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
-use super::super::items::{
-    apply_task_board_item_status_transition_in_tx, bump_change_in_tx,
-    load_item_with_triage_override_in_tx,
-};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
+use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, LaneTransitionWrite, replace_with_lane_transition_in_tx,
 };
@@ -42,10 +40,10 @@ async fn load_override_target_in_tx(
     deleted_message: &'static str,
 ) -> Result<(TaskBoardItem, i64, Option<TaskBoardTriageOverride>), CliError> {
     ensure_expected_sequence_in_tx(transaction, expected_items_change_seq).await?;
-    let (item, revision, existing_override) =
-        load_item_with_triage_override_in_tx(transaction, item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+    let (item, revision, existing_override) = transaction
+        .load_item_with_triage_override_in_tx(item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     ensure_expected_revision(&item.id, revision, expected_item_revision)?;
     if item.deleted_at.is_some() {
         return Err(CliErrorKind::invalid_transition(deleted_message).into());
@@ -135,7 +133,9 @@ async fn place_override_set_in_tx(
         true,
     )
     .await?;
-    apply_task_board_item_status_transition_in_tx(transaction, &item).await?;
+    transaction
+        .apply_task_board_item_status_transition_in_tx(&item)
+        .await?;
     replace_with_lane_transition_in_tx(transaction, before, revision, item, transition).await
 }
 
@@ -245,7 +245,9 @@ async fn place_override_clear_in_tx(
     revision: i64,
     transition: LaneTransitionKind,
 ) -> Result<LaneTransitionWrite, CliError> {
-    apply_task_board_item_status_transition_in_tx(transaction, &item).await?;
+    transaction
+        .apply_task_board_item_status_transition_in_tx(&item)
+        .await?;
     let write =
         replace_with_lane_transition_in_tx(transaction, before, revision, item, transition).await?;
     clear_triage_override_row_in_tx(transaction, &write.item.id).await?;

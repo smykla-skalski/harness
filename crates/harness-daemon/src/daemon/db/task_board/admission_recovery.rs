@@ -5,7 +5,7 @@ use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::dispatch_intents::decode_applied;
-use super::items::load_item_in_tx;
+use super::item_tx_ext::TaskBoardItemTxExt;
 use crate::daemon::db::{AsyncDaemonDb, CliError, SessionState, db_error, utc_now};
 use crate::session::service as session_service;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, TaskStatus};
@@ -256,7 +256,8 @@ async fn block_linked_session_task(
     recovery: &TaskBoardAdmissionWorkerRecovery,
     reason: &str,
 ) -> Result<bool, CliError> {
-    let item_is_linked = load_item_in_tx(transaction, &recovery.item_id)
+    let item_is_linked = transaction
+        .load_item_in_tx(&recovery.item_id)
         .await?
         .is_some_and(|(item, _)| item_matches_recovery(&item, recovery));
     if !item_is_linked {

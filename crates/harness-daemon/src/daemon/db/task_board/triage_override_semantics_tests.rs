@@ -1,6 +1,6 @@
 use sqlx::query;
 
-use super::super::super::items::test_support::{load_item_in_tx, replace_item_in_tx};
+use super::super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::super::triage_apply::apply_builtin_v1_triage_in_tx;
 use super::super::{
     TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideSetInput,
@@ -95,7 +95,8 @@ async fn automatic_evaluation_keeps_deciding_but_never_moves_placement_while_ove
         .begin_immediate_transaction("re-evaluate while overridden")
         .await
         .expect("begin transaction");
-    let (mut item, revision) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, revision) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -115,7 +116,8 @@ async fn automatic_evaluation_keeps_deciding_but_never_moves_placement_while_ove
     .await
     .expect("apply triage")
     .expect("a fresh decision generation is still recorded");
-    replace_item_in_tx(&mut transaction, &item, revision + 1)
+    transaction
+        .replace_item_in_tx(&item, revision + 1)
         .await
         .expect("persist item");
     transaction.commit().await.expect("commit");

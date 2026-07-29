@@ -2,7 +2,8 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
-use super::items::{bump_change_in_tx, load_item_with_triage_override_in_tx};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -115,8 +116,9 @@ async fn check_escalation_eligibility_in_tx(
     item_id: &str,
     decided_at: &str,
 ) -> Result<EscalationEligibility, CliError> {
-    let Some((item, revision, existing_override)) =
-        load_item_with_triage_override_in_tx(transaction, item_id).await?
+    let Some((item, revision, existing_override)) = transaction
+        .load_item_with_triage_override_in_tx(item_id)
+        .await?
     else {
         return reject_running_escalation_in_tx(
             transaction,

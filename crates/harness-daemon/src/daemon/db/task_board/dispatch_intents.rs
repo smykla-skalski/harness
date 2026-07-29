@@ -7,7 +7,8 @@ use self::completion::{
 use super::ITEMS_CHANGE_SCOPE;
 use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_workflow_start::validate_pending_dispatch;
-use super::items::{bump_change_in_tx, load_item_in_tx};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -223,7 +224,8 @@ pub(super) async fn link_and_enqueue_task_board_dispatch(
         })?;
         return Ok(applied);
     }
-    let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
+    let (mut item, revision) = transaction
+        .load_item_in_tx(board_item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
     let before = item.clone();

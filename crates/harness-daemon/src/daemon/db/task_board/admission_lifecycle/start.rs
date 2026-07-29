@@ -1,5 +1,6 @@
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::TaskBoardAdmissionCheck;
 use super::super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
@@ -75,7 +76,8 @@ async fn resolve_dispatch_admission_start_in_tx<'c>(
 > {
     let (item_id, item_revision, session_id, work_item_id, execution_id) =
         claimed_item_identity(&mut transaction, intent_id, claim_token).await?;
-    let (item, loaded_revision) = super::super::items::load_item_in_tx(&mut transaction, &item_id)
+    let (item, loaded_revision) = transaction
+        .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     if loaded_revision != item_revision {

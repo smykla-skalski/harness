@@ -9,9 +9,8 @@ use crate::daemon::db::task_board::ITEMS_CHANGE_SCOPE;
 use crate::daemon::db::task_board::admission_lifecycle::{
     ensure_item_admission_can_terminate_in_tx, release_managed_worker_admission_in_tx,
 };
-use crate::daemon::db::task_board::items::{
-    bump_change_in_tx, items_change_sequence_in_tx, load_item_in_tx,
-};
+use crate::daemon::db::task_board::item_tx_ext::TaskBoardItemTxExt;
+use crate::daemon::db::task_board::items::bump_change_in_tx;
 use crate::daemon::db::task_board::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -23,7 +22,8 @@ pub(in crate::daemon::db::task_board) async fn project_terminal_execution_in_tx(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<TaskBoardWorkflowTerminalProjection, CliError> {
     let owner = validate_terminal_execution(execution)?;
-    let (item, item_revision) = load_item_in_tx(transaction, &execution.item_id)
+    let (item, item_revision) = transaction
+        .load_item_in_tx(&execution.item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{}' not found", execution.item_id)))?;
     let prepared = settle_prepared_dispatch_in_tx(transaction, execution).await?;
@@ -137,7 +137,7 @@ async fn terminal_change_sequence_in_tx(
     committed_released: bool,
 ) -> Result<i64, CliError> {
     if committed_released {
-        items_change_sequence_in_tx(transaction).await
+        transaction.items_change_sequence_in_tx().await
     } else {
         bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await
     }

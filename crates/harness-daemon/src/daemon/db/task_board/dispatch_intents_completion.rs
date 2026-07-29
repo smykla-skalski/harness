@@ -10,7 +10,8 @@ use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::dispatch_workflow_start::{
     insert_started_workflow_in_tx, load_claimed_applied, workflow_start_fence,
 };
-use super::super::items::{bump_change_in_tx, load_item_in_tx};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
+use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -38,7 +39,8 @@ pub(super) async fn screen_dispatch_completion_in_tx(
         .dispatch_claimed_intent_identity_in_tx(intent_id, claim_token)
         .await?;
     let applied = load_claimed_applied(transaction, intent_id, claim_token).await?;
-    let (item, revision) = load_item_in_tx(transaction, &item_id)
+    let (item, revision) = transaction
+        .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     let still_linked = item.session_id.as_deref() == Some(session_id.as_str())

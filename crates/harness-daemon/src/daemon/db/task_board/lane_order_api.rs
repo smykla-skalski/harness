@@ -2,10 +2,8 @@ use sqlx::{Sqlite, Transaction};
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
-use super::items::{
-    apply_task_board_item_status_transition_in_tx, bump_change_in_tx,
-    load_item_with_triage_override_in_tx,
-};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionKind, TaskBoardLanePositionAuditKind, TaskBoardLaneShift,
     record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
@@ -94,7 +92,9 @@ pub(super) async fn set_task_board_lane_position(
         .await?;
     let (before, revision, item, audit_before) =
         prepare_manual_lane_position_in_tx(&mut transaction, &input).await?;
-    apply_task_board_item_status_transition_in_tx(&mut transaction, &item).await?;
+    transaction
+        .apply_task_board_item_status_transition_in_tx(&item)
+        .await?;
     settle_manual_lane_mutation_in_tx(
         transaction,
         ManualLaneMutation {
@@ -166,10 +166,10 @@ pub(super) async fn place_task_board_item_automatically(
     let mut transaction = db
         .begin_immediate_transaction("task board automatic lane position")
         .await?;
-    let (mut item, revision, existing_override) =
-        load_item_with_triage_override_in_tx(&mut transaction, item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+    let (mut item, revision, existing_override) = transaction
+        .load_item_with_triage_override_in_tx(item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     let before = item.clone();
     if preserves_existing_lane_placement(&before, existing_override.as_ref()) {
         transaction.commit().await.map_err(|error| {
@@ -270,10 +270,10 @@ async fn prepare_manual_lane_position_in_tx(
     input: &TaskBoardLanePositionInput,
 ) -> Result<(TaskBoardItem, i64, TaskBoardItem, TaskBoardItem), CliError> {
     ensure_expected_sequence_in_tx(transaction, input.expected_items_change_seq).await?;
-    let (mut item, revision, existing_override) =
-        load_item_with_triage_override_in_tx(transaction, &input.item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
+    let (mut item, revision, existing_override) = transaction
+        .load_item_with_triage_override_in_tx(&input.item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
     ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
     if item.deleted_at.is_some() {
         return Err(
@@ -308,10 +308,10 @@ async fn prepare_lane_reset_in_tx(
     input: &TaskBoardLaneResetInput,
 ) -> Result<(TaskBoardItem, i64, Option<TaskBoardTriageOverride>), CliError> {
     ensure_expected_sequence_in_tx(transaction, input.expected_items_change_seq).await?;
-    let (item, revision, existing_override) =
-        load_item_with_triage_override_in_tx(transaction, &input.item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
+    let (item, revision, existing_override) = transaction
+        .load_item_with_triage_override_in_tx(&input.item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{}' not found", input.item_id)))?;
     ensure_expected_revision(&item.id, revision, input.expected_item_revision)?;
     if item.deleted_at.is_some() {
         return Err(

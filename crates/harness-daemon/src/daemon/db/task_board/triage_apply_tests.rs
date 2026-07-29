@@ -1,7 +1,7 @@
 use sqlx::{query, query_scalar};
 use tempfile::tempdir;
 
-use super::super::items::test_support::{load_item_in_tx, replace_item_in_tx};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::{apply_builtin_v1_triage_in_tx, triage_cause};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
@@ -46,7 +46,8 @@ pub(super) async fn seed_decided_todo_item(db: &AsyncDaemonDb) -> &'static str {
         .begin_immediate_transaction("seed decided todo")
         .await
         .expect("begin transaction");
-    let (mut item, revision) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, revision) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -61,7 +62,8 @@ pub(super) async fn seed_decided_todo_item(db: &AsyncDaemonDb) -> &'static str {
     .await
     .expect("apply triage")
     .expect("decision recorded");
-    replace_item_in_tx(&mut transaction, &item, revision + 1)
+    transaction
+        .replace_item_in_tx(&item, revision + 1)
         .await
         .expect("persist triaged placement");
     transaction.commit().await.expect("commit");
@@ -79,7 +81,8 @@ async fn eligible_inbox_item_with_a_label_promotes_to_todo_with_automatic_placem
         .begin_immediate_transaction("test promote")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, _) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -122,7 +125,8 @@ async fn eligible_inbox_item_with_no_labels_stays_in_inbox_as_undecided() {
         .begin_immediate_transaction("test undecided")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, _) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -184,7 +188,8 @@ async fn active_dispatch_reservations_suppress_triage_decisions_and_placement() 
             .begin_immediate_transaction("test reserved item triage")
             .await
             .expect("begin transaction");
-        let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+        let (mut item, _) = transaction
+            .load_item_in_tx("item-1")
             .await
             .expect("load item")
             .expect("item exists");
@@ -228,7 +233,8 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
         .begin_immediate_transaction("test needs info")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, _) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -263,7 +269,8 @@ async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
         .begin_immediate_transaction("test second pass")
         .await
         .expect("begin transaction");
-    let (mut reloaded, _) = load_item_in_tx(&mut second_transaction, item_id)
+    let (mut reloaded, _) = second_transaction
+        .load_item_in_tx(item_id)
         .await
         .expect("load item")
         .expect("item exists");
@@ -312,7 +319,8 @@ async fn manual_placement_suppresses_status_and_placement_but_not_decision_histo
         .begin_immediate_transaction("test manual suppression")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, _) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");
@@ -390,7 +398,8 @@ async fn ineligible_umbrella_item_is_never_evaluated() {
         .begin_immediate_transaction("test ineligible")
         .await
         .expect("begin transaction");
-    let (mut item, _) = load_item_in_tx(&mut transaction, "item-1")
+    let (mut item, _) = transaction
+        .load_item_in_tx("item-1")
         .await
         .expect("load item")
         .expect("item exists");

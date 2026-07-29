@@ -5,9 +5,8 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::super::ITEMS_CHANGE_SCOPE;
-use super::super::items::{
-    TriageOutcome, bump_change_in_tx, clear_children_parent_in_tx, load_item_in_tx, validate_item,
-};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
+use super::super::items::{TriageOutcome, bump_change_in_tx, validate_item};
 use super::super::lane_order::{
     LaneTransitionKind, LaneTransitionWrite, replace_with_lane_transition_in_tx,
 };
@@ -87,7 +86,7 @@ async fn load_hide_candidate_in_tx(
     expected_revision: i64,
     context: &ProviderExclusionAuditContext,
 ) -> Result<Option<(TaskBoardItem, i64)>, CliError> {
-    let Some((item, revision)) = load_item_in_tx(transaction, item_id).await? else {
+    let Some((item, revision)) = transaction.load_item_in_tx(item_id).await? else {
         return Err(db_error(format!("task-board item '{item_id}' not found")));
     };
     if revision != expected_revision
@@ -118,7 +117,7 @@ pub(super) async fn apply_exclusion_tombstone_in_tx(
     item.tombstone_cause = Some(TaskBoardTombstoneCause::ProviderExclusion);
     item.updated_at = utc_now();
     validate_item(&item)?;
-    let unparented_children = clear_children_parent_in_tx(transaction, &before.id).await?;
+    let unparented_children = transaction.clear_children_parent_in_tx(&before.id).await?;
     let write = replace_with_lane_transition_in_tx(
         transaction,
         before.clone(),

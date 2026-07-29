@@ -6,7 +6,7 @@ use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::dispatch_preparation_claim::{
     TaskBoardPreparationUnavailable, classify_unavailable_preparation_in_tx,
 };
-use super::super::items::{load_item_in_tx, replace_item_in_tx};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::{
     ClaimedTaskBoardDispatchPreparation, PREPARATION_LEASE_SECONDS, ReservedTaskBoardDispatch,
     TaskBoardDispatchPreparation, preparation_revision_error,
@@ -356,7 +356,8 @@ pub(super) async fn screen_preparation_claim_in_tx(
         ));
     };
     let preparation = decode_preparation(&payload)?;
-    let (item, item_revision) = load_item_in_tx(transaction, &preparation.board_item_id)
+    let (item, item_revision) = transaction
+        .load_item_in_tx(&preparation.board_item_id)
         .await?
         .ok_or_else(|| {
             db_error(format!(
@@ -475,7 +476,7 @@ pub(super) async fn stamp_admitting_execution_in_tx(
     item.workflow.worktree = None;
     item.workflow.current_step_id = None;
     item.updated_at = utc_now();
-    replace_item_in_tx(transaction, &item, item_revision).await
+    transaction.replace_item_in_tx(&item, item_revision).await
 }
 
 /// Clears the `Admitting` stamp when a reserved dispatch is retired, so the
@@ -488,7 +489,7 @@ pub(super) async fn clear_admitting_execution_in_tx(
     board_item_id: &str,
     workflow_execution_id: &str,
 ) -> Result<(), CliError> {
-    let Some((mut item, item_revision)) = load_item_in_tx(transaction, board_item_id).await? else {
+    let Some((mut item, item_revision)) = transaction.load_item_in_tx(board_item_id).await? else {
         return Ok(());
     };
     let owns = item.workflow.execution_id.as_deref() == Some(workflow_execution_id)
@@ -499,5 +500,5 @@ pub(super) async fn clear_admitting_execution_in_tx(
     item.workflow.execution_id = None;
     item.workflow.status = TaskBoardWorkflowStatus::Idle;
     item.updated_at = utc_now();
-    replace_item_in_tx(transaction, &item, item_revision).await
+    transaction.replace_item_in_tx(&item, item_revision).await
 }

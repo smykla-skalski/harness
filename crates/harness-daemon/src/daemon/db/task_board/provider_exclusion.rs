@@ -6,10 +6,8 @@ use self::write::{
 };
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
-use super::items::{
-    ParentAssignmentValidation, TaskBoardMutation, TriageOutcome, bump_change_in_tx,
-    check_parent_assignment_in_tx, load_item_with_triage_override_in_tx, next_child_order_in_tx,
-};
+use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items::{ParentAssignmentValidation, TaskBoardMutation, TriageOutcome, bump_change_in_tx};
 use super::lane_order::LaneTransitionKind;
 use super::provider_queries::ProviderQueries;
 use super::triage_apply::reapply_active_override_outcome_in_tx;
@@ -240,8 +238,9 @@ async fn load_provider_exclusion_restore_candidate_in_tx(
     expected_revision: i64,
     context: &ProviderExclusionAuditContext,
 ) -> Result<Option<(TaskBoardItem, i64, Option<TaskBoardTriageOverride>)>, CliError> {
-    let Some((item, revision, override_)) =
-        load_item_with_triage_override_in_tx(transaction, item_id).await?
+    let Some((item, revision, override_)) = transaction
+        .load_item_with_triage_override_in_tx(item_id)
+        .await?
     else {
         return Ok(None);
     };
@@ -319,9 +318,12 @@ async fn resolve_restore_parent_in_tx(
         item.child_order = 0;
         return Ok(());
     };
-    match check_parent_assignment_in_tx(transaction, item_id, &parent_id).await? {
+    match transaction
+        .check_parent_assignment_in_tx(item_id, &parent_id)
+        .await?
+    {
         ParentAssignmentValidation::Valid => {
-            item.child_order = next_child_order_in_tx(transaction, &parent_id).await?;
+            item.child_order = transaction.next_child_order_in_tx(&parent_id).await?;
         }
         ParentAssignmentValidation::Invalid(reason) => {
             tracing::warn!(

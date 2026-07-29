@@ -4,7 +4,8 @@ use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::admission_lifecycle::commit_compensating_dispatch_admission_in_tx;
 use super::super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
-use super::super::items::{bump_change_in_tx, load_item_in_tx};
+use super::super::item_tx_ext::TaskBoardItemTxExt;
+use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
@@ -58,7 +59,8 @@ async fn prepare_pending_admission_refusal_in_tx(
         restore_consumed_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &utc_now())
             .await?;
     }
-    let (item, revision) = load_item_in_tx(transaction, &applied.board_item_id)
+    let (item, revision) = transaction
+        .load_item_in_tx(&applied.board_item_id)
         .await?
         .ok_or_else(|| {
             db_error(format!(
