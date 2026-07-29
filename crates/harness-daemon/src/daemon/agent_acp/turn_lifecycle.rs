@@ -411,15 +411,25 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         // A cancelled run keeps `error` NULL and records the reason in
         // `stop_reason`, matching the Codex path so a downstream reader never
         // mistakes a deliberate cancellation for a failure.
-        self.persist_settlement(
-            id,
-            AgentTurnRunStatus::Cancelled,
-            None,
-            None,
-            Some("cancelled".into()),
-            None,
-        )
-        .await?;
+        if let Err(error) = self
+            .persist_settlement(
+                id,
+                AgentTurnRunStatus::Cancelled,
+                None,
+                None,
+                Some("cancelled".into()),
+                None,
+            )
+            .await
+        {
+            // The provider stop already succeeded but the terminal write did
+            // not. Drop the local cancellation flag so later polling of
+            // `status`/`failure` re-observes the provider-side cancellation and
+            // persists it, instead of short-circuiting on the flag forever and
+            // leaving the row stuck `running` with its admission unreleased.
+            self.rollback_cancellation(id)?;
+            return Err(error);
+        }
         Ok(AgentTurnStatus::Cancelled)
     }
 }
