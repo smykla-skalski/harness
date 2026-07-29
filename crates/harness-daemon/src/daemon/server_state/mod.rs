@@ -1,10 +1,12 @@
-//! Daemon HTTP server state, generic over the database types it carries.
+//! Daemon HTTP server state, generic over the database and companion-router
+//! types it carries.
 //!
 //! [`DaemonHttpState`] and its satellite types live here instead of
 //! `crate::daemon::http` so a module that only needs the state's shape - not
-//! `crate::daemon::db`'s concrete types - can depend on this module instead of
-//! all of `http`. `Db` and `AsyncDb` stay generic specifically so this module
-//! never has to change in lockstep with `db`'s own internals; `crate::daemon::http`
+//! `crate::daemon::db`'s or `crate::daemon::http::companion`'s concrete types -
+//! can depend on this module instead of all of `http`. `Db`, `AsyncDb`, and
+//! `Companion` stay generic specifically so this module never has to change in
+//! lockstep with `db`'s or `companion`'s own internals; `crate::daemon::http`
 //! is the one place that ties them down with `DaemonHttpState`/`AsyncDaemonDbSlot`
 //! concrete type aliases.
 
@@ -16,7 +18,6 @@ use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::http::companion::CompanionRouter;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_pairing::{
     RemotePairingEvent, RemotePairingRateLimiter, RemotePairingStatusRateLimiter,
@@ -25,6 +26,7 @@ use crate::daemon::state::DaemonManifest;
 
 mod async_db_slot;
 mod auth_mode;
+mod error_body;
 mod managed_agent_locks;
 mod recovery_snapshot_cache;
 mod remote_limits;
@@ -32,26 +34,30 @@ mod replay_buffer;
 
 pub use async_db_slot::AsyncDaemonDbSlot;
 pub use auth_mode::DaemonHttpAuthMode;
+pub use error_body::{DaemonErrorBody, DaemonErrorDetail};
 pub use managed_agent_locks::{ManagedAgentMutationGuard, ManagedAgentMutationLocks};
 pub use recovery_snapshot_cache::RecoverySnapshotCache;
 pub use remote_limits::{RemoteRequestLimitConfig, RemoteRequestLimits};
 pub use replay_buffer::{PreparedBroadcast, ReplayBuffer};
 
 /// Daemon HTTP server state, generic over the synchronous and asynchronous
-/// database handles it carries.
+/// database handles it carries, plus the companion router type.
 ///
 /// `crate::daemon::http::DaemonHttpState` is the concrete alias every route
-/// handler, WebSocket relay, and service function names; `Db`/`AsyncDb` exist
-/// only so this struct's shape does not have to move in lockstep with
-/// `crate::daemon::db`.
-pub struct DaemonHttpState<Db, AsyncDb> {
+/// handler, WebSocket relay, and service function names; `Db`/`AsyncDb`/
+/// `Companion` exist only so this struct's shape does not have to move in
+/// lockstep with `crate::daemon::db` or `crate::daemon::http::companion`,
+/// whose concrete `CompanionRouter` type is itself built on `http`'s own
+/// `DaemonHttpState` alias and would reintroduce the cycle this module exists
+/// to avoid if named here directly.
+pub struct DaemonHttpState<Db, AsyncDb, Companion> {
     pub token: String,
     pub auth_mode: DaemonHttpAuthMode,
     pub remote_domain: Option<String>,
     /// Companion service this daemon forwards a configured path subtree to.
     /// `None` leaves the router, the auth layer, and every response exactly as
     /// they are without companion routing.
-    pub companion: Option<CompanionRouter>,
+    pub companion: Option<Companion>,
     pub remote_request_limits: Option<RemoteRequestLimits>,
     pub remote_pairing_limiter: Arc<Mutex<RemotePairingRateLimiter>>,
     pub remote_pairing_status_limiter: Arc<Mutex<RemotePairingStatusRateLimiter>>,
@@ -86,8 +92,9 @@ pub struct DaemonHttpState<Db, AsyncDb> {
 // Written by hand rather than `#[derive(Clone)]`: the derive would add
 // `Db: Clone` and `AsyncDb: Clone` bounds, but every field holding one is
 // behind an `Arc`, so cloning the state never needs to clone the database
-// itself.
-impl<Db, AsyncDb> Clone for DaemonHttpState<Db, AsyncDb> {
+// itself. `Companion` is not behind an `Arc` here, so it keeps its own
+// `Clone` bound - `CompanionRouter` itself is cheap to clone (an `Arc` inside).
+impl<Db, AsyncDb, Companion: Clone> Clone for DaemonHttpState<Db, AsyncDb, Companion> {
     fn clone(&self) -> Self {
         Self {
             token: self.token.clone(),

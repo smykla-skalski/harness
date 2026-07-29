@@ -11,7 +11,7 @@ use super::routes_support::{
     wire_error,
 };
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
-use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::daemon::server_state::DaemonErrorBody;
 use crate::task_board::remote_wire::wire::RemoteAssignmentWireState;
 use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,

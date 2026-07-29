@@ -181,10 +181,14 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
     }
 }
 
-// The one place `Db`/`AsyncDb` get tied down to this daemon's actual database
-// types; every route handler, WebSocket relay, and service function names
-// this alias, never `server_state::DaemonHttpState` directly.
-pub type DaemonHttpState = server_state::DaemonHttpState<DaemonDb, AsyncDaemonDb>;
+// Every route handler, WebSocket relay, and service function names this
+// alias, never `server_state::DaemonHttpState` directly. `task_board_remote_transport`
+// ties the same three types down independently rather than importing this
+// alias, to avoid the cycle its own doc comment explains; both resolve to the
+// identical monomorphized type, which is what lets its routes merge into this
+// module's `OpenApiRouter`.
+pub type DaemonHttpState =
+    server_state::DaemonHttpState<DaemonDb, AsyncDaemonDb, companion::CompanionRouter>;
 
 /// Build the default remote pairing rate limiter used by daemon HTTP state.
 #[must_use]

@@ -12,8 +12,8 @@ use super::routes_support::{
     map_route_result, offer_response, record_lease, route_error, verify_route_identity, wire_error,
 };
 use crate::daemon::db::utc_now;
-use crate::daemon::http::openapi::DaemonErrorBody;
 use crate::daemon::http::{require_async_db, require_execution_remote_client};
+use crate::daemon::server_state::DaemonErrorBody;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
