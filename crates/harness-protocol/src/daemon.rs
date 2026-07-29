@@ -14,11 +14,11 @@ pub mod http_paths {
     pub const HEADLESS_READINESS: &str = "/v1/headless/readiness";
 }
 
-/// Daemon HTTP/WS wire-protocol version, mirroring
-/// `src/daemon/protocol/summaries.rs`'s own copy the same way `WS` above
-/// mirrors that file's `http_paths`: `harness-session::transport` needs it
-/// for the headless-readiness request without depending back on the root
-/// crate. Keep in sync by hand when the root copy's version number changes.
+/// Daemon HTTP/WS wire-protocol version. Canonical here rather than in
+/// `harness-daemon`: `harness-session::transport` needs it for the
+/// headless-readiness request without depending back on the daemon crate, and
+/// the daemon itself now resolves this constant from here directly instead of
+/// carrying its own hand-synced copy.
 pub const DAEMON_WIRE_VERSION: u32 = 5;
 
 /// Wire request for a headless execution readiness check.
@@ -113,6 +113,23 @@ pub mod reviews;
 /// that used to define them, letting `db` and the rest of the daemon share
 /// one definition instead of `db` reaching back into the daemon for it.
 pub mod audit;
+
+/// Voice-session wire types (start/stop a session, stream audio chunks and
+/// transcript updates), relocated from `harness-daemon`'s
+/// `daemon::protocol::voice`. Pure data with no daemon-only dependency.
+pub mod voice;
+
+/// `OpenRouter` model-catalog wire types, relocated from `harness-daemon`'s
+/// `daemon::protocol::openrouter_models`. Pure data with no daemon-only
+/// dependency.
+pub mod openrouter_models;
+
+/// Daemon health, readiness, log-level, telemetry, and ACP-transcript wire
+/// types free of daemon-only state, relocated from `harness-daemon`'s
+/// `daemon::protocol::summaries`. That module keeps the daemon-state-carrying
+/// remainder (the diagnostics report and its GitHub rate-limit fields) and
+/// the timeline pagination types tracked separately by issue #1102.
+pub mod summaries;
 
 // Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
 // route-table-derived `task_board_mcp_methods()`, which never chains in

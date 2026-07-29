@@ -6,10 +6,11 @@ use utoipa_axum::routes;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
+use crate::daemon::protocol::http_paths;
 use crate::daemon::service::session_acp_transcript_async;
 use crate::feature_flags::acp_enabled_from_env;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 
 use super::{DaemonHttpState, require_async_db};
 

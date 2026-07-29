@@ -4,8 +4,7 @@ use axum::http::{HeaderMap, StatusCode};
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
-use crate::daemon::protocol::DaemonTelemetryKind;
-use crate::daemon::protocol::DaemonTelemetryRequest;
+use harness_protocol::daemon::summaries::{DaemonTelemetryKind, DaemonTelemetryRequest};
 
 use super::super::core::{get_diagnostics, post_daemon_telemetry};
 use super::{auth_headers, response_json, test_http_state_with_db};

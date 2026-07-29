@@ -40,20 +40,22 @@ use super::http::{
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
-    AgentRemoveRequest, DAEMON_WIRE_VERSION, DaemonControlResponse, DaemonDiagnosticsReport,
-    HealthResponse, LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
-    ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
-    SessionExtensionsPayload, SessionLeaveRequest, SessionSummary, SessionUpdatedPayload,
-    SessionsUpdatedDeltaPayload, SessionsUpdatedPayload, SetLogLevelRequest, SignalAckRequest,
-    SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
-    TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
-    TaskUpdateRequest, TimelineEntry,
+    AgentRemoveRequest, DaemonDiagnosticsReport, LeaderTransferRequest, ObserveSessionRequest,
+    ProjectSummary, RoleChangeRequest, SessionDetail, SessionEndRequest, SessionExtensionsPayload,
+    SessionLeaveRequest, SessionSummary, SessionUpdatedPayload, SessionsUpdatedDeltaPayload,
+    SessionsUpdatedPayload, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
+    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDeleteRequest,
+    TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
 use super::watch;
 use super::websocket::ReplayBuffer;
+use harness_protocol::daemon::DAEMON_WIRE_VERSION;
+use harness_protocol::daemon::summaries::{
+    DaemonControlResponse, HealthResponse, LogLevelResponse, ReadyEventPayload, SetLogLevelRequest,
+};
 
 #[derive(Debug, Clone)]
 struct DaemonObserveRuntime {

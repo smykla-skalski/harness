@@ -14,7 +14,7 @@ use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 
 use super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::OpenRouterModelCatalogResponse;
+use harness_protocol::daemon::openrouter_models::OpenRouterModelCatalogResponse;
 
 pub(super) fn openrouter_model_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new().routes(routes!(get_openrouter_models))

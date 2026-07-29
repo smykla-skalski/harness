@@ -9,11 +9,12 @@ use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::http::{DaemonHttpState, error_status_and_body};
 use crate::daemon::protocol::{
-    SessionDetail, SessionMutationResponse, SessionStartRequest, SetLogLevelRequest,
-    WsErrorPayload, WsRequest, WsResponse, bind_control_plane_actor_value,
+    SessionDetail, SessionMutationResponse, SessionStartRequest, WsErrorPayload, WsRequest,
+    WsResponse, bind_control_plane_actor_value,
 };
 use crate::daemon::service;
 use harness_kernel::errors::CliError;
+use harness_protocol::daemon::summaries::SetLogLevelRequest;
 
 use super::frames::{error_response, error_response_with_payload, ok_response};
 use super::params::{extract_session_agent_id, extract_session_id};

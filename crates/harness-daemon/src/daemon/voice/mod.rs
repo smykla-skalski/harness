@@ -14,11 +14,12 @@ use uuid::Uuid;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::protocol::{
-    VoiceAudioChunkRequest, VoiceProcessingSink, VoiceSessionFinishReason,
-    VoiceSessionFinishRequest, VoiceSessionMutationResponse, VoiceSessionStartRequest,
-    VoiceSessionStartResponse, VoiceTranscriptUpdateRequest,
+use harness_protocol::daemon::voice::{
+    VoiceAudioChunkRequest, VoiceAudioFormatDescriptor, VoiceProcessingSink, VoiceRouteTarget,
+    VoiceSessionFinishReason, VoiceSessionFinishRequest, VoiceSessionMutationResponse,
+    VoiceSessionStartRequest, VoiceSessionStartResponse, VoiceTranscriptUpdateRequest,
 };
+
 use super::state;
 
 use cleanup::{cleanup_abandoned_sessions_at, remove_session_dir};
@@ -33,7 +34,7 @@ struct VoiceSessionRecord {
     actor: String,
     locale_identifier: String,
     accepted_sinks: Vec<VoiceProcessingSink>,
-    route_target: super::protocol::VoiceRouteTarget,
+    route_target: VoiceRouteTarget,
     requires_confirmation: bool,
     remote_processor_url: Option<String>,
     created_at: String,
@@ -45,7 +46,7 @@ struct VoiceSessionRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StoredVoiceChunk {
     sequence: u64,
-    format: super::protocol::VoiceAudioFormatDescriptor,
+    format: VoiceAudioFormatDescriptor,
     frame_count: usize,
     started_at_seconds: f64,
     duration_seconds: f64,

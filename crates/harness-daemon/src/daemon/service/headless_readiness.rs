@@ -3,7 +3,7 @@ use crate::agents::runtime::models;
 use crate::daemon::bridge::{
     BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeStatusReport,
 };
-use crate::daemon::protocol::{
+use harness_protocol::daemon::{
     DAEMON_WIRE_VERSION, HeadlessReadinessCredential, HeadlessReadinessLane,
     HeadlessReadinessModel, HeadlessReadinessPeer, HeadlessReadinessReport,
     HeadlessReadinessRequest, HeadlessReadinessRuntime,

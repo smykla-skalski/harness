@@ -6,11 +6,10 @@ use super::{
 use crate::daemon::acp_probe::probe_acp_agents_cached;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::launchd::LaunchAgentStatus;
-use crate::daemon::protocol::{
-    DaemonTelemetryRequest, DaemonTelemetryResponse, GitHubApiDiagnostics,
-};
+use crate::daemon::protocol::GitHubApiDiagnostics;
 use crate::github_api::GitHubProtectedClient;
 use harness_kernel::redact::secrets;
+use harness_protocol::daemon::summaries::{DaemonTelemetryRequest, DaemonTelemetryResponse};
 use tokio::task::{JoinError, spawn_blocking};
 
 /// Build a point-in-time daemon status report.

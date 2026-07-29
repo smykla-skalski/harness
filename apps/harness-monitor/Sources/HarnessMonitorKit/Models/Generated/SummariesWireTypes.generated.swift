@@ -4,131 +4,6 @@
 
 import Foundation
 
-public struct HealthResponseWire: Codable, Equatable, Sendable {
-  public var status: String
-  public var version: String
-  public var pid: UInt32
-  public var endpoint: String
-  public var startedAt: String
-  public var logLevel: String
-  public var projectCount: UInt
-  public var worktreeCount: UInt
-  public var sessionCount: UInt
-  public var wireVersion: UInt32
-  public var daemonId: String
-  public var daemonName: String
-
-  public init(status: String, version: String, pid: UInt32, endpoint: String, startedAt: String, logLevel: String, projectCount: UInt, worktreeCount: UInt, sessionCount: UInt, wireVersion: UInt32 = 1, daemonId: String = "", daemonName: String = "") {
-    self.status = status
-    self.version = version
-    self.pid = pid
-    self.endpoint = endpoint
-    self.startedAt = startedAt
-    self.logLevel = logLevel
-    self.projectCount = projectCount
-    self.worktreeCount = worktreeCount
-    self.sessionCount = sessionCount
-    self.wireVersion = wireVersion
-    self.daemonId = daemonId
-    self.daemonName = daemonName
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    status = try container.decode(String.self, forKey: .status)
-    version = try container.decode(String.self, forKey: .version)
-    pid = try container.decode(UInt32.self, forKey: .pid)
-    endpoint = try container.decode(String.self, forKey: .endpoint)
-    startedAt = try container.decode(String.self, forKey: .startedAt)
-    logLevel = try container.decode(String.self, forKey: .logLevel)
-    projectCount = try container.decode(UInt.self, forKey: .projectCount)
-    worktreeCount = try container.decode(UInt.self, forKey: .worktreeCount)
-    sessionCount = try container.decode(UInt.self, forKey: .sessionCount)
-    wireVersion = try container.decodeIfPresent(UInt32.self, forKey: .wireVersion) ?? 1
-    daemonId = try container.decodeIfPresent(String.self, forKey: .daemonId) ?? ""
-    daemonName = try container.decodeIfPresent(String.self, forKey: .daemonName) ?? ""
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case status
-    case version
-    case pid
-    case endpoint
-    case startedAt = "started_at"
-    case logLevel = "log_level"
-    case projectCount = "project_count"
-    case worktreeCount = "worktree_count"
-    case sessionCount = "session_count"
-    case wireVersion = "wire_version"
-    case daemonId = "daemon_id"
-    case daemonName = "daemon_name"
-  }
-}
-
-public struct DaemonControlResponseWire: Codable, Equatable, Sendable {
-  public var status: String
-
-  public init(status: String) {
-    self.status = status
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case status
-  }
-}
-
-public struct LogLevelResponseWire: Codable, Equatable, Sendable {
-  public var level: String
-  public var filter: String
-
-  public init(level: String, filter: String) {
-    self.level = level
-    self.filter = filter
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case level
-    case filter
-  }
-}
-
-public struct SetLogLevelRequestWire: Codable, Equatable, Sendable {
-  public var level: String
-
-  public init(level: String) {
-    self.level = level
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case level
-  }
-}
-
-public struct HostBridgeReconfigureRequestWire: Codable, Equatable, Sendable {
-  public var enable: [String]
-  public var disable: [String]
-  public var force: Bool
-
-  public init(enable: [String] = [], disable: [String] = [], force: Bool = false) {
-    self.enable = enable
-    self.disable = disable
-    self.force = force
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    enable = try container.decodeIfPresent([String].self, forKey: .enable) ?? []
-    disable = try container.decodeIfPresent([String].self, forKey: .disable) ?? []
-    force = try container.decodeIfPresent(Bool.self, forKey: .force) ?? false
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case enable
-    case disable
-    case force
-  }
-}
-
 public struct GitHubApiDiagnosticsWire: Codable, Equatable, Sendable {
   public var dataRevision: UInt64?
   public var buckets: [GitHubRateBucketDiagnosticsWire]
@@ -225,96 +100,6 @@ public struct GitHubOperationSpendDiagnosticsWire: Codable, Equatable, Sendable 
     case operation
     case networkRequests = "network_requests"
     case graphqlPoints = "graphql_points"
-  }
-}
-
-public struct TimelineCursorWire: Codable, Equatable, Sendable {
-  public var recordedAt: String
-  public var entryId: String
-
-  public init(recordedAt: String, entryId: String) {
-    self.recordedAt = recordedAt
-    self.entryId = entryId
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case recordedAt = "recorded_at"
-    case entryId = "entry_id"
-  }
-}
-
-public struct TimelineWindowRequestWire: Codable, Equatable, Sendable {
-  public var scope: String?
-  public var limit: UInt?
-  public var before: TimelineCursorWire?
-  public var after: TimelineCursorWire?
-  public var knownRevision: Int64?
-
-  public init(scope: String? = nil, limit: UInt? = nil, before: TimelineCursorWire? = nil, after: TimelineCursorWire? = nil, knownRevision: Int64? = nil) {
-    self.scope = scope
-    self.limit = limit
-    self.before = before
-    self.after = after
-    self.knownRevision = knownRevision
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case scope
-    case limit
-    case before
-    case after
-    case knownRevision = "known_revision"
-  }
-}
-
-public struct TimelineWindowResponseWire: Codable, Equatable, Sendable {
-  public var revision: Int64
-  public var totalCount: UInt
-  public var windowStart: UInt
-  public var windowEnd: UInt
-  public var hasOlder: Bool
-  public var hasNewer: Bool
-  public var oldestCursor: TimelineCursorWire?
-  public var newestCursor: TimelineCursorWire?
-  public var entries: [TimelineEntryWire]?
-  public var unchanged: Bool
-
-  public init(revision: Int64, totalCount: UInt, windowStart: UInt, windowEnd: UInt, hasOlder: Bool, hasNewer: Bool, oldestCursor: TimelineCursorWire? = nil, newestCursor: TimelineCursorWire? = nil, entries: [TimelineEntryWire]? = nil, unchanged: Bool) {
-    self.revision = revision
-    self.totalCount = totalCount
-    self.windowStart = windowStart
-    self.windowEnd = windowEnd
-    self.hasOlder = hasOlder
-    self.hasNewer = hasNewer
-    self.oldestCursor = oldestCursor
-    self.newestCursor = newestCursor
-    self.entries = entries
-    self.unchanged = unchanged
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case revision
-    case totalCount = "total_count"
-    case windowStart = "window_start"
-    case windowEnd = "window_end"
-    case hasOlder = "has_older"
-    case hasNewer = "has_newer"
-    case oldestCursor = "oldest_cursor"
-    case newestCursor = "newest_cursor"
-    case entries
-    case unchanged
-  }
-}
-
-public struct AcpTranscriptResponseWire: Codable, Equatable, Sendable {
-  public var entries: [TimelineEntryWire]
-
-  public init(entries: [TimelineEntryWire]) {
-    self.entries = entries
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case entries
   }
 }
 
@@ -780,6 +565,84 @@ public struct TimelineEntryWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct TimelineCursorWire: Codable, Equatable, Sendable {
+  public var recordedAt: String
+  public var entryId: String
+
+  public init(recordedAt: String, entryId: String) {
+    self.recordedAt = recordedAt
+    self.entryId = entryId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case recordedAt = "recorded_at"
+    case entryId = "entry_id"
+  }
+}
+
+public struct TimelineWindowRequestWire: Codable, Equatable, Sendable {
+  public var scope: String?
+  public var limit: UInt?
+  public var before: TimelineCursorWire?
+  public var after: TimelineCursorWire?
+  public var knownRevision: Int64?
+
+  public init(scope: String? = nil, limit: UInt? = nil, before: TimelineCursorWire? = nil, after: TimelineCursorWire? = nil, knownRevision: Int64? = nil) {
+    self.scope = scope
+    self.limit = limit
+    self.before = before
+    self.after = after
+    self.knownRevision = knownRevision
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case scope
+    case limit
+    case before
+    case after
+    case knownRevision = "known_revision"
+  }
+}
+
+public struct TimelineWindowResponseWire: Codable, Equatable, Sendable {
+  public var revision: Int64
+  public var totalCount: UInt
+  public var windowStart: UInt
+  public var windowEnd: UInt
+  public var hasOlder: Bool
+  public var hasNewer: Bool
+  public var oldestCursor: TimelineCursorWire?
+  public var newestCursor: TimelineCursorWire?
+  public var entries: [TimelineEntryWire]?
+  public var unchanged: Bool
+
+  public init(revision: Int64, totalCount: UInt, windowStart: UInt, windowEnd: UInt, hasOlder: Bool, hasNewer: Bool, oldestCursor: TimelineCursorWire? = nil, newestCursor: TimelineCursorWire? = nil, entries: [TimelineEntryWire]? = nil, unchanged: Bool) {
+    self.revision = revision
+    self.totalCount = totalCount
+    self.windowStart = windowStart
+    self.windowEnd = windowEnd
+    self.hasOlder = hasOlder
+    self.hasNewer = hasNewer
+    self.oldestCursor = oldestCursor
+    self.newestCursor = newestCursor
+    self.entries = entries
+    self.unchanged = unchanged
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case revision
+    case totalCount = "total_count"
+    case windowStart = "window_start"
+    case windowEnd = "window_end"
+    case hasOlder = "has_older"
+    case hasNewer = "has_newer"
+    case oldestCursor = "oldest_cursor"
+    case newestCursor = "newest_cursor"
+    case entries
+    case unchanged
+  }
+}
+
 public struct StreamEventWire: Codable, Equatable, Sendable {
   public var event: String
   public var recordedAt: String
@@ -798,6 +661,143 @@ public struct StreamEventWire: Codable, Equatable, Sendable {
     case recordedAt = "recorded_at"
     case sessionId = "session_id"
     case payload
+  }
+}
+
+public struct HealthResponseWire: Codable, Equatable, Sendable {
+  public var status: String
+  public var version: String
+  public var pid: UInt32
+  public var endpoint: String
+  public var startedAt: String
+  public var logLevel: String
+  public var projectCount: UInt
+  public var worktreeCount: UInt
+  public var sessionCount: UInt
+  public var wireVersion: UInt32
+  public var daemonId: String
+  public var daemonName: String
+
+  public init(status: String, version: String, pid: UInt32, endpoint: String, startedAt: String, logLevel: String, projectCount: UInt, worktreeCount: UInt, sessionCount: UInt, wireVersion: UInt32 = 1, daemonId: String = "", daemonName: String = "") {
+    self.status = status
+    self.version = version
+    self.pid = pid
+    self.endpoint = endpoint
+    self.startedAt = startedAt
+    self.logLevel = logLevel
+    self.projectCount = projectCount
+    self.worktreeCount = worktreeCount
+    self.sessionCount = sessionCount
+    self.wireVersion = wireVersion
+    self.daemonId = daemonId
+    self.daemonName = daemonName
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    status = try container.decode(String.self, forKey: .status)
+    version = try container.decode(String.self, forKey: .version)
+    pid = try container.decode(UInt32.self, forKey: .pid)
+    endpoint = try container.decode(String.self, forKey: .endpoint)
+    startedAt = try container.decode(String.self, forKey: .startedAt)
+    logLevel = try container.decode(String.self, forKey: .logLevel)
+    projectCount = try container.decode(UInt.self, forKey: .projectCount)
+    worktreeCount = try container.decode(UInt.self, forKey: .worktreeCount)
+    sessionCount = try container.decode(UInt.self, forKey: .sessionCount)
+    wireVersion = try container.decodeIfPresent(UInt32.self, forKey: .wireVersion) ?? 1
+    daemonId = try container.decodeIfPresent(String.self, forKey: .daemonId) ?? ""
+    daemonName = try container.decodeIfPresent(String.self, forKey: .daemonName) ?? ""
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case status
+    case version
+    case pid
+    case endpoint
+    case startedAt = "started_at"
+    case logLevel = "log_level"
+    case projectCount = "project_count"
+    case worktreeCount = "worktree_count"
+    case sessionCount = "session_count"
+    case wireVersion = "wire_version"
+    case daemonId = "daemon_id"
+    case daemonName = "daemon_name"
+  }
+}
+
+public struct DaemonControlResponseWire: Codable, Equatable, Sendable {
+  public var status: String
+
+  public init(status: String) {
+    self.status = status
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case status
+  }
+}
+
+public struct LogLevelResponseWire: Codable, Equatable, Sendable {
+  public var level: String
+  public var filter: String
+
+  public init(level: String, filter: String) {
+    self.level = level
+    self.filter = filter
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case level
+    case filter
+  }
+}
+
+public struct SetLogLevelRequestWire: Codable, Equatable, Sendable {
+  public var level: String
+
+  public init(level: String) {
+    self.level = level
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case level
+  }
+}
+
+public struct HostBridgeReconfigureRequestWire: Codable, Equatable, Sendable {
+  public var enable: [String]
+  public var disable: [String]
+  public var force: Bool
+
+  public init(enable: [String] = [], disable: [String] = [], force: Bool = false) {
+    self.enable = enable
+    self.disable = disable
+    self.force = force
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    enable = try container.decodeIfPresent([String].self, forKey: .enable) ?? []
+    disable = try container.decodeIfPresent([String].self, forKey: .disable) ?? []
+    force = try container.decodeIfPresent(Bool.self, forKey: .force) ?? false
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case enable
+    case disable
+    case force
+  }
+}
+
+public struct AcpTranscriptResponseWire: Codable, Equatable, Sendable {
+  public var entries: [TimelineEntryWire]
+
+  public init(entries: [TimelineEntryWire]) {
+    self.entries = entries
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case entries
   }
 }
 

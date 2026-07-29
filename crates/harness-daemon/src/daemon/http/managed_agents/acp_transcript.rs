@@ -5,8 +5,9 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 
-use crate::daemon::protocol::{AcpTranscriptResponse, http_paths};
+use crate::daemon::protocol::http_paths;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;

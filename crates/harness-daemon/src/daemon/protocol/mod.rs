@@ -1,12 +1,10 @@
 mod api_contract;
 mod binding;
-mod openrouter_models;
 mod reviews;
 mod summaries;
 mod task_board;
 #[cfg(test)]
 mod tests;
-mod voice;
 mod websocket;
 
 pub use api_contract::*;
@@ -16,7 +14,6 @@ pub use binding::{
 };
 pub use harness_protocol::daemon::audit::*;
 pub use harness_protocol::managed_agents::codex::*;
-pub use openrouter_models::*;
 pub use reviews::*;
 pub use summaries::*;
 // The wire contracts below describe the session and task-board domains and now
@@ -30,5 +27,4 @@ pub use harness_protocol::daemon::task_board_list_bounds::{
     TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS,
 };
 pub use task_board::*;
-pub use voice::*;
 pub use websocket::*;

@@ -4,8 +4,8 @@ use super::{
     reconcile_expired_pending_signals_for_db, session_not_found, snapshot, timeline,
 };
 use crate::daemon::index::ResolvedSession;
-use crate::daemon::protocol::AcpTranscriptResponse;
 use crate::session::service::ResolvedRuntimeSessionAgent;
+use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 #[cfg(test)]
 use harness_protocol::timeline::TimelineCursor;
 use harness_protocol::timeline::{TimelineWindowRequest, TimelineWindowResponse};

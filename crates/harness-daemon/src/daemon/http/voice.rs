@@ -7,12 +7,13 @@ use axum::response::Response;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::daemon::protocol::{
-    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest, http_paths,
-};
+use crate::daemon::protocol::http_paths;
 use crate::daemon::voice::{
     append_audio_chunk, append_transcript_async, finish_session_async, start_session_async,
+};
+use harness_protocol::daemon::voice::{
+    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    VoiceTranscriptUpdateRequest,
 };
 
 use super::DaemonHttpState;
@@ -20,7 +21,7 @@ use super::auth::authorize_control_request;
 use super::response::{extract_request_id, timed_json};
 
 use super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::{VoiceSessionMutationResponse, VoiceSessionStartResponse};
+use harness_protocol::daemon::voice::{VoiceSessionMutationResponse, VoiceSessionStartResponse};
 
 pub(super) fn voice_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()

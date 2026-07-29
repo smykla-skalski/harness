@@ -16,7 +16,10 @@ use super::{
     TaskBoardSetTriageOverrideRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
     TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
-    TaskUpdateRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    TaskUpdateRequest,
+};
+use harness_protocol::daemon::voice::{
+    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
     VoiceTranscriptUpdateRequest,
 };
 

@@ -2387,6 +2387,13 @@ const POLICY_REPLAY_SOURCE: &str =
 const SUMMARIES_SOURCE: &str =
     include_str!("../crates/harness-daemon/src/daemon/protocol/summaries.rs");
 const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon.rs");
+// HealthResponse, DaemonControlResponse, LogLevelResponse, SetLogLevelRequest,
+// HostBridgeReconfigureRequest, and AcpTranscriptResponse moved out of
+// summaries.rs into the protocol crate's own daemon::summaries module (issue
+// #1125), and this generator parses source text rather than types, so the
+// summaries module has to keep reading them from their new file.
+const DAEMON_SUMMARIES_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/summaries.rs");
 // TimelineEntry moved out of summaries.rs into the protocol crate, and this
 // generator parses source text rather than types, so the summaries module has
 // to keep reading it from its new file or TimelineEntryWire stops resolving.
@@ -2510,8 +2517,8 @@ const SESSION_STATE_EMIT_ONLY: &[&str] =
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str =
-    include_str!("../crates/harness-daemon/src/daemon/protocol/openrouter_models.rs");
-const VOICE_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/protocol/voice.rs");
+    include_str!("../crates/harness-protocol/src/daemon/openrouter_models.rs");
+const VOICE_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon/voice.rs");
 const AUDIT_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon/audit.rs");
 // The shared protocol package owns the managed terminal snapshot/request types
 // and their defaults. Runtime-only PTY behavior remains in daemon/agent_tui.
@@ -3248,12 +3255,13 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output: SUMMARIES_OUTPUT,
             description: "the Rust daemon health, summary and tool-activity types",
-            defaults: &[SUMMARIES_SOURCE],
+            defaults: &[SUMMARIES_SOURCE, DAEMON_SUMMARIES_SOURCE],
             sources: &[
                 SUMMARIES_SOURCE,
                 SESSION_SUMMARIES_SOURCE,
                 TIMELINE_SOURCE,
                 SHARED_DAEMON_SOURCE,
+                DAEMON_SUMMARIES_SOURCE,
                 HOOK_PROMPTS_SOURCE,
             ],
         },

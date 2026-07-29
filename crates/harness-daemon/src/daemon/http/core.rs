@@ -11,19 +11,18 @@ use utoipa_axum::routes;
 use axum::extract::Query;
 
 use crate::daemon::acp_probe::cached_probe_snapshot;
-use crate::daemon::protocol::{
-    DaemonTelemetryRequest, HeadlessReadinessReport, HeadlessReadinessRequest, ReadinessResponse,
-    RuntimeSessionResolutionResponse, http_paths,
-};
+use crate::daemon::protocol::{RuntimeSessionResolutionResponse, http_paths};
 use crate::daemon::remote_diagnostics::project_diagnostics_report;
 use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::daemon::service;
 use harness_kernel::errors::CliErrorKind;
+use harness_protocol::daemon::summaries::{
+    DaemonTelemetryRequest, DaemonTelemetryResponse, HealthResponse, ReadinessResponse,
+};
+use harness_protocol::daemon::{HeadlessReadinessReport, HeadlessReadinessRequest};
 
 use super::openapi::DaemonErrorBody;
-use crate::daemon::protocol::{
-    DaemonDiagnosticsReport, DaemonTelemetryResponse, HealthResponse, ProjectSummary,
-};
+use crate::daemon::protocol::{DaemonDiagnosticsReport, ProjectSummary};
 
 use super::auth::{authenticated_remote_client, require_auth};
 use super::response::{extract_request_id, timed_json};
