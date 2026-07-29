@@ -309,7 +309,7 @@ fn malformed_query_response() -> Response {
         axum::Json(serde_json::json!({
             "error": {
                 "code": "SYBRA_BAD_QUERY",
-                "message": "Sybra event query is malformed",
+                "message": "Sybra query is malformed",
             }
         })),
     )
