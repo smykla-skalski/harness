@@ -47,7 +47,7 @@ fn minimal_state() -> DaemonHttpState {
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender.clone(), db_slot, false),
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 

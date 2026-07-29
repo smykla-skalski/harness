@@ -87,7 +87,7 @@ async fn snapshot_is_consistent_bounded_and_read_only() {
         Some(timestamp(success_at).as_str())
     );
     assert_eq!(snapshot.last_reconciliation_at, None);
-    assert_eq!(snapshot.queue, Default::default());
+    assert_eq!(snapshot.queue, TaskBoardAutomationQueueSummary::default());
     assert_eq!(
         snapshot.active_run.as_ref().map(|run| run.run_id.as_str()),
         Some("run-active")

@@ -243,7 +243,7 @@ fn sample_session_state() -> SessionState {
         title: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
         context: "active ACP test session".into(),
         status: SessionStatus::Active,
-        policy: Default::default(),
+        policy: crate::session::types::SessionPolicy::default(),
         created_at: "2026-04-29T00:00:00Z".into(),
         updated_at: "2026-04-29T00:00:00Z".into(),
         agents,

@@ -121,7 +121,7 @@ async fn test_state(db_path: &std::path::Path) -> (DaemonHttpState, Arc<AsyncDae
             false,
         ),
         managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     };
     (state, async_db)
 }

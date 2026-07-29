@@ -198,7 +198,7 @@ pub(crate) fn performance_session_state(
         } else {
             SessionStatus::Active
         },
-        policy: Default::default(),
+        policy: crate::session::types::SessionPolicy::default(),
         created_at: timestamp.clone(),
         updated_at: timestamp.clone(),
         agents,

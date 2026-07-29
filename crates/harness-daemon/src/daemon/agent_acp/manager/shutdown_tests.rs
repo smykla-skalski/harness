@@ -21,10 +21,10 @@ fn descriptor(command: &Path) -> AcpAgentDescriptor {
         launch_command: command.display().to_string(),
         launch_args: Vec::new(),
         env_passthrough: Vec::new(),
-        spawn_configuration: Default::default(),
+        spawn_configuration: crate::agents::acp::catalog::AcpSpawnConfiguration::default(),
         model_catalog: None,
         install_hint: None,
-        session_configuration: Default::default(),
+        session_configuration: crate::agents::acp::catalog::AcpSessionConfiguration::default(),
         doctor_probe: catalog::DoctorProbe {
             command: command.display().to_string(),
             args: Vec::new(),

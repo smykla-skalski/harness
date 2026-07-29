@@ -120,7 +120,7 @@ pub(in crate::daemon::http) fn test_http_state_with_db_path(
             sender, db_slot, async_db, false,
         ),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 
@@ -195,7 +195,7 @@ pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 
@@ -249,7 +249,7 @@ pub(in crate::daemon::http) fn sample_session_state() -> SessionState {
         title: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         context: "http timeline scope fixture".into(),
         status: SessionStatus::Active,
-        policy: Default::default(),
+        policy: crate::session::types::SessionPolicy::default(),
         created_at: now.clone(),
         updated_at: now.clone(),
         agents,

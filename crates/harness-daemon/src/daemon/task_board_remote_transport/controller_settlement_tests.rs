@@ -178,7 +178,8 @@ pub(super) async fn settlement_ready_controller(item_id: &str) -> PreparedLifecy
     let mut status = completed_status(&state);
     status.state = RemoteAssignmentWireState::Unknown;
     status.result = None;
-    status.output_artifacts = Default::default();
+    status.output_artifacts =
+        crate::daemon::task_board_remote_wire::wire_artifacts::RemoteArtifactManifest::default();
     status.error_code = Some("remote_assignment_outcome_unknown".into());
     status.status_sha256.clear();
     let status = status.seal().expect("seal evidence-only terminal status");

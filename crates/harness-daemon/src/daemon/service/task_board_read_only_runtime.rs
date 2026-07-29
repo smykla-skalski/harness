@@ -467,7 +467,7 @@ mod tests {
             backport_source: None,
             author_login: "author".into(),
             author_avatar_url: None,
-            author_association: Default::default(),
+            author_association: crate::reviews::ReviewAuthorAssociation::default(),
             state: ReviewPullRequestState::Open,
             mergeable: ReviewMergeableState::Mergeable,
             review_status: ReviewReviewStatus::ReviewRequired,

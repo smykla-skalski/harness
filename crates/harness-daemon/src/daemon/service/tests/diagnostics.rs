@@ -49,7 +49,7 @@ fn diagnostics_report_includes_workspace_and_recent_events() {
                 revision: 0,
                 updated_at: String::new(),
                 binary_stamp: None,
-                ownership: Default::default(),
+                ownership: crate::daemon::state::DaemonOwnership::default(),
             };
             state::write_manifest(&manifest).expect("manifest");
             state::append_event("info", "daemon booted").expect("append event");
@@ -109,7 +109,7 @@ fn diagnostics_report_returns_default_bridge_when_no_bridge_running() {
                 revision: 0,
                 updated_at: String::new(),
                 binary_stamp: None,
-                ownership: Default::default(),
+                ownership: crate::daemon::state::DaemonOwnership::default(),
             };
             state::write_manifest(&manifest).expect("manifest");
 
@@ -154,7 +154,7 @@ fn diagnostics_report_merges_live_bridge_state() {
                 revision: 0,
                 updated_at: String::new(),
                 binary_stamp: None,
-                ownership: Default::default(),
+                ownership: crate::daemon::state::DaemonOwnership::default(),
             };
             state::write_manifest(&manifest).expect("manifest");
 
@@ -227,7 +227,7 @@ fn diagnostics_report_skips_unreadable_manifest() {
                 revision: 0,
                 updated_at: String::new(),
                 binary_stamp: None,
-                ownership: Default::default(),
+                ownership: crate::daemon::state::DaemonOwnership::default(),
             };
             state::write_manifest(&manifest).expect("manifest");
             let manifest_path = state::manifest_path();

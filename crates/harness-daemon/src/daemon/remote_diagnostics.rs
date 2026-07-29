@@ -160,7 +160,7 @@ mod tests {
                     file_size: 3,
                     modification_time_interval_since_1970: 4.0,
                 }),
-                ownership: Default::default(),
+                ownership: crate::daemon::state::DaemonOwnership::default(),
             }),
             launch_agent: LaunchAgentStatus {
                 installed: false,

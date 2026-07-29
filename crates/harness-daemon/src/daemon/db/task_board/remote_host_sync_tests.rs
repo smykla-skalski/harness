@@ -78,7 +78,8 @@ async fn cleaned_unknown_allows_host_replacement_and_clear_without_losing_histor
     replacement.local_execution_host.host_id = "executor-b".into();
     assert_identity_change_fenced(&fixture.db, &replacement).await;
     let mut cleared = replacement.clone();
-    cleared.local_execution_host = Default::default();
+    cleared.local_execution_host =
+        crate::task_board::automation::TaskBoardLocalExecutionHostConfig::default();
     assert_identity_change_fenced(&fixture.db, &cleared).await;
 
     fixture

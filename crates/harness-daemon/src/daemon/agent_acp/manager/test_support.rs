@@ -180,7 +180,7 @@ fn sample_session_state(session_id: &str) -> SessionState {
         title: session_id.to_string(),
         context: "test session".into(),
         status: SessionStatus::Active,
-        policy: Default::default(),
+        policy: crate::session::types::SessionPolicy::default(),
         created_at: "2026-04-03T12:00:00Z".into(),
         updated_at: "2026-04-03T12:05:00Z".into(),
         agents,

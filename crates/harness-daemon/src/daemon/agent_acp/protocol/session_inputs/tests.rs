@@ -14,7 +14,7 @@ fn descriptor_with_inputs(
         launch_command: "fake".to_owned(),
         launch_args: Vec::new(),
         env_passthrough: Vec::new(),
-        spawn_configuration: Default::default(),
+        spawn_configuration: crate::agents::acp::catalog::AcpSpawnConfiguration::default(),
         model_catalog: None,
         install_hint: None,
         session_configuration: AcpSessionConfiguration {

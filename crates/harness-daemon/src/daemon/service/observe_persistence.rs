@@ -342,7 +342,7 @@ mod tests {
                 managed_agent: None,
                 last_activity_at: None,
                 current_task_id: None,
-                runtime_capabilities: Default::default(),
+                runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
                 persona: None,
                 runtime_session_title: None,
             },

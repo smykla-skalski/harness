@@ -27,7 +27,7 @@ fn descriptor_with_session_configuration(
         launch_command: "test-acp".to_string(),
         launch_args: Vec::new(),
         env_passthrough: Vec::new(),
-        spawn_configuration: Default::default(),
+        spawn_configuration: crate::agents::acp::catalog::AcpSpawnConfiguration::default(),
         model_catalog: None,
         install_hint: None,
         session_configuration,
@@ -149,7 +149,7 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
     ));
     let session_guard = SessionRouteGuard::default();
     let descriptor = descriptor_with_session_configuration(AcpSessionConfiguration {
-        model: Default::default(),
+        model: crate::agents::acp::catalog::AcpSessionModelTransport::default(),
         effort: AcpSessionEffortTransport::ConfigOption {
             selector: AcpSessionConfigOptionBinding {
                 option_id: Some("effort".to_string()),
