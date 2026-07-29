@@ -20,6 +20,10 @@ use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 /// under the shipped prompt then stalled in `Running` forever the moment the
 /// operator customized `read_only_review` to name a fact this execution has no
 /// value for, and the error was swallowed into the pass report.
+// Held across every await in this test deliberately: the shared prompt-catalog fixture guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn a_finished_attempt_is_harvested_when_its_prompt_cannot_render() {
     let _lock = prompt_catalog_test_lock();
@@ -67,6 +71,10 @@ async fn a_finished_attempt_is_harvested_when_its_prompt_cannot_render() {
 /// Starting a run is the one thing that genuinely needs the prompt. It refuses
 /// where an operator can see it rather than stalling the attempt every tick,
 /// and it refuses before claiming the side effect, so nothing was launched.
+// Held across every await in this test deliberately: the shared prompt-catalog fixture guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn an_attempt_whose_prompt_cannot_render_refuses_visibly() {
     let _lock = prompt_catalog_test_lock();

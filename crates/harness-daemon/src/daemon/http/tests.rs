@@ -367,6 +367,11 @@ async fn get_health_reports_the_daemon_identity() {
     assert_eq!(body["daemon_name"], identity.name);
 }
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn get_health_responds_when_db_lock_is_held() {
     let state = test_http_state_with_db();
@@ -417,6 +422,11 @@ async fn get_runtime_session_resolution_returns_null_resolved_when_nothing_match
     assert!(body["resolved"].is_null());
 }
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn get_ready_returns_ok_without_querying_database() {
     let state = test_http_state_with_db();
@@ -434,6 +444,11 @@ async fn get_ready_returns_ok_without_querying_database() {
     assert_eq!(body["daemon_epoch"].as_str(), Some(expected_epoch.as_str()));
 }
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn get_diagnostics_responds_when_db_lock_is_held() {
     let state = test_http_state_with_db();

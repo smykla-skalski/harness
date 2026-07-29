@@ -1,5 +1,9 @@
 use super::*;
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn observed_label_and_repository_eligibility_loss_completes_only_matching_tasks() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;

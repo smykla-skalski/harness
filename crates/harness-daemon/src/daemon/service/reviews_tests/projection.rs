@@ -139,6 +139,10 @@ fn cached_query_response_returns_only_its_repo_bucket() {
     assert!(hit_b.from_cache);
 }
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn repository_source_aggregate_reuses_canonical_per_repository_buckets() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;
@@ -173,6 +177,10 @@ async fn repository_source_aggregate_reuses_canonical_per_repository_buckets() {
     );
 }
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempotently() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;
@@ -216,6 +224,10 @@ async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempoten
     );
 }
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn cached_reviews_projection_preserves_user_selected_status() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;
@@ -275,6 +287,10 @@ async fn cached_reviews_projection_preserves_user_selected_status() {
     );
 }
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn cached_reviews_projection_reopens_done_task_when_review_is_requested_again() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;
@@ -317,6 +333,10 @@ async fn cached_reviews_projection_reopens_done_task_when_review_is_requested_ag
     assert_eq!(updated.status, TaskBoardStatus::Inbox);
 }
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn failed_cached_projection_is_retried_without_refetching_reviews() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;
@@ -362,6 +382,10 @@ async fn failed_cached_projection_is_retried_without_refetching_reviews() {
     );
 }
 
+// Held across every await in this test deliberately: the shared GitHub API budget state guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn targeted_missing_refresh_completes_only_matching_imported_review() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;

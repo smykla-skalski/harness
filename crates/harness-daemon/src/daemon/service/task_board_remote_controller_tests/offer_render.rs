@@ -20,6 +20,10 @@ use super::{assignment_count, refresh_fixture_observation};
 ///
 /// The fixture execution has no pull request and sorts first; the second
 /// candidate has one and must still reach its host.
+// Held across every await in this test deliberately: the shared prompt-catalog fixture guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn one_unrenderable_candidate_does_not_block_the_others() {
     let _lock = prompt_catalog_test_lock();

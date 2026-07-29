@@ -94,6 +94,11 @@ async fn run_remote_viewer_diagnostics_flow() {
     let _ = server.await;
 }
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 async fn seed_sensitive_diagnostics(state: &crate::daemon::http::DaemonHttpState) {
     state::write_manifest(&sensitive_manifest()).expect("write sensitive manifest");
     let db = state.db.get().expect("db slot").lock().expect("db lock");

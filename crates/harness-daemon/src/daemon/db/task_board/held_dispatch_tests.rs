@@ -388,6 +388,10 @@ fn approval_graph(revision: u64) -> PolicyGraph {
 /// `http::tests::task_board_deliver_prompt` covers the case that actually
 /// bites, where the item is edited during the hold; this pins the same refusal
 /// against the approval-grant fixture, which that pair does not exercise.
+// Held across every await in this test deliberately: the shared prompt-catalog fixture guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
     let _lock = crate::task_board::prompt_catalog::prompt_catalog_test_lock();

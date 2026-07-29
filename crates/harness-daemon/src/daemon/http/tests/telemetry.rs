@@ -11,6 +11,10 @@ use tokio::net::TcpListener;
 use tokio::sync::Notify;
 use tracing_subscriber::prelude::*;
 
+// Held across every await in this test deliberately: the shared telemetry log-filter handle guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn trace_http_request_uses_route_name_and_parent_trace_context() {
     let _guard = crate::telemetry::telemetry_test_guard();
@@ -78,6 +82,10 @@ async fn trace_http_request_uses_route_name_and_parent_trace_context() {
     );
 }
 
+// Held across every await in this test deliberately: the shared telemetry log-filter handle guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn trace_http_request_projects_baggage_attributes_onto_server_span() {
     let _guard = crate::telemetry::telemetry_test_guard();
@@ -139,6 +147,10 @@ async fn trace_http_request_projects_baggage_attributes_onto_server_span() {
     );
 }
 
+// Held across every await in this test deliberately: the shared telemetry log-filter handle guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn trace_http_request_does_not_inherit_concurrent_request_trace_context() {
     let _guard = crate::telemetry::telemetry_test_guard();
