@@ -23,7 +23,7 @@ use super::workflow_first_start_admission::{
     TaskBoardFirstStartAdmission, revalidate_first_start_admission_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::service::task_board_read_only_coordinator::requests::remote_codex_attempt_request;
+use crate::daemon::task_board_codex_requests::remote_codex_attempt_request;
 use crate::daemon::task_board_remote_wire::wire::{RemoteCodexLaunchEnvelope, RemoteOfferRequest};
 use crate::task_board::TaskBoardExecutionPhase;
 use crate::task_board::{
