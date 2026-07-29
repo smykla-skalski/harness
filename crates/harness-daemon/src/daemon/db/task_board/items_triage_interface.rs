@@ -35,13 +35,13 @@ use crate::task_board::{
 /// latter as a fresh decision. Owned here instead of by triage so item
 /// mutation can match on its variants without depending on triage's module.
 #[derive(Debug)]
-pub(crate) enum TriageOutcome {
+pub(in super::super) enum TriageOutcome {
     Decided(TaskBoardTriageDecision),
     RetainedEffect(TaskBoardTriageDecision),
 }
 
 impl TriageOutcome {
-    pub(crate) const fn decision(&self) -> &TaskBoardTriageDecision {
+    pub(in super::super) const fn decision(&self) -> &TaskBoardTriageDecision {
         match self {
             Self::Decided(decision) | Self::RetainedEffect(decision) => decision,
         }
@@ -57,7 +57,7 @@ impl TriageOutcome {
 /// conflicting-write rejection check. Every method mirrors an existing
 /// triage function one-to-one -- the production implementation is a plain
 /// forward, not new logic.
-pub(crate) trait TriageEvaluator {
+pub(in super::super) trait TriageEvaluator {
     async fn apply_active_triage_in_tx(
         &self,
         transaction: &mut Transaction<'_, Sqlite>,
