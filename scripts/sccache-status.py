@@ -77,7 +77,10 @@ def _socket_accepts(path: Path) -> bool:
     return True
 
 
-def _stats(binary: str, uds: str) -> tuple[dict[str, str], str]:
+def _stats(
+    binary: str,
+    uds: str,
+) -> tuple[dict[str, str], dict[str, int], str]:
     completed = subprocess.run(
         (binary, "--show-stats"),
         check=False,
@@ -86,13 +89,28 @@ def _stats(binary: str, uds: str) -> tuple[dict[str, str], str]:
         text=True,
     )
     if completed.returncode != 0:
-        return {}, completed.stderr.strip() or "query failed"
+        return {}, {}, completed.stderr.strip() or "query failed"
     values: dict[str, str] = {}
+    reasons: dict[str, int] = {}
+    reading_reasons = False
     for line in completed.stdout.splitlines():
+        if line == "Non-cacheable reasons:":
+            reading_reasons = True
+            continue
+        if reading_reasons and not line:
+            reading_reasons = False
+            continue
         match = re.match(r"^(.+?)\s{2,}(.+?)\s*$", line)
         if match:
-            values[match.group(1)] = match.group(2)
-    return values, "ok"
+            key, value = match.groups()
+            if reading_reasons:
+                try:
+                    reasons[key] = int(value.split()[0])
+                except ValueError:
+                    pass
+            else:
+                values[key] = value
+    return values, reasons, "ok"
 
 
 def _integer(values: dict[str, str], key: str) -> int:
@@ -101,6 +119,14 @@ def _integer(values: dict[str, str], key: str) -> int:
         return int(raw)
     except ValueError:
         return 0
+
+
+def _overall_status(server_status: str, effectiveness: str) -> str:
+    if server_status != "healthy":
+        return server_status
+    if effectiveness in {"low", "unavailable"}:
+        return "degraded"
+    return "healthy"
 
 
 def _cache_paths(values: dict[str, str]) -> tuple[Path, ...]:
@@ -236,38 +262,68 @@ def main() -> int:
 
     configured = Path(uds)
     reachable = _socket_accepts(configured)
-    values, stats_outcome = _stats(binary, uds) if reachable else ({}, "socket unreachable")
+    values, reasons, stats_outcome = (
+        _stats(binary, uds)
+        if reachable
+        else ({}, {}, "socket unreachable")
+    )
     inventory = _server_inventory(configured)
     requests = _integer(values, "Compile requests")
     hits = _integer(values, "Cache hits")
     misses = _integer(values, "Cache misses")
     non_cacheable = _integer(values, "Non-cacheable calls")
     hit_rate = 100 * hits / max(1, hits + misses)
+    non_cacheable_rate = 100 * non_cacheable / max(1, requests)
     if inventory.orphan:
-        state = "leaking"
+        server_state = "leaking"
     elif not reachable:
-        state = "unavailable"
+        server_state = "unavailable"
     else:
-        state = "healthy"
+        server_state = "healthy"
     if stats_outcome != "ok":
-        historical_reuse = "unavailable"
+        effectiveness = "unavailable"
     elif hits + misses < 20:
-        historical_reuse = "insufficient-data"
+        effectiveness = "insufficient-data"
     elif hit_rate < 5:
-        historical_reuse = "low"
+        effectiveness = "low"
     else:
-        historical_reuse = "normal"
+        effectiveness = "normal"
+    state = _overall_status(server_state, effectiveness)
+    dominant_reason = (
+        max(reasons.items(), key=lambda item: (item[1], item[0]))
+        if reasons
+        else None
+    )
+    reason_summary = ",".join(
+        f"{reason}:{count}"
+        for reason, count in sorted(
+            reasons.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+    )
     paths = _cache_paths(values)
 
     print(f"sccache_status={state}")
+    print(f"sccache_server_status={server_state}")
+    print(f"cache_effectiveness={effectiveness}")
     print(f"socket_reachable={'yes' if reachable else 'no'}")
     print(f"stats_query={stats_outcome}")
     print(f"compile_requests={requests}")
     print(f"cache_hits={hits}")
     print(f"cache_misses={misses}")
     print(f"cache_hit_rate={hit_rate:.2f}%")
-    print(f"historical_cache_reuse={historical_reuse}")
+    print(f"historical_cache_reuse={effectiveness}")
     print(f"non_cacheable_calls={non_cacheable}")
+    print(f"non_cacheable_rate={non_cacheable_rate:.2f}%")
+    print(
+        "dominant_non_cacheable_reason="
+        + (
+            f"{dominant_reason[0]}:{dominant_reason[1]}"
+            if dominant_reason
+            else "unavailable"
+        )
+    )
+    print(f"non_cacheable_reasons={reason_summary or 'unavailable'}")
     print(f"cache_paths={','.join(str(path) for path in paths) or 'unavailable'}")
     print(f"cache_birth={_birth(paths)}")
     print(f"cache_size_kb={_size_kb(paths)}")

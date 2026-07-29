@@ -29,12 +29,29 @@ class SccacheStatusTests(unittest.TestCase):
     def test_stats_query_targets_configured_socket(self) -> None:
         with patch.object(status.subprocess, "run") as run:
             run.return_value.returncode = 0
-            run.return_value.stdout = ""
+            run.return_value.stdout = """\
+Compile requests                   101
+Cache hits                           1
+Cache misses                       100
+
+Non-cacheable reasons:
+incremental                         40
+multiple input files                20
+"""
             run.return_value.stderr = ""
-            status._stats("/tools/sccache", "/tmp/repo.sock")
+            values, reasons, outcome = status._stats(
+                "/tools/sccache",
+                "/tmp/repo.sock",
+            )
 
         environment = run.call_args.kwargs["env"]
         self.assertEqual(environment["SCCACHE_SERVER_UDS"], "/tmp/repo.sock")
+        self.assertEqual(outcome, "ok")
+        self.assertEqual(values["Compile requests"], "101")
+        self.assertEqual(
+            reasons,
+            {"incremental": 40, "multiple input files": 20},
+        )
 
     def test_disabled_cache_still_reports_wrapper_ownership(self) -> None:
         output = io.StringIO()
@@ -109,7 +126,14 @@ class SccacheStatusTests(unittest.TestCase):
             ("/tmp/harness-sccache/orphan.sock",),
         )
 
-    def test_low_lifetime_hit_rate_is_historical_not_current_health(self) -> None:
+    def test_overall_status_preserves_server_failures_and_measurement_gaps(self) -> None:
+        self.assertEqual(status._overall_status("leaking", "low"), "leaking")
+        self.assertEqual(status._overall_status("unavailable", "low"), "unavailable")
+        self.assertEqual(status._overall_status("healthy", "unavailable"), "degraded")
+        self.assertEqual(status._overall_status("healthy", "low"), "degraded")
+        self.assertEqual(status._overall_status("healthy", "normal"), "healthy")
+
+    def test_low_reuse_degrades_effectiveness_not_server_health(self) -> None:
         output = io.StringIO()
         inventory = status.ServerInventory(
             availability="available",
@@ -141,7 +165,9 @@ class SccacheStatusTests(unittest.TestCase):
                         "Compile requests": "101",
                         "Cache hits": "1",
                         "Cache misses": "100",
+                        "Non-cacheable calls": "60",
                     },
+                    {"incremental": 40, "multiple input files": 20},
                     "ok",
                 ),
             ),
@@ -151,8 +177,19 @@ class SccacheStatusTests(unittest.TestCase):
         ):
             self.assertEqual(status.main(), 0)
 
-        self.assertIn("sccache_status=healthy", output.getvalue())
+        self.assertIn("sccache_status=degraded", output.getvalue())
+        self.assertIn("sccache_server_status=healthy", output.getvalue())
+        self.assertIn("cache_effectiveness=low", output.getvalue())
         self.assertIn("historical_cache_reuse=low", output.getvalue())
+        self.assertIn("non_cacheable_rate=59.41%", output.getvalue())
+        self.assertIn(
+            "dominant_non_cacheable_reason=incremental:40",
+            output.getvalue(),
+        )
+        self.assertIn(
+            "non_cacheable_reasons=incremental:40,multiple input files:20",
+            output.getvalue(),
+        )
 
 
 if __name__ == "__main__":
