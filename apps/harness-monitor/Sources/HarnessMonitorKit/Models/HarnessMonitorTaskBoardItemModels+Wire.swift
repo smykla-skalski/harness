@@ -45,6 +45,7 @@ extension TaskBoardWorkflowState {
     let status: TaskBoardWorkflowStatus =
       switch wire.status {
       case .idle: .idle
+      case .admitting: .running
       case .running: .running
       case .paused: .paused
       case .completed: .completed
