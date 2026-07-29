@@ -4,9 +4,14 @@ import contextlib
 import importlib.util
 import io
 import os
+import select
+import shutil
+import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -27,6 +32,89 @@ def load_runner():
 
 
 class ParallelScriptTestRunnerTests(unittest.TestCase):
+    def _production_sccache(self) -> str:
+        sccache = shutil.which("sccache")
+        if sccache is None:
+            self.skipTest("production sccache is unavailable")
+        version = subprocess.run(
+            (sccache, "--version"),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if version.returncode != 0:
+            self.skipTest("production sccache is unusable")
+        return sccache
+
+    @staticmethod
+    def _socket_accepts(path: Path) -> bool:
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.settimeout(0.2)
+        try:
+            client.connect(str(path))
+        except OSError:
+            return False
+        finally:
+            client.close()
+        return True
+
+    def _assert_socket_state(self, path: Path, *, accepting: bool) -> None:
+        self.assertIs(
+            self._socket_accepts(path),
+            accepting,
+            f"{path} is unexpectedly "
+            f"{'unreachable' if accepting else 'reachable'}",
+        )
+
+    def _pid_exit_watch(self, pid: int):
+        if sys.platform == "darwin":
+            queue = select.kqueue()
+            queue.control(
+                [
+                    select.kevent(
+                        pid,
+                        filter=select.KQ_FILTER_PROC,
+                        flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT,
+                        fflags=select.KQ_NOTE_EXIT,
+                    )
+                ],
+                0,
+                0,
+            )
+            return queue
+        if sys.platform.startswith("linux") and hasattr(os, "pidfd_open"):
+            return os.pidfd_open(pid)
+        self.skipTest("process-exit watch unavailable")
+
+    def _await_pid_exit(self, watch) -> None:
+        if sys.platform == "darwin":
+            self.assertTrue(watch.control(None, 1, 2))
+            watch.close()
+            return
+        ready, _, _ = select.select((watch,), (), (), 2)
+        os.close(watch)
+        self.assertTrue(ready)
+
+    def _start_socket_holder(self, path: Path) -> subprocess.Popen[str]:
+        probe = (
+            "import os, signal, socket; "
+            "listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); "
+            "listener.bind(os.environ['OWNED_SOCKET']); listener.listen(4); "
+            "print('ready', flush=True); signal.pause()"
+        )
+        process = subprocess.Popen(
+            (sys.executable, "-u", "-c", probe),
+            env={**os.environ, "OWNED_SOCKET": str(path)},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+            text=True,
+        )
+        self.assertIsNotNone(process.stdout)
+        self.assertEqual(process.stdout.readline(), "ready\n")
+        self._assert_socket_state(path, accepting=True)
+        return process
+
     def test_total_runtime_budget_is_opt_in(self) -> None:
         runner = load_runner()
         with (
@@ -346,6 +434,186 @@ print(tmp)
             process.wait(timeout=2)
 
         self.assertNotEqual(process.returncode, 0)
+
+    def test_darwin_wait_keeps_process_when_exit_watch_registration_fails(
+        self,
+    ) -> None:
+        runner = load_runner()
+
+        class RegistrationFailureQueue:
+            def control(self, changes, _max_events, _timeout):
+                if changes is not None:
+                    raise PermissionError
+                return ()
+
+            def close(self):
+                return None
+
+        with (
+            patch.object(runner.platform, "system", return_value="Darwin"),
+            patch.object(runner.select, "kqueue", return_value=RegistrationFailureQueue()),
+            patch.object(runner, "_signal_pids"),
+        ):
+            remaining = runner._signal_and_wait_for_pid_exits(
+                (123,),
+                signal.SIGTERM,
+                0,
+            )
+
+        self.assertEqual(remaining, {123})
+
+    def test_linux_wait_keeps_process_when_pidfd_open_fails(self) -> None:
+        runner = load_runner()
+
+        with (
+            patch.object(runner.platform, "system", return_value="Linux"),
+            patch.object(runner.os, "pidfd_open", side_effect=PermissionError, create=True),
+            patch.object(runner, "_signal_pids"),
+        ):
+            remaining = runner._signal_and_wait_for_pid_exits(
+                (123,),
+                signal.SIGTERM,
+                0,
+            )
+
+        self.assertEqual(remaining, {123})
+
+    def test_teardown_stops_daemonized_production_sccache_by_owned_socket(
+        self,
+    ) -> None:
+        sccache = self._production_sccache()
+
+        with tempfile.TemporaryDirectory(prefix="hst.", dir="/tmp") as directory:
+            sandbox = Path(directory)
+            owned_socket = sandbox / "owned-sccache.sock"
+            cache_directory = sandbox / "cache"
+            home = sandbox / "home"
+            cache_directory.mkdir()
+            home.mkdir()
+            environment = {
+                "HOME": str(home),
+                "SCCACHE_DIR": str(cache_directory),
+                "SCCACHE_CACHE_SIZE": "1G",
+                "SCCACHE_IDLE_TIMEOUT": "600",
+                "SCCACHE_SERVER_UDS": str(owned_socket),
+            }
+            try:
+                started = subprocess.run(
+                    (sccache, "--start-server"),
+                    check=False,
+                    capture_output=True,
+                    env={**os.environ, **environment},
+                    text=True,
+                )
+                self.assertEqual(started.returncode, 0, started.stderr)
+                self._assert_socket_state(owned_socket, accepting=True)
+
+                runner = load_runner()
+                owners = runner.socket_owners_under(sandbox)
+                watches = tuple(self._pid_exit_watch(pid) for pid in owners)
+                runner._terminate_owned_processes(sandbox)
+                for watch in watches:
+                    self._await_pid_exit(watch)
+                self._assert_socket_state(owned_socket, accepting=False)
+            finally:
+                subprocess.run(
+                    (sccache, "--stop-server"),
+                    check=False,
+                    capture_output=True,
+                    env={**os.environ, **environment},
+                    text=True,
+                )
+
+    def test_teardown_stops_parallel_owned_socket_servers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="hst.", dir="/tmp") as directory:
+            sandbox = Path(directory)
+            sockets = tuple(sandbox / f"parallel-{index}.sock" for index in range(2))
+            processes = tuple(self._start_socket_holder(path) for path in sockets)
+            try:
+                runner = load_runner()
+                runner._terminate_owned_processes(sandbox)
+                for path, process in zip(sockets, processes, strict=True):
+                    self._assert_socket_state(path, accepting=False)
+                    process.wait(timeout=2)
+            finally:
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+
+    def test_timeout_teardown_stops_daemonized_owned_socket_server(self) -> None:
+        runner = load_runner()
+        with tempfile.TemporaryDirectory(prefix="hst.", dir="/tmp") as directory:
+            sandbox = Path(directory)
+            owned_socket = sandbox / "timeout-owned.sock"
+            probe = """
+import os
+import signal
+import socket
+
+listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+listener.bind(os.environ["OWNED_SOCKET"])
+listener.listen(4)
+signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})
+if os.fork() == 0:
+    os.setsid()
+    if os.fork() != 0:
+        os._exit(0)
+    devnull = os.open(os.devnull, os.O_RDWR)
+    for descriptor in (0, 1, 2):
+        os.dup2(devnull, descriptor)
+    signal.sigwait({signal.SIGUSR1})
+signal.sigwait({signal.SIGUSR1})
+"""
+            summary = runner.run_tasks(
+                (
+                    runner.Task(
+                        "timeout-owned-socket",
+                        (sys.executable, "-c", probe),
+                        environment={"OWNED_SOCKET": str(owned_socket)},
+                    ),
+                ),
+                max_workers=1,
+                timeout_seconds=0.2,
+                sandbox_root=sandbox,
+            )
+            self.assertTrue(summary.results[0].timed_out)
+            self._assert_socket_state(owned_socket, accepting=True)
+            owners = runner.socket_owners_under(sandbox)
+            watches = tuple(self._pid_exit_watch(pid) for pid in owners)
+            runner._terminate_owned_processes(sandbox)
+            for watch in watches:
+                self._await_pid_exit(watch)
+            self._assert_socket_state(owned_socket, accepting=False)
+
+    def test_teardown_finds_owned_server_after_socket_directory_is_deleted(
+        self,
+    ) -> None:
+        runner = load_runner()
+        with tempfile.TemporaryDirectory(prefix="hst.", dir="/tmp") as directory:
+            sandbox = Path(directory)
+            socket_directory = sandbox / "deleted"
+            socket_directory.mkdir()
+            owned_socket = socket_directory / "owned.sock"
+            process = self._start_socket_holder(owned_socket)
+            owners = runner.socket_owners_under(sandbox)
+            owned_pids = tuple(owners)
+            self.assertTrue(owned_pids)
+            owned_socket.unlink()
+            socket_directory.rmdir()
+
+            try:
+                runner._terminate_owned_processes(sandbox)
+                process.wait(timeout=2)
+                self.assertNotEqual(process.returncode, 0)
+            finally:
+                for pid in owned_pids:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                if process.poll() is None:
+                    process.wait(timeout=2)
 
     def test_jobserver_cleanup_token_excludes_production_roots(self) -> None:
         runner = load_runner()

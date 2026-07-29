@@ -498,6 +498,10 @@ run = "./scripts/cargo-local.sh --print-env"
 description = "Prove that an isolated fresh checkout lane reuses Cargo artifacts through copy-on-write seeding"
 run = "./scripts/rust-build-cache-canary.sh"
 
+[tasks."cargo:cache:status"]
+description = "Report configured repo sccache health, cache age/size, and safely identifiable live/orphan servers"
+run = "python3 scripts/sccache-status.py"
+
 [tasks."monitor:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
 run = "apps/harness-monitor/Scripts/generate.sh"
