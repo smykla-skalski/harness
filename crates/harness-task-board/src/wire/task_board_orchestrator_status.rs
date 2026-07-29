@@ -152,7 +152,7 @@ mod tests {
     use crate::dispatch::{
         DispatchLifecycle, DispatchLifecyclePhase, DispatchLifecycleStatus, DispatchLifecycleStep,
     };
-    use crate::orchestrator::TaskBoardHeldDispatchSummary;
+    use crate::orchestrator::{TaskBoardHeldDispatchSummary, TaskBoardOrchestratorSettings};
     use crate::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
     use crate::types::TaskBoardItem;
 
@@ -297,7 +297,7 @@ mod tests {
             }),
             workflow_execution_counts: Vec::new(),
             automation: None,
-            settings: crate::orchestrator::TaskBoardOrchestratorSettings::default(),
+            settings: TaskBoardOrchestratorSettings::default(),
         };
 
         assert_eq!(status.last_run_applied_count(), 2);
