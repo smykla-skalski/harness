@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -89,7 +89,7 @@ pub(super) fn reviews_policy_run_request(
     }
 }
 
-pub(super) fn write_active_policy_graph(root: &PathBuf, graph: PolicyGraph) {
+pub(super) fn write_active_policy_graph(root: &Path, graph: PolicyGraph) {
     store_gate_policy(root, Some(graph));
 }
 

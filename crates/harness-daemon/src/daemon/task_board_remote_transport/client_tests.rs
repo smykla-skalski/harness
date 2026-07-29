@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair};
@@ -297,7 +298,7 @@ fn response(status: u16, body: &str, headers: &[(&str, &str)]) -> String {
         body.len()
     );
     for (name, value) in headers {
-        response.push_str(&format!("{name}: {value}\r\n"));
+        let _ = write!(response, "{name}: {value}\r\n");
     }
     response.push_str("\r\n");
     response.push_str(body);

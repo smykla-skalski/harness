@@ -25,7 +25,7 @@ fn load_running_bridge_state_returns_none_when_no_state_file() {
 #[test]
 fn load_running_bridge_state_returns_state_when_bridge_lock_held() {
     with_temp_daemon_root(|| {
-        write_fake_bridge_state(99999999);
+        write_fake_bridge_state(99_999_999);
         let _flock = hold_bridge_lock();
         // Both modes return Some when the flock is held.
         assert!(
@@ -65,7 +65,7 @@ fn load_running_bridge_state_returns_state_when_bridge_rpc_succeeds_without_lock
 fn load_running_bridge_state_returns_none_when_neither_lock_nor_pid_live() {
     with_temp_daemon_root(|| {
         // pid 99999999 is definitely not alive.
-        write_fake_bridge_state(99999999);
+        write_fake_bridge_state(99_999_999);
         assert!(
             load_running_bridge_state(LivenessMode::LockOnly)
                 .expect("lock-only")
@@ -85,7 +85,7 @@ fn load_running_bridge_state_returns_none_when_neither_lock_nor_pid_live() {
 #[test]
 fn load_running_bridge_state_does_not_delete_state_file() {
     with_temp_daemon_root(|| {
-        write_fake_bridge_state(99999999);
+        write_fake_bridge_state(99_999_999);
         let _ = load_running_bridge_state(LivenessMode::LockOnly).expect("lock-only");
         assert!(
             bridge_state_path().exists(),

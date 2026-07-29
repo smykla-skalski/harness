@@ -57,6 +57,8 @@ pub(super) fn assert_concurrent_database_error(error: RemoteExecutionControllerE
         RemoteExecutionControllerError::Database(error) => {
             assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
         }
-        other => panic!("expected database authority rejection before I/O, got {other:?}"),
+        other @ RemoteExecutionControllerError::Transport(_) => {
+            panic!("expected database authority rejection before I/O, got {other:?}")
+        }
     }
 }

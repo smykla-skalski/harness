@@ -90,7 +90,12 @@ fn manifest_deserializes_binary_stamp_when_present() {
     assert_eq!(stamp.device_identifier, 41);
     assert_eq!(stamp.inode, 84);
     assert_eq!(stamp.file_size, 16_384);
-    assert_eq!(stamp.modification_time_interval_since_1970, 1_713_000_000.0);
+    // No arithmetic touches this value between the literal above and here, so
+    // the round-trip through serde_json preserves the exact bit pattern.
+    #[allow(clippy::float_cmp)]
+    {
+        assert_eq!(stamp.modification_time_interval_since_1970, 1_713_000_000.0);
+    }
 }
 
 #[test]

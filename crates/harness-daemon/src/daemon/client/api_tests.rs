@@ -338,7 +338,7 @@ fn acp_inspect_gets_optional_session_filter() {
             "watchdog_state": "active",
             "pending_permissions": 0,
             "terminal_count": 0,
-            "prompt_deadline_remaining_ms": 600000
+            "prompt_deadline_remaining_ms": 600_000
         }]
     })
     .to_string();

@@ -42,7 +42,7 @@ fn compute_bridge_manifest_update_returns_none_when_host_bridge_unchanged() {
 #[test]
 fn compute_bridge_manifest_update_returns_some_when_lock_held_and_manifest_stale() {
     with_temp_daemon_root(|| {
-        write_fake_bridge_state(99999999);
+        write_fake_bridge_state(99_999_999);
         let _flock = hold_bridge_lock();
 
         // Manifest currently shows bridge as not running.

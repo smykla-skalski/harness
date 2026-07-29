@@ -92,8 +92,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
                             return true;
                         }
                     }
-                    Ok(_) => {}
-                    Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {}
+                    Ok(_) | Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {}
                     Err(_) => break,
                 }
             }

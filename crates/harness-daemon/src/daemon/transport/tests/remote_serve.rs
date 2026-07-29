@@ -40,9 +40,8 @@ fn daemon_remote_serve_execution_plan_requires_persisted_acme_state() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let args = remote_serve_args();
 
-    let error = match build_remote_serve_execution_plan(&args, &db) {
-        Ok(_) => panic!("remote serve should fail closed without persisted ACME state"),
-        Err(error) => error,
+    let Err(error) = build_remote_serve_execution_plan(&args, &db) else {
+        panic!("remote serve should fail closed without persisted ACME state")
     };
     let message = error.to_string();
 

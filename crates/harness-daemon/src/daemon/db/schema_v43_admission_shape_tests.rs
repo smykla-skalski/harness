@@ -163,9 +163,8 @@ async fn assert_async_corruption_refused(table: Option<&str>) {
     }
     drop(db);
 
-    let error = match AsyncDaemonDb::connect(&path).await {
-        Ok(_) => panic!("corrupted v43 shape must be refused"),
-        Err(error) => error,
+    let Err(error) = AsyncDaemonDb::connect(&path).await else {
+        panic!("corrupted v43 shape must be refused")
     };
     assert!(error.to_string().contains("incompatible"), "{error}");
 }

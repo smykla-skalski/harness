@@ -268,11 +268,10 @@ async fn unavailable_offer_does_not_freeze_unconfigured_admission_authority() {
         .expect("load blocked execution")
         .expect("execution");
     assert!(
-        execution
+        !execution
             .ownership
             .resources
-            .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
-            .is_none()
+            .contains_key(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
     );
     assert!(
         execution

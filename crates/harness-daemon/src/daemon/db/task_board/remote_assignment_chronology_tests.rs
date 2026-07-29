@@ -65,7 +65,7 @@ async fn malformed_and_noncanonical_persisted_times_fail_closed_on_load() {
         .execute(fixture.db.pool())
         .await;
         if let Err(error) = corruption {
-            assert!(error.to_string().contains("CHECK constraint failed"))
+            assert!(error.to_string().contains("CHECK constraint failed"));
         } else {
             let error = fixture
                 .db
