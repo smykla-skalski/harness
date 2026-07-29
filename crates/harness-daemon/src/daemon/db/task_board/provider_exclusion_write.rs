@@ -162,7 +162,7 @@ struct RestoredWrite<'a> {
 /// Revives the screened tombstone, reconciles its triage placement and
 /// records the one restored audit event. The caller commits.
 ///
-/// A free function taking `db` explicitly, not a `AsyncDaemonDb` method:
+/// A free function taking `db` explicitly, not an `AsyncDaemonDb` method:
 /// `task_board` doesn't own `AsyncDaemonDb`, and this helper never needs
 /// method-call syntax at any of its call sites (all inside `provider_exclusion`
 /// itself), so there's no reason to route it through `ProviderQueries`.
