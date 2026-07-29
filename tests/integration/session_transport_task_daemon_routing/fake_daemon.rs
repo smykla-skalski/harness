@@ -191,9 +191,12 @@ where
         let _lock = install_fake_running_xdg_daemon(tmp.path(), &endpoint, token);
         let (handle, captured) = spawn_daemon_server(listener, session_detail_response(session_id));
         run();
-        drop(handle);
+        request_fake_daemon_shutdown(&endpoint);
+        handle
+            .join()
+            .expect("fake daemon thread should exit cleanly after the request completed");
         let mut slot = captured.lock().expect("lock");
-        slot.take().expect("daemon must capture POST")
+        slot.take().expect("daemon must capture a request")
     })
 }
 
@@ -210,9 +213,12 @@ where
         let (handle, captured) =
             spawn_daemon_server(listener, improver_outcome_response().to_string());
         run();
-        drop(handle);
+        request_fake_daemon_shutdown(&endpoint);
+        handle
+            .join()
+            .expect("fake daemon thread should exit cleanly after the request completed");
         let mut slot = captured.lock().expect("lock");
-        slot.take().expect("daemon must capture POST")
+        slot.take().expect("daemon must capture a request")
     })
 }
 
