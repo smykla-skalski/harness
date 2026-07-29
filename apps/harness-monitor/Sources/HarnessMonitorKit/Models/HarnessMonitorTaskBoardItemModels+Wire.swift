@@ -61,6 +61,8 @@ extension TaskBoardWorkflowState {
       worktree: wire.worktree,
       prNumber: wire.prNumber,
       prUrl: wire.prUrl,
+      prHeadRevision: wire.prHeadRevision,
+      prAuthor: wire.prAuthor,
       lastError: wire.lastError,
       policyTraceIds: wire.policyTraceIds
     )
@@ -98,6 +100,7 @@ extension TaskBoardItem {
       executionRepository: wire.executionRepository,
       targetProjectTypes: wire.targetProjectTypes,
       agentMode: wire.agentMode,
+      workflowKind: wire.workflowKind,
       kind: wire.kind,
       externalRefs: wire.externalRefs.map(TaskBoardExternalRef.init(wire:)),
       importedFromProvider: wire.importedFromProvider.map(TaskBoardExternalRefProvider.init(wire:)),

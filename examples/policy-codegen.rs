@@ -2726,6 +2726,19 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardShiftedItemRevision",
     "TaskBoardItemPositionMutationResponse",
 ];
+const TASK_BOARD_REVIEW_REPORT_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/review_report.rs");
+const TASK_BOARD_REPORT_ONLY_REVIEW_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/report_only_review.rs");
+const TASK_BOARD_REVIEW_REPORT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardReviewReportWireTypes.generated.swift";
+const TASK_BOARD_REVIEW_REPORT_EMIT_ONLY: &[&str] = &[
+    "TaskBoardReviewFindingSeverity",
+    "TaskBoardReviewFindingLocation",
+    "TaskBoardReportOnlyReviewFinding",
+    "TaskBoardAiReviewReportStatus",
+    "TaskBoardAiReviewReportRecord",
+    "TaskBoardAiReviewReportResponse",
+];
 const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../crates/harness-task-board/src/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/triage_override.rs");
@@ -3424,6 +3437,15 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: TASK_BOARD_REVIEW_REPORT_OUTPUT,
+            description: "the Rust task-board report-only review response",
+            defaults: &[],
+            sources: &[
+                TASK_BOARD_REPORT_ONLY_REVIEW_SOURCE,
+                TASK_BOARD_REVIEW_REPORT_SOURCE,
+            ],
+        },
+        GeneratedModule {
             output: TASK_BOARD_TRIAGE_OUTPUT,
             description: "the Rust task-board triage decision record, its override, and its read/mutation responses",
             defaults: &[TASK_BOARD_TRIAGE_SOURCE, TASK_BOARD_TRIAGE_OVERRIDE_SOURCE],
@@ -3694,6 +3716,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
+        TASK_BOARD_REVIEW_REPORT_OUTPUT => TASK_BOARD_REVIEW_REPORT_EMIT_ONLY,
         TASK_BOARD_TRIAGE_OUTPUT => TASK_BOARD_TRIAGE_EMIT_ONLY,
         TASK_BOARD_TRIAGE_RULES_OUTPUT => TASK_BOARD_TRIAGE_RULES_EMIT_ONLY,
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,

@@ -88,6 +88,7 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPositionReset: .object(sampleTaskBoardPositionMutationJSON),
   .taskBoardTriageGet: fixtureJSONValue(sampleTaskBoardTriageCurrentText),
   .taskBoardTriageHistory: fixtureJSONValue(sampleTaskBoardTriageHistoryText),
+  .taskBoardReviewReportGet: fixtureJSONValue(sampleTaskBoardReviewReportText),
   .taskBoardCreate: .object(sampleTaskBoardItemJSON),
   .taskBoardGet: .object(sampleTaskBoardItemJSON),
   .taskBoardUpdate: .object(sampleTaskBoardItemJSON),

@@ -43,6 +43,8 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
       sampleTaskBoardTriageCurrentText,
     Route("/v1/task-board/items/board-1/triage/history", method: "GET"):
       sampleTaskBoardTriageHistoryText,
+    Route("/v1/task-board/items/board-1/review-report", method: "GET"):
+      sampleTaskBoardReviewReportText,
     Route("/v1/task-board/items/board-1/planning/begin"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/submit"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/approve"): sampleTaskBoardPlanningResponseText,

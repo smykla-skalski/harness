@@ -16,6 +16,11 @@ struct TaskBoardTriageInspectorLoadKey: Hashable {
   let updatedAt: String
 }
 
+struct TaskBoardReviewReportLoadKey: Hashable {
+  let itemID: String
+  let updatedAt: String
+}
+
 @MainActor private let taskBoardApprovedAtSubmissionFormatter: ISO8601DateFormatter = {
   let formatter = ISO8601DateFormatter()
   formatter.formatOptions = [.withInternetDateTime]

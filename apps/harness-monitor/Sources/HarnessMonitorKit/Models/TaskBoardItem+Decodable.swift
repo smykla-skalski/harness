@@ -14,6 +14,7 @@ extension TaskBoardItem {
     case executionRepository
     case targetProjectTypes
     case agentMode
+    case workflowKind
     case kind
     case externalRefs
     case importedFromProvider
@@ -48,6 +49,8 @@ extension TaskBoardItem {
     self.targetProjectTypes =
       try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
     self.agentMode = try container.decode(TaskBoardAgentMode.self, forKey: .agentMode)
+    self.workflowKind =
+      try container.decodeIfPresent(TaskBoardWorkflowKind.self, forKey: .workflowKind)
     self.kind = try container.decodeIfPresent(TaskBoardItemKind.self, forKey: .kind) ?? .task
     self.externalRefs =
       try container.decodeIfPresent([TaskBoardExternalRef].self, forKey: .externalRefs) ?? []
