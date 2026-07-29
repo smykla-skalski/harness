@@ -66,9 +66,9 @@ class SccacheRecoverTests(unittest.TestCase):
                 env=environment,
                 text=True,
             )
+            owned_pids = tuple(recover.socket_owners_under(sandbox))
             self.assertEqual(started.returncode, 0, started.stderr)
             state, pid = recover._peer_pid(str(orphan_socket))
-            owned_pids = tuple(recover.socket_owners_under(sandbox))
             self.assertEqual(state, "live")
             self.assertIsNotNone(pid)
             orphan_socket.unlink()
