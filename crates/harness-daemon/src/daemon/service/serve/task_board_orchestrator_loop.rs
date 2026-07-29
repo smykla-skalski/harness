@@ -212,7 +212,7 @@ mod tests {
             last_run: None,
             workflow_execution_counts: Vec::new(),
             automation: None,
-            settings: Default::default(),
+            settings: crate::task_board::orchestrator::TaskBoardOrchestratorSettings::default(),
         }
     }
 }

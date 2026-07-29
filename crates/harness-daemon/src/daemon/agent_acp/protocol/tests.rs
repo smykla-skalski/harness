@@ -124,7 +124,7 @@ fn descriptor_with_session_configuration(
         launch_command: "test-acp".to_string(),
         launch_args: Vec::new(),
         env_passthrough: Vec::new(),
-        spawn_configuration: Default::default(),
+        spawn_configuration: crate::agents::acp::catalog::AcpSpawnConfiguration::default(),
         model_catalog: None,
         install_hint: None,
         session_configuration,
@@ -141,7 +141,7 @@ fn descriptor_with_session_configuration(
 fn disabled_session_config() -> AcpSessionRequestConfig {
     AcpSessionRequestConfig::from_request(
         &AcpAgentStartRequest::default(),
-        &descriptor_with_session_configuration(Default::default()),
+        &descriptor_with_session_configuration(AcpSessionConfiguration::default()),
     )
 }
 

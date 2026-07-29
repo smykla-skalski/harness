@@ -84,7 +84,7 @@ pub(super) fn test_http_state() -> DaemonHttpState {
             false,
         ),
         managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 

@@ -145,7 +145,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
             false,
         ),
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 
@@ -213,7 +213,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         acp_agent_manager,
         agent_tui_manager,
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 
@@ -345,7 +345,7 @@ fn sample_session_state() -> SessionState {
         title: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
         context: "agent tui websocket fixture".into(),
         status: SessionStatus::Active,
-        policy: Default::default(),
+        policy: crate::session::types::SessionPolicy::default(),
         created_at: "2026-04-13T19:00:00Z".into(),
         updated_at: "2026-04-13T19:00:00Z".into(),
         agents,

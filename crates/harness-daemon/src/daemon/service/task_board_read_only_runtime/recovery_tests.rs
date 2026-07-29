@@ -67,7 +67,7 @@ async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
         title: "restart".into(),
         context: "restart recovery".into(),
         status: SessionStatus::AwaitingLeader,
-        policy: Default::default(),
+        policy: crate::session::types::SessionPolicy::default(),
         created_at: "2026-07-17T23:58:00Z".into(),
         updated_at: "2026-07-17T23:58:00Z".into(),
         agents: BTreeMap::new(),
@@ -163,7 +163,7 @@ fn restarted_state(db_path: &std::path::Path, async_db: Arc<AsyncDaemonDb>) -> D
             false,
         ),
         managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     }
 }
 

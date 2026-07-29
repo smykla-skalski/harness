@@ -72,7 +72,7 @@ mod tests {
             title: String::new(),
             context: String::new(),
             status: SessionStatus::Active,
-            policy: Default::default(),
+            policy: crate::session::types::SessionPolicy::default(),
             created_at: "2026-04-20T00:00:00Z".into(),
             updated_at: "2026-04-20T00:00:00Z".into(),
             agents: BTreeMap::new(),

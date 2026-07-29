@@ -62,7 +62,7 @@ fn try_build_client_requires_authenticated_api_readiness() {
                 revision: 0,
                 updated_at: String::new(),
                 binary_stamp: None,
-                ownership: Default::default(),
+                ownership: crate::daemon::state::DaemonOwnership::default(),
             };
             state::write_manifest(&manifest).expect("write manifest");
 
