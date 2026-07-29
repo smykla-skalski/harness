@@ -1,6 +1,187 @@
+use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use super::*;
+
+const ACTIVE_DELIVERY_SESSION_ID: &str = "4f2f2a50-142c-583c-a0b5-e0d671b61e40";
+
+struct ActiveDeliveryFixture {
+    async_db: Arc<crate::daemon::db::AsyncDaemonDb>,
+    manager: AgentTuiManagerHandle,
+    tui_id: String,
+    leader_id: String,
+    worker_id: String,
+}
+
+async fn active_delivery_start_idle_worker(project: &Path) -> ActiveDeliveryFixture {
+    let db_path = project
+        .parent()
+        .expect("project parent")
+        .join("daemon.sqlite");
+    let async_db = Arc::new(
+        crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+            .await
+            .expect("open async daemon db"),
+    );
+    let db_slot = Arc::new(OnceLock::new());
+    let async_db_slot = Arc::new(OnceLock::new());
+    async_db_slot
+        .set(Arc::clone(&async_db))
+        .expect("async db slot");
+    let (sender, _) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new_with_async_db(sender, db_slot, async_db_slot, false);
+    // Subprocess-backed ack round-trip can exceed the 1s production budget
+    // when the full test suite saturates the machine; a generous override
+    // keeps the delivery assertion deterministic.
+    manager.set_ack_timeout(Duration::from_secs(30));
+
+    let state = start_direct_session_async(
+        &async_db,
+        project,
+        ACTIVE_DELIVERY_SESSION_ID,
+        "async active drop",
+        "wake idle tui worker on task drop",
+        None,
+    )
+    .await;
+    let leader_id = state.leader_id.clone().expect("leader id");
+    let worker_session_id = "async-active-drop-worker";
+    let signal_dir = runtime::runtime_for_name("codex")
+        .expect("codex runtime")
+        .signal_dir(project, worker_session_id);
+    let script = write_idle_signal_script(
+        project,
+        &signal_dir,
+        worker_session_id,
+        ACTIVE_DELIVERY_SESSION_ID,
+        IdleSignalScriptBehavior::AckOnWake,
+    );
+
+    let snapshot = manager
+        .start(
+            ACTIVE_DELIVERY_SESSION_ID,
+            &AgentTuiStartRequest {
+                runtime: "codex".into(),
+                role: SessionRole::Worker,
+                fallback_role: None,
+                capabilities: vec![],
+                name: Some("idle worker".into()),
+                prompt: None,
+                project_dir: Some(project.to_string_lossy().into()),
+                argv: vec!["sh".into(), script.path().to_string_lossy().into_owned()],
+                rows: 5,
+                cols: 40,
+                persona: None,
+                task_id: None,
+                board_item_id: None,
+                workflow_execution_id: None,
+                model: None,
+                effort: None,
+                allow_custom_model: false,
+            },
+        )
+        .expect("start agent tui");
+    manager
+        .signal_ready(&snapshot.tui_id)
+        .expect("signal ready");
+    script.wait_until_ready();
+
+    let joined = join_session_direct_async(
+        ACTIVE_DELIVERY_SESSION_ID,
+        &crate::daemon::protocol::SessionJoinRequest {
+            runtime: "codex".into(),
+            role: SessionRole::Worker,
+            fallback_role: None,
+            capabilities: vec!["agent-tui".into(), format!("agent-tui:{}", snapshot.tui_id)],
+            name: Some("idle worker".into()),
+            project_dir: project.to_string_lossy().into(),
+            persona: None,
+        },
+        &async_db,
+    )
+    .await
+    .expect("join session");
+    let worker_id = joined
+        .agents
+        .values()
+        .find(|agent| agent.role == SessionRole::Worker)
+        .expect("worker agent")
+        .agent_id
+        .clone();
+
+    ActiveDeliveryFixture {
+        async_db,
+        manager,
+        tui_id: snapshot.tui_id,
+        leader_id,
+        worker_id,
+    }
+}
+
+async fn active_delivery_create_and_drop_task_and_assert(fixture: ActiveDeliveryFixture) {
+    let created = create_task_async(
+        ACTIVE_DELIVERY_SESSION_ID,
+        &TaskCreateRequest {
+            actor: fixture.leader_id.clone(),
+            title: "actively delivered task".into(),
+            context: Some("deliver immediately via async daemon path".into()),
+            severity: crate::session::types::TaskSeverity::Medium,
+            suggested_fix: None,
+        },
+        &fixture.async_db,
+    )
+    .await
+    .expect("create task");
+    let task_id = created.tasks[0].task_id.clone();
+
+    let dropped = drop_task_async(
+        ACTIVE_DELIVERY_SESSION_ID,
+        &task_id,
+        &TaskDropRequest {
+            actor: fixture.leader_id,
+            target: crate::daemon::protocol::TaskDropTarget::Agent {
+                agent_id: fixture.worker_id.clone(),
+            },
+            queue_policy: crate::session::types::TaskQueuePolicy::Locked,
+            reason: None,
+        },
+        &fixture.async_db,
+        crate::daemon::service::WakeDispatch::new(Some(&fixture.manager), None),
+    )
+    .await;
+    fixture
+        .manager
+        .stop(&fixture.tui_id)
+        .expect("stop agent tui");
+    let dropped = dropped.expect("drop task");
+
+    let task = dropped
+        .tasks
+        .iter()
+        .find(|task| task.task_id == task_id)
+        .expect("dropped task");
+    assert_eq!(task.status, crate::session::types::TaskStatus::InProgress);
+    assert_eq!(
+        task.assigned_to.as_deref(),
+        Some(fixture.worker_id.as_str())
+    );
+
+    let action_hint = format!("task:{task_id}");
+    let signal = dropped
+        .signals
+        .iter()
+        .find(|signal| {
+            signal.agent_id == fixture.worker_id
+                && signal.signal.payload.action_hint.as_deref() == Some(action_hint.as_str())
+        })
+        .expect("delivered signal");
+    assert_eq!(signal.status, SessionSignalStatus::Delivered);
+    assert_eq!(
+        signal.acknowledgment.as_ref().map(|ack| ack.result),
+        Some(AckResult::Accepted)
+    );
+}
 
 #[test]
 fn drop_task_async_actively_delivers_to_idle_tui_agent() {
@@ -8,162 +189,8 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
         temp_env::with_var("CODEX_SESSION_ID", Some("async-active-drop-worker"), || {
             let runtime = tokio::runtime::Runtime::new().expect("runtime");
             runtime.block_on(async {
-                let db_path = project
-                    .parent()
-                    .expect("project parent")
-                    .join("daemon.sqlite");
-                let async_db = Arc::new(
-                    crate::daemon::db::AsyncDaemonDb::connect(&db_path)
-                        .await
-                        .expect("open async daemon db"),
-                );
-                let db_slot = Arc::new(OnceLock::new());
-                let async_db_slot = Arc::new(OnceLock::new());
-                async_db_slot
-                    .set(Arc::clone(&async_db))
-                    .expect("async db slot");
-                let (sender, _) = broadcast::channel(8);
-                let manager =
-                    AgentTuiManagerHandle::new_with_async_db(sender, db_slot, async_db_slot, false);
-                // Subprocess-backed ack round-trip can exceed the 1s production
-                // budget when the full test suite saturates the machine; a
-                // generous override keeps the delivery assertion deterministic.
-                manager.set_ack_timeout(Duration::from_secs(30));
-
-                let session_id = "4f2f2a50-142c-583c-a0b5-e0d671b61e40";
-                let state = start_direct_session_async(
-                    &async_db,
-                    project,
-                    session_id,
-                    "async active drop",
-                    "wake idle tui worker on task drop",
-                    None,
-                )
-                .await;
-                let leader_id = state.leader_id.clone().expect("leader id");
-                let worker_session_id = "async-active-drop-worker";
-                let signal_dir = runtime::runtime_for_name("codex")
-                    .expect("codex runtime")
-                    .signal_dir(project, worker_session_id);
-                let script = write_idle_signal_script(
-                    project,
-                    &signal_dir,
-                    worker_session_id,
-                    session_id,
-                    IdleSignalScriptBehavior::AckOnWake,
-                );
-
-                let snapshot = manager
-                    .start(
-                        session_id,
-                        &AgentTuiStartRequest {
-                            runtime: "codex".into(),
-                            role: SessionRole::Worker,
-                            fallback_role: None,
-                            capabilities: vec![],
-                            name: Some("idle worker".into()),
-                            prompt: None,
-                            project_dir: Some(project.to_string_lossy().into()),
-                            argv: vec!["sh".into(), script.path().to_string_lossy().into_owned()],
-                            rows: 5,
-                            cols: 40,
-                            persona: None,
-                            task_id: None,
-                            board_item_id: None,
-                            workflow_execution_id: None,
-                            model: None,
-                            effort: None,
-                            allow_custom_model: false,
-                        },
-                    )
-                    .expect("start agent tui");
-                manager
-                    .signal_ready(&snapshot.tui_id)
-                    .expect("signal ready");
-                script.wait_until_ready();
-
-                let joined = join_session_direct_async(
-                    session_id,
-                    &crate::daemon::protocol::SessionJoinRequest {
-                        runtime: "codex".into(),
-                        role: SessionRole::Worker,
-                        fallback_role: None,
-                        capabilities: vec![
-                            "agent-tui".into(),
-                            format!("agent-tui:{}", snapshot.tui_id),
-                        ],
-                        name: Some("idle worker".into()),
-                        project_dir: project.to_string_lossy().into(),
-                        persona: None,
-                    },
-                    &async_db,
-                )
-                .await
-                .expect("join session");
-                let worker_id = joined
-                    .agents
-                    .values()
-                    .find(|agent| agent.role == SessionRole::Worker)
-                    .expect("worker agent")
-                    .agent_id
-                    .clone();
-
-                let created = create_task_async(
-                    session_id,
-                    &TaskCreateRequest {
-                        actor: leader_id.clone(),
-                        title: "actively delivered task".into(),
-                        context: Some("deliver immediately via async daemon path".into()),
-                        severity: crate::session::types::TaskSeverity::Medium,
-                        suggested_fix: None,
-                    },
-                    &async_db,
-                )
-                .await
-                .expect("create task");
-                let task_id = created.tasks[0].task_id.clone();
-
-                let dropped = drop_task_async(
-                    session_id,
-                    &task_id,
-                    &TaskDropRequest {
-                        actor: leader_id,
-                        target: crate::daemon::protocol::TaskDropTarget::Agent {
-                            agent_id: worker_id.clone(),
-                        },
-                        queue_policy: crate::session::types::TaskQueuePolicy::Locked,
-                        reason: None,
-                    },
-                    &async_db,
-                    crate::daemon::service::WakeDispatch::new(Some(&manager), None),
-                )
-                .await;
-                manager.stop(&snapshot.tui_id).expect("stop agent tui");
-                let dropped = dropped.expect("drop task");
-
-                let task = dropped
-                    .tasks
-                    .iter()
-                    .find(|task| task.task_id == task_id)
-                    .expect("dropped task");
-                assert_eq!(task.status, crate::session::types::TaskStatus::InProgress);
-                assert_eq!(task.assigned_to.as_deref(), Some(worker_id.as_str()));
-
-                let action_hint = format!("task:{task_id}");
-                let signal = dropped
-                    .signals
-                    .iter()
-                    .find(|signal| {
-                        signal.agent_id == worker_id
-                            && signal.signal.payload.action_hint.as_deref()
-                                == Some(action_hint.as_str())
-                    })
-                    .expect("delivered signal");
-                assert_eq!(signal.status, SessionSignalStatus::Delivered);
-                assert_eq!(
-                    signal.acknowledgment.as_ref().map(|ack| ack.result),
-                    Some(AckResult::Accepted)
-                );
+                let fixture = active_delivery_start_idle_worker(project).await;
+                active_delivery_create_and_drop_task_and_assert(fixture).await;
             });
         });
     });
