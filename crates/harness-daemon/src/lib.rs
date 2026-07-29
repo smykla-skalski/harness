@@ -20,8 +20,20 @@ pub(crate) mod github_api {
 pub mod hooks;
 pub mod infra;
 pub mod observe;
-#[path = "../../../src/reviews/mod.rs"]
-pub mod reviews;
+pub mod reviews {
+    pub use harness_reviews::*;
+    // These four groups sit in `harness_reviews`'s own submodules rather
+    // than its crate root, unlike everything the glob above already
+    // reaches; root's own `src/reviews/mod.rs` facade re-exports the same
+    // four for the same reason (there restricted to `pub(crate)`, which this
+    // crate's exclusively-internal `crate::daemon` consumer has no need of).
+    pub use harness_reviews::files::local_clone::{
+        LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
+    };
+    pub use harness_reviews::files::preview_from_patch;
+    pub use harness_reviews::files::viewed::{ViewedMutation, classify_outcome};
+    pub use harness_reviews::github::ReviewsGitHubClient;
+}
 pub use harness_workspace::sandbox;
 pub mod session;
 pub mod setup;
