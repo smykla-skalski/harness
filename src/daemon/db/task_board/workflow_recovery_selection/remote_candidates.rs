@@ -9,7 +9,7 @@ use crate::task_board::TaskBoardWorkflowExecutionRecord;
 
 const REMOTE_CANDIDATE_QUEUE: &str = "remote_target_candidates";
 const REMOTE_CANDIDATE_COUNT: &str = "SELECT COUNT(*) FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'pr_fix_review', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state = 'preparing'
       AND json_type(resource_ownership_json,
@@ -23,7 +23,7 @@ const REMOTE_CANDIDATE_COUNT: &str = "SELECT COUNT(*) FROM task_board_workflow_e
             AND remote.state IN ('offered', 'claimed', 'started', 'running', 'unknown')
       )";
 const SELECT_REMOTE_CANONICAL: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'pr_fix_review', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state = 'preparing'
       AND json_type(resource_ownership_json,
@@ -38,7 +38,7 @@ const SELECT_REMOTE_CANONICAL: &str = "SELECT * FROM task_board_workflow_executi
       )
     ORDER BY updated_at, execution_id LIMIT ?1";
 const SELECT_REMOTE_AFTER_CURSOR: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'pr_fix_review', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state = 'preparing'
       AND json_type(resource_ownership_json,
@@ -54,7 +54,7 @@ const SELECT_REMOTE_AFTER_CURSOR: &str = "SELECT * FROM task_board_workflow_exec
       AND (updated_at > ?1 OR (updated_at = ?1 AND execution_id > ?2))
     ORDER BY updated_at, execution_id LIMIT ?3";
 const SELECT_REMOTE_THROUGH_CURSOR: &str = "SELECT * FROM task_board_workflow_executions
-    WHERE workflow_kind IN ('default_task', 'pr_fix', 'review', 'pr_review')
+    WHERE workflow_kind IN ('default_task', 'pr_fix', 'pr_fix_review', 'review', 'pr_review')
       AND completed_at IS NULL
       AND state = 'preparing'
       AND json_type(resource_ownership_json,
