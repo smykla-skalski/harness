@@ -7,6 +7,8 @@ mod admission_reservations;
 pub(super) use admission_lifecycle::release_managed_worker_admission_in_tx;
 mod aggregates;
 mod automation_cancel_targets;
+mod dispatch_admission_queries;
+mod dispatch_admission_tx_ext;
 mod dispatch_intents;
 mod dispatch_preparation_claim;
 mod dispatch_preparations;

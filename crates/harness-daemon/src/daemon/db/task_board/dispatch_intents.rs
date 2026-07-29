@@ -5,6 +5,7 @@ use self::completion::{
     apply_dispatch_completion_in_tx, screen_dispatch_completion_in_tx, settle_dispatch_intent_in_tx,
 };
 use super::ITEMS_CHANGE_SCOPE;
+use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_workflow_start::validate_pending_dispatch;
 use super::items::{bump_change_in_tx, load_item_in_tx};
 use super::lane_order::{
@@ -139,10 +140,6 @@ pub(crate) struct ClaimedTaskBoardDispatch {
 
 impl AsyncDaemonDb {
     /// Atomically link a Task Board item to its created task and enqueue worker startup.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "dispatch linking must keep item mutation and intent enqueue atomic"
-    )]
     pub(crate) async fn link_and_enqueue_task_board_dispatch(
         &self,
         board_item_id: &str,
@@ -150,64 +147,14 @@ impl AsyncDaemonDb {
         work_item_id: &str,
         lifecycle: &DispatchLifecycle,
     ) -> Result<DispatchAppliedTask, CliError> {
-        io::validate_safe_segment(board_item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch enqueue")
-            .await?;
-        if let Some(existing) = active_intent_payload(&mut transaction, board_item_id).await? {
-            let applied = ensure_dispatch_linkage(
-                decode_applied(&existing)?,
-                board_item_id,
-                session_id,
-                work_item_id,
-            )?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit existing task board dispatch intent: {error}"
-                ))
-            })?;
-            return Ok(applied);
-        }
-        let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
-        let before = item.clone();
-        if item.workflow.execution_id.is_none() {
-            item.workflow.execution_id = Some(new_workflow_execution_id());
-        }
-        item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some("dispatch".to_string());
-        item.workflow.attempts = item.workflow.attempts.saturating_add(1);
-        item.workflow.push_policy_trace_id(new_policy_trace_id());
-        item.status = TaskBoardStatus::InProgress;
-        item.session_id = Some(session_id.to_string());
-        item.work_item_id = Some(work_item_id.to_string());
-        item.updated_at = utc_now();
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            LaneTransitionKind::Generic,
+        <Self as DispatchAdmissionQueries>::link_and_enqueue_task_board_dispatch(
+            self,
+            board_item_id,
+            session_id,
+            work_item_id,
+            lifecycle,
         )
-        .await?;
-        let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
-        let applied = DispatchAppliedTask {
-            board_item_id: board_item_id.to_string(),
-            session_id: session_id.to_string(),
-            work_item_id: work_item_id.to_string(),
-            lifecycle: lifecycle.clone(),
-            item: write.item,
-            read_only_workflow: None,
-            write_workflow: None,
-        };
-        insert_intent(&mut transaction, &applied).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board dispatch enqueue: {error}")))?;
-        Ok(applied)
+        .await
     }
 
     /// Claim one pending or lease-expired worker startup for an item.
@@ -215,61 +162,14 @@ impl AsyncDaemonDb {
         &self,
         board_item_id: &str,
     ) -> Result<Option<ClaimedTaskBoardDispatch>, CliError> {
-        io::validate_safe_segment(board_item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch claim")
-            .await?;
-        let Some(pending) = load_pending_dispatch_claim(&mut transaction, board_item_id).await?
-        else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit empty task board dispatch claim: {error}"))
-            })?;
-            return Ok(None);
-        };
-        let applied = decode_applied(&pending.payload_json)?;
-        let (mut transaction, action) =
-            resolve_dispatch_claim_action_in_tx(transaction, board_item_id, &pending, &applied)
-                .await?;
-        let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
-        let changed =
-            claim_task_board_dispatch_intent_in_tx(&mut transaction, &pending, &claim_token)
-                .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board dispatch claim: {error}")))?;
-        if changed == 0 {
-            return Ok(None);
-        }
-        Ok(Some(ClaimedTaskBoardDispatch {
-            intent_id: pending.intent_id,
-            claim_token,
-            applied,
-            consumed_approval_grant_id: pending.consumed_approval_grant_id,
-            action,
-        }))
+        <Self as DispatchAdmissionQueries>::claim_task_board_dispatch(self, board_item_id).await
     }
 
     /// Claim the next pending worker startup, including lease-expired work after restart.
     pub(crate) async fn claim_next_task_board_dispatch(
         &self,
     ) -> Result<Option<ClaimedTaskBoardDispatch>, CliError> {
-        let item_id = query_as::<_, (String,)>(
-            "SELECT item_id FROM task_board_dispatch_intents
-             WHERE status = 'pending'
-                OR (status = 'starting'
-                    AND datetime(claimed_at) <= datetime('now', ?1))
-             ORDER BY created_at, intent_id LIMIT 1",
-        )
-        .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| db_error(format!("load next task board dispatch: {error}")))?
-        .map(|row| row.0);
-        match item_id {
-            Some(item_id) => self.claim_task_board_dispatch(&item_id).await,
-            None => Ok(None),
-        }
+        <Self as DispatchAdmissionQueries>::claim_next_task_board_dispatch(self).await
     }
 
     pub(crate) async fn complete_task_board_dispatch(
@@ -278,20 +178,169 @@ impl AsyncDaemonDb {
         claim_token: &str,
         managed_worker_id: &str,
     ) -> Result<TaskBoardItem, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board dispatch completion")
-            .await?;
-        let screened =
-            screen_dispatch_completion_in_tx(&mut transaction, intent_id, claim_token).await?;
-        let item = apply_dispatch_completion_in_tx(&mut transaction, *screened, intent_id).await?;
-        settle_dispatch_intent_in_tx(&mut transaction, intent_id, claim_token, managed_worker_id)
-            .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board dispatch completion: {error}")))?;
-        Ok(item)
+        <Self as DispatchAdmissionQueries>::complete_task_board_dispatch(
+            self,
+            intent_id,
+            claim_token,
+            managed_worker_id,
+        )
+        .await
     }
+}
+
+/// Real implementations behind the matching [`DispatchAdmissionQueries`]
+/// methods, called from the single consolidated trait impl in
+/// `dispatch_admission_queries.rs` (a trait's methods can only be implemented
+/// in one `impl` block per type, so the per-area files hand it plain
+/// functions instead of each declaring their own `impl DispatchAdmissionQueries
+/// for AsyncDaemonDb`).
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "dispatch linking must keep item mutation and intent enqueue atomic"
+)]
+pub(super) async fn link_and_enqueue_task_board_dispatch(
+    db: &AsyncDaemonDb,
+    board_item_id: &str,
+    session_id: &str,
+    work_item_id: &str,
+    lifecycle: &DispatchLifecycle,
+) -> Result<DispatchAppliedTask, CliError> {
+    io::validate_safe_segment(board_item_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board dispatch enqueue")
+        .await?;
+    if let Some(existing) = active_intent_payload(&mut transaction, board_item_id).await? {
+        let applied = ensure_dispatch_linkage(
+            decode_applied(&existing)?,
+            board_item_id,
+            session_id,
+            work_item_id,
+        )?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit existing task board dispatch intent: {error}"
+            ))
+        })?;
+        return Ok(applied);
+    }
+    let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
+    let before = item.clone();
+    if item.workflow.execution_id.is_none() {
+        item.workflow.execution_id = Some(new_workflow_execution_id());
+    }
+    item.workflow.status = TaskBoardWorkflowStatus::Running;
+    item.workflow.current_step_id = Some("dispatch".to_string());
+    item.workflow.attempts = item.workflow.attempts.saturating_add(1);
+    item.workflow.push_policy_trace_id(new_policy_trace_id());
+    item.status = TaskBoardStatus::InProgress;
+    item.session_id = Some(session_id.to_string());
+    item.work_item_id = Some(work_item_id.to_string());
+    item.updated_at = utc_now();
+    let write = replace_with_lane_transition_in_tx(
+        &mut transaction,
+        before,
+        revision,
+        item,
+        LaneTransitionKind::Generic,
+    )
+    .await?;
+    let change_sequence = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
+    let applied = DispatchAppliedTask {
+        board_item_id: board_item_id.to_string(),
+        session_id: session_id.to_string(),
+        work_item_id: work_item_id.to_string(),
+        lifecycle: lifecycle.clone(),
+        item: write.item,
+        read_only_workflow: None,
+        write_workflow: None,
+    };
+    insert_intent(&mut transaction, &applied).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board dispatch enqueue: {error}")))?;
+    Ok(applied)
+}
+
+pub(super) async fn claim_task_board_dispatch(
+    db: &AsyncDaemonDb,
+    board_item_id: &str,
+) -> Result<Option<ClaimedTaskBoardDispatch>, CliError> {
+    io::validate_safe_segment(board_item_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board dispatch claim")
+        .await?;
+    let Some(pending) = load_pending_dispatch_claim(&mut transaction, board_item_id).await? else {
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit empty task board dispatch claim: {error}"))
+        })?;
+        return Ok(None);
+    };
+    let applied = decode_applied(&pending.payload_json)?;
+    let (mut transaction, action) =
+        resolve_dispatch_claim_action_in_tx(transaction, board_item_id, &pending, &applied)
+            .await?;
+    let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
+    let changed = claim_task_board_dispatch_intent_in_tx(&mut transaction, &pending, &claim_token)
+        .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board dispatch claim: {error}")))?;
+    if changed == 0 {
+        return Ok(None);
+    }
+    Ok(Some(ClaimedTaskBoardDispatch {
+        intent_id: pending.intent_id,
+        claim_token,
+        applied,
+        consumed_approval_grant_id: pending.consumed_approval_grant_id,
+        action,
+    }))
+}
+
+pub(super) async fn claim_next_task_board_dispatch(
+    db: &AsyncDaemonDb,
+) -> Result<Option<ClaimedTaskBoardDispatch>, CliError> {
+    let item_id = query_as::<_, (String,)>(
+        "SELECT item_id FROM task_board_dispatch_intents
+             WHERE status = 'pending'
+                OR (status = 'starting'
+                    AND datetime(claimed_at) <= datetime('now', ?1))
+             ORDER BY created_at, intent_id LIMIT 1",
+    )
+    .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
+    .fetch_optional(db.pool())
+    .await
+    .map_err(|error| db_error(format!("load next task board dispatch: {error}")))?
+    .map(|row| row.0);
+    match item_id {
+        Some(item_id) => claim_task_board_dispatch(db, &item_id).await,
+        None => Ok(None),
+    }
+}
+
+pub(super) async fn complete_task_board_dispatch(
+    db: &AsyncDaemonDb,
+    intent_id: &str,
+    claim_token: &str,
+    managed_worker_id: &str,
+) -> Result<TaskBoardItem, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board dispatch completion")
+        .await?;
+    let screened = screen_dispatch_completion_in_tx(&mut transaction, intent_id, claim_token).await?;
+    let item = apply_dispatch_completion_in_tx(&mut transaction, *screened, intent_id).await?;
+    settle_dispatch_intent_in_tx(&mut transaction, intent_id, claim_token, managed_worker_id)
+        .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board dispatch completion: {error}")))?;
+    Ok(item)
 }
 
 #[path = "dispatch_intents_completion.rs"]

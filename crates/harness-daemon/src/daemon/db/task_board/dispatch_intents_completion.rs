@@ -6,9 +6,7 @@
 use sqlx::{Sqlite, Transaction, query};
 
 use super::super::ITEMS_CHANGE_SCOPE;
-use super::super::admission_lifecycle::{
-    commit_dispatch_admission_in_tx, validate_worker_start_fence_in_tx,
-};
+use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::dispatch_workflow_start::{
     insert_started_workflow_in_tx, load_claimed_applied, workflow_start_fence,
 };
@@ -16,7 +14,7 @@ use super::super::items::{bump_change_in_tx, load_item_in_tx};
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
-use super::{claimed_intent_identity, ensure_dispatch_item_startable};
+use super::ensure_dispatch_item_startable;
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::{DispatchAppliedTask, TaskBoardItem, TaskBoardWorkflowStatus};
 
@@ -36,8 +34,9 @@ pub(super) async fn screen_dispatch_completion_in_tx(
     intent_id: &str,
     claim_token: &str,
 ) -> Result<Box<ScreenedDispatchCompletion>, CliError> {
-    let (item_id, session_id, work_item_id, execution_id) =
-        claimed_intent_identity(transaction, intent_id, claim_token).await?;
+    let (item_id, session_id, work_item_id, execution_id) = transaction
+        .dispatch_claimed_intent_identity_in_tx(intent_id, claim_token)
+        .await?;
     let applied = load_claimed_applied(transaction, intent_id, claim_token).await?;
     let (item, revision) = load_item_in_tx(transaction, &item_id)
         .await?
@@ -67,12 +66,12 @@ async fn validate_dispatch_start_fence_in_tx(
     revision: i64,
 ) -> Result<(), CliError> {
     if let Some((prepared_item_revision, configuration_revision)) = workflow_start_fence(applied)? {
-        validate_worker_start_fence_in_tx(
-            transaction,
-            Some((prepared_item_revision, configuration_revision)),
-            revision,
-        )
-        .await?;
+        transaction
+            .validate_worker_start_fence_in_tx(
+                Some((prepared_item_revision, configuration_revision)),
+                revision,
+            )
+            .await?;
     }
     Ok(())
 }
@@ -137,5 +136,7 @@ pub(super) async fn settle_dispatch_intent_in_tx(
             "task board dispatch intent '{intent_id}' is not claimed"
         )));
     }
-    commit_dispatch_admission_in_tx(transaction, intent_id, managed_worker_id).await
+    transaction
+        .commit_dispatch_admission_in_tx(intent_id, managed_worker_id)
+        .await
 }

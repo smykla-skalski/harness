@@ -2,7 +2,9 @@ use sqlx::{Sqlite, SqliteConnection, Transaction, query, query_as};
 use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
-use super::admission_lifecycle::{TaskBoardAdmissionCheck, revalidate_dispatch_admission_in_tx};
+use super::admission_lifecycle::TaskBoardAdmissionCheck;
+use super::dispatch_admission_queries::DispatchAdmissionQueries;
+use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::dispatch_intents::{
     ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction, decode_applied,
     ensure_dispatch_item_startable,
@@ -18,12 +20,10 @@ use crate::daemon::db::policy::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
-use crate::infra::io;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
-    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches,
-    TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary, TaskBoardItem, consumed_grant_id,
-    dispatch_policy_from_graph,
+    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches, TaskBoardHeldDispatchSummary,
+    TaskBoardItem, consumed_grant_id, dispatch_policy_from_graph,
 };
 
 #[derive(Debug)]
@@ -51,49 +51,14 @@ impl AsyncDaemonDb {
     pub(crate) async fn held_task_board_dispatch_summary(
         &self,
     ) -> Result<TaskBoardHeldDispatchSummary, CliError> {
-        let rows = query_as::<_, (String, String, String, String)>(
-            "SELECT intent_id, item_id, session_id, work_item_id
-             FROM task_board_dispatch_intents WHERE status = 'held'
-             ORDER BY created_at, intent_id",
-        )
-        .fetch_all(self.pool())
-        .await
-        .map_err(|error| db_error(format!("list held task board dispatches: {error}")))?;
-        let items = rows
-            .into_iter()
-            .map(
-                |(intent_id, board_item_id, session_id, work_item_id)| TaskBoardHeldDispatchItem {
-                    intent_id,
-                    board_item_id,
-                    session_id,
-                    work_item_id,
-                },
-            )
-            .collect::<Vec<_>>();
-        Ok(TaskBoardHeldDispatchSummary {
-            count: items.len(),
-            items,
-        })
+        <Self as DispatchAdmissionQueries>::held_task_board_dispatch_summary(self).await
     }
 
     pub(crate) async fn held_task_board_dispatch(
         &self,
         board_item_id: &str,
     ) -> Result<HeldTaskBoardDispatch, CliError> {
-        io::validate_safe_segment(board_item_id)?;
-        let row = query_as::<_, (String, String)>(
-            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status = 'held'",
-        )
-        .bind(board_item_id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| db_error(format!("load held task board dispatch: {error}")))?
-        .ok_or_else(|| held_conflict(board_item_id))?;
-        Ok(HeldTaskBoardDispatch {
-            intent_id: row.0,
-            applied: decode_applied(&row.1)?,
-        })
+        <Self as DispatchAdmissionQueries>::held_task_board_dispatch(self, board_item_id).await
     }
 
     /// Atomically re-evaluate current spawn policy, consume any one-shot grant,
@@ -102,26 +67,15 @@ impl AsyncDaemonDb {
         &self,
         board_item_id: &str,
     ) -> Result<ClaimedHeldTaskBoardDispatch, CliError> {
-        io::validate_safe_segment(board_item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board held dispatch delivery")
-            .await?;
-        // Both arms must stay boxed. Awaited inline they fold their frames into
-        // this future, which the websocket dispatcher, the HTTP task-board
-        // operations and the route executor all await; that pushes those three
-        // and this function past the 16384-byte threshold of
-        // `clippy::large_futures`, which is denied here. `cargo check` will not
-        // tell you, because the limit is a lint rather than a compile error.
-        match Box::pin(prepare_held_claim_in_tx(&mut transaction, board_item_id)).await? {
-            HeldClaimPreparation::Refused { context, message } => {
-                Err(commit_held_refusal(transaction, context, message).await)
-            }
-            HeldClaimPreparation::Ready(prepared) => {
-                Box::pin(deliver_held_claim(transaction, *prepared)).await
-            }
-        }
+        <Self as DispatchAdmissionQueries>::claim_held_task_board_dispatch(self, board_item_id).await
     }
 }
+
+// Real implementations behind the matching `DispatchAdmissionQueries` methods
+// live in `queries` (split into its own file to keep this one under the repo's
+// line budget), not here or in `dispatch_admission_queries.rs` itself.
+#[path = "held_dispatch_queries.rs"]
+pub(in crate::daemon::db::task_board) mod queries;
 
 /// Whether a held claim may proceed, or which refusal it settled on.
 enum HeldClaimPreparation {
@@ -153,13 +107,9 @@ async fn prepare_held_claim_in_tx(
     board_item_id: &str,
 ) -> Result<HeldClaimPreparation, CliError> {
     let state = load_held_claim_state_in_tx(transaction, board_item_id).await?;
-    if let TaskBoardAdmissionCheck::Blocked(admission) = revalidate_dispatch_admission_in_tx(
-        transaction,
-        &state.intent_id,
-        &state.item,
-        state.revision,
-    )
-    .await?
+    if let TaskBoardAdmissionCheck::Blocked(admission) = transaction
+        .revalidate_dispatch_admission_in_tx(&state.intent_id, &state.item, state.revision)
+        .await?
     {
         return Ok(HeldClaimPreparation::Refused {
             context: "refused held task board admission",
