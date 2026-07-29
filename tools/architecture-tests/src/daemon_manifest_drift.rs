@@ -1,16 +1,16 @@
-//! `crates/harness-daemon/src/lib.rs` still compiles two root `src/` trees
-//! directly through `#[path]` (`daemon`, `task_board`) instead of depending
-//! on a crate for them. The root crate and `harness-daemon` each declare
-//! their own dependencies and features for that same source, and nothing
-//! keeps the two manifests in step: a change under one of these trees that
-//! starts needing a new crate or feature builds cleanly in whichever crate
-//! its author is testing and leaves the other broken, discovered later by
-//! someone on an unrelated branch.
+//! `crates/harness-daemon/src/lib.rs` still compiles one root `src/` tree
+//! directly through `#[path]` (`daemon`) instead of depending on a crate for
+//! it. The root crate and `harness-daemon` each declare their own
+//! dependencies and features for that same source, and nothing keeps the
+//! two manifests in step: a change under this tree that starts needing a
+//! new crate or feature builds cleanly in whichever crate its author is
+//! testing and leaves the other broken, discovered later by someone on an
+//! unrelated branch.
 //!
-//! This check only watches the two trees above. Everything that used to be
-//! `#[path]`-mirrored alongside them (`feature_flags`, `reviews`) already
-//! moved to a real crate dependency, where `cargo` itself keeps the
-//! manifests honest.
+//! This check only watches the tree above. Everything that used to be
+//! `#[path]`-mirrored alongside it (`feature_flags.rs`, `reviews`, then
+//! `task_board`) already moved to a real crate dependency, where `cargo`
+//! itself keeps the manifests honest.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use super::helpers::repo_root;
 
-const MIRRORED_ROOTS: &[&str] = &["src/daemon", "src/task_board"];
+const MIRRORED_ROOTS: &[&str] = &["src/daemon"];
 const ROOT_MANIFEST: &str = "Cargo.toml";
 const DAEMON_MANIFEST: &str = "crates/harness-daemon/Cargo.toml";
 

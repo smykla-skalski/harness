@@ -1,18 +1,13 @@
 use super::helpers::{collect_hits_in_paths, collect_hits_in_tree, repo_root};
 
-const LEGACY_FILE_REPOSITORIES: &[(&str, &str)] = &[(
-    "src/task_board/orchestrator.rs",
-    "pub struct TaskBoardOrchestrator",
-)];
-
-/// `store.rs`/`machines.rs`, and now the `policy_runtime` repositories below,
-/// moved into `harness-task-board`, which cannot share the root crate's
-/// `cfg(test)` activation domain: the root crate's own `#[cfg(test)]` call
-/// sites (e.g. `daemon::service::task_board::store()`) need `TaskBoardStore`
-/// visible when the *root* crate is under test, which a dependency crate's
-/// own `cfg(test)` never is. `test-support` is that crate's escape hatch for
-/// exactly this, matching `harness-agents`'s and `harness-daemon-client`'s
-/// own feature of the same name.
+/// `store.rs`/`machines.rs`, `orchestrator.rs`, and the `policy_runtime`
+/// repositories below all moved into `harness-task-board`, which cannot
+/// share the root crate's `cfg(test)` activation domain: the root crate's
+/// own `#[cfg(test)]` call sites (e.g. `daemon::service::task_board::store()`)
+/// need `TaskBoardStore` visible when the *root* crate is under test, which a
+/// dependency crate's own `cfg(test)` never is. `test-support` is that
+/// crate's escape hatch for exactly this, matching `harness-agents`'s and
+/// `harness-daemon-client`'s own feature of the same name.
 const LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD: &[(&str, &str)] = &[
     (
         "crates/harness-task-board/src/store.rs",
@@ -21,6 +16,10 @@ const LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD: &[(&str, &str)] = &[
     (
         "crates/harness-task-board/src/machines.rs",
         "pub struct MachineRegistry",
+    ),
+    (
+        "crates/harness-task-board/src/orchestrator.rs",
+        "pub struct TaskBoardOrchestrator",
     ),
     (
         "crates/harness-task-board/src/policy_runtime/repository.rs",
@@ -141,15 +140,6 @@ fn live_task_board_consumers_do_not_reopen_legacy_storage() {
 #[test]
 fn legacy_task_board_file_repositories_are_test_only() {
     let root = repo_root();
-    for (relative_path, declaration) in LEGACY_FILE_REPOSITORIES {
-        let source = std::fs::read_to_string(root.join(relative_path))
-            .unwrap_or_else(|error| panic!("read {relative_path}: {error}"));
-        let test_only_declaration = format!("#[cfg(test)]\n{declaration}");
-        assert!(
-            source.contains(&test_only_declaration),
-            "{relative_path} must keep `{declaration}` test-only"
-        );
-    }
     for (relative_path, declaration) in LEGACY_FILE_REPOSITORIES_IN_HARNESS_TASK_BOARD {
         let source = std::fs::read_to_string(root.join(relative_path))
             .unwrap_or_else(|error| panic!("read {relative_path}: {error}"));
