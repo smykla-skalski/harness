@@ -240,6 +240,7 @@ mod observe_loop;
 mod observe_persistence;
 mod observe_stream;
 mod openrouter_models;
+mod openrouter_readiness;
 mod read_reconciliation;
 mod resolved_events;
 mod review_mutations;
@@ -462,7 +463,10 @@ pub use task_board_working_copies::{
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 
-pub(crate) use headless_readiness::{HeadlessReadinessInputs, build_headless_readiness_report};
+pub(crate) use headless_readiness::{
+    CredentialAssessment, HeadlessReadinessInputs, RuntimeProbe, build_headless_readiness_report,
+};
+pub(crate) use openrouter_readiness::{OpenRouterCredential, probe_openrouter_readiness};
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
 pub(crate) use observe_persistence::{

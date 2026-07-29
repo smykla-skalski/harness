@@ -10,7 +10,7 @@ use utoipa_axum::routes;
 
 use axum::extract::Query;
 
-use crate::daemon::acp_probe::probe_acp_agents_cached;
+use crate::daemon::acp_probe::cached_probe_snapshot;
 use crate::daemon::protocol::{
     DaemonTelemetryRequest, HeadlessReadinessReport, HeadlessReadinessRequest, ReadinessResponse,
     RuntimeSessionResolutionResponse, http_paths,
@@ -169,14 +169,20 @@ pub(super) async fn post_headless_readiness(
             CliErrorKind::workflow_io(format!("headless readiness bridge task failed: {error}"))
         })??;
         let orchestrator = orchestrator?;
+        let probe_snapshot = cached_probe_snapshot();
+        let runtime_probe = probe_snapshot.as_ref().map_or(
+            service::RuntimeProbe::Pending,
+            service::RuntimeProbe::Ready,
+        );
+        let (credential, model_available) = assess_headless_provider(&request).await;
         Ok(service::build_headless_readiness_report(
             &service::HeadlessReadinessInputs {
                 request: &request,
                 daemon_version: &state.manifest.version,
                 bridge: &bridge,
-                runtime_probe: &probe_acp_agents_cached(),
-                openrouter_configured: crate::daemon::state::task_board_openrouter_token()
-                    .is_some(),
+                runtime_probe,
+                credential,
+                model_available,
                 orchestrator_active: orchestrator.enabled && orchestrator.running,
             },
         ))
@@ -189,6 +195,35 @@ pub(super) async fn post_headless_readiness(
         start,
         result,
     )
+}
+
+/// Resolve the credential and model prerequisites against the live provider so
+/// the report reflects acceptance and offered models rather than mere presence
+/// or static catalog membership. Non-`OpenRouter` runtimes need no credential and
+/// fall back to the static catalog, which is the only signal available for them.
+async fn assess_headless_provider(
+    request: &HeadlessReadinessRequest,
+) -> (service::CredentialAssessment, bool) {
+    let static_model_ok =
+        crate::agents::runtime::models::validate_model(&request.runtime, &request.model).is_ok();
+    if request.runtime != "openrouter" {
+        return (service::CredentialAssessment::NotRequired, static_model_ok);
+    }
+    let Some(token) = crate::daemon::state::task_board_openrouter_token() else {
+        return (service::CredentialAssessment::Missing, static_model_ok);
+    };
+    let readiness = service::probe_openrouter_readiness(&token, &request.model).await;
+    let credential = match readiness.credential {
+        service::OpenRouterCredential::Accepted => service::CredentialAssessment::Accepted,
+        service::OpenRouterCredential::Rejected(detail) => {
+            service::CredentialAssessment::Rejected(detail)
+        }
+        service::OpenRouterCredential::Unverified(detail) => {
+            service::CredentialAssessment::Unverified(detail)
+        }
+    };
+    let model_available = readiness.model_available.unwrap_or(static_model_ok);
+    (credential, model_available)
 }
 
 #[utoipa::path(
