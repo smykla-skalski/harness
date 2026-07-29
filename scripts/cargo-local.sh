@@ -197,9 +197,10 @@ configure_sccache_socket() {
 
   # Every server enforces its own size limit over the same on-disk cache, so
   # keying the socket per checkout put several of them in an eviction fight.
-  # The repository plus its basedir inventory gives every current worktree one
-  # server while letting an old inventory drain after worktrees change.
-  socket_id="$(short_hash "$COMMON_REPO_ROOT:${SCCACHE_BASEDIRS:-}")"
+  # The repository, compiler-cache version, and basedir inventory give every
+  # current worktree one server while letting an old configuration drain after
+  # the binary version or registered worktrees change.
+  socket_id="$(short_hash "$COMMON_REPO_ROOT:${SCCACHE_VERSION:-}:${SCCACHE_BASEDIRS:-}")"
   export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
   export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-1800}"
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"

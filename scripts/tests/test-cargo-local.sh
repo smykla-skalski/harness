@@ -1500,7 +1500,7 @@ scenario_sccache_socket_is_shared_across_checkouts() {
   local common_root="$base/main"
   local explicit_target="$base/explicit-target"
   local co out a_sock="" b_sock="" a_target="" b_target=""
-  local a_bases="" b_bases="" explicit_bases="" expected_bases=""
+  local a_bases="" b_bases="" explicit_bases="" expected_bases="" version_socket=""
   mkdir -p "$fake_bin" "$common_root/.git"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
   cat >"$fake_bin/git" <<EOF
@@ -1557,7 +1557,7 @@ EOF
     fi
   done
 
-  expected_bases="$common_root:$base/alpha:$base/beta:$common_root/target/dev/local-v2:$a_target:$b_target"
+  expected_bases="$common_root:$base/alpha:$base/beta:$common_root/target/dev/$(cargo_lane_main_segment):$a_target:$b_target"
   if [[ -n "$a_sock" ]] \
     && [[ "$a_target" != "$b_target" ]] \
     && [[ "$a_sock" == "$b_sock" ]] \
@@ -1566,6 +1566,25 @@ EOF
     pass "one sccache server normalizes every checkout and target lane"
   else
     fail "sccache sharing drifted: sockets=$a_sock,$b_sock targets=$a_target,$b_target basedirs=$a_bases,$b_bases"
+  fi
+
+  write_fake_sccache "$fake_bin/sccache" "0.17.0"
+  version_socket="$(
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$base/alpha/scripts/cargo-local.sh" --print-env \
+      | awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }'
+  )"
+  if [[ -n "$version_socket" ]] && [[ "$version_socket" != "$a_sock" ]]; then
+    pass "an sccache version change rotates the shared server socket"
+  else
+    fail "sccache version change kept the old server socket: $a_sock"
   fi
 
   explicit_bases="$(
