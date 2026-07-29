@@ -26,6 +26,7 @@ mod file_comment {
 pub(crate) mod files {
     pub use harness_reviews::files::*;
 }
+#[cfg(feature = "daemon-runtime")]
 mod github {
     pub use harness_reviews::github::*;
 }
@@ -55,6 +56,7 @@ pub use enums::{
 pub use file_comment::{
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
 };
+#[cfg(feature = "daemon-runtime")]
 pub(crate) use files::local_clone::{
     LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
     local_clone_list_entry_from_registry,

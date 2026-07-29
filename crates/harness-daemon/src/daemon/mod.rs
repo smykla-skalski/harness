@@ -16,8 +16,11 @@
 //! HARNESS_SANDBOXED=1 harness-daemon serve --port 0
 //! ```
 
-use std::{env, net::IpAddr};
+use std::env;
+#[cfg(feature = "daemon-runtime")]
+use std::net::IpAddr;
 
+#[cfg(feature = "daemon-runtime")]
 use ::http::Uri;
 
 /// Default app group used by Harness Monitor and local daemon discovery.
@@ -64,6 +67,7 @@ mod policy_runtime_store;
 pub mod protocol;
 #[cfg(feature = "daemon-runtime")]
 mod provider_credentials;
+#[cfg(feature = "daemon-runtime")]
 mod pull_request_action_store;
 #[cfg(feature = "daemon-runtime")]
 pub mod remote;
@@ -101,7 +105,7 @@ pub mod remote_identity;
 pub mod remote_pairing;
 #[cfg(feature = "daemon-runtime")]
 mod remote_pairing_expiry_loop;
-#[cfg(feature = "daemon-runtime")]
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) mod remote_redaction;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_request_audit;
@@ -134,6 +138,7 @@ pub mod watch;
 pub mod websocket;
 
 #[must_use]
+#[cfg(feature = "daemon-runtime")]
 pub(crate) fn is_loopback_host(host: &str) -> bool {
     let host = host.trim();
     host.eq_ignore_ascii_case("localhost")
@@ -143,6 +148,7 @@ pub(crate) fn is_loopback_host(host: &str) -> bool {
 }
 
 #[must_use]
+#[cfg(feature = "daemon-runtime")]
 pub(crate) fn is_local_websocket_endpoint(endpoint: &str) -> bool {
     let Ok(uri) = endpoint.trim().parse::<Uri>() else {
         return false;

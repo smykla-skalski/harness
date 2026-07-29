@@ -1,9 +1,12 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "daemon-runtime")]
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+#[cfg(feature = "daemon-runtime")]
 use crate::session::types::{ManagedAgentRef, SessionState};
 #[cfg(feature = "daemon-runtime")]
 use crate::workspace::project_context_dir;
@@ -24,6 +27,7 @@ pub(super) fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, Daemon
     })
 }
 
+#[cfg(feature = "daemon-runtime")]
 pub(super) struct ResolvedTuiProject {
     pub(super) project_dir: PathBuf,
     pub(super) context_root: PathBuf,
@@ -87,6 +91,7 @@ pub(super) async fn resolve_tui_project_async(
     })
 }
 
+#[cfg(feature = "daemon-runtime")]
 pub(super) fn agent_id_for_tui(state: &SessionState, tui_id: &str) -> Result<String, CliError> {
     let managed_agent = ManagedAgentRef::tui(tui_id);
     if let Some(agent_id) = state.find_session_agent_id_by_managed_agent(&managed_agent) {
@@ -123,6 +128,7 @@ pub(super) fn agent_id_for_tui(state: &SessionState, tui_id: &str) -> Result<Str
 /// separately, so a mismatch between this file and the transcript is a
 /// delivery question, not a bug in the recording.
 #[must_use]
+#[cfg(feature = "daemon-runtime")]
 pub(crate) fn recorded_prompt_path(transcript_path: &Path) -> PathBuf {
     transcript_path.with_file_name("prompt.txt")
 }
@@ -131,6 +137,7 @@ pub(crate) fn recorded_prompt_path(transcript_path: &Path) -> PathBuf {
 /// written is not a prompt-recording problem the start can shrug off -- the
 /// transcript lands in the same place, so the run would be unobservable
 /// anyway.
+#[cfg(feature = "daemon-runtime")]
 pub(super) fn record_started_prompt(transcript_path: &Path, prompt: &str) -> Result<(), CliError> {
     let path = recorded_prompt_path(transcript_path);
     if let Some(parent) = path.parent() {
@@ -144,6 +151,7 @@ pub(super) fn record_started_prompt(transcript_path: &Path, prompt: &str) -> Res
     Ok(())
 }
 
+#[cfg(feature = "daemon-runtime")]
 pub(super) fn transcript_path(context_root: &Path, runtime: &str, tui_id: &str) -> PathBuf {
     context_root
         .join("agents")
@@ -203,7 +211,7 @@ pub(super) fn persist_transcript(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod tests {
     use super::agent_id_for_tui;
     use crate::agents::runtime::RuntimeCapabilities;

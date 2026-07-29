@@ -7,6 +7,7 @@ rust-version = "1.95"
 [[bin]]
 name = "harness-daemon"
 path = "src/main.rs"
+required-features = ["daemon-runtime"]
 
 [dependencies]
 agent-client-protocol = "=2.0.0"
