@@ -89,17 +89,17 @@ struct Fixture {
 
 #[tokio::test]
 async fn terminal_transition_cancels_unclaimed_dispatches_and_fences_starting() {
-    exercise_terminal_action(TerminalAction::Complete).await;
+    Box::pin(exercise_terminal_action(TerminalAction::Complete)).await;
 }
 
 #[tokio::test]
 async fn delete_cancels_unclaimed_dispatches_and_fences_starting() {
-    exercise_terminal_action(TerminalAction::Delete).await;
+    Box::pin(exercise_terminal_action(TerminalAction::Delete)).await;
 }
 
 async fn exercise_terminal_action(action: TerminalAction) {
     for phase in IntentPhase::ALL {
-        let fixture = fixture(phase, action).await;
+        let fixture = Box::pin(fixture(phase, action)).await;
         let result = apply_action(&fixture.db, &fixture.item_id, action).await;
         if phase.is_claimed() {
             let error = result.expect_err("claimed starting dispatch must fence terminal mutation");

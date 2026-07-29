@@ -212,20 +212,23 @@ async fn dispatch_read_query_managed_agent_detail_rejects_legacy_agent_id_param(
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_returns_acp_disabled_when_feature_flag_off()
 {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-inspect-disabled".into(),
-            method: "managed_agent.acp_inspect".into(),
-            params: serde_json::json!({}),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("0"))],
+        async {
+            let state = test_http_state_with_db();
+            let request = WsRequest {
+                id: "req-acp-inspect-disabled".into(),
+                method: "managed_agent.acp_inspect".into(),
+                params: serde_json::json!({}),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        let error = response.error.expect("ACP disabled error");
-        assert_eq!(error.code, "ACP_DISABLED");
-    })
+            let error = response.error.expect("ACP disabled error");
+            assert_eq!(error.code, "ACP_DISABLED");
+        },
+    ))
     .await;
 }
 
@@ -249,152 +252,170 @@ async fn dispatch_read_query_managed_agent_acp_sessions_requires_managed_agent_i
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_sessions_returns_acp_disabled_when_feature_flag_off()
 {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("0"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-sessions-disabled".into(),
-            method: "managed_agent.acp_sessions".into(),
-            params: serde_json::json!({ "managed_agent_id": "acp-worker" }),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("0"))],
+        async {
+            let state = test_http_state_with_db();
+            let request = WsRequest {
+                id: "req-acp-sessions-disabled".into(),
+                method: "managed_agent.acp_sessions".into(),
+                params: serde_json::json!({ "managed_agent_id": "acp-worker" }),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        let error = response.error.expect("ACP disabled error");
-        assert_eq!(error.code, "ACP_DISABLED");
-    })
+            let error = response.error.expect("ACP disabled error");
+            assert_eq!(error.code, "ACP_DISABLED");
+        },
+    ))
     .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_uses_session_id_scope() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-inspect-alias".into(),
-            method: "managed_agent.acp_inspect".into(),
-            params: serde_json::json!({
-                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-            }),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("1"))],
+        async {
+            let state = test_http_state_with_db();
+            let request = WsRequest {
+                id: "req-acp-inspect-alias".into(),
+                method: "managed_agent.acp_inspect".into(),
+                params: serde_json::json!({
+                    "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        assert!(response.error.is_none());
-        let result = response.result.expect("ACP inspect response");
-        assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
-    })
+            assert!(response.error.is_none());
+            let result = response.result.expect("ACP inspect response");
+            assert_eq!(result["agents"].as_array().map(Vec::len), Some(0));
+        },
+    ))
     .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_inspect_rejects_legacy_require_session_id() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-inspect-legacy-scope".into(),
-            method: "managed_agent.acp_inspect".into(),
-            params: serde_json::json!({
-                "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-            }),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("1"))],
+        async {
+            let state = test_http_state_with_db();
+            let request = WsRequest {
+                id: "req-acp-inspect-legacy-scope".into(),
+                method: "managed_agent.acp_inspect".into(),
+                params: serde_json::json!({
+                    "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        let error = response.error.expect("invalid params error");
-        assert_eq!(error.code, "INVALID_PARAMS");
-        assert_eq!(
-            error.message,
-            "require_session_id is no longer supported; use session_id"
-        );
-    })
+            let error = response.error.expect("invalid params error");
+            assert_eq!(error.code, "INVALID_PARAMS");
+            assert_eq!(
+                error.message,
+                "require_session_id is no longer supported; use session_id"
+            );
+        },
+    ))
     .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_transcript_returns_only_acp_rows() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_async_db_timeline().await;
-        seed_sample_acp_transcript(&state);
-        let request = WsRequest {
-            id: "req-acp-transcript".into(),
-            method: "managed_agent.acp_transcript".into(),
-            params: serde_json::json!({
-                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-            }),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("1"))],
+        async {
+            let state = test_http_state_with_async_db_timeline().await;
+            seed_sample_acp_transcript(&state);
+            let request = WsRequest {
+                id: "req-acp-transcript".into(),
+                method: "managed_agent.acp_transcript".into(),
+                params: serde_json::json!({
+                    "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        assert!(response.error.is_none());
-        let result = response.result.expect("ACP transcript response");
-        let Value::Array(entries) = result["entries"].clone() else {
-            panic!("expected ACP transcript entries array");
-        };
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
-        assert_eq!(
-            entries[0]["session_id"].as_str(),
-            Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
-        );
-        assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
-        assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
-        assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("gemini"));
-    })
+            assert!(response.error.is_none());
+            let result = response.result.expect("ACP transcript response");
+            let Value::Array(entries) = result["entries"].clone() else {
+                panic!("expected ACP transcript entries array");
+            };
+            assert_eq!(entries.len(), 1);
+            assert_eq!(entries[0]["kind"].as_str(), Some("assistant_text"));
+            assert_eq!(
+                entries[0]["session_id"].as_str(),
+                Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
+            );
+            assert_eq!(entries[0]["agent_id"].as_str(), Some("codex-worker"));
+            assert_eq!(entries[0]["summary"].as_str(), Some("ACP transcript line"));
+            assert_eq!(entries[0]["payload"]["runtime"].as_str(), Some("gemini"));
+        },
+    ))
     .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_transcript_uses_session_id_scope() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_async_db_timeline().await;
-        seed_sample_acp_transcript(&state);
-        let request = WsRequest {
-            id: "req-acp-transcript-alias".into(),
-            method: "managed_agent.acp_transcript".into(),
-            params: serde_json::json!({
-                "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-            }),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("1"))],
+        async {
+            let state = test_http_state_with_async_db_timeline().await;
+            seed_sample_acp_transcript(&state);
+            let request = WsRequest {
+                id: "req-acp-transcript-alias".into(),
+                method: "managed_agent.acp_transcript".into(),
+                params: serde_json::json!({
+                    "session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        assert!(response.error.is_none());
-        let result = response.result.expect("ACP transcript response");
-        let Value::Array(entries) = result["entries"].clone() else {
-            panic!("expected ACP transcript entries array");
-        };
-        assert_eq!(entries.len(), 1);
-    })
+            assert!(response.error.is_none());
+            let result = response.result.expect("ACP transcript response");
+            let Value::Array(entries) = result["entries"].clone() else {
+                panic!("expected ACP transcript entries array");
+            };
+            assert_eq!(entries.len(), 1);
+        },
+    ))
     .await;
 }
 
 #[tokio::test]
 async fn dispatch_read_query_managed_agent_acp_transcript_rejects_legacy_require_session_id() {
-    temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-        let state = test_http_state_with_db();
-        let request = WsRequest {
-            id: "req-acp-transcript-legacy-scope".into(),
-            method: "managed_agent.acp_transcript".into(),
-            params: serde_json::json!({
-                "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-            }),
-            trace_context: None,
-        };
+    Box::pin(temp_env::async_with_vars(
+        [("HARNESS_FEATURE_ACP", Some("1"))],
+        async {
+            let state = test_http_state_with_db();
+            let request = WsRequest {
+                id: "req-acp-transcript-legacy-scope".into(),
+                method: "managed_agent.acp_transcript".into(),
+                params: serde_json::json!({
+                    "require_session_id": "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+                }),
+                trace_context: None,
+            };
 
-        let response = dispatch_read_query(&request, &state).await;
+            let response = dispatch_read_query(&request, &state).await;
 
-        let error = response.error.expect("invalid params error");
-        assert_eq!(error.code, "INVALID_PARAMS");
-        assert_eq!(
-            error.message,
-            "require_session_id is no longer supported; use session_id"
-        );
-    })
+            let error = response.error.expect("invalid params error");
+            assert_eq!(error.code, "INVALID_PARAMS");
+            assert_eq!(
+                error.message,
+                "require_session_id is no longer supported; use session_id"
+            );
+        },
+    ))
     .await;
 }
 

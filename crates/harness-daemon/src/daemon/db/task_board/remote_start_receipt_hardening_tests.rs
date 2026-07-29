@@ -26,7 +26,7 @@ struct AdoptedExecutor {
 
 #[tokio::test]
 async fn start_receipt_survives_lease_rotation_and_owner_takeover() {
-    let adopted = adopted_executor().await;
+    let adopted = Box::pin(adopted_executor()).await;
     let receipt = adopted.record.start_receipt.clone().expect("start receipt");
     let initial_owner = adopted
         .record
@@ -57,14 +57,14 @@ async fn start_receipt_survives_lease_rotation_and_owner_takeover() {
     ));
 
     assert!(matches!(
-        adopted
+        Box::pin(adopted
             .fixture
             .db
             .adopt_task_board_remote_executor_start(
                 &adopted.authority,
                 Path::new(&adopted.project_dir),
                 STARTED_AT,
-            )
+            ))
             .await
             .expect("replay start after renewal"),
         TaskBoardRemoteMutationOutcome::Replayed(ref record)
@@ -97,14 +97,14 @@ async fn start_receipt_survives_lease_rotation_and_owner_takeover() {
     assert_eq!(successor.owner_epoch, initial_owner.owner_epoch + 1);
     assert_ne!(successor.sha256, initial_owner.sha256);
     assert!(matches!(
-        adopted
+        Box::pin(adopted
             .fixture
             .db
             .adopt_task_board_remote_executor_start(
                 &adopted.authority,
                 Path::new(&adopted.project_dir),
                 STARTED_AT,
-            )
+            ))
             .await
             .expect("replay start after owner transfer"),
         TaskBoardRemoteMutationOutcome::Replayed(ref record)
@@ -119,7 +119,7 @@ async fn start_adoption_rejects_wrong_durable_session_or_worktree() {
         ("session_id", "different-session"),
         ("worktree_path", "/tmp/different-worktree"),
     ] {
-        let prepared = prepared_executor().await;
+        let prepared = Box::pin(prepared_executor()).await;
         query(
             "UPDATE sessions SET state_json = json_set(state_json, ?2, ?3)
              WHERE session_id = ?1",
@@ -131,14 +131,14 @@ async fn start_adoption_rejects_wrong_durable_session_or_worktree() {
         .await
         .expect("corrupt durable session evidence");
         assert!(matches!(
-            prepared
+            Box::pin(prepared
                 .fixture
                 .db
                 .adopt_task_board_remote_executor_start(
                     &prepared.authority,
                     Path::new(&prepared.project_dir),
                     STARTED_AT,
-                )
+                ))
                 .await
                 .expect("reject mismatched durable session"),
             TaskBoardRemoteMutationOutcome::Stale(ref record)
@@ -158,7 +158,7 @@ async fn schema_rejects_partial_start_receipt_and_owner_evidence() {
          SET executor_lifecycle_owner_epoch = NULL WHERE assignment_id = ?1",
     ];
     for statement in statements {
-        let adopted = adopted_executor().await;
+        let adopted = Box::pin(adopted_executor()).await;
         let error = query(statement)
             .bind(&adopted.record.assignment_id)
             .execute(adopted.fixture.db.pool())
@@ -179,7 +179,7 @@ async fn schema_rejects_partial_start_receipt_and_owner_evidence() {
 
 #[tokio::test]
 async fn model_rejects_tampered_start_receipt_and_owner_digests() {
-    let receipt_tamper = adopted_executor().await;
+    let receipt_tamper = Box::pin(adopted_executor()).await;
     query(
         "UPDATE task_board_remote_assignments
          SET executor_start_receipt_json = json_set(
@@ -199,7 +199,7 @@ async fn model_rejects_tampered_start_receipt_and_owner_digests() {
         .expect_err("receipt digest must reject semantic tampering");
     assert!(receipt_error.to_string().contains("start receipt"));
 
-    let owner_tamper = adopted_executor().await;
+    let owner_tamper = Box::pin(adopted_executor()).await;
     query(
         "UPDATE task_board_remote_assignments
          SET executor_lifecycle_owner_sha256 = ?2 WHERE assignment_id = ?1",
@@ -219,17 +219,14 @@ async fn model_rejects_tampered_start_receipt_and_owner_digests() {
 }
 
 async fn adopted_executor() -> AdoptedExecutor {
-    let prepared = prepared_executor().await;
-    let outcome = prepared
-        .fixture
-        .db
-        .adopt_task_board_remote_executor_start(
-            &prepared.authority,
-            Path::new(&prepared.project_dir),
-            STARTED_AT,
-        )
-        .await
-        .expect("adopt exact remote start");
+    let prepared = Box::pin(prepared_executor()).await;
+    let outcome = Box::pin(prepared.fixture.db.adopt_task_board_remote_executor_start(
+        &prepared.authority,
+        Path::new(&prepared.project_dir),
+        STARTED_AT,
+    ))
+    .await
+    .expect("adopt exact remote start");
     let TaskBoardRemoteMutationOutcome::Updated(record) = outcome else {
         panic!("expected updated start, got {outcome:?}");
     };

@@ -14,7 +14,7 @@ use crate::task_board::{
 async fn finalize_attaches_latest_item_and_retains_receipt() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-latest")).await;
+    Box::pin(create_item(&db, item("task-finalize-latest"))).await;
     let intent = begin(&db, "task-finalize-latest", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#51").await;
     let baseline = created
@@ -78,7 +78,7 @@ async fn finalize_attaches_latest_item_and_retains_receipt() {
 async fn attached_receipt_blocks_stale_finalize_and_new_create_after_unlink() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-stale")).await;
+    Box::pin(create_item(&db, item("task-finalize-stale"))).await;
     let intent = begin(&db, "task-finalize-stale", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#57").await;
     db.finalize_task_board_external_create_intent(&created)
@@ -128,7 +128,7 @@ async fn attached_receipt_blocks_stale_finalize_and_new_create_after_unlink() {
 async fn finalize_same_identity_preserves_newer_local_reference() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-existing")).await;
+    Box::pin(create_item(&db, item("task-finalize-existing"))).await;
     let intent = begin(&db, "task-finalize-existing", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#52").await;
     let mut newer = ExternalTaskRef::new(ExternalProvider::GitHub, "example/repository#52")
@@ -174,8 +174,8 @@ async fn finalize_same_identity_preserves_newer_local_reference() {
 async fn finalize_rejects_cross_item_or_different_same_provider_identity() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-owner")).await;
-    create_item(&db, item("task-finalize-other")).await;
+    Box::pin(create_item(&db, item("task-finalize-owner"))).await;
+    Box::pin(create_item(&db, item("task-finalize-other"))).await;
     let intent = begin(&db, "task-finalize-owner", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#53").await;
     db.update_task_board_item("task-finalize-other", |current| {
@@ -198,7 +198,7 @@ async fn finalize_rejects_cross_item_or_different_same_provider_identity() {
     assert_eq!(cross_item.code(), "WORKFLOW_CONCURRENT");
     assert_eq!(sequence(&db).await, before);
 
-    create_item(&db, item("task-finalize-different")).await;
+    Box::pin(create_item(&db, item("task-finalize-different"))).await;
     let intent = begin(&db, "task-finalize-different", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#54").await;
     db.update_task_board_item("task-finalize-different", |current| {
@@ -228,7 +228,7 @@ async fn finalize_rejects_cross_item_or_different_same_provider_identity() {
 async fn attached_receipt_reserves_provider_identity_after_unlink() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-receipt-owner")).await;
+    Box::pin(create_item(&db, item("task-finalize-receipt-owner"))).await;
     let owner = begin(&db, "task-finalize-receipt-owner", ExternalProvider::GitHub).await;
     let owner = record(&db, &owner, "example/repository#58").await;
     db.finalize_task_board_external_create_intent(&owner)
@@ -241,7 +241,7 @@ async fn attached_receipt_reserves_provider_identity_after_unlink() {
     .await
     .expect("unlink owner");
 
-    create_item(&db, item("task-finalize-receipt-other")).await;
+    Box::pin(create_item(&db, item("task-finalize-receipt-other"))).await;
     let other = begin(&db, "task-finalize-receipt-other", ExternalProvider::GitHub).await;
     let other = record(&db, &other, "example/repository#58").await;
     let before = sequence(&db).await;
@@ -267,7 +267,7 @@ async fn attached_receipt_reserves_provider_identity_after_unlink() {
 async fn finalize_accepts_concurrent_github_target_normalization() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-github-normalized")).await;
+    Box::pin(create_item(&db, item("task-finalize-github-normalized"))).await;
     let intent = begin(
         &db,
         "task-finalize-github-normalized",
@@ -305,7 +305,7 @@ async fn finalize_accepts_concurrent_github_target_normalization() {
 async fn finalize_fails_on_github_target_divergence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-github-target")).await;
+    Box::pin(create_item(&db, item("task-finalize-github-target"))).await;
     let github = begin(&db, "task-finalize-github-target", ExternalProvider::GitHub).await;
     let github = record(&db, &github, "example/repository#55").await;
     db.update_task_board_item("task-finalize-github-target", |current| {
@@ -327,7 +327,7 @@ async fn finalize_fails_on_github_target_divergence() {
 async fn tombstone_after_create_keeps_ref_attached_for_remote_cleanup() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-finalize-tombstone")).await;
+    Box::pin(create_item(&db, item("task-finalize-tombstone"))).await;
     let intent = begin(&db, "task-finalize-tombstone", ExternalProvider::GitHub).await;
     db.delete_task_board_item("task-finalize-tombstone")
         .await

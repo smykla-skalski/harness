@@ -22,8 +22,8 @@ const REASON: &str = "operator requested cancellation";
 
 #[tokio::test]
 async fn journaled_cancel_status_survives_restart_and_projects_before_cleanup() {
-    let fixture = controller_fixture(1).await;
-    let (assignment, cancel) = pending_cancel(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let (assignment, cancel) = Box::pin(pending_cancel(&fixture)).await;
     assert_eq!(
         pending_cancel_request_for_record(&assignment)
             .expect("decode pending cancel")
@@ -102,8 +102,8 @@ async fn journaled_cancel_status_survives_restart_and_projects_before_cleanup() 
 
 #[tokio::test]
 async fn wrong_cancel_status_evidence_performs_zero_mutation() {
-    let fixture = controller_fixture(1).await;
-    let (before, _) = pending_cancel(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let (before, _) = Box::pin(pending_cancel(&fixture)).await;
     let request = status_request(&fixture.request, &before);
     assert!(
         fixture
@@ -159,8 +159,8 @@ async fn wrong_cancel_status_evidence_performs_zero_mutation() {
 
 #[tokio::test]
 async fn cancel_status_cannot_cross_host_trust_rotation() {
-    let fixture = controller_fixture(1).await;
-    let (before, _) = pending_cancel(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let (before, _) = Box::pin(pending_cancel(&fixture)).await;
     rotate_host_trust(&fixture).await;
     let parent = fixture
         .db
@@ -192,7 +192,7 @@ async fn cancel_status_cannot_cross_host_trust_rotation() {
 async fn pending_cancel(
     fixture: &ControllerFixture,
 ) -> (TaskBoardRemoteAssignmentRecord, RemoteCancelRequest) {
-    let accepted = accept_controller(fixture).await;
+    let accepted = Box::pin(accept_controller(fixture)).await;
     let request = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: fixture.request.binding.clone(),

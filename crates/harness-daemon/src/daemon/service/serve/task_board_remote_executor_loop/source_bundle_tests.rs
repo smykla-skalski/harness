@@ -28,7 +28,7 @@ const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
 async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
     let data = tempfile::tempdir().expect("create isolated data root");
     let data_path = data.path().to_string_lossy().into_owned();
-    temp_env::async_with_vars(
+    Box::pin(temp_env::async_with_vars(
         [
             ("XDG_DATA_HOME", Some(data_path.as_str())),
             ("CLAUDE_SESSION_ID", Some("remote-bundle-cleanup-test")),
@@ -39,7 +39,8 @@ async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
             configure_executor(&fixture, source.repository.path()).await;
             let (offer, bundle_sha256) = bundle_offer(&fixture.request, &source);
             upload_bundle(&fixture, &offer, &source.bytes).await;
-            let (assignment, authority) = claim_with_start_authority(&fixture, &offer).await;
+            let (assignment, authority) =
+                Box::pin(claim_with_start_authority(&fixture, &offer)).await;
             let identity = remote_executor_identity(&assignment).expect("executor identity");
             let workspace = super::super::source::ensure_remote_session(
                 &fixture.db,
@@ -110,7 +111,7 @@ async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
                     .is_some()
             );
         },
-    )
+    ))
     .await;
 }
 

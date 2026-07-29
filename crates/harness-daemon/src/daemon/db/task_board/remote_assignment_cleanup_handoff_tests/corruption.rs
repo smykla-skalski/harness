@@ -2,8 +2,8 @@ use super::*;
 
 #[tokio::test]
 async fn cleanup_handoff_bypasses_an_undecodable_parent_but_no_handoff_fails_closed() {
-    let fixture = controller_fixture(1).await;
-    let superseded = superseded_detached_controller_assignment(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let superseded = Box::pin(superseded_detached_controller_assignment(&fixture)).await;
     record_pending_cleanup_handoff(&fixture, &superseded).await;
     let settlement = settle_controller_assignment(&fixture, &superseded).await;
     let cleanup =
@@ -34,8 +34,8 @@ async fn cleanup_handoff_bypasses_an_undecodable_parent_but_no_handoff_fails_clo
     ));
 
     for missing_parent in [false, true] {
-        let fixture = controller_fixture(1).await;
-        let superseded = superseded_detached_controller_assignment(&fixture).await;
+        let fixture = Box::pin(controller_fixture(1)).await;
+        let superseded = Box::pin(superseded_detached_controller_assignment(&fixture)).await;
         record_pending_cleanup_handoff(&fixture, &superseded).await;
         let settlement = settle_controller_assignment(&fixture, &superseded).await;
         let cleanup = RemoteCleanupObservationRequest::for_settlement(&settlement)

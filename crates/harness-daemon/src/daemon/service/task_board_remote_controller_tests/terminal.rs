@@ -20,8 +20,8 @@ async fn detached_completed_or_failed_return_before_any_terminal_client_operatio
         TaskBoardRemoteAssignmentState::Completed,
         TaskBoardRemoteAssignmentState::Failed,
     ] {
-        let fixture = remote_controller_fixture(1).await;
-        let assignment = detached_terminal_assignment(&fixture, state).await;
+        let fixture = Box::pin(remote_controller_fixture(1)).await;
+        let assignment = Box::pin(detached_terminal_assignment(&fixture, state)).await;
         restore_parent_to_targetless_preparing(&fixture).await;
         let sequence = fixture
             .db
@@ -67,9 +67,12 @@ async fn same_target_with_any_mismatched_active_adoption_proof_has_zero_terminal
         ActiveTargetCorruption::Idempotency,
         ActiveTargetCorruption::AttemptState,
     ] {
-        let fixture = remote_controller_fixture(1).await;
-        let assignment =
-            detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Completed).await;
+        let fixture = Box::pin(remote_controller_fixture(1)).await;
+        let assignment = Box::pin(detached_terminal_assignment(
+            &fixture,
+            TaskBoardRemoteAssignmentState::Completed,
+        ))
+        .await;
         corrupt_active_target_proof(&fixture, corruption).await;
         let sequence = fixture
             .db
@@ -109,9 +112,12 @@ async fn same_target_with_any_mismatched_active_adoption_proof_has_zero_terminal
 
 #[tokio::test]
 async fn result_adopted_handoff_settles_after_parent_deletion_without_fetch_or_adoption() {
-    let fixture = remote_controller_fixture(1).await;
-    let assignment =
-        detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Failed).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
+    let assignment = Box::pin(detached_terminal_assignment(
+        &fixture,
+        TaskBoardRemoteAssignmentState::Failed,
+    ))
+    .await;
     let parent = fixture
         .db
         .task_board_workflow_execution(&fixture.execution.execution_id)

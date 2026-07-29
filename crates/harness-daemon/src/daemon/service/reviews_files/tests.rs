@@ -31,7 +31,7 @@ async fn list_request_rejects_empty_pull_request_id() {
 #[tokio::test]
 async fn patch_request_rejects_empty_pull_request_id() {
     let request = ReviewsFilesPatchRequest {
-        pull_request_id: "".into(),
+        pull_request_id: String::new(),
         head_ref_oid_expected: "abc".into(),
         paths: vec!["src/lib.rs".into()],
         number: None,
@@ -79,7 +79,7 @@ async fn viewed_request_rejects_empty_paths() {
 async fn blob_request_rejects_empty_oid() {
     let request = ReviewsFilesBlobRequest {
         repository_id: "MDEwOlJlcG9zaXRvcnk".into(),
-        oid: "".into(),
+        oid: String::new(),
         path: "logo.png".into(),
     };
     let err = fetch_review_file_blob(&request).await.unwrap_err();
@@ -194,7 +194,7 @@ fn local_clone_gc_retains_registry_row_when_delete_fails() {
         gc_registry_entry("owner/repo", bare_path.clone(), 1024),
     );
 
-    let report = apply_local_clone_gc_targets(&mut registry, &[key.clone()]);
+    let report = apply_local_clone_gc_targets(&mut registry, std::slice::from_ref(&key));
 
     assert_eq!(report.targets, 1);
     assert_eq!(report.removed, 0);

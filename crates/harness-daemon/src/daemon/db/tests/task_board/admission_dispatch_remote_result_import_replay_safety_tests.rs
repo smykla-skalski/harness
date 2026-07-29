@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn applied_import_replays_only_after_fresh_exact_git_proof() {
-    let candidate = import_candidate("result-import-replay").await;
+    let candidate = Box::pin(import_candidate("result-import-replay")).await;
     let applied = import_result(&candidate, &candidate.parent).await;
     assert_eq!(applied.state, TaskBoardRemoteResultImportState::Applied);
     candidate.git.assert_applied();
@@ -23,7 +23,7 @@ async fn applied_import_replays_only_after_fresh_exact_git_proof() {
 
 #[tokio::test]
 async fn dirty_applied_replay_projects_manual_required_without_overwriting_worktree() {
-    let candidate = import_candidate("result-import-dirty").await;
+    let candidate = Box::pin(import_candidate("result-import-dirty")).await;
     import_result(&candidate, &candidate.parent).await;
     fs::write(
         candidate.git.controller.join("result.txt"),

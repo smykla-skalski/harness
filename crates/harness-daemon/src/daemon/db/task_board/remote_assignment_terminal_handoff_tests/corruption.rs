@@ -14,8 +14,8 @@ use crate::task_board::{TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecuti
 
 #[tokio::test]
 async fn same_target_superseded_generation_cannot_record_a_cleanup_handoff() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let superseded = match fixture
         .db
         .supersede_unclaimed_task_board_remote_assignment(
@@ -66,8 +66,8 @@ async fn same_target_superseded_generation_cannot_record_a_cleanup_handoff() {
 
 #[tokio::test]
 async fn same_target_cancelled_generation_without_handoff_cannot_create_cleanup_authority() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let request = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: fixture.request.binding.clone(),
@@ -97,16 +97,14 @@ async fn same_target_cancelled_generation_without_handoff_cannot_create_cleanup_
         .await
         .expect("claim cancelled corruption authority")
         .expect("cancelled corruption authority remains active");
-    let cancelled = match fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:11Z",
-        )
-        .await
-        .expect("persist cancelled corruption fixture")
+    let cancelled = match Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("persist cancelled corruption fixture")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected cancelled corruption fixture, got {other:?}"),
@@ -149,7 +147,7 @@ async fn same_target_cancelled_generation_without_handoff_cannot_create_cleanup_
 #[tokio::test]
 async fn uppercase_or_malformed_terminal_handoff_evidence_fails_closed() {
     for corruption in ["uppercase", "malformed_time"] {
-        let (fixture, assignment) = detached_superseded_handoff().await;
+        let (fixture, assignment) = Box::pin(detached_superseded_handoff()).await;
         inject_unchecked_handoff_corruption(&fixture, &assignment.assignment_id, corruption).await;
 
         let result = fixture
@@ -172,9 +170,12 @@ async fn uppercase_or_malformed_terminal_handoff_evidence_fails_closed() {
 
 #[tokio::test]
 async fn schema_valid_mismatched_terminal_handoff_kind_is_not_settlement_authority() {
-    let fixture = controller_fixture(1).await;
-    let assignment =
-        super::detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Failed).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let assignment = Box::pin(super::detached_terminal_assignment(
+        &fixture,
+        TaskBoardRemoteAssignmentState::Failed,
+    ))
+    .await;
     let parent = fixture
         .db
         .task_board_workflow_execution(&fixture.execution.execution_id)
@@ -251,8 +252,8 @@ async fn detached_superseded_handoff() -> (
     ControllerFixture,
     super::super::TaskBoardRemoteAssignmentRecord,
 ) {
-    let fixture = controller_fixture(1).await;
-    let _ = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let _ = Box::pin(accept_controller(&fixture)).await;
     restore_parent_to_targetless_preparing(&fixture).await;
     let assignment = match fixture
         .db

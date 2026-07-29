@@ -53,7 +53,12 @@ pub(super) async fn terminal_executor(phase: TaskBoardExecutionPhase) -> Termina
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
     assert!(matches!(
-        authorize_and_start_executor(&fixture, &accepted.assignment_id, STARTED_AT).await,
+        Box::pin(authorize_and_start_executor(
+            &fixture,
+            &accepted.assignment_id,
+            STARTED_AT
+        ))
+        .await,
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
     let record = fixture

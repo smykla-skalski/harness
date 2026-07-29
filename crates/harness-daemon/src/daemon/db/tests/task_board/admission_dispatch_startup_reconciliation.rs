@@ -60,8 +60,7 @@ async fn startup_reconciliation_releases_orphaned_codex_concurrency() {
         async_db_slot,
         false,
     );
-    controller
-        .reconcile_task_board_admission_workers_after_restart()
+    Box::pin(controller.reconcile_task_board_admission_workers_after_restart())
         .await
         .expect("reconcile orphaned worker admission");
 

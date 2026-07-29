@@ -369,8 +369,20 @@ async fn targeted_missing_refresh_completes_only_matching_imported_review() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
-    create_imported_review(&db, "missing-review", "acme/api", 31).await;
-    create_imported_review(&db, "unrelated-review", "acme/api", 32).await;
+    Box::pin(create_imported_review(
+        &db,
+        "missing-review",
+        "acme/api",
+        31,
+    ))
+    .await;
+    Box::pin(create_imported_review(
+        &db,
+        "unrelated-review",
+        "acme/api",
+        32,
+    ))
+    .await;
     let missing = requested_review_item("acme/api", "pr_missing", 31, &[]);
     let unrelated = requested_review_item("acme/api", "pr_unrelated", 32, &[]);
     let request = ReviewsRefreshRequest {

@@ -15,10 +15,10 @@ const REASON: &str = "operator requested exact remote cancellation";
 
 #[tokio::test]
 async fn claimed_to_started_race_leaves_force_cancel_mutations_unwritten() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    let claimed = claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    let claimed = Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let target = fixture
         .db
         .task_board_automation_cancel_target(&fixture.execution.execution_id)
@@ -72,9 +72,15 @@ async fn claimed_to_started_race_leaves_force_cancel_mutations_unwritten() {
         AuditOutcome::Success,
     );
 
-    let error = apply_cancel(&fixture.db, before.clone(), &target, REASON, &audit)
-        .await
-        .expect_err("running generation must reject the claimed target");
+    let error = Box::pin(apply_cancel(
+        &fixture.db,
+        before.clone(),
+        &target,
+        REASON,
+        &audit,
+    ))
+    .await
+    .expect_err("running generation must reject the claimed target");
     assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
     assert_eq!(
         fixture
@@ -107,10 +113,10 @@ async fn claimed_to_started_race_leaves_force_cancel_mutations_unwritten() {
 
 #[tokio::test]
 async fn feature_off_force_cancel_leaves_workflow_change_and_audit_untouched() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let before = fixture
         .db
         .task_board_workflow_execution(&fixture.execution.execution_id)

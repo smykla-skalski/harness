@@ -15,7 +15,7 @@ use super::admission_dispatch::{
 
 #[tokio::test]
 async fn worker_claim_renewal_prevents_reclaim() {
-    let (_dir, db, claim) = claimed_dispatch("task-worker-claim-renewal").await;
+    let (_dir, db, claim) = Box::pin(claimed_dispatch("task-worker-claim-renewal")).await;
     age_claim(&db, &claim.intent_id).await;
 
     db.renew_task_board_dispatch_claim(&claim.intent_id, &claim.claim_token)
@@ -33,7 +33,7 @@ async fn worker_claim_renewal_prevents_reclaim() {
 
 #[tokio::test]
 async fn stale_worker_claim_cannot_mutate_reclaimed_claim() {
-    let (_dir, db, first) = claimed_dispatch("task-worker-claim-stale").await;
+    let (_dir, db, first) = Box::pin(claimed_dispatch("task-worker-claim-stale")).await;
     age_claim(&db, &first.intent_id).await;
     let reclaimed = db
         .claim_next_task_board_dispatch()
@@ -64,14 +64,14 @@ async fn stale_worker_claim_cannot_mutate_reclaimed_claim() {
 async fn reclaimed_worker_restores_admission_but_honors_write_revision_fence() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(2)).await;
-    let first_intent = prepare_admitted_dispatch(&db, "reclaimed-worker-first").await;
+    let first_intent = Box::pin(prepare_admitted_dispatch(&db, "reclaimed-worker-first")).await;
     let first = db
         .claim_task_board_dispatch("reclaimed-worker-first")
         .await
         .expect("claim first dispatch")
         .expect("pending first dispatch");
     assert!(matches!(first.action, TaskBoardDispatchClaimAction::Start));
-    let _second_intent = prepare_admitted_dispatch(&db, "reclaimed-worker-second").await;
+    let _second_intent = Box::pin(prepare_admitted_dispatch(&db, "reclaimed-worker-second")).await;
     configure_policy(&db, admission_policy(1)).await;
     age_claim_and_release_admission(&db, &first.intent_id).await;
 
@@ -113,8 +113,8 @@ async fn reclaimed_worker_restores_admission_but_honors_write_revision_fence() {
 async fn first_worker_claim_still_revalidates_after_preparation_attempts() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(2)).await;
-    let first_intent = prepare_admitted_dispatch(&db, "first-worker-revalidation").await;
-    let _second_intent = prepare_admitted_dispatch(&db, "first-worker-competitor").await;
+    let first_intent = Box::pin(prepare_admitted_dispatch(&db, "first-worker-revalidation")).await;
+    let _second_intent = Box::pin(prepare_admitted_dispatch(&db, "first-worker-competitor")).await;
     configure_policy(&db, admission_policy(1)).await;
 
     let error = db
@@ -131,7 +131,7 @@ async fn first_worker_claim_still_revalidates_after_preparation_attempts() {
 
 #[tokio::test]
 async fn completed_lookup_requires_the_exact_workflow_execution() {
-    let (_dir, db, claim) = claimed_dispatch("task-worker-completed-identity").await;
+    let (_dir, db, claim) = Box::pin(claimed_dispatch("task-worker-completed-identity")).await;
     db.complete_task_board_dispatch(&claim.intent_id, &claim.claim_token, "codex-completed")
         .await
         .expect("complete worker dispatch");
@@ -152,7 +152,7 @@ async fn completed_lookup_requires_the_exact_workflow_execution() {
 
 #[tokio::test]
 async fn crash_reclaims_compensation_without_restarting_or_completing_worker() {
-    let (_dir, db, first) = claimed_dispatch("task-worker-compensation-reclaim").await;
+    let (_dir, db, first) = Box::pin(claimed_dispatch("task-worker-compensation-reclaim")).await;
     db.begin_task_board_dispatch_compensation(
         &first.intent_id,
         &first.claim_token,
@@ -215,7 +215,7 @@ async fn crash_reclaims_compensation_without_restarting_or_completing_worker() {
 
 #[tokio::test]
 async fn compensation_renewal_ignores_broken_start_admission_evidence() {
-    let (_dir, db, claim) = claimed_dispatch("task-worker-compensation-admission").await;
+    let (_dir, db, claim) = Box::pin(claimed_dispatch("task-worker-compensation-admission")).await;
     db.begin_task_board_dispatch_compensation(
         &claim.intent_id,
         &claim.claim_token,

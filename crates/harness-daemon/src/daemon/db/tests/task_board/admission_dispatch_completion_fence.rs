@@ -9,7 +9,7 @@ use crate::task_board::{
 async fn read_only_completion_rechecks_configuration_before_mutation_and_can_compensate() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(1)).await;
-    let fixture = prepare_read_only_completion_fence(&db).await;
+    let fixture = Box::pin(prepare_read_only_completion_fence(&db)).await;
     let item_before_completion = db
         .task_board_item_snapshot(&fixture.item_id)
         .await
@@ -47,7 +47,7 @@ async fn prepare_read_only_completion_fence(db: &AsyncDaemonDb) -> ReadOnlyCompl
     db.create_task_board_item(item).await.expect("create item");
     let intent = preparing_intent(
         db.reserve_task_board_dispatch(
-            &create_plan_for_existing(&db, item_id).await,
+            &create_plan_for_existing(db, item_id).await,
             "control-plane",
             Some("/tmp/project"),
             false,

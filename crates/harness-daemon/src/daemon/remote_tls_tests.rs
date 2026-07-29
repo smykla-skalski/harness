@@ -138,7 +138,7 @@ fn generated_bundle(domain: &str) -> RemoteCertificateBundle {
     RemoteCertificateBundle::new(certificate.pem().as_str(), &key.serialize_pem())
 }
 
-const TEST_CERTIFICATE_PEM: &str = r#"-----BEGIN CERTIFICATE-----
+const TEST_CERTIFICATE_PEM: &str = r"-----BEGIN CERTIFICATE-----
 MIIDGzCCAgOgAwIBAgIUO6qbgSSvho2GLuSvxiWE6x7/H+wwDQYJKoZIhvcNAQEL
 BQAwHTEbMBkGA1UEAwwSZGFlbW9uLmV4YW1wbGUuY29tMB4XDTI2MDcwOTExNTAx
 MloXDTI2MDcxMDExNTAxMlowHTEbMBkGA1UEAwwSZGFlbW9uLmV4YW1wbGUuY29t
@@ -156,9 +156,9 @@ VHs+G7SrVjiNijOgozt45HQR4CvAgPxcZoGu1U4lmprrx7HaWIC+56y6MFghb4Kg
 +InZkMWy6ySoFbYjMSsPBifaKnuF1NUTPjL0VE8oNyNftIvFjjZuctvHjhlK+FMP
 Tys9LeCcV0h6PMHH+/hQLJC4R3RuS2uu55KtmTnhHMjNB3M56XfWb/y18n3GVkys
 yy4u0xXmF216ZT32j2SxkTQxQOVG9EqmwaZUcuACYQ==
------END CERTIFICATE-----"#;
+-----END CERTIFICATE-----";
 
-const TEST_PRIVATE_KEY_PEM: &str = r#"-----BEGIN PRIVATE KEY-----
+const TEST_PRIVATE_KEY_PEM: &str = r"-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCkIpdrijU60AEu
 iWxX9+wTWeNMz7HSoEkUphVb7c+LwwICedBn7JjNDgPxZ+/XOM7LVj9Rh0iKrEEU
 s2nR6sPFb5viS4dIq4YNvXlkDKzqJEDltxMqfPxAYpXOYUjABtLh08k3NFvsC4Oq
@@ -185,4 +185,4 @@ CocWww/+gs9r8H9zXTsH2icABHCSo/FKVgMpN2CnAoGBAKyhHuD2+HadpZ+H6GaL
 2pPNV9/lqGJ+CgHUmf1xvPr6zOHQWRYAZ2J3/SslZyyNC1J+dBW+Fps3nnQ3lG62
 JBpZ8TiiuDYnOqjZTHejjLdFPS2py0ID0IfBlRE+m9oMFJsZbOR91Ra3zHHKBqMJ
 r3onbxBi+otiVHYyfV7mz6XW
------END PRIVATE KEY-----"#;
+-----END PRIVATE KEY-----";

@@ -6,7 +6,7 @@ use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState}
 
 #[tokio::test]
 async fn completed_review_rejects_missing_extra_wrong_path_and_tampered_bytes() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Review).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Review)).await;
     let (response, artifacts) = completed_evidence(&terminal.record);
 
     let mut missing = response.clone();
@@ -55,7 +55,7 @@ async fn completed_review_rejects_missing_extra_wrong_path_and_tampered_bytes() 
 
 #[tokio::test]
 async fn implementation_requires_and_atomically_persists_the_exact_git_bundle() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Implementation).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Implementation)).await;
     let (response, artifacts) = completed_evidence(&terminal.record);
     assert_eq!(artifacts.len(), 2);
 
@@ -94,7 +94,7 @@ async fn implementation_requires_and_atomically_persists_the_exact_git_bundle() 
 
 #[tokio::test]
 async fn completed_evaluate_requires_only_the_canonical_result_artifact() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Evaluate).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Evaluate)).await;
     let (response, artifacts) = completed_evidence(&terminal.record);
     assert_eq!(artifacts.len(), 1);
 
@@ -123,7 +123,7 @@ async fn completed_evaluate_requires_only_the_canonical_result_artifact() {
 
 #[tokio::test]
 async fn failed_terminal_has_no_output_artifacts_and_replays_exactly() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Review).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Review)).await;
     let response = failed_evidence(&terminal.record);
     let outcome = terminal
         .fixture

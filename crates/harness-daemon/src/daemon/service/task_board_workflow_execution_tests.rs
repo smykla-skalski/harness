@@ -21,12 +21,12 @@ use super::task_board_workflow_test_support::{
 #[tokio::test]
 async fn write_workflow_is_rejected_without_a_durable_execution() {
     let test = TestDatabase::open().await;
-    let snapshot = seed_snapshot(
+    let snapshot = Box::pin(seed_snapshot(
         &test.db,
         "task-write",
         TaskBoardWorkflowKind::DefaultTask,
         reviewers(1, 1),
-    )
+    ))
     .await;
 
     let error = create_or_load_workflow_execution(
@@ -56,13 +56,13 @@ async fn write_workflow_is_rejected_without_a_durable_execution() {
 #[tokio::test]
 async fn frozen_revision_change_requires_human_without_moving_the_head() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-frozen",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let expected = TaskBoardWorkflowExecutionCas::from(&record);
     let mut revisions = TaskBoardWorkflowRevisionGuard::from(&record.snapshot);
@@ -98,13 +98,13 @@ async fn frozen_revision_change_requires_human_without_moving_the_head() {
 #[tokio::test]
 async fn retry_schedule_is_idempotent_durable_and_resumes_only_when_due() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-retry",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let retry = TaskBoardRetrySchedule {
         action_key: "review:reviewer-amber".into(),
@@ -190,13 +190,13 @@ async fn retry_schedule_is_idempotent_durable_and_resumes_only_when_due() {
 #[tokio::test]
 async fn completed_attempt_replay_survives_phase_advance_but_conflict_fails() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-replay",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let preparing = review_attempt(&record.execution_id, "attempt-replay");
     create_workflow_execution_attempt(&test.db, &preparing)
@@ -265,13 +265,13 @@ async fn completed_attempt_replay_survives_phase_advance_but_conflict_fails() {
 #[tokio::test]
 async fn attempt_create_and_cas_are_fenced_by_durable_parent_phase() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-phase-fence",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let preparing = review_attempt(&record.execution_id, "attempt-before-advance");
     test.db

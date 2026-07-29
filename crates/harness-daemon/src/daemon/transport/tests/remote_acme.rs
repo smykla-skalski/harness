@@ -172,7 +172,7 @@ fn daemon_remote_acme_renew_replaces_legacy_account_without_credentials() {
         issuance
             .account
             .as_ref()
-            .map(|account| account.account_id()),
+            .map(crate::daemon::remote_acme::RemoteAcmeAccountCredentials::account_id),
         Some("https://acme.test/acct/initial")
     );
 }

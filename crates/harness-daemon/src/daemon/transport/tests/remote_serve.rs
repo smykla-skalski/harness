@@ -308,7 +308,7 @@ async fn daemon_remote_initial_acme_shutdown_persists_account_cleanup_and_failur
         issuance
             .account
             .as_ref()
-            .map(|account| account.account_id()),
+            .map(crate::daemon::remote_acme::RemoteAcmeAccountCredentials::account_id),
         Some("https://acme.test/acct/startup")
     );
     let state = db.load_remote_acme_state().expect("load ACME state");

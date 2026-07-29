@@ -19,7 +19,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn running_status_after_lost_claim_response_promotes_and_commits_start_once() {
-    let prepared = prepare_lost_claim_running_status().await;
+    let prepared = Box::pin(prepare_lost_claim_running_status()).await;
     let response = remote_status(&prepared.offer, RemoteAssignmentWireState::Running, true);
     record_status(&prepared, &response).await;
     assert_committed_start(&prepared).await;
@@ -64,7 +64,11 @@ async fn running_status_after_lost_claim_response_promotes_and_commits_start_onc
 }
 
 async fn prepare_lost_claim_running_status() -> PreparedRemoteOffer {
-    let prepared = prepare_remote_offer_with_policy("admission-remote-lost-claim", true).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(
+        "admission-remote-lost-claim",
+        true,
+    ))
+    .await;
     super::remote_start_tests::offer_remote(
         &prepared,
         "2026-07-19T10:00:00Z",
@@ -82,15 +86,13 @@ async fn prepare_lost_claim_running_status() -> PreparedRemoteOffer {
         .await
         .expect("claim offer authority")
         .expect("offer remains active");
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &super::completion_evidence_tests::accepted_offer(&prepared.offer),
-            "executor-a",
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &super::completion_evidence_tests::accepted_offer(&prepared.offer),
+        "executor-a",
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer");
     let accepted = prepared
         .db
         .task_board_remote_assignment(&prepared.offer.binding.assignment_id)
@@ -130,8 +132,12 @@ async fn prepare_lost_claim_running_status() -> PreparedRemoteOffer {
 
 #[tokio::test]
 async fn completed_remote_status_is_provisional_and_keeps_remote_ownership() {
-    let prepared = prepare_remote_offer_with_policy("admission-remote-completed", true).await;
-    persist_remote_start(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(
+        "admission-remote-completed",
+        true,
+    ))
+    .await;
+    Box::pin(persist_remote_start(&prepared)).await;
     let parent = load_execution(&prepared.db, &prepared.execution_id).await;
     let ledger = admission_ledger_snapshot(&prepared.db, &prepared.intent).await;
     let response = completed_status(&prepared.offer);
@@ -171,8 +177,12 @@ async fn completed_remote_status_is_provisional_and_keeps_remote_ownership() {
 
 #[tokio::test]
 async fn transient_remote_failure_does_not_schedule_retry_before_result_adoption() {
-    let prepared = prepare_remote_offer_with_policy("admission-remote-retry", true).await;
-    persist_remote_start(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(
+        "admission-remote-retry",
+        true,
+    ))
+    .await;
+    Box::pin(persist_remote_start(&prepared)).await;
     let parent = load_execution(&prepared.db, &prepared.execution_id).await;
     let ledger = admission_ledger_snapshot(&prepared.db, &prepared.intent).await;
     let response = failed_status(&prepared.offer, TaskBoardFailureClass::Transient);
@@ -200,9 +210,13 @@ async fn transient_remote_failure_does_not_schedule_retry_before_result_adoption
 
 #[tokio::test]
 async fn exhausted_transient_observation_does_not_release_concurrency_or_stop_parent() {
-    let prepared =
-        prepare_remote_offer_with_retry("admission-remote-exhausted", true, Some(1)).await;
-    persist_remote_start(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_retry(
+        "admission-remote-exhausted",
+        true,
+        Some(1),
+    ))
+    .await;
+    Box::pin(persist_remote_start(&prepared)).await;
     let parent = load_execution(&prepared.db, &prepared.execution_id).await;
     let response = failed_status(&prepared.offer, TaskBoardFailureClass::Transient);
     record_status(&prepared, &response).await;

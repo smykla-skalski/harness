@@ -18,13 +18,13 @@ use super::task_board_workflow_test_support::{
 #[tokio::test]
 async fn reviewer_outcome_rejects_stale_head_and_preserves_exact_pr_head() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-pr-head",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
 
     let error = record_workflow_reviewer_outcome(
@@ -57,13 +57,13 @@ async fn read_only_changes_required_requires_human_without_changing_head() {
         TaskBoardWorkflowKind::PR_REVIEW,
     ] {
         let test = TestDatabase::open().await;
-        let record = create_execution(
+        let record = Box::pin(create_execution(
             &test.db,
             &format!("task-{workflow_kind:?}"),
             workflow_kind,
             reviewers(1, 1),
             Some("head-amber"),
-        )
+        ))
         .await;
 
         let changed = outcome_record(
@@ -108,13 +108,13 @@ async fn read_only_changes_required_requires_human_without_changing_head() {
 #[tokio::test]
 async fn unknown_attempt_outcome_never_claims_terminal_success() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-unknown",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let attempt = preparing_attempt(
         &record.execution_id,
@@ -173,13 +173,13 @@ async fn unknown_attempt_outcome_never_claims_terminal_success() {
 #[tokio::test]
 async fn pr_review_publish_and_cleanup_require_evidence_then_finish_idempotently() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-terminal",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let publish = outcome_record(
         record_workflow_reviewer_outcome(

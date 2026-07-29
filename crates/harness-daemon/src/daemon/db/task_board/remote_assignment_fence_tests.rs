@@ -11,7 +11,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn selected_local_target_wins_before_remote_offer_without_remote_work() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     assert!(
         fixture
             .db
@@ -77,7 +77,7 @@ async fn selected_local_target_wins_before_remote_offer_without_remote_work() {
 
 #[tokio::test]
 async fn targetless_preparing_attempt_cannot_claim_local_runtime() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     query("DELETE FROM task_board_execution_hosts WHERE host_role = 'controller_remote'")
         .execute(fixture.db.pool())
         .await
@@ -99,7 +99,7 @@ async fn targetless_preparing_attempt_cannot_claim_local_runtime() {
 
 #[tokio::test]
 async fn new_targetless_starting_attempt_has_no_legacy_local_authority() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     restore_parent(&fixture, TaskBoardExecutionState::Starting).await;
     query(
         "UPDATE task_board_execution_attempts SET state = 'starting'
@@ -135,7 +135,7 @@ async fn new_targetless_starting_attempt_has_no_legacy_local_authority() {
 
 #[tokio::test]
 async fn remote_offer_wins_before_local_claim_without_local_work() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     assert!(matches!(
         offer_controller(&fixture).await,
         TaskBoardRemoteOfferOutcome::Created(_)
@@ -185,7 +185,7 @@ async fn remote_offer_wins_before_local_claim_without_local_work() {
 
 #[tokio::test]
 async fn unresolved_older_generation_blocks_selection_and_local_start() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     offer_controller(&fixture).await;
     assert!(
         fixture
@@ -270,7 +270,7 @@ async fn unresolved_older_generation_blocks_selection_and_local_start() {
 #[tokio::test]
 async fn raw_terminal_assignments_never_release_the_local_start_fence() {
     for state in ["completed", "failed", "cancelled", "superseded"] {
-        let fixture = controller_fixture(1).await;
+        let fixture = Box::pin(controller_fixture(1)).await;
         offer_controller(&fixture).await;
         force_terminal_assignment(&fixture, state).await;
         restore_parent(&fixture, TaskBoardExecutionState::Preparing).await;
@@ -314,7 +314,7 @@ async fn raw_terminal_assignments_never_release_the_local_start_fence() {
 
 #[tokio::test]
 async fn exact_preclaim_fallback_marker_releases_one_distinct_local_attempt() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = match offer_controller(&fixture).await {
         TaskBoardRemoteOfferOutcome::Created(assignment) => assignment,
         other => panic!("expected created remote assignment, got {other:?}"),
@@ -325,12 +325,12 @@ async fn exact_preclaim_fallback_marker_releases_one_distinct_local_attempt() {
         .await
         .expect("begin fallback transaction");
     assert!(matches!(
-        super::remote_assignment_rejection::apply_unclaimable_offer(
+        Box::pin(super::remote_assignment_rejection::apply_unclaimable_offer(
             transaction,
             assignment,
             "executor_unavailable",
             "2026-07-19T10:00:02Z",
-        )
+        ))
         .await
         .expect("apply exact local fallback"),
         TaskBoardRemoteMutationOutcome::Updated(_)

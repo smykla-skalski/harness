@@ -16,7 +16,7 @@ const CLEANED_AT: &str = "2026-07-19T10:00:50Z";
 #[tokio::test]
 async fn unknown_capacity_drops_only_after_exact_cleanup_and_stays_dropped_after_prune() {
     let fixture = executor_fixture(1).await;
-    let (unknown, settlement) = unknown_workspace_assignment(&fixture).await;
+    let (unknown, settlement) = Box::pin(unknown_workspace_assignment(&fixture)).await;
     assert_eq!(active_count(&fixture).await, 1);
     let before_settlement = fixture
         .db
@@ -115,7 +115,7 @@ async fn unknown_capacity_drops_only_after_exact_cleanup_and_stays_dropped_after
 #[tokio::test]
 async fn completed_cleanup_marker_survives_receipt_and_artifact_pruning() {
     let fixture = executor_fixture(1).await;
-    let (completed, entry) = completed_assignment_with_artifact(&fixture).await;
+    let (completed, entry) = Box::pin(completed_assignment_with_artifact(&fixture)).await;
     let fetch = store_and_verify_artifact(&fixture, &completed, &entry).await;
     let settlement = completed_settlement(&fixture, &completed);
     fixture
@@ -269,7 +269,7 @@ async fn never_claimed_superseded_generation_releases_capacity_without_cleanup()
 #[tokio::test]
 async fn late_cleanup_after_restart_keeps_receipt_until_marker_then_prunes_safely() {
     let fixture = executor_fixture(1).await;
-    let (unknown, settlement) = unknown_workspace_assignment(&fixture).await;
+    let (unknown, settlement) = Box::pin(unknown_workspace_assignment(&fixture)).await;
     fixture
         .db
         .settle_task_board_remote_assignment(&settlement, PRINCIPAL, SETTLED_AT)

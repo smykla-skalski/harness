@@ -151,7 +151,12 @@ pub(super) async fn assert_run_once_routes_match(
     base_url: &str,
     state: &crate::daemon::http::DaemonHttpState,
 ) {
-    seed_ready_board_item(state, "parity-run-once-http", "Run once HTTP parity item").await;
+    Box::pin(seed_ready_board_item(
+        state,
+        "parity-run-once-http",
+        "Run once HTTP parity item",
+    ))
+    .await;
     let http = post_json(
         client,
         base_url,
@@ -168,7 +173,12 @@ pub(super) async fn assert_run_once_routes_match(
     )
     .await;
 
-    seed_ready_board_item(state, "parity-run-once-ws", "Run once WS parity item").await;
+    Box::pin(seed_ready_board_item(
+        state,
+        "parity-run-once-ws",
+        "Run once WS parity item",
+    ))
+    .await;
     let ws = ws_result(
         base_url,
         "req-task-board-orchestrator-run-once",

@@ -244,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn config_failure_reports_create_once_and_acks_the_follow_up() {
-        let (_dir, db, request) = config_failure_fixture().await;
+        let (_dir, db, request) = Box::pin(config_failure_fixture()).await;
         let mut metrics = SyncExecutionMetrics::default();
 
         execute(
@@ -299,7 +299,7 @@ mod tests {
 
     #[tokio::test]
     async fn pending_attached_follow_up_never_reemits_an_applied_sync_operation() {
-        let (_dir, db, request) = config_failure_fixture().await;
+        let (_dir, db, request) = Box::pin(config_failure_fixture()).await;
         let created = db
             .list_created_task_board_external_create_intents()
             .await
@@ -338,7 +338,7 @@ mod tests {
 
     #[tokio::test]
     async fn dry_run_leaves_pending_attached_follow_up_untouched() {
-        let (_dir, db, mut request) = config_failure_fixture().await;
+        let (_dir, db, mut request) = Box::pin(config_failure_fixture()).await;
         let created = db
             .list_created_task_board_external_create_intents()
             .await

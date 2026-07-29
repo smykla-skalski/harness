@@ -38,8 +38,8 @@ pub(super) async fn completed_candidate(
     label: &str,
     mutate_bytes: Option<fn(&mut RemoteTypedResult)>,
 ) -> CompletedCandidate {
-    let prepared = prepare_remote_offer_with_policy(label, true).await;
-    offer_and_accept(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(label, true)).await;
+    Box::pin(offer_and_accept(&prepared)).await;
     let typed = typed_review_result(&prepared);
     let mut stored = typed.clone();
     if let Some(mutate) = mutate_bytes {
@@ -72,8 +72,8 @@ pub(super) async fn failed_candidate(
     failure_class: TaskBoardFailureClass,
     max_attempts: Option<u32>,
 ) -> CompletedCandidate {
-    let prepared = prepare_remote_offer_with_retry(label, true, max_attempts).await;
-    offer_and_accept(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_retry(label, true, max_attempts)).await;
+    Box::pin(offer_and_accept(&prepared)).await;
     let mut response = remote_status(&prepared.offer, RemoteAssignmentWireState::Running, true);
     response.state = RemoteAssignmentWireState::Failed;
     response.error_code = Some("remote_execution_failed".into());
@@ -106,15 +106,13 @@ async fn offer_and_accept(prepared: &PreparedRemoteOffer) {
         .await
         .expect("claim offer authority")
         .expect("offer remains active");
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared.offer),
-            PRINCIPAL,
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared.offer),
+        PRINCIPAL,
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer");
     let assignment = prepared
         .db
         .task_board_remote_assignment(&prepared.offer.binding.assignment_id)
@@ -131,25 +129,23 @@ async fn offer_and_accept(prepared: &PreparedRemoteOffer) {
     // Record the executor's claim response so the controller settles the claim I/O
     // authority the same way the live path does; the terminal adoption target is
     // then authority-free.
-    prepared
-        .db
-        .record_task_board_remote_assignment_claim(
-            &claim,
-            &RemoteClaimResponse {
-                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                binding: prepared.offer.binding.clone(),
-                offer_request_sha256: prepared.offer.request_sha256.clone(),
-                lease: RemoteLease {
-                    lease_id: claim.lease_id.clone(),
-                    expires_at: "2026-07-19T10:01:00Z".into(),
-                },
-                claimed_at: "2026-07-19T10:00:02Z".into(),
+    Box::pin(prepared.db.record_task_board_remote_assignment_claim(
+        &claim,
+        &RemoteClaimResponse {
+            schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+            binding: prepared.offer.binding.clone(),
+            offer_request_sha256: prepared.offer.request_sha256.clone(),
+            lease: RemoteLease {
+                lease_id: claim.lease_id.clone(),
+                expires_at: "2026-07-19T10:01:00Z".into(),
             },
-            PRINCIPAL,
-            "2026-07-19T10:00:02Z",
-        )
-        .await
-        .expect("record remote claim response");
+            claimed_at: "2026-07-19T10:00:02Z".into(),
+        },
+        PRINCIPAL,
+        "2026-07-19T10:00:02Z",
+    ))
+    .await
+    .expect("record remote claim response");
 }
 
 async fn record_terminal_status(prepared: &PreparedRemoteOffer, response: &RemoteStatusResponse) {

@@ -26,15 +26,15 @@ const DIVERGED_AT: &str = "2026-07-19T10:00:30Z";
 #[tokio::test]
 async fn late_claim_response_recovers_from_the_persisted_state_with_or_without_authority() {
     for preclaim_authority in [false, true] {
-        assert_late_claim_recovery(preclaim_authority).await;
+        Box::pin(assert_late_claim_recovery(preclaim_authority)).await;
     }
 }
 
 #[tokio::test]
 async fn non_remote_parent_divergence_supersedes_only_the_exact_assignment() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let diverged = bind_parent_locally(&fixture).await;
 
     let recovered = fixture
@@ -62,9 +62,9 @@ async fn non_remote_parent_divergence_supersedes_only_the_exact_assignment() {
 
 #[tokio::test]
 async fn terminal_parent_supersedes_the_retained_remote_generation() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let terminal = terminalize_parent_out_of_band(&fixture).await;
 
     let recovered = fixture
@@ -91,8 +91,8 @@ async fn active_assignment_divergence_and_terminal_parent_free_capacity() {
         TaskBoardRemoteAssignmentState::Running,
     ] {
         for terminal_parent in [false, true] {
-            let fixture = controller_fixture(1).await;
-            let active = active_assignment(&fixture, assignment_state).await;
+            let fixture = Box::pin(controller_fixture(1)).await;
+            let active = Box::pin(active_assignment(&fixture, assignment_state)).await;
             let preserved_parent = if terminal_parent {
                 terminalize_parent_out_of_band(&fixture).await
             } else {
@@ -132,9 +132,9 @@ async fn active_assignment_divergence_and_terminal_parent_free_capacity() {
 
 #[tokio::test]
 async fn failed_detached_supersede_rolls_back_assignment_and_parent() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let diverged = bind_parent_locally(&fixture).await;
     install_supersede_failure(&fixture).await;
 
@@ -153,8 +153,8 @@ async fn failed_detached_supersede_rolls_back_assignment_and_parent() {
 }
 
 async fn assert_late_claim_recovery(preclaim_authority: bool) {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let request = claim_request(&fixture.request, &accepted);
     if preclaim_authority {
         fixture
@@ -167,11 +167,14 @@ async fn assert_late_claim_recovery(preclaim_authority: bool) {
         claim_only_operation_trust(&fixture, &request).await;
     }
     let response = claim_response(&fixture, &accepted);
-    let outcome = fixture
-        .db
-        .record_task_board_remote_assignment_claim(&request, &response, HOST, AFTER_EXPIRY)
-        .await
-        .expect("retain and recover late claim response");
+    let outcome = Box::pin(fixture.db.record_task_board_remote_assignment_claim(
+        &request,
+        &response,
+        HOST,
+        AFTER_EXPIRY,
+    ))
+    .await
+    .expect("retain and recover late claim response");
     assert!(matches!(
         outcome,
         TaskBoardRemoteMutationOutcome::Updated(record)
@@ -227,8 +230,8 @@ async fn active_assignment(
     fixture: &ControllerFixture,
     state: TaskBoardRemoteAssignmentState,
 ) -> super::TaskBoardRemoteAssignmentRecord {
-    let accepted = accept_controller(fixture).await;
-    let claimed = claim_controller(fixture, &accepted).await;
+    let accepted = Box::pin(accept_controller(fixture)).await;
+    let claimed = Box::pin(claim_controller(fixture, &accepted)).await;
     if state == TaskBoardRemoteAssignmentState::Claimed {
         return claimed;
     }

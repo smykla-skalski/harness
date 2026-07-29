@@ -28,7 +28,7 @@ async fn seed_item(db: &AsyncDaemonDb, id: &str) {
 #[tokio::test]
 async fn records_and_reads_the_current_decision() {
     let (_directory, db) = connect().await;
-    seed_item(&db, "item-1").await;
+    Box::pin(seed_item(&db, "item-1")).await;
 
     let mut transaction = db
         .begin_immediate_transaction("test record decision")
@@ -71,7 +71,7 @@ async fn records_and_reads_the_current_decision() {
 #[tokio::test]
 async fn recording_again_supersedes_the_prior_generation_and_stays_current() {
     let (_directory, db) = connect().await;
-    seed_item(&db, "item-1").await;
+    Box::pin(seed_item(&db, "item-1")).await;
 
     let mut transaction = db
         .begin_immediate_transaction("test first decision")
@@ -142,7 +142,7 @@ async fn recording_again_supersedes_the_prior_generation_and_stays_current() {
 #[tokio::test]
 async fn rejects_non_canonical_evaluator_identity_version_and_fingerprint() {
     let (_directory, db) = connect().await;
-    seed_item(&db, "item-1").await;
+    Box::pin(seed_item(&db, "item-1")).await;
 
     let mut transaction = db
         .begin_immediate_transaction("test rejects malformed identity")

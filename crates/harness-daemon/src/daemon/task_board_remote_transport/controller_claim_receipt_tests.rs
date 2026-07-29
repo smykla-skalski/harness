@@ -91,8 +91,8 @@ async fn executor_claim_receipt_survives_renewal_terminalization_and_restart() {
 
 #[tokio::test]
 async fn controller_claim_receipt_replays_without_network_after_renewal_and_terminalization() {
-    let fixture = remote_controller_fixture(1).await;
-    let accepted = accept_controller_offer(&fixture).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller_offer(&fixture)).await;
     let claim = controller_claim_request(&fixture, &accepted);
     let original = controller_claim_response(&fixture, &claim);
     fixture
@@ -101,14 +101,22 @@ async fn controller_claim_receipt_replays_without_network_after_renewal_and_term
         .await
         .expect("claim controller claim authority")
         .expect("claim remains active");
-    fixture
-        .db
-        .record_task_board_remote_assignment_claim(&claim, &original, HOST, "2026-07-19T10:00:11Z")
-        .await
-        .expect("record controller claim response");
+    Box::pin(fixture.db.record_task_board_remote_assignment_claim(
+        &claim,
+        &original,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("record controller claim response");
 
     let renewed = renew_controller_assignment(&fixture, &accepted).await;
-    assert_controller_replay_without_network(&fixture.db, &claim, &original).await;
+    Box::pin(assert_controller_replay_without_network(
+        &fixture.db,
+        &claim,
+        &original,
+    ))
+    .await;
 
     let cancel = cancel_request(
         &fixture.request.binding,
@@ -137,17 +145,20 @@ async fn controller_claim_receipt_replays_without_network_after_renewal_and_term
         .await
         .expect("claim controller cancellation authority")
         .expect("cancellation remains active");
-    fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &cancel,
-            &response,
-            HOST,
-            "2026-07-19T10:00:40Z",
-        )
-        .await
-        .expect("record controller terminal response");
-    assert_controller_replay_without_network(&fixture.db, &claim, &original).await;
+    Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &cancel,
+        &response,
+        HOST,
+        "2026-07-19T10:00:40Z",
+    ))
+    .await
+    .expect("record controller terminal response");
+    Box::pin(assert_controller_replay_without_network(
+        &fixture.db,
+        &claim,
+        &original,
+    ))
+    .await;
 }
 
 async fn assert_exact_executor_replay(
@@ -332,11 +343,13 @@ async fn accept_controller_offer(
         }),
         rejection_code: None,
     };
-    match fixture
-        .db
-        .record_task_board_remote_offer_response(&response, HOST, "2026-07-19T10:00:01Z")
-        .await
-        .expect("record accepted controller offer")
+    match Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &response,
+        HOST,
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted controller offer")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected accepted controller offer, got {other:?}"),
@@ -427,8 +440,7 @@ async fn assert_controller_replay_without_network(
         RemoteExecutionControllerClient::new_for_tests(HOST, pinned_client(&endpoint, &tls));
     let network = tokio::spawn(async move { listener.accept().await.is_ok() });
 
-    let (response, outcome) = controller
-        .claim(db, claim)
+    let (response, outcome) = Box::pin(controller.claim(db, claim))
         .await
         .expect("replay controller claim without network");
     assert_eq!(response, *original);

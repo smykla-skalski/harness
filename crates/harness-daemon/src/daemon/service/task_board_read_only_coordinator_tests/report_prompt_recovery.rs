@@ -23,7 +23,7 @@ use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 #[tokio::test]
 async fn a_finished_attempt_is_harvested_when_its_prompt_cannot_render() {
     let _lock = prompt_catalog_test_lock();
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "report-unrenderable-harvest",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
@@ -34,7 +34,7 @@ async fn a_finished_attempt_is_harvested_when_its_prompt_cannot_render() {
             error: None,
             completed_at: None,
         }),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()]);
 
@@ -70,7 +70,7 @@ async fn a_finished_attempt_is_harvested_when_its_prompt_cannot_render() {
 #[tokio::test]
 async fn an_attempt_whose_prompt_cannot_render_refuses_visibly() {
     let _lock = prompt_catalog_test_lock();
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "report-unrenderable-start",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
@@ -81,7 +81,7 @@ async fn an_attempt_whose_prompt_cannot_render_refuses_visibly() {
             error: None,
             completed_at: None,
         }),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     let _installed = scoped_prompt_catalog(

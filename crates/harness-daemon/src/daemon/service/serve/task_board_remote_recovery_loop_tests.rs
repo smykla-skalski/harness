@@ -22,7 +22,7 @@ mod schedule;
 
 #[tokio::test]
 async fn foreground_recovery_drains_poisoned_incomplete_pages_before_unrelated_callback() {
-    let fixture = poisoned_recovery_fixture(130).await;
+    let fixture = Box::pin(poisoned_recovery_fixture(130)).await;
     assert!(
         fixture
             .db
@@ -75,7 +75,7 @@ async fn foreground_recovery_drains_poisoned_incomplete_pages_before_unrelated_c
 
 #[tokio::test]
 async fn startup_tolerates_quarantine_and_bounded_inbox() {
-    let fixture = poisoned_recovery_fixture(130).await;
+    let fixture = Box::pin(poisoned_recovery_fixture(130)).await;
     recover_remote_assignments_at_startup(&fixture.db)
         .await
         .expect("startup leaves poisoned rows fenced for background recovery");
@@ -118,7 +118,7 @@ async fn top_level_recovery_query_failure_still_blocks_callback() {
 
 #[tokio::test]
 async fn background_expiry_waits_for_the_last_controller_page() {
-    let fixture = poisoned_recovery_fixture(65).await;
+    let fixture = Box::pin(poisoned_recovery_fixture(65)).await;
     let mut schedule = RecoverySchedule::new(Duration::from_secs(30));
 
     maintain_remote_recovery_after_coverage(
@@ -175,7 +175,7 @@ async fn background_expiry_waits_for_the_last_controller_page() {
 
 #[tokio::test]
 async fn background_maintenance_prunes_only_cleanup_completed_evidence() {
-    let fixture = settled_old_fixture().await;
+    let fixture = Box::pin(settled_old_fixture()).await;
 
     let mut schedule = RecoverySchedule::new(Duration::from_secs(30));
     maintain_remote_recovery(&fixture.executor.db, &mut schedule).await;
@@ -275,7 +275,12 @@ async fn settled_old_fixture() -> SettledOldFixture {
         .claim_task_board_remote_assignment(&claim, REMOTE_EXECUTOR_PRINCIPAL, &at(1))
         .await
         .expect("claim old executor assignment");
-    authorize_and_start_remote_executor(&executor, &accepted.assignment_id, &at(2)).await;
+    Box::pin(authorize_and_start_remote_executor(
+        &executor,
+        &accepted.assignment_id,
+        &at(2),
+    ))
+    .await;
     let lease_id = accepted.lease_id.expect("accepted executor lease");
     let cancel = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -318,7 +323,7 @@ async fn settled_old_fixture() -> SettledOldFixture {
 }
 
 async fn poisoned_recovery_fixture(poison_count: u32) -> RecoveryFixture {
-    let mut prepared = prepare_remote_offer("recovery-liveness-healthy").await;
+    let mut prepared = Box::pin(prepare_remote_offer("recovery-liveness-healthy")).await;
     let now = Utc::now() + ChronoDuration::seconds(1);
     let offered_at = now.to_rfc3339_opts(SecondsFormat::Secs, true);
     let lease_expires_at =

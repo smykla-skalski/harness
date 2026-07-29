@@ -8,12 +8,12 @@ use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
 async fn local_review_waits_for_two_reviewer_quorum_before_evaluation() {
-    let fixture = seed_execution_with_reviewers(
+    let fixture = Box::pin(seed_execution_with_reviewers(
         "local-two-reviewer-quorum",
         TaskBoardWorkflowKind::Review,
         2,
         2,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([
         PlannedReport::passing_review_for("reviewer-amber"),

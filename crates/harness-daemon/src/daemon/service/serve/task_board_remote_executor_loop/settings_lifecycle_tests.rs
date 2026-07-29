@@ -21,7 +21,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 async fn compatible_settings_changes_reconcile_started_workers_through_terminal() {
     for drift in [SettingsDrift::Disabled, SettingsDrift::RevisionOnly] {
         for owner_instance in [EXECUTOR_INSTANCE, "restarted-instance"] {
-            let (fixture, _, started, authority, _) = adopted_worker().await;
+            let (fixture, _, started, authority, _) = Box::pin(adopted_worker()).await;
             drift_executor_settings(&fixture.db, drift).await;
             query("UPDATE codex_runs SET status = 'cancelled', updated_at = ?2 WHERE run_id = ?1")
                 .bind(&authority.identity.run_id)
@@ -48,7 +48,7 @@ async fn compatible_settings_changes_reconcile_started_workers_through_terminal(
 
 #[tokio::test]
 async fn launch_material_drift_is_durable_stop_only_across_ambiguous_restart() {
-    let (fixture, _, started, authority, old_checkout) = adopted_worker().await;
+    let (fixture, _, started, authority, old_checkout) = Box::pin(adopted_worker()).await;
     let (replacement, _) = git_repository(&fixture._temp.path().join("replacement"));
     configure_checkout(&fixture.db, &replacement).await;
     let claim = fixture
@@ -126,7 +126,7 @@ async fn launch_material_drift_is_durable_stop_only_across_ambiguous_restart() {
 // separate future capability (executor takeover resume), out of scope here.
 #[tokio::test]
 async fn post_adoption_replay_requires_the_current_lifecycle_owner() {
-    let (fixture, _claimed, started, _authority, _workspace) = adopted_worker().await;
+    let (fixture, _claimed, started, _authority, _workspace) = Box::pin(adopted_worker()).await;
     let identity = remote_executor_identity(&started).expect("remote executor identity");
     // The successor acquires ownership on the same whole-second clock the
     // reconcile loop reads, so the monotonic-owner fence sees a stable owner
@@ -188,7 +188,7 @@ async fn post_adoption_replay_requires_the_current_lifecycle_owner() {
 
 #[tokio::test]
 async fn lifecycle_owner_takeover_waits_for_the_exact_expiry() {
-    let (fixture, _, started, _, _) = adopted_worker().await;
+    let (fixture, _, started, _, _) = Box::pin(adopted_worker()).await;
     let owner_at = Utc::now().to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let owner_b = fixture
         .db
@@ -236,7 +236,7 @@ async fn adopted_worker() -> (
     let (origin, revision) = git_repository(fixture._temp.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
-    let (accepted, authority) = claim_start_authority(&fixture, &request).await;
+    let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
     let claimed = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&claimed).expect("remote executor identity");
     let workspace = prepare_remote_workspace(

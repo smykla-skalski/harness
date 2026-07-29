@@ -9,7 +9,7 @@ use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState}
 
 #[tokio::test]
 async fn terminal_artifacts_and_status_commit_once_under_the_exact_owner() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Review).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Review)).await;
     let (response, artifacts) = completed_evidence(&terminal.record);
     let outcome = terminal
         .fixture
@@ -52,7 +52,7 @@ async fn terminal_artifacts_and_status_commit_once_under_the_exact_owner() {
 
 #[tokio::test]
 async fn conflicting_terminal_owner_status_or_bytes_are_stale_without_mutation() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Review).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Review)).await;
     let (response, artifacts) = completed_evidence(&terminal.record);
     let TaskBoardRemoteMutationOutcome::Updated(committed) = terminal
         .fixture
@@ -91,7 +91,7 @@ async fn conflicting_terminal_owner_status_or_bytes_are_stale_without_mutation()
 
 #[tokio::test]
 async fn terminal_update_failure_rolls_back_every_artifact_byte() {
-    let terminal = terminal_executor(TaskBoardExecutionPhase::Review).await;
+    let terminal = Box::pin(terminal_executor(TaskBoardExecutionPhase::Review)).await;
     let (response, artifacts) = completed_evidence(&terminal.record);
     query(
         "CREATE TRIGGER inject_remote_terminal_failure

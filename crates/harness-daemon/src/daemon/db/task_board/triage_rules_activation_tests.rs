@@ -314,7 +314,7 @@ async fn activation_failing_after_supersede_and_insert_rolls_back_completely() {
 }
 
 /// Concurrent item creation and rule-set activation on the same daemon must
-/// serialize through SQLite's immediate-transaction locking without a torn
+/// serialize through `SQLite`'s immediate-transaction locking without a torn
 /// or duplicated write: the item ends up with exactly one *current*
 /// decision, made by whichever evaluator actually committed around it.
 #[tokio::test]

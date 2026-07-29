@@ -21,11 +21,11 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn generic_expiry_defers_exact_source_owner_until_conclusive_rejection() {
-    let prepared = prepare_remote_implementation_offer(
+    let prepared = Box::pin(prepare_remote_implementation_offer(
         "source-owned-expiry",
         "/tmp/source-owned-expiry",
         SOURCE_REVISION,
-    )
+    ))
     .await;
     let offer = persist_source_owned_offer(&prepared).await;
     assert_source_owned_recovery_defers(&prepared.db, &offer).await;
@@ -53,21 +53,20 @@ async fn generic_expiry_defers_exact_source_owner_until_conclusive_rejection() {
             .map(String::as_str),
         Some(expected_remote_target.as_str())
     );
-    restarted
-        .record_task_board_remote_offer_response(
-            &RemoteOfferResponse {
-                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                binding: offer.binding.clone(),
-                offer_request_sha256: offer.request_sha256.clone(),
-                disposition: RemoteOfferDisposition::Rejected,
-                lease: None,
-                rejection_code: Some("executor_unavailable".into()),
-            },
-            HOST,
-            "2026-07-19T10:00:02Z",
-        )
-        .await
-        .expect("apply conclusive source offer rejection");
+    Box::pin(restarted.record_task_board_remote_offer_response(
+        &RemoteOfferResponse {
+            schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+            binding: offer.binding.clone(),
+            offer_request_sha256: offer.request_sha256.clone(),
+            disposition: RemoteOfferDisposition::Rejected,
+            lease: None,
+            rejection_code: Some("executor_unavailable".into()),
+        },
+        HOST,
+        "2026-07-19T10:00:02Z",
+    ))
+    .await
+    .expect("apply conclusive source offer rejection");
     assert!(!source_recovery_owns(&restarted, &offer).await);
     let assignment = restarted
         .task_board_remote_assignment(&offer.binding.assignment_id)

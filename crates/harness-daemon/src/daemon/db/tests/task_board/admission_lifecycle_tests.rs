@@ -20,7 +20,7 @@ async fn configured_policy_rejects_missing_decision_and_ledger_evidence() {
     let db = test_db().await;
     configure_policy(&db, concurrency_policy()).await;
 
-    let renewal_intent = reserve(&db, "admission-missing-renewal", None).await;
+    let renewal_intent = Box::pin(reserve(&db, "admission-missing-renewal", None)).await;
     let renewal_claim = db
         .claim_task_board_dispatch_preparation(&renewal_intent)
         .await
@@ -37,7 +37,7 @@ async fn configured_policy_rejects_missing_decision_and_ledger_evidence() {
             .contains("without a current allowed decision under the configured policy")
     );
 
-    let commit_intent = reserve(&db, "admission-missing-commit", None).await;
+    let commit_intent = Box::pin(reserve(&db, "admission-missing-commit", None)).await;
     let preparation = db
         .claim_task_board_dispatch_preparation(&commit_intent)
         .await
@@ -71,7 +71,7 @@ async fn configured_policy_rejects_missing_decision_and_ledger_evidence() {
 async fn empty_policy_preserves_evidenceless_renewal_and_commit() {
     let db = test_db().await;
     configure_policy(&db, TaskBoardAutomationPolicy::default()).await;
-    let intent = reserve(&db, "admission-empty-policy", None).await;
+    let intent = Box::pin(reserve(&db, "admission-empty-policy", None)).await;
     let preparation = db
         .claim_task_board_dispatch_preparation(&intent)
         .await
@@ -101,7 +101,7 @@ async fn empty_policy_preserves_evidenceless_renewal_and_commit() {
 async fn renewal_recompiles_a_closed_time_window_reservation() {
     let db = test_db().await;
     configure_policy(&db, active_time_window_policy()).await;
-    let intent = reserve(&db, "admission-window-rollover", None).await;
+    let intent = Box::pin(reserve(&db, "admission-window-rollover", None)).await;
     let preparation = db
         .claim_task_board_dispatch_preparation(&intent)
         .await
@@ -125,7 +125,7 @@ async fn renewal_recompiles_a_closed_time_window_reservation() {
 async fn claim_heartbeat_and_commit_keep_the_frozen_start_authorization() {
     let db = test_db().await;
     configure_policy(&db, active_time_window_policy()).await;
-    let intent = reserve(&db, "admission-authorized-window", None).await;
+    let intent = Box::pin(reserve(&db, "admission-authorized-window", None)).await;
     let preparation = db
         .claim_task_board_dispatch_preparation(&intent)
         .await
@@ -178,7 +178,7 @@ async fn claim_heartbeat_and_commit_keep_the_frozen_start_authorization() {
 async fn worker_claim_renewal_rejects_orphaned_admission_ledger() {
     let db = test_db().await;
     configure_policy(&db, concurrency_policy()).await;
-    let intent = reserve(&db, "admission-orphaned-ledger", None).await;
+    let intent = Box::pin(reserve(&db, "admission-orphaned-ledger", None)).await;
     let preparation = db
         .claim_task_board_dispatch_preparation(&intent)
         .await
@@ -217,7 +217,12 @@ async fn worker_claim_renewal_rejects_orphaned_admission_ledger() {
 async fn renewal_recompiles_rate_token_and_cost_bucket_rollover() {
     let db = test_db().await;
     configure_policy(&db, windowed_budget_policy()).await;
-    let intent = reserve(&db, "admission-budget-rollover", Some((40, 75_000))).await;
+    let intent = Box::pin(reserve(
+        &db,
+        "admission-budget-rollover",
+        Some((40, 75_000)),
+    ))
+    .await;
     let preparation = db
         .claim_task_board_dispatch_preparation(&intent)
         .await

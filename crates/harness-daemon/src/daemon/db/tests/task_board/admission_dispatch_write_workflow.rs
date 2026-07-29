@@ -9,7 +9,7 @@ const APPROVED_AT: &str = "2026-07-18T10:00:00Z";
 
 #[tokio::test]
 async fn write_dispatch_atomically_starts_approved_implementation() {
-    let (db, intent, preparation, launch) = reserved_write("atomic-start").await;
+    let (db, intent, preparation, launch) = Box::pin(reserved_write("atomic-start")).await;
     let source_revision = launch.source_item_revision;
     let applied = publish_write(&db, &preparation, launch).await;
     let published = applied.write_workflow.as_ref().expect("write launch");
@@ -73,7 +73,7 @@ async fn write_dispatch_atomically_starts_approved_implementation() {
 
 #[tokio::test]
 async fn write_launch_rejects_item_revision_aba_before_pending_claim() {
-    let (db, intent, preparation, launch) = reserved_write("revision-aba").await;
+    let (db, intent, preparation, launch) = Box::pin(reserved_write("revision-aba")).await;
     let applied = publish_write(&db, &preparation, launch).await;
     for title in ["Transient title", "Implement approved plan"] {
         db.update_task_board_item(&applied.board_item_id, |item| {
@@ -97,7 +97,7 @@ async fn write_launch_rejects_item_revision_aba_before_pending_claim() {
 
 #[tokio::test]
 async fn write_completion_rejects_forged_persisted_plan_evidence_atomically() {
-    let (db, intent, preparation, launch) = reserved_write("forged-plan").await;
+    let (db, intent, preparation, launch) = Box::pin(reserved_write("forged-plan")).await;
     let applied = publish_write(&db, &preparation, launch).await;
     let claim = db
         .claim_task_board_dispatch(&applied.board_item_id)
@@ -136,7 +136,7 @@ async fn write_completion_rejects_forged_persisted_plan_evidence_atomically() {
 
 #[tokio::test]
 async fn starting_write_launch_blocks_public_item_mutation() {
-    let (db, _, preparation, launch) = reserved_write("starting-mutation").await;
+    let (db, _, preparation, launch) = Box::pin(reserved_write("starting-mutation")).await;
     let applied = publish_write(&db, &preparation, launch).await;
     db.claim_task_board_dispatch(&applied.board_item_id)
         .await
@@ -166,7 +166,14 @@ async fn reserved_write(
     ClaimedTaskBoardDispatchPreparation,
     TaskBoardWriteWorkflowLaunch,
 ) {
-    reserved_write_at(label, None, "/tmp/worktree", "head-base", false).await
+    Box::pin(reserved_write_at(
+        label,
+        None,
+        "/tmp/worktree",
+        "head-base",
+        false,
+    ))
+    .await
 }
 
 pub(super) async fn reserved_write_at(
@@ -181,8 +188,12 @@ pub(super) async fn reserved_write_at(
     ClaimedTaskBoardDispatchPreparation,
     TaskBoardWriteWorkflowLaunch,
 ) {
-    let (db, item_id) =
-        prepare_reserved_write_item(label, execution_repository, configure_remote).await;
+    let (db, item_id) = Box::pin(prepare_reserved_write_item(
+        label,
+        execution_repository,
+        configure_remote,
+    ))
+    .await;
     let plan = create_plan_for_existing(&db, &item_id).await;
     let intent = preparing_intent(
         db.reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)

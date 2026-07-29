@@ -19,7 +19,7 @@ fn sealed_offer_digest_binds_complete_attempt_and_repository_evidence() {
 
     let mut variants = Vec::new();
     variants.push(with_binding(&request, |binding| {
-        binding.assignment_id = "other".into()
+        binding.assignment_id = "other".into();
     }));
     let mut execution_changed = request.clone();
     execution_changed.binding.execution_id = "other".into();
@@ -31,18 +31,18 @@ fn sealed_offer_digest_binds_complete_attempt_and_repository_evidence() {
     );
     variants.push(execution_changed);
     variants.push(with_binding(&request, |binding| {
-        binding.action_key = "other".into()
+        binding.action_key = "other".into();
     }));
     variants.push(with_binding(&request, |binding| binding.attempt = 2));
     variants.push(with_binding(&request, |binding| {
-        binding.idempotency_key = "other".into()
+        binding.idempotency_key = "other".into();
     }));
     variants.push(with_binding(&request, |binding| {
-        binding.host_instance_id = "other".into()
+        binding.host_instance_id = "other".into();
     }));
     variants.push(with_binding(&request, |binding| binding.fencing_epoch = 2));
     variants.push(with_binding(&request, |binding| {
-        binding.configuration_revision = 2
+        binding.configuration_revision = 2;
     }));
     variants.push(with_binding(&request, |binding| {
         binding.execution_record_sha256 = "b".repeat(64);
@@ -55,7 +55,7 @@ fn sealed_offer_digest_binds_complete_attempt_and_repository_evidence() {
     );
     variants.push(repository_changed);
     variants.push(with_binding(&request, |binding| {
-        binding.base_revision = "3333333333333333333333333333333333333333".into()
+        binding.base_revision = "3333333333333333333333333333333333333333".into();
     }));
     let mut workflow_kind_changed = with_binding(&request, |binding| {
         binding.workflow_kind = TaskBoardWorkflowKind::PR_FIX;

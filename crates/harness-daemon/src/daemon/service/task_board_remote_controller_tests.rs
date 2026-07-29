@@ -26,7 +26,7 @@ mod unknown;
 
 #[tokio::test]
 async fn eligible_initial_attempt_selects_remote_before_any_local_run() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     refresh_fixture_observation(&fixture, 1, 0).await;
     let mut report = TaskBoardRemoteControllerReport::default();
 
@@ -55,7 +55,7 @@ async fn eligible_initial_attempt_selects_remote_before_any_local_run() {
 
 #[tokio::test]
 async fn no_eligible_host_selects_one_local_target_before_claim() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     // A valid host advertises at least one slot; a fully-occupied host is the "no eligible host" case.
     refresh_fixture_observation(&fixture, 1, 1).await;
     let mut report = TaskBoardRemoteControllerReport::default();
@@ -105,7 +105,7 @@ async fn no_eligible_host_selects_one_local_target_before_claim() {
 
 #[tokio::test]
 async fn newer_host_revision_selects_one_local_disposition_without_remote_io() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     let mut settings = fixture
         .db
         .task_board_orchestrator_settings()
@@ -160,7 +160,7 @@ async fn newer_host_revision_selects_one_local_disposition_without_remote_io() {
 
 #[tokio::test]
 async fn transient_progress_failure_defers_exact_generation_and_survives_restart() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     assert!(matches!(
         fixture
             .db

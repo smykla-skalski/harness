@@ -17,7 +17,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 #[tokio::test]
 async fn renewed_claim_can_acquire_exact_start_authority_once() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let claimed = load_assignment(&fixture, &accepted.assignment_id).await;
     let immutable_receipt = claimed.claim_receipt.clone();
     let old_lease = claimed.lease_id.clone().expect("initial lease");
@@ -48,13 +48,13 @@ async fn renewed_claim_can_acquire_exact_start_authority_once() {
     let (project_dir, permit) =
         persist_executor_run(&fixture, &renewed, &authority, "2026-07-19T10:00:40Z").await;
     assert!(matches!(
-        fixture
+        Box::pin(fixture
             .db
             .adopt_task_board_remote_executor_start(
                 &permit,
                 Path::new(&project_dir),
                 "2026-07-19T10:00:40Z",
-            )
+            ))
             .await
             .expect("adopt renewed exact start"),
         TaskBoardRemoteMutationOutcome::Updated(ref record)
@@ -94,7 +94,7 @@ async fn renewed_claim_can_acquire_exact_start_authority_once() {
 #[tokio::test]
 async fn recovery_winner_prevents_a_late_start_authority() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let recovered = fixture
         .db
         .recover_task_board_remote_assignments(AFTER_EXPIRY)
@@ -122,7 +122,7 @@ async fn recovery_winner_prevents_a_late_start_authority() {
 #[tokio::test]
 async fn concurrent_recovery_and_start_authority_have_one_atomic_winner() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let barrier = Arc::new(Barrier::new(3));
     let authority_db = fixture.db.clone();
     let recovery_db = fixture.db.clone();
@@ -151,27 +151,24 @@ async fn concurrent_recovery_and_start_authority_have_one_atomic_winner() {
         .expect("join recovery")
         .expect("recovery result");
     let durable = load_assignment(&fixture, &accepted.assignment_id).await;
-    match authority {
-        Some(authority) => {
-            assert!(recovery.recovered.is_empty());
-            assert_eq!(durable.state, TaskBoardRemoteAssignmentState::Claimed);
-            assert_eq!(
-                durable.executor_start_authority_sha256.as_deref(),
-                Some(authority.sha256.as_str())
-            );
-        }
-        None => {
-            assert_eq!(recovery.recovered.len(), 1);
-            assert_eq!(durable.state, TaskBoardRemoteAssignmentState::Unknown);
-            assert!(durable.executor_start_authority_sha256.is_none());
-        }
+    if let Some(authority) = authority {
+        assert!(recovery.recovered.is_empty());
+        assert_eq!(durable.state, TaskBoardRemoteAssignmentState::Claimed);
+        assert_eq!(
+            durable.executor_start_authority_sha256.as_deref(),
+            Some(authority.sha256.as_str())
+        );
+    } else {
+        assert_eq!(recovery.recovered.len(), 1);
+        assert_eq!(durable.state, TaskBoardRemoteAssignmentState::Unknown);
+        assert!(durable.executor_start_authority_sha256.is_none());
     }
 }
 
 #[tokio::test]
 async fn token_without_a_run_expires_only_after_its_exact_window() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(
@@ -230,7 +227,7 @@ async fn start_authority_digest_rejects_claim_evidence_tampering() {
         ("lease_expires_at", "2026-07-19T10:01:01Z"),
     ] {
         let fixture = executor_fixture(1).await;
-        let accepted = claim_executor(&fixture).await;
+        let accepted = Box::pin(claim_executor(&fixture)).await;
         fixture
             .db
             .claim_task_board_remote_executor_start_authority(
@@ -301,7 +298,7 @@ async fn start_authority_digest_rejects_claim_evidence_tampering() {
 async fn adoption_rejects_pre_token_and_mismatched_launch_evidence() {
     for mismatch in ["pre_token", "display_name"] {
         let fixture = executor_fixture(1).await;
-        let accepted = claim_executor(&fixture).await;
+        let accepted = Box::pin(claim_executor(&fixture)).await;
         let authority = fixture
             .db
             .claim_task_board_remote_executor_start_authority(
@@ -336,13 +333,13 @@ async fn adoption_rejects_pre_token_and_mismatched_launch_evidence() {
                 .expect("tamper launch request evidence");
         }
         assert!(matches!(
-            fixture
+            Box::pin(fixture
                 .db
                 .adopt_task_board_remote_executor_start(
                     &permit,
                     Path::new(&project_dir),
                     run_at,
-                )
+                ))
                 .await
                 .expect("reject mismatched durable run"),
             TaskBoardRemoteMutationOutcome::Stale(ref record)
@@ -355,7 +352,7 @@ async fn adoption_rejects_pre_token_and_mismatched_launch_evidence() {
 #[tokio::test]
 async fn a_successfully_stopped_invalid_run_clears_only_the_exact_token() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(
@@ -404,15 +401,13 @@ async fn a_successfully_stopped_invalid_run_clears_only_the_exact_token() {
             .is_none()
     );
     assert!(matches!(
-        fixture
-            .db
-            .adopt_task_board_remote_executor_start(
-                &permit,
-                Path::new(&snapshot.project_dir),
-                STARTED_AT,
-            )
-            .await
-            .expect("stop-only start adoption"),
+        Box::pin(fixture.db.adopt_task_board_remote_executor_start(
+            &permit,
+            Path::new(&snapshot.project_dir),
+            STARTED_AT,
+        ))
+        .await
+        .expect("stop-only start adoption"),
         TaskBoardRemoteMutationOutcome::Stale(_)
     ));
     assert!(matches!(

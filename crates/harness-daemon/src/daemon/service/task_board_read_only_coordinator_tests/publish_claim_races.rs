@@ -10,11 +10,11 @@ use super::runtime::FakeReadOnlyRuntime;
 
 #[tokio::test]
 async fn stale_starting_snapshot_does_not_republish_settled_attempt() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-stale-starting-snapshot",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     let stale = super::load_execution(&fixture).await;
@@ -49,11 +49,11 @@ async fn stale_starting_snapshot_does_not_republish_settled_attempt() {
 
 #[tokio::test]
 async fn completed_publish_phase_advance_supersedes_parent_state_repair() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-phase-advance-wins",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let initial = super::load_execution(&fixture).await;
     let starting = initial.attempts[0].clone();

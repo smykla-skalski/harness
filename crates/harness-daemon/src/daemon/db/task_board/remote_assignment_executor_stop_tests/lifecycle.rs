@@ -3,12 +3,17 @@ use super::*;
 #[tokio::test]
 async fn lifecycle_stop_intent_survives_ambiguity_and_fences_every_owner() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
-    let started =
-        match authorize_and_start_executor(&fixture, &accepted.assignment_id, STARTED_AT).await {
-            TaskBoardRemoteMutationOutcome::Updated(record) => record,
-            other => panic!("expected started executor, got {other:?}"),
-        };
+    let accepted = Box::pin(claim_executor(&fixture)).await;
+    let started = match Box::pin(authorize_and_start_executor(
+        &fixture,
+        &accepted.assignment_id,
+        STARTED_AT,
+    ))
+    .await
+    {
+        TaskBoardRemoteMutationOutcome::Updated(record) => record,
+        other => panic!("expected started executor, got {other:?}"),
+    };
     let owner = started
         .executor_lifecycle_owner
         .clone()
@@ -50,7 +55,10 @@ async fn lifecycle_stop_intent_survives_ambiguity_and_fences_every_owner() {
         .expect("replay lifecycle stop authority")
         .expect("replayed lifecycle stop authority");
     assert_eq!(replay, pending);
-    assert_owner_is_stop_only(&fixture, &started, &owner, &pending).await;
+    Box::pin(assert_owner_is_stop_only(
+        &fixture, &started, &owner, &pending,
+    ))
+    .await;
 
     run.status = CodexRunStatus::Cancelled;
     run.updated_at = "2026-07-19T10:00:23Z".into();
@@ -136,7 +144,10 @@ async fn assert_owner_is_stop_only(
                 && record.executor_stop_pending.as_ref() == Some(pending)
                 && record.status_response.is_none()
     ));
-    assert_other_executor_mutations_are_stale(fixture, started, pending).await;
+    Box::pin(assert_other_executor_mutations_are_stale(
+        fixture, started, pending,
+    ))
+    .await;
 }
 
 async fn assert_other_executor_mutations_are_stale(

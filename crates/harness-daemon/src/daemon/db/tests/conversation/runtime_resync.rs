@@ -259,7 +259,7 @@ fn append_conversation_events_merges_live_batches_without_replacing_history() {
         "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
         "claude-leader",
         "gemini",
-        &[first.clone()],
+        std::slice::from_ref(&first),
     )
     .expect("append first live batch");
     db.append_conversation_events(

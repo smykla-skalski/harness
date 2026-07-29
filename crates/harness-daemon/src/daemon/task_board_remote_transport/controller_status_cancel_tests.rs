@@ -17,8 +17,8 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn status_authority_wins_before_cancel_and_cancel_performs_zero_io() {
-    let state = prepared_acceptance("status-before-cancel-authority").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("status-before-cancel-authority")).await;
+    Box::pin(persist_claim(&state)).await;
     let status = status_request(&state);
     let status_response = completed_status(&state);
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
@@ -39,28 +39,30 @@ async fn status_authority_wins_before_cancel_and_cancel_performs_zero_io() {
         ],
     ));
 
-    temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let status_call = spawn_status(&status_controller, &state, &status);
-        status_server
-            .seen
-            .await
-            .expect("status request reached executor");
-        let cancel_error = cancel_controller
-            .cancel(&state.prepared.db, &cancel)
-            .await
-            .expect_err("status authority must exclude cancellation");
-        assert_concurrent_database_error(cancel_error);
-        status_server.release.send(()).expect("release status");
-        let status_outcome = status_call
-            .await
-            .expect("status task")
-            .expect("status settles atomically");
-        assert!(matches!(
-            status_outcome.1,
-            TaskBoardRemoteMutationOutcome::Updated(ref record)
-                if record.state == TaskBoardRemoteAssignmentState::Completed
-        ));
-    })
+    Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("authority-secret"))],
+        async {
+            let status_call = spawn_status(&status_controller, &state, &status);
+            status_server
+                .seen
+                .await
+                .expect("status request reached executor");
+            let cancel_error = Box::pin(cancel_controller.cancel(&state.prepared.db, &cancel))
+                .await
+                .expect_err("status authority must exclude cancellation");
+            assert_concurrent_database_error(cancel_error);
+            status_server.release.send(()).expect("release status");
+            let status_outcome = status_call
+                .await
+                .expect("status task")
+                .expect("status settles atomically");
+            assert!(matches!(
+                status_outcome.1,
+                TaskBoardRemoteMutationOutcome::Updated(ref record)
+                    if record.state == TaskBoardRemoteAssignmentState::Completed
+            ));
+        },
+    ))
     .await;
     assert_eq!(status_server.requests.await.expect("status barrier"), 1);
     assert_eq!(cancel_requests.await.expect("cancel probe"), 0);
@@ -68,8 +70,8 @@ async fn status_authority_wins_before_cancel_and_cancel_performs_zero_io() {
 
 #[tokio::test]
 async fn journaled_cancel_lets_a_reconciling_status_reach_the_executor() {
-    let state = prepared_acceptance("cancel-authority-before-status").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("cancel-authority-before-status")).await;
+    Box::pin(persist_claim(&state)).await;
     let status = status_request(&state);
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
     let cancel_response = cancel_response(&state.prepared.offer, &state.times.before_expiry);
@@ -123,8 +125,8 @@ async fn journaled_cancel_lets_a_reconciling_status_reach_the_executor() {
 
 #[tokio::test]
 async fn completed_status_before_cancel_denies_cancel_with_zero_io() {
-    let state = prepared_acceptance("completed-status-before-cancel").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("completed-status-before-cancel")).await;
+    Box::pin(persist_claim(&state)).await;
     let status = status_request(&state);
     let status_response = completed_status(&state);
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
@@ -139,25 +141,27 @@ async fn completed_status_before_cancel_denies_cancel_with_zero_io() {
     let cancel_controller =
         pinned_controller_with_times(&cancel_endpoint, &tls, [state.times.before_expiry.clone()]);
 
-    temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let status_call = status_controller.status(&state.prepared.db, &status);
-        let release_status = async {
-            status_server.seen.await.expect("status reached executor");
-            status_server.release.send(()).expect("release status");
-        };
-        let (outcome, ()) = tokio::join!(status_call, release_status);
-        let outcome = outcome.expect("terminal status settles atomically");
-        assert!(matches!(
-            outcome.1,
-            TaskBoardRemoteMutationOutcome::Updated(ref record)
-                if record.state == TaskBoardRemoteAssignmentState::Completed
-        ));
-        let error = cancel_controller
-            .cancel(&state.prepared.db, &cancel)
-            .await
-            .expect_err("completed status must fence later cancellation");
-        assert_concurrent_database_error(error);
-    })
+    Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("authority-secret"))],
+        async {
+            let status_call = status_controller.status(&state.prepared.db, &status);
+            let release_status = async {
+                status_server.seen.await.expect("status reached executor");
+                status_server.release.send(()).expect("release status");
+            };
+            let (outcome, ()) = tokio::join!(status_call, release_status);
+            let outcome = outcome.expect("terminal status settles atomically");
+            assert!(matches!(
+                outcome.1,
+                TaskBoardRemoteMutationOutcome::Updated(ref record)
+                    if record.state == TaskBoardRemoteAssignmentState::Completed
+            ));
+            let error = Box::pin(cancel_controller.cancel(&state.prepared.db, &cancel))
+                .await
+                .expect_err("completed status must fence later cancellation");
+            assert_concurrent_database_error(error);
+        },
+    ))
     .await;
     assert_eq!(status_server.requests.await.expect("status barrier"), 1);
     assert_eq!(cancel_requests.await.expect("cancel probe"), 0);
@@ -206,7 +210,7 @@ fn spawn_cancel(
     let controller = Arc::clone(controller);
     let db = (*state.prepared.db).clone();
     let request = request.clone();
-    tokio::spawn(async move { controller.cancel(&db, &request).await })
+    tokio::spawn(async move { Box::pin(controller.cancel(&db, &request)).await })
 }
 
 async fn assert_cancelled_without_authority(

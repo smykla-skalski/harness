@@ -422,7 +422,7 @@ fn corrupt_legacy_host(conn: &rusqlite::Connection, invalid: InvalidLegacyHost) 
             )
             .expect("corrupt repository inventory");
         }
-    };
+    }
 }
 
 #[test]

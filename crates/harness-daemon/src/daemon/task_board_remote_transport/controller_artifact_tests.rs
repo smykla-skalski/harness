@@ -26,7 +26,7 @@ struct ArtifactFixture {
 
 #[tokio::test]
 async fn durable_artifact_replay_skips_a_second_http_fetch() {
-    let fixture = completed_artifact_fixture("artifact-fetch-replay").await;
+    let fixture = Box::pin(completed_artifact_fixture("artifact-fetch-replay")).await;
     let tls = test_tls_material();
     let server = spawn_barrier_server(
         &tls,
@@ -63,16 +63,19 @@ async fn durable_artifact_replay_skips_a_second_http_fetch() {
 
 #[tokio::test]
 async fn failed_http_fetch_retains_trust_authority_without_artifact() {
-    let fixture = completed_artifact_fixture("artifact-fetch-crash").await;
+    let fixture = Box::pin(completed_artifact_fixture("artifact-fetch-crash")).await;
     let tls = test_tls_material();
     let (endpoint, requests) = spawn_probe_server(&tls).await;
     let controller = pinned_controller(&endpoint, &tls);
-    temp_env::async_with_vars([(TOKEN_ENV, Some("artifact-secret"))], async {
-        controller
-            .fetch_artifact(&fixture.state.prepared.db, &fixture.request)
-            .await
-            .expect_err("failed HTTP fetch must retain durable authority");
-    })
+    Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("artifact-secret"))],
+        async {
+            controller
+                .fetch_artifact(&fixture.state.prepared.db, &fixture.request)
+                .await
+                .expect_err("failed HTTP fetch must retain durable authority");
+        },
+    ))
     .await;
     assert_eq!(requests.await.expect("failed fetch request count"), 1);
     assert_fetch_pending(&fixture.state.prepared.db, &fixture.request).await;
@@ -80,7 +83,7 @@ async fn failed_http_fetch_retains_trust_authority_without_artifact() {
 
 #[tokio::test]
 async fn artifact_response_cannot_cross_a_host_trust_rotation() {
-    let fixture = completed_artifact_fixture("artifact-fetch-trust-rotation").await;
+    let fixture = Box::pin(completed_artifact_fixture("artifact-fetch-trust-rotation")).await;
     let tls = test_tls_material();
     let server = spawn_barrier_server(
         &tls,
@@ -119,7 +122,7 @@ async fn artifact_response_cannot_cross_a_host_trust_rotation() {
 
 #[tokio::test]
 async fn conflicting_immutable_artifact_preserves_fetch_authority() {
-    let fixture = completed_artifact_fixture("artifact-fetch-conflict").await;
+    let fixture = Box::pin(completed_artifact_fixture("artifact-fetch-conflict")).await;
     insert_conflicting_artifact(&fixture).await;
     claim_fetch(&fixture).await;
     let error = fixture
@@ -144,7 +147,7 @@ async fn conflicting_immutable_artifact_preserves_fetch_authority() {
 
 #[tokio::test]
 async fn artifact_insert_failure_rolls_back_trust_consumption() {
-    let fixture = completed_artifact_fixture("artifact-fetch-rollback").await;
+    let fixture = Box::pin(completed_artifact_fixture("artifact-fetch-rollback")).await;
     query(
         "CREATE TRIGGER reject_controller_artifact_insert
          BEFORE INSERT ON task_board_remote_artifacts
@@ -170,8 +173,8 @@ async fn artifact_insert_failure_rolls_back_trust_consumption() {
 }
 
 async fn completed_artifact_fixture(item_id: &str) -> ArtifactFixture {
-    let state = prepared_acceptance(item_id).await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance(item_id)).await;
+    Box::pin(persist_claim(&state)).await;
     let entry = RemoteArtifactEntry {
         relative_path: "result/attempt.json".into(),
         sha256: hex::encode(Sha256::digest(ARTIFACT_CONTENT)),

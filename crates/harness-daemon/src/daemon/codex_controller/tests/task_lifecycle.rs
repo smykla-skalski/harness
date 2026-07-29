@@ -222,7 +222,7 @@ fn completed_bound_run_submits_task_for_review() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn completed_bound_run_advances_linked_board_item() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, _tempdir) =
             controller_with_async_session_state(sample_session_state_with_open_task()).await;
         let mut item = TaskBoardItem::new(
@@ -264,13 +264,13 @@ async fn completed_bound_run_advances_linked_board_item() {
             item.workflow.current_step_id.as_deref(),
             Some("review_pending")
         );
-    })
+    }))
     .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn completed_bound_run_advances_board_after_worker_submits_review() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, _tempdir) =
             controller_with_async_session_state(sample_session_state_with_open_task()).await;
         let mut item = TaskBoardItem::new(
@@ -322,13 +322,13 @@ async fn completed_bound_run_advances_board_after_worker_submits_review() {
             item.workflow.current_step_id.as_deref(),
             Some("review_pending")
         );
-    })
+    }))
     .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn blocked_final_without_work_fails_run_and_does_not_advance_board() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, tempdir) =
             controller_with_async_session_state(sample_session_state_with_open_task()).await;
         let mut item = TaskBoardItem::new(
@@ -394,7 +394,7 @@ async fn blocked_final_without_work_fails_run_and_does_not_advance_board() {
         let item = db.task_board_item("board-1").await.expect("board item");
         assert_eq!(item.status, TaskBoardStatus::Failed);
         assert_ne!(item.status, TaskBoardStatus::ToReview);
-    })
+    }))
     .await;
 }
 

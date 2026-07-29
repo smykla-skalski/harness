@@ -13,14 +13,19 @@ pub(crate) struct PreparedRemoteOffer {
 }
 
 pub(crate) async fn prepare_remote_offer(item_id: &str) -> PreparedRemoteOffer {
-    prepare_remote_offer_with_policy(item_id, false).await
+    Box::pin(prepare_remote_offer_with_policy(item_id, false)).await
 }
 
 pub(crate) async fn prepare_remote_offer_with_policy(
     item_id: &str,
     configure_admission: bool,
 ) -> PreparedRemoteOffer {
-    prepare_remote_offer_with_retry(item_id, configure_admission, None).await
+    Box::pin(prepare_remote_offer_with_retry(
+        item_id,
+        configure_admission,
+        None,
+    ))
+    .await
 }
 
 pub(crate) async fn prepare_remote_offer_with_retry(
@@ -106,7 +111,7 @@ async fn normalize_prepared_times(db: &AsyncDaemonDb, execution_id: &str) {
          SET created_at = '2026-07-19T10:00:00Z', updated_at = '2026-07-19T10:00:00Z'
          WHERE execution_id = ?1",
     )
-    .bind(&execution_id)
+    .bind(execution_id)
     .execute(db.pool())
     .await
     .expect("normalize prepared execution time");
@@ -115,7 +120,7 @@ async fn normalize_prepared_times(db: &AsyncDaemonDb, execution_id: &str) {
          SET started_at = '2026-07-19T10:00:00Z', updated_at = '2026-07-19T10:00:00Z'
          WHERE execution_id = ?1",
     )
-    .bind(&execution_id)
+    .bind(execution_id)
     .execute(db.pool())
     .await
     .expect("normalize prepared attempt time");

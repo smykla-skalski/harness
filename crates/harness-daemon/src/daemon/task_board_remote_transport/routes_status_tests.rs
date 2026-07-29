@@ -9,8 +9,8 @@ use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 
 #[tokio::test]
 async fn failed_route_echoes_exact_durable_failure_class_and_refuses_absence() {
-    let state = prepared_acceptance("failed-status-route").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("failed-status-route")).await;
+    Box::pin(persist_claim(&state)).await;
     let request = status_request(&state);
     let response = failed_status(&state, TaskBoardFailureClass::Transient);
     let outcome = state

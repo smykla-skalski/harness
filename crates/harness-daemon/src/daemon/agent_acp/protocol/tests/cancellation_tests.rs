@@ -143,9 +143,8 @@ async fn pending_permission_does_not_stall_other_requests() {
         tokio::time::timeout(Duration::from_secs(5), served_rx).await,
         "read probe should report before the test deadline",
     );
-    assert_eq!(
+    assert!(
         ok(served, "read probe channel should stay open"),
-        true,
         "fs/read_text_file must be served while a permission is outstanding"
     );
 

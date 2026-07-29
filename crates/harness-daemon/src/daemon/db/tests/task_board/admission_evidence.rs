@@ -15,7 +15,12 @@ use super::admission_dispatch::{configure_policy, preparing_intent, test_db};
 async fn compensation_survives_reservation_horizon_and_retry_with_exact_usage() {
     let db = test_db().await;
     configure_policy(&db, finite_policy(1)).await;
-    let intent = reserve_item(&db, "compensation-evidence", Some((400, 75_000))).await;
+    let intent = Box::pin(reserve_item(
+        &db,
+        "compensation-evidence",
+        Some((400, 75_000)),
+    ))
+    .await;
     prepare_dispatch(&db, &intent).await;
     let claim = db
         .claim_task_board_dispatch("compensation-evidence")
@@ -71,7 +76,7 @@ async fn compensation_survives_reservation_horizon_and_retry_with_exact_usage() 
 async fn refused_pending_intent_releases_capacity_in_the_same_transaction() {
     let db = test_db().await;
     configure_policy(&db, finite_policy(1)).await;
-    let intent = reserve_item(&db, "refused-pending", Some((400, 75_000))).await;
+    let intent = Box::pin(reserve_item(&db, "refused-pending", Some((400, 75_000)))).await;
     prepare_dispatch(&db, &intent).await;
     db.update_task_board_item("refused-pending", |item| {
         item.status = TaskBoardStatus::Todo;
@@ -88,7 +93,7 @@ async fn refused_pending_intent_releases_capacity_in_the_same_transaction() {
     assert_eq!(intent_status(&db, &intent).await, "failed");
     assert_eq!(active_ledger_rows(&db, &intent).await, 0);
 
-    let next = reserve_item(&db, "refused-capacity-reuse", Some((1, 1))).await;
+    let next = Box::pin(reserve_item(&db, "refused-capacity-reuse", Some((1, 1)))).await;
     assert!(!next.is_empty());
 }
 
@@ -96,8 +101,8 @@ async fn refused_pending_intent_releases_capacity_in_the_same_transaction() {
 async fn claim_to_start_policy_drift_commits_the_blocked_evidence() {
     let db = test_db().await;
     configure_policy(&db, finite_policy(2)).await;
-    let first = reserve_item(&db, "start-drift-first", Some((400, 75_000))).await;
-    let second = reserve_item(&db, "start-drift-second", Some((400, 75_000))).await;
+    let first = Box::pin(reserve_item(&db, "start-drift-first", Some((400, 75_000)))).await;
+    let second = Box::pin(reserve_item(&db, "start-drift-second", Some((400, 75_000)))).await;
     prepare_dispatch(&db, &first).await;
     prepare_dispatch(&db, &second).await;
     let first_claim = db

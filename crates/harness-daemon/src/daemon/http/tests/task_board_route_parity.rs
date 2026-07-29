@@ -36,11 +36,16 @@ async fn run_task_board_workflow_parity() {
         .replace_policy_workspace(&workspace)
         .await
         .expect("configure explicit parity fallback");
-    seed_ready_board_item(&state, "parity-workflow", "Parity workflow item").await;
+    Box::pin(seed_ready_board_item(
+        &state,
+        "parity-workflow",
+        "Parity workflow item",
+    ))
+    .await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    assert_planning_routes_match(&client, &base_url, &state).await;
+    Box::pin(assert_planning_routes_match(&client, &base_url, &state)).await;
     assert_http_ws_post_match(
         &client,
         &base_url,
@@ -95,8 +100,8 @@ async fn assert_planning_routes_match(
     base_url: &str,
     state: &crate::daemon::http::DaemonHttpState,
 ) {
-    seed_planning_board_item(state, "parity-plan-http").await;
-    seed_planning_board_item(state, "parity-plan-ws").await;
+    Box::pin(seed_planning_board_item(state, "parity-plan-http")).await;
+    Box::pin(seed_planning_board_item(state, "parity-plan-ws")).await;
 
     let http_begin = post_json(
         client,
@@ -212,7 +217,7 @@ async fn run_task_board_orchestrator_parity() {
         json!({}),
     )
     .await;
-    assert_run_once_routes_match(&client, &base_url, &state).await;
+    Box::pin(assert_run_once_routes_match(&client, &base_url, &state)).await;
     assert_no_durable_runs(&state).await;
     assert_settings_routes_match(&client, &base_url).await;
     assert_runtime_config_routes_match(&client, &base_url).await;

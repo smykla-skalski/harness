@@ -14,19 +14,23 @@ use super::super::fixture::{Fixture, NOW, insert_committed_admission};
 use super::BASE_HEAD;
 
 pub(super) async fn seed_write_execution(label: &str) -> Fixture {
-    seed_write_execution_kind(label, TaskBoardWorkflowKind::DefaultTask).await
+    Box::pin(seed_write_execution_kind(
+        label,
+        TaskBoardWorkflowKind::DefaultTask,
+    ))
+    .await
 }
 
 pub(super) async fn seed_write_execution_kind(
     label: &str,
     workflow_kind: TaskBoardWorkflowKind,
 ) -> Fixture {
-    seed_write_execution_configured(
+    Box::pin(seed_write_execution_configured(
         label,
         workflow_kind,
         Some(format!("work-coordinator-{label}")),
         None,
-    )
+    ))
     .await
 }
 
@@ -34,19 +38,25 @@ pub(super) async fn seed_write_execution_with_task(
     label: &str,
     task_id: Option<String>,
 ) -> Fixture {
-    seed_write_execution_configured(label, TaskBoardWorkflowKind::DefaultTask, task_id, None).await
+    Box::pin(seed_write_execution_configured(
+        label,
+        TaskBoardWorkflowKind::DefaultTask,
+        task_id,
+        None,
+    ))
+    .await
 }
 
 pub(super) async fn seed_write_execution_with_retry_limit(
     label: &str,
     max_attempts: u32,
 ) -> Fixture {
-    seed_write_execution_configured(
+    Box::pin(seed_write_execution_configured(
         label,
         TaskBoardWorkflowKind::DefaultTask,
         Some(format!("work-coordinator-{label}")),
         Some(max_attempts),
-    )
+    ))
     .await
 }
 

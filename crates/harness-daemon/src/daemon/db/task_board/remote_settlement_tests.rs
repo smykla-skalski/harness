@@ -17,7 +17,7 @@ const SETTLED_AT: &str = "2026-07-19T10:00:50Z";
 #[tokio::test]
 async fn lost_settlement_response_replays_first_timestamp_after_restart() {
     let fixture = executor_fixture(1).await;
-    let (cancelled, request) = cancelled_assignment(&fixture).await;
+    let (cancelled, request) = Box::pin(cancelled_assignment(&fixture)).await;
     assert!(
         fixture
             .db
@@ -66,7 +66,7 @@ async fn lost_settlement_response_replays_first_timestamp_after_restart() {
 #[tokio::test]
 async fn settlement_receipt_rejects_principal_and_request_collisions() {
     let fixture = executor_fixture(1).await;
-    let (cancelled, request) = cancelled_assignment(&fixture).await;
+    let (cancelled, request) = Box::pin(cancelled_assignment(&fixture)).await;
     let first = fixture
         .db
         .settle_task_board_remote_assignment(&request, PRINCIPAL, SETTLED_AT)
@@ -103,7 +103,7 @@ async fn settlement_receipt_rejects_principal_and_request_collisions() {
 #[tokio::test]
 async fn artifact_bytes_survive_until_settlement_retention_then_prune_without_reopen() {
     let fixture = executor_fixture(1).await;
-    let (completed, entry) = completed_assignment_with_artifact(&fixture).await;
+    let (completed, entry) = Box::pin(completed_assignment_with_artifact(&fixture)).await;
     let fetch = store_and_verify_artifact(&fixture, &completed, &entry).await;
     assert!(
         fixture

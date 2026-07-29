@@ -12,7 +12,7 @@ const NEWER_CLAIM_AT: &str = "2026-07-19T10:00:50Z";
 
 #[tokio::test]
 async fn active_cursor_survives_reconnect_and_reaches_a_newer_claim() {
-    let fixture = seeded_executor(65).await;
+    let fixture = Box::pin(seeded_executor(65)).await;
     // Claimed rows are already active for the scan (state IN claimed/started/running);
     // a raw 'running' with started_at but no start receipt violates the v43 CHECK, so
     // age the old active page by updated_at alone - all the scan cursor orders on.
@@ -74,7 +74,7 @@ async fn active_cursor_survives_reconnect_and_reaches_a_newer_claim() {
 
 #[tokio::test]
 async fn terminal_cursor_is_bounded_and_restart_fair() {
-    let fixture = seeded_executor(65).await;
+    let fixture = Box::pin(seeded_executor(65)).await;
     query(
         "UPDATE task_board_remote_assignments
          SET state = 'cancelled', completed_at = ?1, updated_at = ?1",
@@ -123,7 +123,7 @@ async fn terminal_cursor_is_bounded_and_restart_fair() {
 
 #[tokio::test]
 async fn scan_wraps_and_revisits_a_row_after_durable_state_change() {
-    let fixture = seeded_executor(3).await;
+    let fixture = Box::pin(seeded_executor(3)).await;
     let first = fixture
         .db
         .scan_task_board_remote_executor_assignments()

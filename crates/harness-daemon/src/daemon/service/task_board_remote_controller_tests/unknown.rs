@@ -24,11 +24,11 @@ const CLEANED_AT: &str = "2026-07-19T10:02:03Z";
 
 #[tokio::test]
 async fn recovered_unknown_observation_settles_then_cleans_without_resuming_or_replaying_io() {
-    let (fixture, unknown) = recovered_unknown_fixture().await;
+    let (fixture, unknown) = Box::pin(recovered_unknown_fixture()).await;
     let calls = UnknownCalls::default();
 
     assert!(
-        drive_unknown_once(&fixture, &unknown, &calls)
+        Box::pin(drive_unknown_once(&fixture, &unknown, &calls))
             .await
             .expect("settle authenticated Unknown observation")
     );
@@ -39,7 +39,7 @@ async fn recovered_unknown_observation_settles_then_cleans_without_resuming_or_r
 
     let settled = load_assignment(&fixture).await;
     assert!(
-        drive_unknown_once(&fixture, &settled, &calls)
+        Box::pin(drive_unknown_once(&fixture, &settled, &calls))
             .await
             .expect("cleanup settled Unknown generation")
     );
@@ -50,7 +50,7 @@ async fn recovered_unknown_observation_settles_then_cleans_without_resuming_or_r
 
     let cleaned = load_assignment(&fixture).await;
     assert!(
-        !drive_unknown_once(&fixture, &cleaned, &calls)
+        !Box::pin(drive_unknown_once(&fixture, &cleaned, &calls))
             .await
             .expect("replay completed Unknown cleanup")
     );
@@ -61,7 +61,7 @@ async fn recovered_unknown_observation_settles_then_cleans_without_resuming_or_r
 
 #[tokio::test]
 async fn recovered_unknown_transient_status_failure_retries_before_any_settlement() {
-    let (fixture, unknown) = recovered_unknown_fixture().await;
+    let (fixture, unknown) = Box::pin(recovered_unknown_fixture()).await;
     let calls = UnknownCalls::default();
     let error = super::super::poll_unknown_assignment_with(
         &fixture.db,
@@ -83,7 +83,7 @@ async fn recovered_unknown_transient_status_failure_retries_before_any_settlemen
     assert_eq!(calls.settle.load(Ordering::SeqCst), 0);
     assert_eq!(calls.cleanup.load(Ordering::SeqCst), 0);
     assert!(
-        drive_unknown_once(&fixture, &unknown, &calls)
+        Box::pin(drive_unknown_once(&fixture, &unknown, &calls))
             .await
             .expect("retry Unknown status after transient failure")
     );
@@ -93,7 +93,7 @@ async fn recovered_unknown_transient_status_failure_retries_before_any_settlemen
 
 #[tokio::test]
 async fn changed_unknown_observation_keeps_its_status_trust_unconsumed() {
-    let (fixture, unknown) = recovered_unknown_fixture().await;
+    let (fixture, unknown) = Box::pin(recovered_unknown_fixture()).await;
     let request = remote_controller_status_request(&fixture.request, &unknown);
     let mut response = unknown_status(&request, &unknown);
     response.workspace_ref = Some("changed-workspace".into());
@@ -143,9 +143,9 @@ struct UnknownCalls {
 }
 
 async fn recovered_unknown_fixture() -> (RemoteControllerFixture, TaskBoardRemoteAssignmentRecord) {
-    let fixture = remote_controller_fixture(1).await;
-    let accepted = accept_remote_controller(&fixture).await;
-    let claimed = claim_remote_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
+    let accepted = Box::pin(accept_remote_controller(&fixture)).await;
+    let claimed = Box::pin(claim_remote_controller(&fixture, &accepted)).await;
     let request = remote_controller_status_request(&fixture.request, &claimed);
     assert!(
         fixture
@@ -198,7 +198,7 @@ async fn drive_unknown_once(
     let status_calls = &calls.status;
     let cleanup_calls = &calls.cleanup;
     let settle_calls = &calls.settle;
-    super::super::poll_unknown_assignment_with(
+    Box::pin(super::super::poll_unknown_assignment_with(
         db,
         assignment,
         move |request| {
@@ -220,7 +220,7 @@ async fn drive_unknown_once(
             }
         },
         move |current| async move {
-            super::super::terminal::finish_terminal_assignment_with(
+            Box::pin(super::super::terminal::finish_terminal_assignment_with(
                 db,
                 &current,
                 || async { Ok(()) },
@@ -232,10 +232,10 @@ async fn drive_unknown_once(
                     settle_calls.fetch_add(1, Ordering::SeqCst);
                     record_settlement(db, &request).await
                 },
-            )
+            ))
             .await
         },
-    )
+    ))
     .await
 }
 

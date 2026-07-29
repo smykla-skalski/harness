@@ -23,8 +23,8 @@ use super::{assignment_count, refresh_fixture_observation};
 #[tokio::test]
 async fn one_unrenderable_candidate_does_not_block_the_others() {
     let _lock = prompt_catalog_test_lock();
-    let fixture = crate::daemon::db::remote_controller_fixture(1).await;
-    let renderable = add_remote_review_candidate(
+    let fixture = Box::pin(crate::daemon::db::remote_controller_fixture(1)).await;
+    let renderable = Box::pin(add_remote_review_candidate(
         &fixture.db,
         "remote-with-pr",
         Some(TaskBoardPullRequestIdentity {
@@ -32,7 +32,7 @@ async fn one_unrenderable_candidate_does_not_block_the_others() {
             number: 42,
             head: None,
         }),
-    )
+    ))
     .await;
     refresh_fixture_observation(&fixture, 2, 0).await;
     let _installed = scoped_prompt_catalog(

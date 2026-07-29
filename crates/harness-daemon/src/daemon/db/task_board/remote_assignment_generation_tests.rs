@@ -9,7 +9,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn controller_offer_rejects_a_caller_supplied_lease_outside_the_sealed_duration() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
 
     let error = fixture
         .db
@@ -60,9 +60,9 @@ async fn controller_offer_rejects_a_caller_supplied_lease_outside_the_sealed_dur
 
 #[tokio::test]
 async fn status_rejects_a_late_request_after_the_exact_lease_generation_changes() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let accepted = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let accepted = Box::pin(claim_controller(&fixture, &accepted)).await;
     let stale_request = status_request(&fixture.request, &accepted);
     let renewal = RemoteLeaseRenewRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -210,9 +210,9 @@ async fn executor_rejects_a_rotation_that_does_not_extend_the_current_lease() {
 
 #[tokio::test]
 async fn controller_persists_claim_before_renewal_without_status_polling() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     assert_eq!(claimed.state, TaskBoardRemoteAssignmentState::Claimed);
     assert_eq!(claimed.claimed_at.as_deref(), Some(CLAIMED_AT));
     assert_eq!(
@@ -283,11 +283,13 @@ pub(crate) async fn accept_controller(
         }),
         rejection_code: None,
     };
-    match fixture
-        .db
-        .record_task_board_remote_offer_response(&response, HOST, "2026-07-19T10:00:01Z")
-        .await
-        .expect("record accepted offer")
+    match Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &response,
+        HOST,
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected accepted offer, got {other:?}"),
@@ -315,16 +317,14 @@ pub(crate) async fn claim_controller(
         .await
         .expect("claim remote claim authority")
         .expect("claim remains active");
-    match fixture
-        .db
-        .record_task_board_remote_assignment_claim(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:11Z",
-        )
-        .await
-        .expect("persist controller claim")
+    match Box::pin(fixture.db.record_task_board_remote_assignment_claim(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("persist controller claim")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected claimed assignment, got {other:?}"),

@@ -23,7 +23,7 @@ use super::{
 
 #[tokio::test]
 async fn workflow_dispatch_persists_before_any_codex_start() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
 
@@ -59,7 +59,7 @@ async fn workflow_dispatch_persists_before_any_codex_start() {
 
 #[tokio::test]
 async fn managed_read_only_start_rejects_revision_drift_before_codex() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     sqlx::query("UPDATE task_board_items SET revision = revision + 2 WHERE item_id = ?1")
         .bind(&claim.applied.board_item_id)
@@ -83,7 +83,7 @@ async fn managed_read_only_start_rejects_revision_drift_before_codex() {
 
 #[tokio::test]
 async fn absent_worker_rejects_settings_drift_before_codex() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     bump_settings_revision(&db).await;
 
@@ -99,12 +99,18 @@ async fn absent_worker_rejects_settings_drift_before_codex() {
 
 #[tokio::test]
 async fn final_start_fence_rejects_post_preflight_settings_drift() {
-    assert_post_preflight_drift_is_fenced(FinalStartDrift::SettingsRevision).await;
+    Box::pin(assert_post_preflight_drift_is_fenced(
+        FinalStartDrift::SettingsRevision,
+    ))
+    .await;
 }
 
 #[tokio::test]
 async fn final_start_fence_rejects_post_preflight_kill_switch() {
-    assert_post_preflight_drift_is_fenced(FinalStartDrift::SpawnKillSwitch).await;
+    Box::pin(assert_post_preflight_drift_is_fenced(
+        FinalStartDrift::SpawnKillSwitch,
+    ))
+    .await;
 }
 
 #[derive(Clone, Copy)]
@@ -125,7 +131,7 @@ impl FinalStartDrift {
 }
 
 async fn assert_post_preflight_drift_is_fenced(drift: FinalStartDrift) {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     let pause = StartAuthorizationPause::new();
     let settlement = pause.scope(settle_claimed_task_board_worker(&state, &db, &mut claim));
@@ -150,7 +156,7 @@ async fn assert_post_preflight_drift_is_fenced(drift: FinalStartDrift) {
 
 #[tokio::test]
 async fn exact_worker_is_compensated_after_settings_drift() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     let seeded = seed_exact_read_only_worker(&db, &claim, CodexRunStatus::Running).await;
     bump_settings_revision(&db).await;
@@ -180,7 +186,7 @@ async fn exact_worker_is_compensated_after_settings_drift() {
 
 #[tokio::test]
 async fn recovered_item_drift_persists_compensation_before_stopping_worker() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     let worker = seed_exact_read_only_worker(&db, &claim, CodexRunStatus::Running).await;
     sqlx::query("UPDATE task_board_items SET revision = revision + 2 WHERE item_id = ?1")
@@ -200,10 +206,7 @@ async fn recovered_item_drift_persists_compensation_before_stopping_worker() {
     );
     assert_eq!(workflow_execution_count(&db).await, 0);
     assert_eq!(intent_status(&db, &claim.intent_id).await, "failed");
-    assert_eq!(
-        intent_compensation_pending(&db, &claim.intent_id).await,
-        false
-    );
+    assert!(!intent_compensation_pending(&db, &claim.intent_id).await);
     assert!(
         !db.codex_run(&worker.run_id)
             .await
@@ -216,7 +219,7 @@ async fn recovered_item_drift_persists_compensation_before_stopping_worker() {
 
 #[tokio::test]
 async fn stale_claim_after_probe_keeps_exact_worker_running() {
-    let (state, mut stale_claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut stale_claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     let worker = seed_exact_read_only_worker(&db, &stale_claim, CodexRunStatus::Running).await;
     start_worker_for_applied_task(
@@ -268,12 +271,12 @@ async fn stale_claim_after_probe_keeps_exact_worker_running() {
 
 pub(super) async fn claimed_read_only_dispatch()
 -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
-    claimed_read_only_dispatch_with_policy(true).await
+    Box::pin(claimed_read_only_dispatch_with_policy(true)).await
 }
 
 pub(super) async fn claimed_read_only_dispatch_without_policy()
 -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
-    claimed_read_only_dispatch_with_policy(false).await
+    Box::pin(claimed_read_only_dispatch_with_policy(false)).await
 }
 
 async fn claimed_read_only_dispatch_with_policy(

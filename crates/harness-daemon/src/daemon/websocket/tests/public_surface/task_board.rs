@@ -46,8 +46,18 @@ fn dispatch_evaluate_and_run_once_flow() {
                 .expect("configure explicit websocket fallback");
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
-            run_websocket_task_board_item_scope_flow(&state, &connection, &project_dir).await;
-            run_websocket_task_board_run_once_flow(&state, &connection, &project_dir).await;
+            Box::pin(run_websocket_task_board_item_scope_flow(
+                &state,
+                &connection,
+                &project_dir,
+            ))
+            .await;
+            Box::pin(run_websocket_task_board_run_once_flow(
+                &state,
+                &connection,
+                &project_dir,
+            ))
+            .await;
         });
     });
 }
@@ -57,8 +67,18 @@ async fn run_websocket_task_board_item_scope_flow(
     connection: &Arc<Mutex<ConnectionState>>,
     project_dir: &std::path::Path,
 ) {
-    seed_ready_board_item(state, "board-ws-dispatch", "WS dispatch item").await;
-    seed_ready_board_item(state, "board-ws-dispatch-other", "WS dispatch other item").await;
+    Box::pin(seed_ready_board_item(
+        state,
+        "board-ws-dispatch",
+        "WS dispatch item",
+    ))
+    .await;
+    Box::pin(seed_ready_board_item(
+        state,
+        "board-ws-dispatch-other",
+        "WS dispatch other item",
+    ))
+    .await;
     let dispatch_response =
         dispatch_ws_item(state, connection, "board-ws-dispatch", project_dir).await;
     let applied = first_applied(response_result(&dispatch_response));
@@ -113,8 +133,18 @@ async fn run_websocket_task_board_run_once_flow(
     connection: &Arc<Mutex<ConnectionState>>,
     project_dir: &std::path::Path,
 ) {
-    seed_ready_board_item(state, "board-ws-run-once", "WS run once item").await;
-    seed_ready_board_item(state, "board-ws-run-once-other", "WS run once other item").await;
+    Box::pin(seed_ready_board_item(
+        state,
+        "board-ws-run-once",
+        "WS run once item",
+    ))
+    .await;
+    Box::pin(seed_ready_board_item(
+        state,
+        "board-ws-run-once-other",
+        "WS run once other item",
+    ))
+    .await;
     let run_once_response = dispatch(
         &request(
             "req-task-board-run-once",

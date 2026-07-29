@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn pinned_runtime_profile_is_none_when_env_is_unset() {
         temp_env::with_var(HARNESS_MONITOR_RUNTIME_PROFILE_ENV, None::<&str>, || {
-            assert_eq!(pinned_runtime_profile(), None)
+            assert_eq!(pinned_runtime_profile(), None);
         });
     }
 

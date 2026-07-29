@@ -19,11 +19,11 @@ const TERMINAL_AT: &str = "2026-07-19T10:00:10Z";
 
 #[tokio::test]
 async fn offline_terminal_cleanup_retry_does_not_block_foreground_driver() {
-    let fixture = remote_controller_fixture(1).await;
-    let accepted = accept_remote_assignment(&fixture).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
+    let accepted = Box::pin(accept_remote_assignment(&fixture)).await;
     // Claim before cancelling so the cleanup-pending generation is a genuine capacity
     // owner; a never-claimed generation releases its slot without a cleanup handshake.
-    let claimed = claim_remote_assignment(&fixture, &accepted).await;
+    let claimed = Box::pin(claim_remote_assignment(&fixture, &accepted)).await;
     let cancel = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: fixture.request.binding.clone(),
@@ -55,11 +55,14 @@ async fn offline_terminal_cleanup_retry_does_not_block_foreground_driver() {
         .expect("claim terminal handoff cancellation")
         .expect("terminal handoff cancellation remains active");
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_assignment_cancel(&cancel, &response, host_id, TERMINAL_AT)
-            .await
-            .expect("persist terminal projection handoff"),
+        Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+            &cancel,
+            &response,
+            host_id,
+            TERMINAL_AT
+        ))
+        .await
+        .expect("persist terminal projection handoff"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
     disable_fixture_host(&fixture).await;
@@ -121,8 +124,8 @@ async fn offline_terminal_cleanup_retry_does_not_block_foreground_driver() {
 
 #[tokio::test]
 async fn active_unhanded_off_quarantine_does_not_block_unrelated_local_work() {
-    let fixture = remote_controller_fixture(1).await;
-    let _accepted = accept_remote_assignment(&fixture).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
+    let _accepted = Box::pin(accept_remote_assignment(&fixture)).await;
     disable_fixture_host(&fixture).await;
 
     let scan_at = super::super::canonical_now();
@@ -211,15 +214,13 @@ async fn accept_remote_assignment(
         }),
         rejection_code: None,
     };
-    match fixture
-        .db
-        .record_task_board_remote_offer_response(
-            &response,
-            &fixture.request.binding.host_id,
-            OFFERED_AT,
-        )
-        .await
-        .expect("persist accepted terminal cleanup offer")
+    match Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &response,
+        &fixture.request.binding.host_id,
+        OFFERED_AT,
+    ))
+    .await
+    .expect("persist accepted terminal cleanup offer")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected accepted terminal cleanup offer, got {other:?}"),
@@ -256,11 +257,13 @@ async fn claim_remote_assignment(
         },
         claimed_at: CLAIMED_AT.into(),
     };
-    match fixture
-        .db
-        .record_task_board_remote_assignment_claim(&claim, &response, host_id, CLAIMED_AT)
-        .await
-        .expect("persist terminal cleanup claim")
+    match Box::pin(
+        fixture
+            .db
+            .record_task_board_remote_assignment_claim(&claim, &response, host_id, CLAIMED_AT),
+    )
+    .await
+    .expect("persist terminal cleanup claim")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected claimed terminal cleanup assignment, got {other:?}"),

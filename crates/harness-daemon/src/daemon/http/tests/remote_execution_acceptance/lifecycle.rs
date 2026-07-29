@@ -23,11 +23,11 @@ use crate::task_board::{
 fn default_task_implementation_cross_daemon_lifecycle_imports_and_cleans_up() {
     run_deep_acceptance_async(|| async {
         let tls = test_tls_material();
-        with_acceptance_environment(
+        Box::pin(with_acceptance_environment(
             &tls,
             "remote-acceptance-lifecycle",
             run_default_task_implementation_lifecycle(&tls),
-        )
+        ))
         .await;
     });
 }
@@ -70,7 +70,7 @@ where
         .expect("join deep acceptance test thread");
 }
 async fn run_default_task_implementation_lifecycle(tls: &TestTlsMaterial) {
-    let baseline = prepare_default_task_prior_phase_baseline(tls).await;
+    let baseline = Box::pin(prepare_default_task_prior_phase_baseline(tls)).await;
     baseline.server.stop().await;
 }
 
@@ -100,9 +100,15 @@ pub(super) async fn prepare_default_task_prior_phase_baseline(
         .async_db
         .get()
         .expect("controller async database");
-    let seeded = fixture.seed_default_task(controller_db).await;
+    let seeded = Box::pin(fixture.seed_default_task(controller_db)).await;
     let claimed = offer_and_claim(controller_db, &seeded.execution_id).await;
-    let result = execute_implementation(&executor, executor_db, &claimed, &seeded).await;
+    let result = Box::pin(execute_implementation(
+        &executor,
+        executor_db,
+        &claimed,
+        &seeded,
+    ))
+    .await;
     settle_and_clean_up(controller_db, &executor, &seeded.execution_id).await;
     assert_completion(
         controller_db,

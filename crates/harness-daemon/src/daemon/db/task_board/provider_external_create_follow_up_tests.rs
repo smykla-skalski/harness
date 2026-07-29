@@ -10,8 +10,8 @@ use crate::task_board::{
 async fn pending_follow_up_query_is_provider_filtered_and_deterministic() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-follow-up-first")).await;
-    create_item(&db, item("task-follow-up-second")).await;
+    Box::pin(create_item(&db, item("task-follow-up-first"))).await;
+    Box::pin(create_item(&db, item("task-follow-up-second"))).await;
     // Ordering is by scope before the random intent id, so two intents in one
     // scope would come back in an arbitrary order and this would flake.
     let first = attach_in_scope(
@@ -49,7 +49,7 @@ async fn pending_follow_up_query_is_provider_filtered_and_deterministic() {
 async fn audit_and_follow_up_ack_are_atomic_and_idempotent() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-follow-up-atomic")).await;
+    Box::pin(create_item(&db, item("task-follow-up-atomic"))).await;
     let attached = attach(
         &db,
         "task-follow-up-atomic",
@@ -132,8 +132,8 @@ async fn audit_and_follow_up_ack_are_atomic_and_idempotent() {
 async fn follow_up_batch_failure_rolls_back_earlier_audit_and_ack_writes() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-follow-up-batch-first")).await;
-    create_item(&db, item("task-follow-up-batch-second")).await;
+    Box::pin(create_item(&db, item("task-follow-up-batch-first"))).await;
+    Box::pin(create_item(&db, item("task-follow-up-batch-second"))).await;
     let first = attach(
         &db,
         "task-follow-up-batch-first",
@@ -206,7 +206,7 @@ async fn pending_follow_up_query_uses_the_partial_index() {
 async fn finalization_supersedes_only_fields_matching_the_final_item() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-follow-up-conflicts")).await;
+    Box::pin(create_item(&db, item("task-follow-up-conflicts"))).await;
     let intent = begin(&db, "task-follow-up-conflicts", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#83").await;
     db.replace_open_task_board_sync_conflicts(
@@ -255,7 +255,7 @@ async fn finalization_supersedes_only_fields_matching_the_final_item() {
 async fn conflict_cleanup_failure_rolls_back_attachment_and_receipt() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-follow-up-conflict-failure")).await;
+    Box::pin(create_item(&db, item("task-follow-up-conflict-failure"))).await;
     let intent = begin(
         &db,
         "task-follow-up-conflict-failure",

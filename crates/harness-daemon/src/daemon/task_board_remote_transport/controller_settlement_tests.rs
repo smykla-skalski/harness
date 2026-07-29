@@ -16,7 +16,7 @@ use crate::daemon::task_board_remote_wire::wire::{
 
 #[tokio::test]
 async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt() {
-    let state = settlement_ready_controller("settlement-lost-response").await;
+    let state = Box::pin(settlement_ready_controller("settlement-lost-response")).await;
     let (request, response) = settlement(&state).await;
     let tls = test_tls_material();
     let (failed_endpoint, failed_requests) =
@@ -27,12 +27,15 @@ async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt(
         pinned_client(&failed_endpoint, &tls),
         [state.times.after_expiry.clone()],
     );
-    temp_env::async_with_vars([(TOKEN_ENV, Some("controller-secret"))], async {
-        first
-            .settle(&state.prepared.db, &request)
-            .await
-            .expect_err("lost settlement response remains ambiguous");
-    })
+    Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("controller-secret"))],
+        async {
+            first
+                .settle(&state.prepared.db, &request)
+                .await
+                .expect_err("lost settlement response remains ambiguous");
+        },
+    ))
     .await;
     let failed_requests = failed_requests.await.expect("failed settlement server");
     assert_eq!(failed_requests.len(), 2);
@@ -55,10 +58,10 @@ async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt(
         pinned_client(&replay_endpoint, &tls),
         [state.times.after_expiry.clone()],
     );
-    let adopted = temp_env::async_with_vars(
+    let adopted = Box::pin(temp_env::async_with_vars(
         [(TOKEN_ENV, Some("controller-secret"))],
         restarted.settle(&state.prepared.db, &request),
-    )
+    ))
     .await
     .expect("executor receipt replay is adopted after restart");
     assert_eq!(adopted, response);
@@ -90,7 +93,10 @@ async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt(
 
 #[tokio::test]
 async fn settlement_authority_rejects_stale_generation_lease_principal_and_request() {
-    let state = settlement_ready_controller("settlement-authority-conflicts").await;
+    let state = Box::pin(settlement_ready_controller(
+        "settlement-authority-conflicts",
+    ))
+    .await;
     let (request, _) = settlement(&state).await;
     assert!(
         state
@@ -136,7 +142,7 @@ async fn settlement_authority_rejects_stale_generation_lease_principal_and_reque
 
 #[tokio::test]
 async fn settlement_authority_rejects_a_missing_controller_handoff() {
-    let state = settlement_ready_controller("settlement-missing-handoff").await;
+    let state = Box::pin(settlement_ready_controller("settlement-missing-handoff")).await;
     let (request, _) = settlement(&state).await;
     query(
         "UPDATE task_board_remote_assignments SET
@@ -167,8 +173,8 @@ async fn settlement_authority_rejects_a_missing_controller_handoff() {
 }
 
 pub(super) async fn settlement_ready_controller(item_id: &str) -> PreparedLifecycle {
-    let state = prepared_acceptance(item_id).await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance(item_id)).await;
+    Box::pin(persist_claim(&state)).await;
     let mut status = completed_status(&state);
     status.state = RemoteAssignmentWireState::Unknown;
     status.result = None;

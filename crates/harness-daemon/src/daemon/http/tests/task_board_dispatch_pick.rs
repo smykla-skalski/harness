@@ -20,8 +20,13 @@ async fn run_dispatch_pick_with_empty_body() {
     allow_fallback_spawn_for_test(&state).await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
-    seed_ready_board_item(&state, "board-pick-low", "Low item").await;
-    seed_ready_board_item(&state, "board-pick-high", "High item").await;
+    Box::pin(seed_ready_board_item(&state, "board-pick-low", "Low item")).await;
+    Box::pin(seed_ready_board_item(
+        &state,
+        "board-pick-high",
+        "High item",
+    ))
+    .await;
     put_json(
         &client,
         &base_url,

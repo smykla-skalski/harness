@@ -11,12 +11,12 @@ use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
 async fn second_reconciler_waits_for_claimed_report_without_orphaning_run() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "report-exclusive",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
         Some(starting_attempt()),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
     runtime.block_report();
@@ -66,7 +66,7 @@ async fn second_reconciler_waits_for_claimed_report_without_orphaning_run() {
 
 #[tokio::test]
 async fn missing_claimed_report_waits_until_deadline_then_becomes_unknown() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "report-missing-grace",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
@@ -77,7 +77,7 @@ async fn missing_claimed_report_waits_until_deadline_then_becomes_unknown() {
             error: None,
             completed_at: None,
         }),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
 
@@ -112,12 +112,12 @@ async fn missing_claimed_report_waits_until_deadline_then_becomes_unknown() {
 
 #[tokio::test]
 async fn failed_start_without_durable_run_enters_retry_wait() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "report-start-absent",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
         Some(starting_attempt()),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
 
@@ -150,12 +150,12 @@ async fn failed_start_without_durable_run_enters_retry_wait() {
 
 #[tokio::test]
 async fn failed_start_with_durable_run_reconciles_without_duplicate() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "report-start-durable",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
         Some(starting_attempt()),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
     runtime.fail_next_start_after_persist();
@@ -190,7 +190,7 @@ async fn failed_start_with_durable_run_reconciles_without_duplicate() {
 
 #[tokio::test]
 async fn prepared_initial_report_survives_restart_and_starts_once() {
-    let fixture = seed_dispatched_initial_report("initial-report-grace").await;
+    let fixture = Box::pin(seed_dispatched_initial_report("initial-report-grace")).await;
     let before = load_execution(&fixture).await;
     assert_eq!(before.attempts[0].state, TaskBoardAttemptState::Preparing);
     assert!(before.attempts[0].available_at.is_none());

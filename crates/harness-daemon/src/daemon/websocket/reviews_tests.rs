@@ -10,7 +10,7 @@ async fn review_write_websocket_routes_fail_closed_without_enforced_policy() {
     let temp = tempdir().expect("tempdir");
     let xdg_root = temp.path().join("xdg");
     let xdg_root = xdg_root.to_str().expect("utf8 xdg").to_owned();
-    temp_env::async_with_vars(
+    Box::pin(temp_env::async_with_vars(
         [
             ("HARNESS_DAEMON_DATA_HOME", Some(xdg_root.as_str())),
             ("XDG_DATA_HOME", Some(xdg_root.as_str())),
@@ -39,7 +39,7 @@ async fn review_write_websocket_routes_fail_closed_without_enforced_policy() {
                 );
             }
         },
-    )
+    ))
     .await;
 }
 

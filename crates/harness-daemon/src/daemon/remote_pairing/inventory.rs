@@ -178,7 +178,7 @@ mod tests {
         }
     }
 
-    /// These labels are the wire format and the enum the OpenAPI schema
+    /// These labels are the wire format and the enum the `OpenAPI` schema
     /// documents, so they are pinned against what `serde` actually emits. The
     /// previous spelling asserted them against an inherent accessor instead,
     /// which would have stayed green through a change to the `rename_all` that

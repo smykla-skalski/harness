@@ -11,7 +11,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response() {
-    let state = prepared_acceptance("lost-cancel-response").await;
+    let state = Box::pin(prepared_acceptance("lost-cancel-response")).await;
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
     let response = cancel_response(&state.prepared.offer, &state.times.before_expiry);
     let tls = test_tls_material();
@@ -32,12 +32,14 @@ async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response
         ],
     );
 
-    let cancelled = temp_env::async_with_vars([(TOKEN_ENV, Some("controller-secret"))], async {
-        controller
-            .cancel(&state.prepared.db, &cancel)
-            .await
-            .expect("exact cancel retry converges")
-    })
+    let cancelled = Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("controller-secret"))],
+        async {
+            Box::pin(controller.cancel(&state.prepared.db, &cancel))
+                .await
+                .expect("exact cancel retry converges")
+        },
+    ))
     .await;
     assert_eq!(cancelled.0, response);
     assert!(matches!(
@@ -51,8 +53,7 @@ async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response
 
     let restarted =
         RemoteExecutionControllerClient::new_for_tests(HOST_ID, pinned_client(&endpoint, &tls));
-    let replayed = restarted
-        .cancel(&state.prepared.db, &cancel)
+    let replayed = Box::pin(restarted.cancel(&state.prepared.db, &cancel))
         .await
         .expect("restart replays durable cancellation without I/O");
     assert_eq!(replayed.0, response);
@@ -77,8 +78,8 @@ async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response
 
 #[tokio::test]
 async fn claim_only_cancel_restarts_with_the_exact_empty_response_evidence() {
-    let state = prepared_acceptance("claim-only-cancel-replay").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("claim-only-cancel-replay")).await;
+    Box::pin(persist_claim(&state)).await;
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
     let response = claimed_cancel_response(
         &state.prepared.offer,
@@ -101,10 +102,10 @@ async fn claim_only_cancel_restarts_with_the_exact_empty_response_evidence() {
             state.times.before_expiry.clone(),
         ],
     );
-    let cancelled = temp_env::async_with_vars(
+    let cancelled = Box::pin(temp_env::async_with_vars(
         [(TOKEN_ENV, Some("controller-secret"))],
         controller.cancel(&state.prepared.db, &cancel),
-    )
+    ))
     .await
     .expect("claim-only cancel succeeds");
     assert_eq!(cancelled.0, response);
@@ -113,8 +114,7 @@ async fn claim_only_cancel_restarts_with_the_exact_empty_response_evidence() {
 
     let restarted =
         RemoteExecutionControllerClient::new_for_tests(HOST_ID, pinned_client(&endpoint, &tls));
-    let replayed = restarted
-        .cancel(&state.prepared.db, &cancel)
+    let replayed = Box::pin(restarted.cancel(&state.prepared.db, &cancel))
         .await
         .expect("restart replays exact empty response evidence");
     assert_eq!(
@@ -140,7 +140,7 @@ async fn claim_only_cancel_restarts_with_the_exact_empty_response_evidence() {
 
 #[tokio::test]
 async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
-    let state = prepared_acceptance("lost-cancel-status-reconciliation").await;
+    let state = Box::pin(prepared_acceptance("lost-cancel-status-reconciliation")).await;
     let cancel = cancel_request(&state.prepared.offer, "lease-admission");
     let tls = test_tls_material();
     let (cancel_endpoint, cancel_requests) =
@@ -152,12 +152,14 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
         [state.times.before_expiry.clone()],
     );
 
-    temp_env::async_with_vars([(TOKEN_ENV, Some("controller-secret"))], async {
-        controller
-            .cancel(&state.prepared.db, &cancel)
-            .await
-            .expect_err("both cancel responses are lost");
-    })
+    Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("controller-secret"))],
+        async {
+            Box::pin(controller.cancel(&state.prepared.db, &cancel))
+                .await
+                .expect_err("both cancel responses are lost");
+        },
+    ))
     .await;
     assert_eq!(
         cancel_requests.await.expect("cancel request count").len(),
@@ -209,8 +211,7 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
         status_requests.await.expect("status request count").len(),
         1
     );
-    let replayed = restarted
-        .cancel(&state.prepared.db, &cancel)
+    let replayed = Box::pin(restarted.cancel(&state.prepared.db, &cancel))
         .await
         .expect("replay status-reconciled cancellation without I/O");
     assert_eq!(replayed.0.observed_at, status_response.observed_at);

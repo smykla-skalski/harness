@@ -27,7 +27,7 @@ fn production_tick_uses_the_runtime_seam_for_start_then_active_probe() {
 }
 
 async fn production_tick_uses_the_runtime_seam_for_start_then_active_probe_body() {
-    let (fixture, before) = live_claimed_executor().await;
+    let (fixture, before) = Box::pin(live_claimed_executor()).await;
     let offer = before
         .require_offer()
         .expect("sealed executor offer")

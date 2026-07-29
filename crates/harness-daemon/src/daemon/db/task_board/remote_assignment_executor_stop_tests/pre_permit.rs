@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn pre_permit_invalid_run_stops_and_settles_under_the_start_authority() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(
@@ -85,7 +85,7 @@ async fn pre_permit_invalid_run_stops_and_settles_under_the_start_authority() {
 #[tokio::test]
 async fn pre_permit_stop_is_refused_when_a_start_permit_is_durable() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(

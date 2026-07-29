@@ -18,7 +18,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn terminal_failure_is_provisional_and_immutable_across_restart() {
-    let (fixture, request, running) = running_controller().await;
+    let (fixture, request, running) = Box::pin(running_controller()).await;
     let response = failure_status(&request, &running, TaskBoardFailureClass::Transient);
     let parent = load_execution(&fixture).await;
 
@@ -89,7 +89,7 @@ async fn non_retryable_remote_failures_remain_provisional_until_verified() {
         TaskBoardFailureClass::Policy,
         TaskBoardFailureClass::Conflict,
     ] {
-        let (fixture, request, running) = running_controller().await;
+        let (fixture, request, running) = Box::pin(running_controller()).await;
         let response = failure_status(&request, &running, failure_class);
         let parent = load_execution(&fixture).await;
         fixture
@@ -103,8 +103,8 @@ async fn non_retryable_remote_failures_remain_provisional_until_verified() {
 
 #[tokio::test]
 async fn exhausted_transient_failure_remains_provisional_until_verified() {
-    let fixture = controller_fixture_with_retry_attempts(1, Some(1)).await;
-    let (fixture, request, running) = running_controller_from(fixture).await;
+    let fixture = Box::pin(controller_fixture_with_retry_attempts(1, Some(1))).await;
+    let (fixture, request, running) = Box::pin(running_controller_from(fixture)).await;
     let response = failure_status(&request, &running, TaskBoardFailureClass::Transient);
     let parent = load_execution(&fixture).await;
     fixture
@@ -121,7 +121,7 @@ async fn raw_cancelled_and_unknown_statuses_cannot_terminate_a_running_assignmen
         RemoteAssignmentWireState::Cancelled,
         RemoteAssignmentWireState::Unknown,
     ] {
-        let (fixture, request, running) = running_controller().await;
+        let (fixture, request, running) = Box::pin(running_controller()).await;
         let response = ambiguous_terminal_status(&request, &running, wire_state);
         let parent = load_execution(&fixture).await;
 
@@ -143,7 +143,7 @@ async fn raw_cancelled_and_unknown_statuses_cannot_terminate_a_running_assignmen
 
 #[tokio::test]
 async fn definitive_status_after_unknown_recovery_preserves_human_required() {
-    let (fixture, _, _) = running_controller().await;
+    let (fixture, _, _) = Box::pin(running_controller()).await;
     let recovered = fixture
         .db
         .recover_task_board_remote_assignments(AFTER_EXPIRY)
@@ -214,8 +214,8 @@ async fn definitive_status_after_unknown_recovery_preserves_human_required() {
 
 #[tokio::test]
 async fn raw_preclaim_superseded_status_is_rejected() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let request = status_request(&fixture.request, &accepted);
     let response = superseded_status(&request, &accepted, false);
     let parent = load_execution(&fixture).await;
@@ -244,8 +244,8 @@ async fn raw_preclaim_superseded_status_is_rejected() {
 
 #[tokio::test]
 async fn raw_superseded_status_with_lost_claim_evidence_is_rejected() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let claim = claim_request(&fixture.request, &accepted);
     fixture
         .db
@@ -292,8 +292,8 @@ async fn raw_superseded_status_with_lost_claim_evidence_is_rejected() {
 #[tokio::test]
 async fn lost_claim_status_requires_the_exact_l1_lease() {
     for mismatch in ["missing", "wrong"] {
-        let fixture = controller_fixture(1).await;
-        let accepted = accept_controller(&fixture).await;
+        let fixture = Box::pin(controller_fixture(1)).await;
+        let accepted = Box::pin(accept_controller(&fixture)).await;
         let claim = claim_request(&fixture.request, &accepted);
         fixture
             .db
@@ -370,8 +370,8 @@ async fn running_controller() -> (
     RemoteStatusRequest,
     super::TaskBoardRemoteAssignmentRecord,
 ) {
-    let fixture = controller_fixture(1).await;
-    running_controller_from(fixture).await
+    let fixture = Box::pin(controller_fixture(1)).await;
+    Box::pin(running_controller_from(fixture)).await
 }
 
 async fn running_controller_from(
@@ -381,8 +381,8 @@ async fn running_controller_from(
     RemoteStatusRequest,
     super::TaskBoardRemoteAssignmentRecord,
 ) {
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let request = status_request(&fixture.request, &claimed);
     let response = running_status(&request, &claimed);
     fixture

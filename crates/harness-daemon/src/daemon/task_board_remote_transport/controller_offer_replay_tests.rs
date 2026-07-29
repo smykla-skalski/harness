@@ -16,9 +16,9 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_terminal() {
-    let state = central_offer().await;
+    let state = Box::pin(central_offer()).await;
     let original = accepted_offer(&state);
-    persist_acceptance(&state).await;
+    Box::pin(persist_acceptance(&state)).await;
     let claim = claim_request(&state);
     let claimed = claim_response(&state);
     assert!(
@@ -30,22 +30,24 @@ async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_term
             .expect("claim remote claim authority")
             .is_some()
     );
-    state
-        .fixture
-        .db
-        .record_task_board_remote_assignment_claim(&claim, &claimed, HOST_ID, &utc_now())
-        .await
-        .expect("persist claim response");
+    Box::pin(state.fixture.db.record_task_board_remote_assignment_claim(
+        &claim,
+        &claimed,
+        HOST_ID,
+        &utc_now(),
+    ))
+    .await
+    .expect("persist claim response");
     let renewal = renewal_request(&state);
     let renewal_response = renewal_response(&state);
     persist_renewal(&state.fixture.db, &renewal, &renewal_response).await;
     let tls = test_tls_material();
     let (endpoint, requests) = spawn_probe_server(&tls).await;
     let controller = pinned_controller(&endpoint, &tls);
-    let (renewed_replay, terminal_replay) =
-        temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-            let renewed = controller
-                .offer(&state.fixture.db, &state.fixture.request)
+    let (renewed_replay, terminal_replay) = Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("authority-secret"))],
+        async {
+            let renewed = Box::pin(controller.offer(&state.fixture.db, &state.fixture.request))
                 .await
                 .expect("replay original offer after renewal");
             let cancel = cancel_request(&state);
@@ -56,24 +58,21 @@ async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_term
                 .await
                 .expect("claim terminal cancellation authority")
                 .expect("terminal cancellation remains active");
-            state
-                .fixture
-                .db
-                .record_task_board_remote_assignment_cancel(
-                    &cancel,
-                    &cancel_response(&state, &claimed.claimed_at),
-                    HOST_ID,
-                    &utc_now(),
-                )
-                .await
-                .expect("persist terminal cancellation");
-            let terminal = controller
-                .offer(&state.fixture.db, &state.fixture.request)
+            Box::pin(state.fixture.db.record_task_board_remote_assignment_cancel(
+                &cancel,
+                &cancel_response(&state, &claimed.claimed_at),
+                HOST_ID,
+                &utc_now(),
+            ))
+            .await
+            .expect("persist terminal cancellation");
+            let terminal = Box::pin(controller.offer(&state.fixture.db, &state.fixture.request))
                 .await
                 .expect("replay original offer after terminal mutation");
             (renewed, terminal)
-        })
-        .await;
+        },
+    ))
+    .await;
     let original_bytes = serde_json::to_vec(&original).expect("original response JSON");
     assert_eq!(
         serde_json::to_vec(&renewed_replay.0).expect("renewed replay JSON"),
@@ -116,7 +115,7 @@ async fn persist_renewal(
 
 #[tokio::test]
 async fn rejected_capacity_receipt_replays_after_fallback_and_rejects_conflicts() {
-    let state = central_offer().await;
+    let state = Box::pin(central_offer()).await;
     let response = rejected_offer(&state);
     assert!(state
         .fixture
@@ -129,12 +128,13 @@ async fn rejected_capacity_receipt_replays_after_fallback_and_rejects_conflicts(
         .await
         .expect("claim rejected offer authority")
         .is_some());
-    state
-        .fixture
-        .db
-        .record_task_board_remote_offer_response(&response, HOST_ID, &utc_now())
-        .await
-        .expect("persist capacity rejection and local fallback");
+    Box::pin(state.fixture.db.record_task_board_remote_offer_response(
+        &response,
+        HOST_ID,
+        &utc_now(),
+    ))
+    .await
+    .expect("persist capacity rejection and local fallback");
     try_stop(&state, "stop after local fallback")
         .await
         .expect("mutate parent after rejected receipt");
@@ -146,33 +146,33 @@ async fn rejected_capacity_receipt_replays_after_fallback_and_rejects_conflicts(
     let mut conflicting = state.fixture.request.clone();
     conflicting.launch.prompt.push_str(" conflicting");
     conflicting = conflicting.seal().expect("reseal conflicting offer");
-    temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let replay = controller
-            .offer(&state.fixture.db, &state.fixture.request)
-            .await
-            .expect("replay rejected offer from immutable receipt");
-        assert_eq!(
-            serde_json::to_vec(&replay.0).unwrap(),
-            serde_json::to_vec(&response).unwrap()
-        );
-        assert!(matches!(
-            replay.1,
-            TaskBoardRemoteMutationOutcome::Replayed(ref record)
-                if record.state == TaskBoardRemoteAssignmentState::Superseded
-        ));
-        assert_concurrent_database_error(
-            controller
-                .offer(&state.fixture.db, &conflicting)
+    Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("authority-secret"))],
+        async {
+            let replay = Box::pin(controller.offer(&state.fixture.db, &state.fixture.request))
                 .await
-                .expect_err("conflicting sealed offer cannot reuse receipt"),
-        );
-        assert_concurrent_database_error(
-            wrong_principal
-                .offer(&state.fixture.db, &state.fixture.request)
-                .await
-                .expect_err("conflicting principal cannot reuse receipt"),
-        );
-    })
+                .expect("replay rejected offer from immutable receipt");
+            assert_eq!(
+                serde_json::to_vec(&replay.0).unwrap(),
+                serde_json::to_vec(&response).unwrap()
+            );
+            assert!(matches!(
+                replay.1,
+                TaskBoardRemoteMutationOutcome::Replayed(ref record)
+                    if record.state == TaskBoardRemoteAssignmentState::Superseded
+            ));
+            assert_concurrent_database_error(
+                Box::pin(controller.offer(&state.fixture.db, &conflicting))
+                    .await
+                    .expect_err("conflicting sealed offer cannot reuse receipt"),
+            );
+            assert_concurrent_database_error(
+                Box::pin(wrong_principal.offer(&state.fixture.db, &state.fixture.request))
+                    .await
+                    .expect_err("conflicting principal cannot reuse receipt"),
+            );
+        },
+    ))
     .await;
     assert_eq!(requests.await.expect("rejected replay probe"), 0);
 }

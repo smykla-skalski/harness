@@ -13,7 +13,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn controller_offer_atomically_binds_and_exact_replay_is_a_noop() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
 
     assert_eq!(
         fixture.request.launch.persona.as_deref(),
@@ -91,7 +91,7 @@ async fn controller_offer_atomically_binds_and_exact_replay_is_a_noop() {
 
 #[tokio::test]
 async fn tampered_launch_contract_is_rejected_before_remote_persistence() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     for mutate in [
         |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
             request.launch.persona = Some("different-reviewer".into());
@@ -147,7 +147,7 @@ async fn tampered_launch_contract_is_rejected_before_remote_persistence() {
 
 #[tokio::test]
 async fn wrong_base_or_head_is_rejected_before_assignment_or_target_mutation() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     for mutate in [
         // Canonical but wrong evidence reaches the frozen-execution check rather than wire validation.
         |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
@@ -213,7 +213,7 @@ async fn wrong_base_or_head_is_rejected_before_assignment_or_target_mutation() {
 
 #[tokio::test]
 async fn frozen_pull_request_head_binds_fork_repository_branch_ref_and_revision() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let mut parent = fixture.execution.clone();
     parent.snapshot.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
     parent.transition.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
@@ -265,7 +265,7 @@ async fn frozen_pull_request_head_binds_fork_repository_branch_ref_and_revision(
 
 #[tokio::test]
 async fn rejected_offer_binds_one_local_start_and_never_becomes_remote_eligible_again() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let TaskBoardRemoteOfferOutcome::Created(assignment) = offer_controller(&fixture).await else {
         panic!("controller offer was not created");
     };
@@ -278,11 +278,13 @@ async fn rejected_offer_binds_one_local_start_and_never_becomes_remote_eligible_
     let rejected = rejected_response(&fixture.request, "capacity_changed");
 
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_offer_response(&rejected, HOST, CLAIMED_AT)
-            .await
-            .expect("record rejection"),
+        Box::pin(
+            fixture
+                .db
+                .record_task_board_remote_offer_response(&rejected, HOST, CLAIMED_AT)
+        )
+        .await
+        .expect("record rejection"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
     let execution = load_execution(&fixture).await;
@@ -306,11 +308,13 @@ async fn rejected_offer_binds_one_local_start_and_never_becomes_remote_eligible_
         .expect("sequence");
 
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_offer_response(&rejected, HOST, CLAIMED_AT)
-            .await
-            .expect("replay rejection"),
+        Box::pin(
+            fixture
+                .db
+                .record_task_board_remote_offer_response(&rejected, HOST, CLAIMED_AT)
+        )
+        .await
+        .expect("replay rejection"),
         TaskBoardRemoteMutationOutcome::Replayed(_)
     ));
     assert_eq!(

@@ -15,7 +15,7 @@ use support::*;
 
 #[tokio::test]
 async fn completed_result_adopts_once_and_settles_prepared_start_before_target_clear() {
-    let candidate = completed_candidate("remote-result-completed", None).await;
+    let candidate = Box::pin(completed_candidate("remote-result-completed", None)).await;
     store_result(&candidate).await;
     let expected = TaskBoardWorkflowExecutionCas::from(&candidate.parent);
 
@@ -114,7 +114,7 @@ async fn completed_result_adopts_once_and_settles_prepared_start_before_target_c
 
 #[tokio::test]
 async fn stale_parent_epoch_and_divergent_target_mutate_nothing() {
-    let candidate = completed_candidate("remote-result-stale", None).await;
+    let candidate = Box::pin(completed_candidate("remote-result-stale", None)).await;
     store_result(&candidate).await;
     let expected = TaskBoardWorkflowExecutionCas::from(&candidate.parent);
     let mut sibling_changed = candidate.parent.clone();
@@ -189,15 +189,15 @@ async fn stale_parent_epoch_and_divergent_target_mutate_nothing() {
 
 #[tokio::test]
 async fn missing_extra_tampered_and_mismatched_result_artifacts_fail_closed() {
-    let missing = completed_candidate("remote-result-missing", None).await;
+    let missing = Box::pin(completed_candidate("remote-result-missing", None)).await;
     assert_adoption_rejected_unchanged(&missing).await;
 
-    let extra = completed_candidate("remote-result-extra", None).await;
+    let extra = Box::pin(completed_candidate("remote-result-extra", None)).await;
     store_result(&extra).await;
     insert_extra_artifact(&extra).await;
     assert_adoption_rejected_unchanged(&extra).await;
 
-    let tampered = completed_candidate("remote-result-tampered", None).await;
+    let tampered = Box::pin(completed_candidate("remote-result-tampered", None)).await;
     store_result(&tampered).await;
     query(
         "UPDATE task_board_remote_artifacts SET content = zeroblob(size_bytes)
@@ -217,7 +217,11 @@ async fn missing_extra_tampered_and_mismatched_result_artifacts_fail_closed() {
         ("profile", wrong_profile),
         ("head", wrong_head),
     ] {
-        let candidate = completed_candidate(&format!("remote-result-{label}"), Some(mutate)).await;
+        let candidate = Box::pin(completed_candidate(
+            &format!("remote-result-{label}"),
+            Some(mutate),
+        ))
+        .await;
         store_result(&candidate).await;
         assert_adoption_rejected_unchanged(&candidate).await;
     }
@@ -225,11 +229,11 @@ async fn missing_extra_tampered_and_mismatched_result_artifacts_fail_closed() {
 
 #[tokio::test]
 async fn failed_result_adopts_retry_and_all_nontransient_terminal_classes_once() {
-    let retry = failed_candidate(
+    let retry = Box::pin(failed_candidate(
         "remote-result-retry",
         TaskBoardFailureClass::Transient,
         Some(2),
-    )
+    ))
     .await;
     let expected = TaskBoardWorkflowExecutionCas::from(&retry.parent);
     let TaskBoardRemoteResultAdoptionOutcome::Updated(retrying) = retry
@@ -272,7 +276,7 @@ async fn failed_result_adopts_retry_and_all_nontransient_terminal_classes_once()
         TaskBoardFailureClass::Conflict,
     ] {
         let label = format!("remote-result-{failure_class:?}").to_lowercase();
-        let candidate = failed_candidate(&label, failure_class, Some(3)).await;
+        let candidate = Box::pin(failed_candidate(&label, failure_class, Some(3))).await;
         let expected = TaskBoardWorkflowExecutionCas::from(&candidate.parent);
         let TaskBoardRemoteResultAdoptionOutcome::Updated(stopped) = candidate
             .prepared

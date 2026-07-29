@@ -58,7 +58,7 @@ async fn run_route_parity() {
 }
 
 async fn run_force_cancel_parity() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     fixture
         .db
         .initialize_task_board_automation_control_from_legacy_intent(
@@ -67,8 +67,8 @@ async fn run_force_cancel_parity() {
         )
         .await
         .expect("initialize automation control");
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let target = fixture
         .db
         .task_board_automation_cancel_target(&fixture.execution.execution_id)

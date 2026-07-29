@@ -60,7 +60,7 @@ async fn shutdown_after_session_creation_never_claims_or_starts_body() {
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let loop_handle = spawn_task_board_remote_executor_loop(
         executor_state(&fixture.db, EXECUTOR_INSTANCE),
-        Duration::from_secs(60),
+        Duration::from_mins(1),
         shutdown_rx,
     );
 

@@ -25,7 +25,7 @@ const AUTHORITY_AT: &str = "2026-07-19T10:00:20Z";
 async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_ref() {
     let data = tempfile::tempdir().expect("create isolated data root");
     let data_path = data.path().to_string_lossy().into_owned();
-    temp_env::async_with_vars(
+    Box::pin(temp_env::async_with_vars(
         [
             ("XDG_DATA_HOME", Some(data_path.as_str())),
             ("CLAUDE_SESSION_ID", Some("remote-snapshot-restart-test")),
@@ -38,7 +38,7 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
             configure_executor(&fixture, &target).await;
             let offer = snapshot_offer(&fixture.request, &source);
             upload_snapshot(&fixture, &offer, &source.bytes).await;
-            let assignment = claim_assignment(&fixture, &offer).await;
+            let assignment = Box::pin(claim_assignment(&fixture, &offer)).await;
             let identity = remote_executor_identity(&assignment).expect("executor identity");
             assert!(!git_object_exists(&target, &source.revision));
             let imported = super::super::source_bundle::materialize_repository_snapshot(
@@ -97,7 +97,7 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
                 &snapshot_import_ref(&offer, &source)
             ));
         },
-    )
+    ))
     .await;
 }
 

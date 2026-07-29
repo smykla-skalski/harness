@@ -17,7 +17,7 @@ pub(super) async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     (directory, db)
 }
 
-/// A `work_item_id` placeholder keeps the item ineligible for BuiltInV1 at
+/// A `work_item_id` placeholder keeps the item ineligible for `BuiltInV1` at
 /// seed time, so the generic, non-triaging `db.create_task_board_item` seed
 /// does not pre-empt the explicit `apply_builtin_v1_triage_in_tx` call each
 /// test exercises. Tests clear it after loading, before applying.
@@ -254,7 +254,7 @@ async fn needs_info_label_stays_undecided_even_with_other_labels() {
 #[tokio::test]
 async fn unchanged_fingerprint_is_idempotent_and_records_no_new_decision() {
     let (_directory, db) = connect().await;
-    let item_id = seed_decided_todo_item(&db).await;
+    let item_id = Box::pin(seed_decided_todo_item(&db)).await;
 
     // Re-evaluate the same fields again (as an unrelated field update would);
     // the fingerprint has not changed and the first pass's placement was

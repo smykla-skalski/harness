@@ -10,21 +10,21 @@ use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
 async fn recovery_cursor_advances_after_no_progress() {
-    let first = seed_publish_attempt(
+    let first = Box::pin(seed_publish_attempt(
         "a-young-publish",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     set_attempt_deadline(&first.test.db, &first.execution_id, RETRY_AT).await;
-    let (_, second_execution_id) = seed_additional_execution(
+    let (_, second_execution_id) = Box::pin(seed_additional_execution(
         &first.test.db,
         "b-start-report",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionPhase::Review,
         TaskBoardExecutionState::Running,
         Some(starting_attempt()),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
     let first_tick = super::super::task_board_read_only_coordinator::
@@ -54,7 +54,7 @@ async fn recovery_cursor_advances_after_no_progress() {
 
 #[tokio::test]
 async fn recovery_cursor_advances_after_candidate_error() {
-    let first = seed_execution(
+    let first = Box::pin(seed_execution(
         "a-load-error",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
@@ -65,16 +65,16 @@ async fn recovery_cursor_advances_after_candidate_error() {
             error: None,
             completed_at: None,
         }),
-    )
+    ))
     .await;
-    seed_additional_execution(
+    Box::pin(seed_additional_execution(
         &first.test.db,
         "b-after-error",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionPhase::Review,
         TaskBoardExecutionState::Running,
         Some(starting_attempt()),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
     runtime.set_load_error("transient controller reconciliation failure");

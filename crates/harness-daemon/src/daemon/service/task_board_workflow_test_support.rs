@@ -114,7 +114,7 @@ pub(super) async fn create_execution(
     reviewers: TaskBoardResolvedReviewer,
     head: Option<&str>,
 ) -> TaskBoardWorkflowExecutionRecord {
-    let snapshot = seed_snapshot(db, item_id, workflow_kind, reviewers).await;
+    let snapshot = Box::pin(seed_snapshot(db, item_id, workflow_kind, reviewers)).await;
     let pull_request =
         (workflow_kind == TaskBoardWorkflowKind::PR_REVIEW).then(|| TaskBoardPullRequestIdentity {
             repository: "example/compass".into(),
