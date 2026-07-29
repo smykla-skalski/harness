@@ -199,11 +199,25 @@ impl TaskBoardWorkflowState {
 pub enum TaskBoardWorkflowStatus {
     #[default]
     Idle,
+    /// A dispatch has been reserved for this ticket and one execution now owns
+    /// it, but the worker has not started yet. The ticket stays in Todo through
+    /// this window; the state records which execution admitted it so a repeated
+    /// admission is visibly a no-op rather than a second competing run.
+    Admitting,
     Running,
     Paused,
     Completed,
     Failed,
     Cancelled,
+}
+
+impl TaskBoardWorkflowStatus {
+    /// Every workflow status, derived from the `ValueEnum` variants so code that
+    /// aggregates across all statuses can never silently miss a newly added one.
+    #[must_use]
+    pub fn all() -> &'static [Self] {
+        <Self as ValueEnum>::value_variants()
+    }
 }
 
 #[derive(

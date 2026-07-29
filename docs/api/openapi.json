@@ -33202,6 +33202,7 @@
         "type": "string",
         "enum": [
           "idle",
+          "admitting",
           "running",
           "paused",
           "completed",

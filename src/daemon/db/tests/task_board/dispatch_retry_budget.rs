@@ -8,7 +8,8 @@ use crate::daemon::db::{
     TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
 };
 use crate::task_board::{
-    SpawnGateSwitches, TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy,
+    SpawnGateSwitches, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
+    build_dispatch_plans_with_policy,
 };
 
 /// Bounds every give-up loop below. Without it a preparation that never stops
@@ -178,6 +179,13 @@ async fn an_exhausted_preparation_releases_its_item() {
         TaskBoardStatus::Todo,
         "an item whose dispatch gave up must be dispatchable again"
     );
+    // Retiring the dispatch releases the Admitting stamp, so the ticket no longer
+    // points at a dead execution and reads as retryable rather than owned.
+    assert!(
+        item.workflow.execution_id.is_none(),
+        "a retired dispatch must not leave the ticket pinned to a dead execution"
+    );
+    assert_eq!(item.workflow.status, TaskBoardWorkflowStatus::Idle);
     let plan = build_dispatch_plans_with_policy(
         &[item],
         None,
@@ -190,12 +198,26 @@ async fn an_exhausted_preparation_releases_its_item() {
         .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
         .await
         .expect("reserve after exhaustion");
-    match retry {
-        ReservedTaskBoardDispatch::Preparing { intent_id, .. } => {
-            assert_ne!(intent_id, intent, "a retry must not reuse the dead intent");
+    let retry_execution = match retry {
+        ReservedTaskBoardDispatch::Preparing {
+            intent_id: retry_intent,
+            preparation,
+        } => {
+            assert_ne!(retry_intent, intent, "a retry must not reuse the dead intent");
+            preparation.workflow_execution_id
         }
         ReservedTaskBoardDispatch::Applied(_) | ReservedTaskBoardDispatch::Blocked(_) => {
             panic!("an exhausted intent must not block a fresh reservation")
         }
-    }
+    };
+    let readmitted = db
+        .task_board_item("retry-release")
+        .await
+        .expect("reload readmitted item");
+    assert_eq!(
+        readmitted.workflow.execution_id.as_deref(),
+        Some(retry_execution.as_str()),
+        "a fresh dispatch must stamp its own execution, not resurrect the dead one"
+    );
+    assert_eq!(readmitted.workflow.status, TaskBoardWorkflowStatus::Admitting);
 }
