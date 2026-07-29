@@ -21,8 +21,8 @@ mod tests {
 
     use harness_kernel::errors::CliErrorKind;
     use harness_task_board::github::{
-        ActionState, InMemoryPullRequestEvidenceSource, MergeLedgerOutcome, Mergeability,
-        PullRequestAction, PullRequestActionFailureClass, PullRequestActionKind,
+        ActionGateRequirement, ActionState, InMemoryPullRequestEvidenceSource, MergeLedgerOutcome,
+        Mergeability, PullRequestAction, PullRequestActionFailureClass, PullRequestActionKind,
         PullRequestActionStore, PullRequestEvidence, PullRequestIdentity, PullRequestLifecycle,
         PullRequestMergeGates, RecordedAction, ReviewDecision, ReviewGate, merge_with_ledger,
     };
@@ -143,14 +143,21 @@ mod tests {
         let path = dir.path().join("harness.db");
         let calls = AtomicUsize::new(0);
 
-        // First process: the merge request leaves but its response is lost.
+        // First process: the gate clears on a green pull request, the merge
+        // request leaves, but its response is lost.
         {
             let db = AsyncDaemonDb::connect(&path).await.expect("open database");
-            let before = InMemoryPullRequestEvidenceSource::new();
-            let error = merge_with_ledger(&db, &before, action("merge", None), || async {
-                calls.fetch_add(1, Ordering::SeqCst);
-                Err(CliErrorKind::workflow_io("connection lost after send").into())
-            })
+            let before = InMemoryPullRequestEvidenceSource::new().with_evidence(open_evidence());
+            let error = merge_with_ledger(
+                &db,
+                &before,
+                action("merge", None),
+                ActionGateRequirement::for_merge(),
+                || async {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    Err(CliErrorKind::workflow_io("connection lost after send").into())
+                },
+            )
             .await
             .expect_err("a lost response surfaces the error");
             assert!(error.to_string().contains("connection lost"));
@@ -161,10 +168,16 @@ mod tests {
         // pull request already merged - the lost request had in fact applied.
         let db = AsyncDaemonDb::connect(&path).await.expect("reopen database");
         let after = InMemoryPullRequestEvidenceSource::new().with_evidence(merged_evidence());
-        let outcome = merge_with_ledger(&db, &after, action("merge", None), || async {
-            calls.fetch_add(1, Ordering::SeqCst);
-            Ok(())
-        })
+        let outcome = merge_with_ledger(
+            &db,
+            &after,
+            action("merge", None),
+            ActionGateRequirement::for_merge(),
+            || async {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        )
         .await
         .expect("the uncertain merge reconciles as applied");
         assert_eq!(outcome, MergeLedgerOutcome::AlreadyApplied);
@@ -176,15 +189,23 @@ mod tests {
     }
 
     fn merged_evidence() -> PullRequestEvidence {
+        evidence(PullRequestLifecycle::Merged)
+    }
+
+    fn open_evidence() -> PullRequestEvidence {
+        evidence(PullRequestLifecycle::Open)
+    }
+
+    fn evidence(lifecycle: PullRequestLifecycle) -> PullRequestEvidence {
         PullRequestEvidence {
             identity: PullRequestIdentity::from_slug("owner/repo", 42),
             head_revision: "head-sha".to_owned(),
             author: None,
-            lifecycle: PullRequestLifecycle::Merged,
+            lifecycle,
             is_draft: false,
             gates: PullRequestMergeGates {
-                mergeability: Mergeability::Unknown,
-                viewer_can_update: false,
+                mergeability: Mergeability::Mergeable,
+                viewer_can_update: true,
                 viewer_can_merge_as_admin: false,
                 checks: Vec::new(),
                 required_check_names: Vec::new(),

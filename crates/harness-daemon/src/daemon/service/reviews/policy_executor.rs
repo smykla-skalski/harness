@@ -11,8 +11,8 @@ use crate::daemon::service::reviews::token::{github_token, missing_token_error};
 use crate::reviews::policy::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
 use crate::reviews::{ReviewTarget, ReviewsGitHubClient};
 use crate::task_board::github::{
-    GitHubMergeMethod, GitHubPullRequestEvidenceSource, MergeLedgerOutcome, PullRequestAction,
-    PullRequestActionKind, PullRequestIdentity, merge_with_ledger,
+    ActionGateRequirement, GitHubMergeMethod, GitHubPullRequestEvidenceSource, MergeLedgerOutcome,
+    PullRequestAction, PullRequestActionKind, PullRequestIdentity, merge_with_ledger,
 };
 use harness_kernel::errors::CliErrorKind;
 use crate::task_board::policy_runtime::handoff::HandoffPolicyProvider;
@@ -96,15 +96,25 @@ impl DaemonReviewsPolicyExecutor {
                 .with_url(Some(target.url.clone())),
             head_revision: target.head_sha.clone(),
         };
-        match merge_with_ledger(store.as_ref(), &source, action, || {
-            self.client.policy_merge(target, method)
-        })
-        .await?
-        {
+        let outcome = merge_with_ledger(
+            store.as_ref(),
+            &source,
+            action,
+            ActionGateRequirement::for_merge(),
+            || self.client.merge_verified(target, method),
+        )
+        .await?;
+        match outcome {
             MergeLedgerOutcome::Merged | MergeLedgerOutcome::AlreadyApplied => Ok(()),
-            MergeLedgerOutcome::Abandoned => Err(CliErrorKind::workflow_io(format!(
-                "merge for {}#{} was abandoned after a permanent failure",
-                target.repository, target.number
+            MergeLedgerOutcome::Blocked(blocks) => Err(CliErrorKind::workflow_io(format!(
+                "refused merge for {}#{}: {}",
+                target.repository,
+                target.number,
+                blocks
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("; ")
             ))
             .into()),
         }

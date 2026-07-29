@@ -231,6 +231,22 @@ impl ReviewsGitHubClient {
         merge_target(&self.automation, target, method).await
     }
 
+    /// Merge without the fresh-evidence gate, for a caller that runs the gate
+    /// itself. The durable merge ledger verifies the gates immediately before
+    /// issuing this call, so re-checking here would only duplicate the read.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the repository has no automation config or the
+    /// GitHub merge mutation fails.
+    pub async fn merge_verified(
+        &self,
+        target: &ReviewTarget,
+        method: GitHubMergeMethod,
+    ) -> Result<(), CliError> {
+        merge_target(&self.automation, target, method).await
+    }
+
     /// # Errors
     ///
     /// Never returns `Err`; each target's outcome is captured in its own
