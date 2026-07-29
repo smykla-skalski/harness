@@ -33,7 +33,7 @@ Wall times are seconds. Median and range use three steady-state samples except t
 | Same-lane no-op leaf check | 1.16, 1.18, 1.12 | 1.16 | 0.06 | Cargo fingerprints avoid compiler work |
 | Leaf-crate edit/check | 1.66, 1.41, 1.53 | 1.53 | 0.25 | Small edit remains close to the no-op path |
 | Daemon edit/check | 7.80, 6.27, 6.21 | 6.27 | 1.59 | Rootward edit recompiles a larger dependency surface |
-| Fresh COW fixture plus identical checkout and branch edit | 1.86, 2.11, 1.87 | 1.87 | 0.25 | Donor compile median 0.44; seed 4 artifacts in 0.0; identical checkout 0.00; branch edit 0.03 |
+| Fresh COW fixture plus identical checkout and branch edit | 1.86, 2.11, 1.87 | 1.87 | 0.25 | Donor compile median 0.44; seed reported 4 artifacts in 0.0; identical checkout reported 0.00; branch edit 0.03 |
 | Six-group compile-only unit gate, cold | 398.71 | 398.71 | single | Compilation only; no tests executed |
 | Six-group compile-only unit gate, warm | 10.45, 8.83, 8.81 | 8.83 | 1.64 | Warm same-lane compilation remains fast |
 | Root Harness unit command wall time | 1.76, 1.48, 1.58 | 1.58 | 0.28 | End-to-end task overhead, preparation, and test execution |
