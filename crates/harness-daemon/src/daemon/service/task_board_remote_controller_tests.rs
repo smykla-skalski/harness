@@ -211,7 +211,7 @@ async fn transient_progress_failure_defers_exact_generation_and_survives_restart
         1
     );
 
-    let database_path = fixture._temp.path().join("controller.db");
+    let database_path = fixture.temp_dir.path().join("controller.db");
     drop(fixture.db);
     let reopened = AsyncDaemonDb::connect(&database_path)
         .await

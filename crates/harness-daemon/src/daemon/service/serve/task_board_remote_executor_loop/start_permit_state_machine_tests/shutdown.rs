@@ -7,7 +7,7 @@ fn shutdown_after_session_creation_never_claims_or_starts() {
 
 async fn shutdown_after_session_creation_never_claims_or_starts_body() {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let now = Utc::now();
     let offered_at =

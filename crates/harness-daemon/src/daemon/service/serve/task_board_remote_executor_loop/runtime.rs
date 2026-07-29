@@ -52,17 +52,20 @@ impl PreparedRemoteWorkerAction {
     }
 }
 
+// `db` and `workspace` are read only by the `#[cfg(test)]` seam below; a
+// non-test build never reaches that branch, so they go unused there.
+#[cfg_attr(not(test), allow(unused_variables))]
 pub(super) async fn execute_remote_worker_action(
     state: &DaemonHttpState,
-    _db: &AsyncDaemonDb,
+    db: &AsyncDaemonDb,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
-    _workspace: &Path,
+    workspace: &Path,
 ) -> Result<CodexRunSnapshot, CliError> {
     #[cfg(test)]
     if let Some(snapshot) =
-        super::test_seam::execute_runtime_seam(_db, offer, identity, action, _workspace).await?
+        super::test_seam::execute_runtime_seam(db, offer, identity, action, workspace).await?
     {
         return Ok(snapshot);
     }

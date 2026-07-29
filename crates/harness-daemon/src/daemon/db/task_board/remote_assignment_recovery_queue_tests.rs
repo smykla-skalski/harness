@@ -123,7 +123,7 @@ async fn a_migrated_row_never_starves_or_is_mutated_by_current_recovery_across_r
     assert_migrated_untouched(&fixture.db, "legacy-superseded").await;
 
     // Across a restart the migrated row stays inert and out of recovery.
-    let path = fixture._temp.path().join("controller.db");
+    let path = fixture.temp_dir.path().join("controller.db");
     fixture.db.pool().close().await;
     let reopened = crate::daemon::db::AsyncDaemonDb::connect(&path)
         .await

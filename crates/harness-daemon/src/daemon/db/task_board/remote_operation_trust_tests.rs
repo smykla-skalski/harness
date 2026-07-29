@@ -88,7 +88,7 @@ async fn disabled_r2_lifecycle_operations_use_the_frozen_generation_and_survive_
     )
     .await
     .expect("claim restart-stable lifecycle authority");
-    let path = fixture._temp.path().join("controller.db");
+    let path = fixture.temp_dir.path().join("controller.db");
     fixture.db.pool().close().await;
     let restarted = AsyncDaemonDb::connect(&path)
         .await
@@ -205,7 +205,7 @@ async fn cleanup_observation_rolls_a_stale_per_call_fence_after_restart() {
         .is_err()
     );
 
-    let path = fixture._temp.path().join("controller.db");
+    let path = fixture.temp_dir.path().join("controller.db");
     fixture.db.pool().close().await;
     let restarted = AsyncDaemonDb::connect(&path)
         .await

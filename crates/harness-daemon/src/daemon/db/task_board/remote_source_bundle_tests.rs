@@ -38,7 +38,7 @@ async fn prior_phase_offer_requires_durable_exact_bundle_and_replays_after_resta
         .store_task_board_remote_source_bundle(&upload, PRINCIPAL, INSTANCE, NOW)
         .await
         .expect("persist source bundle");
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("reopen executor db after lost upload response");
     let replay = reopened
@@ -147,7 +147,7 @@ async fn source_abandonment_reloads_exact_authority_and_replays_after_restart() 
         .expect("persist source abandonment");
     fixture.db.pool().close().await;
 
-    let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let restarted = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart after source abandonment response loss");
     let stored = restarted
@@ -213,7 +213,7 @@ async fn repository_snapshot_upload_replays_and_gates_offer_admission() {
         .store_task_board_remote_source_bundle(&upload, PRINCIPAL, INSTANCE, NOW)
         .await
         .expect("store repository snapshot");
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("reopen executor with repository snapshot");
     let replay = reopened
@@ -309,7 +309,7 @@ async fn lost_offer_response_replays_acceptance_after_restart_and_forbids_reassi
         panic!("first offer was not accepted");
     };
     fixture.db.pool().close().await;
-    let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let restarted = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart after lost accepted response");
     let TaskBoardRemoteOfferOutcome::AcceptedReplay(replayed) = restarted
@@ -366,7 +366,7 @@ async fn rejected_orphan_source_prunes_bytes_but_replays_compact_receipt_after_r
         .await
         .expect("store source before executor restart");
     fixture.db.pool().close().await;
-    let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let restarted = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart executor before old-instance offer");
     let rejected = restarted

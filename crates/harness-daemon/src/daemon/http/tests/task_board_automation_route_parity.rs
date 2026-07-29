@@ -81,7 +81,7 @@ async fn run_force_cancel_parity() {
         actor: Some("spoofed caller".into()),
     })
     .expect("encode force-cancel request");
-    let db_path = fixture._temp.path().join("controller.db");
+    let db_path = fixture.temp_dir.path().join("controller.db");
     let state = super::test_http_state_with_db_path(&db_path, "force-cancel-parity");
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();

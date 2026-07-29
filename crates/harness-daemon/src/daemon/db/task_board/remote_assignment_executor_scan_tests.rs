@@ -49,9 +49,9 @@ async fn active_cursor_survives_reconnect_and_reaches_a_newer_claim() {
             .any(|id| id.ends_with("064"))
     );
 
-    let database_path = fixture._temp.path().join("executor.db");
+    let database_path = fixture.temp_dir.path().join("executor.db");
     let ExecutorFixture {
-        db, _temp: temp, ..
+        db, temp_dir: temp, ..
     } = fixture;
     drop(db);
     let restarted = AsyncDaemonDb::connect(&database_path)
@@ -98,9 +98,9 @@ async fn terminal_cursor_is_bounded_and_restart_fair() {
             .any(|id| id.ends_with("064"))
     );
 
-    let database_path = fixture._temp.path().join("executor.db");
+    let database_path = fixture.temp_dir.path().join("executor.db");
     let ExecutorFixture {
-        db, _temp: temp, ..
+        db, temp_dir: temp, ..
     } = fixture;
     drop(db);
     let restarted = AsyncDaemonDb::connect(&database_path)

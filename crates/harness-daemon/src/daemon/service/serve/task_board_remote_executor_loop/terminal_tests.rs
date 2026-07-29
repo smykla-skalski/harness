@@ -57,8 +57,12 @@ async fn completed_review_persists_once_and_replays_after_restart() {
         .clone()
         .expect("terminal lifecycle owner");
 
-    let database_path = fixture._temp.path().join("executor.db");
-    let RemoteExecutorFixture { db, _temp, .. } = fixture;
+    let database_path = fixture.temp_dir.path().join("executor.db");
+    let RemoteExecutorFixture {
+        db,
+        temp_dir: _guard,
+        ..
+    } = fixture;
     drop(db);
     let reopened = AsyncDaemonDb::connect(&database_path)
         .await

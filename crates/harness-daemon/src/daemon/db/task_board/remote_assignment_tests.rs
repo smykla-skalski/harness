@@ -39,7 +39,7 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
     );
 
     let configured = executor_fixture(1).await;
-    let fork_checkout = configured._temp.path().join("fork-checkout");
+    let fork_checkout = configured.temp_dir.path().join("fork-checkout");
     std::fs::create_dir(&fork_checkout).expect("create fork checkout");
     let fork_checkout = fork_checkout
         .canonicalize()
@@ -118,7 +118,7 @@ async fn lost_acceptance_replays_after_settings_change_but_start_fails_before_io
     let fixture = executor_fixture(1).await;
     let accepted = accept_executor(&fixture, &fixture.request).await;
     let checkout = fixture
-        ._temp
+        .temp_dir
         .path()
         .join("checkout")
         .canonicalize()

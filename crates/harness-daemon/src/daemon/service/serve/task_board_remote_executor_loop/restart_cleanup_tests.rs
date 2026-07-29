@@ -74,7 +74,7 @@ async fn predecessor_partial_workspace() -> (
     PathBuf,
 ) {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
     let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;

@@ -105,7 +105,7 @@ async fn cleaned_unknown_allows_host_replacement_and_clear_without_losing_histor
     assert_eq!(host_state(&fixture.db, "executor-b").await, Some(true));
     assert_settlement_history(&fixture.db, &unknown.assignment_id).await;
 
-    let database_path = fixture._temp.path().join("executor.db");
+    let database_path = fixture.temp_dir.path().join("executor.db");
     fixture.db.pool().close().await;
     let restarted = AsyncDaemonDb::connect(&database_path)
         .await

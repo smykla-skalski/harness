@@ -45,7 +45,7 @@ async fn startup_reconciliation_releases_orphaned_codex_concurrency() {
         .expect("load change sequence");
 
     let reopened = Arc::new(
-        AsyncDaemonDb::connect(&db._directory.path().join("harness.db"))
+        AsyncDaemonDb::connect(&db.directory.path().join("harness.db"))
             .await
             .expect("reopen async db"),
     );

@@ -13,7 +13,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 #[tokio::test]
 async fn settings_can_win_during_provisioning_and_force_exact_cleanup() {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
     let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
@@ -70,7 +70,7 @@ async fn settings_can_win_during_provisioning_and_force_exact_cleanup() {
 #[tokio::test]
 async fn final_start_io_permit_fences_settings_until_adoption() {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
     let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;

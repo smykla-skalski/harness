@@ -222,7 +222,7 @@ async fn abandoned_generation_fences_aliased_upload_and_accept_across_restart() 
 
     // Across restart the abandonment tombstone keeps fencing both aliases.
     fixture.db.pool().close().await;
-    let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let restarted = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart after abandonment");
     assert_aliases_fenced(&restarted, &alias_upload, &alias_content, &accept_alias).await;

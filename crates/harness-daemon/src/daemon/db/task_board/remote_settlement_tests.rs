@@ -33,7 +33,7 @@ async fn lost_settlement_response_replays_first_timestamp_after_restart() {
         .await
         .expect("persist settlement before response loss");
     let first_bytes = serde_json::to_vec(&first.response).expect("serialize first response");
-    let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let restarted = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart executor database");
     let replay = restarted

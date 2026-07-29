@@ -39,8 +39,8 @@ async fn crash_before_stop_io_restarts_in_stop_only_mode() {
         .expect("persist stop before I/O")
         .expect("stop-pending marker");
 
-    let database_path = fixture._temp.path().join("executor.db");
-    let temp = fixture._temp;
+    let database_path = fixture.temp_dir.path().join("executor.db");
+    let temp = fixture.temp_dir;
     drop(fixture.db);
     let db = AsyncDaemonDb::connect(&database_path)
         .await

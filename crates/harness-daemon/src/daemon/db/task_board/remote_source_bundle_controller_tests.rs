@@ -44,7 +44,7 @@ async fn controller_source_upload_receipt_is_current_trust_fenced_and_restart_sa
     assert_eq!(stored.response, response);
     assert_eq!(stored.content.as_deref(), Some(content.as_slice()));
 
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("controller.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("controller.db"))
         .await
         .expect("reopen controller after committed upload response");
     let replay = reopened

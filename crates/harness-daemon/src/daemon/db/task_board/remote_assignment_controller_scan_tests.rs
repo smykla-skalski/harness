@@ -44,7 +44,7 @@ async fn controller_scan_replays_a_durable_active_generation_across_restart() {
 
     drop(fixture.db);
     let reopened =
-        crate::daemon::db::AsyncDaemonDb::connect(&fixture._temp.path().join("controller.db"))
+        crate::daemon::db::AsyncDaemonDb::connect(&fixture.temp_dir.path().join("controller.db"))
             .await
             .expect("reopen controller database");
     let replay = reopened

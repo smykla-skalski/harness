@@ -46,7 +46,7 @@ async fn outbound_source_is_atomic_with_assignment_and_restart_replay() {
         .await
         .expect("load outbound source")
         .expect("outbound source exists");
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("reopen outbound source database");
     let replay = reopened
