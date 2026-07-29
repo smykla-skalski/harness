@@ -20,7 +20,9 @@ async fn a_fresh_merge_issues_once_and_never_repeats() {
     let source = green_source(HEAD);
     let calls = AtomicUsize::new(0);
 
-    let first = merge(&store, &source, &calls, Ok(())).await.expect("a cleared merge proceeds");
+    let first = merge(&store, &source, &calls, Ok(()))
+        .await
+        .expect("a cleared merge proceeds");
     assert_eq!(first, MergeLedgerOutcome::Merged);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 
@@ -91,7 +93,11 @@ async fn a_refused_gate_blocks_without_issuing_or_recording_uncertainty() {
         .await
         .expect("a refused gate is not an error");
     assert!(matches!(outcome, MergeLedgerOutcome::Blocked(_)));
-    assert_eq!(calls.load(Ordering::SeqCst), 0, "a refused merge issues no request");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "a refused merge issues no request"
+    );
 
     // The refusal is a transient failure, not an uncertain record, so a later
     // attempt re-admits cleanly rather than being forced to reconcile.

@@ -295,7 +295,10 @@ mod tests {
     fn frozen_identity_rejects_a_changed_repository_or_number() {
         let item = item();
 
-        for changed in [frozen("acme/widgets", 18, true), frozen("acme/other", 17, true)] {
+        for changed in [
+            frozen("acme/widgets", 18, true),
+            frozen("acme/other", 17, true),
+        ] {
             let error = confirm_frozen_pull_request_identity(&item, &changed, true)
                 .expect_err("a changed pull request identity must be rejected");
             assert_eq!(

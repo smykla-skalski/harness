@@ -14,12 +14,12 @@ use crate::task_board::github::{
     ActionGateRequirement, GitHubMergeMethod, GitHubPullRequestEvidenceSource, MergeLedgerOutcome,
     PullRequestAction, PullRequestActionKind, PullRequestIdentity, merge_with_ledger,
 };
-use harness_kernel::errors::CliErrorKind;
 use crate::task_board::policy_runtime::handoff::HandoffPolicyProvider;
 use crate::task_board::policy_runtime::notification::NotificationPolicyProvider;
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::task_creation::TaskCreationPolicyProvider;
 use harness_kernel::errors::CliError;
+use harness_kernel::errors::CliErrorKind;
 
 pub(crate) struct DaemonReviewsPolicyExecutor {
     client: ReviewsGitHubClient,

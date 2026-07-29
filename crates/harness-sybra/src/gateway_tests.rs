@@ -320,11 +320,20 @@ async fn event_tokens_are_consumed_and_streams_have_dedicated_capacity() {
     let malformed_rpc = edge
         .router
         .clone()
-        .oneshot(request(Method::POST, "/api/A/B?trace=%zz", true, Body::empty()))
+        .oneshot(request(
+            Method::POST,
+            "/api/A/B?trace=%zz",
+            true,
+            Body::empty(),
+        ))
         .await
         .expect("malformed RPC query");
     assert_eq!(malformed_rpc.status(), StatusCode::BAD_REQUEST);
-    assert!(body_text(malformed_rpc).await.contains("Sybra query is malformed"));
+    assert!(
+        body_text(malformed_rpc)
+            .await
+            .contains("Sybra query is malformed")
+    );
     assert_eq!(edge.count(), 0);
 
     for uri in ["/events", "/events?token=wrong-browser-token-000000000"] {

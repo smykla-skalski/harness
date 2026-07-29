@@ -30,7 +30,7 @@ pub use pr_evidence::{
     ActionAdmission, ActionGateBlock, ActionGateDecision, ActionGateRequirement, ActionOutcome,
     ActionState, CheckGate, CheckState, CheckWait, CheckWaitControls, CheckWaitOutcome,
     CheckWaitProgress, GitHubPullRequestEvidenceSource, InMemoryPullRequestActionStore,
-    InMemoryPullRequestEvidenceSource, Mergeability, MergeLedgerOutcome, PullRequestAction,
+    InMemoryPullRequestEvidenceSource, MergeLedgerOutcome, Mergeability, PullRequestAction,
     PullRequestActionFailureClass, PullRequestActionKind, PullRequestActionStore,
     PullRequestEvidence, PullRequestEvidenceRead, PullRequestEvidenceSource, PullRequestIdentity,
     PullRequestLifecycle, PullRequestMergeGates, RecordedAction, ReviewDecision, ReviewGate,
