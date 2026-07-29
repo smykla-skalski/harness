@@ -344,7 +344,7 @@ impl fmt::Debug for DaemonDb {
 // assert a freshly migrated database's stamped version against this
 // constant, the same reason `AsyncDaemonDb` above is `pub` rather than
 // `pub(crate)`.
-pub const SCHEMA_VERSION: &str = "57";
+pub const SCHEMA_VERSION: &str = "58";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

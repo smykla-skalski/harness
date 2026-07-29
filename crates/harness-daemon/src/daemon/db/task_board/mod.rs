@@ -107,6 +107,7 @@ mod remote_assignment_status_settlement_tests;
 mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
+mod review_reports;
 mod triage_apply;
 mod triage_apply_agent;
 mod triage_apply_rules;
