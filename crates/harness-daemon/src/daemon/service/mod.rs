@@ -466,7 +466,6 @@ pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 pub(crate) use headless_readiness::{
     CredentialAssessment, HeadlessReadinessInputs, RuntimeProbe, build_headless_readiness_report,
 };
-pub(crate) use openrouter_readiness::{OpenRouterCredential, probe_openrouter_readiness};
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
 pub(crate) use observe_persistence::{
@@ -479,6 +478,7 @@ pub(crate) use observe_stream::{
     global_stream_initial_events_async, session_stream_initial_events_async,
     session_updated_core_event_async, sessions_updated_event_async,
 };
+pub(crate) use openrouter_readiness::{OpenRouterCredential, probe_openrouter_readiness};
 pub(crate) use read_reconciliation::*;
 #[cfg(test)]
 pub(crate) use sessions::session_timeline_window;

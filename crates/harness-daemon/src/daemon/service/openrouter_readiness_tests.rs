@@ -27,9 +27,9 @@ fn serve_once(status: &str, body: &str) -> (String, JoinHandle<()>) {
             "unexpected request line: {request}"
         );
         assert!(
-            request
-                .lines()
-                .any(|line| line.to_ascii_lowercase().starts_with("authorization: bearer")),
+            request.lines().any(|line| line
+                .to_ascii_lowercase()
+                .starts_with("authorization: bearer")),
             "request omitted bearer authorization"
         );
         write!(
@@ -48,7 +48,11 @@ fn accepted_key_with_offered_model_reports_available() {
         "200 OK",
         r#"{"data":[{"id":"deepseek/deepseek-v4-flash"},{"id":"openai/gpt-5.5"}]}"#,
     );
-    let readiness = block_on(probe_at(&base_url, "or-secret", "deepseek/deepseek-v4-flash"));
+    let readiness = block_on(probe_at(
+        &base_url,
+        "or-secret",
+        "deepseek/deepseek-v4-flash",
+    ));
     server.join().expect("mock server finishes");
     assert_eq!(readiness.credential, OpenRouterCredential::Accepted);
     assert_eq!(readiness.model_available, Some(true));
@@ -57,7 +61,11 @@ fn accepted_key_with_offered_model_reports_available() {
 #[test]
 fn accepted_key_without_offered_model_reports_unavailable() {
     let (base_url, server) = serve_once("200 OK", r#"{"data":[{"id":"openai/gpt-5.5"}]}"#);
-    let readiness = block_on(probe_at(&base_url, "or-secret", "deepseek/deepseek-v4-flash"));
+    let readiness = block_on(probe_at(
+        &base_url,
+        "or-secret",
+        "deepseek/deepseek-v4-flash",
+    ));
     server.join().expect("mock server finishes");
     assert_eq!(readiness.credential, OpenRouterCredential::Accepted);
     assert_eq!(readiness.model_available, Some(false));
@@ -69,7 +77,11 @@ fn accepted_key_with_unreadable_body_leaves_model_undetermined() {
     // not read as "model unavailable"; it leaves the decision to the caller's
     // static-catalog fallback via `None`.
     let (base_url, server) = serve_once("200 OK", r#"{"models":[{"id":"x"}]}"#);
-    let readiness = block_on(probe_at(&base_url, "or-secret", "deepseek/deepseek-v4-flash"));
+    let readiness = block_on(probe_at(
+        &base_url,
+        "or-secret",
+        "deepseek/deepseek-v4-flash",
+    ));
     server.join().expect("mock server finishes");
     assert_eq!(readiness.credential, OpenRouterCredential::Accepted);
     assert_eq!(readiness.model_available, None);

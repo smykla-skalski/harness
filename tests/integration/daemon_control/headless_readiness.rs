@@ -16,7 +16,11 @@ fn readiness_body(runtime: &str, model: &str) -> Value {
     })
 }
 
-fn spawn_readiness_daemon(home: &Path, xdg: &Path, openrouter_api_url: Option<&str>) -> ManagedChild {
+fn spawn_readiness_daemon(
+    home: &Path,
+    xdg: &Path,
+    openrouter_api_url: Option<&str>,
+) -> ManagedChild {
     let mut command = Command::new(daemon_binary());
     configure_daemon_serve_command(&mut command, home, xdg, &[]);
     if let Some(url) = openrouter_api_url {
