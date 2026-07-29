@@ -503,7 +503,7 @@ description = "Prove that an isolated fresh checkout lane reuses Cargo artifacts
 run = "./scripts/rust-build-cache-canary.sh"
 
 [tasks."cargo:cache:status"]
-description = "Report configured repo sccache health, cache age/size, and safely identifiable live/orphan servers"
+description = "Report configured repo sccache health, cache effectiveness, non-cacheable reasons, and live/orphan servers"
 run = "python3 scripts/sccache-status.py"
 
 [tasks."monitor:generate"]
