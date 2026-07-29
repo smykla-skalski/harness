@@ -327,12 +327,14 @@ fn validate_action_sequence(
             TaskBoardDependencyActionKind::ContinueWorkflow
         }
     };
-    let expected = [TaskBoardDependencyActionKind::RecordResult, terminal];
+    let expected = [
+        (1, TaskBoardDependencyActionKind::RecordResult),
+        (2, terminal),
+    ];
     if actions.len() != expected.len()
-        || actions
-            .iter()
-            .zip(expected)
-            .any(|(action, kind)| action.kind != kind)
+        || actions.iter().zip(expected).any(|(action, (order, kind))| {
+            action.order != order || action.kind != kind || action.reason.trim().is_empty()
+        })
     {
         return Err(TaskBoardDependencyTriageError::ActionPlanContradictsDisposition);
     }

@@ -42,6 +42,23 @@ fn compiler_rejects_duplicate_capabilities_without_the_outer_validator() {
 }
 
 #[test]
+fn compiler_rejects_order_and_reason_without_the_outer_validator() {
+    let mut unordered = safe_result();
+    unordered.next_steps[1].order = 1;
+    assert_eq!(
+        compile_task_board_dependency_action_plan(&unordered),
+        Err(TaskBoardDependencyTriageError::ActionPlanContradictsDisposition)
+    );
+
+    let mut empty_reason = safe_result();
+    empty_reason.next_steps[1].reason = "  ".into();
+    assert_eq!(
+        compile_task_board_dependency_action_plan(&empty_reason),
+        Err(TaskBoardDependencyTriageError::ActionPlanContradictsDisposition)
+    );
+}
+
+#[test]
 fn model_supplied_action_arguments_are_rejected_by_the_wire_schema() {
     let mut payload = serde_json::to_value(safe_result()).expect("serialize result");
     payload["next_steps"][0]["command"] = serde_json::json!("rm -rf workspace");
