@@ -107,10 +107,12 @@ mod review_tasks;
 mod routing;
 mod runtime_registration;
 mod runtime_support;
+mod session_exit;
 mod session_helpers;
 mod session_state;
 mod signal_support;
 mod signals;
+mod task_assignment;
 mod task_delete;
 mod task_queue;
 mod task_state;
@@ -165,6 +167,7 @@ pub use misc::*;
 pub use review_state::*;
 pub use routing::*;
 pub use runtime_support::*;
+pub use session_exit::*;
 pub use session_helpers::*;
 pub use session_state::*;
 // The session-index test suite in `harness-session` fixtures sessions
@@ -172,6 +175,7 @@ pub use session_state::*;
 // glob above.
 pub use session_state::build_new_session_with_policy;
 pub use signal_support::*;
+pub use task_assignment::*;
 pub use task_delete::*;
 pub use task_queue::*;
 pub use task_state::*;

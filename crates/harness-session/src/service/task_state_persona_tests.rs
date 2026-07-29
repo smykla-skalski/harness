@@ -1,7 +1,8 @@
 use super::*;
+use super::super::apply_advance_queued_tasks;
 use crate::types::{
-    AgentPersona, AgentStatus, PersonaSymbol, SessionMetrics, SessionPolicy, SessionRole,
-    SessionStatus, TaskSeverity, TaskSource,
+    AgentPersona, AgentRegistration, AgentStatus, PersonaSymbol, SessionMetrics, SessionPolicy,
+    SessionRole, SessionStatus, TaskSeverity, TaskSource,
 };
 use harness_agents::kind::RuntimeKind;
 use harness_agents::runtime::RuntimeCapabilities;
