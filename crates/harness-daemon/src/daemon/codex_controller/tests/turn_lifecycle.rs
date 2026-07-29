@@ -1,3 +1,5 @@
+use serde_json::json;
+
 use crate::agents::turn::{
     AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnId, AgentTurnRequest,
     AgentTurnRuntime, AgentTurnStatus,
@@ -65,6 +67,16 @@ async fn completed_codex_turn_returns_one_stable_report() {
     let (controller, db, _tempdir) = controller_with_db();
     let mut snapshot = report_snapshot(CodexRunStatus::Completed);
     snapshot.final_message = Some("Complete Codex report".into());
+    snapshot.model = Some("gpt-5.3-codex-spark".into());
+    super::super::handle::record_snapshot_event(
+        &mut snapshot,
+        "thread/start",
+        "Codex thread ready".into(),
+        &json!({
+            "thread": { "id": "thread-1" },
+            "model": "gpt-5.3-codex-spark"
+        }),
+    );
     db.lock()
         .expect("db lock")
         .save_codex_run(&snapshot)
@@ -80,8 +92,14 @@ async fn completed_codex_turn_returns_one_stable_report() {
     assert_eq!(result.correlation_id, id);
     assert_eq!(result.report, "Complete Codex report");
     assert_eq!(result.stop_reason, "end_turn");
-    assert_eq!(result.requested_model.as_deref(), Some("gpt-5.5"));
-    assert_eq!(result.effective_model.as_deref(), Some("gpt-5.5"));
+    assert_eq!(
+        result.requested_model.as_deref(),
+        Some("gpt-5.3-codex-spark")
+    );
+    assert_eq!(
+        result.effective_model.as_deref(),
+        Some("gpt-5.3-codex-spark")
+    );
     assert_eq!(
         runtime.result(&id).await.expect("reload result"),
         Some(result)
@@ -131,35 +149,47 @@ async fn failed_codex_turns_use_shared_recovery_categories() {
             "HTTP 401 unauthorized",
             AgentTurnFailureCategory::Authentication,
             false,
+            AgentTurnFailureStage::Execution,
         ),
         (
             "HTTP 429 rate limit",
             AgentTurnFailureCategory::RateLimited,
             true,
+            AgentTurnFailureStage::Execution,
         ),
         (
             "unsupported model gpt-x",
             AgentTurnFailureCategory::UnsupportedModel,
             false,
+            AgentTurnFailureStage::Execution,
+        ),
+        (
+            "codex app-server reported unsupported model selection: requested 'gpt-5.3-codex-spark', effective 'gpt-5.5'",
+            AgentTurnFailureCategory::UnsupportedModel,
+            false,
+            AgentTurnFailureStage::Start,
         ),
         (
             "connection closed",
             AgentTurnFailureCategory::Transport,
             false,
+            AgentTurnFailureStage::Execution,
         ),
         (
             "provider refused prompt",
             AgentTurnFailureCategory::ProviderRejected,
             false,
+            AgentTurnFailureStage::Execution,
         ),
         (
             "unrecognized failure",
             AgentTurnFailureCategory::Unknown,
             false,
+            AgentTurnFailureStage::Execution,
         ),
     ];
 
-    for (sequence, (detail, category, retry_safe)) in cases.into_iter().enumerate() {
+    for (sequence, (detail, category, retry_safe, stage)) in cases.into_iter().enumerate() {
         let mut snapshot = report_snapshot(CodexRunStatus::Failed);
         snapshot.run_id = format!("codex-failure-{sequence}");
         snapshot.error = Some(detail.into());
@@ -174,7 +204,7 @@ async fn failed_codex_turns_use_shared_recovery_categories() {
             .expect("load failure")
             .expect("failed turn failure");
         assert_eq!(failure.category, category, "{detail}");
-        assert_eq!(failure.stage, AgentTurnFailureStage::Execution);
+        assert_eq!(failure.stage, stage);
         assert_eq!(failure.automatic_retry_safe, retry_safe, "{detail}");
     }
 }

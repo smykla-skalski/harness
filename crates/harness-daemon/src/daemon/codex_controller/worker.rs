@@ -118,9 +118,11 @@ impl CodexRunWorker {
         })?;
 
         let result = startup_request(rpc, method, params, method).await?;
-        let thread_id = wire::thread_id_from_result(&result).ok_or_else(|| {
-            CliErrorKind::workflow_parse("codex thread response missing thread.id")
+        let thread = wire::thread_result_from_result(&result).ok_or_else(|| {
+            CliErrorKind::workflow_parse("codex thread response missing thread.id or model")
         })?;
+        validate_effective_model(self.snapshot.model.as_deref(), &thread.model)?;
+        let thread_id = thread.thread.id;
         self.snapshot.thread_id = Some(thread_id.clone());
         self.snapshot.latest_summary = Some(format!("Thread {thread_id} ready"));
         self.record_event(method, format!("Codex thread {thread_id} ready"), &result);
@@ -398,6 +400,18 @@ impl CodexRunWorker {
         )
         .await
     }
+}
+
+fn validate_effective_model(requested: Option<&str>, effective: &str) -> Result<(), CliError> {
+    if requested.is_none_or(|requested| requested == effective) {
+        return Ok(());
+    }
+    let requested = requested.unwrap_or_default();
+    Err(CliErrorKind::workflow_parse(format!(
+        "{}: requested '{requested}', effective '{effective}'",
+        wire::MODEL_MISMATCH_DETAIL
+    ))
+    .into())
 }
 
 fn notification_id_matches(expected: Option<&str>, actual: Option<&str>) -> bool {

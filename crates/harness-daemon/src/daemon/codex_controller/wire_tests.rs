@@ -2,7 +2,7 @@ use serde_json::json;
 
 use super::{
     AppServerNotification, CompletedItem, ThreadParamsInput, initialize_params, parse_notification,
-    thread_id_from_result, thread_params, turn_start_params,
+    thread_params, thread_result_from_result, turn_start_params,
 };
 
 #[test]
@@ -101,8 +101,16 @@ fn notification_parser_extracts_handled_shapes_tolerantly() {
 #[test]
 fn result_parsers_extract_ids_from_app_server_responses() {
     assert_eq!(
-        thread_id_from_result(&json!({ "thread": { "id": "thread-1" } })),
-        Some("thread-1".to_string())
+        thread_result_from_result(&json!({
+            "thread": { "id": "thread-1" },
+            "model": "gpt-5.3-codex-spark"
+        })),
+        Some(super::ThreadResult {
+            thread: super::IdRef {
+                id: "thread-1".to_string()
+            },
+            model: "gpt-5.3-codex-spark".to_string(),
+        })
     );
 }
 

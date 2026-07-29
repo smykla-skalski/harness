@@ -403,7 +403,7 @@ fn run_codex(
         let run = &snapshot["snapshot"];
         let status = run["status"].as_str().unwrap_or("unknown");
         if !matches!(status, "queued" | "running" | "waiting_approval") {
-            let effective_model = run["model"].as_str().map(ToOwned::to_owned);
+            let effective_model = codex_effective_model(run);
             if status != "completed" {
                 return Err(SmokeFailure::new(
                     &correlation_id,
@@ -425,6 +425,15 @@ fn run_codex(
                     "completed run omitted final_message",
                 )
             })?;
+            if effective_model.as_deref() != Some(CODEX_MODEL) {
+                return Err(SmokeFailure::new(
+                    &correlation_id,
+                    runtime,
+                    CODEX_MODEL,
+                    "model_evidence",
+                    format!("effective model was {effective_model:?}"),
+                ));
+            }
             return Ok(completed_report(
                 &correlation_id,
                 runtime,
@@ -445,6 +454,18 @@ fn run_codex(
         }
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
+}
+
+fn codex_effective_model(run: &Value) -> Option<String> {
+    run["events"].as_array()?.iter().rev().find_map(|event| {
+        if !matches!(
+            event["kind"].as_str(),
+            Some("thread/start" | "thread/resume")
+        ) {
+            return None;
+        }
+        event["payload"]["model"].as_str().map(ToOwned::to_owned)
+    })
 }
 
 fn completed_report(
