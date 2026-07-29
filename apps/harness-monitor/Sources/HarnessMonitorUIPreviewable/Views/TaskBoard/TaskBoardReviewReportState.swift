@@ -40,8 +40,11 @@ final class TaskBoardReviewReportState {
     let loadToken = token
     loadState = .loading
     let response = await actions.store?.taskBoardItemReviewReport(id: item.id)
-    guard !Task.isCancelled else { return }
     guard itemID == item.id, token == loadToken else { return }
+    guard !Task.isCancelled else {
+      loadState = .idle
+      return
+    }
     loadState = response.map(LoadState.loaded) ?? .failed
   }
 }
