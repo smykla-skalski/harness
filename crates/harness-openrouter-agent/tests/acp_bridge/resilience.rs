@@ -45,6 +45,10 @@ async fn http_error_fails_the_prompt_with_a_separate_diagnostic() {
         "expected diagnostic chunk, got {chunks:?}",
     );
     assert!(
+        chunks.matches("openrouter error").count() == 1,
+        "diagnostic repeated its error prefix: {chunks:?}",
+    );
+    assert!(
         chunks.to_lowercase().contains("rate limit"),
         "expected rate-limit phrasing, got {chunks:?}",
     );

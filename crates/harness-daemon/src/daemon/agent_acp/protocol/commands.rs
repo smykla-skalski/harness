@@ -28,7 +28,6 @@ use crate::daemon::agent_acp::prompt_gate::PromptLease;
 pub(super) type ProtocolCommandResult<T> = Result<T, String>;
 
 /// How long a detach waits for the agent to confirm the session is closed.
-///
 /// Short because someone is stopping one agent and waiting on the reply, and
 /// the process-lifecycle lock is held for the whole call. The lifecycle budget
 /// would bound it too, but at a latency nobody wants on an interactive stop.
@@ -394,6 +393,7 @@ async fn send_prompt(
     prompt: String,
 ) -> AcpResult<()> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/prompt"));
+    super::session_state::begin_turn(supervisor);
     let request = PromptRequest::new(
         session_id,
         vec![ContentBlock::Text(TextContent::new(prompt))],
@@ -403,9 +403,14 @@ async fn send_prompt(
         connection.send_request(request).block_task(),
     )
     .await
-    .map_err(|_| super::deadline_error("session/prompt", prompt_timeout))??;
-    super::session_state::record_stop_reason(supervisor, &response);
-    Ok(())
+    .map_err(|_| super::deadline_error("session/prompt", prompt_timeout))
+    .and_then(std::convert::identity);
+    if let Ok(response) = &response {
+        super::session_state::record_stop_reason(supervisor, response);
+    } else {
+        super::session_state::discard_turn(supervisor);
+    }
+    response.map(drop)
 }
 
 async fn detach_protocol_session(

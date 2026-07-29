@@ -319,7 +319,7 @@ fn error_outcome(
     let message = format!("openrouter error: {error}");
     tracing::warn!(%error, "openrouter turn failed");
     let chunk = ContentChunk::new(ContentBlock::Text(TextContent::new(format!(
-        "[openrouter error] {message}"
+        "[openrouter error] {error}"
     ))));
     if let Err(send_error) = connection.send_notification(SessionNotification::new(
         session_id.clone(),

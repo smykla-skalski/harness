@@ -140,6 +140,7 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
             ..SupervisionConfig::default()
         },
     ));
+    let result_supervisor = Arc::clone(&supervisor);
     let operations = Arc::new(Mutex::new(Vec::<String>::new()));
     let (client_transport, agent_transport) = Channel::duplex();
     let agent_task = tokio::spawn(run_agent_recording_attach_config_order(
@@ -200,6 +201,12 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
         operations.lock().expect("recorded operations").clone(),
         vec!["set_config:effort:high".to_string(), "prompt".to_string()]
     );
+    let result = result_supervisor
+        .session_state()
+        .and_then(|state| state.last_turn_result)
+        .expect("prompt command should publish a terminal result");
+    assert_eq!(result.report, "");
+    assert_eq!(result.stop_reason, "end_turn");
 
     let _ = supervisor_child.kill();
     let _ = supervisor_child.wait();
