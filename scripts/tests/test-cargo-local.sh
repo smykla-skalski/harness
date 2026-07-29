@@ -1501,7 +1501,8 @@ scenario_sccache_socket_is_shared_across_checkouts() {
   local explicit_target="$base/explicit-target"
   local socket_tmpdir="$SOCKET_TMPDIR/checkouts"
   local co out a_sock="" b_sock="" a_target="" b_target=""
-  local a_bases="" b_bases="" explicit_bases="" expected_bases="" version_socket=""
+  local a_bases="" b_bases="" explicit_bases="" expected_bases="" failure_bases=""
+  local version_socket=""
   mkdir -p "$fake_bin" "$common_root/.git" "$socket_tmpdir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
   cat >"$fake_bin/git" <<EOF
@@ -1509,7 +1510,9 @@ scenario_sccache_socket_is_shared_across_checkouts() {
 if [[ "\$*" == *"--git-common-dir"* ]]; then
   printf '%s\n' "$common_root/.git"
 elif [[ "\$*" == *"worktree list --porcelain"* ]]; then
-  if [[ "\${HARNESS_TEST_EMPTY_WORKTREES:-}" == "1" ]]; then
+  if [[ "\${HARNESS_TEST_WORKTREE_FAILURE:-}" == "1" ]]; then
+    exit 92
+  elif [[ "\${HARNESS_TEST_EMPTY_WORKTREES:-}" == "1" ]]; then
     exit 0
   elif [[ "\$*" == *"$base/alpha"* ]]; then
     printf 'worktree %s\n\nworktree %s\n\nworktree %s\n\n' "$base/beta" "$common_root" "$base/alpha"
@@ -1590,6 +1593,27 @@ EOF
     pass "an sccache version change rotates the shared server socket"
   else
     fail "sccache version change kept the old server socket: $a_sock"
+  fi
+
+  failure_bases="$(
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      TMPDIR="$socket_tmpdir/" \
+      USER="$TEST_USER" \
+      HARNESS_TEST_WORKTREE_FAILURE=1 \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$base/alpha/scripts/cargo-local.sh" --print-env \
+      | awk -F= '$1 == "SCCACHE_BASEDIRS" { print substr($0, index($0, "=") + 1) }'
+  )"
+  if [[ "$failure_bases" == "$base/alpha:$a_target" ]]; then
+    pass "a failed worktree query uses the single-checkout basedir fallback"
+  else
+    fail "failed worktree query did not use fallback basedirs: $failure_bases"
   fi
 
   explicit_bases="$(

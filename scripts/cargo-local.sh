@@ -211,7 +211,8 @@ default_sccache_basedirs() {
 
   worktrees="$(
     git -C "$ROOT" worktree list --porcelain 2>/dev/null \
-      | awk '/^worktree / { sub(/^worktree /, ""); print }'
+      | awk '/^worktree / { sub(/^worktree /, ""); print }' \
+      || true
   )"
   if [[ -z "$worktrees" ]]; then
     printf '%s' "$ROOT"
