@@ -54,5 +54,10 @@ fn is_test_temp_boundary(path: &Path, metadata: &Metadata) -> bool {
         path == temp_dir() && metadata.uid() == trusted_owner().0 && metadata.mode() & 0o022 == 0;
     let sticky_system_temp =
         path == Path::new("/tmp") && metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
-    secure_session_temp || sticky_system_temp
+    // `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures sit inside the crate's own checkout,
+    // whose mode tracks the host umask. That's the developer's or CI's own tree, not attacker
+    // controlled, so trust it regardless of write bits.
+    let crate_manifest_dir =
+        path == Path::new(env!("CARGO_MANIFEST_DIR")) && metadata.uid() == trusted_owner().0;
+    secure_session_temp || sticky_system_temp || crate_manifest_dir
 }

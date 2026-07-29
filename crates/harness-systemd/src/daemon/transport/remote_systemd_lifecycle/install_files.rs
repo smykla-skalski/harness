@@ -330,10 +330,15 @@ fn validate_trusted_ancestors(path: &Path, label: &str) -> Result<(), CliError> 
 }
 
 fn is_test_temp_boundary(path: &Path, metadata: &Metadata, expected_uid: u32) -> bool {
-    cfg!(test)
-        && path == temp_dir()
-        && metadata.uid() == expected_uid
-        && metadata.mode() & 0o022 == 0
+    if !cfg!(test) || metadata.uid() != expected_uid {
+        return false;
+    }
+    // `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures live inside the crate's own checkout,
+    // whose mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the
+    // developer's or CI's own tree, not attacker controlled, so trust it regardless of write bits.
+    let crate_manifest_dir = path == Path::new(env!("CARGO_MANIFEST_DIR"));
+    let secure_session_temp = path == temp_dir() && metadata.mode() & 0o022 == 0;
+    crate_manifest_dir || secure_session_temp
 }
 
 fn prepare_temporary(

@@ -65,6 +65,13 @@ fn validate_trusted_ancestors(label: &str, path: &Path) -> Result<(), CliError> 
                 ancestor.display()
             )));
         }
+        // `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures sit inside the crate's own checkout,
+        // whose mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the
+        // developer's or CI's own tree, not attacker controlled, so trust it before the writability
+        // check below would otherwise reject it.
+        if cfg!(test) && ancestor == Path::new(env!("CARGO_MANIFEST_DIR")) {
+            break;
+        }
         let sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
         if metadata.mode() & 0o022 != 0 && !sticky_root {
             return Err(io_error(format!(

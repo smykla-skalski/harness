@@ -325,6 +325,9 @@ pub(super) fn validate_trusted_ancestors(path: &Path) -> Result<(), CliError> {
                 ancestor.display()
             )));
         }
+        if is_test_manifest_dir_boundary(ancestor, &metadata) {
+            break;
+        }
         let sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
         if metadata.mode() & 0o022 != 0 && !sticky_root {
             return Err(io_error(format!(
@@ -334,6 +337,13 @@ pub(super) fn validate_trusted_ancestors(path: &Path) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+// `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures sit inside the crate's own checkout, whose
+// mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the developer's
+// or CI's own tree, not attacker controlled, so trust it as a boundary regardless of write bits.
+fn is_test_manifest_dir_boundary(path: &Path, metadata: &Metadata) -> bool {
+    cfg!(test) && path == Path::new(env!("CARGO_MANIFEST_DIR")) && metadata.uid() == trusted_uid()
 }
 
 pub(super) fn open_directory(path: &Path) -> Result<File, CliError> {
