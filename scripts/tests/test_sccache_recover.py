@@ -85,8 +85,11 @@ class SccacheRecoverTests(unittest.TestCase):
                         pass
 
     def test_peer_pid_tracks_live_process_and_deleted_socket(self) -> None:
-        with self.subTest(state="live"):
-            socket_path = Path(os.environ["TMPDIR"]) / "recovery-peer.sock"
+        with (
+            self.subTest(state="live"),
+            tempfile.TemporaryDirectory(prefix="hst.", dir="/tmp") as directory,
+        ):
+            socket_path = Path(directory) / "recovery-peer.sock"
             ready_read, ready_write = os.pipe()
             pid = os.fork()
             if pid == 0:
