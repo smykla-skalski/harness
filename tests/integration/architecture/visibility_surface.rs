@@ -33,8 +33,8 @@ fn helper_modules_do_not_leak_publicly() {
         ),
         (
             "src/setup/mod.rs",
-            "pub mod wrapper;",
-            "pub(crate) mod wrapper;",
+            "pub use harness_hooks::wrapper;",
+            "pub(crate) use harness_hooks::wrapper;",
         ),
         (
             "src/observe/mod.rs",
