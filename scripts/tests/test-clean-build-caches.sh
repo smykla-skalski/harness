@@ -613,6 +613,10 @@ scenario_authorized_removal_is_audited_before_cache_deletion() {
     fail "audit omitted force attribution: $(<"$audit")"
     return
   }
+  grep -Fq '"stop_outcome":"server-unconfigured"' "$audit" || {
+    fail "audit mislabeled an unconfigured server: $(<"$audit")"
+    return
+  }
   pass
 }
 

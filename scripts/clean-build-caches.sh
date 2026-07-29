@@ -185,7 +185,7 @@ stop_repo_sccache_server() {
     done < <(python3 "$ROOT/scripts/lib/sccache_processes.py" --socket "$uds" 2>/dev/null || true)
   fi
   [[ -n "$uds" ]] || {
-    SCCACHE_STOP_OUTCOME="server-unidentified"
+    SCCACHE_STOP_OUTCOME="server-unconfigured"
     return 0
   }
   if [[ ! -S "$uds" && -z "$SCCACHE_SELECTED_PIDS" ]]; then
