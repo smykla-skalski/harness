@@ -26,7 +26,6 @@
 //! side of this interface: every real call site already holds an open
 //! transaction and nothing else from `AsyncDaemonDb`.
 
-use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
 
 use super::remote_assignment_stop_fence::RemoteTargetStopPlan;
@@ -36,7 +35,6 @@ use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use remote_assignment_model::TaskBoardRemoteAssignmentRecord;
 
-#[async_trait]
 pub(in crate::daemon::db::task_board) trait RemoteAssignmentFencing:
     Send + Sync
 {
@@ -64,7 +62,6 @@ pub(in crate::daemon::db::task_board) trait RemoteAssignmentFencing:
     ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError>;
 }
 
-#[async_trait]
 impl RemoteAssignmentFencing for AsyncDaemonDb {
     async fn active_remote_assignment_exists_in_tx(
         transaction: &mut Transaction<'_, Sqlite>,

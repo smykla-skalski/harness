@@ -28,7 +28,6 @@
 //! namespace rather than an instance, called through
 //! `AsyncDaemonDb::method(..)`.
 
-use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
 
 use super::{
@@ -43,7 +42,6 @@ use crate::task_board::{
 use workflow_first_start_admission::TaskBoardFirstStartAdmission;
 use workflow_terminal::{PreparedDispatchSettlement, TaskBoardWorkflowTerminalProjection};
 
-#[async_trait]
 pub(in crate::daemon::db::task_board) trait WorkflowExecutionFencing:
     Send + Sync
 {
@@ -86,7 +84,6 @@ pub(in crate::daemon::db::task_board) trait WorkflowExecutionFencing:
     ) -> Result<TaskBoardFirstStartAdmission, CliError>;
 }
 
-#[async_trait]
 impl WorkflowExecutionFencing for AsyncDaemonDb {
     fn cas_mismatch(
         expected: &TaskBoardWorkflowExecutionCas,
