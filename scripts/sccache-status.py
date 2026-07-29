@@ -16,6 +16,7 @@ from lib.sccache_processes import (
     is_sccache_server_command,
     pids_for_socket,
     process_command,
+    sccache_socket_roots,
     socket_owners_under,
 )
 
@@ -147,9 +148,8 @@ def _normalized(path: str) -> str:
 
 
 def _server_inventory(configured: Path) -> tuple[str, int, int, tuple[str, ...]]:
-    roots = {Path("/tmp"), configured.parent}
     owners: dict[int, set[str]] = {}
-    for root in roots:
+    for root in sccache_socket_roots(configured):
         for pid, paths in socket_owners_under(root).items():
             owners.setdefault(pid, set()).update(_normalized(path) for path in paths)
     server_paths = {

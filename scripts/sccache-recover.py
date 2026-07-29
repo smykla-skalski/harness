@@ -19,6 +19,7 @@ from lib.sccache_processes import (
     is_sccache_server_command,
     pids_for_socket,
     process_command,
+    sccache_socket_roots,
     socket_owners_under,
 )
 
@@ -95,9 +96,8 @@ def _peer_pid(path: str) -> tuple[str, int | None]:
 
 
 def _owners(configured: Path) -> tuple[Owner, ...]:
-    roots = {Path("/tmp"), configured.parent}
     owned: dict[int, set[str]] = {}
-    for root in roots:
+    for root in sccache_socket_roots(configured):
         for pid, paths in socket_owners_under(root).items():
             owned.setdefault(pid, set()).update(_normalized(path) for path in paths)
     socket_paths = {

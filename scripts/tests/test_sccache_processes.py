@@ -14,6 +14,16 @@ from scripts.lib import sccache_processes
 
 
 class SccacheProcessTests(unittest.TestCase):
+    def test_socket_roots_include_the_configured_runtime_temp_directory(self) -> None:
+        configured = Path(
+            "/var/folders/runtime/harness-sccache/repository.sock"
+        )
+
+        self.assertEqual(
+            sccache_processes.sccache_socket_roots(configured),
+            (Path("/tmp"), Path("/var/folders/runtime")),
+        )
+
     def test_pids_for_socket_canonicalizes_tmp_aliases(self) -> None:
         target = Path("/tmp/hst.fixture/owned.sock")
         owners = {41: ("/private/tmp/hst.fixture/owned.sock type=STREAM",)}

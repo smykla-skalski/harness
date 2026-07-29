@@ -110,6 +110,15 @@ def pids_for_socket(path: Path) -> tuple[int, ...]:
     )
 
 
+def sccache_socket_roots(configured: Path) -> tuple[Path, ...]:
+    runtime_root = (
+        configured.parent.parent
+        if configured.parent.name.startswith("harness-sccache")
+        else configured.parent
+    )
+    return tuple(sorted({Path("/tmp"), runtime_root}))
+
+
 def process_command(pid: int) -> str:
     completed = subprocess.run(
         ("/bin/ps", "-ww", "-p", str(pid), "-o", "command="),
