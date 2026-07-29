@@ -1,9 +1,9 @@
 use std::fs;
 
-use crate::infra::io::{read_json_typed, write_json_pretty};
-use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::workspace::utc_now;
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::{read_json_typed, write_json_pretty};
+use harness_workspace::workspace::utc_now;
 
 use super::paths::manifest_lock_path;
 use super::{

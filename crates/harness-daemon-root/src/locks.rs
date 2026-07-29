@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::infra::persistence::flock::{
+use harness_infra::persistence::flock::{
     FlockErrorContext, TryAcquireFlockError, flock_is_held_at as shared_flock_is_held_at,
     try_acquire_exclusive_flock,
 };
@@ -8,10 +8,12 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{DaemonLockGuard, FlockGuard, ensure_daemon_dirs, load_manifest, lock_path};
 
-pub(crate) fn acquire_flock_exclusive(
-    path: &Path,
-    label: &'static str,
-) -> Result<FlockGuard, CliError> {
+/// Acquire an exclusive flock at `path`, using `label` in diagnostics.
+///
+/// # Errors
+/// Returns `CliError` when another holder already owns the lock or the lock
+/// file cannot be opened.
+pub fn acquire_flock_exclusive(path: &Path, label: &'static str) -> Result<FlockGuard, CliError> {
     match try_acquire_exclusive_flock(path, FlockErrorContext::new(label)) {
         Ok(guard) => Ok(guard),
         Err(TryAcquireFlockError::Busy) => {
@@ -22,7 +24,7 @@ pub(crate) fn acquire_flock_exclusive(
 }
 
 #[must_use]
-pub(crate) fn flock_is_held_at(path: &Path) -> bool {
+pub fn flock_is_held_at(path: &Path) -> bool {
     shared_flock_is_held_at(path)
 }
 

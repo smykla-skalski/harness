@@ -4,16 +4,15 @@ use std::sync::{LazyLock, RwLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::infra::io::read_json_typed;
-#[cfg(any(test, feature = "daemon-runtime"))]
-use crate::task_board::TaskBoardGitRuntimeProfile;
-use crate::task_board::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
-    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
-    normalize_repository_slug,
-};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::read_json_typed;
+use harness_task_board::{
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
+    TaskBoardOpenRouterTokenSyncResponse, normalize_repository_slug,
+};
+#[cfg(any(test, feature = "daemon-runtime", feature = "test-support"))]
+use harness_task_board::TaskBoardGitRuntimeProfile;
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
 
@@ -71,7 +70,10 @@ pub fn load_runtime_config() -> Result<Option<DaemonRuntimeConfig>, CliError> {
 ///
 /// This is restricted to the one-time migration and config-preserving write
 /// paths. Runtime consumers must continue to use [`load_runtime_config`].
-pub(crate) fn load_runtime_config_raw() -> Result<Option<DaemonRuntimeConfig>, CliError> {
+///
+/// # Errors
+/// Returns `CliError` when the config file exists but cannot be parsed.
+pub fn load_runtime_config_raw() -> Result<Option<DaemonRuntimeConfig>, CliError> {
     if !config_path().is_file() {
         return Ok(None);
     }
@@ -108,7 +110,7 @@ pub fn persist_log_level(level: Option<&str>) -> Result<(), CliError> {
 ///
 /// # Errors
 /// Returns `CliError` when the daemon runtime config exists but cannot be parsed.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let mut config = load_runtime_config()?
         .and_then(|config| config.task_board_git_runtime_config)
@@ -118,8 +120,14 @@ pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig,
     Ok(config)
 }
 
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn overlay_task_board_git_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
+/// Also reachable from `load_task_board_git_runtime_config` below (test /
+/// test-support only), on top of this function's own daemon-runtime
+/// re-export, so the gate is the union of both callers' conditions.
+///
+/// # Panics
+/// Panics when the in-memory secret state lock is poisoned.
+#[cfg(any(test, feature = "daemon-runtime", feature = "test-support"))]
+pub fn overlay_task_board_git_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
     let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
         .read()
         .expect("task-board git runtime secret state lock poisoned")
@@ -133,8 +141,14 @@ pub(crate) fn overlay_task_board_git_runtime_secret_flags(config: &mut TaskBoard
     }
 }
 
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn overlay_task_board_git_runtime_profile_secrets(
+/// Also reachable from `task_board_git_runtime_profile` below (test /
+/// test-support only), on top of this function's own daemon-runtime
+/// re-export, so the gate is the union of both callers' conditions.
+///
+/// # Panics
+/// Panics when the in-memory secret state lock is poisoned.
+#[cfg(any(test, feature = "daemon-runtime", feature = "test-support"))]
+pub fn overlay_task_board_git_runtime_profile_secrets(
     profile: &mut TaskBoardGitRuntimeProfile,
     repository: Option<&str>,
 ) {
@@ -156,7 +170,7 @@ pub(crate) fn overlay_task_board_git_runtime_profile_secrets(
 /// Materialize process-only key material into a database-loaded runtime config.
 /// The returned value must remain in memory and must never be persisted.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn overlay_task_board_git_runtime_secrets(config: &mut TaskBoardGitRuntimeConfig) {
+pub fn overlay_task_board_git_runtime_secrets(config: &mut TaskBoardGitRuntimeConfig) {
     overlay_task_board_git_runtime_profile_secrets(&mut config.global, None);
     for override_config in &mut config.repository_overrides {
         overlay_task_board_git_runtime_profile_secrets(
@@ -166,7 +180,7 @@ pub(crate) fn overlay_task_board_git_runtime_secrets(config: &mut TaskBoardGitRu
     }
 }
 
-#[cfg(any(test, feature = "daemon-runtime"))]
+#[cfg(any(test, feature = "daemon-runtime", feature = "test-support"))]
 fn overlay_profile_flags(
     target: &mut TaskBoardGitRuntimeProfile,
     secrets: &TaskBoardGitRuntimeProfile,
@@ -188,7 +202,7 @@ fn overlay_profile_flags(
 ///
 /// # Errors
 /// Returns `CliError` when the runtime config cannot be written.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn persist_task_board_git_runtime_config(
     task_board_config: &TaskBoardGitRuntimeConfig,
 ) -> Result<(), CliError> {
@@ -216,9 +230,12 @@ pub fn replace_task_board_git_runtime_secrets(task_board_config: &TaskBoardGitRu
 /// Preserve process-only secret bytes when a redacted GET response is sent
 /// back as a full runtime-config update. A false configured flag remains an
 /// explicit removal.
-#[must_use]
+///
+/// # Panics
+/// Panics when the in-memory secret state lock is poisoned.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn retaining_task_board_git_runtime_secrets(
+#[must_use]
+pub fn retaining_task_board_git_runtime_secrets(
     request: &TaskBoardGitRuntimeConfig,
 ) -> TaskBoardGitRuntimeConfig {
     let current = TASK_BOARD_GIT_RUNTIME_SECRETS
@@ -293,7 +310,7 @@ fn retain_secret(target: &mut Option<String>, configured: bool, existing: Option
 ///
 /// # Panics
 /// Panics when the in-memory secret state lock is poisoned.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub fn task_board_git_runtime_profile(
     repository: Option<&str>,
 ) -> Result<TaskBoardGitRuntimeProfile, CliError> {

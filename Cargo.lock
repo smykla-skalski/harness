@@ -3639,6 +3639,8 @@ dependencies = [
  "fs2",
  "harness-agents",
  "harness-daemon-client",
+ "harness-daemon-root",
+ "harness-daemon-state",
  "harness-hook",
  "harness-infra",
  "harness-kernel",
@@ -3703,6 +3705,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon-client",
+ "harness-daemon-state",
  "harness-db-schema",
  "harness-feature-flags",
  "harness-github-api",
@@ -3788,6 +3791,45 @@ dependencies = [
  "tracing",
  "user_dirs",
  "uzers",
+]
+
+[[package]]
+name = "harness-daemon-root"
+version = "55.0.0"
+dependencies = [
+ "fs-err",
+ "fs2",
+ "harness-infra",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-telemetry",
+ "harness-testkit",
+ "harness-workspace",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "harness-daemon-state"
+version = "55.0.0"
+dependencies = [
+ "fs-err",
+ "harness-daemon-root",
+ "harness-infra",
+ "harness-kernel",
+ "harness-task-board",
+ "harness-testkit",
+ "harness-workspace",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "temp-env",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]

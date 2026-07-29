@@ -1,6 +1,4 @@
 mod audit;
-mod config;
-mod identity;
 mod locks;
 mod manifest;
 mod paths;
@@ -50,6 +48,6 @@ pub(super) fn sample_manifest(pid: u32, endpoint: &str) -> DaemonManifest {
             file_size: 3,
             modification_time_interval_since_1970: 4.0,
         }),
-        ownership: crate::daemon::state::DaemonOwnership::default(),
+        ownership: super::DaemonOwnership::default(),
     }
 }

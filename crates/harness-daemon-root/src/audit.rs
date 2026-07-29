@@ -15,9 +15,9 @@ use std::os::unix::fs::PermissionsExt;
 
 use uuid::Uuid;
 
-use crate::infra::io::write_text;
-use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::write_text;
+use harness_workspace::workspace::utc_now;
 
 use super::{
     DaemonAuditEvent, DaemonDiagnostics, auth_token_path, daemon_root, ensure_daemon_dirs,
