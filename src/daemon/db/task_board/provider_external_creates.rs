@@ -266,7 +266,9 @@ impl AsyncDaemonDb {
         load_one(self, LOAD_ACTIVE_INTENT_SQL, item_id, provider).await
     }
 
-    pub(crate) async fn task_board_external_create_receipt(
+    /// # Errors
+    /// Returns [`CliError`] when the read fails.
+    pub async fn task_board_external_create_receipt(
         &self,
         item_id: &str,
         provider: ExternalProvider,

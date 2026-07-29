@@ -36,6 +36,10 @@ mod integration {
     mod session_transport_commands_daemon_routing;
     mod session_transport_managed_agents_daemon_routing;
     mod session_transport_task_daemon_routing;
+    mod task_board_external_sync_daemon;
+    mod task_board_external_sync_daemon_conflict_policy;
+    mod task_board_external_sync_daemon_create_done;
+    mod task_board_item_commands_daemon_routing;
 
     // Everything else under `architecture` scans the source tree and needs no
     // runtime, so only this one file follows the daemon here. It keeps its

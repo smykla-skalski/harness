@@ -4,19 +4,20 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use tempfile::tempdir;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::external::{
-    ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
-    ExternalProviderScopeIdentity,
-};
-use crate::task_board::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalRefSyncState, ExternalRevisionUpdate,
-    ExternalSyncAction, ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    ExternalSyncField, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, TaskBoardExternalCreateIntentState, TaskBoardItem, TaskBoardStatus,
-    sync_external_tasks,
-};
 use harness_kernel::errors::{CliError, CliErrorKind};
+
+use harness::daemon::db::AsyncDaemonDb;
+use harness::task_board::external::{
+    ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
+    ExternalProviderScopeIdentity, ExternalSyncClient, ExternalSyncOptions,
+    TaskBoardExternalCreateIntentState, sync_external_tasks,
+};
+use harness::task_board::{
+    ExternalProvider, ExternalProviderCapabilities, ExternalRefSyncState, ExternalRevisionUpdate,
+    ExternalSyncAction, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
+    ExternalSyncOperation, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
+    ExternalUpdateOutcome, TaskBoardItem, TaskBoardStatus,
+};
 
 #[tokio::test]
 async fn newly_created_done_item_is_linked_then_closed() {
@@ -174,7 +175,7 @@ async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
 async fn sync(
     board: &AsyncDaemonDb,
     client: CreateDoneClient,
-) -> Result<Vec<crate::task_board::ExternalSyncOperation>, CliError> {
+) -> Result<Vec<ExternalSyncOperation>, CliError> {
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
     sync_external_tasks(board, push_options(), &clients).await
 }

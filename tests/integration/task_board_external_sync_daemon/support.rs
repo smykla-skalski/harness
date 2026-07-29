@@ -1,15 +1,17 @@
+//! Shared fake sync-client fixtures for this group.
+
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use harness_kernel::errors::CliError;
 
-use crate::task_board::external::{
+use harness::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
 };
-use crate::task_board::{
+use harness::task_board::{
     ExternalProvider, ExternalRef, ExternalRefProvider, ExternalRefSyncState, ExternalSyncClient,
     ExternalTask, ExternalTaskRef, PlanningState, TaskBoardItem, TaskBoardStatus,
 };
-use harness_kernel::errors::CliError;
 
 pub(super) struct FakeSyncClient {
     provider: ExternalProvider,
@@ -32,18 +34,11 @@ impl FakeSyncClient {
         }
     }
 
-    pub(super) fn with_delete(mut self) -> Self {
-        self.allows_delete = true;
-        self
-    }
-
-    pub(super) fn with_authoritative_review_inbox(mut self) -> Self {
-        self.authoritative_review_inbox = true;
-        self
-    }
-
-    pub(super) fn deleted_handle(&self) -> Arc<Mutex<Vec<String>>> {
-        self.deleted.clone()
+    pub(super) fn pushed_ids(&self) -> Vec<String> {
+        self.pushed
+            .lock()
+            .expect("push log should not be poisoned")
+            .clone()
     }
 }
 
@@ -160,70 +155,6 @@ pub(super) fn external_task(external_id: &str, title: &str) -> ExternalTask {
         project_id: None,
         updated_at: None,
         ..ExternalTask::default()
-    }
-}
-
-pub(super) fn github_external_task(
-    external_id: &str,
-    title: &str,
-    project_id: &str,
-) -> ExternalTask {
-    github_external_task_with_status(external_id, title, project_id, TaskBoardStatus::Inbox)
-}
-
-pub(super) fn github_external_task_with_status(
-    external_id: &str,
-    title: &str,
-    project_id: &str,
-    status: TaskBoardStatus,
-) -> ExternalTask {
-    ExternalTask {
-        reference: ExternalTaskRef::new(ExternalProvider::GitHub, external_id)
-            .with_url(format!("https://example.test/issues/{external_id}")),
-        title: title.to_owned(),
-        body: "Investigate the linked issue.".to_owned(),
-        status,
-        project_id: Some(project_id.to_owned()),
-        updated_at: Some("2026-05-14T03:00:00Z".to_string()),
-        ..ExternalTask::default()
-    }
-}
-
-pub(super) fn github_umbrella_task(
-    external_id: &str,
-    title: &str,
-    project_id: &str,
-) -> ExternalTask {
-    ExternalTask {
-        tracks_children: true,
-        ..github_external_task(external_id, title, project_id)
-    }
-}
-
-pub(super) fn github_child_task(
-    external_id: &str,
-    title: &str,
-    project_id: &str,
-    parent_external_id: &str,
-) -> ExternalTask {
-    ExternalTask {
-        parent_reference: Some(ExternalTaskRef::new(
-            ExternalProvider::GitHub,
-            parent_external_id,
-        )),
-        ..github_external_task(external_id, title, project_id)
-    }
-}
-
-pub(super) fn github_task_with_labels(
-    external_id: &str,
-    title: &str,
-    project_id: &str,
-    labels: &[&str],
-) -> ExternalTask {
-    ExternalTask {
-        labels: labels.iter().map(ToString::to_string).collect(),
-        ..github_external_task(external_id, title, project_id)
     }
 }
 

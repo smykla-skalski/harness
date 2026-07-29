@@ -107,7 +107,7 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
 /// is cheap and lets long-lived background tasks (e.g. the policy-decision
 /// recording drain) own a handle without re-opening the database.
 #[derive(Debug, Clone)]
-pub(crate) struct AsyncDaemonDb {
+pub struct AsyncDaemonDb {
     pool: SqlitePool,
     pub(super) path: PathBuf,
     /// `Arc<OnceLock<_>>`, not a plain field: daemon startup resolves this
@@ -125,7 +125,7 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] when the pool or schema probe cannot be initialized.
-    pub(crate) async fn connect(path: &Path) -> Result<Self, CliError> {
+    pub async fn connect(path: &Path) -> Result<Self, CliError> {
         trace_async_db_operation("connect", "maintenance", Some(path), || async move {
             async_bootstrap::prepare_legacy_schema(path)?;
             let options = SqliteConnectOptions::new()

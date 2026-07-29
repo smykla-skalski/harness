@@ -1,14 +1,24 @@
-mod execution_repository_tests;
+//! General task-board external-sync coverage against a real daemon database
+//! and the legacy file-backed board, split from its sibling
+//! `task_board_external_sync_daemon_conflict_policy` group because it
+//! exercises the fake `FakeSyncClient`/`external_task` fixtures rather than
+//! the update-focused `UpdateFakeSyncClient` those tests share; `support`
+//! holds this group's own fixtures.
+
+mod execution_repository;
+mod support;
 
 use tempfile::tempdir;
 
-use super::support::{FakeSyncClient, external_task};
-use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::{
-    ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncClient,
-    ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOptions, ExternalTask,
-    ExternalTaskRef, TaskBoardItem, TaskBoardStatus, TaskBoardStore, sync_external_tasks,
+use harness::daemon::db::AsyncDaemonDb;
+use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::{
+    ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncConflictPolicy,
+    ExternalSyncDirection, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
+    TaskBoardStore,
 };
+
+use support::{FakeSyncClient, external_task};
 
 #[tokio::test]
 async fn fake_client_pulls_tasks_without_network() {

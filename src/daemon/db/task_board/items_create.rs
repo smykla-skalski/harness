@@ -21,7 +21,10 @@ impl AsyncDaemonDb {
     /// must keep using this method so an unrelated internal create can never
     /// become accidental triage ingress. The public create API and provider
     /// import use the `_with_triage` methods below instead.
-    pub(crate) async fn create_task_board_item(
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item is invalid or the insert fails.
+    pub async fn create_task_board_item(
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {

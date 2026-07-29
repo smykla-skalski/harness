@@ -3,11 +3,22 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use tempfile::tempdir;
 
-use super::*;
-use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::store::TaskBoardItemPatch;
-use crate::task_board::{ExternalRefProvider, TaskBoardConflictState, TaskBoardSyncConflict};
-use harness_kernel::errors::CliErrorKind;
+use harness_kernel::errors::{CliError, CliErrorKind};
+
+use harness::daemon::db::AsyncDaemonDb;
+use harness::task_board::external::{
+    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+    ExternalSyncClient, ExternalSyncOptions, TaskBoardExternalCreateStore,
+    TaskBoardSyncItemSnapshot, TaskBoardSyncStore, sync_external_tasks,
+};
+use harness::task_board::store::TaskBoardItemPatch;
+use harness::task_board::{
+    ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncConflictPolicy,
+    ExternalSyncDirection, ExternalSyncField, ExternalTask, TaskBoardConflictState, TaskBoardItem,
+    TaskBoardStatus, TaskBoardSyncConflict,
+};
+
+use super::support::{UpdateFakeSyncClient, linked_item, remote_task};
 
 #[tokio::test]
 async fn push_precondition_failure_persists_three_way_conflict() {
@@ -396,7 +407,7 @@ impl FailingPersistenceStore {
     }
 }
 
-impl crate::task_board::TaskBoardExternalCreateStore for FailingPersistenceStore {}
+impl TaskBoardExternalCreateStore for FailingPersistenceStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for FailingPersistenceStore {

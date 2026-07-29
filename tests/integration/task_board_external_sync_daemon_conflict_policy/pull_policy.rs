@@ -1,7 +1,13 @@
 use tempfile::tempdir;
 
-use super::*;
-use crate::daemon::db::AsyncDaemonDb;
+use harness::daemon::db::AsyncDaemonDb;
+use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::{
+    ExternalProvider, ExternalSyncAction, ExternalSyncConflictPolicy, ExternalSyncDirection,
+    ExternalSyncField, TaskBoardStatus,
+};
+
+use super::support::{UpdateFakeSyncClient, linked_item, remote_task};
 
 #[tokio::test]
 async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {

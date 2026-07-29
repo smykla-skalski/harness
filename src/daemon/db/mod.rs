@@ -207,7 +207,10 @@ mod writes;
 
 #[cfg(test)]
 pub(crate) use async_bootstrap::all_migration_versions;
-pub(crate) use async_pool::AsyncDaemonDb;
+// `pub`, not `pub(crate)`: `tests/integration_daemon.rs`'s task-board sync
+// scenarios link `harness` as an ordinary dependency and need this handle
+// directly, the same reason `daemon::client::test_support` is `pub` there.
+pub use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,

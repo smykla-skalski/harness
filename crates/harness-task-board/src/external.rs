@@ -5,11 +5,11 @@
 //! `sync` reaches `TaskBoardSyncConflict` from this crate's own `automation`
 //! module (moved in a prior slice), not from `external` itself.
 //!
-//! The `sync_tests`/`tests` test-only clusters stay in the root crate's
-//! `src/task_board/external.rs` for a later slice: several of their files
-//! reach `crate::daemon::db::AsyncDaemonDb`/`crate::daemon::client::test_support`
-//! as integration-test fixtures and need to relocate to `tests/integration/`
-//! first.
+//! This crate holds no test-only `sync_tests`/`tests` clusters of its own:
+//! those stayed in the root crate's `src/task_board/external.rs` (the ones
+//! with no daemon reach) or relocated to root's `tests/integration/` (the
+//! ones that read a live `AsyncDaemonDb`), because both depend on the root
+//! binary crate's daemon layer, which this leaf crate never does.
 
 use std::fmt;
 use std::ops::Not;
