@@ -5,12 +5,13 @@ use tokio::sync::broadcast::Sender;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{SessionSummary, StreamEvent, TaskBoardUpdatedPayload};
-use crate::daemon::{service, snapshot, timeline};
+use crate::daemon::{snapshot, timeline};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::TaskBoardAutomationSnapshot;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use super::service_port::WatchServicePort;
 use super::state::{RefreshScope, SessionDigest, WatchChanges, WatchSnapshot};
 
 pub(super) fn refresh_watch_snapshot(
@@ -118,18 +119,19 @@ pub(super) async fn emit_watch_changes(
     changes: WatchChanges,
     db: Option<&Arc<Mutex<DaemonDb>>>,
     async_db: Option<&Arc<AsyncDaemonDb>>,
+    port: &dyn WatchServicePort,
 ) {
     if let Some(async_db) = async_db {
-        emit_watch_changes_async(sender, changes, async_db).await;
+        emit_watch_changes_async(sender, changes, async_db, port).await;
         return;
     }
 
     emit_watch_changes_with(
         changes,
         db,
-        |db_ref| service::broadcast_sessions_updated(sender, db_ref),
-        |session_id, db_ref| service::broadcast_session_updated_core(sender, session_id, db_ref),
-        |session_id, db_ref| service::broadcast_session_extensions(sender, session_id, db_ref),
+        |db_ref| port.broadcast_sessions_updated(sender, db_ref),
+        |session_id, db_ref| port.broadcast_session_updated_core(sender, session_id, db_ref),
+        |session_id, db_ref| port.broadcast_session_extensions(sender, session_id, db_ref),
     );
 }
 
@@ -137,13 +139,15 @@ async fn emit_watch_changes_async(
     sender: &Sender<StreamEvent>,
     changes: WatchChanges,
     async_db: &Arc<AsyncDaemonDb>,
+    port: &dyn WatchServicePort,
 ) {
     emit_task_board_updated_async(sender, &changes, async_db.as_ref()).await;
     let session_ids: Vec<_> = changes.session_ids.into_iter().collect();
     if changes.sessions_updated {
-        service::broadcast_sessions_updated_async(sender, Some(async_db.as_ref())).await;
+        port.broadcast_sessions_updated_async(sender, Some(async_db.as_ref()))
+            .await;
     }
-    broadcast_session_fanout_async(sender, session_ids, async_db).await;
+    broadcast_session_fanout_async(sender, session_ids, async_db, port).await;
 }
 
 /// Core updates go out for every session before any extension payload, so a
@@ -152,13 +156,14 @@ async fn broadcast_session_fanout_async(
     sender: &Sender<StreamEvent>,
     session_ids: Vec<String>,
     async_db: &Arc<AsyncDaemonDb>,
+    port: &dyn WatchServicePort,
 ) {
     for session_id in &session_ids {
-        service::broadcast_session_updated_core_async(sender, session_id, Some(async_db.as_ref()))
+        port.broadcast_session_updated_core_async(sender, session_id, Some(async_db.as_ref()))
             .await;
     }
     for session_id in session_ids {
-        service::broadcast_session_extensions_async(sender, &session_id, Some(async_db.as_ref()))
+        port.broadcast_session_extensions_async(sender, &session_id, Some(async_db.as_ref()))
             .await;
     }
 }
@@ -176,7 +181,7 @@ async fn emit_task_board_updated_async(
         return;
     }
     let automation = if task_board_automation_v2_enabled_from_env() {
-        match service::task_board_automation_snapshot(db).await {
+        match db.task_board_automation_snapshot().await {
             Ok(snapshot) => Some(snapshot),
             Err(error) => {
                 tracing::warn!(%error, "failed to build task-board automation push snapshot");
