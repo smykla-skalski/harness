@@ -36,7 +36,8 @@ use std::sync::{Mutex, MutexGuard};
 use harness_task_board::TaskBoardTriageEscalationConfig;
 use harness_workspace::workspace::normalized_env_value;
 
-/// Env var that enables ACP managed-agent runtime routes before the modal ships.
+/// Env var that gates ACP managed-agent runtime routes; enabled by default
+/// now that the blocking permission modal has landed, `=0` disables it.
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 /// Env var that enables background Reviews policy runs.
 pub const REVIEWS_BACKGROUND_AUTO_ENV: &str = "HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO";
