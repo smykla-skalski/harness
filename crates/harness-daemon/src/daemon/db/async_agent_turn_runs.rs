@@ -119,8 +119,10 @@ const SELECT_BY_ID_SQL: &str = "SELECT run_id, session_id, task_id, board_item_i
 // immutable and simply omitted from the update, so it keeps its first-insert
 // value; identity, context, the actual runtime, and both models are preserved
 // with COALESCE so a poll that only knows the new status never erases what an
-// earlier save established. The status itself is sticky once terminal, so one
-// terminal outcome survives every later write and every restart.
+// earlier save established. The trailing WHERE freezes the whole row once it is
+// terminal: a terminal run's status, error, stop_reason, and every other
+// column become immutable, so exactly one terminal outcome survives every later
+// write and every restart even under a racing caller.
 const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_id, board_item_id, \
      workflow_execution_id, project_dir, requested_runtime, actual_runtime, requested_model, \
      actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at) \
@@ -134,13 +136,13 @@ const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_
         actual_runtime = COALESCE(excluded.actual_runtime, agent_turn_runs.actual_runtime), \
         requested_model = COALESCE(excluded.requested_model, agent_turn_runs.requested_model), \
         actual_model = COALESCE(excluded.actual_model, agent_turn_runs.actual_model), \
-        status = CASE WHEN agent_turn_runs.status IN ('completed', 'failed', 'cancelled') \
-                      THEN agent_turn_runs.status ELSE excluded.status END, \
+        status = excluded.status, \
         source_revision = COALESCE(excluded.source_revision, agent_turn_runs.source_revision), \
         report = COALESCE(excluded.report, agent_turn_runs.report), \
         stop_reason = COALESCE(excluded.stop_reason, agent_turn_runs.stop_reason), \
         error = COALESCE(excluded.error, agent_turn_runs.error), \
-        updated_at = excluded.updated_at";
+        updated_at = excluded.updated_at \
+     WHERE agent_turn_runs.status NOT IN ('completed', 'failed', 'cancelled')";
 
 impl AsyncDaemonDb {
     /// Record a non-Codex run at start. Idempotent by `run_id`: a repeat start

@@ -134,6 +134,38 @@ async fn terminal_outcome_is_sticky_and_records_actual_model() {
 }
 
 #[tokio::test]
+async fn terminal_row_is_frozen_against_later_writes() {
+    let (_dir, db) = open_db().await;
+    db.record_agent_turn_run_started(&snapshot("run-6", AgentTurnRunStatus::Running))
+        .await
+        .expect("record start");
+
+    let mut completed = snapshot("run-6", AgentTurnRunStatus::Completed);
+    completed.actual_model = Some("deepseek/deepseek-v4-flash".into());
+    db.save_agent_turn_run(&completed)
+        .await
+        .expect("save completed");
+
+    // A later write that would flip the run to failed with an error must not
+    // touch the already-terminal row: exactly one terminal outcome stands.
+    let mut failed = snapshot("run-6", AgentTurnRunStatus::Failed);
+    failed.error = Some("late failure".into());
+    db.save_agent_turn_run(&failed).await.expect("save failed");
+
+    let stored = db
+        .agent_turn_run("run-6")
+        .await
+        .expect("load")
+        .expect("run exists");
+    assert_eq!(stored.status, AgentTurnRunStatus::Completed);
+    assert!(stored.error.is_none());
+    assert_eq!(
+        stored.actual_model.as_deref(),
+        Some("deepseek/deepseek-v4-flash")
+    );
+}
+
+#[tokio::test]
 async fn restart_settles_interrupted_run_exactly_once() {
     let (_dir, db) = open_db().await;
     db.record_agent_turn_run_started(&snapshot("run-3", AgentTurnRunStatus::Running))
