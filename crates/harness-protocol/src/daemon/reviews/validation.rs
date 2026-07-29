@@ -1,13 +1,25 @@
-use crate::backports::BackportDetector;
+//! Input validation for the reviews wire types, relocated from
+//! `harness-reviews::validation`. That file called into `harness-reviews`'s
+//! private `BackportDetector::validate_patterns`; `BackportDetector` itself
+//! stays in `harness-reviews` since it also compiles patterns into a live
+//! matcher and runs them against PR titles (real runtime behavior, not
+//! wire-shape validation of a request). Only the self-contained
+//! "does every pattern compile as a regex" check moved here, as
+//! [`validate_backport_patterns`] - `BackportDetector` no longer needed its
+//! own copy once the requests that call this validation moved too.
+
+use regex::Regex;
+
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::{
+use super::body_update::ReviewsBodyUpdateRequest;
+use super::types::{
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,
-    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest,
-    ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsPolicySubject,
-    ReviewsPullRequestResolveRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsBodyRequest, ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest,
+    ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyStatusRequest, ReviewsPolicySubject, ReviewsPullRequestResolveRequest,
+    ReviewsQueryRequest, ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 
 impl ReviewsQueryRequest {
@@ -24,7 +36,7 @@ impl ReviewsQueryRequest {
             )
             .into());
         }
-        BackportDetector::validate_patterns(&self.normalized_backport_patterns())?;
+        validate_backport_patterns(&self.normalized_backport_patterns())?;
         Ok(())
     }
 }
@@ -60,7 +72,7 @@ impl ReviewsPullRequestResolveRequest {
             )
             .into());
         }
-        BackportDetector::validate_patterns(&self.normalized_backport_patterns())?;
+        validate_backport_patterns(&self.normalized_backport_patterns())?;
         Ok(())
     }
 }
@@ -222,7 +234,7 @@ impl ReviewsRefreshRequest {
     /// Returns `CliError` when no dependency update targets are provided.
     pub fn validate(&self) -> Result<(), CliError> {
         ensure_targets(&self.targets, "refresh")?;
-        BackportDetector::validate_patterns(&self.normalized_backport_patterns())
+        validate_backport_patterns(&self.normalized_backport_patterns())
     }
 }
 
@@ -274,6 +286,26 @@ impl ReviewsPolicyHistoryRequest {
     }
 }
 
+/// Check that every backport-detection pattern compiles as a regex.
+///
+/// # Errors
+/// Returns `CliError` naming the first pattern that fails to compile.
+pub fn validate_backport_patterns(patterns: &[String]) -> Result<(), CliError> {
+    for pattern in patterns {
+        let pattern = pattern.trim();
+        if pattern.is_empty() {
+            continue;
+        }
+        Regex::new(pattern).map_err(|error| -> CliError {
+            CliErrorKind::workflow_parse(format!(
+                "invalid reviews backport pattern '{pattern}': {error}"
+            ))
+            .into()
+        })?;
+    }
+    Ok(())
+}
+
 fn ensure_targets(targets: &[ReviewTarget], action: &str) -> Result<(), CliError> {
     if targets.is_empty() {
         return Err(CliErrorKind::workflow_parse(format!(
@@ -305,4 +337,23 @@ fn ensure_policy_subject(subject: &ReviewsPolicySubject) -> Result<(), CliError>
         .into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_backport_patterns;
+
+    #[test]
+    fn validate_backport_patterns_rejects_unparseable_regex() {
+        let patterns = vec!["(".to_owned()];
+
+        assert!(validate_backport_patterns(&patterns).is_err());
+    }
+
+    #[test]
+    fn validate_backport_patterns_accepts_valid_regex_and_skips_blank_entries() {
+        let patterns = vec![String::new(), r"backport of #(?P<number>\d+)".to_owned()];
+
+        assert!(validate_backport_patterns(&patterns).is_ok());
+    }
 }

@@ -5,13 +5,16 @@
 //! (where the other write actions live) while the service-layer just
 //! handles token resolution and cache drain.
 
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+
+pub use harness_protocol::daemon::reviews::review_thread_resolve::{
+    ReviewsReviewThreadResolveRequest, ReviewsReviewThreadResolveResponse,
+};
 
 /// Resolve a `PullRequestReviewThread` by its node ID. Returns the
 /// updated thread's `isResolved` flag so the daemon can echo the
@@ -33,22 +36,6 @@ mutation UnresolveReviewReviewThread($threadId: ID!) {
   }
 }
 ";
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsReviewThreadResolveRequest {
-    pub thread_id: String,
-    pub resolved: bool,
-    /// PR cache key — the daemon drains the per-PR timeline cache
-    /// after a successful mutation so the next fetch reflects the new
-    /// `isResolved` state.
-    pub pull_request_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsReviewThreadResolveResponse {
-    pub thread_id: String,
-    pub resolved: bool,
-}
 
 /// Execute the resolve / unresolve mutation against GitHub. Returns
 /// the confirmed server-side `isResolved` value from the GraphQL

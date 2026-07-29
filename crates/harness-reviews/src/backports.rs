@@ -42,17 +42,6 @@ impl BackportDetector {
         )
     }
 
-    pub(super) fn validate_patterns(patterns: &[String]) -> Result<(), CliError> {
-        for pattern in patterns {
-            let pattern = pattern.trim();
-            if pattern.is_empty() {
-                continue;
-            }
-            compile_pattern(pattern)?;
-        }
-        Ok(())
-    }
-
     fn compile(enabled: bool, patterns: &[String]) -> Result<Option<Self>, CliError> {
         if !enabled {
             return Ok(None);
@@ -160,12 +149,5 @@ mod tests {
                 .detect("kumahq/kuma", "chore(deps): bump envoy")
                 .is_none()
         );
-    }
-
-    #[test]
-    fn validates_configured_patterns() {
-        let patterns = vec!["(".to_owned()];
-
-        assert!(BackportDetector::validate_patterns(&patterns).is_err());
     }
 }

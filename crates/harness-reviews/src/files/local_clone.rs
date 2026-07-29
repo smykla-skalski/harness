@@ -30,6 +30,8 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub use harness_protocol::daemon::reviews::files::local_clone::LocalCloneListEntry;
+
 /// Default disk budget (MB) for the entire clones tree.
 pub const LOCAL_CLONE_DISK_BUDGET_MB: u64 = 5 * 1024;
 
@@ -235,31 +237,26 @@ pub fn pat_clone_url(repo_full_name: &str, token: &Sensitive) -> Sensitive {
     ))
 }
 
-/// One row in the Settings-panel projection of the clones registry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct LocalCloneListEntry {
-    pub repo_full_name: String,
-    pub repo_key_segment: String,
-    pub size_bytes: u64,
-    #[schema(value_type = String, format = DateTime)]
-    pub created_at: DateTime<Utc>,
-    #[schema(value_type = String, format = DateTime)]
-    pub last_used_at: DateTime<Utc>,
-    #[schema(value_type = String, format = DateTime)]
-    pub last_fetched_at: DateTime<Utc>,
-}
-
-impl LocalCloneListEntry {
-    #[must_use]
-    pub fn from_registry_entry(key: &RepoKey, entry: &RegistryEntry) -> Self {
-        Self {
-            repo_full_name: entry.repo_full_name.clone(),
-            repo_key_segment: key.safe_segment(),
-            size_bytes: entry.size_bytes,
-            created_at: entry.created_at,
-            last_used_at: entry.last_used_at,
-            last_fetched_at: entry.last_fetched_at,
-        }
+/// Build the Settings-panel projection of one clones-registry entry.
+///
+/// A free function rather than a `LocalCloneListEntry` inherent method: that
+/// struct now lives in `harness-protocol` (see this module's `pub use`
+/// above), and `harness-protocol` cannot depend on this crate to reach
+/// `RepoKey` / `RegistryEntry` (it would cycle back through this crate's own
+/// dependency on `harness-protocol`), so the constructor stayed behind here
+/// instead of moving with the struct.
+#[must_use]
+pub fn local_clone_list_entry_from_registry(
+    key: &RepoKey,
+    entry: &RegistryEntry,
+) -> LocalCloneListEntry {
+    LocalCloneListEntry {
+        repo_full_name: entry.repo_full_name.clone(),
+        repo_key_segment: key.safe_segment(),
+        size_bytes: entry.size_bytes,
+        created_at: entry.created_at,
+        last_used_at: entry.last_used_at,
+        last_fetched_at: entry.last_fetched_at,
     }
 }
 
@@ -444,7 +441,7 @@ mod tests {
         let key = RepoKey::new("owner/repo");
         let now = Utc::now();
         let entry = make_entry(now, 4_096);
-        let list_entry = LocalCloneListEntry::from_registry_entry(&key, &entry);
+        let list_entry = local_clone_list_entry_from_registry(&key, &entry);
         assert_eq!(list_entry.repo_full_name, "owner/repo");
         assert_eq!(list_entry.size_bytes, 4_096);
         assert!(list_entry.repo_key_segment.contains("owner_repo"));

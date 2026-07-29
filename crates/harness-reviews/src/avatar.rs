@@ -4,27 +4,15 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use reqwest::Url;
 use reqwest::header;
-use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::utc_now;
 
+pub use harness_protocol::daemon::reviews::avatar::{ReviewsAvatarRequest, ReviewsAvatarResponse};
+
 const AVATAR_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const AVATAR_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_AVATAR_BYTES: usize = 256 * 1024;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsAvatarRequest {
-    pub avatar_url: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsAvatarResponse {
-    pub avatar_url: String,
-    pub mime_type: String,
-    pub content_base64: String,
-    pub fetched_at: String,
-}
 
 /// Fetch a GitHub avatar image through the daemon so Monitor never reaches
 /// out to GitHub directly from `SwiftUI` row rendering.

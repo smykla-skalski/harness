@@ -1,7 +1,16 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_workspace::workspace::utc_now;
+
+/// Current UTC time as ISO 8601 with a `Z` suffix and no microseconds.
+/// Duplicates `harness_workspace::workspace::utc_now`'s format rather than
+/// depending on that crate: `harness-workspace` pulls in `gix` and other
+/// heavyweight dependencies this otherwise-lean protocol crate has no other
+/// reason to carry, for a single one-line helper.
+fn utc_now() -> String {
+    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]

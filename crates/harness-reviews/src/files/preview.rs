@@ -2,13 +2,7 @@
 
 use super::{ReviewFilePatch, ReviewFilePreview};
 
-const DEFAULT_PREVIEW_LINE_LIMIT: u32 = 1_000;
-
-/// Default number of unified-diff lines returned for a preview.
-#[must_use]
-pub const fn preview_line_limit() -> u32 {
-    DEFAULT_PREVIEW_LINE_LIMIT
-}
+pub use harness_protocol::daemon::reviews::files::preview_line_limit;
 
 /// Convert a full patch row into a bounded preview row.
 #[must_use]

@@ -2550,54 +2550,70 @@ const SESSION_REQUESTS_SOURCE: &str =
 // split, since a string enum's generated form is a drop-in for the hand one.
 // Most are open enums (OPEN_STRING_ENUMS); ReviewAuthorAssociation is the lone
 // closed one, mirroring its closed Rust enum and exhaustive Swift consumers.
-const REVIEWS_ENUMS_SOURCE: &str = include_str!("../crates/harness-reviews/src/enums.rs");
+// Relocated (issue #1056) from harness-reviews to harness-protocol along with
+// the other reviews wire-type sources below: pure data with inherent methods
+// touching only CliError/harness-kernel, moved so harness-reviews depending
+// on harness-protocol for them (instead of defining them locally) doesn't
+// recreate the #1054 dependency cycle. harness-reviews re-exports every name
+// unchanged, so nothing about what this tool generates changes.
+const REVIEWS_ENUMS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/enums.rs");
 // reviews leaves: small clean request/response structs (plus two enums). Split
 // into suffixed *Wire types; the hand models live in scattered/mixed Swift
 // files, so this is additive, not direct adoption. body_update's response
 // carries a DateTime (-> String) and the open ReviewsBodyUpdateOutcome.
-const REVIEWS_AVATAR_SOURCE: &str = include_str!("../crates/harness-reviews/src/avatar.rs");
+const REVIEWS_AVATAR_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/avatar.rs");
 const REVIEWS_BODY_UPDATE_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/body_update.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/body_update.rs");
 const REVIEWS_FILE_COMMENT_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/file_comment.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/file_comment.rs");
 const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/review_thread_resolve.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/review_thread_resolve.rs");
 // reviews files-core: the file list/patch/preview/blob/viewed surface plus the
-// two cross-wire facade types from service.rs/local_clone.rs. preview.rs carries
-// no types (the preview structs live in mod.rs) but supplies the
-// `preview_line_limit` default fn and its const. service.rs/local_clone.rs each
-// expose one wire type (FilesLargeDiffStrategy, LocalCloneListEntry); their
-// daemon-internal serde types are SKIP_TYPES.
-const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/mod.rs");
-const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../crates/harness-reviews/src/files/blob.rs");
+// two cross-wire facade types from service.rs/local_clone.rs. The former
+// mod.rs/preview.rs/service.rs trio now live combined in one `files.rs` (the
+// preview default fn/const and the FilesLargeDiffStrategy enum moved into it
+// too), so REVIEWS_FILES_MOD_SOURCE alone covers what those three used to;
+// `HarnessCodeLanguage` deliberately stayed out of that merge (its own
+// `files/language.rs`, still unreferenced here) so it keeps being
+// referenced-not-defined rather than newly generated. local_clone.rs's
+// daemon-internal serde types (RepoKey, RegistryEntry, LocalCloneRegistry)
+// stayed behind in harness-reviews, so REVIEWS_FILES_LOCAL_CLONE_SOURCE now
+// only carries the LocalCloneListEntry wire type; still a SKIP_TYPES-free
+// source.
+const REVIEWS_FILES_MOD_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/files.rs");
+const REVIEWS_FILES_BLOB_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/files/blob.rs");
 const REVIEWS_FILES_VIEWED_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/files/viewed.rs");
-const REVIEWS_FILES_PREVIEW_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/files/preview.rs");
-const REVIEWS_FILES_SERVICE_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/files/service.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/files/viewed.rs");
 const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/files/local_clone.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/files/local_clone.rs");
 // reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
 // tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
 // the payload alongside the tag); the entries carry chrono DateTime, a boxed
 // SimpleActorEventEntry, and a JsonValue raw payload - all handled.
 const REVIEWS_TIMELINE_TYPES_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/timeline/types.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/timeline/types.rs");
 const REVIEWS_TIMELINE_MOD_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/timeline/mod.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/timeline.rs");
 // reviews types core: the query/item/check/action/policy request-response
 // surface. The public umbrella re-exports the split action and policy modules,
 // so generation needs all three files. The custom default fns it references live
-// in crates/harness-reviews/src/logic.rs (the defaults source). GitHubMergeMethod
-// is referenced-not-defined (renamed to the hand type); ReviewAuthorAssociation
-// references the adopted closed enum.
-const REVIEWS_TYPES_SOURCE: &str = include_str!("../crates/harness-reviews/src/types.rs");
+// in crates/harness-protocol/src/daemon/reviews/logic.rs (the defaults source).
+// GitHubMergeMethod is referenced-not-defined (renamed to the hand type,
+// itself now defined in harness-protocol rather than harness-task-board, see
+// that crate's github_config.rs); ReviewAuthorAssociation references the
+// adopted closed enum.
+const REVIEWS_TYPES_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/types.rs");
 const REVIEWS_TYPES_ACTIONS_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/types/actions.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/types/actions.rs");
 const REVIEWS_TYPES_POLICY_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/types/policy.rs");
-const REVIEWS_LOGIC_SOURCE: &str = include_str!("../crates/harness-reviews/src/logic.rs");
+    include_str!("../crates/harness-protocol/src/daemon/reviews/types/policy.rs");
+const REVIEWS_LOGIC_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/logic.rs");
 // websocket: the JSON-RPC-ish transport envelope. The five self-contained frame
 // types (request/response/error/push/chunk) generate; the three config/probe/
 // inspect payloads reference unmigrated persona/runtime/acp types and are SKIP'd
@@ -3033,6 +3049,18 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
 ];
 const GITHUB_CONFIG_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/github_config.rs");
+// GitHubMergeMethod itself moved to harness-protocol (issue #1056, alongside
+// the reviews wire types that embed it - see harness-protocol's
+// daemon::reviews module doc); github_config.rs now only re-exports it. Its
+// own `#[default]` variant still needs to resolve for
+// GitHubAutomationSettings.merge_method's `#[serde(default)]`, which reads
+// from the symbol table `build_symbol_table` builds over `sources` (not
+// `defaults`), so this file joins GITHUB_CONFIG_SOURCE there.
+// GitHubMergeMethod itself still never gets its own declaration emitted:
+// GITHUB_CONFIG_EMIT_ONLY doesn't list it (TYPE_RENAMES points references at
+// the hand TaskBoardGitHubMergeMethod instead).
+const GITHUB_MERGE_METHOD_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/reviews/github_merge_method.rs");
 const GITHUB_CONFIG_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitHubProjectWireTypes.generated.swift";
 // The GitHubAutomationSettings sub-tree nested in
 // TaskBoardOrchestratorSettings.github_project. The structs suffix to *Wire;
@@ -3277,13 +3305,11 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
             description: "the Rust reviews file list, patch, preview, blob, viewed and local-clone types",
-            defaults: &[REVIEWS_FILES_MOD_SOURCE, REVIEWS_FILES_PREVIEW_SOURCE],
+            defaults: &[REVIEWS_FILES_MOD_SOURCE],
             sources: &[
                 REVIEWS_FILES_MOD_SOURCE,
                 REVIEWS_FILES_BLOB_SOURCE,
                 REVIEWS_FILES_VIEWED_SOURCE,
-                REVIEWS_FILES_PREVIEW_SOURCE,
-                REVIEWS_FILES_SERVICE_SOURCE,
                 REVIEWS_FILES_LOCAL_CLONE_SOURCE,
             ],
         },
@@ -3533,7 +3559,7 @@ fn modules() -> Vec<GeneratedModule> {
             output: GITHUB_CONFIG_OUTPUT,
             description: "the Rust task-board github project config sub-tree",
             defaults: &[GITHUB_CONFIG_SOURCE],
-            sources: &[GITHUB_CONFIG_SOURCE],
+            sources: &[GITHUB_CONFIG_SOURCE, GITHUB_MERGE_METHOD_SOURCE],
         },
         GeneratedModule {
             output: ORCHESTRATOR_OUTPUT,
