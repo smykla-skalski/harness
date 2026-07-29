@@ -1,11 +1,10 @@
 use super::*;
 
-/// The full expected `(method, path, ws_method, swift_client_exposed)` table
-/// for `task_board_routes_have_complete_ws_parity`, split into its own file
-/// purely to keep `task_board.rs` under the repo's line cap -- this is pure
-/// literal data, not logic.
-pub(super) fn expected_task_board_ws_parity()
--> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+// Each `_part_N` helper below is a slice of the same literal table, split
+// purely to keep every function under the repo's line cap; there is no
+// per-part meaning; `expected_task_board_ws_parity` below is the real API.
+fn expected_task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
+{
     vec![
         (
             HttpRouteMethod::Get,
@@ -91,6 +90,12 @@ pub(super) fn expected_task_board_ws_parity()
             ws_methods::TASK_BOARD_DISPATCH_PICK,
             true,
         ),
+    ]
+}
+
+fn expected_task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
+{
+    vec![
         (
             HttpRouteMethod::Post,
             http_paths::TASK_BOARD_EVALUATE,
@@ -175,6 +180,12 @@ pub(super) fn expected_task_board_ws_parity()
             ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
             true,
         ),
+    ]
+}
+
+fn expected_task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
+{
+    vec![
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
@@ -259,6 +270,12 @@ pub(super) fn expected_task_board_ws_parity()
             ws_methods::POLICY_CANVAS_SET_ACTIVE,
             true,
         ),
+    ]
+}
+
+fn expected_task_board_ws_parity_part_4() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
+{
+    vec![
         (
             HttpRouteMethod::Post,
             http_paths::POLICY_CANVASES_DELETE,
@@ -343,6 +360,12 @@ pub(super) fn expected_task_board_ws_parity()
             ws_methods::POLICY_CANVAS_IMPORT,
             true,
         ),
+    ]
+}
+
+fn expected_task_board_ws_parity_part_5() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
+{
+    vec![
         (
             HttpRouteMethod::Post,
             http_paths::POLICY_SCENARIOS_CREATE,
@@ -427,6 +450,12 @@ pub(super) fn expected_task_board_ws_parity()
             ws_methods::TASK_BOARD_TRIAGE_GET,
             true,
         ),
+    ]
+}
+
+fn expected_task_board_ws_parity_part_6() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
+{
+    vec![
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ITEM_TRIAGE_HISTORY,
@@ -506,4 +535,20 @@ pub(super) fn expected_task_board_ws_parity()
             true,
         ),
     ]
+}
+
+/// The full expected `(method, path, ws_method, swift_client_exposed)` table
+/// for `task_board_routes_have_complete_ws_parity`, split into its own file
+/// purely to keep `task_board.rs` under the repo's line cap -- this is pure
+/// literal data, not logic.
+pub(super) fn expected_task_board_ws_parity()
+-> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+    let mut expected = Vec::new();
+    expected.extend(expected_task_board_ws_parity_part_1());
+    expected.extend(expected_task_board_ws_parity_part_2());
+    expected.extend(expected_task_board_ws_parity_part_3());
+    expected.extend(expected_task_board_ws_parity_part_4());
+    expected.extend(expected_task_board_ws_parity_part_5());
+    expected.extend(expected_task_board_ws_parity_part_6());
+    expected
 }
