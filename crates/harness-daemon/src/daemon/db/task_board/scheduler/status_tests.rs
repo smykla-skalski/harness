@@ -360,10 +360,12 @@ async fn seed_policy_live_revision(db: &AsyncDaemonDb, revision: u64) {
 }
 
 async fn seed_settings(db: &AsyncDaemonDb, revision: i64, interval_seconds: u64) {
-    let mut settings = TaskBoardOrchestratorSettings::default();
-    settings.scheduling = TaskBoardAutomationSchedulingSettings {
-        reconcile_interval_seconds: interval_seconds,
-        ..TaskBoardAutomationSchedulingSettings::default()
+    let settings = TaskBoardOrchestratorSettings {
+        scheduling: TaskBoardAutomationSchedulingSettings {
+            reconcile_interval_seconds: interval_seconds,
+            ..TaskBoardAutomationSchedulingSettings::default()
+        },
+        ..TaskBoardOrchestratorSettings::default()
     };
     query(
         "INSERT INTO task_board_orchestrator_settings (

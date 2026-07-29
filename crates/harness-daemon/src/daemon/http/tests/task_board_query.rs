@@ -72,7 +72,7 @@ async fn run_cursor_boundary_flow() {
         json!({ "id": "z-new", "title": "Mutation" }),
     )
     .await;
-    let stale = client
+    let stale_response = client
         .get(format!(
             "{base_url}{}?limit=1&cursor={cursor}",
             http_paths::TASK_BOARD_ITEMS
@@ -81,8 +81,11 @@ async fn run_cursor_boundary_flow() {
         .send()
         .await
         .expect("send stale cursor");
-    assert_eq!(stale.status(), StatusCode::BAD_REQUEST);
-    let stale_body = stale.json::<Value>().await.expect("stale cursor body");
+    assert_eq!(stale_response.status(), StatusCode::BAD_REQUEST);
+    let stale_body = stale_response
+        .json::<Value>()
+        .await
+        .expect("stale cursor body");
     assert!(
         stale_body["error"]["message"]
             .as_str()

@@ -81,7 +81,7 @@ async fn cleanup_observation_is_pending_then_byte_exact_across_restart() {
     wrong_epoch.binding.fencing_epoch += 1;
     wrong_epoch.request_sha256.clear();
     let wrong_epoch = wrong_epoch.seal().expect("seal wrong cleanup generation");
-    let stale = authenticated_post(
+    let stale_response = authenticated_post(
         &client,
         &base_url,
         CLEANUP_OBSERVATION_PATH,
@@ -89,7 +89,7 @@ async fn cleanup_observation_is_pending_then_byte_exact_across_restart() {
         &wrong_epoch,
     )
     .await;
-    assert_eq!(stale.status(), StatusCode::CONFLICT);
+    assert_eq!(stale_response.status(), StatusCode::CONFLICT);
 
     restarted.abort();
     let _ = restarted.await;

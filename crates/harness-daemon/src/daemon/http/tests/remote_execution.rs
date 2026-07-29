@@ -263,8 +263,9 @@ async fn executor_lifecycle_replays_renewal_without_accepting_old_generation() {
     assert_offer_replay(&client, &base_url, &offer, &original_acceptance).await;
 
     let stale_status = status_request(&offer, &old_lease.lease_id);
-    let stale = authenticated_post(&client, &base_url, STATUS_PATH, HOST_ID, &stale_status).await;
-    assert_eq!(stale.status(), StatusCode::CONFLICT);
+    let stale_response =
+        authenticated_post(&client, &base_url, STATUS_PATH, HOST_ID, &stale_status).await;
+    assert_eq!(stale_response.status(), StatusCode::CONFLICT);
 
     let current_status = status_request(&offer, &renewed.lease.lease_id);
     let current =

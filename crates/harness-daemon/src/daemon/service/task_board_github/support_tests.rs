@@ -22,10 +22,11 @@ fn github_item(project_id: Option<&str>, execution_repository: Option<&str>) -> 
 }
 
 fn config_for(owner: &str, repo: &str) -> GitHubProjectConfig {
-    let mut config = GitHubProjectConfig::default();
-    config.owner = owner.into();
-    config.repo = repo.into();
-    config
+    GitHubProjectConfig {
+        owner: owner.into(),
+        repo: repo.into(),
+        ..GitHubProjectConfig::default()
+    }
 }
 
 /// A GitHub import leaves `project_id` null and puts the slug in

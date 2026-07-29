@@ -197,9 +197,11 @@ fn interactive_worker_request_uses_terminal_runtime() {
 }
 
 fn review_launch() -> TaskBoardReadOnlyWorkflowLaunch {
-    let mut profile = TaskBoardReviewerProfile::default();
-    profile.model = Some("gpt-5".into());
-    profile.effort = Some("high".into());
+    let profile = TaskBoardReviewerProfile {
+        model: Some("gpt-5".into()),
+        effort: Some("high".into()),
+        ..TaskBoardReviewerProfile::default()
+    };
     TaskBoardReadOnlyWorkflowLaunch {
         workflow_kind: TaskBoardWorkflowKind::Review,
         execution_repository: None,

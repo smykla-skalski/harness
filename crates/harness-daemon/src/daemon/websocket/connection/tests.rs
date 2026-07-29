@@ -255,8 +255,10 @@ async fn incoming_ping_frames_reply_with_matching_pong() {
 async fn remote_websocket_caps_in_flight_dispatch_tasks() {
     let mut state = test_http_state_with_db();
     state.auth_mode = crate::daemon::http::DaemonHttpAuthMode::Remote;
-    let mut config = crate::daemon::http::RemoteRequestLimitConfig::default();
-    config.max_websocket_in_flight_requests = 1;
+    let config = crate::daemon::http::RemoteRequestLimitConfig {
+        max_websocket_in_flight_requests: 1,
+        ..crate::daemon::http::RemoteRequestLimitConfig::default()
+    };
     state.remote_request_limits =
         Some(crate::daemon::http::RemoteRequestLimits::new(config).expect("remote request limits"));
     let registration = RemoteClientRegistration::new_for_tests(
