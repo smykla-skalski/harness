@@ -1,3 +1,4 @@
+use std::future::{self, Ready};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -88,9 +89,12 @@ async fn an_errored_merge_that_actually_applied_is_never_reissued() {
     );
 }
 
-async fn counting_merge(calls: &AtomicUsize, result: Result<(), CliError>) -> Result<(), CliError> {
+fn counting_merge(
+    calls: &AtomicUsize,
+    result: Result<(), CliError>,
+) -> Ready<Result<(), CliError>> {
     calls.fetch_add(1, Ordering::SeqCst);
-    result
+    future::ready(result)
 }
 
 fn boom() -> CliError {

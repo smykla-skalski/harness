@@ -25,7 +25,7 @@ pub enum MergeLedgerOutcome {
 /// `begin_action` records the intent before GitHub sees it. An intent that
 /// already succeeded is `AlreadyApplied`; a permanently-failed one is
 /// `Abandoned`; an uncertain prior attempt is reconciled against fresh evidence
-/// - a pull request already `Merged` is adopted as applied - before any retry.
+/// (a pull request already `Merged` is adopted as applied) before any retry.
 /// Only on a clean `Proceed` is `merge` invoked, and its result is recorded:
 /// success finalizes the record, while any error is stored as `Uncertain`, since
 /// a merge request that errored may still have applied server-side, so the next
