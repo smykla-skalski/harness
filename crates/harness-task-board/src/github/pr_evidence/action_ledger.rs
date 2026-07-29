@@ -122,7 +122,7 @@ pub trait PullRequestActionStore: Send + Sync {
 /// Admission is a load-then-upsert, not atomic on its own: two callers racing on
 /// the same id could both be admitted. The store must serialize admission per id
 /// - a durable implementation with a transaction or a unique constraint on the
-/// active record, mirroring the task-board dispatch ledger.
+///   active record, mirroring the task-board dispatch ledger.
 ///
 /// # Errors
 /// Returns a storage error.
