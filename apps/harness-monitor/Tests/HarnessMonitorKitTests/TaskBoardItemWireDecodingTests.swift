@@ -24,7 +24,6 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.priority == .high)
     #expect(item.agentMode == .interactive)
     #expect(item.workflowKind == .prFix)
-    #expect(item.workflowKind == .prFix)
     #expect(item.executionRepository == "acme/widget")
     #expect(item.tags == ["urgent"])
     #expect(item.importedFromProvider == .gitHub)

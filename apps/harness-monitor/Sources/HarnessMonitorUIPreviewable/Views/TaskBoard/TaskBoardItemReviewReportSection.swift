@@ -4,7 +4,7 @@ import SwiftUI
 struct TaskBoardItemReviewReportSection: View {
   let item: TaskBoardItem
   let actions: TaskBoardOverviewActions
-  @Bindable var state: TaskBoardReviewReportState
+  let state: TaskBoardReviewReportState
   @Environment(\.fontScale)
   private var fontScale
 
