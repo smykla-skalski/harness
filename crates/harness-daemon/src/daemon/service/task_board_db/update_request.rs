@@ -1,5 +1,7 @@
 use crate::daemon::protocol::TaskBoardUpdateItemRequest;
-use crate::task_board::{ExternalRef, PlanningState, TaskBoardItem, TaskBoardWorkflowState};
+use crate::task_board::{
+    ExternalRef, PlanningState, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowState,
+};
 use harness_kernel::errors::CliError;
 
 use super::request_validation::validate_update_estimates;
@@ -71,7 +73,26 @@ pub(super) fn apply_update_request(
         request.clear_identity.clear_parent_item_id,
     );
     apply_update_state(item, request);
+    admit_imported_pull_request(item);
     Ok(())
+}
+
+/// Give an imported pull-request ticket the execution mode its intent requires
+/// the moment it lands in Todo, so moving it straight from Inbox makes it
+/// dispatch-ready without a second manual step. A pure review request routes
+/// read-only (`Evaluate`); a dependency update - alone or combined with a
+/// review - writes headless. Deriving the mode from the workflow kind here keeps
+/// a review from carrying the write-oriented default that read-only preparation
+/// rejects, while a combined ticket keeps both its write mode and its review
+/// intent. Re-running it on an already-admitted ticket is a no-op, so repeated
+/// transitions stay idempotent.
+fn admit_imported_pull_request(item: &mut TaskBoardItem) {
+    if item.status.canonical_persisted_status() != TaskBoardStatus::Todo {
+        return;
+    }
+    if let Some(mode) = item.workflow_kind.imported_admission_agent_mode() {
+        item.agent_mode = mode;
+    }
 }
 
 pub(super) fn replacement_external_refs(
