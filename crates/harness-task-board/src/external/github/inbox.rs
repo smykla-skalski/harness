@@ -1,5 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 
@@ -26,6 +28,14 @@ pub struct GitHubInboxSyncClient {
     repositories: Vec<GitHubRepository>,
     import_labels: Vec<String>,
     include_review_requests: bool,
+    /// Whether the most recent pull observed every configured query. A pull
+    /// that skipped a failed query is short of the live inbox, so it must not
+    /// act authoritative and close a ticket whose pull request went missing
+    /// only behind that failure. Callers build a fresh client per sync, so the
+    /// persisted-scope role (`ExternalProviderScopeIdentity::for_client`, read
+    /// before the pull) always reflects the `true` default while the close path
+    /// reads this instance's own post-pull value.
+    last_pull_complete: Arc<AtomicBool>,
 }
 
 impl GitHubInboxSyncClient {
@@ -61,6 +71,7 @@ impl GitHubInboxSyncClient {
             repositories,
             import_labels: import_labels.to_vec(),
             include_review_requests: true,
+            last_pull_complete: Arc::new(AtomicBool::new(true)),
         })
     }
 
@@ -84,6 +95,10 @@ impl GitHubInboxSyncClient {
         let mut client = Self::from_config(config)?;
         client.include_review_requests = false;
         Ok(client)
+    }
+
+    fn mark_pull_complete(&self, complete: bool) {
+        self.last_pull_complete.store(complete, Ordering::Release);
     }
 
     async fn current_user_login(&self) -> Result<String, CliError> {
@@ -137,11 +152,12 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
     }
 
     fn authoritative_review_inbox(&self) -> bool {
-        self.include_review_requests
+        self.include_review_requests && self.last_pull_complete.load(Ordering::Acquire)
     }
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
         if self.repositories.is_empty() {
+            self.mark_pull_complete(true);
             return Ok(Vec::new());
         }
         let login = self.current_user_login().await?;
@@ -164,18 +180,21 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
             pulled_repository_count += 1;
             tasks.extend(assigned_tasks);
 
-            if !self.include_review_requests {
-                continue;
+            if self.include_review_requests {
+                match self.review_request_tasks(repository, login.as_str()).await {
+                    Ok(review_tasks) => tasks.extend(review_tasks),
+                    Err(error) => record_repository_failure(
+                        &mut failures,
+                        repository,
+                        "review request search",
+                        &error,
+                    ),
+                }
             }
-            match self.review_request_tasks(repository, login.as_str()).await {
-                Ok(review_tasks) => tasks.extend(review_tasks),
-                Err(error) => record_repository_failure(
-                    &mut failures,
-                    repository,
-                    "review request search",
-                    &error,
-                ),
-            }
+
+            // Dependency-update pull requests are assignment-independent and
+            // are the only source for a dependency-only ticket, so discover
+            // them even when this client imports assigned work alone.
             match self.dependency_update_tasks(repository).await {
                 Ok(dependency_tasks) => tasks.extend(dependency_tasks),
                 Err(error) => record_repository_failure(
@@ -187,8 +206,10 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
             }
         }
         if pulled_repository_count == 0 && !failures.is_empty() {
+            self.mark_pull_complete(false);
             return Err(all_inbox_repositories_failed(failures));
         }
+        self.mark_pull_complete(failures.is_empty());
         // A pull request can match both the review-request and a dependency
         // search, so fold those into one ticket that carries both intents.
         Ok(union_pull_request_intents(tasks))

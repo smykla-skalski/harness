@@ -5,6 +5,7 @@
 //! the update-focused `UpdateFakeSyncClient` those tests share; `support`
 //! holds this group's own fixtures.
 
+mod discovery;
 mod execution_repository;
 mod support;
 

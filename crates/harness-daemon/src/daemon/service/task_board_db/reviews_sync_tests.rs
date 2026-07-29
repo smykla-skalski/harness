@@ -11,6 +11,7 @@ use crate::task_board::external::{
 };
 use crate::task_board::{
     ExternalProvider, TaskBoardGitHubInboxConfig, TaskBoardOrchestratorSettings,
+    TaskBoardWorkflowKind,
 };
 use crate::task_board::{ExternalSyncClient, TaskBoardItem};
 use crate::workspace::utc_now;
@@ -103,6 +104,44 @@ async fn backed_off_review_repository_does_not_block_another_repository() {
     assert_eq!(
         board_items[0].execution_repository.as_deref(),
         Some("acme/widgets")
+    );
+}
+
+#[tokio::test]
+async fn shared_review_ticket_records_intent_author_and_head() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    let repositories = vec!["acme/widgets".into()];
+    db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings {
+        github_inbox: TaskBoardGitHubInboxConfig {
+            repositories: repositories.clone(),
+            label_filter: Vec::new(),
+        },
+        ..TaskBoardOrchestratorSettings::default()
+    })
+    .await
+    .expect("configure review inbox");
+
+    let items = vec![review_item("acme/widgets", 42)];
+    let (_, operations) = reconcile_shared_review_items_db(&db, &items)
+        .await
+        .expect("reconcile review request");
+    let board_items = db.list_task_board_items(None).await.expect("board items");
+
+    assert_eq!(operations.len(), 1);
+    assert_eq!(board_items.len(), 1);
+    let ticket = &board_items[0];
+    assert_eq!(ticket.workflow_kind, TaskBoardWorkflowKind::PrReview);
+    assert_eq!(ticket.workflow.pr_head_revision.as_deref(), Some("head-42"));
+    assert_eq!(ticket.workflow.pr_author.as_deref(), Some("author"));
+    assert_eq!(
+        ticket
+            .external_refs
+            .first()
+            .and_then(|reference| reference.url.as_deref()),
+        Some("https://github.com/acme/widgets/pull/42")
     );
 }
 
