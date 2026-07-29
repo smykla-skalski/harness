@@ -19,6 +19,8 @@ pub mod agent_tui;
 pub mod bridge;
 #[path = "../../../../crates/harness-daemon/src/daemon/discovery/mod.rs"]
 pub mod discovery;
+#[path = "../../../../crates/harness-daemon/src/daemon/remote_redaction.rs"]
+pub(crate) mod remote_redaction;
 pub mod protocol {
     pub use harness_protocol::daemon::StreamEvent;
 }

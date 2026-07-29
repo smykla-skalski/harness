@@ -78,6 +78,7 @@ fn apply_redaction_rules(mut redacted: String, rules: &[(Regex, &'static str)]) 
     redacted
 }
 
+#[cfg(feature = "daemon-runtime")]
 pub(crate) fn redact_secret_detail(detail: &str) -> String {
     let mut redacted = String::with_capacity(detail.len());
     let mut offset = 0;
@@ -106,6 +107,7 @@ pub(crate) fn redact_secret_detail(detail: &str) -> String {
     redacted
 }
 
+#[cfg(feature = "daemon-runtime")]
 fn is_secret_value_terminator(value_char: char) -> bool {
     value_char.is_whitespace()
         || matches!(value_char, '&' | ';' | ',' | ')' | ']' | '}' | '"' | '\'')
