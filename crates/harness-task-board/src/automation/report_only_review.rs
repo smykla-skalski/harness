@@ -1,3 +1,5 @@
+use std::path::{Component, Path};
+
 use serde::{Deserialize, Serialize};
 
 use crate::TaskBoardPhaseCapabilityProfile;
@@ -63,6 +65,11 @@ pub enum TaskBoardReportOnlyReviewError {
     InvalidHeadRevision,
     #[error("report-only review finding line must be greater than zero")]
     InvalidFindingLine,
+    #[error(
+        "report-only review finding path must be a repo-relative path without a leading '/', \
+         '..' traversal, control characters, or leading/trailing whitespace"
+    )]
+    InvalidFindingPath,
     #[error("report-only review output is invalid: {detail}")]
     InvalidOutput { detail: String },
 }
@@ -161,13 +168,32 @@ fn parse_output(
         })?;
     validate_nonempty("summary", &output.summary)?;
     for finding in &output.findings {
-        validate_nonempty("finding.location.path", &finding.location.path)?;
+        validate_finding_path(&finding.location.path)?;
         validate_nonempty("finding.evidence", &finding.evidence)?;
         if finding.location.line == Some(0) {
             return Err(TaskBoardReportOnlyReviewError::InvalidFindingLine);
         }
     }
     Ok(output)
+}
+
+/// Reject paths that could point outside the repo boundary: absolute paths,
+/// `..` traversal, control characters, and leading/trailing whitespace all
+/// pass a plain non-empty check, so this checks the shape explicitly instead.
+fn validate_finding_path(value: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
+    validate_nonempty("finding.location.path", value)?;
+    let path = Path::new(value);
+    let safe = value.trim() == value
+        && !value.chars().any(char::is_control)
+        && !path.is_absolute()
+        && !path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir));
+    if safe {
+        Ok(())
+    } else {
+        Err(TaskBoardReportOnlyReviewError::InvalidFindingPath)
+    }
 }
 
 fn validate_head_revision(revision: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
@@ -266,6 +292,31 @@ mod tests {
 
         for output in cases {
             assert!(request.complete("fake", "model", "model", output).is_err());
+        }
+    }
+
+    #[test]
+    fn invalid_finding_paths_fail_closed() {
+        let request = request("diff content");
+        let finding = |path: &str| {
+            format!(
+                r#"{{"summary":"Reviewed.","findings":[{{"severity":"low","location":{{"path":"{path}"}},"evidence":"bad"}}]}}"#
+            )
+        };
+        let cases = [
+            finding("../outside.rs"),
+            finding("src/../../outside.rs"),
+            finding("/etc/passwd"),
+            finding(r"src/\u0007lib.rs"),
+            finding(" src/lib.rs"),
+            finding("src/lib.rs "),
+        ];
+
+        for output in cases {
+            assert!(matches!(
+                request.complete("fake", "model", "model", &output),
+                Err(TaskBoardReportOnlyReviewError::InvalidFindingPath)
+            ));
         }
     }
 
