@@ -153,6 +153,7 @@ public enum TaskBoardInspectorPreviewRenderer {
         textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
         directory: directory
       )
+      && dumpReviewReport(toDirectory: directory)
   }
 
   private static func render(

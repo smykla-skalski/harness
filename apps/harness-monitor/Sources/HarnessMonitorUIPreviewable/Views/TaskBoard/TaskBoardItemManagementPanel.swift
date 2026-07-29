@@ -18,6 +18,7 @@ struct TaskBoardItemManagementPanel: View {
   @State private var projectTypeSuggestions: [String] = []
   @State private var creationOutcome = TaskBoardItemCreationOutcome()
   @State private var triageInspector = TaskBoardTriageInspectorState()
+  @State private var reviewReportState = TaskBoardReviewReportState()
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.dismiss)
@@ -27,6 +28,11 @@ struct TaskBoardItemManagementPanel: View {
     item.map {
       TaskBoardTriageInspectorLoadKey(itemID: $0.id, updatedAt: $0.updatedAt)
     }
+  }
+
+  private var reviewReportLoadKey: TaskBoardReviewReportLoadKey? {
+    guard let item, item.showsReviewReport else { return nil }
+    return TaskBoardReviewReportLoadKey(itemID: item.id, updatedAt: item.updatedAt)
   }
 
   var headerTitleFont: Font {
@@ -89,6 +95,13 @@ struct TaskBoardItemManagementPanel: View {
       routesToEditor
       approvalReadout
       if let item {
+        if item.showsReviewReport {
+          TaskBoardItemReviewReportSection(
+            item: item,
+            actions: actions,
+            state: reviewReportState
+          )
+        }
         TaskBoardManagementTriageSection(
           item: item,
           metrics: metrics,
@@ -109,6 +122,10 @@ struct TaskBoardItemManagementPanel: View {
     .task(id: triageInspectorLoadKey) {
       guard let item else { return }
       await triageInspector.load(item: item, actions: actions)
+    }
+    .task(id: reviewReportLoadKey) {
+      guard let item, item.showsReviewReport else { return }
+      await reviewReportState.load(item: item, actions: actions)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")

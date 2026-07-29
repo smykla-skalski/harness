@@ -38,6 +38,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(workflow.status == .running)
     #expect(workflow.attempts == 2)
     #expect(workflow.prNumber == 42)
+    #expect(workflow.prHeadRevision == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+    #expect(workflow.prAuthor == "renovate[bot]")
     #expect(item.usage.inputTokens == 100)
     #expect(item.usage.costUsd == 0.25)
   }
@@ -98,6 +100,7 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.status == .inProgress)
     #expect(item.priority == .high)
     #expect(item.agentMode == .interactive)
+    #expect(item.workflowKind == .prFix)
     #expect(item.externalRefs.first?.provider == .gitHub)
     #expect(item.externalRefs.first?.url == "https://example.com/123")
     #expect(item.externalRefs.first?.syncState?.status == .todo)
@@ -107,6 +110,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(workflow.status == .running)
     #expect(workflow.attempts == 2)
     #expect(workflow.prNumber == 42)
+    #expect(workflow.prHeadRevision == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+    #expect(workflow.prAuthor == "renovate[bot]")
     #expect(item.usage.inputTokens == 100)
   }
 
@@ -280,6 +285,8 @@ private let fullItemPayloadFixture = """
       "attempts": 2,
       "branch": "fix/bug",
       "pr_number": 42,
+      "pr_head_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pr_author": "renovate[bot]",
       "policy_trace_ids": ["trace-1"]
     },
     "session_id": "sig-1",

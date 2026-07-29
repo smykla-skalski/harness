@@ -196,6 +196,8 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
   public let worktree: String?
   public let prNumber: UInt64?
   public let prUrl: String?
+  public let prHeadRevision: String?
+  public let prAuthor: String?
   public let lastError: String?
   public let policyTraceIds: [String]
 
@@ -208,6 +210,8 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
     worktree: String? = nil,
     prNumber: UInt64? = nil,
     prUrl: String? = nil,
+    prHeadRevision: String? = nil,
+    prAuthor: String? = nil,
     lastError: String? = nil,
     policyTraceIds: [String] = []
   ) {
@@ -219,6 +223,8 @@ public struct TaskBoardWorkflowState: Codable, Equatable, Sendable {
     self.worktree = worktree
     self.prNumber = prNumber
     self.prUrl = prUrl
+    self.prHeadRevision = prHeadRevision
+    self.prAuthor = prAuthor
     self.lastError = lastError
     self.policyTraceIds = policyTraceIds
   }
@@ -234,6 +240,8 @@ extension TaskBoardWorkflowState {
     case worktree
     case prNumber
     case prUrl
+    case prHeadRevision
+    case prAuthor
     case lastError
     case policyTraceIds
   }
@@ -249,6 +257,8 @@ extension TaskBoardWorkflowState {
       worktree: try container.decodeIfPresent(String.self, forKey: .worktree),
       prNumber: try container.decodeIfPresent(UInt64.self, forKey: .prNumber),
       prUrl: try container.decodeIfPresent(String.self, forKey: .prUrl),
+      prHeadRevision: try container.decodeIfPresent(String.self, forKey: .prHeadRevision),
+      prAuthor: try container.decodeIfPresent(String.self, forKey: .prAuthor),
       lastError: try container.decodeIfPresent(String.self, forKey: .lastError),
       policyTraceIds: try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
     )
@@ -283,6 +293,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let executionRepository: String?
   public let targetProjectTypes: [String]
   public let agentMode: TaskBoardAgentMode
+  public let workflowKind: TaskBoardWorkflowKind?
   public let kind: TaskBoardItemKind
   public let externalRefs: [TaskBoardExternalRef]
   public let importedFromProvider: TaskBoardExternalRefProvider?
@@ -313,6 +324,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     executionRepository: String? = nil,
     targetProjectTypes: [String] = [],
     agentMode: TaskBoardAgentMode,
+    workflowKind: TaskBoardWorkflowKind? = nil,
     kind: TaskBoardItemKind = .task,
     externalRefs: [TaskBoardExternalRef],
     importedFromProvider: TaskBoardExternalRefProvider? = nil,
@@ -342,6 +354,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.executionRepository = executionRepository
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
+    self.workflowKind = workflowKind
     self.kind = kind
     self.externalRefs = externalRefs
     self.importedFromProvider = importedFromProvider

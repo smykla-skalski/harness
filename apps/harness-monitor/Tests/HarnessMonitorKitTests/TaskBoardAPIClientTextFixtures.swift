@@ -89,6 +89,33 @@ let sampleTaskBoardTriageHistoryText =
   }
   """
 
+let sampleTaskBoardReviewReportText =
+  """
+  {
+    "status": "completed",
+    "report": {
+      "report_id": "report-1",
+      "item_id": "board-1",
+      "correlation_id": "correlation-1",
+      "repository": "example/harness",
+      "pull_request_number": 42,
+      "head_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "runtime": "openrouter",
+      "requested_model": "deepseek/deepseek-v4-flash",
+      "effective_model": "deepseek/deepseek-v4-flash",
+      "status": "completed",
+      "summary": "One actionable finding.",
+      "findings": [{
+        "severity": "high",
+        "location": {"path": "src/review.rs", "line": 42},
+        "evidence": "The retry path loses the original correlation id."
+      }],
+      "started_at": "2026-07-29T19:40:00Z",
+      "finished_at": "2026-07-29T19:41:12Z"
+    }
+  }
+  """
+
 let sampleTaskBoardEvaluationSummaryText =
   """
   {
