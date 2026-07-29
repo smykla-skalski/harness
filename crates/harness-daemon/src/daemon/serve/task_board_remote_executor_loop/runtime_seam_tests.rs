@@ -11,7 +11,7 @@ use crate::daemon::db::{
     remote_executor_fixture, remote_executor_identity,
 };
 use crate::daemon::protocol::CodexRunStatus;
-use crate::daemon::service::serve::test_support::{
+use crate::daemon::serve::test_support::{
     RuntimeSeamScope, install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
 use crate::task_board::{

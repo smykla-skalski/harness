@@ -7,7 +7,7 @@ use crate::daemon::remote_acme::RemoteAcmeRenewalIssuer;
 use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
-use crate::daemon::service::{self, DaemonServeConfig, ShutdownSignalGuard};
+use crate::daemon::serve::{self, DaemonServeConfig, ShutdownSignalGuard};
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::runtime::{Handle, Runtime};
@@ -275,7 +275,7 @@ async fn run_remote_serve_lifecycle_async(
     }
     let plan = build_remote_serve_execution_plan_from_config(args, db, remote_config)?;
     // Boxing keeps the long-lived HTTPS future below the denied large-futures threshold.
-    Box::pin(service::serve_remote_https(
+    Box::pin(serve::serve_remote_https(
         plan.service_config,
         plan.acme_plan,
         shutdown_tx,

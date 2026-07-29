@@ -399,11 +399,11 @@ pub(super) fn offer_request(
     instance_id: &str,
 ) -> RemoteOfferRequest {
     let cas = crate::task_board::TaskBoardWorkflowExecutionCas::from(execution);
-    let launch = crate::daemon::service::task_board_read_only_coordinator::requests::remote_codex_attempt_request(
-        execution,
-        attempt,
-    )
-    .expect("build canonical remote Codex launch");
+    let launch =
+        crate::daemon::task_board_read_only_coordinator::requests::remote_codex_attempt_request(
+            execution, attempt,
+        )
+        .expect("build canonical remote Codex launch");
     RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: RemoteAttemptBinding {

@@ -1,9 +1,11 @@
-use super::super::{CliError, CliErrorKind, DaemonServeConfig, TcpListener, log_sandbox_startup};
+use super::config::{DaemonServeConfig, log_sandbox_startup};
 use super::legacy_migration::log_legacy_daemon_root_migration;
 use super::manifest::build_manifest;
 use crate::daemon::state::{self, DaemonManifest};
 use crate::daemon::voice::cleanup_abandoned_sessions;
 use crate::workspace::orphan_cleanup::run_startup_sweep;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use tokio::net::TcpListener;
 
 pub(super) fn prepare_local_daemon_environment(config: &DaemonServeConfig) -> Result<(), CliError> {
     super::validate_serve_config(config)?;

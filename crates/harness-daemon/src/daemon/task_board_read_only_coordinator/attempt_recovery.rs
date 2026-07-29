@@ -101,7 +101,7 @@ async fn recover_retry_wait(
             .clone()
             .ok_or_else(|| invalid_transition("retry attempt has no availability time"))?,
     };
-    super::super::task_board_workflow_execution::schedule_workflow_retry(
+    crate::daemon::service::task_board_workflow_execution::schedule_workflow_retry(
         db,
         &TaskBoardWorkflowExecutionCas::from(execution),
         retry,
@@ -183,7 +183,7 @@ pub(super) async fn schedule_resolution_retry(
         timestamp,
     ) {
         TaskBoardAttemptRetryDecision::Retry(retry) => {
-            super::super::task_board_workflow_execution::schedule_workflow_retry(
+            crate::daemon::service::task_board_workflow_execution::schedule_workflow_retry(
                 db,
                 &TaskBoardWorkflowExecutionCas::from(execution),
                 retry,

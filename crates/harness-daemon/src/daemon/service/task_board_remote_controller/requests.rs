@@ -19,7 +19,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::task_board_read_only_coordinator::requests::remote_codex_attempt_request;
+use crate::daemon::task_board_read_only_coordinator::requests::remote_codex_attempt_request;
 
 #[path = "requests/source.rs"]
 mod source;

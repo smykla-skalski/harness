@@ -39,7 +39,7 @@ where
             advance_with_head(db, execution, revisions, &result.head_revision, now).await?;
         }
         Some(TaskBoardAttemptResultArtifact::Review(outcome)) => {
-            super::super::task_board_workflow_review::record_workflow_reviewer_outcome(
+            crate::daemon::service::task_board_workflow_review::record_workflow_reviewer_outcome(
                 db,
                 &TaskBoardWorkflowExecutionCas::from(execution),
                 outcome.clone(),
@@ -194,7 +194,7 @@ async fn advance(
     revisions: &TaskBoardWorkflowRevisionGuard,
     now: &str,
 ) -> Result<(), CliError> {
-    super::super::task_board_workflow_execution::advance_workflow_execution(
+    crate::daemon::service::task_board_workflow_execution::advance_workflow_execution(
         db,
         &TaskBoardWorkflowExecutionCas::from(execution),
         revisions,
@@ -213,7 +213,7 @@ async fn advance_with_head(
     head: &str,
     now: &str,
 ) -> Result<(), CliError> {
-    super::super::task_board_workflow_execution::advance_workflow_execution(
+    crate::daemon::service::task_board_workflow_execution::advance_workflow_execution(
         db,
         &TaskBoardWorkflowExecutionCas::from(execution),
         revisions,
@@ -234,7 +234,7 @@ async fn advance_publication(
 ) -> Result<(), CliError> {
     let observed = external_url.map(parse_pull_request_url).transpose()?;
     let pull_request = publication_identity(execution, observed.as_ref())?;
-    super::super::task_board_workflow_execution::advance_workflow_execution(
+    crate::daemon::service::task_board_workflow_execution::advance_workflow_execution(
         db,
         &TaskBoardWorkflowExecutionCas::from(execution),
         revisions,

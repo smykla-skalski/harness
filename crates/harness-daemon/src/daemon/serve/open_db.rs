@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::daemon::service::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::state;
 use harness_kernel::errors::CliError;
 

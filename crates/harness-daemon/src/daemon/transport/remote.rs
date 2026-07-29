@@ -21,7 +21,7 @@ pub use values::{DaemonRemotePairTtl, DaemonRemoteRole, DaemonRemoteScope};
 use crate::daemon::remote_pairing::{
     RemotePairingCode, RemotePairingCreateParams, create_remote_pairing, pairing_expires_at,
 };
-use crate::daemon::service::DaemonServeConfig;
+use crate::daemon::serve::DaemonServeConfig;
 use crate::daemon::state;
 use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;

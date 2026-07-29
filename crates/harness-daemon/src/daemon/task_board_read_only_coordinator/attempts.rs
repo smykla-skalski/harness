@@ -33,7 +33,7 @@ where
         return Ok(());
     }
     if execution.transition.execution_state == TaskBoardExecutionState::RetryWait {
-        super::super::task_board_workflow_execution::resume_workflow_retry(
+        crate::daemon::service::task_board_workflow_execution::resume_workflow_retry(
             db,
             &TaskBoardWorkflowExecutionCas::from(&execution),
             now,
@@ -209,8 +209,10 @@ async fn schedule_next_attempt(
         updated_at: now.to_string(),
         completed_at: None,
     };
-    super::super::task_board_workflow_execution::create_workflow_execution_attempt(db, &attempt)
-        .await?;
+    crate::daemon::service::task_board_workflow_execution::create_workflow_execution_attempt(
+        db, &attempt,
+    )
+    .await?;
     set_execution_state(
         db,
         &execution.execution_id,
@@ -429,7 +431,7 @@ pub(super) async fn require_human(
         return Ok(());
     }
     let mut updated = current.clone();
-    super::super::task_board_workflow_execution::require_human(&mut updated, reason, now);
+    crate::daemon::service::task_board_workflow_execution::require_human(&mut updated, reason, now);
     updated.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
         kind,
         summary: summary.to_string(),

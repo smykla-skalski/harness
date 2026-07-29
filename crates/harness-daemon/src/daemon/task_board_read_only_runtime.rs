@@ -228,7 +228,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         if review.viewer_has_active_approval == Some(true) {
             return Ok(lifecycle_outcome(execution, &review, false));
         }
-        let response = super::reviews::approve_reviews(&ReviewsApproveRequest {
+        let response = crate::daemon::service::reviews::approve_reviews(&ReviewsApproveRequest {
             targets: vec![review.target()],
             source: ReviewsApproveRequestSource::Direct,
         })
@@ -266,7 +266,10 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
     ) -> Result<TaskBoardLifecycleOutcome, CliError> {
-        super::task_board_github::publish_task_board_write_execution(self.db, execution).await
+        crate::daemon::service::task_board_github::publish_task_board_write_execution(
+            self.db, execution,
+        )
+        .await
     }
 
     async fn verify_write_workflow_publication(
@@ -274,7 +277,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         execution: &TaskBoardWorkflowExecutionRecord,
         known_external_url: Option<&str>,
     ) -> Result<TaskBoardPublishVerification, CliError> {
-        super::task_board_github::verify_task_board_write_execution_publication(
+        crate::daemon::service::task_board_github::verify_task_board_write_execution_publication(
             self.db,
             execution,
             known_external_url,
@@ -288,8 +291,11 @@ async fn resolve_pr_review(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<ReviewItem, CliError> {
     let identity = pr_review_identity(execution)?;
-    let review =
-        super::reviews::resolve_exact_pull_request(&identity.repository, identity.number).await?;
+    let review = crate::daemon::service::reviews::resolve_exact_pull_request(
+        &identity.repository,
+        identity.number,
+    )
+    .await?;
     if review.state != ReviewPullRequestState::Open {
         return Err(invalid_transition(format!(
             "pull request '{}#{}' is not open",

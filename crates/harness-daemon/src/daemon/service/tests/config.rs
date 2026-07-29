@@ -1,4 +1,7 @@
 use super::*;
+use crate::daemon::codex_transport::{self, CodexTransportKind, codex_transport_from_env};
+use crate::daemon::serve::{self, DaemonServeConfig};
+use crate::daemon::server_state::DaemonHttpAuthMode;
 
 static LOG_FILTER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 static TEST_LOG_FILTER_LAYER: OnceLock<
@@ -10,23 +13,17 @@ fn daemon_serve_config_default_is_unsandboxed() {
     let config = DaemonServeConfig::default();
     assert!(!config.sandboxed);
     assert_eq!(config.codex_transport, CodexTransportKind::Stdio);
-    assert_eq!(
-        config.auth_mode,
-        crate::daemon::http::DaemonHttpAuthMode::Local
-    );
+    assert_eq!(config.auth_mode, DaemonHttpAuthMode::Local);
     assert!(config.remote_domain.is_none());
 }
 
 #[test]
 fn daemon_serve_config_can_select_remote_http_auth_mode() {
     let config = DaemonServeConfig {
-        auth_mode: crate::daemon::http::DaemonHttpAuthMode::Remote,
+        auth_mode: DaemonHttpAuthMode::Remote,
         ..DaemonServeConfig::default()
     };
-    assert_eq!(
-        super::super::serve::http_auth_mode(&config),
-        crate::daemon::http::DaemonHttpAuthMode::Remote
-    );
+    assert_eq!(serve::http_auth_mode(&config), DaemonHttpAuthMode::Remote);
 }
 
 fn with_isolated_transport_env<F: FnOnce()>(ws_url: Option<&str>, f: F) {
@@ -63,7 +60,7 @@ fn codex_transport_from_env_defaults_to_websocket_when_sandboxed() {
         assert_eq!(
             codex_transport_from_env(true),
             CodexTransportKind::WebSocket {
-                endpoint: super::codex_transport::DEFAULT_CODEX_WS_ENDPOINT.to_string(),
+                endpoint: codex_transport::DEFAULT_CODEX_WS_ENDPOINT.to_string(),
             }
         );
     });
@@ -89,7 +86,7 @@ fn serve_rejects_non_loopback_bind_host() {
         let result = runtime.block_on(async {
             tokio::time::timeout(
                 std::time::Duration::from_millis(200),
-                serve(DaemonServeConfig {
+                serve::serve(DaemonServeConfig {
                     host: "0.0.0.0".into(),
                     ..DaemonServeConfig::default()
                 }),

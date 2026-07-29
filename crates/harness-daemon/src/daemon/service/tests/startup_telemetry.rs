@@ -3,6 +3,8 @@ use super::*;
 use std::sync::{Arc, Mutex};
 use std::time::Duration as StdDuration;
 
+use crate::daemon::serve::{self, DaemonServeConfig};
+
 use opentelemetry::Value as OTelValue;
 use opentelemetry::global;
 use opentelemetry::trace::TracerProvider as _;
@@ -37,7 +39,7 @@ fn daemon_serve_startup_groups_db_spans_under_startup_root() {
                     .expect("runtime");
                 runtime.block_on(async {
                     let serve_task = tokio::spawn(async {
-                        serve(DaemonServeConfig {
+                        serve::serve(DaemonServeConfig {
                             host: "127.0.0.1".into(),
                             port: 0,
                             ..DaemonServeConfig::default()

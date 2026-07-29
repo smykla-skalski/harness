@@ -10,8 +10,10 @@ use crate::feature_flags;
 use crate::workspace::{host_home_dir, normalized_env_value};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use super::super::codex_transport::codex_transport_from_env;
 use super::super::launchd;
-use super::super::service::{self, DaemonServeConfig};
+use super::super::serve::{self, DaemonServeConfig};
+use super::super::service;
 use super::super::snapshot;
 use super::super::state;
 use super::control::{
@@ -217,7 +219,7 @@ impl DaemonServeArgs {
                     endpoint: url.trim().to_string(),
                 }
             }
-            _ => service::codex_transport_from_env(sandboxed),
+            _ => codex_transport_from_env(sandboxed),
         };
         DaemonServeConfig {
             host: self.host.clone(),
@@ -312,7 +314,7 @@ impl DaemonDevArgs {
                     endpoint: url.to_string(),
                 }
             }
-            _ => service::codex_transport_from_env(false),
+            _ => codex_transport_from_env(false),
         };
 
         DaemonDevExecutionPlan {
@@ -436,7 +438,7 @@ fn execute_daemon_service(
             "create daemon tokio runtime: {error}"
         )))
     })?;
-    runtime.block_on(service::serve(config))?;
+    runtime.block_on(serve::serve(config))?;
     Ok(0)
 }
 

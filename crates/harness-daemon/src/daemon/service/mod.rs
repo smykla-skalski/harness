@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
-use std::env;
 use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::process::id as process_id;
 use std::slice;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -14,7 +12,7 @@ use crate::agents::runtime::signal::{
 };
 use crate::agents::service as agents_service;
 use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
+    AgentRegistration, SessionLogEntry, SessionState, SessionTransition, TaskSource,
 };
 use crate::session::{
     observe as session_observe, service as session_service, storage as session_storage,
@@ -24,7 +22,6 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::AbortHandle;
@@ -32,11 +29,6 @@ use tokio::task::AbortHandle;
 use super::agent_acp::AcpAgentManagerHandle;
 use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
-use super::codex_controller::CodexControllerHandle;
-use super::codex_transport::{self, CodexTransportKind};
-use super::http::{
-    self, CompanionRouteConfig, DaemonHttpAuthMode, DaemonHttpState, RemoteRequestLimitConfig,
-};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 use super::protocol::{
@@ -50,8 +42,6 @@ use super::protocol::{
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
-use super::watch;
-use super::websocket::ReplayBuffer;
 use harness_protocol::daemon::DAEMON_WIRE_VERSION;
 use harness_protocol::daemon::summaries::{
     DaemonControlResponse, HealthResponse, LogLevelResponse, ReadyEventPayload, SetLogLevelRequest,
@@ -98,7 +88,7 @@ pub(crate) enum ObserveLoopState {
 }
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
-static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
+pub(crate) static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
 static SESSION_LIVENESS_REFRESH_CACHE: OnceLock<Mutex<BTreeMap<String, Instant>>> = OnceLock::new();
 
 #[must_use]
@@ -116,7 +106,7 @@ pub(crate) fn observe_sender() -> Option<broadcast::Sender<StreamEvent>> {
 /// `OnceLock`s; registering unconditionally would let a losing caller's
 /// sender end up backing audit pushes while a different caller's runtime
 /// stays the one actually active.
-fn install_observe_runtime(
+pub(crate) fn install_observe_runtime(
     sender: broadcast::Sender<StreamEvent>,
     poll_interval: Duration,
     db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
@@ -173,91 +163,18 @@ pub struct DaemonStatusReport {
     pub diagnostics: DaemonDiagnostics,
 }
 
-#[derive(Debug, Clone)]
-pub struct DaemonServeConfig {
-    pub host: String,
-    pub port: u16,
-    pub auth_mode: DaemonHttpAuthMode,
-    pub remote_domain: Option<String>,
-    pub remote_request_limits: Option<RemoteRequestLimitConfig>,
-    /// Companion service to forward a configured path subtree to. Remote serve
-    /// only; a loopback daemon serves its own routes and nothing else.
-    pub companion: Option<CompanionRouteConfig>,
-    pub poll_interval: Duration,
-    pub observe_interval: Duration,
-    /// Whether the daemon is running inside the macOS App Sandbox.
-    ///
-    /// When true, subprocess-based platform integration (e.g. `launchctl`
-    /// invocations, respawning the daemon binary directly) is disabled and
-    /// surfaces a structured error instead of attempting the operation.
-    pub sandboxed: bool,
-    /// How the daemon should reach its Codex app-server. Sandboxed daemons
-    /// default to WebSocket because they cannot spawn subprocesses; the
-    /// unsandboxed default is stdio. See [`codex_transport_from_env`].
-    pub codex_transport: CodexTransportKind,
-}
-
-impl Default for DaemonServeConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".into(),
-            port: 0,
-            auth_mode: DaemonHttpAuthMode::Local,
-            remote_domain: None,
-            remote_request_limits: None,
-            companion: None,
-            poll_interval: Duration::from_secs(2),
-            observe_interval: Duration::from_secs(5),
-            sandboxed: false,
-            codex_transport: CodexTransportKind::Stdio,
-        }
-    }
-}
-
-/// Resolve the Codex transport kind for a given sandbox mode, consulting
-/// `HARNESS_CODEX_WS_URL`. Delegates to [`codex_transport::codex_transport_from_env`].
-#[must_use]
-pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
-    codex_transport::codex_transport_from_env(sandboxed)
-}
-
 /// Returns true when `HARNESS_SANDBOXED` is set to a truthy value (`1`, `true`, `yes`, `on`).
 #[must_use]
 pub fn sandboxed_from_env() -> bool {
     super::sandboxed_from_env()
 }
 
-/// Returns true when the current working directory is under
-/// `Library/Group Containers/`, which is a strong signal that the process
-/// launched inside the macOS App Sandbox.
-#[must_use]
-pub fn cwd_looks_sandboxed() -> bool {
-    env::current_dir()
-        .ok()
-        .and_then(|path| path.into_os_string().into_string().ok())
-        .is_some_and(|path| path.contains("Library/Group Containers/"))
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-fn log_sandbox_startup(sandboxed: bool) {
-    tracing::info!(sandboxed, "daemon starting");
-    if !sandboxed && cwd_looks_sandboxed() {
-        tracing::warn!(
-            "daemon cwd is under Library/Group Containers/ but HARNESS_SANDBOXED is unset; \
-             subprocess features may fail under the macOS App Sandbox"
-        );
-    }
-}
-
 use crate::daemon::db;
 use crate::daemon::protocol;
-use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod adopt;
 mod direct;
+mod headless_readiness;
 mod improver_apply;
 mod leave;
 mod mutations;
@@ -273,17 +190,11 @@ mod resolved_events;
 mod review_mutations;
 mod review_mutations_async;
 mod review_submit_txn;
-mod reviews;
+pub(crate) mod reviews;
 mod reviews_files;
 mod reviews_github_policy;
 mod reviews_thread_resolve;
 mod reviews_timeline;
-mod serve;
-#[cfg(test)]
-pub(crate) use serve::test_support::{
-    install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
-};
-mod headless_readiness;
 mod session_setup;
 mod session_teardown;
 mod sessions;
@@ -293,7 +204,7 @@ mod signals_async_send;
 mod signals_timeout;
 mod status;
 mod sync_support;
-mod task_board;
+pub(crate) mod task_board;
 pub(crate) use task_board::{validate_read_only_workflow_launch, validate_write_workflow_launch};
 mod task_board_automation_force_cancel;
 #[cfg(test)]
@@ -310,7 +221,7 @@ pub(crate) use task_board_remote_result_import::{
 mod task_board_completion;
 mod task_board_db;
 mod task_board_evaluation;
-mod task_board_github;
+pub(crate) mod task_board_github;
 #[cfg(test)]
 mod task_board_host;
 mod task_board_orchestrator_control;
@@ -318,24 +229,20 @@ mod task_board_orchestrator_db;
 mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
-pub(crate) mod task_board_read_only_coordinator;
-#[cfg(test)]
-mod task_board_read_only_coordinator_tests;
-mod task_board_read_only_runtime;
 pub(crate) mod task_board_remote_controller;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
-mod task_board_workflow_execution;
+pub(crate) mod task_board_workflow_execution;
 #[cfg(test)]
 mod task_board_workflow_execution_tests;
 #[cfg(test)]
 mod task_board_workflow_repository_tests;
-mod task_board_workflow_review;
+pub(crate) mod task_board_workflow_review;
 #[cfg(test)]
 mod task_board_workflow_review_tests;
 #[cfg(test)]
-mod task_board_workflow_test_support;
+pub(crate) mod task_board_workflow_test_support;
 mod task_board_working_copies;
 mod wake_route;
 
@@ -379,6 +286,8 @@ pub(crate) use review_mutations_async::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
     submit_for_review_async, submit_review_async,
 };
+pub(crate) use reviews::policy::spawn_reviews_policy_timer_loop;
+pub(crate) use reviews::policy_event_inbox::spawn_reviews_policy_event_loop;
 pub use reviews::{
     add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
     catalog_review_repositories, clear_reviews_cache, comment_on_reviews, fetch_review_body,
@@ -399,10 +308,6 @@ pub use reviews_files::{
 };
 pub use reviews_thread_resolve::set_review_thread_resolved;
 pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};
-pub use serve::serve;
-pub(crate) use serve::{
-    ShutdownSignalGuard, recover_remote_assignments_before_local_work, serve_remote_https,
-};
 pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
     session_timeline,
@@ -529,8 +434,6 @@ pub(crate) use sync_support::{
     sync_file_state_from_async_db, task_drop_effect_signal_records, write_task_start_signals,
 };
 
-#[cfg(test)]
-pub(crate) use serve::session_import_required;
 #[cfg(test)]
 pub(crate) use sessions::{
     build_timeline_window_response, clear_session_liveness_refresh_cache_entry,
