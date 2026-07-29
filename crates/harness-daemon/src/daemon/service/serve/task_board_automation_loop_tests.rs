@@ -141,8 +141,9 @@ fn retry_delay_is_exponential_and_bounded() {
 #[test]
 fn retry_backoff_blocks_an_already_due_interval() {
     let mut loop_state = AutomationLoopState::new(0);
-    loop_state.last_reconciliation = Instant::now().checked_sub(Duration::from_mins(1)).unwrap();
-    loop_state.retry_not_before = Some(Instant::now() + Duration::from_mins(1));
+    let now = Instant::now();
+    loop_state.last_reconciliation = now.checked_sub(Duration::from_mins(1)).unwrap_or(now);
+    loop_state.retry_not_before = Some(now + Duration::from_mins(1));
 
     assert!(loop_state.last_reconciliation.elapsed() >= Duration::from_secs(1));
     assert!(loop_state.is_backing_off());
