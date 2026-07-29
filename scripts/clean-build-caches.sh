@@ -225,7 +225,11 @@ clean_sccache_caches() {
       [[ "$existing" == "$resolved" ]] && continue 2
     done
     dirs+=("$resolved")
-    size_kb="$(path_size_kb "$dir")"
+    # Size the resolved physical path, not $dir: du -sk on a symlink to a
+    # directory reports 0, so sizing the unresolved path would undercount a
+    # cache reached through a symlinked ~/Library/Caches and could keep an
+    # oversized cache below the threshold.
+    size_kb="$(path_size_kb "$resolved")"
     total_kb=$((total_kb + size_kb))
   done
 
