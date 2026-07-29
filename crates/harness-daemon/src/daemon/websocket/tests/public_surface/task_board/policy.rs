@@ -235,7 +235,7 @@ fn websocket_policy_pipeline_routes_round_trip() {
             )
             .await;
             let promote = response_result(&promote_response);
-            assert_eq!(promote["document"]["mode"].as_str(), Some("enforced"));
+            assert_eq!(promote["revision"].as_u64(), Some(saved_revision));
 
             let audit_response = dispatch(
                 &request(
@@ -249,6 +249,7 @@ fn websocket_policy_pipeline_routes_round_trip() {
             .await;
             let audit = response_result(&audit_response);
             assert_eq!(audit["active_revision"].as_u64(), Some(saved_revision));
+            assert_eq!(audit["mode"].as_str(), Some("enforced"));
             assert_eq!(
                 audit["latest_simulation"]["revision"].as_u64(),
                 Some(saved_revision)
