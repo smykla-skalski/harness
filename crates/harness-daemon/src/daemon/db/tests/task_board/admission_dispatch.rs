@@ -241,7 +241,7 @@ async fn terminal_run_before_dispatch_commit_releases_only_concurrency() {
 
 pub(crate) struct TestDb {
     db: AsyncDaemonDb,
-    _directory: TempDir,
+    directory: TempDir,
 }
 
 impl Deref for TestDb {
@@ -254,7 +254,7 @@ impl Deref for TestDb {
 
 impl TestDb {
     pub(crate) async fn reopen(&self) -> AsyncDaemonDb {
-        AsyncDaemonDb::connect(&self._directory.path().join("harness.db"))
+        AsyncDaemonDb::connect(&self.directory.path().join("harness.db"))
             .await
             .expect("reopen test db")
     }
@@ -272,10 +272,7 @@ pub(super) async fn test_db() -> TestDb {
         .expect("sync session");
     drop(sync_db);
     let db = AsyncDaemonDb::connect(&path).await.expect("open db");
-    TestDb {
-        db,
-        _directory: directory,
-    }
+    TestDb { db, directory }
 }
 
 pub(super) fn admission_policy(concurrency_limit: u64) -> TaskBoardAutomationPolicy {

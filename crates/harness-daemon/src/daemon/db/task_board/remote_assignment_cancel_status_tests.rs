@@ -31,7 +31,7 @@ async fn journaled_cancel_status_survives_restart_and_projects_before_cleanup() 
         cancel
     );
 
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("controller.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("controller.db"))
         .await
         .expect("reopen controller database");
     let durable = reopened

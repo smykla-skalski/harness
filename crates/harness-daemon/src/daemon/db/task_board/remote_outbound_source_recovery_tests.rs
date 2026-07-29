@@ -177,7 +177,7 @@ async fn protected_source_inbox_never_starves_later_expiry_after_restart() {
         .expect("commit protected source inbox");
 
     fixture.db.pool().close().await;
-    let restarted = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let restarted = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart before bounded recovery scan");
     let batch = restarted

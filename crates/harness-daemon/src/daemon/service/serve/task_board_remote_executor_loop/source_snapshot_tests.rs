@@ -33,7 +33,7 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
         async {
             let source = SnapshotSource::new();
             let fixture = remote_executor_fixture(1).await;
-            let target = fixture._temp.path().join("configured-checkout");
+            let target = fixture.temp_dir.path().join("configured-checkout");
             init_repository(&target, "target-only\n");
             configure_executor(&fixture, &target).await;
             let offer = snapshot_offer(&fixture.request, &source);
@@ -54,8 +54,12 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
                 .require_imported()
                 .expect("durable private snapshot ref");
 
-            let db_path = fixture._temp.path().join("executor.db");
-            let RemoteExecutorFixture { db, _temp, .. } = fixture;
+            let db_path = fixture.temp_dir.path().join("executor.db");
+            let RemoteExecutorFixture {
+                db,
+                temp_dir: _guard,
+                ..
+            } = fixture;
             drop(db);
             let reopened = AsyncDaemonDb::connect(&db_path)
                 .await

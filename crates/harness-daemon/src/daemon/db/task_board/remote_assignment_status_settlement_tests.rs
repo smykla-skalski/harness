@@ -67,7 +67,7 @@ async fn terminal_failure_is_provisional_and_immutable_across_restart() {
     ));
     assert_eq!(load_execution(&fixture).await, parent);
 
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("controller.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("controller.db"))
         .await
         .expect("reopen controller database");
     assert_eq!(

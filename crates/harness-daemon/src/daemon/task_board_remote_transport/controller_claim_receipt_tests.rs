@@ -80,7 +80,7 @@ async fn executor_claim_receipt_survives_renewal_terminalization_and_restart() {
     ));
     assert_exact_executor_replay(&fixture.db, &claim, &original_json).await;
 
-    let database_path = fixture._temp.path().join("executor.db");
+    let database_path = fixture.temp_dir.path().join("executor.db");
     drop(fixture.db);
     let restarted = AsyncDaemonDb::connect(&database_path)
         .await

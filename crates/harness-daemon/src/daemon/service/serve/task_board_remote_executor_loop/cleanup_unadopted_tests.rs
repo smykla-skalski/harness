@@ -187,8 +187,12 @@ async fn preclaim_superseded_cleanup_is_restart_safe_and_mutation_free() {
     assert_eq!(active_count(&fixture).await, 0);
     let identity = remote_executor_identity(&superseded).expect("preclaim executor identity");
     let settlement = terminal_settlement(&superseded, RemoteAssignmentWireState::Superseded);
-    let database_path = fixture._temp.path().join("executor.db");
-    let RemoteExecutorFixture { db, _temp, .. } = fixture;
+    let database_path = fixture.temp_dir.path().join("executor.db");
+    let RemoteExecutorFixture {
+        db,
+        temp_dir: _guard,
+        ..
+    } = fixture;
     drop(db);
     let reopened = crate::daemon::db::AsyncDaemonDb::connect(&database_path)
         .await
@@ -336,7 +340,7 @@ pub(super) async fn claimed_executor_workspace() -> (
     PathBuf,
 ) {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture, &origin).await;
     let mut request = fixture.request.clone();
     request.binding.base_revision.clone_from(&revision);

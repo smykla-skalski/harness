@@ -180,7 +180,7 @@ async fn seed_executor_session(
 }
 
 fn provisioned_project_dir(fixture: &ExecutorFixture, workspace_ref: &str) -> String {
-    let checkout = fixture._temp.path().join("checkout");
+    let checkout = fixture.temp_dir.path().join("checkout");
     let project_dir = checkout.join(workspace_ref);
     std::fs::create_dir_all(&project_dir).expect("create remote executor fixture worktree");
     let canonical = project_dir

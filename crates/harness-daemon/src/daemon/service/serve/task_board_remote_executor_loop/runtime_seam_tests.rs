@@ -198,7 +198,7 @@ where
 
 async fn live_claimed_executor() -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let now = Utc::now();
     let offered_at = (now - Duration::seconds(2)).to_rfc3339_opts(SecondsFormat::AutoSi, true);

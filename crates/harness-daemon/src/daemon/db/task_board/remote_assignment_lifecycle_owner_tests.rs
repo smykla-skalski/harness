@@ -91,9 +91,9 @@ async fn prepare_restarted_executor() -> RestartedExecutor {
         persist_executor_run(&fixture, &authorized, &authority, STARTED_AT).await;
     assert_recovery_defers_owned_start(&fixture.db).await;
 
-    let path = fixture._temp.path().join("executor.db");
+    let path = fixture.temp_dir.path().join("executor.db");
     let request = fixture.request.clone();
-    let temp = fixture._temp;
+    let temp = fixture.temp_dir;
     drop(fixture.db);
     let db = AsyncDaemonDb::connect(&path)
         .await

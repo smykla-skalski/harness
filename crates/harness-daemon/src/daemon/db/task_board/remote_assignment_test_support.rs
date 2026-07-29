@@ -49,7 +49,7 @@ pub(super) const SOURCE_REVISION: &str = "11111111111111111111111111111111111111
 
 pub(crate) struct ControllerFixture {
     pub(crate) db: AsyncDaemonDb,
-    pub(crate) _temp: TempDir,
+    pub(crate) temp_dir: TempDir,
     pub(crate) execution: TaskBoardWorkflowExecutionRecord,
     pub(crate) attempt: TaskBoardExecutionAttemptRecord,
     pub(crate) request: RemoteOfferRequest,
@@ -103,7 +103,7 @@ pub(super) async fn controller_fixture_with_retry_attempts(
     );
     ControllerFixture {
         db,
-        _temp: temp,
+        temp_dir: temp,
         execution,
         attempt,
         request,
@@ -126,7 +126,7 @@ pub(super) async fn offer_controller(fixture: &ControllerFixture) -> TaskBoardRe
 
 pub(crate) struct ExecutorFixture {
     pub(crate) db: AsyncDaemonDb,
-    pub(crate) _temp: TempDir,
+    pub(crate) temp_dir: TempDir,
     pub(crate) request: RemoteOfferRequest,
 }
 
@@ -163,7 +163,7 @@ pub(crate) async fn executor_fixture(capacity: u32) -> ExecutorFixture {
     let request = detached_offer("assignment-executor-1", "attempt-key-1");
     ExecutorFixture {
         db,
-        _temp: temp,
+        temp_dir: temp,
         request,
     }
 }

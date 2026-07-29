@@ -164,7 +164,7 @@ async fn assert_settled_source_retention(
     assert_eq!(durable.state, TaskBoardRemoteAssignmentState::Cancelled);
     assert!(durable.cleanup_completed_at.is_some());
     assert!(!source_recovery_owns(&fixture.db, offer).await);
-    let reopened = AsyncDaemonDb::connect(&fixture._temp.path().join("executor.db"))
+    let reopened = AsyncDaemonDb::connect(&fixture.temp_dir.path().join("executor.db"))
         .await
         .expect("restart after outbound source pruning");
     assert!(pruned_outbound_source(&reopened, offer).await);

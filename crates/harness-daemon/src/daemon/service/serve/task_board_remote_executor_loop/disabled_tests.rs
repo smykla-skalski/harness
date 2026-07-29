@@ -108,7 +108,7 @@ async fn start_authority_is_durable_before_checkout_io() {
 #[tokio::test]
 async fn expired_provisioning_permit_cleans_partial_workspace_before_unknown() {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
     let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
@@ -188,7 +188,7 @@ pub(super) async fn claim_start_authority(
 
 async fn live_claimed_fixture() -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
     let fixture = remote_executor_fixture(1).await;
-    let invalid_checkout = fixture._temp.path().join("not-a-repository");
+    let invalid_checkout = fixture.temp_dir.path().join("not-a-repository");
     fs_err::create_dir_all(&invalid_checkout).expect("create non-repository checkout");
     configure_checkout(&fixture.db, &invalid_checkout).await;
     let now = Utc::now();

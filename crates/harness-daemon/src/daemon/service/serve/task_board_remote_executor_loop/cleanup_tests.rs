@@ -85,9 +85,13 @@ async fn settled_unknown_cleanup_releases_capacity_and_survives_restart() {
             );
             assert!(!workspace.exists());
 
-            let database_path = fixture._temp.path().join("executor.db");
+            let database_path = fixture.temp_dir.path().join("executor.db");
             let marker = cleaned.cleanup_completed_at.clone();
-            let RemoteExecutorFixture { db, _temp, .. } = fixture;
+            let RemoteExecutorFixture {
+                db,
+                temp_dir: _guard,
+                ..
+            } = fixture;
             drop(db);
             let reopened = crate::daemon::db::AsyncDaemonDb::connect(&database_path)
                 .await
@@ -235,7 +239,7 @@ async fn started_executor() -> (
     PathBuf,
 ) {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     // Session provisioning canonicalizes origin_path, so the frozen checkout must
     // resolve macOS /var -> /private/var or exact_provisioned_session never matches.
     super::super::disabled_tests::configure_checkout(&fixture.db, &origin).await;

@@ -206,7 +206,7 @@ async fn claimed_cancelled_generation_holds_capacity_until_cleanup_after_restart
         .await
         .expect("settle cancelled generation");
 
-    let database_path = fixture._temp.path().join("executor.db");
+    let database_path = fixture.temp_dir.path().join("executor.db");
     fixture.db.pool().close().await;
     let restarted = AsyncDaemonDb::connect(&database_path)
         .await
@@ -291,7 +291,7 @@ async fn late_cleanup_after_restart_keeps_receipt_until_marker_then_prunes_safel
     );
     assert_eq!(active_count(&fixture).await, 1);
 
-    let database_path = fixture._temp.path().join("executor.db");
+    let database_path = fixture.temp_dir.path().join("executor.db");
     fixture.db.pool().close().await;
     let restarted = AsyncDaemonDb::connect(&database_path)
         .await

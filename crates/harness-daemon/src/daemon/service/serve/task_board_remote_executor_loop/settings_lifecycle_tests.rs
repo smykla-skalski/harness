@@ -49,7 +49,7 @@ async fn compatible_settings_changes_reconcile_started_workers_through_terminal(
 #[tokio::test]
 async fn launch_material_drift_is_durable_stop_only_across_ambiguous_restart() {
     let (fixture, _, started, authority, old_checkout) = Box::pin(adopted_worker()).await;
-    let (replacement, _) = git_repository(&fixture._temp.path().join("replacement"));
+    let (replacement, _) = git_repository(&fixture.temp_dir.path().join("replacement"));
     configure_checkout(&fixture.db, &replacement).await;
     let claim = fixture
         .db
@@ -233,7 +233,7 @@ async fn adopted_worker() -> (
     PathBuf,
 ) {
     let fixture = remote_executor_fixture(1).await;
-    let (origin, revision) = git_repository(fixture._temp.path());
+    let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
     let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
