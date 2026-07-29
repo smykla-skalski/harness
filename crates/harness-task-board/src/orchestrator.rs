@@ -93,7 +93,7 @@ impl TaskBoardOrchestrator {
     ///
     /// # Errors
     /// Returns `CliError` when state, settings, or board items cannot be read.
-    pub fn status(&self) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    pub fn status(&self) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         self.status_from_state(self.state()?)
     }
 
@@ -103,9 +103,9 @@ impl TaskBoardOrchestrator {
     ///
     /// # Errors
     /// Returns `CliError` when `state.json` cannot be read.
-    pub fn state_as_status(&self) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    pub fn state_as_status(&self) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         let state = self.state()?;
-        Ok(TaskBoardOrchestratorStatus {
+        Ok(TaskBoardOrchestratorStatusSnapshot {
             enabled: state.enabled,
             running: state.running,
             step_mode: false,
@@ -122,7 +122,7 @@ impl TaskBoardOrchestrator {
     ///
     /// # Errors
     /// Returns `CliError` when state cannot be read or written.
-    pub fn start(&self) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    pub fn start(&self) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         self.set_running_intent(true, true)
     }
 
@@ -130,7 +130,7 @@ impl TaskBoardOrchestrator {
     ///
     /// # Errors
     /// Returns `CliError` when state cannot be read or written.
-    pub fn stop(&self) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    pub fn stop(&self) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         self.set_running_intent(false, false)
     }
 
@@ -142,7 +142,7 @@ impl TaskBoardOrchestrator {
         &self,
         request: &TaskBoardOrchestratorRunOnceRequest,
         dispatch: F,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError>
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError>
     where
         F: FnOnce(
             &TaskBoardOrchestratorDispatchInput,
@@ -165,7 +165,7 @@ impl TaskBoardOrchestrator {
     pub fn run_autonomous_once<F>(
         &self,
         dispatch: F,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError>
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError>
     where
         F: FnOnce(
             &TaskBoardOrchestratorDispatchInput,
@@ -268,7 +268,7 @@ impl TaskBoardOrchestrator {
         &self,
         prepared: TaskBoardOrchestratorPreparedRun,
         dispatch: DispatchExecutionSummary,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         self.complete_run_with_evaluation(prepared, dispatch, None)
     }
 
@@ -281,7 +281,7 @@ impl TaskBoardOrchestrator {
         prepared: TaskBoardOrchestratorPreparedRun,
         dispatch: DispatchExecutionSummary,
         evaluation: Option<TaskBoardEvaluationSummary>,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         self.finish_run(run_record(RunRecordInput {
             run_id: prepared.run_id,
             started_at: prepared.started_at,
@@ -319,9 +319,9 @@ impl TaskBoardOrchestrator {
     fn status_from_state(
         &self,
         state: TaskBoardOrchestratorState,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         let settings = self.settings()?;
-        Ok(TaskBoardOrchestratorStatus {
+        Ok(TaskBoardOrchestratorStatusSnapshot {
             enabled: state.enabled,
             running: state.running,
             step_mode: settings.step_mode,
@@ -338,7 +338,7 @@ impl TaskBoardOrchestrator {
         &self,
         enabled: bool,
         running: bool,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         let mut state = self.state()?;
         state.enabled = enabled;
         state.running = running;
@@ -367,7 +367,7 @@ impl TaskBoardOrchestrator {
     fn finish_run(
         &self,
         summary: TaskBoardOrchestratorRunSummary,
-    ) -> Result<TaskBoardOrchestratorStatus, CliError> {
+    ) -> Result<TaskBoardOrchestratorStatusSnapshot, CliError> {
         self.save_last_run(summary, TaskBoardOrchestratorTickPhase::Completed)?;
         self.status()
     }
