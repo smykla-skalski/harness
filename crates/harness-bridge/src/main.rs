@@ -3,8 +3,16 @@ use std::thread;
 use std::time::Duration;
 
 use clap::Parser;
+// `BridgeCommand`'s `Execute` impl binds to whichever `command_context`
+// copy compiled alongside it: this crate's own under the default,
+// mirror-backed build, or the real `harness-daemon`'s under
+// `daemon-runtime` (see `src/daemon/mod.rs`'s `bridge` swap). Bringing in
+// the wrong trait compiles clean but leaves `execute()` unresolved.
+#[cfg(not(feature = "daemon-runtime"))]
 use harness_bridge::app::{AppContext, Execute};
 use harness_bridge::daemon::bridge::BridgeCommand;
+#[cfg(feature = "daemon-runtime")]
+use harness_daemon::app::{AppContext, Execute};
 use harness_kernel::errors;
 use harness_telemetry::{RuntimeService, init_tracing_subscriber_for};
 

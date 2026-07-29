@@ -3638,6 +3638,7 @@ dependencies = [
  "fs-err",
  "fs2",
  "harness-agents",
+ "harness-daemon",
  "harness-daemon-client",
  "harness-daemon-root",
  "harness-daemon-state",

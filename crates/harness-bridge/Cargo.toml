@@ -22,6 +22,15 @@ crossterm = "0.29.0"
 fs2 = "0.4.3"
 fs-err = "3.3.0"
 harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["bridge-runtime"] }
+# Optional and gated behind `daemon-runtime`, never this crate's own default
+# (`bridge-runtime`) feature set: only `agent_acp`, `agent_tui`, and `bridge`
+# swap from the `#[path]`-mirrored tree to the real crate (see
+# `src/daemon/mod.rs`). Default features stay on rather than
+# `default-features = false` because those are the same
+# `daemon-runtime`/`standalone-daemon`/`standalone-worker` trio the real
+# `harness-daemon` binary itself always builds with, matching root's own
+# `harness-daemon` dependency.
+harness-daemon = { path = "../harness-daemon", version = "55.0.0", optional = true }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
 harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.0" }
 # Optional: only the `daemon-runtime` build mode needs the task-board runtime
@@ -63,7 +72,13 @@ libc = "0.2"
 [features]
 default = ["bridge-runtime"]
 bridge-runtime = []
-daemon-runtime = ["dep:harness-daemon-state"]
+# `agent_acp`, `agent_tui`, and `bridge` swap to a thin re-export over the
+# real `harness-daemon` crate under this feature (see `src/daemon/mod.rs`):
+# their daemon-only branches assume sibling modules (`service`, `db`,
+# `codex_controller`, `session::service`) this crate never carries on its
+# own, so nothing but the real dependency can satisfy them. `state` needs no
+# such swap; it already gets its daemon-only surface from `harness-daemon-state`.
+daemon-runtime = ["dep:harness-daemon-state", "dep:harness-daemon"]
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
