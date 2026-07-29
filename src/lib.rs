@@ -12,14 +12,15 @@ pub mod app;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub mod daemon;
 // Deliberate public API facade, not scaffolding: `harness::errors`,
-// `harness::kernel`, `harness::workspace` and `harness::sandbox` stay stable
-// paths for consumers of this crate. Code inside the workspace names
-// `harness_kernel::` and `harness_workspace::` directly, so do not add uses of
-// `crate::errors`, `crate::kernel`, `crate::workspace`, `crate::sandbox` or
-// `crate::git` on the strength of these.
-pub use harness_kernel::errors;
+// `harness::kernel`, `harness::workspace`, `harness::sandbox` and
+// `harness::feature_flags` stay stable paths for consumers of this crate.
+// Code inside the workspace names `harness_kernel::`, `harness_workspace::`
+// and `harness_feature_flags::` directly, so do not add uses of
+// `crate::errors`, `crate::kernel`, `crate::workspace`, `crate::sandbox`,
+// `crate::git` or `crate::feature_flags` on the strength of these.
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
-pub mod feature_flags;
+pub use harness_feature_flags::feature_flags;
+pub use harness_kernel::errors;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]
 pub(crate) use harness_workspace::git;
 #[cfg_attr(not(feature = "daemon-runtime"), allow(dead_code, unused_imports))]

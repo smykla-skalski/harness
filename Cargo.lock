@@ -3521,6 +3521,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon-client",
+ "harness-feature-flags",
  "harness-github-api",
  "harness-hooks",
  "harness-infra",
@@ -3700,6 +3701,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon-client",
+ "harness-feature-flags",
  "harness-github-api",
  "harness-hook",
  "harness-hooks",
@@ -3778,6 +3780,15 @@ dependencies = [
  "tracing",
  "user_dirs",
  "uzers",
+]
+
+[[package]]
+name = "harness-feature-flags"
+version = "54.0.0"
+dependencies = [
+ "harness-task-board",
+ "harness-workspace",
+ "temp-env",
 ]
 
 [[package]]
