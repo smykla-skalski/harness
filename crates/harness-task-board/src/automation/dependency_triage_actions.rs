@@ -141,7 +141,7 @@ pub struct TaskBoardDependencyActionAuditRecord {
 
 #[async_trait]
 pub trait TaskBoardDependencyActionAuditSink: Send + Sync {
-    /// Persist one plan admission decision before any registered capability runs.
+    /// Persist one action admission decision before that action's registered capability runs.
     ///
     /// # Errors
     ///
