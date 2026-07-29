@@ -319,7 +319,11 @@ fn a_failed_preparation_does_not_strand_the_ticket_admitting() {
     );
 
     let output = run_harness(&home, &xdg, &["daemon", "stop"]);
-    assert!(output.status.success(), "stop failed: {}", output_text(&output));
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
     wait_for_child_exit(&mut daemon);
 }
 
