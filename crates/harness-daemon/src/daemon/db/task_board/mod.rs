@@ -69,6 +69,7 @@ mod remote_assignment_executor_terminal_contract_tests;
 mod remote_assignment_executor_terminal_test_support;
 #[cfg(test)]
 mod remote_assignment_executor_terminal_tests;
+mod remote_assignment_fencing;
 mod remote_assignment_inbox;
 mod remote_assignment_io_authority;
 mod remote_assignment_lease;
@@ -154,6 +155,7 @@ mod workflow_dispatch_settlement;
 mod workflow_execution_attempts;
 mod workflow_execution_audited_cancel;
 mod workflow_execution_candidates;
+mod workflow_execution_fencing;
 mod workflow_execution_revisions;
 mod workflow_execution_rows;
 mod workflow_executions;

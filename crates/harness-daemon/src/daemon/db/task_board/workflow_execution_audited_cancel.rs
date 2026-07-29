@@ -4,7 +4,8 @@ use super::super::audit::insert_audit_event_if_absent_in_tx;
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::automation_cancel_targets::cancel_target_in_tx;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_stop_fence::{RemoteTargetStopPlan, remote_target_stop_plan_in_tx};
+use super::remote_assignment_fencing::RemoteAssignmentFencing;
+use super::remote_assignment_stop_fence::RemoteTargetStopPlan;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, validate_atomic_execution_attempt_update,
 };
@@ -160,7 +161,9 @@ async fn apply_audited_remote_cancel_in_tx(
         updated_attempt,
         &combined,
     )?;
-    let plan = remote_target_stop_plan_in_tx(transaction, &screened.current, &combined).await?;
+    let plan =
+        AsyncDaemonDb::remote_target_stop_plan_in_tx(transaction, &screened.current, &combined)
+            .await?;
     let record = match plan {
         RemoteTargetStopPlan::PersistCancelIntent(parent) => {
             update_execution_in_tx(transaction, expected_execution, &parent).await?;

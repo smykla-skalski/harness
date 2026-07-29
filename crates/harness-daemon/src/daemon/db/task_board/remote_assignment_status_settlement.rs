@@ -6,9 +6,9 @@ use super::remote_assignment_authority_settlement::adopt_remote_claim_evidence_i
 use super::remote_assignment_io_authority::{active_target_matches, has_remote_io_authority};
 use super::remote_assignment_lease::claim_request_for_record;
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
+use super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::workflow_executions::load_execution_in_tx;
-use super::workflow_terminal::settle_prepared_dispatch_in_tx;
-use crate::daemon::db::CliError;
+use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteClaimRequest, RemoteStatusResponse,
@@ -200,7 +200,7 @@ pub(super) async fn settle_running_status_in_tx(
     if response.state != RemoteAssignmentWireState::Running {
         return Ok(());
     }
-    let prepared = settle_prepared_dispatch_in_tx(transaction, parent).await?;
+    let prepared = AsyncDaemonDb::settle_prepared_dispatch_in_tx(transaction, parent).await?;
     if prepared.changed {
         bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
     }

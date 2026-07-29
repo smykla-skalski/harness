@@ -5,8 +5,8 @@ use super::super::remote_assignment_model::{
     canonical_time, concurrent, load_assignment_in_tx, nonblank, to_i64,
 };
 use super::super::workflow_execution_attempts::update_attempt_in_tx;
+use super::super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
-use super::super::workflow_terminal::project_terminal_execution_in_tx;
 use super::super::{ORCHESTRATOR_CHANGE_SCOPE, items::bump_change_in_tx};
 use super::model::{TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportState};
 use super::storage::require_import;
@@ -166,7 +166,7 @@ async fn persist_manual_recovery_in_tx(
     )
     .await?;
     bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-    project_terminal_execution_in_tx(transaction, &recovery.combined).await?;
+    AsyncDaemonDb::project_terminal_execution_in_tx(transaction, &recovery.combined).await?;
     Ok(())
 }
 

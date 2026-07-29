@@ -4,7 +4,6 @@ use super::{
     TaskBoardRemoteResultAdoptionOutcome, completed_implementation, require_active_adoption_target,
     terminal_adoption_replay_matches,
 };
-use crate::daemon::db::CliError;
 use crate::daemon::db::task_board::remote_assignment_active_fence::{
     TaskBoardRemoteControllerHandoffKind, controller_handoff_matches_in_tx,
 };
@@ -12,7 +11,9 @@ use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, concurrent, load_assignment_in_tx,
 };
 use crate::daemon::db::task_board::remote_result_import::require_adopted_remote_implementation_import_in_tx;
-use crate::daemon::db::task_board::workflow_executions::{cas_mismatch, load_execution_in_tx};
+use crate::daemon::db::task_board::workflow_execution_fencing::WorkflowExecutionFencing;
+use crate::daemon::db::task_board::workflow_executions::load_execution_in_tx;
+use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::{
     TaskBoardExecutionAttemptRecord, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
@@ -61,7 +62,9 @@ pub(super) async fn screen_terminal_adoption_in_tx(
             outcome: Box::new(TaskBoardRemoteResultAdoptionOutcome::Replayed(parent)),
         });
     }
-    if assignment.fencing_epoch != fencing_epoch || cas_mismatch(expected, &parent).is_some() {
+    if assignment.fencing_epoch != fencing_epoch
+        || AsyncDaemonDb::cas_mismatch(expected, &parent).is_some()
+    {
         return Ok(TerminalAdoptionScreen::Settled {
             context: "stale",
             outcome: Box::new(TaskBoardRemoteResultAdoptionOutcome::Stale(parent)),

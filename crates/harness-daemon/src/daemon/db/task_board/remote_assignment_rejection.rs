@@ -14,11 +14,10 @@ use super::remote_assignment_model::{
     to_i64,
 };
 use super::remote_offer_receipts::ensure_rejected_offer_receipt_in_tx;
-use super::workflow_execution_attempts::{
-    insert_attempt_in_tx, update_attempt_in_tx, validate_attempt_phase,
-};
+use super::workflow_execution_attempts::{insert_attempt_in_tx, update_attempt_in_tx};
+use super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
-use crate::daemon::db::{CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteOfferResponse;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
@@ -282,8 +281,8 @@ fn build_fallback(
     };
     validate_task_board_execution_attempt(&fallback)
         .map_err(|error| db_error(format!("validate local fallback attempt: {error}")))?;
-    validate_attempt_phase(parent, &failed)?;
-    validate_attempt_phase(parent, &fallback)?;
+    AsyncDaemonDb::validate_attempt_phase(parent, &failed)?;
+    AsyncDaemonDb::validate_attempt_phase(parent, &fallback)?;
     let mut updated_parent = parent.clone();
     updated_parent.transition.execution_state = TaskBoardExecutionState::Starting;
     updated_parent.ownership.host_id = None;

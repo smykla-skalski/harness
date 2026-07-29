@@ -27,8 +27,8 @@ use super::remote_outbound_sources::{
 use super::remote_source_bundle_reassignment_evidence::{
     SourceReassignmentEvidence, require_reassignment_evidence_in_tx,
 };
-use super::workflow_execution_attempts::attempt_cas_matches;
-use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
+use super::workflow_execution_fencing::WorkflowExecutionFencing;
+use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
@@ -298,8 +298,8 @@ async fn exact_parent_in_tx(
                 && attempt.attempt == expected_attempt.attempt
         })
         .ok_or_else(|| concurrent("source reassignment attempt disappeared"))?;
-    if cas_mismatch(expected_execution, &parent).is_some()
-        || !attempt_cas_matches(expected_attempt, attempt)
+    if AsyncDaemonDb::cas_mismatch(expected_execution, &parent).is_some()
+        || !AsyncDaemonDb::attempt_cas_matches(expected_attempt, attempt)
         || parent.transition.execution_state != TaskBoardExecutionState::Starting
         || attempt.state != TaskBoardAttemptState::Starting
     {

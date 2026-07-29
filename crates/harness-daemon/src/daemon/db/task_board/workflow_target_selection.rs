@@ -2,7 +2,7 @@ use sqlx::{Sqlite, Transaction};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_active_fence::active_remote_assignment_exists_in_tx;
+use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, update_attempt_in_tx, validate_attempt_phase,
 };
@@ -129,7 +129,11 @@ async fn local_target_is_stale_in_tx(
     {
         return Ok(true);
     }
-    active_remote_assignment_exists_in_tx(transaction, &expected_execution.execution_id).await
+    AsyncDaemonDb::active_remote_assignment_exists_in_tx(
+        transaction,
+        &expected_execution.execution_id,
+    )
+    .await
 }
 
 fn build_local_target(

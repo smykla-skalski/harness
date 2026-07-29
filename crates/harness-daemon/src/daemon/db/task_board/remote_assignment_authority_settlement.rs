@@ -8,10 +8,10 @@ use super::remote_assignment_io_authority::{
     has_remote_io_authority, monotonic_time, require_authority_parent,
 };
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
-use super::workflow_execution_attempts::{update_attempt_in_tx, validate_attempt_phase};
+use super::workflow_execution_attempts::update_attempt_in_tx;
+use super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
-use super::workflow_terminal::project_terminal_execution_in_tx;
-use crate::daemon::db::{CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use crate::task_board::remote_wire::wire::{RemoteCancelRequest, RemoteClaimRequest};
 use crate::task_board::{
@@ -96,7 +96,7 @@ pub(super) async fn adopt_remote_claim_evidence_in_tx(
     running_attempt.updated_at = monotonic_time(&current_attempt.updated_at, claimed_at)?;
     validate_task_board_attempt_update(&current_attempt, &running_attempt)
         .map_err(|error| db_error(format!("validate remote claim attempt: {error}")))?;
-    validate_attempt_phase(&parent, &running_attempt)?;
+    AsyncDaemonDb::validate_attempt_phase(&parent, &running_attempt)?;
     let mut updated_parent = parent.clone();
     updated_parent.transition.execution_state = TaskBoardExecutionState::Running;
     updated_parent
@@ -233,7 +233,7 @@ pub(super) async fn project_cancelled_workflow_in_tx(
     cancelled_attempt.completed_at = Some(completed_at.clone());
     validate_task_board_attempt_update(&current_attempt, &cancelled_attempt)
         .map_err(|error| db_error(format!("validate remote cancelled attempt: {error}")))?;
-    validate_attempt_phase(&parent, &cancelled_attempt)?;
+    AsyncDaemonDb::validate_attempt_phase(&parent, &cancelled_attempt)?;
     let mut stopped_parent = parent.clone();
     stopped_parent.transition.execution_state = TaskBoardExecutionState::Cancelled;
     stopped_parent.blocked_reason = None;
@@ -281,7 +281,7 @@ pub(super) async fn project_cancelled_workflow_in_tx(
         settled_at,
     )
     .await?;
-    project_terminal_execution_in_tx(transaction, &combined)
+    AsyncDaemonDb::project_terminal_execution_in_tx(transaction, &combined)
         .await
         .map(|_| ())
 }

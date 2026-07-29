@@ -13,8 +13,8 @@ use super::remote_assignment_io_authority::{
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
 use super::remote_assignment_status_failure::settle_failed_remote_attempt_in_tx;
 use super::workflow_execution_attempts::update_attempt_in_tx;
+use super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::workflow_executions::update_execution_in_tx;
-use super::workflow_terminal::{project_terminal_execution_in_tx, settle_prepared_dispatch_in_tx};
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{RemoteAssignmentWireState, RemoteStatusResponse};
@@ -140,7 +140,8 @@ async fn apply_terminal_adoption_in_tx(
     // the items change itself; the settled dispatch only owes its own bump when
     // nothing else published one.
     let published = if handoff.terminal_parent {
-        let projection = project_terminal_execution_in_tx(transaction, &handoff.combined).await?;
+        let projection =
+            AsyncDaemonDb::project_terminal_execution_in_tx(transaction, &handoff.combined).await?;
         projection.item_changed || projection.admission_released
     } else {
         false
@@ -172,7 +173,7 @@ async fn adopt_terminal_handoff_in_tx(
     response: &RemoteStatusResponse,
     adopted_at: &str,
 ) -> Result<AdoptedHandoff, CliError> {
-    let prepared = settle_prepared_dispatch_in_tx(transaction, parent).await?;
+    let prepared = AsyncDaemonDb::settle_prepared_dispatch_in_tx(transaction, parent).await?;
     let (combined, updated_attempt, terminal_parent) = match response.state {
         RemoteAssignmentWireState::Completed => {
             let artifact = load_completed_artifact(

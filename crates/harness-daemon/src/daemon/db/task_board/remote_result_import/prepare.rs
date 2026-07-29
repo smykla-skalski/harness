@@ -8,14 +8,13 @@ use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
 use super::super::remote_assignment_io_authority::monotonic_time;
 use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
-use super::super::workflow_executions::{
-    cas_mismatch, load_execution_in_tx, update_execution_in_tx,
-};
+use super::super::workflow_execution_fencing::WorkflowExecutionFencing;
+use super::super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use super::evidence::{ImportMaterials, load_import_materials};
 use super::model::{TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportRequest};
 use super::storage::{insert_import_in_tx, load_import_in_tx, prepared_import};
 use super::{exact_assignment, require_exact_replay, require_import_authority_available};
-use crate::daemon::db::{CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, validate_task_board_workflow_execution,
@@ -41,7 +40,7 @@ pub(super) async fn load_result_import_target_in_tx(
     let parent = load_execution_in_tx(transaction, &assignment.execution_id)
         .await?
         .ok_or_else(|| concurrent("remote result import execution disappeared"))?;
-    if cas_mismatch(expected, &parent).is_some() {
+    if AsyncDaemonDb::cas_mismatch(expected, &parent).is_some() {
         return Err(concurrent(
             "remote result import lost its exact parent record",
         ));

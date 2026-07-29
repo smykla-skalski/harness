@@ -2,8 +2,7 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_io_authority::has_remote_io_authority;
-use super::remote_assignment_stop_fence::remote_stop_requires_cancellation;
+use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::load_execution_attempts_in_tx;
 use super::workflow_execution_rows::{WorkflowExecutionRow, execution_json, label, phase_label};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
@@ -379,7 +378,7 @@ pub(super) fn ensure_terminal_transition_has_no_active_side_effect(
         && is_stopped(updated.transition.execution_state);
     if stops
         && has_active_external_side_effect(current)
-        && !remote_stop_requires_cancellation(current, updated)
+        && !AsyncDaemonDb::remote_stop_requires_cancellation(current, updated)
     {
         return Err(CliErrorKind::concurrent_modification(
             "workflow execution has an admitted external side effect",
@@ -390,7 +389,7 @@ pub(super) fn ensure_terminal_transition_has_no_active_side_effect(
 }
 
 fn has_active_external_side_effect(execution: &TaskBoardWorkflowExecutionRecord) -> bool {
-    has_remote_io_authority(execution)
+    AsyncDaemonDb::has_remote_io_authority(execution)
         || execution
             .ownership
             .resources
