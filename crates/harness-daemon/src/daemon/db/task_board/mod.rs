@@ -31,6 +31,7 @@ mod mapper;
 mod orchestrator_settings_queries;
 mod policy_queues;
 mod policy_runs;
+mod policy_runtime_queries;
 mod project_registry_queries;
 mod project_shapes;
 mod projects;

@@ -8,6 +8,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::POLICY_RUNTIME_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::mapper::{parse_json, to_json};
+use super::policy_runtime_queries::PolicyRuntimeQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::policy_runtime::handoff_outbox::HandoffRecord;
 use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;
@@ -45,21 +46,11 @@ impl AsyncDaemonDb {
         event: PolicyWorkflowEvent,
         now: DateTime<Utc>,
     ) -> Result<i64, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("policy event publish")
-            .await?;
-        let mut events = load_events(transaction.as_mut()).await?;
-        events.retain(|stored| {
-            !expired(&stored.occurred_at, now)
-                && (stored.event_key != event.event_key || stored.subject_key != event.subject_key)
-        });
-        events.push(event);
-        write_events(&mut transaction, &events).await?;
-        commit_policy_queue_change(transaction, "policy event publish").await
+        <Self as PolicyRuntimeQueries>::publish_policy_event_at(self, event, now).await
     }
 
     pub(crate) async fn pending_policy_events(&self) -> Result<Vec<PolicyWorkflowEvent>, CliError> {
-        load_events(self.pool()).await
+        <Self as PolicyRuntimeQueries>::pending_policy_events(self).await
     }
 
     pub(crate) async fn remove_delivered_policy_events_at(
@@ -67,15 +58,8 @@ impl AsyncDaemonDb {
         delivered: &[PolicyWorkflowEvent],
         now: DateTime<Utc>,
     ) -> Result<i64, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("policy event delivery")
-            .await?;
-        let mut events = load_events(transaction.as_mut()).await?;
-        events.retain(|event| {
-            !expired(&event.occurred_at, now) && !delivered.iter().any(|removed| removed == event)
-        });
-        write_events(&mut transaction, &events).await?;
-        commit_policy_queue_change(transaction, "policy event delivery").await
+        <Self as PolicyRuntimeQueries>::remove_delivered_policy_events_at(self, delivered, now)
+            .await
     }
 
     pub(crate) async fn record_policy_handoff_at(
@@ -83,12 +67,11 @@ impl AsyncDaemonDb {
         record: HandoffRecord,
         now: DateTime<Utc>,
     ) -> Result<i64, CliError> {
-        self.append_outbox_record(HANDOFF_SQL, "policy handoff", record, now)
-            .await
+        <Self as PolicyRuntimeQueries>::record_policy_handoff_at(self, record, now).await
     }
 
     pub(crate) async fn policy_handoff_records(&self) -> Result<Vec<HandoffRecord>, CliError> {
-        load_outbox(self, HANDOFF_SQL, "policy handoff").await
+        <Self as PolicyRuntimeQueries>::policy_handoff_records(self).await
     }
 
     pub(crate) async fn record_policy_notification_at(
@@ -96,14 +79,13 @@ impl AsyncDaemonDb {
         record: NotificationRecord,
         now: DateTime<Utc>,
     ) -> Result<i64, CliError> {
-        self.append_outbox_record(NOTIFICATION_SQL, "policy notification", record, now)
-            .await
+        <Self as PolicyRuntimeQueries>::record_policy_notification_at(self, record, now).await
     }
 
     pub(crate) async fn policy_notification_records(
         &self,
     ) -> Result<Vec<NotificationRecord>, CliError> {
-        load_outbox(self, NOTIFICATION_SQL, "policy notification").await
+        <Self as PolicyRuntimeQueries>::policy_notification_records(self).await
     }
 
     pub(crate) async fn record_policy_task_creation_at(
@@ -111,33 +93,119 @@ impl AsyncDaemonDb {
         record: TaskCreationRecord,
         now: DateTime<Utc>,
     ) -> Result<i64, CliError> {
-        self.append_outbox_record(TASK_CREATION_SQL, "policy task creation", record, now)
-            .await
+        <Self as PolicyRuntimeQueries>::record_policy_task_creation_at(self, record, now).await
     }
 
     pub(crate) async fn policy_task_creation_records(
         &self,
     ) -> Result<Vec<TaskCreationRecord>, CliError> {
-        load_outbox(self, TASK_CREATION_SQL, "policy task creation").await
+        <Self as PolicyRuntimeQueries>::policy_task_creation_records(self).await
     }
+}
 
-    async fn append_outbox_record<T>(
-        &self,
-        sql: OutboxSql,
-        context: &'static str,
-        record: T,
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError>
-    where
-        T: Serialize + DeserializeOwned + RecordedAt,
-    {
-        let mut transaction = self.begin_immediate_transaction(context).await?;
-        let mut records = load_outbox_in_tx(&mut transaction, sql, context).await?;
-        records.retain(|stored: &T| !expired(stored.recorded_at(), now));
-        records.push(record);
-        write_outbox(&mut transaction, sql, context, &records).await?;
-        commit_policy_queue_change(transaction, context).await
-    }
+/// Real implementations behind the matching [`PolicyRuntimeQueries`] methods,
+/// called from the single consolidated trait impl in
+/// `policy_runtime_queries.rs` (a trait's methods can only be implemented in
+/// one `impl` block per type, so this file hands it plain functions instead
+/// of declaring its own `impl PolicyRuntimeQueries for AsyncDaemonDb`).
+pub(super) async fn publish_policy_event_at(
+    db: &AsyncDaemonDb,
+    event: PolicyWorkflowEvent,
+    now: DateTime<Utc>,
+) -> Result<i64, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("policy event publish")
+        .await?;
+    let mut events = load_events(transaction.as_mut()).await?;
+    events.retain(|stored| {
+        !expired(&stored.occurred_at, now)
+            && (stored.event_key != event.event_key || stored.subject_key != event.subject_key)
+    });
+    events.push(event);
+    write_events(&mut transaction, &events).await?;
+    commit_policy_queue_change(transaction, "policy event publish").await
+}
+
+pub(super) async fn pending_policy_events(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<PolicyWorkflowEvent>, CliError> {
+    load_events(db.pool()).await
+}
+
+pub(super) async fn remove_delivered_policy_events_at(
+    db: &AsyncDaemonDb,
+    delivered: &[PolicyWorkflowEvent],
+    now: DateTime<Utc>,
+) -> Result<i64, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("policy event delivery")
+        .await?;
+    let mut events = load_events(transaction.as_mut()).await?;
+    events.retain(|event| {
+        !expired(&event.occurred_at, now) && !delivered.iter().any(|removed| removed == event)
+    });
+    write_events(&mut transaction, &events).await?;
+    commit_policy_queue_change(transaction, "policy event delivery").await
+}
+
+pub(super) async fn record_policy_handoff_at(
+    db: &AsyncDaemonDb,
+    record: HandoffRecord,
+    now: DateTime<Utc>,
+) -> Result<i64, CliError> {
+    append_outbox_record(db, HANDOFF_SQL, "policy handoff", record, now).await
+}
+
+pub(super) async fn policy_handoff_records(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<HandoffRecord>, CliError> {
+    load_outbox(db, HANDOFF_SQL, "policy handoff").await
+}
+
+pub(super) async fn record_policy_notification_at(
+    db: &AsyncDaemonDb,
+    record: NotificationRecord,
+    now: DateTime<Utc>,
+) -> Result<i64, CliError> {
+    append_outbox_record(db, NOTIFICATION_SQL, "policy notification", record, now).await
+}
+
+pub(super) async fn policy_notification_records(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<NotificationRecord>, CliError> {
+    load_outbox(db, NOTIFICATION_SQL, "policy notification").await
+}
+
+pub(super) async fn record_policy_task_creation_at(
+    db: &AsyncDaemonDb,
+    record: TaskCreationRecord,
+    now: DateTime<Utc>,
+) -> Result<i64, CliError> {
+    append_outbox_record(db, TASK_CREATION_SQL, "policy task creation", record, now).await
+}
+
+pub(super) async fn policy_task_creation_records(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskCreationRecord>, CliError> {
+    load_outbox(db, TASK_CREATION_SQL, "policy task creation").await
+}
+
+async fn append_outbox_record<T>(
+    db: &AsyncDaemonDb,
+    sql: OutboxSql,
+    context: &'static str,
+    record: T,
+    now: DateTime<Utc>,
+) -> Result<i64, CliError>
+where
+    T: Serialize + DeserializeOwned + RecordedAt,
+{
+    let mut transaction = db.begin_immediate_transaction(context).await?;
+    let mut records = load_outbox_in_tx(&mut transaction, sql, context).await?;
+    records.retain(|stored: &T| !expired(stored.recorded_at(), now));
+    records.push(record);
+    write_outbox(&mut transaction, sql, context, &records).await?;
+    commit_policy_queue_change(transaction, context).await
 }
 
 trait RecordedAt {
