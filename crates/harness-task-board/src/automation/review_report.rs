@@ -47,6 +47,7 @@ pub struct TaskBoardAiReviewReportRecord {
     pub item_id: String,
     pub correlation_id: String,
     pub repository: String,
+    #[schema(minimum = 1)]
     pub pull_request_number: u64,
     pub head_revision: String,
     pub runtime: String,

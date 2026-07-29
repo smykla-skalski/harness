@@ -28682,7 +28682,7 @@
           "pull_request_number": {
             "type": "integer",
             "format": "int64",
-            "minimum": 0
+            "minimum": 1
           },
           "report_id": {
             "type": "string"
