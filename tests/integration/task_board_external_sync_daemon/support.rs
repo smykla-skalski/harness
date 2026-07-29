@@ -19,6 +19,7 @@ pub(super) struct FakeSyncClient {
     pushed: Mutex<Vec<String>>,
     allows_delete: bool,
     authoritative_review_inbox: bool,
+    scope_id: String,
     deleted: Arc<Mutex<Vec<String>>>,
 }
 
@@ -30,6 +31,9 @@ impl FakeSyncClient {
             pushed: Mutex::new(Vec::new()),
             allows_delete: false,
             authoritative_review_inbox: false,
+            // Not the provider name, which is not a repository slug and so
+            // cannot pass validation as a GitHub create target.
+            scope_id: "acme/widgets".into(),
             deleted: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -39,6 +43,21 @@ impl FakeSyncClient {
             .lock()
             .expect("push log should not be poisoned")
             .clone()
+    }
+
+    /// Marks this client as the authoritative review inbox, so a pull whose
+    /// tasks omit an imported review request may close that ticket. A real
+    /// inbox client reports this only after a complete pull.
+    pub(super) fn with_authoritative_review_inbox(mut self) -> Self {
+        self.authoritative_review_inbox = true;
+        self
+    }
+
+    /// Overrides the repository scope this client owns, letting a test place a
+    /// fixture ticket under the same slug the client reconciles.
+    pub(super) fn with_scope(mut self, scope_id: &str) -> Self {
+        self.scope_id = scope_id.to_owned();
+        self
     }
 }
 
@@ -52,10 +71,8 @@ impl ExternalSyncClient for FakeSyncClient {
         Some(self)
     }
 
-    // The default scope is the provider name, which is not a repository slug
-    // and so cannot pass validation as a GitHub create target.
     fn scope_id(&self) -> String {
-        "acme/widgets".into()
+        self.scope_id.clone()
     }
 
     fn allows_delete(&self) -> bool {

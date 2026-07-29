@@ -13,7 +13,7 @@ use crate::reviews::{ReviewItem, ReviewPullRequestState, ReviewsQueryRequest};
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncDirection, ExternalSyncOperation,
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
-    normalize_repository_slug, sync_external_tasks,
+    TaskBoardWorkflowKind, normalize_repository_slug, sync_external_tasks,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -296,8 +296,19 @@ fn review_external_task(item: &ReviewItem) -> ExternalTask {
         status: TaskBoardStatus::Inbox,
         project_id: Some(item.repository.clone()),
         updated_at: Some(item.updated_at.to_rfc3339_opts(SecondsFormat::Secs, true)),
+        // A review request carries the same intent, author, and exact head the
+        // inbox classifier records, so the ticket can freeze onto that revision
+        // and combine with a dependency intent instead of importing as a
+        // generic task that loses both.
+        workflow_kind: TaskBoardWorkflowKind::PrReview,
+        pr_head_revision: non_empty(&item.head_sha),
+        pr_author: non_empty(&item.author_login),
         ..ExternalTask::default()
     }
+}
+
+fn non_empty(value: &str) -> Option<String> {
+    (!value.trim().is_empty()).then(|| value.to_owned())
 }
 
 #[cfg(test)]

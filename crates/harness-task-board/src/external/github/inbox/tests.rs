@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -250,6 +251,117 @@ async fn github_inbox_folds_a_pull_request_with_both_intents_into_one_ticket() {
 }
 
 #[tokio::test]
+async fn github_inbox_assigned_only_still_discovers_dependency_pull_requests() {
+    let _guard = acquire_global_budget_test_lock().await;
+    // An assigned-only client skips the review-request search yet must still
+    // find the dependency-only pull request, its sole discovery source.
+    let (endpoint, requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(
+            200,
+            search_response_with_pull_request(
+                12,
+                "https://example.test/good/pull/12",
+                "abc123",
+                "renovate[bot]",
+            ),
+        ),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+    ]);
+    let client = assigned_only_inbox_client(&endpoint, &["good/repo"]);
+
+    let tasks = client.pull_tasks().await.expect("assigned-only inbox pull");
+
+    handle.join().expect("mock server");
+    let requests = requests.lock().expect("requests");
+    // viewer + assigned + two dependency-bot searches + dependency label, and
+    // no review-request search.
+    assert_eq!(requests.len(), 5);
+    assert!(
+        requests
+            .iter()
+            .all(|request| !request.contains("review-requested"))
+    );
+    assert!(requests[2].contains("author:renovate[bot]"));
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].workflow_kind, TaskBoardWorkflowKind::PrFix);
+    assert_eq!(tasks[0].pr_head_revision.as_deref(), Some("abc123"));
+    assert!(
+        !client.authoritative_review_inbox(),
+        "an assigned-only client never closes review tickets"
+    );
+}
+
+#[tokio::test]
+async fn github_inbox_incomplete_pull_drops_authoritative_review_inbox() {
+    let _guard = acquire_global_budget_test_lock().await;
+    // The review-request search fails while the assigned search succeeds, so
+    // the pull returns partial results and must not stay authoritative: a
+    // ticket whose pull request is missing only behind the failure would
+    // otherwise be closed.
+    let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(
+            200,
+            search_response_with_issue("https://example.test/good/7"),
+        ),
+        MockResponse::json(
+            422,
+            json!({
+                "message": "Validation Failed",
+                "errors": [{
+                    "message": "review search failed",
+                    "resource": "Search",
+                    "field": "q",
+                    "code": "invalid"
+                }]
+            }),
+        ),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+    ]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
+    assert!(
+        client.authoritative_review_inbox(),
+        "a review-importing client starts authoritative"
+    );
+
+    let tasks = client.pull_tasks().await.expect("partial inbox pull");
+
+    handle.join().expect("mock server");
+    assert_eq!(tasks.len(), 1);
+    assert!(
+        !client.authoritative_review_inbox(),
+        "a pull that skipped a failed query must not act authoritative"
+    );
+}
+
+#[tokio::test]
+async fn github_inbox_complete_pull_keeps_authoritative_review_inbox() {
+    let _guard = acquire_global_budget_test_lock().await;
+    let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(200, empty_search_response()),
+    ]);
+    let client = inbox_client_with_base_uri(&endpoint, &["good/repo"]);
+
+    client.pull_tasks().await.expect("inbox pull");
+
+    handle.join().expect("mock server");
+    assert!(
+        client.authoritative_review_inbox(),
+        "a pull with every query succeeding stays authoritative"
+    );
+}
+
+#[tokio::test]
 async fn github_inbox_pull_fails_when_no_repository_can_be_pulled() {
     let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
@@ -303,7 +415,14 @@ fn inbox_client_with_base_uri(base_uri: &str, repositories: &[&str]) -> GitHubIn
         repositories,
         import_labels: Vec::new(),
         include_review_requests: true,
+        last_pull_complete: Arc::new(AtomicBool::new(true)),
     }
+}
+
+fn assigned_only_inbox_client(base_uri: &str, repositories: &[&str]) -> GitHubInboxSyncClient {
+    let mut client = inbox_client_with_base_uri(base_uri, repositories);
+    client.include_review_requests = false;
+    client
 }
 
 fn search_response_with_issue(url: &str) -> serde_json::Value {
