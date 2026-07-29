@@ -13,6 +13,8 @@ pub(super) const METHOD_THREAD_RESUME: &str = "thread/resume";
 pub(super) const METHOD_TURN_START: &str = "turn/start";
 pub(super) const METHOD_TURN_STEER: &str = "turn/steer";
 pub(super) const METHOD_TURN_INTERRUPT: &str = "turn/interrupt";
+pub(super) const MODEL_MISMATCH_DETAIL: &str =
+    "codex app-server model mismatch: unsupported model selection";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum AppServerNotification {
@@ -133,10 +135,8 @@ pub(super) fn turn_interrupt_params(thread_id: &str, turn_id: &str) -> Result<Va
     )
 }
 
-pub(super) fn thread_id_from_result(result: &Value) -> Option<String> {
-    serde_json::from_value::<ThreadResult>(result.clone())
-        .ok()
-        .map(|result| result.thread.id)
+pub(super) fn thread_result_from_result(result: &Value) -> Option<ThreadResult> {
+    serde_json::from_value(result.clone()).ok()
 }
 
 pub(super) fn turn_id_from_result(result: &Value) -> Option<String> {
@@ -286,9 +286,10 @@ enum InputItem<'a> {
     Text { text: &'a str },
 }
 
-#[derive(Deserialize)]
-struct ThreadResult {
-    thread: IdRef,
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+pub(super) struct ThreadResult {
+    pub(super) thread: IdRef,
+    pub(super) model: String,
 }
 
 #[derive(Deserialize)]
@@ -296,9 +297,9 @@ struct TurnResult {
     turn: IdRef,
 }
 
-#[derive(Deserialize)]
-struct IdRef {
-    id: String,
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+pub(super) struct IdRef {
+    pub(super) id: String,
 }
 
 #[derive(Deserialize)]

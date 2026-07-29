@@ -9,7 +9,7 @@ use crate::daemon::remote_redaction::redact_known_secrets;
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::CodexControllerHandle;
+use super::{CodexControllerHandle, wire};
 
 #[derive(Clone)]
 pub struct CodexAgentTurnRuntime {
@@ -88,6 +88,7 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
         if snapshot.status != CodexRunStatus::Completed {
             return Ok(None);
         }
+        let effective_model = codex_effective_model(&snapshot);
         let report = snapshot
             .final_message
             .filter(|report| !report.trim().is_empty())
@@ -100,8 +101,8 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
             correlation_id: id.clone(),
             report,
             stop_reason: "end_turn".into(),
-            requested_model: snapshot.model.clone(),
-            effective_model: snapshot.model,
+            requested_model: snapshot.model,
+            effective_model,
         }))
     }
 
@@ -125,14 +126,31 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
     }
 }
 
+fn codex_effective_model(snapshot: &CodexRunSnapshot) -> Option<String> {
+    snapshot.events.iter().rev().find_map(|event| {
+        if !matches!(event.kind.as_str(), "thread/start" | "thread/resume") {
+            return None;
+        }
+        event.payload.get("model")?.as_str().map(ToOwned::to_owned)
+    })
+}
+
 fn codex_failure(error: Option<&str>) -> AgentTurnFailure {
     let raw_detail = error.unwrap_or("Codex execution failed without an error detail");
     let category = AgentTurnFailureCategory::from_message(raw_detail);
-    AgentTurnFailure::new(
-        category,
-        AgentTurnFailureStage::Execution,
-        bounded_redacted_detail(raw_detail),
-    )
+    let stage = if is_model_mismatch(raw_detail) {
+        AgentTurnFailureStage::Start
+    } else {
+        AgentTurnFailureStage::Execution
+    };
+    AgentTurnFailure::new(category, stage, bounded_redacted_detail(raw_detail))
+}
+
+fn is_model_mismatch(detail: &str) -> bool {
+    detail
+        .strip_prefix("[WORKFLOW_PARSE] ")
+        .unwrap_or(detail)
+        .starts_with(wire::MODEL_MISMATCH_DETAIL)
 }
 
 fn bounded_redacted_detail(detail: &str) -> String {

@@ -12,6 +12,8 @@ use crate::daemon::protocol::{
     CodexApprovalDecision, CodexApprovalRequest, CodexRunMode, StreamEvent,
 };
 
+const SPARK_MODEL: &str = "gpt-5.3-codex-spark";
+
 #[tokio::test]
 async fn initialize_sends_initialized_notification_before_thread_requests() {
     let (_control_tx, control_rx) = mpsc::unbounded_channel();
@@ -43,6 +45,123 @@ async fn initialize_sends_initialized_notification_before_thread_requests() {
         serde_json::from_str(frames.get(1).expect("initialized frame")).expect("initialized json");
     assert_eq!(initialize["method"], json!(wire::METHOD_INITIALIZE));
     assert_eq!(initialized, json!({ "method": wire::METHOD_INITIALIZED }));
+}
+
+#[tokio::test]
+async fn thread_start_sends_requested_model_and_records_effective_model() {
+    let (controller, _db, _tempdir) = super::super::tests::test_support::controller_with_db();
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot =
+        super::super::tests::test_support::codex_run_snapshot(CodexRunStatus::Running);
+    snapshot.thread_id = None;
+    snapshot.turn_id = None;
+    snapshot.model = Some(SPARK_MODEL.to_string());
+    let mut worker = CodexRunWorker::new(controller, snapshot, control_rx);
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let recv = Arc::new(Mutex::new(VecDeque::from([json!({
+        "id": 1,
+        "result": {
+            "thread": { "id": "thread-spark" },
+            "model": SPARK_MODEL
+        }
+    })
+    .to_string()])));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport {
+        sent: Arc::clone(&sent),
+        recv,
+    }));
+
+    worker
+        .start_or_resume_thread(&mut rpc)
+        .await
+        .expect("matching Spark model should start the thread");
+
+    let frame: serde_json::Value = serde_json::from_str(
+        sent.lock()
+            .expect("sent frames")
+            .first()
+            .expect("thread frame"),
+    )
+    .expect("thread frame json");
+    assert_eq!(frame["method"], wire::METHOD_THREAD_START);
+    assert_eq!(frame["params"]["model"], SPARK_MODEL);
+    assert_eq!(worker.snapshot.thread_id.as_deref(), Some("thread-spark"));
+    assert_eq!(
+        worker.snapshot.events.last().map(|event| &event.payload),
+        Some(&json!({
+            "thread": { "id": "thread-spark" },
+            "model": SPARK_MODEL
+        }))
+    );
+}
+
+#[tokio::test]
+async fn thread_start_rejects_model_mismatch_before_turn_start() {
+    let (controller, _db, _tempdir) = super::super::tests::test_support::controller_with_db();
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot =
+        super::super::tests::test_support::codex_run_snapshot(CodexRunStatus::Running);
+    snapshot.thread_id = None;
+    snapshot.turn_id = None;
+    snapshot.model = Some(SPARK_MODEL.to_string());
+    let mut worker = CodexRunWorker::new(controller, snapshot, control_rx);
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let recv = Arc::new(Mutex::new(VecDeque::from([json!({
+        "id": 1,
+        "result": {
+            "thread": { "id": "thread-default" },
+            "model": "gpt-5.5"
+        }
+    })
+    .to_string()])));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport {
+        sent: Arc::clone(&sent),
+        recv,
+    }));
+
+    let error = worker
+        .start_or_resume_thread(&mut rpc)
+        .await
+        .expect_err("a mismatched effective model must fail");
+
+    assert!(error.to_string().contains(SPARK_MODEL));
+    assert!(error.to_string().contains("gpt-5.5"));
+    assert_eq!(sent.lock().expect("sent frames").len(), 1);
+    assert_eq!(worker.snapshot.thread_id, None);
+    assert_eq!(worker.snapshot.turn_id, None);
+    assert!(worker.snapshot.events.is_empty());
+}
+
+#[tokio::test]
+async fn thread_start_reports_an_invalid_response_shape() {
+    let (controller, _db, _tempdir) = super::super::tests::test_support::controller_with_db();
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot =
+        super::super::tests::test_support::codex_run_snapshot(CodexRunStatus::Running);
+    snapshot.thread_id = None;
+    snapshot.turn_id = None;
+    snapshot.model = Some(SPARK_MODEL.to_string());
+    let mut worker = CodexRunWorker::new(controller, snapshot, control_rx);
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let recv = Arc::new(Mutex::new(VecDeque::from([json!({
+        "id": 1,
+        "result": {
+            "thread": { "id": 42 },
+            "model": ["gpt-5.5"]
+        }
+    })
+    .to_string()])));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport { sent, recv }));
+
+    let error = worker
+        .start_or_resume_thread(&mut rpc)
+        .await
+        .expect_err("invalid thread response shape must fail");
+
+    assert!(error.to_string().contains("invalid thread response shape"));
+    assert_eq!(worker.snapshot.thread_id, None);
+    assert_eq!(worker.snapshot.turn_id, None);
+    assert!(worker.snapshot.events.is_empty());
 }
 
 #[tokio::test]

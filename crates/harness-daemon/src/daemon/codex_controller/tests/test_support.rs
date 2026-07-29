@@ -43,7 +43,7 @@ pub(super) fn codex_approval_request(
     }
 }
 
-pub(super) fn controller_with_db() -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
+pub(crate) fn controller_with_db() -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
     controller_with_session_state(sample_session_state())
 }
 
@@ -280,7 +280,7 @@ fn add_open_task(state: &mut SessionState) {
     .expect("create task");
 }
 
-pub(super) fn codex_run_snapshot(status: CodexRunStatus) -> CodexRunSnapshot {
+pub(crate) fn codex_run_snapshot(status: CodexRunStatus) -> CodexRunSnapshot {
     CodexRunSnapshot {
         run_id: "codex-run-1".into(),
         session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
