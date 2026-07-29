@@ -12,6 +12,7 @@ use super::remote_claim_receipts::{claim_receipt_values, exact_claim_response};
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteClaimRequest, RemoteClaimResponse};
@@ -24,37 +25,54 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         observed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        validate_claim_exchange(request, response, authenticated_principal)?;
-        let claimed = canonical_time(&response.claimed_at, "remote claim response time")?;
-        let observed = canonical_time(observed_at, "remote claim observation time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote claim response")
-            .await?;
-        let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        let window = claim_window(&record, request, response, claimed, authenticated_principal)?;
-        if let Some(refusal) = window.refusal {
-            commit_noop(transaction, refusal.reason()).await?;
-            return Ok(refusal.outcome(record));
-        }
-        consume_controller_operation_trust_in_tx(
-            &mut transaction,
-            &record,
-            TaskBoardRemoteOperationKind::Claim,
-            &request.request_sha256,
-        )
-        .await?;
-        let observed_after_fence = window.lease_expiry.is_some_and(|expiry| observed >= expiry)
-            || window.deadline.is_some_and(|deadline| observed >= deadline);
-        settle_claim_response_in_tx(
-            transaction,
-            &record,
+        <Self as RemoteExecutionQueries>::record_task_board_remote_assignment_claim(
+            self,
             request,
             response,
+            authenticated_principal,
             observed_at,
-            observed_after_fence,
         )
         .await
     }
+}
+
+pub(super) async fn record_task_board_remote_assignment_claim(
+    db: &AsyncDaemonDb,
+    request: &RemoteClaimRequest,
+    response: &RemoteClaimResponse,
+    authenticated_principal: &str,
+    observed_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    validate_claim_exchange(request, response, authenticated_principal)?;
+    let claimed = canonical_time(&response.claimed_at, "remote claim response time")?;
+    let observed = canonical_time(observed_at, "remote claim observation time")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote claim response")
+        .await?;
+    let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    let window = claim_window(&record, request, response, claimed, authenticated_principal)?;
+    if let Some(refusal) = window.refusal {
+        commit_noop(transaction, refusal.reason()).await?;
+        return Ok(refusal.outcome(record));
+    }
+    consume_controller_operation_trust_in_tx(
+        &mut transaction,
+        &record,
+        TaskBoardRemoteOperationKind::Claim,
+        &request.request_sha256,
+    )
+    .await?;
+    let observed_after_fence = window.lease_expiry.is_some_and(|expiry| observed >= expiry)
+        || window.deadline.is_some_and(|deadline| observed >= deadline);
+    settle_claim_response_in_tx(
+        transaction,
+        &record,
+        request,
+        response,
+        observed_at,
+        observed_after_fence,
+    )
+    .await
 }
 
 fn validate_claim_exchange(

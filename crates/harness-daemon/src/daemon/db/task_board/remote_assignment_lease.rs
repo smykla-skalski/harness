@@ -12,6 +12,7 @@ use super::remote_assignment_model::{
 use super::remote_claim_receipts::{
     claim_receipt_values, claim_response_for_record, exact_claim_response,
 };
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::RemoteClaimResponse;
@@ -27,35 +28,13 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         claimed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote assignment claim: {error}")))?;
-        nonblank(
-            authenticated_principal,
-            "remote assignment authenticated principal",
-        )?;
-        canonical_time(claimed_at, "remote assignment claim time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote assignment claim")
-            .await?;
-        let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if let Some(outcome) = claim_screen_outcome(&record, request, authenticated_principal) {
-            let (reason, outcome) = outcome.into_reason_and_outcome(record);
-            commit_noop(transaction, reason).await?;
-            return Ok(outcome);
-        }
-        ensure_before_expiry(&record, claimed_at)?;
-        let response = claim_response_for_record(&record, request, claimed_at)?;
-        claim_assignment_in_tx(
-            &mut transaction,
-            &record,
+        <Self as RemoteExecutionQueries>::claim_task_board_remote_assignment(
+            self,
             request,
-            &response,
             authenticated_principal,
             claimed_at,
         )
-        .await?;
-        finish_mutation(transaction, &record.assignment_id, "claim").await
+        .await
     }
 
     pub(crate) async fn mark_task_board_remote_assignment_running(
@@ -157,6 +136,43 @@ impl AsyncDaemonDb {
         }
         renew_request_for_record(&record).map(Some)
     }
+}
+
+pub(super) async fn claim_task_board_remote_assignment(
+    db: &AsyncDaemonDb,
+    request: &RemoteClaimRequest,
+    authenticated_principal: &str,
+    claimed_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote assignment claim: {error}")))?;
+    nonblank(
+        authenticated_principal,
+        "remote assignment authenticated principal",
+    )?;
+    canonical_time(claimed_at, "remote assignment claim time")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote assignment claim")
+        .await?;
+    let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    if let Some(outcome) = claim_screen_outcome(&record, request, authenticated_principal) {
+        let (reason, outcome) = outcome.into_reason_and_outcome(record);
+        commit_noop(transaction, reason).await?;
+        return Ok(outcome);
+    }
+    ensure_before_expiry(&record, claimed_at)?;
+    let response = claim_response_for_record(&record, request, claimed_at)?;
+    claim_assignment_in_tx(
+        &mut transaction,
+        &record,
+        request,
+        &response,
+        authenticated_principal,
+        claimed_at,
+    )
+    .await?;
+    finish_mutation(transaction, &record.assignment_id, "claim").await
 }
 
 pub(super) fn renew_request_for_record(

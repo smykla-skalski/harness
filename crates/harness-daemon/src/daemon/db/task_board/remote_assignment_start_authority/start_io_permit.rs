@@ -15,6 +15,7 @@ use crate::daemon::db::task_board::remote_assignment_lease::{commit_noop, requir
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
 };
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -67,82 +68,93 @@ impl TaskBoardRemoteExecutorStartIoPermitOutcome {
 }
 
 impl AsyncDaemonDb {
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
-    )]
     pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
         &self,
         authority: &TaskBoardRemoteExecutorStartAuthority,
         project_dir: &Path,
         permitted_at: &str,
     ) -> Result<TaskBoardRemoteExecutorStartIoPermitOutcome, CliError> {
-        canonical_time(permitted_at, "remote executor Start I/O permit time")?;
-        let project_dir = canonical_project_dir(project_dir)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote executor Start I/O permit")
-            .await?;
-        let record = require_assignment(&mut transaction, &authority.assignment_id).await?;
-        if executor_start_authority(&record)?.as_ref() != Some(authority)
-            || record.executor_stop_pending.is_some()
-        {
-            commit_noop(transaction, "stale remote executor Start I/O permit").await?;
-            return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
-        }
-        if let Some(permit) = executor_start_io_permit(&record)? {
-            if !exact_provisioned_session(&mut transaction, &record, &permit.identity, &project_dir)
-                .await?
-            {
-                return Err(concurrent(
-                    "remote executor Start I/O permit lost its provisioned session",
-                ));
-            }
-            commit_noop(transaction, "replayed remote executor Start I/O permit").await?;
-            return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Replayed(
-                permit,
-            ));
-        }
-        let host_instance_id = record
-            .claimed_host_instance_id
-            .as_deref()
-            .ok_or_else(|| db_error("remote executor start has no claimed host"))?;
-        if canonical_time(permitted_at, "remote executor Start I/O permit time")?
-            < canonical_time(
-                &authority.acquired_at,
-                "remote executor provisioning authority time",
-            )?
-        {
-            commit_noop(transaction, "early remote executor Start I/O permit").await?;
-            return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
-        }
-        if !executor_settings_still_match(&mut transaction, &record).await?
-            || !start_authority_eligible(&record, host_instance_id, permitted_at)?
-            || !exact_provisioned_session(
-                &mut transaction,
-                &record,
-                &authority.identity,
-                &project_dir,
-            )
+        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_start_io_permit(
+            self,
+            authority,
+            project_dir,
+            permitted_at,
+        )
+        .await
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+)]
+pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
+    db: &AsyncDaemonDb,
+    authority: &TaskBoardRemoteExecutorStartAuthority,
+    project_dir: &Path,
+    permitted_at: &str,
+) -> Result<TaskBoardRemoteExecutorStartIoPermitOutcome, CliError> {
+    canonical_time(permitted_at, "remote executor Start I/O permit time")?;
+    let project_dir = canonical_project_dir(project_dir)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote executor Start I/O permit")
+        .await?;
+    let record = require_assignment(&mut transaction, &authority.assignment_id).await?;
+    if executor_start_authority(&record)?.as_ref() != Some(authority)
+        || record.executor_stop_pending.is_some()
+    {
+        commit_noop(transaction, "stale remote executor Start I/O permit").await?;
+        return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
+    }
+    if let Some(permit) = executor_start_io_permit(&record)? {
+        if !exact_provisioned_session(&mut transaction, &record, &permit.identity, &project_dir)
             .await?
         {
-            commit_noop(transaction, "unavailable remote executor Start I/O permit").await?;
-            return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
-        }
-        if deterministic_run_exists(&mut transaction, &authority.identity).await? {
             return Err(concurrent(
-                "remote executor Start I/O permit found a pre-authority run",
+                "remote executor Start I/O permit lost its provisioned session",
             ));
         }
-        let permit =
-            persist_start_io_permit(&mut transaction, &record, authority, permitted_at).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote executor Start I/O permit: {error}"))
-        })?;
-        Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(
+        commit_noop(transaction, "replayed remote executor Start I/O permit").await?;
+        return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Replayed(
             permit,
-        ))
+        ));
     }
+    let host_instance_id = record
+        .claimed_host_instance_id
+        .as_deref()
+        .ok_or_else(|| db_error("remote executor start has no claimed host"))?;
+    if canonical_time(permitted_at, "remote executor Start I/O permit time")?
+        < canonical_time(
+            &authority.acquired_at,
+            "remote executor provisioning authority time",
+        )?
+    {
+        commit_noop(transaction, "early remote executor Start I/O permit").await?;
+        return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
+    }
+    if !executor_settings_still_match(&mut transaction, &record).await?
+        || !start_authority_eligible(&record, host_instance_id, permitted_at)?
+        || !exact_provisioned_session(&mut transaction, &record, &authority.identity, &project_dir)
+            .await?
+    {
+        commit_noop(transaction, "unavailable remote executor Start I/O permit").await?;
+        return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
+    }
+    if deterministic_run_exists(&mut transaction, &authority.identity).await? {
+        return Err(concurrent(
+            "remote executor Start I/O permit found a pre-authority run",
+        ));
+    }
+    let permit =
+        persist_start_io_permit(&mut transaction, &record, authority, permitted_at).await?;
+    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote executor Start I/O permit: {error}")))?;
+    Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(
+        permit,
+    ))
 }
 
 async fn persist_start_io_permit(

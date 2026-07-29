@@ -8,6 +8,7 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, load_assignment_in_tx, to_i64,
 };
 use super::workflow_executions::load_execution_in_tx;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::git::bundle::GitBundleImportEvidence;
 use crate::task_board::TaskBoardAttemptResultArtifact;
@@ -155,17 +156,12 @@ impl AsyncDaemonDb {
         assignment_id: &str,
         fencing_epoch: u64,
     ) -> Result<Option<TaskBoardRemoteResultImportRecord>, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin result import load: {error}")))?;
-        let record = load_import_in_tx(&mut transaction, assignment_id, fencing_epoch).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit result import load: {error}")))?;
-        Ok(record)
+        <Self as RemoteExecutionQueries>::task_board_remote_result_import(
+            self,
+            assignment_id,
+            fencing_epoch,
+        )
+        .await
     }
 
     pub(crate) async fn mark_task_board_remote_result_import_manual_required(
@@ -195,6 +191,24 @@ impl AsyncDaemonDb {
         ));
         recovery.await
     }
+}
+
+pub(super) async fn task_board_remote_result_import(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    fencing_epoch: u64,
+) -> Result<Option<TaskBoardRemoteResultImportRecord>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin result import load: {error}")))?;
+    let record = load_import_in_tx(&mut transaction, assignment_id, fencing_epoch).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit result import load: {error}")))?;
+    Ok(record)
 }
 
 /// Persists the `applied` transition and reloads the row it wrote, refusing

@@ -5,6 +5,7 @@ use super::remote_assignment_recovery_queue::{
     CONTROLLER_PROGRESSION_QUARANTINE_CODE, RawRecoveryCandidate,
     quarantine_remote_recovery_failure_in_tx,
 };
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
 #[path = "remote_assignment_controller_scan/sql.rs"]
@@ -55,45 +56,12 @@ struct ScanRow {
 }
 
 impl AsyncDaemonDb {
-    /// Claims one restart-replayable controller generation for remote verification.
     pub(crate) async fn next_task_board_remote_controller_assignment(
         &self,
         now: &str,
     ) -> Result<Option<TaskBoardRemoteControllerScanStep>, CliError> {
-        canonical_time(now, "remote controller scan time")?;
-        let Some(cursor) = self.claim_next_controller_scan_cursor(now).await? else {
-            return Ok(None);
-        };
-        match self
-            .task_board_remote_assignment(&cursor.assignment_id)
+        <Self as RemoteExecutionQueries>::next_task_board_remote_controller_assignment(self, now)
             .await
-        {
-            Ok(Some(assignment)) if assignment.offered_at == cursor.order_at => {
-                Ok(Some(TaskBoardRemoteControllerScanStep::Assignment(
-                    Box::new(TaskBoardRemoteControllerScanItem { assignment, cursor }),
-                )))
-            }
-            Ok(Some(_)) => self
-                .quarantine_controller_scan_decode(
-                    cursor,
-                    now,
-                    db_error("remote controller scan cursor contradicts immutable offer time"),
-                )
-                .await
-                .map(Some),
-            Ok(None) => self
-                .quarantine_controller_scan_decode(
-                    cursor,
-                    now,
-                    db_error("scanned remote controller assignment disappeared"),
-                )
-                .await
-                .map(Some),
-            Err(error) => self
-                .quarantine_controller_scan_decode(cursor, now, error)
-                .await
-                .map(Some),
-        }
     }
 
     async fn claim_next_controller_scan_cursor(
@@ -265,6 +233,44 @@ impl AsyncDaemonDb {
                 scan_incomplete,
             },
         ))
+    }
+}
+
+/// Claims one restart-replayable controller generation for remote verification.
+pub(super) async fn next_task_board_remote_controller_assignment(
+    db: &AsyncDaemonDb,
+    now: &str,
+) -> Result<Option<TaskBoardRemoteControllerScanStep>, CliError> {
+    canonical_time(now, "remote controller scan time")?;
+    let Some(cursor) = db.claim_next_controller_scan_cursor(now).await? else {
+        return Ok(None);
+    };
+    match db.task_board_remote_assignment(&cursor.assignment_id).await {
+        Ok(Some(assignment)) if assignment.offered_at == cursor.order_at => {
+            Ok(Some(TaskBoardRemoteControllerScanStep::Assignment(
+                Box::new(TaskBoardRemoteControllerScanItem { assignment, cursor }),
+            )))
+        }
+        Ok(Some(_)) => db
+            .quarantine_controller_scan_decode(
+                cursor,
+                now,
+                db_error("remote controller scan cursor contradicts immutable offer time"),
+            )
+            .await
+            .map(Some),
+        Ok(None) => db
+            .quarantine_controller_scan_decode(
+                cursor,
+                now,
+                db_error("scanned remote controller assignment disappeared"),
+            )
+            .await
+            .map(Some),
+        Err(error) => db
+            .quarantine_controller_scan_decode(cursor, now, error)
+            .await
+            .map(Some),
     }
 }
 

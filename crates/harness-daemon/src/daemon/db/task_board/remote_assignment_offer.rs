@@ -17,6 +17,7 @@ use super::remote_outbound_sources::{
 use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_execution_fencing::{TaskBoardFirstStartAdmission, WorkflowExecutionFencing};
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_codex_requests::remote_codex_attempt_request;
 use crate::task_board::TaskBoardExecutionPhase;
@@ -52,14 +53,14 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         window: TaskBoardRemoteOfferWindow<'_>,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        Box::pin(self.offer_task_board_remote_assignment_with_source(
+        <Self as RemoteExecutionQueries>::offer_task_board_remote_assignment(
+            self,
             expected_execution,
             expected_attempt,
             request,
-            None,
             authenticated_principal,
             window,
-        ))
+        )
         .await
     }
 
@@ -117,6 +118,25 @@ impl AsyncDaemonDb {
         .await?;
         commit_created_offer(transaction, assignment).await
     }
+}
+
+pub(super) async fn offer_task_board_remote_assignment(
+    db: &AsyncDaemonDb,
+    expected_execution: &TaskBoardWorkflowExecutionCas,
+    expected_attempt: &TaskBoardExecutionAttemptCas,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+    window: TaskBoardRemoteOfferWindow<'_>,
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
+    Box::pin(db.offer_task_board_remote_assignment_with_source(
+        expected_execution,
+        expected_attempt,
+        request,
+        None,
+        authenticated_principal,
+        window,
+    ))
+    .await
 }
 
 struct PreparedRemoteOffer {
