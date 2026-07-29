@@ -180,6 +180,17 @@ fn only_waiting_routes_can_start_an_observer() {
     );
 }
 
+#[test]
+fn required_checks_can_start_waiting_before_their_rollup_appears() {
+    let mut initial = evidence(CheckState::Pending, None);
+    initial.gates.checks.clear();
+
+    let wait = task_board_dependency_check_wait(&waiting_route(), &initial)
+        .expect("missing required check remains pending");
+
+    assert_eq!(wait.required_checks, vec!["build"]);
+}
+
 async fn observe(
     source: &Source,
     wait: &TaskBoardDependencyCheckWait,
