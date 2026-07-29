@@ -22,8 +22,35 @@ struct DaemonCommandTestHarness {
     command: DaemonCommand,
 }
 
+struct ParsedDaemonCommands {
+    serve: DaemonCommand,
+    dev: DaemonCommand,
+    stop: DaemonCommand,
+    restart: DaemonCommand,
+    install: DaemonCommand,
+    remove: DaemonCommand,
+    status: DaemonCommand,
+    doctor: DaemonCommand,
+    snapshot: DaemonCommand,
+}
+
 #[test]
 fn daemon_transport_round_trip_smoke_covers_public_surface() {
+    let parsed = parse_daemon_test_commands();
+    assert_serve_and_dev_commands(parsed.serve, parsed.dev);
+    assert_remaining_commands(
+        parsed.stop,
+        parsed.restart,
+        parsed.install,
+        parsed.remove,
+        parsed.status,
+        parsed.doctor,
+        parsed.snapshot,
+    );
+    assert_manual_stop_and_restart_smoke();
+}
+
+fn parse_daemon_test_commands() -> ParsedDaemonCommands {
     let serve = DaemonCommandTestHarness::try_parse_from([
         "test",
         "serve",
@@ -90,6 +117,20 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
     .expect("parse snapshot command")
     .command;
 
+    ParsedDaemonCommands {
+        serve,
+        dev,
+        stop,
+        restart,
+        install,
+        remove,
+        status,
+        doctor,
+        snapshot,
+    }
+}
+
+fn assert_serve_and_dev_commands(serve: DaemonCommand, dev: DaemonCommand) {
     match serve {
         DaemonCommand::Serve(args) => {
             assert_eq!(args.host, "0.0.0.0");
@@ -135,7 +176,17 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
             );
         },
     );
+}
 
+fn assert_remaining_commands(
+    stop: DaemonCommand,
+    restart: DaemonCommand,
+    install: DaemonCommand,
+    remove: DaemonCommand,
+    status: DaemonCommand,
+    doctor: DaemonCommand,
+    snapshot: DaemonCommand,
+) {
     match stop {
         DaemonCommand::Stop(args) => assert!(args.json),
         other => panic!("expected stop command, got {other:?}"),
@@ -164,7 +215,9 @@ fn daemon_transport_round_trip_smoke_covers_public_surface() {
         }
         other => panic!("expected snapshot command, got {other:?}"),
     }
+}
 
+fn assert_manual_stop_and_restart_smoke() {
     let stopped = stop_daemon_with(
         false,
         &lifecycle::sample_launch_agent_status(false, false),
