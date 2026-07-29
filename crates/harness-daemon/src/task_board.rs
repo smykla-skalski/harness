@@ -27,6 +27,7 @@ pub use harness_task_board::external::{
 // Same narrowing root's own `src/task_board/mod.rs` applies: these stay
 // `pub(crate)` here rather than the wider visibility the crate grants,
 // because nothing outside the daemon's own service code needs them.
+#[cfg(feature = "daemon-runtime")]
 pub(crate) use harness_task_board::external::{
     TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
     TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,

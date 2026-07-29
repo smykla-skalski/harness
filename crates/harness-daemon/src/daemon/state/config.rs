@@ -5,9 +5,11 @@ use std::sync::{LazyLock, RwLock};
 use serde::{Deserialize, Serialize};
 
 use crate::infra::io::read_json_typed;
+#[cfg(any(test, feature = "daemon-runtime"))]
+use crate::task_board::TaskBoardGitRuntimeProfile;
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     normalize_repository_slug,
 };
@@ -116,6 +118,7 @@ pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig,
     Ok(config)
 }
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) fn overlay_task_board_git_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
     let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
         .read()
@@ -130,6 +133,7 @@ pub(crate) fn overlay_task_board_git_runtime_secret_flags(config: &mut TaskBoard
     }
 }
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) fn overlay_task_board_git_runtime_profile_secrets(
     profile: &mut TaskBoardGitRuntimeProfile,
     repository: Option<&str>,
@@ -151,6 +155,7 @@ pub(crate) fn overlay_task_board_git_runtime_profile_secrets(
 
 /// Materialize process-only key material into a database-loaded runtime config.
 /// The returned value must remain in memory and must never be persisted.
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) fn overlay_task_board_git_runtime_secrets(config: &mut TaskBoardGitRuntimeConfig) {
     overlay_task_board_git_runtime_profile_secrets(&mut config.global, None);
     for override_config in &mut config.repository_overrides {
@@ -161,6 +166,7 @@ pub(crate) fn overlay_task_board_git_runtime_secrets(config: &mut TaskBoardGitRu
     }
 }
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 fn overlay_profile_flags(
     target: &mut TaskBoardGitRuntimeProfile,
     secrets: &TaskBoardGitRuntimeProfile,
@@ -211,6 +217,7 @@ pub fn replace_task_board_git_runtime_secrets(task_board_config: &TaskBoardGitRu
 /// back as a full runtime-config update. A false configured flag remains an
 /// explicit removal.
 #[must_use]
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) fn retaining_task_board_git_runtime_secrets(
     request: &TaskBoardGitRuntimeConfig,
 ) -> TaskBoardGitRuntimeConfig {
@@ -235,6 +242,7 @@ pub(crate) fn retaining_task_board_git_runtime_secrets(
     merged
 }
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 fn retain_profile_secrets(
     target: &mut TaskBoardGitRuntimeProfile,
     existing: &TaskBoardGitRuntimeProfile,
@@ -271,6 +279,7 @@ fn retain_profile_secrets(
     );
 }
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 fn retain_secret(target: &mut Option<String>, configured: bool, existing: Option<&String>) {
     if target.is_none() && configured {
         *target = existing.cloned();

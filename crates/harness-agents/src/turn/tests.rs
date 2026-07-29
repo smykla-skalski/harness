@@ -5,7 +5,7 @@ use super::fake::{FakeAgentTurnPlan, FakeAgentTurnRuntime};
 use super::{
     AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnPullRequest,
     AgentTurnPullRequestContext, AgentTurnReadOnlyContent, AgentTurnRequest, AgentTurnRuntime,
-    AgentTurnStatus,
+    AgentTurnSourceFreshness, AgentTurnStatus,
 };
 
 const HEAD_REVISION: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -162,6 +162,54 @@ fn fake_runtime_freezes_pull_request_head_in_the_terminal_result() {
         .expect("load result")
         .expect("completed result");
     assert_eq!(result.source_revision.as_deref(), Some(HEAD_REVISION));
+    assert_eq!(
+        result
+            .source_freshness(HEAD_REVISION)
+            .expect("current source"),
+        AgentTurnSourceFreshness::Current
+    );
+    assert_eq!(
+        result
+            .source_freshness(&"f".repeat(40))
+            .expect("stale source"),
+        AgentTurnSourceFreshness::Stale {
+            reviewed_revision: HEAD_REVISION.into(),
+            current_revision: "f".repeat(40),
+        }
+    );
+}
+
+#[test]
+fn source_freshness_normalizes_revision_boundaries() {
+    let runtime =
+        FakeAgentTurnRuntime::new([FakeAgentTurnPlan::completed("complete report", "end_turn")]);
+    let id = ready(runtime.start(AgentTurnRequest {
+        prompt: "review this pull request".into(),
+        requested_model: None,
+        pull_request: Some(pull_request_context(HEAD_REVISION)),
+    }))
+    .expect("start source-bound turn");
+    complete_turn(&runtime, &id);
+    let mut result = ready(runtime.result(&id))
+        .expect("load result")
+        .expect("completed result");
+    result.source_revision = Some(format!(" {HEAD_REVISION}\n"));
+
+    assert_eq!(
+        result
+            .source_freshness(HEAD_REVISION)
+            .expect("normalized current source"),
+        AgentTurnSourceFreshness::Current
+    );
+    assert_eq!(
+        result
+            .source_freshness(&"f".repeat(40))
+            .expect("normalized stale source"),
+        AgentTurnSourceFreshness::Stale {
+            reviewed_revision: HEAD_REVISION.into(),
+            current_revision: "f".repeat(40),
+        }
+    );
 }
 
 #[test]

@@ -30,10 +30,12 @@
 use tracing::Level;
 
 pub mod agents;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub mod app;
 pub mod daemon;
 pub use harness_feature_flags::feature_flags;
 pub use harness_kernel::errors;
+#[cfg(feature = "daemon-runtime")]
 pub(crate) mod git;
 pub(crate) mod github_api {
     pub use harness_github_api::*;

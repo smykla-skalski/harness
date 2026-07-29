@@ -3,4 +3,5 @@
 // classifier needs now go through `harness_session::observe` and
 // `harness_observe::classifier` directly instead of this facade, since that
 // module moved into `harness-session`.
+#[cfg(feature = "daemon-runtime")]
 pub(crate) use harness_observe::types;
