@@ -14,6 +14,7 @@ mod dispatch_workflow_launch;
 mod dispatch_workflow_start;
 mod held_dispatch;
 mod import_lifecycle;
+mod import_lifecycle_queries;
 mod imports;
 mod item_tx_ext;
 mod items;
