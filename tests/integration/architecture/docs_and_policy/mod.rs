@@ -56,7 +56,7 @@ fn setup_session_transport_stays_transport_only() {
 fn setup_wrapper_does_not_depend_on_block_registry() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let hits = collect_hits_in_tree(
-        &root.join("src/setup/wrapper"),
+        &root.join("crates/harness-hooks/src/wrapper"),
         root,
         None,
         &["BlockRegistry"],

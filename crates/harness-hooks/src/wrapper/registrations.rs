@@ -1,8 +1,9 @@
-use crate::hooks::adapters::{HookRegistration, adapter_for};
-use crate::hooks::protocol::context::NormalizedEvent;
+use crate::adapters::{HookRegistration, adapter_for};
+use crate::protocol::context::NormalizedEvent;
 use harness_protocol::agent::HookAgent;
 
-pub(crate) fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
+#[must_use]
+pub fn process_agent_registrations(agent: HookAgent) -> Vec<HookRegistration> {
     let mut registrations = Vec::new();
 
     // Lifecycle hooks registered for all runtimes. The session-start hook

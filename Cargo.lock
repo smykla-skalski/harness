@@ -3870,6 +3870,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uzers",
 ]
 
 [[package]]
