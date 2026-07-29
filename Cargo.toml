@@ -54,6 +54,13 @@ include = [
 [dependencies]
 harness-agents = { path = "crates/harness-agents", version = "55.0.0" }
 harness-command = { path = "crates/harness-command", version = "55.0.0" }
+# Optional and gated behind `daemon-runtime`, never the shipped `harness`
+# binary's own default (empty) feature set: only `tests/integration/**`
+# reaches `crate::daemon::*`. Default features stay on rather than
+# `default-features = false` because those are the same
+# `daemon-runtime`/`standalone-daemon`/`standalone-worker` trio the real
+# `harness-daemon` binary itself always builds with.
+harness-daemon = { path = "crates/harness-daemon", version = "55.0.0", optional = true }
 harness-daemon-client = { path = "crates/harness-daemon-client", version = "55.0.0" }
 harness-feature-flags = { path = "crates/harness-feature-flags", version = "55.0.0" }
 harness-github-api = { path = "crates/harness-github-api", version = "55.0.0" }
@@ -181,6 +188,7 @@ bridge-runtime = [
 daemon-runtime = [
   "bridge-runtime",
   "harness-session/daemon-runtime",
+  "dep:harness-daemon",
   "dep:agent-client-protocol-http",
   "dep:async-stream",
   "dep:axum",

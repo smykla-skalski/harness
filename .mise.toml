@@ -395,7 +395,17 @@ run = [
   # harness-daemon's default-on standalone-daemon forward breaks the same
   # FocusPreset-dependent items harness-observe's own isolation exists for.
   "./scripts/cargo-local.sh clippy --all-targets -p harness-session",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-agents -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-github-api -p harness-hooks -p harness-infra -p harness-kernel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-agents -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-github-api -p harness-hooks -p harness-infra -p harness-kernel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-workspace -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
+  # harness-daemon stays its own invocation, `--lib --bins` rather than
+  # `--all-targets`, matching the root crate's own line above: its `--lib`
+  # test target compiled to nothing before it ran its own tests (`test =
+  # false` plus a test-cfg'd empty crate body), so its `#[cfg(test)]` content
+  # has never been through a pedantic pass. That surfaced real, but
+  # pre-existing and test-only, lint debt across the whole suite once the
+  # tests started compiling for real; cleaning it up is tracked in a
+  # dedicated follow-up rather than folded into the test-ownership move that
+  # exposed it.
+  "./scripts/cargo-local.sh clippy -p harness-daemon --lib --bins",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

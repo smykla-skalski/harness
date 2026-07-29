@@ -26,33 +26,9 @@ pub use external::{
     HARNESS_GITHUB_TOKEN_ENV, ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome,
     configured_sync_clients,
 };
-pub(crate) use external::{
-    TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
-    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
-    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
-    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
-};
-#[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) use external::{
-    TaskBoardExternalCreateStore, TaskBoardSyncStore,
-    configured_sync_clients_without_review_requests, imported_review_references_from_items,
-    reconcile_review_item_from_snapshots, sync_external_tasks,
-};
-// `summary::build_audit_summary_with_policy` was `pub(crate)` in this file
-// before the move and stays that way: nothing outside root's own daemon
-// service code (`daemon::service::task_board_db`,
-// `daemon::service::task_board_orchestrator_db`) needs it, so this explicit
-// import shadows the wider visibility the crate needs to grant for the
-// re-export itself to compile, the same way `external`'s
-// `TaskBoardExternalCreateBegin` cluster above does. Unlike that cluster,
-// this one imports directly from `harness_task_board` rather than through a
-// root-local facade submodule (`orchestrator`/`summary`/`legacy_import` have
-// none left after this move), so the shadowing is against the same crate the
-// glob above already pulls from, and rustc's `hidden_glob_reexports` flags
-// exactly that as an expected, not accidental, shadow.
-#[cfg(any(test, feature = "daemon-runtime"))]
-#[expect(
-    hidden_glob_reexports,
-    reason = "deliberately narrows this one item back to pub(crate) against the glob above"
-)]
-pub(crate) use harness_task_board::build_audit_summary_with_policy;
+// `sync_external_tasks` has no production call site left in this crate now
+// that `daemon::service` compiles natively in `harness-daemon` instead of
+// mirroring in here: root's own `external::tests` (and `sync_tests`) are the
+// only remaining callers.
+#[cfg(test)]
+pub(crate) use external::sync_external_tasks;

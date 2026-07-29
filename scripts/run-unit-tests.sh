@@ -23,11 +23,10 @@ printf '==> test:unit 4/6: harness-task-board (daemon-runtime feature)\n' >&2
 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime "$@"
 printf '==> test:unit 5/6: Linux systemd crate\n' >&2
 ./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$@"
-# --bin scopes cargo's target selection to the harness-daemon binary only, so
-# this stays separate from the group above: mixing it into a multi-package
-# invocation would silently drop every other package's lib target instead of
-# adding this one. The lib keeps test = false to skip the #[path]-shared
-# content it pulls from the root crate; the bin has no such content, so its
-# own #[cfg(test)] tests are safe to run here.
-printf '==> test:unit 6/6: harness-daemon binary-only unit tests\n' >&2
-./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon "$@"
+# Own invocation for the same reason as the group above: mixing this
+# multi-target selection into a multi-package invocation would silently drop
+# every other package's lib target instead of adding these. harness-daemon
+# now owns and runs its own unit tests directly (`--lib`), no longer mirrored
+# through root's own test build, alongside its always-separate bin tests.
+printf '==> test:unit 6/6: harness-daemon (own lib and binary unit tests)\n' >&2
+./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib --bin harness-daemon "$@"

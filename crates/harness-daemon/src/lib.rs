@@ -1,6 +1,3 @@
-// Canonical unit tests run in the root package. Clippy still constructs a
-// library test target for `--all-targets` even when Cargo marks it disabled.
-#![cfg(not(test))]
 #![deny(unsafe_code)]
 use tracing::Level;
 
@@ -8,6 +5,7 @@ pub mod agents;
 pub mod app;
 pub mod daemon;
 pub use harness_feature_flags::feature_flags;
+pub use harness_kernel::errors;
 pub(crate) mod git;
 pub(crate) mod github_api {
     pub use harness_github_api::*;
