@@ -31,6 +31,7 @@ gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"]
 harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["bridge-runtime"] }
 harness-command = { path = "../harness-command", version = "55.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
+harness-db-schema = { path = "../harness-db-schema", version = "55.0.0" }
 harness-feature-flags = { path = "../harness-feature-flags", version = "55.0.0" }
 harness-github-api = { path = "../harness-github-api", version = "55.0.0" }
 harness-hook = { path = "../harness-hook", version = "55.0.0" }
@@ -104,6 +105,7 @@ security-framework = "3"
 agent-client-protocol-http = { version = "=2.0.0", default-features = false, features = ["client", "server"] }
 assert_cmd = "=2.2.2"
 harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["test-support"] }
+harness-db-schema = { path = "../harness-db-schema", version = "55.0.0", features = ["test-support"] }
 harness-github-api = { path = "../harness-github-api", version = "55.0.0", features = ["test-support"] }
 harness-reviews = { path = "../harness-reviews", version = "55.0.0", features = ["test-support"] }
 harness-task-board = { path = "../harness-task-board", version = "55.0.0", features = ["test-support"] }
@@ -120,6 +122,13 @@ bridge-runtime = []
 daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http", "harness-reviews/daemon-runtime", "harness-session/daemon-runtime", "harness-task-board/daemon-runtime"]
 standalone-daemon = ["harness-observe/standalone-daemon"]
 standalone-worker = []
+# Exposes items normally `cfg(test)`-only (`DaemonDb::open_in_memory`, the
+# `remote_controller_fixture` remote-execution test fixture) to
+# `harness-db-schema`'s own migration tests, which depend on this crate as an
+# ordinary library and so never see its `cfg(test)` items. Matches
+# `harness-agents`'s, `harness-github-api`'s, `harness-reviews`'s, and
+# `harness-task-board`'s own `test-support` feature.
+test-support = []
 tokio-console = ["harness-telemetry/tokio-console"]
 
 [lints.clippy]
@@ -127,4 +136,4 @@ pedantic = { level = "deny", priority = 1 }
 
 [lints.rust]
 unused = { level = "deny", priority = 1 }
-unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("bridge-runtime", "daemon-runtime", "standalone-daemon", "tokio-console"))'] }
+unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("bridge-runtime", "daemon-runtime", "standalone-daemon", "test-support", "tokio-console"))'] }

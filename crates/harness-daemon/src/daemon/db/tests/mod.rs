@@ -36,6 +36,7 @@ mod schema_migrations;
 mod schema_shape_repairs;
 mod schema_shape_repairs_admission;
 mod schema_shape_repairs_wake_events;
+mod schema_v43_legacy_target_controller;
 mod signals;
 mod sync;
 mod sync_change_tracking;

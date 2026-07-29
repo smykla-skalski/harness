@@ -3703,6 +3703,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon-client",
+ "harness-db-schema",
  "harness-feature-flags",
  "harness-github-api",
  "harness-hook",
@@ -3786,6 +3787,25 @@ dependencies = [
  "tracing",
  "user_dirs",
  "uzers",
+]
+
+[[package]]
+name = "harness-db-schema"
+version = "55.0.0"
+dependencies = [
+ "harness-daemon",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-session",
+ "harness-task-board",
+ "harness-workspace",
+ "hex",
+ "rusqlite",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

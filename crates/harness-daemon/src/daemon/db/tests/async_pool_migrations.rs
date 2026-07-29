@@ -160,7 +160,7 @@ fn restore_original_v34_upgrade_shape(db: &DaemonDb) {
     // paired with a partially downgraded dispatch table. Restore the remote
     // and dispatch lineage to shapes the v35 -> v43 chain can actually emit,
     // then remove the v35 and v39 effects exercised by that chain.
-    crate::daemon::db::schema_v43::restore_legacy_v40_for_test(db);
+    harness_db_schema::schema_v43::restore_legacy_v40_for_test(db.connection());
     db.connection()
         .execute_batch(
             "DROP TABLE task_board_dispatch_admission_ledger;

@@ -69,65 +69,7 @@ mod review_writes;
 mod runtime;
 mod schema;
 mod schema_migrations;
-mod schema_repairs;
-mod schema_repairs_admission;
-mod schema_repairs_external_creates;
-mod schema_repairs_reconciliation_cursors;
-mod schema_repairs_remote_execution;
-mod schema_repairs_remote_execution_objects;
-mod schema_repairs_remote_execution_v45;
-mod schema_repairs_triage;
-mod schema_repairs_triage_override;
-mod schema_repairs_wake_events;
 mod schema_sql;
-mod schema_v10;
-mod schema_v11;
-mod schema_v12;
-mod schema_v13;
-mod schema_v14;
-mod schema_v15;
-mod schema_v16;
-mod schema_v17;
-mod schema_v18;
-mod schema_v19;
-mod schema_v20;
-mod schema_v21;
-mod schema_v22;
-mod schema_v23;
-mod schema_v24;
-mod schema_v25;
-mod schema_v26;
-mod schema_v27;
-mod schema_v28;
-mod schema_v29;
-mod schema_v30;
-mod schema_v31;
-mod schema_v32;
-mod schema_v33;
-mod schema_v34;
-mod schema_v35;
-mod schema_v36;
-mod schema_v37;
-mod schema_v38;
-mod schema_v39;
-mod schema_v40;
-mod schema_v41;
-mod schema_v42;
-mod schema_v43;
-mod schema_v44;
-mod schema_v45;
-mod schema_v46;
-mod schema_v47;
-mod schema_v48;
-mod schema_v49;
-mod schema_v50;
-mod schema_v51;
-mod schema_v52;
-mod schema_v53;
-mod schema_v54;
-mod schema_v55;
-mod schema_v56;
-mod schema_v57;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -171,8 +113,7 @@ pub(crate) use task_board::{
     TaskBoardRemoteExecutorScan, TaskBoardRemoteExecutorStartAuthority,
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
     TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopPending,
-    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
-    TaskBoardRemoteIoAuthority, TaskBoardRemoteLifecycleTrustSnapshot,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteHostSelection, TaskBoardRemoteIoAuthority,
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
     TaskBoardRemoteOfferReceiptDisposition, TaskBoardRemoteOfferWindow,
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
@@ -190,6 +131,10 @@ pub(crate) use task_board::{
     ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
     parent_points_to_assignment,
 };
+// `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 controller-operation
+// migration test builds these trust-fence values directly to exercise the
+// paired lifecycle-trust columns the v43 migration adds.
+pub use task_board::{TaskBoardRemoteHostTrustFence, TaskBoardRemoteLifecycleTrustSnapshot};
 #[cfg(test)]
 pub(crate) use task_board::{
     accept_controller as accept_remote_controller, claim_controller as claim_remote_controller,
@@ -395,7 +340,11 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "57";
+// `pub`, not `pub(crate)`: `harness-db-schema`'s own dev-dependency tests
+// assert a freshly migrated database's stamped version against this
+// constant, the same reason `AsyncDaemonDb` above is `pub` rather than
+// `pub(crate)`.
+pub const SCHEMA_VERSION: &str = "57";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

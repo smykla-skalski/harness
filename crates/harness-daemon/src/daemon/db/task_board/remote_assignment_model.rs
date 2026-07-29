@@ -22,8 +22,11 @@ pub(super) use decode::phase_label;
 pub(crate) use outcomes::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
 pub(super) use persistence::{RemoteAssignmentInsertInput, insert_assignment_in_tx};
 
+// `pub`, not `pub(crate)`: `task_board_remote_assignment` above returns this
+// type, and it needs to be nameable wherever that method is called from.
+// Fields stay crate-private; the external callers only check `is_none()`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TaskBoardRemoteAssignmentRecord {
+pub struct TaskBoardRemoteAssignmentRecord {
     pub(crate) assignment_id: String,
     pub(crate) execution_id: String,
     pub(crate) phase: TaskBoardExecutionPhase,
@@ -104,7 +107,13 @@ impl TaskBoardRemoteAssignmentRecord {
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_assignment(
+    /// `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 tombstone
+    /// migration test asserts a superseded legacy assignment is invisible
+    /// through this typed loader.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub async fn task_board_remote_assignment(
         &self,
         assignment_id: &str,
     ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
