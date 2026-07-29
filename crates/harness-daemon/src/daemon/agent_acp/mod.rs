@@ -66,7 +66,10 @@ mod protocol;
 mod sandbox_proxy;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod spawn_credential;
-#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
+// Daemon-only: the turn runtime persists runs through the daemon run store
+// (`crate::daemon::db`), which the bridge facade does not carry, so it is gated
+// to `daemon-runtime` rather than the broader bridge-or-daemon set.
+#[cfg(feature = "daemon-runtime")]
 mod turn_lifecycle;
 
 pub use harness_protocol::managed_agents::acp::{
@@ -86,5 +89,5 @@ pub use harness_protocol::managed_agents::runtime_failures::{
 pub use manager::AcpWakePrompt;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub use manager::{AcpAgentManagerHandle, AcpAgentReconcileResponse};
-#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
+#[cfg(feature = "daemon-runtime")]
 pub use turn_lifecycle::OpenRouterAgentTurnRuntime;

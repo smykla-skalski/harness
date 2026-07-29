@@ -10,6 +10,7 @@ use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
     AcpAgentStartRequest, AcpAgentTurnResult, AcpSessionConfigOptionState,
 };
+use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
 use crate::session::types::AgentStatus;
 use harness_kernel::errors::CliError;
 
@@ -198,6 +199,95 @@ async fn unknown_turn_fails_without_reaching_the_manager() {
     let id = crate::agents::turn::AgentTurnId::new("missing").expect("id");
     let error = runtime.status(&id).await.expect_err("unknown turn");
     assert_eq!(error.code(), "KSRCLI090");
+}
+
+async fn open_store() -> (tempfile::TempDir, Arc<AsyncDaemonDb>) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open async db");
+    (dir, Arc::new(db))
+}
+
+#[tokio::test]
+async fn start_records_a_durable_running_run() {
+    let (_dir, store) = open_store().await;
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_and_store(
+        manager.clone(),
+        "session-a".into(),
+        None,
+        store.clone(),
+    );
+    let id = runtime.start(request()).await.expect("start");
+
+    let stored = store
+        .agent_turn_run(id.as_str())
+        .await
+        .expect("load")
+        .expect("run recorded at start");
+    assert_eq!(stored.status, AgentTurnRunStatus::Running);
+    assert_eq!(stored.requested_runtime, "openrouter");
+    assert_eq!(stored.actual_runtime.as_deref(), Some("openrouter"));
+    assert_eq!(stored.requested_model.as_deref(), Some(MODEL));
+    assert_eq!(stored.source_revision.as_deref(), Some(HEAD));
+}
+
+#[tokio::test]
+async fn completion_records_terminal_outcome_and_actual_model() {
+    let (_dir, store) = open_store().await;
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_and_store(
+        manager.clone(),
+        "session-a".into(),
+        None,
+        store.clone(),
+    );
+    let id = runtime.start(request()).await.expect("start");
+    manager.complete(r#"{"summary":"Reviewed.","findings":[]}"#);
+    runtime
+        .result(&id)
+        .await
+        .expect("result")
+        .expect("completed result");
+
+    let stored = store
+        .agent_turn_run(id.as_str())
+        .await
+        .expect("load")
+        .expect("run exists");
+    assert_eq!(stored.status, AgentTurnRunStatus::Completed);
+    assert_eq!(stored.requested_model.as_deref(), Some(MODEL));
+    assert_eq!(stored.actual_model.as_deref(), Some(MODEL));
+    assert_eq!(
+        stored.report.as_deref(),
+        Some(r#"{"summary":"Reviewed.","findings":[]}"#)
+    );
+}
+
+#[tokio::test]
+async fn cancellation_records_a_terminal_run() {
+    let (_dir, store) = open_store().await;
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_and_store(
+        manager.clone(),
+        "session-a".into(),
+        None,
+        store.clone(),
+    );
+    let id = runtime.start(request()).await.expect("start");
+    runtime.cancel(&id).await.expect("cancel");
+
+    let stored = store
+        .agent_turn_run(id.as_str())
+        .await
+        .expect("load")
+        .expect("run exists");
+    assert_eq!(stored.status, AgentTurnRunStatus::Cancelled);
+    // A cancellation is not a failure: `error` stays NULL and the reason lives
+    // in `stop_reason`, matching the Codex path.
+    assert!(stored.error.is_none());
+    assert_eq!(stored.stop_reason.as_deref(), Some("cancelled"));
 }
 
 fn request() -> AgentTurnRequest {

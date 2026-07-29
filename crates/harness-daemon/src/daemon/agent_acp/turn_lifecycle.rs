@@ -10,8 +10,10 @@ use crate::agents::turn::{
 use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpSessionConfigOptionState,
 };
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::workspace::utc_now;
 
 use super::AcpAgentManagerHandle;
 
@@ -60,6 +62,11 @@ pub struct OpenRouterAgentTurnRuntime {
     session_id: String,
     project_dir: Option<String>,
     bindings: Arc<Mutex<BTreeMap<AgentTurnId, OpenRouterTurnBinding>>>,
+    /// Durable non-Codex run store. `None` only in ACP-behavior unit tests that
+    /// do not exercise persistence; the production `new` path always supplies
+    /// one so every turn is recorded the moment it starts and settles to one
+    /// terminal outcome that survives a restart.
+    store: Option<Arc<AsyncDaemonDb>>,
 }
 
 impl OpenRouterAgentTurnRuntime {
@@ -68,10 +75,18 @@ impl OpenRouterAgentTurnRuntime {
         manager: AcpAgentManagerHandle,
         session_id: impl Into<String>,
         project_dir: Option<String>,
+        store: Arc<AsyncDaemonDb>,
     ) -> Self {
-        Self::with_manager(Arc::new(manager), session_id.into(), project_dir)
+        Self {
+            manager: Arc::new(manager),
+            session_id: session_id.into(),
+            project_dir,
+            bindings: Arc::new(Mutex::new(BTreeMap::new())),
+            store: Some(store),
+        }
     }
 
+    #[cfg(test)]
     fn with_manager(
         manager: Arc<dyn OpenRouterTurnManager>,
         session_id: String,
@@ -82,6 +97,23 @@ impl OpenRouterAgentTurnRuntime {
             session_id,
             project_dir,
             bindings: Arc::new(Mutex::new(BTreeMap::new())),
+            store: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn with_manager_and_store(
+        manager: Arc<dyn OpenRouterTurnManager>,
+        session_id: String,
+        project_dir: Option<String>,
+        store: Arc<AsyncDaemonDb>,
+    ) -> Self {
+        Self {
+            manager,
+            session_id,
+            project_dir,
+            bindings: Arc::new(Mutex::new(BTreeMap::new())),
+            store: Some(store),
         }
     }
 
@@ -139,6 +171,79 @@ impl OpenRouterAgentTurnRuntime {
                 .into()
             })
     }
+
+    async fn persist_start(
+        &self,
+        id: &AgentTurnId,
+        requested_model: Option<String>,
+        source_revision: Option<String>,
+    ) -> Result<(), CliError> {
+        let Some(store) = &self.store else {
+            return Ok(());
+        };
+        let now = utc_now();
+        store
+            .record_agent_turn_run_started(&AgentTurnRunSnapshot {
+                run_id: id.as_str().to_string(),
+                session_id: Some(self.session_id.clone()),
+                task_id: None,
+                board_item_id: None,
+                workflow_execution_id: None,
+                project_dir: self.project_dir.clone(),
+                requested_runtime: OPENROUTER_RUNTIME.into(),
+                actual_runtime: Some(OPENROUTER_RUNTIME.into()),
+                requested_model,
+                actual_model: None,
+                status: AgentTurnRunStatus::Running,
+                source_revision,
+                report: None,
+                stop_reason: None,
+                error: None,
+                created_at: now.clone(),
+                updated_at: now,
+            })
+            .await
+            .map(|_| ())
+    }
+
+    /// Persist an observed settlement. Only the columns learned here are set;
+    /// the store preserves earlier identity and enrichment and keeps a terminal
+    /// status sticky, so repeated polls converge on one durable outcome.
+    async fn persist_settlement(
+        &self,
+        id: &AgentTurnId,
+        status: AgentTurnRunStatus,
+        actual_model: Option<String>,
+        report: Option<String>,
+        stop_reason: Option<String>,
+        error: Option<String>,
+    ) -> Result<(), CliError> {
+        let Some(store) = &self.store else {
+            return Ok(());
+        };
+        let now = utc_now();
+        store
+            .save_agent_turn_run(&AgentTurnRunSnapshot {
+                run_id: id.as_str().to_string(),
+                session_id: Some(self.session_id.clone()),
+                task_id: None,
+                board_item_id: None,
+                workflow_execution_id: None,
+                project_dir: self.project_dir.clone(),
+                requested_runtime: OPENROUTER_RUNTIME.into(),
+                actual_runtime: Some(OPENROUTER_RUNTIME.into()),
+                requested_model: None,
+                actual_model,
+                status,
+                source_revision: None,
+                report,
+                stop_reason,
+                error,
+                created_at: now.clone(),
+                updated_at: now,
+            })
+            .await
+    }
 }
 
 #[async_trait]
@@ -171,11 +276,23 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         self.lock_bindings()?.insert(
             id.clone(),
             OpenRouterTurnBinding {
-                requested_model,
-                source_revision,
+                requested_model: requested_model.clone(),
+                source_revision: source_revision.clone(),
                 cancelled: false,
             },
         );
+        if let Err(error) = self.persist_start(&id, requested_model, source_revision).await {
+            // The remote turn is already running and the binding is inserted,
+            // but the run could not be recorded durably. Leaving both in place
+            // would strand agent work and let a retry start a second turn -- the
+            // exact double-start this durable tracking exists to prevent. Undo
+            // both on a best-effort basis, then surface the persistence error.
+            if let Ok(mut bindings) = self.lock_bindings() {
+                bindings.remove(&id);
+            }
+            let _ = self.manager.stop(id.as_str());
+            return Err(error);
+        }
         Ok(id)
     }
 
@@ -186,13 +303,33 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         }
         let state = self.inspect_turn(id)?.session_state.unwrap_or_default();
         if let Some(failure) = state.last_turn_failure {
-            return Ok(if failure.category == AgentTurnFailureCategory::Cancelled {
-                AgentTurnStatus::Cancelled
-            } else {
-                AgentTurnStatus::Failed
-            });
+            let (status, run_status) =
+                if failure.category == AgentTurnFailureCategory::Cancelled {
+                    (AgentTurnStatus::Cancelled, AgentTurnRunStatus::Cancelled)
+                } else {
+                    (AgentTurnStatus::Failed, AgentTurnRunStatus::Failed)
+                };
+            self.persist_settlement(
+                id,
+                run_status,
+                effective_model(&state.config_options),
+                None,
+                None,
+                Some(failure.detail),
+            )
+            .await?;
+            return Ok(status);
         }
         if state.last_turn_result.is_some() {
+            self.persist_settlement(
+                id,
+                AgentTurnRunStatus::Completed,
+                effective_model(&state.config_options),
+                None,
+                None,
+                None,
+            )
+            .await?;
             Ok(AgentTurnStatus::Completed)
         } else {
             Ok(AgentTurnStatus::Running)
@@ -209,12 +346,22 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         let Some(result) = state.last_turn_result else {
             return Ok(None);
         };
+        let effective_model = effective_model(&state.config_options);
+        self.persist_settlement(
+            id,
+            AgentTurnRunStatus::Completed,
+            effective_model.clone(),
+            Some(result.report.clone()),
+            Some(result.stop_reason.clone()),
+            None,
+        )
+        .await?;
         Ok(Some(AgentTurnResult {
             correlation_id: id.clone(),
             report: result.report,
             stop_reason: result.stop_reason,
             requested_model: binding.requested_model,
-            effective_model: effective_model(&state.config_options),
+            effective_model,
             source_revision: binding.source_revision,
         }))
     }
@@ -240,6 +387,18 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
             self.rollback_cancellation(id)?;
             return Err(error);
         }
+        // A cancelled run keeps `error` NULL and records the reason in
+        // `stop_reason`, matching the Codex path so a downstream reader never
+        // mistakes a deliberate cancellation for a failure.
+        self.persist_settlement(
+            id,
+            AgentTurnRunStatus::Cancelled,
+            None,
+            None,
+            Some("cancelled".into()),
+            None,
+        )
+        .await?;
         Ok(AgentTurnStatus::Cancelled)
     }
 }

@@ -123,6 +123,10 @@ pub async fn serve_remote_https(
             super::recover_remote_assignments_at_startup_with_controller(&app_state, async_db),
         )
         .await?;
+        // Mirror the local serve path: settle interrupted non-Codex runs before
+        // the codex controller scans the admission ledger, so a remote-mode
+        // restart never leaves a non-Codex run or its admission stuck active.
+        async_db.reconcile_interrupted_agent_turn_runs().await?;
     }
     Box::pin(
         app_state
