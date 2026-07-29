@@ -195,6 +195,9 @@ fn validate_pull_request_identity(
 ) -> Result<(), TaskBoardDependencyTriageError> {
     let expected_repository = normalize_repository_slug(Some(repository));
     let actual_repository = normalize_repository_slug(Some(&result.repository));
+    if !valid_head_revision(head) || !valid_head_revision(&result.exact_head_revision) {
+        return Err(TaskBoardDependencyTriageError::InvalidHeadRevision);
+    }
     if expected_repository.is_none()
         || actual_repository != expected_repository
         || number == 0
@@ -202,9 +205,6 @@ fn validate_pull_request_identity(
         || result.exact_head_revision != head
     {
         return Err(TaskBoardDependencyTriageError::PullRequestMismatch);
-    }
-    if !valid_head_revision(&result.exact_head_revision) {
-        return Err(TaskBoardDependencyTriageError::InvalidHeadRevision);
     }
     Ok(())
 }
@@ -305,7 +305,7 @@ fn validate_disposition(
     let valid = match result.disposition {
         TaskBoardDependencyTriageDisposition::WaitForChecks => pending && !failing,
         TaskBoardDependencyTriageDisposition::ContinueSafe => {
-            !pending && !failing && approvals_met && clean
+            !result.checks.is_empty() && !pending && !failing && approvals_met && clean
         }
         TaskBoardDependencyTriageDisposition::ReportOnly
         | TaskBoardDependencyTriageDisposition::HumanRequired
@@ -353,6 +353,13 @@ mod tests {
                 .contains("not valid JSON for the required schema")
         );
 
+        let mut malformed = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
+        malformed.exact_head_revision = "not-a-revision".into();
+        assert_eq!(
+            validate(&malformed),
+            Err(TaskBoardDependencyTriageError::InvalidHeadRevision)
+        );
+
         let mut stale = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         stale.exact_head_revision = "abcdefabcdefabcdefabcdefabcdefabcdefabcd".into();
         let stale = serde_json::to_string(&stale).expect("serialize stale result");
@@ -375,6 +382,10 @@ mod tests {
         let mut under_approved = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         under_approved.approvals.current = 0;
         assert_contradiction(&under_approved);
+
+        let mut no_checks = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
+        no_checks.checks.clear();
+        assert_contradiction(&no_checks);
     }
 
     #[test]

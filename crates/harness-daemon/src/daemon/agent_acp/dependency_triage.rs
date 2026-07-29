@@ -60,6 +60,11 @@ fn parse_completed_dependency_triage(
     expected_pull_request_number: u64,
     expected_head_revision: &str,
 ) -> Result<TaskBoardDependencyTriageResult, CliError> {
+    if result.stop_reason != "end_turn" {
+        return Err(
+            CliErrorKind::workflow_parse("dependency triage result did not end normally").into(),
+        );
+    }
     if result.requested_model.as_deref() != Some(TASK_BOARD_DEPENDENCY_TRIAGE_MODEL)
         || result.effective_model.as_deref() != Some(TASK_BOARD_DEPENDENCY_TRIAGE_MODEL)
         || result.source_revision.as_deref() != Some(expected_head_revision)
@@ -148,6 +153,12 @@ mod tests {
         result.effective_model = Some(TASK_BOARD_DEPENDENCY_TRIAGE_MODEL.into());
         result.source_revision = Some("abcdefabcdefabcdefabcdefabcdefabcdefabcd".into());
         assert!(parse_completed_dependency_triage(&result, "acme/widgets", 17, HEAD).is_err());
+
+        result.source_revision = Some(HEAD.into());
+        result.stop_reason = "max_tokens".into();
+        let error = parse_completed_dependency_triage(&result, "acme/widgets", 17, HEAD)
+            .expect_err("truncated result");
+        assert!(error.to_string().contains("did not end normally"));
     }
 
     fn structured_result() -> TaskBoardDependencyTriageResult {
