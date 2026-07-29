@@ -313,8 +313,12 @@ pub(crate) use remote_assignment_start_authority::{
 };
 #[allow(unused_imports)]
 pub(crate) use remote_evidence_retention::TaskBoardRemoteEvidencePruneResult;
-pub(crate) use remote_hosts::{TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence};
-pub(crate) use remote_lifecycle_trust::TaskBoardRemoteLifecycleTrustSnapshot;
+pub(crate) use remote_hosts::TaskBoardRemoteHostSelection;
+// `pub`, not `pub(crate)`: `db/mod.rs` re-exports these two further, all the
+// way out to `harness-db-schema`'s own v43 controller-operation migration
+// test.
+pub use remote_hosts::TaskBoardRemoteHostTrustFence;
+pub use remote_lifecycle_trust::TaskBoardRemoteLifecycleTrustSnapshot;
 pub(crate) use remote_offer_receipts::{
     TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
 };

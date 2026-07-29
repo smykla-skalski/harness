@@ -53,7 +53,12 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    #[cfg(test)]
+    //
+    // `test-support` alongside `test`: `harness-db-schema`'s own migration
+    // tests build a real `DaemonDb` end-to-end rather than a hand-rolled
+    // bootstrap, so its dev-dependency on this crate needs this reachable
+    // outside `harness-daemon`'s own test build too.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn open_in_memory() -> Result<Self, CliError> {
         let conn = Connection::open_in_memory()
             .map_err(|error| db_error(format!("open in-memory database: {error}")))?;
@@ -113,15 +118,24 @@ impl DaemonDb {
             let should_reclaim_space =
                 super::schema_migrations::run_pre_v7_migrations(&self.conn, version.as_str())?;
             self.run_post_v7_migrations(version.as_str())?;
-            super::schema_repairs::repair_current_schema_shape(self)?;
+            harness_db_schema::schema_repairs::repair_current_schema_shape(
+                &self.conn,
+                super::SCHEMA_VERSION,
+            )?;
             if should_reclaim_space {
                 reclaim_unused_pages(&self.conn)?;
             }
         } else {
             self.run_post_v7_migrations(version.as_str())?;
-            super::schema_repairs::repair_current_schema_shape(self)?;
+            harness_db_schema::schema_repairs::repair_current_schema_shape(
+                &self.conn,
+                super::SCHEMA_VERSION,
+            )?;
         }
-        super::schema_repairs::repair_noncanonical_session_state_wire(self)?;
+        harness_db_schema::schema_repairs::repair_noncanonical_session_state_wire(
+            &self.conn,
+            |project_id, state| self.sync_session(project_id, state),
+        )?;
         Ok(())
     }
 
@@ -268,94 +282,94 @@ impl DaemonDb {
             migrate_v42_to_v43(&self.conn)?;
         }
         if version_number <= 43 {
-            super::schema_v44::run(&self.conn)?;
+            harness_db_schema::schema_v44::run(&self.conn)?;
         }
         if version_number <= 44 {
-            super::schema_v45::run(&self.conn)?;
+            harness_db_schema::schema_v45::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v46(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 45 {
-            super::schema_v46::run(&self.conn)?;
+            harness_db_schema::schema_v46::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v47(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 46 {
-            super::schema_v47::run(&self.conn)?;
+            harness_db_schema::schema_v47::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v48(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 47 {
-            super::schema_v48::run(&self.conn)?;
+            harness_db_schema::schema_v48::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v49(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 48 {
-            super::schema_v49::run(&self.conn)?;
+            harness_db_schema::schema_v49::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v50(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 49 {
-            super::schema_v50::run(&self.conn)?;
+            harness_db_schema::schema_v50::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v51(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 50 {
-            super::schema_v51::run(&self.conn)?;
+            harness_db_schema::schema_v51::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v52(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 51 {
-            super::schema_v52::run(&self.conn)?;
+            harness_db_schema::schema_v52::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v53(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 52 {
-            super::schema_v53::run(&self.conn)?;
+            harness_db_schema::schema_v53::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v54(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 53 {
-            super::schema_v54::run(&self.conn)?;
+            harness_db_schema::schema_v54::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v55(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 54 {
-            super::schema_v55::run(&self.conn)?;
+            harness_db_schema::schema_v55::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v56(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 55 {
-            super::schema_v56::run(&self.conn)?;
+            harness_db_schema::schema_v56::run(&self.conn)?;
         }
         Ok(())
     }
 
     fn apply_pending_migrations_v57(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 56 {
-            super::schema_v57::run(&self.conn)?;
+            harness_db_schema::schema_v57::run(&self.conn)?;
         }
         Ok(())
     }
@@ -376,7 +390,10 @@ impl DaemonDb {
     }
 
     fn migrate_v8_to_v9(&self) -> Result<(), CliError> {
-        super::schema_repairs::repair_stale_active_sessions_without_leader(self)?;
+        harness_db_schema::schema_repairs::repair_stale_active_sessions_without_leader(
+            &self.conn,
+            |project_id, state| self.sync_session(project_id, state),
+        )?;
         self.conn
             .execute(
                 "UPDATE schema_meta SET value = '9' WHERE key = 'version'",

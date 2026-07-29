@@ -44,7 +44,7 @@ async fn async_connect_repairs_missing_dispatch_compensation_marker() {
     let tmp = tempdir().expect("tempdir");
     let db_path = tmp.path().join("harness.db");
     let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
-    crate::daemon::db::schema_v43::restore_legacy_v40_for_test(&sync_db);
+    harness_db_schema::schema_v43::restore_legacy_v40_for_test(sync_db.connection());
     sync_db
         .connection()
         .execute_batch(

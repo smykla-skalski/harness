@@ -31,10 +31,13 @@ pub(crate) struct TaskBoardRemoteHostSelection {
     pub(crate) received_at: String,
 }
 
+// `pub` fields, not `pub(crate)`: `harness-db-schema`'s own v43
+// controller-operation migration test constructs this fence directly to
+// exercise the paired lifecycle-trust columns that migration adds.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TaskBoardRemoteHostTrustFence {
-    pub(crate) config: TaskBoardExecutionHostConfig,
-    pub(crate) configuration_revision: u64,
+pub struct TaskBoardRemoteHostTrustFence {
+    pub config: TaskBoardExecutionHostConfig,
+    pub configuration_revision: u64,
 }
 
 impl AsyncDaemonDb {

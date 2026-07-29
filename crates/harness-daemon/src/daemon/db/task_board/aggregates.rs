@@ -140,7 +140,13 @@ impl AsyncDaemonDb {
         Ok(Some((machine, change_revision)))
     }
 
-    pub(crate) async fn task_board_orchestrator_settings(
+    /// `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 tombstone
+    /// migration test reads and replaces the orchestrator settings row
+    /// directly to exercise a rebind scenario.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub async fn task_board_orchestrator_settings(
         &self,
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
         self.task_board_orchestrator_settings_snapshot()
@@ -169,7 +175,11 @@ impl AsyncDaemonDb {
         })
     }
 
-    pub(crate) async fn replace_task_board_orchestrator_settings(
+    /// `pub`, not `pub(crate)`: see `task_board_orchestrator_settings` above.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub async fn replace_task_board_orchestrator_settings(
         &self,
         settings: &TaskBoardOrchestratorSettings,
     ) -> Result<i64, CliError> {

@@ -168,8 +168,11 @@ impl AsyncDaemonDb {
         .await
     }
 
+    // `pub`, not `pub(crate)`, matching sync `DaemonDb::connection()`:
+    // `harness-db-schema`'s own migration tests assert directly against the
+    // async pool the same way `tests/integration_daemon.rs` already does.
     #[must_use]
-    pub(crate) fn pool(&self) -> &SqlitePool {
+    pub fn pool(&self) -> &SqlitePool {
         &self.pool
     }
 
@@ -199,7 +202,11 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn schema_version(&self) -> Result<String, CliError> {
+    //
+    // `pub`, not `pub(crate)`, matching sync `DaemonDb::schema_version()`:
+    // `harness-db-schema`'s own migration tests assert a freshly migrated
+    // async pool's stamped version the same way the sync tests do.
+    pub async fn schema_version(&self) -> Result<String, CliError> {
         trace_async_db_operation("schema_version", "read", Some(&self.path), || async {
             record_daemon_db_pool_state(
                 "async",

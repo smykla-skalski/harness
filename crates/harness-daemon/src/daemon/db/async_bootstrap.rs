@@ -239,7 +239,8 @@ pub(super) fn prepare_legacy_schema(path: &Path) -> Result<(), CliError> {
     let version: String = conn
         .query_row(SCHEMA_VERSION_SQL, [], |row| row.get(0))
         .map_err(|error| db_error(format!("inspect async schema version: {error}")))?;
-    let needs_shape_repair = super::schema_repairs::current_schema_shape_needs_repair(&conn)?;
+    let needs_shape_repair =
+        harness_db_schema::schema_repairs::current_schema_shape_needs_repair(&conn)?;
     drop(conn);
 
     if version != super::SCHEMA_VERSION || needs_shape_repair {

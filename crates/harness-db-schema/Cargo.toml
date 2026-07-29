@@ -1,0 +1,49 @@
+[package]
+name = "harness-db-schema"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[features]
+# Exposes items normally `cfg(test)`-only (the pure-`Connection` v40 legacy
+# repair fixture `schema_v43::restore_legacy_v40_for_test`) to
+# `harness-daemon`'s own `db/tests/` migration-repair suite, which depends on
+# this crate as an ordinary library and so never sees its `cfg(test)` items.
+# Matches `harness-daemon`'s own `test-support` feature, the mirror image of
+# this same problem in the other direction.
+test-support = []
+
+[dependencies]
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.0" }
+harness-session = { path = "../harness-session", version = "55.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+rusqlite = { version = "0.39", features = ["bundled"] }
+serde_json = "1.0.149"
+sha2 = "0.11.0"
+
+[dev-dependencies]
+# Full-migration end-to-end tests build a real `DaemonDb`/`AsyncDaemonDb`
+# rather than a hand-rolled bootstrap, and one v43 fixture reaches `db`'s own
+# task-board persistence test-support; both keep this crate's test target
+# needing the whole daemon crate to build, a deliberate tradeoff over
+# duplicating `ensure_schema`'s orchestration a second time. See
+# `crates/harness-daemon/Cargo.toml`'s `test-support` feature.
+harness-daemon = { path = "../harness-daemon", version = "55.0.0", features = ["test-support"] }
+hex = "0.4.3"
+sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
+tempfile = "3.27.0"
+tokio = { version = "1.50.0", features = ["macros", "rt-multi-thread"] }
+
+# Matches the root crate's lint set rather than the lighter one the facade
+# crates carry: this code was extracted from harness-daemon's own `db`
+# module, which itself carries only the lighter set, so it keeps the bar it
+# was already written and reviewed against instead of a stricter one applied
+# after the fact.
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

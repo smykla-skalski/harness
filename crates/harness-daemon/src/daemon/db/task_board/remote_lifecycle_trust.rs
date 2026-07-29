@@ -10,9 +10,13 @@ use crate::task_board::{TaskBoardExecutionHostConfig, validate_execution_host_co
 const LIFECYCLE_TRUST_SCHEMA_VERSION: u32 = 1;
 const MAX_LIFECYCLE_TRUST_JSON_BYTES: usize = 4_096;
 
+// `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 controller-operation
+// migration test builds one of these directly and reads `snapshot_sha256`
+// out of it to bind the paired controller-operation trust column; the rest
+// stay crate-private.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct TaskBoardRemoteLifecycleTrustSnapshot {
+pub struct TaskBoardRemoteLifecycleTrustSnapshot {
     schema_version: u32,
     pub(crate) host_id: String,
     pub(crate) endpoint: String,
@@ -22,7 +26,7 @@ pub(crate) struct TaskBoardRemoteLifecycleTrustSnapshot {
     pub(crate) enabled_at_capture: bool,
     pub(crate) observed_host_instance_id: String,
     pub(crate) advertisement_sha256: String,
-    pub(crate) snapshot_sha256: String,
+    pub snapshot_sha256: String,
 }
 
 pub(super) async fn capture_lifecycle_trust_for_offer_in_tx(
@@ -101,7 +105,10 @@ pub(super) async fn require_stable_configured_host_in_tx(
 }
 
 impl TaskBoardRemoteLifecycleTrustSnapshot {
-    pub(crate) fn capture(
+    /// # Errors
+    /// Returns [`CliError`] when `host`, `observed_host_instance_id`, or
+    /// `advertisement_sha256` fail validation.
+    pub fn capture(
         host: &TaskBoardRemoteHostTrustFence,
         observed_host_instance_id: &str,
         advertisement_sha256: &str,
@@ -134,7 +141,10 @@ impl TaskBoardRemoteLifecycleTrustSnapshot {
         Ok(snapshot)
     }
 
-    pub(crate) fn encoded(&self) -> Result<String, CliError> {
+    /// # Errors
+    /// Returns [`CliError`] when the snapshot fails validation or fails to
+    /// serialize.
+    pub fn encoded(&self) -> Result<String, CliError> {
         self.validate()?;
         let json = serde_json::to_string(self)
             .map_err(|error| db_error(format!("serialize remote lifecycle trust: {error}")))?;

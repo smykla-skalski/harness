@@ -7,6 +7,7 @@ members = [
   "crates/harness-command",
   "crates/harness-daemon-client",
   "crates/harness-daemon",
+  "crates/harness-db-schema",
   "crates/harness-feature-flags",
   "crates/harness-github-api",
   "crates/harness-hook",
