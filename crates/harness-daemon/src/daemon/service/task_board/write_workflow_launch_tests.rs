@@ -83,6 +83,21 @@ fn stale_pull_request_head_stops_before_agent_work() {
 }
 
 #[test]
+fn a_changed_pull_request_number_reports_an_identity_change_not_a_stale_head() {
+    let mut fresh = frozen_identity("cafef00d");
+    fresh.number = 18;
+
+    let error = stop_on_stale_pull_request_head(Some(&fresh), Some(&frozen_identity("cafef00d")))
+        .expect_err("a changed pull request number must stop the launch");
+
+    let message = error.to_string();
+    assert!(
+        message.contains("identity changed") && !message.contains("stale head"),
+        "a changed number must not be reported as a stale head: {message}"
+    );
+}
+
+#[test]
 fn unchanged_pull_request_head_is_not_stale() {
     stop_on_stale_pull_request_head(
         Some(&frozen_identity("cafef00d")),

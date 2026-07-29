@@ -10,13 +10,13 @@ use crate::{
 pub enum TaskBoardReadOnlyWorkflowContractError {
     #[error("workflow execution repository is invalid")]
     InvalidRepository,
-    #[error("PrReview workflow requires exactly one active GitHub pull request")]
+    #[error("pull request workflow requires exactly one active GitHub pull request")]
     AmbiguousPullRequest,
-    #[error("PrReview pull request identity is incomplete")]
+    #[error("pull request identity is incomplete")]
     IncompletePullRequest,
-    #[error("PrReview pull request number is invalid")]
+    #[error("pull request number is invalid")]
     InvalidPullRequestNumber,
-    #[error("PrReview pull request contradicts its execution repository")]
+    #[error("pull request contradicts its execution repository")]
     PullRequestRepositoryMismatch,
     #[error("read-only workflow run context uses an unsupported schema version")]
     UnsupportedRunContextVersion,

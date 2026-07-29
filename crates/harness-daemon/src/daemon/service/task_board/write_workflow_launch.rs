@@ -223,8 +223,10 @@ async fn resolve_write_identity(
     Ok((Some(identity), remote_head))
 }
 
-/// Stop a dependency launch whose live pull request head no longer matches the frozen head,
-/// before any agent work starts, with a reason that names the stale revision.
+/// Stop a dependency launch whose live pull request no longer matches the frozen one, before any
+/// agent work starts. A changed repository or number is reported as an identity change; only a
+/// matching identity with a moved head is reported as a stale head, so the reason is never
+/// misattributed.
 fn stop_on_stale_pull_request_head(
     fresh: Option<&TaskBoardPullRequestIdentity>,
     frozen: Option<&TaskBoardPullRequestIdentity>,
@@ -232,6 +234,12 @@ fn stop_on_stale_pull_request_head(
     let (Some(fresh), Some(frozen)) = (fresh, frozen) else {
         return Ok(());
     };
+    if fresh.repository != frozen.repository || fresh.number != frozen.number {
+        return Err(invalid_transition(format!(
+            "PrFix pull request identity changed since launch: frozen '{}#{}', now '{}#{}'",
+            frozen.repository, frozen.number, fresh.repository, fresh.number,
+        )));
+    }
     let fresh_head = fresh.head.as_ref().map(|head| head.revision.as_str());
     let frozen_head = frozen.head.as_ref().map(|head| head.revision.as_str());
     if fresh_head == frozen_head {
