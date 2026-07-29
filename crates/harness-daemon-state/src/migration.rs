@@ -1,13 +1,13 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use crate::infra::io::read_json_typed;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::read_json_typed;
 
-use super::locks::daemon_lock_is_held_at;
-use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};
-use super::paths::{base_daemon_dir, daemon_root_for_ownership};
-use super::{DAEMON_LOCK_FILE, DaemonManifest, MANIFEST_LOCK_FILE};
+use super::{
+    DAEMON_LOCK_FILE, DaemonManifest, DaemonOwnership, MANIFEST_LOCK_FILE, base_daemon_dir,
+    daemon_lock_is_held_at, daemon_ownership_from_env_or_default, daemon_root_for_ownership,
+};
 
 /// Files that exist for lifecycle bookkeeping and should not be moved into
 /// the new ownership subtree. Locks tie to the legacy parent directory and
@@ -180,10 +180,12 @@ pub(crate) fn infer_legacy_ownership(manifest: &DaemonManifest) -> DaemonOwnersh
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::daemon::state::{DaemonBinaryStamp, HostBridgeManifest};
     use std::fs;
+
     use tempfile::TempDir;
+
+    use super::*;
+    use crate::{DaemonBinaryStamp, HostBridgeManifest};
 
     fn manifest_with_helper(path: &str) -> DaemonManifest {
         DaemonManifest {

@@ -2974,7 +2974,7 @@ const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // AcpAgentSnapshotWire (TYPE_RENAMES from the public no-derive AcpAgentSnapshot). The return
 // type of nearly every managed-agent endpoint.
 const MANAGED_AGENTS_EMIT_ONLY: &[&str] = &["ManagedAgentSnapshot", "ManagedAgentListResponse"];
-const DAEMON_STATE_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/state/mod.rs");
+const DAEMON_STATE_SOURCE: &str = include_str!("../crates/harness-daemon-root/src/lib.rs");
 const DAEMON_LAUNCHD_SOURCE: &str =
     include_str!("../crates/harness-daemon/src/daemon/launchd/mod.rs");
 const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/DaemonStateWireTypes.generated.swift";
@@ -2982,7 +2982,7 @@ const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // cluster it nests: the manifest tree (DaemonManifest -> HostBridgeManifest ->
 // HostBridgeCapabilityManifest, plus DaemonBinaryStamp) and the workspace diagnostics
 // (DaemonDiagnostics -> DaemonAuditEvent) moved into the shared protocol crate's daemon.rs
-// (state/mod.rs now only re-exports them), and the launchd LaunchAgentStatus. health and
+// (harness-daemon-root's lib.rs now only re-exports them), and the launchd LaunchAgentStatus. health and
 // github_api resolve to the already-generated HealthResponseWire/GitHubApiDiagnosticsWire
 // (bare suffixed refs). acp_runtime_probe and DaemonManifest.ownership are dropped via
 // OMITTED_WIRE_FIELDS - the hand DaemonDiagnosticsReport/DaemonManifest never model them.

@@ -120,7 +120,15 @@ pub(crate) mod server_state;
 pub mod service;
 #[cfg(feature = "daemon-runtime")]
 pub mod snapshot;
-pub mod state;
+// `state` moved natively into `harness-daemon-state` (bridge-shared
+// primitives split further into `harness-daemon-root`), which now owns and
+// runs its own unit tests directly. A thin re-export over the real
+// dependency, rather than a `#[path]` mirror, keeps every existing
+// `crate::daemon::state::*` call site unchanged while letting a state-only
+// edit skip recompiling this crate entirely.
+pub mod state {
+    pub use harness_daemon_state::*;
+}
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_codex_requests;
 #[cfg(feature = "daemon-runtime")]

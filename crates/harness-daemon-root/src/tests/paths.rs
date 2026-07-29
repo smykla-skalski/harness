@@ -1,6 +1,5 @@
+use harness_workspace::workspace::harness_data_root;
 use tempfile::tempdir;
-
-use crate::workspace::harness_data_root;
 
 use super::super::{
     DaemonOwnership, ScopedDaemonRootOverride, daemon_root, default_daemon_root,

@@ -23,6 +23,11 @@ fs2 = "0.4.3"
 fs-err = "3.3.0"
 harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["bridge-runtime"] }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
+harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.0" }
+# Optional: only the `daemon-runtime` build mode needs the task-board runtime
+# config surface (e.g. `agent_acp`'s OpenRouter token lookup); the default
+# `bridge-runtime` build has no reason to depend on `harness-task-board`.
+harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.0", optional = true }
 harness-hook = { path = "../harness-hook", version = "55.0.0" }
 harness-infra = { path = "../harness-infra", version = "55.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
@@ -58,7 +63,7 @@ libc = "0.2"
 [features]
 default = ["bridge-runtime"]
 bridge-runtime = []
-daemon-runtime = []
+daemon-runtime = ["dep:harness-daemon-state"]
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

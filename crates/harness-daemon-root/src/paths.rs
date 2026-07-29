@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use crate::workspace::{
-    dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
-};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_telemetry::observe_daemon_root_override;
+use harness_workspace::workspace::{
+    dirs_home, ensure_non_indexable, harness_data_root, host_home_dir, normalized_env_value,
+};
 
 use super::ownership::{DaemonOwnership, daemon_ownership_from_env_or_default};
 use super::{

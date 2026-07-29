@@ -2,25 +2,30 @@
 
 use std::fs::File;
 
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+use harness_kernel::errors::{CliError, io_for};
+use harness_kernel::io::write_json_pretty;
+
+use super::config::DaemonRuntimeConfig;
+use super::config_path;
+
+#[cfg(any(test, feature = "daemon-runtime"))]
+use harness_kernel::errors::CliErrorKind;
+#[cfg(any(test, feature = "daemon-runtime"))]
+use harness_task_board::TaskBoardGitRuntimeConfig;
 #[cfg(any(test, feature = "daemon-runtime"))]
 use sha2::{Digest, Sha256};
 
-use super::config::DaemonRuntimeConfig;
 #[cfg(any(test, feature = "daemon-runtime"))]
 use super::config::load_runtime_config_raw;
-use super::config_path;
-use crate::infra::io::write_json_pretty;
-use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-#[cfg(any(test, feature = "daemon-runtime"))]
-use crate::task_board::TaskBoardGitRuntimeConfig;
-#[cfg(any(test, feature = "daemon-runtime"))]
-use harness_kernel::errors::CliErrorKind;
-use harness_kernel::errors::{CliError, io_for};
 
 /// Compute the stable digest carried by the database-backed secret handoff.
 /// `None` means the legacy envelope contains no plaintext secret material.
+///
+/// # Errors
+/// Returns `CliError` when `config` cannot be serialized.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn task_board_git_runtime_secret_handoff_digest(
+pub fn task_board_git_runtime_secret_handoff_digest(
     config: &TaskBoardGitRuntimeConfig,
 ) -> Result<Option<String>, CliError> {
     if !config.contains_plaintext_secrets() {
@@ -35,8 +40,11 @@ pub(crate) fn task_board_git_runtime_secret_handoff_digest(
 }
 
 /// Remove non-secret legacy Task Board config after `SQLite` owns its values.
+///
+/// # Errors
+/// Returns `CliError` when the runtime config cannot be read or written.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn remove_migrated_task_board_config_if_safe() -> Result<bool, CliError> {
+pub fn remove_migrated_task_board_config_if_safe() -> Result<bool, CliError> {
     with_runtime_config_lock(remove_non_secret_envelope)
 }
 
@@ -58,8 +66,12 @@ fn remove_non_secret_envelope() -> Result<bool, CliError> {
 
 /// Remove an acknowledged legacy envelope only when its plaintext still
 /// matches the digest that the secure-store client persisted.
+///
+/// # Errors
+/// Returns `CliError` when the runtime config cannot be read or written, or
+/// when the acknowledged plaintext no longer matches `expected_digest`.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(crate) fn remove_migrated_task_board_config_after_ack(
+pub fn remove_migrated_task_board_config_after_ack(
     expected_digest: &str,
 ) -> Result<bool, CliError> {
     with_runtime_config_lock(|| remove_acknowledged_envelope(expected_digest))

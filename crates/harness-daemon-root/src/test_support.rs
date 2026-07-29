@@ -1,7 +1,7 @@
 use std::fs::OpenOptions;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::io::{Read, Write};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::net::TcpStream;
 
 use fs2::FileExt;
@@ -67,13 +67,18 @@ pub fn install_fake_running_xdg_daemon(
     lock_file
 }
 
-// Only this crate's own `#[cfg(test)]` unit test (`direct_session_start`)
-// calls these two; the `tests/integration_daemon.rs` scenarios that need this
-// fixture in a non-test, `daemon-runtime` build only reach
-// `install_fake_running_xdg_daemon` above and bring their own request/response
-// helpers.
-#[cfg(test)]
-pub(crate) fn read_http_request(stream: &mut TcpStream) -> String {
+/// `harness-daemon`'s own `direct_session_start` unit test calls these two;
+/// the `tests/integration_daemon.rs` scenarios that need this fixture in a
+/// non-test, `daemon-runtime` build only reach `install_fake_running_xdg_daemon`
+/// above and bring their own request/response helpers. `pub`, not
+/// `pub(crate)`, and gated by `test-support` rather than `daemon-runtime`
+/// since that caller is `harness-daemon`'s own `cfg(test)` unit test, in a
+/// different crate that never sees this crate's `cfg(test)`.
+///
+/// # Panics
+/// Panics if the stream cannot be read or the request is not valid UTF-8.
+#[cfg(any(test, feature = "test-support"))]
+pub fn read_http_request(stream: &mut TcpStream) -> String {
     stream.set_nonblocking(false).expect("blocking stream");
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(1)))
@@ -93,8 +98,10 @@ pub(crate) fn read_http_request(stream: &mut TcpStream) -> String {
     String::from_utf8(buffer).expect("utf8 request")
 }
 
-#[cfg(test)]
-pub(crate) fn write_http_response(
+/// # Panics
+/// Panics if the response cannot be written to the stream.
+#[cfg(any(test, feature = "test-support"))]
+pub fn write_http_response(
     stream: &mut TcpStream,
     status: &str,
     content_type: &str,

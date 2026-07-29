@@ -1,0 +1,45 @@
+[package]
+name = "harness-daemon-state"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+fs-err = "3.3.0"
+harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.0" }
+harness-infra = { path = "../harness-infra", version = "55.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+hex = "0.4.3"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.11.0"
+uuid = { version = "1.18.1", features = ["v4"] }
+
+[dev-dependencies]
+harness-testkit = { path = "../../testkit" }
+temp-env = "=0.3.6"
+tempfile = "3.27.0"
+
+[features]
+# Threaded from `harness-daemon`'s own `daemon-runtime` feature (see that
+# crate's Cargo.toml), matching `harness-reviews`, `harness-session`, and
+# `harness-task-board`. Gates the task-board secret-migration helpers that
+# only the full daemon build calls, and forwards on to `harness-daemon-root`'s
+# own `daemon-runtime` feature for its `test_support` fixtures.
+daemon-runtime = ["harness-daemon-root/daemon-runtime"]
+# Exposes the `cfg(test)`-only task-board git-runtime config accessors to
+# `harness-daemon`'s own tests, which depend on this crate as an ordinary
+# library and so never see its `cfg(test)` items. Matches `harness-task-board`'s
+# own `test-support` feature, and forwards on to `harness-daemon-root`'s own
+# `test-support` feature for its HTTP fixture helpers.
+test-support = ["harness-daemon-root/test-support"]
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }
+unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("daemon-runtime", "test-support"))'] }

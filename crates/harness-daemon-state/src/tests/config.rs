@@ -12,7 +12,7 @@ use super::super::{
     task_board_git_runtime_secret_handoff_digest, task_board_github_token,
     task_board_openrouter_token,
 };
-use crate::task_board::{
+use harness_task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
     TaskBoardOpenRouterTokenSyncRequest,
@@ -56,7 +56,7 @@ fn config_path_lives_under_daemon_root() {
             tmp.path()
                 .join("harness")
                 .join("daemon")
-                .join(crate::daemon::state::DaemonOwnership::Managed.as_str())
+                .join(crate::DaemonOwnership::Managed.as_str())
                 .join("config.json")
         );
     });

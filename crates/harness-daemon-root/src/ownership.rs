@@ -2,8 +2,8 @@ use std::sync::Mutex;
 
 pub use harness_protocol::daemon::DaemonOwnership;
 
-use crate::workspace::normalized_env_value;
 use harness_telemetry::observe_daemon_ownership_override;
+use harness_workspace::workspace::normalized_env_value;
 
 use super::DAEMON_OWNERSHIP_ENV;
 

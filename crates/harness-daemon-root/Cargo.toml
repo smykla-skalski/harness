@@ -1,0 +1,42 @@
+[package]
+name = "harness-daemon-root"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+fs-err = "3.3.0"
+fs2 = "0.4.3"
+harness-infra = { path = "../harness-infra", version = "55.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+serde_json = "1.0.149"
+tracing = "0.1.44"
+uuid = { version = "1.18.1", features = ["v4"] }
+
+[dev-dependencies]
+harness-testkit = { path = "../../testkit" }
+temp-env = "=0.3.6"
+tempfile = "3.27.0"
+
+[features]
+# `install_fake_running_xdg_daemon` is also the only way
+# `tests/integration_daemon.rs` (in the root `harness` crate) can fake a
+# running daemon, since that binary links `harness` as an ordinary
+# dependency where `cfg(test)` is never set.
+daemon-runtime = []
+# Exposes the `cfg(test)`-only HTTP fixture helpers to `harness-daemon`'s own
+# tests, which depend on this crate as an ordinary library and so never see
+# its `cfg(test)` items. Matches `harness-daemon-state`'s own `test-support`
+# feature.
+test-support = []
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }
+unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("daemon-runtime", "test-support"))'] }
