@@ -239,13 +239,11 @@ fn settled_status(
     }
     let failed = checks
         .iter()
-        .filter(|check| check.conclusion == TaskBoardDependencyCheckConclusion::Failure)
-        .cloned()
-        .collect::<Vec<_>>();
-    if failed.is_empty() {
-        Ok(TaskBoardDependencyCheckResumeStatus::ChecksPassed { checks })
+        .any(|check| check.conclusion == TaskBoardDependencyCheckConclusion::Failure);
+    if failed {
+        Ok(TaskBoardDependencyCheckResumeStatus::ChecksFailed { checks })
     } else {
-        Ok(TaskBoardDependencyCheckResumeStatus::ChecksFailed { checks: failed })
+        Ok(TaskBoardDependencyCheckResumeStatus::ChecksPassed { checks })
     }
 }
 

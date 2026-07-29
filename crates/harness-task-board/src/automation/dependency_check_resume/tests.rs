@@ -80,6 +80,34 @@ async fn failed_checks_resume_with_names_conclusions_and_links() {
 }
 
 #[test]
+fn failed_outcomes_preserve_the_complete_required_check_set() {
+    let mut settled_evidence = evidence(CheckState::Failure, Some("https://checks/build"));
+    settled_evidence.gates.checks.push(CheckGate {
+        name: "lint".into(),
+        state: CheckState::Success,
+        details_url: Some("https://checks/lint".into()),
+    });
+
+    assert_eq!(
+        settled_status(&settled_evidence, &["build".into(), "lint".into()]).expect("settled"),
+        TaskBoardDependencyCheckResumeStatus::ChecksFailed {
+            checks: vec![
+                settled(
+                    "build",
+                    TaskBoardDependencyCheckConclusion::Failure,
+                    Some("https://checks/build")
+                ),
+                settled(
+                    "lint",
+                    TaskBoardDependencyCheckConclusion::Success,
+                    Some("https://checks/lint")
+                )
+            ]
+        }
+    );
+}
+
+#[test]
 fn pending_checks_cannot_be_recorded_as_terminal_conclusions() {
     let error = settled_status(&evidence(CheckState::Pending, None), &["build".into()])
         .expect_err("pending check must not settle");
