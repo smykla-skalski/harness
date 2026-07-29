@@ -296,7 +296,7 @@ fn validate_disposition(
     let approvals_met = result.approvals.current >= result.approvals.required;
     let clean = result.conflicts.state == TaskBoardDependencyConflictState::Clean;
     let valid = match result.disposition {
-        TaskBoardDependencyTriageDisposition::WaitForChecks => pending,
+        TaskBoardDependencyTriageDisposition::WaitForChecks => pending && !failing,
         TaskBoardDependencyTriageDisposition::ContinueSafe => {
             !pending && !failing && approvals_met && clean
         }
@@ -370,6 +370,15 @@ mod tests {
     fn wait_requires_pending_check_and_steps_are_strictly_ordered() {
         let wait = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         assert_contradiction(&wait);
+
+        let mut failed_while_pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
+        failed_while_pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
+        failed_while_pending.checks.push(TaskBoardDependencyCheck {
+            name: "lint".into(),
+            state: TaskBoardDependencyCheckState::Failed,
+            details_url: None,
+        });
+        assert_contradiction(&failed_while_pending);
 
         let mut unordered = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         unordered.next_steps[0].order = 2;
