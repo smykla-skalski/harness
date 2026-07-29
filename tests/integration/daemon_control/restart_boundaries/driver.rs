@@ -136,9 +136,9 @@ impl RestartDriver {
             path.trim_start_matches('/')
         );
         let runtime = Runtime::new().expect("runtime");
+        let client = reqwest::Client::new();
         let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
         loop {
-            let client = reqwest::Client::new();
             let mut builder = match method {
                 "POST" => client.post(&url),
                 "PUT" => client.put(&url),
