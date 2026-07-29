@@ -284,9 +284,10 @@ fn github_resource_name(resource: GitHubRateResource) -> String {
         .unwrap_or_else(|| format!("{resource:?}"))
 }
 
-pub use harness_protocol::timeline::{
-    TimelineCursor, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
-};
+// TimelineCursor, TimelineWindowRequest, and TimelineWindowResponse live in
+// harness_protocol::timeline alongside TimelineEntry; import them from there
+// directly instead of adding a re-export here.
+pub use harness_protocol::timeline::TimelineEntry;
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AcpTranscriptResponse {

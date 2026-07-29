@@ -3,10 +3,9 @@ use super::{
     db_error, replace_all_session_timeline_entries,
 };
 #[cfg(test)]
-use super::{
-    OptionalExtension, SessionTimelineStateRow, TimelineCursor, TimelineWindowRequest,
-    TimelineWindowResponse, usize_from_i64,
-};
+use super::{OptionalExtension, SessionTimelineStateRow, usize_from_i64};
+#[cfg(test)]
+use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
 
 impl DaemonDb {
     #[cfg(test)]
