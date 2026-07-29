@@ -206,33 +206,39 @@ configure_sccache_socket() {
 }
 
 default_sccache_basedirs() {
-  local checkout segment worktrees
+  local checkout inventory segment worktrees
 
   worktrees="$(
     git -C "$ROOT" worktree list --porcelain 2>/dev/null \
       | awk '/^worktree / { sub(/^worktree /, ""); print }'
   )"
   if [[ -z "$worktrees" ]]; then
-    if [[ "$target_dir" == /* ]]; then
-      printf '%s:%s\n' "$ROOT" "$target_dir"
-    else
-      printf '%s:%s/%s\n' "$ROOT" "$ROOT" "$target_dir"
+    printf '%s' "$ROOT"
+    if (( target_dir_is_default )); then
+      printf ':%s' "$target_dir"
     fi
+    printf '\n'
     return 0
   fi
 
-  while IFS= read -r checkout; do
-    [[ -n "$checkout" ]] || continue
-    printf '%s\n' "$checkout"
-    if [[ "$checkout" == "$COMMON_REPO_ROOT" ]]; then
-      segment="$(cargo_lane_main_segment)"
-    else
-      segment="$(cargo_lane_segment_for_path "$checkout")"
-    fi
-    printf '%s/target/dev/%s\n' "$COMMON_REPO_ROOT" "$segment"
-  done <<<"$worktrees" \
-    | awk 'substr($0, 1, 1) == "/" && !seen[$0]++' \
-    | paste -sd: -
+  inventory="$(
+    while IFS= read -r checkout; do
+      [[ -n "$checkout" ]] || continue
+      printf '%s\n' "$checkout"
+      if [[ "$checkout" == "$COMMON_REPO_ROOT" ]]; then
+        segment="$(cargo_lane_main_segment)"
+      else
+        segment="$(cargo_lane_segment_for_path "$checkout")"
+      fi
+      printf '%s/target/dev/%s\n' "$COMMON_REPO_ROOT" "$segment"
+    done <<<"$worktrees" \
+      | awk 'substr($0, 1, 1) == "/"' \
+      | LC_ALL=C sort -u
+  )"
+  {
+    awk -v root="$COMMON_REPO_ROOT" '$0 == root { print; exit }' <<<"$inventory"
+    awk -v root="$COMMON_REPO_ROOT" '$0 != root' <<<"$inventory"
+  } | paste -sd: -
 }
 
 # An unknown - a timeout under load, a permission error - reads as reachable on

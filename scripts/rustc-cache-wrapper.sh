@@ -10,7 +10,8 @@ unalias -a 2>/dev/null || true
 # retain fixed Homebrew fallbacks. Versions older than 0.14 are skipped because
 # they cannot provide the socket isolation used by the repository. cargo-local
 # supplies every registered source root and target lane through SCCACHE_BASEDIRS
-# so cacheable Rust invocations can hit across worktrees.
+# so sccache 0.17 and newer can normalize cacheable Rust invocations across
+# worktrees.
 
 sccache_version_supported() {
   local version="${1#v}" major minor patch
