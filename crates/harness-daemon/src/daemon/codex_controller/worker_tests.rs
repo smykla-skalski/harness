@@ -133,6 +133,38 @@ async fn thread_start_rejects_model_mismatch_before_turn_start() {
 }
 
 #[tokio::test]
+async fn thread_start_reports_an_invalid_response_shape() {
+    let (controller, _db, _tempdir) = super::super::tests::test_support::controller_with_db();
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot =
+        super::super::tests::test_support::codex_run_snapshot(CodexRunStatus::Running);
+    snapshot.thread_id = None;
+    snapshot.turn_id = None;
+    snapshot.model = Some(SPARK_MODEL.to_string());
+    let mut worker = CodexRunWorker::new(controller, snapshot, control_rx);
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let recv = Arc::new(Mutex::new(VecDeque::from([json!({
+        "id": 1,
+        "result": {
+            "thread": { "id": 42 },
+            "model": ["gpt-5.5"]
+        }
+    })
+    .to_string()])));
+    let mut rpc = CodexJsonRpc::new(Box::new(FakeTransport { sent, recv }));
+
+    let error = worker
+        .start_or_resume_thread(&mut rpc)
+        .await
+        .expect_err("invalid thread response shape must fail");
+
+    assert!(error.to_string().contains("invalid thread response shape"));
+    assert_eq!(worker.snapshot.thread_id, None);
+    assert_eq!(worker.snapshot.turn_id, None);
+    assert!(worker.snapshot.events.is_empty());
+}
+
+#[tokio::test]
 async fn invalid_steer_ack_does_not_fail_worker_loop() {
     let (_control_tx, control_rx) = mpsc::unbounded_channel();
     let mut worker = CodexRunWorker::new(

@@ -119,7 +119,9 @@ impl CodexRunWorker {
 
         let result = startup_request(rpc, method, params, method).await?;
         let thread = wire::thread_result_from_result(&result).ok_or_else(|| {
-            CliErrorKind::workflow_parse("codex thread response missing thread.id or model")
+            CliErrorKind::workflow_parse(
+                "codex app-server returned an invalid thread response shape",
+            )
         })?;
         validate_effective_model(self.snapshot.model.as_deref(), &thread.model)?;
         let thread_id = thread.thread.id;
