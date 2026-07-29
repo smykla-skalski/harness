@@ -1,7 +1,6 @@
 use tempfile::tempdir;
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
-use super::provider_external_create_rows::next_timestamp;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     ExternalCreateOutcome, ExternalProvider, ExternalRefSyncState, ExternalSyncField,
@@ -286,19 +285,12 @@ async fn inconsistent_persisted_create_evidence_fails_closed_on_read() {
     assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
 }
 
-#[test]
-fn transition_timestamp_advances_when_wall_clock_has_not() {
-    assert_eq!(
-        next_timestamp("2999-12-31T23:59:58Z").expect("next timestamp"),
-        "2999-12-31T23:59:59Z"
-    );
-}
-
-#[test]
-fn transition_timestamp_fails_closed_at_the_persisted_range_boundary() {
-    next_timestamp("9999-12-31T23:59:59Z").expect_err("maximum persisted timestamp cannot advance");
-}
-
+// `next_timestamp`'s own pure-logic coverage
+// (`transition_timestamp_advances_when_wall_clock_has_not`,
+// `transition_timestamp_fails_closed_at_the_persisted_range_boundary`) moved
+// with the function into `harness-task-board-provider-sync`'s
+// `provider_external_create_rows.rs`; this file keeps only the
+// database-backed scenario below.
 #[tokio::test]
 async fn record_and_finalize_advance_persisted_clock_without_wall_clock_rollover() {
     let dir = tempdir().expect("tempdir");

@@ -4,35 +4,51 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
 use sqlx::{Sqlite, Transaction, query, query_as};
 
-use super::provider_external_create_rows::{create_conflict, load_intent_by_id};
-use super::provider_queries::ProviderQueries;
-use crate::daemon::db::audit::UPSERT_AUDIT_EVENT_SQL;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::protocol::HarnessMonitorAuditEvent;
-use crate::task_board::{
+use harness_kernel::errors::CliError;
+use harness_protocol::daemon::audit::HarnessMonitorAuditEvent;
+use harness_task_board::external::{
     ExternalProvider, TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
     TaskBoardExternalCreateReceipt,
 };
 
+use crate::provider_external_create_rows::{create_conflict, load_intent_by_id};
+use crate::store::ProviderSyncStore;
+use crate::support::db_error;
+
 const CREATE_FOLLOW_UP_TITLE: &str = "Record provider create receipt";
 
-impl AsyncDaemonDb {
-    pub(crate) async fn complete_task_board_external_create_follow_ups(
-        &self,
-        intents: &[TaskBoardExternalCreateIntent],
-    ) -> Result<Vec<HarnessMonitorAuditEvent>, CliError> {
-        <Self as ProviderQueries>::complete_task_board_external_create_follow_ups(self, intents)
-            .await
-    }
-}
+/// Mirrors `daemon::db::audit::UPSERT_AUDIT_EVENT_SQL`; duplicated because
+/// this crate cannot depend on `harness-daemon` (see `store.rs`), and the
+/// upsert here must run inside this function's own already-open transaction
+/// rather than the pool-scoped write `AsyncDaemonDb::upsert_audit_event`
+/// does. Any change to the `audit_events` schema must update both copies.
+const UPSERT_AUDIT_EVENT_SQL: &str = "
+INSERT INTO audit_events (
+    id, recorded_at, source, category, kind, severity, outcome, title, summary,
+    subject, actor, correlation_id, action_key, payload_json, legacy_message, related_urls_json
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+ON CONFLICT(id) DO UPDATE SET
+    recorded_at = excluded.recorded_at,
+    source = excluded.source,
+    category = excluded.category,
+    kind = excluded.kind,
+    severity = excluded.severity,
+    outcome = excluded.outcome,
+    title = excluded.title,
+    summary = excluded.summary,
+    subject = excluded.subject,
+    actor = excluded.actor,
+    correlation_id = excluded.correlation_id,
+    action_key = excluded.action_key,
+    payload_json = excluded.payload_json,
+    legacy_message = excluded.legacy_message,
+    related_urls_json = excluded.related_urls_json";
 
-/// Real implementation behind [`ProviderQueries::complete_task_board_external_create_follow_ups`],
-/// called from the single consolidated trait impl in `provider_queries.rs`
-/// (a trait's methods can only be implemented in one `impl` block per type,
-/// so the per-area files hand `provider_queries.rs` a plain function instead
-/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
-pub(super) async fn complete_task_board_external_create_follow_ups(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when a stored intent no longer matches, or the write
+/// fails.
+pub async fn complete_task_board_external_create_follow_ups<D: ProviderSyncStore>(
+    db: &D,
     intents: &[TaskBoardExternalCreateIntent],
 ) -> Result<Vec<HarnessMonitorAuditEvent>, CliError> {
     let mut ordered = intents.to_vec();

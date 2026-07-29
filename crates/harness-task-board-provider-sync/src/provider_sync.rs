@@ -2,16 +2,14 @@ use chrono::{DateTime, Duration};
 use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
-use crate::daemon::db::task_board::items::bump_change_in_tx;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
-use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
-use crate::task_board::ExternalProvider;
-use crate::task_board::external::{
-    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::external::{
+    ExternalProvider, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeAvailability, ExternalProviderScopeHealth, ExternalProviderScopeState,
 };
 
-use super::ORCHESTRATOR_CHANGE_SCOPE;
+use crate::store::ProviderSyncStore;
+use crate::support::{ORCHESTRATOR_CHANGE_SCOPE, db_error};
 
 const BACKOFF_BASE_SECONDS: u64 = 30;
 const BACKOFF_MULTIPLIER: u64 = 4;
@@ -20,86 +18,10 @@ const ATTEMPT_LEASE_SECONDS: i64 = 900;
 const ATTEMPT_HEALTH_PREFIX: &str = "attempting:";
 type ProviderScopeRow = (Option<String>, String, i64, Option<String>);
 
-impl AsyncDaemonDb {
-    /// # Errors
-    /// Returns [`CliError`] when the read fails.
-    pub async fn task_board_provider_scope_state(
-        &self,
-        provider: ExternalProvider,
-        scope_id: &str,
-    ) -> Result<ExternalProviderScopeState, CliError> {
-        <Self as ProviderQueries>::task_board_provider_scope_state(self, provider, scope_id).await
-    }
-
-    pub(crate) async fn begin_task_board_provider_scope_attempt(
-        &self,
-        provider: ExternalProvider,
-        scope_id: &str,
-        now: &str,
-    ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
-        <Self as ProviderQueries>::begin_task_board_provider_scope_attempt(
-            self, provider, scope_id, now,
-        )
-        .await
-    }
-
-    pub(crate) async fn renew_task_board_provider_scope_attempt(
-        &self,
-        attempt: &ExternalProviderScopeAttempt,
-        now: &str,
-    ) -> Result<(), CliError> {
-        <Self as ProviderQueries>::renew_task_board_provider_scope_attempt(self, attempt, now).await
-    }
-
-    pub(crate) async fn release_task_board_provider_scope_attempt(
-        &self,
-        attempt: &ExternalProviderScopeAttempt,
-        released_at: &str,
-    ) -> Result<(), CliError> {
-        <Self as ProviderQueries>::release_task_board_provider_scope_attempt(
-            self,
-            attempt,
-            released_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn complete_task_board_provider_scope_success(
-        &self,
-        attempt: &ExternalProviderScopeAttempt,
-        base_revision: Option<&str>,
-        completed_at: &str,
-    ) -> Result<(), CliError> {
-        <Self as ProviderQueries>::complete_task_board_provider_scope_success(
-            self,
-            attempt,
-            base_revision,
-            completed_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn complete_task_board_provider_scope_failure(
-        &self,
-        attempt: &ExternalProviderScopeAttempt,
-        completed_at: &str,
-    ) -> Result<ExternalProviderScopeState, CliError> {
-        <Self as ProviderQueries>::complete_task_board_provider_scope_failure(
-            self,
-            attempt,
-            completed_at,
-        )
-        .await
-    }
-}
-
-/// Real implementations behind the matching [`ProviderQueries`] methods,
-/// called from the single consolidated trait impl in `provider_queries.rs`
-/// (a trait's methods can only be implemented in one `impl` block per type,
-/// so the per-area files hand `provider_queries.rs` a plain function instead
-/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
-pub(super) async fn task_board_provider_scope_state(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn task_board_provider_scope_state<D: ProviderSyncStore>(
+    db: &D,
     provider: ExternalProvider,
     scope_id: &str,
 ) -> Result<ExternalProviderScopeState, CliError> {
@@ -119,8 +41,10 @@ pub(super) async fn task_board_provider_scope_state(
     )
 }
 
-pub(super) async fn begin_task_board_provider_scope_attempt(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the transaction fails.
+pub async fn begin_task_board_provider_scope_attempt<D: ProviderSyncStore>(
+    db: &D,
     provider: ExternalProvider,
     scope_id: &str,
     now: &str,
@@ -192,8 +116,10 @@ pub(super) async fn begin_task_board_provider_scope_attempt(
     ))
 }
 
-pub(super) async fn renew_task_board_provider_scope_attempt(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the attempt is stale or the write fails.
+pub async fn renew_task_board_provider_scope_attempt<D: ProviderSyncStore>(
+    db: &D,
     attempt: &ExternalProviderScopeAttempt,
     now: &str,
 ) -> Result<(), CliError> {
@@ -219,8 +145,10 @@ pub(super) async fn renew_task_board_provider_scope_attempt(
     }
 }
 
-pub(super) async fn release_task_board_provider_scope_attempt(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the attempt is stale or the write fails.
+pub async fn release_task_board_provider_scope_attempt<D: ProviderSyncStore>(
+    db: &D,
     attempt: &ExternalProviderScopeAttempt,
     released_at: &str,
 ) -> Result<(), CliError> {
@@ -233,7 +161,8 @@ pub(super) async fn release_task_board_provider_scope_attempt(
         return Err(stale_attempt_error(attempt));
     }
     if !attempt.created_scope() {
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+            .await?;
     }
     transaction.commit().await.map_err(|error| {
         db_error(format!(
@@ -242,8 +171,10 @@ pub(super) async fn release_task_board_provider_scope_attempt(
     })
 }
 
-pub(super) async fn complete_task_board_provider_scope_success(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the attempt is stale or the write fails.
+pub async fn complete_task_board_provider_scope_success<D: ProviderSyncStore>(
+    db: &D,
     attempt: &ExternalProviderScopeAttempt,
     base_revision: Option<&str>,
     completed_at: &str,
@@ -288,7 +219,8 @@ pub(super) async fn complete_task_board_provider_scope_success(
         return Err(stale_attempt_error(attempt));
     }
     if changed {
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+            .await?;
     }
     transaction
         .commit()
@@ -296,8 +228,10 @@ pub(super) async fn complete_task_board_provider_scope_success(
         .map_err(|error| db_error(format!("commit task-board provider success: {error}")))
 }
 
-pub(super) async fn complete_task_board_provider_scope_failure(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the attempt is stale or the write fails.
+pub async fn complete_task_board_provider_scope_failure<D: ProviderSyncStore>(
+    db: &D,
     attempt: &ExternalProviderScopeAttempt,
     completed_at: &str,
 ) -> Result<ExternalProviderScopeState, CliError> {
@@ -340,7 +274,8 @@ pub(super) async fn complete_task_board_provider_scope_failure(
     if updated != 1 {
         return Err(stale_attempt_error(attempt));
     }
-    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+        .await?;
     transaction
         .commit()
         .await

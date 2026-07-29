@@ -29,10 +29,18 @@ pub use harness_task_board::external::{
 // because nothing outside the daemon's own service code needs them.
 #[cfg(feature = "daemon-runtime")]
 pub(crate) use harness_task_board::external::{
-    TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
-    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
-    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
-    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
+    TaskBoardExternalCreateBegin, TaskBoardExternalCreateFinalizeResult,
+    TaskBoardExternalCreateIntent,
+};
+// The rest of this family only appears in `#[cfg(test)]` code now: production
+// code that used to pattern-match them lives in
+// `harness-task-board-provider-sync` and reaches its own copies directly,
+// while the provider-sync test files that stayed in this crate still
+// pattern-match these through `crate::task_board`.
+#[cfg(test)]
+pub(crate) use harness_task_board::external::{
+    TaskBoardExternalCreateExisting, TaskBoardExternalCreateFinalizeDisposition,
+    TaskBoardExternalCreateIntentState,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use harness_task_board::external::{

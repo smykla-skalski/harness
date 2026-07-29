@@ -1,15 +1,18 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
-use super::mapper::{parse_json, to_json};
-use super::provider_external_create_evidence::validate_create_evidence;
-use crate::daemon::db::{CliError, CliErrorKind, db_error, utc_now};
-use crate::task_board::{
-    ExternalCreateOutcome, ExternalProvider, ExternalRef, ExternalSyncField,
-    TaskBoardExternalCreateEvidence, TaskBoardExternalCreateIntent,
-    TaskBoardExternalCreateIntentState, TaskBoardExternalCreateReceipt,
-    TaskBoardExternalCreateSnapshot, TaskBoardItem, TaskBoardStatus, normalize_repository_slug,
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::external::{
+    ExternalCreateOutcome, ExternalProvider, ExternalSyncField, TaskBoardExternalCreateEvidence,
+    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
+    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
 };
+use harness_task_board::{ExternalRef, TaskBoardItem, TaskBoardStatus, normalize_repository_slug};
+use harness_workspace::workspace::utc_now;
+
+use crate::mapper::{parse_json, to_json};
+use crate::provider_external_create_evidence::validate_create_evidence;
+use crate::support::db_error;
 
 const LOAD_LATEST_INTENT_SQL: &str =
     "SELECT intent_id, item_id, item_revision, provider, scope_id, create_key, state,
@@ -24,7 +27,7 @@ const LOAD_INTENT_BY_ID_SQL: &str =
             created_at, outcome_recorded_at, attached_at, attached_item_revision, updated_at
      FROM task_board_external_create_intents WHERE intent_id = ?1";
 
-pub(super) async fn load_latest_intent(
+pub(crate) async fn load_latest_intent(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
     provider: ExternalProvider,
@@ -39,7 +42,7 @@ pub(super) async fn load_latest_intent(
         .transpose()
 }
 
-pub(super) async fn load_intent_by_id(
+pub(crate) async fn load_intent_by_id(
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,
 ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
@@ -52,7 +55,7 @@ pub(super) async fn load_intent_by_id(
         .transpose()
 }
 
-pub(super) async fn insert_intent(
+pub(crate) async fn insert_intent(
     transaction: &mut Transaction<'_, Sqlite>,
     intent: &TaskBoardExternalCreateIntent,
 ) -> Result<(), CliError> {
@@ -87,7 +90,7 @@ pub(super) async fn insert_intent(
     Ok(())
 }
 
-pub(super) async fn update_created_evidence(
+pub(crate) async fn update_created_evidence(
     transaction: &mut Transaction<'_, Sqlite>,
     intent: &TaskBoardExternalCreateIntent,
     outcome: &ExternalCreateOutcome,
@@ -127,7 +130,7 @@ pub(super) async fn update_created_evidence(
     }
 }
 
-pub(super) async fn update_attached_receipt(
+pub(crate) async fn update_attached_receipt(
     transaction: &mut Transaction<'_, Sqlite>,
     intent: &TaskBoardExternalCreateIntent,
     attached_at: &str,
@@ -158,7 +161,7 @@ pub(super) async fn update_attached_receipt(
     }
 }
 
-pub(super) fn create_snapshot(
+pub(crate) fn create_snapshot(
     item: &TaskBoardItem,
     provider: ExternalProvider,
     provider_target: &str,
@@ -191,7 +194,7 @@ pub(super) fn create_snapshot(
     })
 }
 
-pub(super) fn create_changed_fields(
+pub(crate) fn create_changed_fields(
     snapshot: &TaskBoardExternalCreateSnapshot,
     provider: ExternalProvider,
 ) -> Vec<ExternalSyncField> {
@@ -205,7 +208,7 @@ pub(super) fn create_changed_fields(
     fields
 }
 
-pub(super) fn require_same_intent(
+pub(crate) fn require_same_intent(
     stored: &TaskBoardExternalCreateIntent,
     expected: &TaskBoardExternalCreateIntent,
 ) -> Result<(), CliError> {
@@ -225,7 +228,7 @@ pub(super) fn require_same_intent(
     }
 }
 
-pub(super) fn next_timestamp(previous: &str) -> Result<String, CliError> {
+pub(crate) fn next_timestamp(previous: &str) -> Result<String, CliError> {
     let previous = DateTime::parse_from_rfc3339(previous)
         .map_err(|error| db_error(format!("parse external create timestamp: {error}")))?
         .with_timezone(&Utc);
@@ -249,17 +252,17 @@ pub(super) fn next_timestamp(previous: &str) -> Result<String, CliError> {
     }
 }
 
-pub(super) fn provider_label(provider: ExternalProvider) -> &'static str {
+pub(crate) fn provider_label(provider: ExternalProvider) -> &'static str {
     match provider {
         ExternalProvider::GitHub => "github",
     }
 }
 
-pub(super) fn create_conflict(intent: &TaskBoardExternalCreateIntent, reason: &str) -> CliError {
+pub(crate) fn create_conflict(intent: &TaskBoardExternalCreateIntent, reason: &str) -> CliError {
     create_conflict_for(&intent.item_id, intent.provider, reason)
 }
 
-pub(super) fn create_conflict_for(
+pub(crate) fn create_conflict_for(
     item_id: &str,
     provider: ExternalProvider,
     reason: &str,
@@ -270,7 +273,7 @@ pub(super) fn create_conflict_for(
     .into()
 }
 
-pub(super) fn normalize_provider_target(
+pub(crate) fn normalize_provider_target(
     provider: ExternalProvider,
     target: &str,
 ) -> Result<String, CliError> {
@@ -301,7 +304,7 @@ fn parse_provider(value: &str) -> Result<ExternalProvider, CliError> {
 }
 
 #[derive(Debug, FromRow)]
-pub(super) struct ExternalCreateIntentRow {
+pub(crate) struct ExternalCreateIntentRow {
     intent_id: String,
     item_id: String,
     item_revision: i64,
@@ -321,7 +324,7 @@ pub(super) struct ExternalCreateIntentRow {
 }
 
 impl ExternalCreateIntentRow {
-    pub(super) fn into_intent(self) -> Result<TaskBoardExternalCreateIntent, CliError> {
+    pub(crate) fn into_intent(self) -> Result<TaskBoardExternalCreateIntent, CliError> {
         let snapshot: TaskBoardExternalCreateSnapshot = parse_json(
             &self.create_snapshot_json,
             "task-board external create snapshot",
@@ -416,4 +419,23 @@ fn validate_decoded_intent(intent: &TaskBoardExternalCreateIntent) -> Result<(),
         validate_create_evidence(intent, &evidence.outcome, &evidence.provider_baseline)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::next_timestamp;
+
+    #[test]
+    fn transition_timestamp_advances_when_wall_clock_has_not() {
+        assert_eq!(
+            next_timestamp("2999-12-31T23:59:58Z").expect("next timestamp"),
+            "2999-12-31T23:59:59Z"
+        );
+    }
+
+    #[test]
+    fn transition_timestamp_fails_closed_at_the_persisted_range_boundary() {
+        next_timestamp("9999-12-31T23:59:59Z")
+            .expect_err("maximum persisted timestamp cannot advance");
+    }
 }

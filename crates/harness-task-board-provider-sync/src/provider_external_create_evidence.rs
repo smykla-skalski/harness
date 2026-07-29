@@ -1,13 +1,16 @@
 use chrono::DateTime;
 
-use super::provider_external_create_rows::{create_conflict, normalize_provider_target};
-use crate::daemon::db::CliError;
-use crate::task_board::{
-    ExternalCreateOutcome, ExternalProvider, ExternalRef, ExternalRefSyncState,
-    TaskBoardExternalCreateIntent, TaskBoardStatus, normalize_repository_slug,
+use harness_kernel::errors::CliError;
+use harness_task_board::external::{
+    ExternalCreateOutcome, ExternalProvider, TaskBoardExternalCreateIntent,
+};
+use harness_task_board::{
+    ExternalRef, ExternalRefSyncState, TaskBoardStatus, normalize_repository_slug,
 };
 
-pub(super) fn validate_create_evidence(
+use crate::provider_external_create_rows::{create_conflict, normalize_provider_target};
+
+pub(crate) fn validate_create_evidence(
     intent: &TaskBoardExternalCreateIntent,
     outcome: &ExternalCreateOutcome,
     provider_baseline: &ExternalRef,
@@ -44,7 +47,7 @@ pub(super) fn validate_create_evidence(
     }
 }
 
-pub(super) fn normalized_evidence_target(
+pub(crate) fn normalized_evidence_target(
     intent: &TaskBoardExternalCreateIntent,
     outcome: &ExternalCreateOutcome,
 ) -> Result<Option<String>, CliError> {

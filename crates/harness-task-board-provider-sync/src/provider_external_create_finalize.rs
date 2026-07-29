@@ -1,48 +1,35 @@
 use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
-use super::items::{
-    bump_change_in_tx, ensure_workflow_item_mutation_allowed_in_tx, load_item_in_tx,
-    replace_item_in_tx,
+use harness_kernel::errors::CliError;
+use harness_task_board::external::{
+    ExternalProvider, ExternalSyncField, TaskBoardExternalCreateEvidence,
+    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
+    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
+    TaskBoardExternalCreateReceipt,
 };
-use super::provider_external_create_evidence::{
+use harness_task_board::{ExternalRef, TaskBoardItem, TaskBoardStatus, normalize_repository_slug};
+use harness_workspace::workspace::utc_now;
+
+use crate::provider_external_create_evidence::{
     normalized_evidence_target, validate_create_evidence,
 };
-use super::provider_external_create_rows::{
+use crate::provider_external_create_rows::{
     create_conflict, load_intent_by_id, next_timestamp, provider_label, require_same_intent,
     update_attached_receipt,
 };
-use super::provider_queries::ProviderQueries;
-use super::provider_sync_conflicts::supersede_open_sync_conflicts_in_connection;
-use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::task_board::{
-    ExternalProvider, ExternalRef, ExternalSyncField, TaskBoardExternalCreateEvidence,
-    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
-    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
-    TaskBoardExternalCreateReceipt, TaskBoardItem, TaskBoardStatus, normalize_repository_slug,
-};
-use crate::workspace::utc_now;
+use crate::provider_sync_conflicts::supersede_open_sync_conflicts_in_connection;
+use crate::store::ProviderSyncStore;
+use crate::support::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE, db_error};
 
-impl AsyncDaemonDb {
-    pub(crate) async fn finalize_task_board_external_create_intent(
-        &self,
-        intent: &TaskBoardExternalCreateIntent,
-    ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
-        <Self as ProviderQueries>::finalize_task_board_external_create_intent(self, intent).await
-    }
-}
-
-/// Real implementation behind [`ProviderQueries::finalize_task_board_external_create_intent`],
-/// called from the single consolidated trait impl in `provider_queries.rs`
-/// (a trait's methods can only be implemented in one `impl` block per type,
-/// so the per-area files hand `provider_queries.rs` a plain function instead
-/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+/// # Errors
+/// Returns [`CliError`] when the intent's evidence, identity, or item CAS
+/// checks fail, or the write fails.
 #[expect(
     clippy::cognitive_complexity,
     reason = "finalization keeps evidence, identity, item CAS, and receipt persistence atomic"
 )]
-pub(super) async fn finalize_task_board_external_create_intent(
-    db: &AsyncDaemonDb,
+pub async fn finalize_task_board_external_create_intent<D: ProviderSyncStore>(
+    db: &D,
     intent: &TaskBoardExternalCreateIntent,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
     let expected = intent
@@ -79,7 +66,9 @@ pub(super) async fn finalize_task_board_external_create_intent(
     ) {
         return Err(create_conflict(&stored, "intent is not ready to finalize"));
     }
-    let Some((item, item_revision)) = load_item_in_tx(&mut transaction, &stored.item_id).await?
+    let Some((item, item_revision)) = db
+        .load_item_in_tx(&mut transaction, &stored.item_id)
+        .await?
     else {
         commit(transaction, "missing-item task-board external create").await?;
         return Ok(finalize_result(
@@ -96,6 +85,7 @@ pub(super) async fn finalize_task_board_external_create_intent(
     let attached_at = next_timestamp(&stored.updated_at)?;
     if already_linked {
         return finalize_existing_link(
+            db,
             transaction,
             stored,
             item,
@@ -107,6 +97,7 @@ pub(super) async fn finalize_task_board_external_create_intent(
         .await;
     }
     finalize_new_link(
+        db,
         transaction,
         stored,
         item,
@@ -118,7 +109,8 @@ pub(super) async fn finalize_task_board_external_create_intent(
     .await
 }
 
-async fn finalize_new_link(
+async fn finalize_new_link<D: ProviderSyncStore>(
+    db: &D,
     mut transaction: Transaction<'_, Sqlite>,
     stored: TaskBoardExternalCreateIntent,
     mut item: TaskBoardItem,
@@ -127,7 +119,8 @@ async fn finalize_new_link(
     provider_target: Option<&str>,
     provider_baseline: &ExternalRef,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
-    ensure_workflow_item_mutation_allowed_in_tx(&mut transaction, &stored.item_id).await?;
+    db.ensure_workflow_item_mutation_allowed_in_tx(&mut transaction, &stored.item_id)
+        .await?;
     apply_provider_identity(&mut item, &stored, provider_target)?;
     item.external_refs.push(provider_baseline.clone());
     if item.updated_at.as_str() < attached_at {
@@ -135,6 +128,7 @@ async fn finalize_new_link(
     }
     let attached_item_revision = item_revision + 1;
     write_new_link_in_tx(
+        db,
         &mut transaction,
         &stored,
         &item,
@@ -155,7 +149,8 @@ async fn finalize_new_link(
 
 /// Writes the item, the receipt, and the resulting sync conflicts for a
 /// create intent that just formed its first link to a board item.
-async fn write_new_link_in_tx(
+async fn write_new_link_in_tx<D: ProviderSyncStore>(
+    db: &D,
     transaction: &mut Transaction<'_, Sqlite>,
     stored: &TaskBoardExternalCreateIntent,
     item: &TaskBoardItem,
@@ -163,7 +158,8 @@ async fn write_new_link_in_tx(
     attached_item_revision: i64,
     provider_baseline: &ExternalRef,
 ) -> Result<(), CliError> {
-    replace_item_in_tx(transaction, item, attached_item_revision).await?;
+    db.replace_item_in_tx(transaction, item, attached_item_revision)
+        .await?;
     update_attached_receipt(transaction, stored, attached_at, attached_item_revision).await?;
     let conflicts_changed = supersede_create_conflicts(
         transaction.as_mut(),
@@ -173,14 +169,17 @@ async fn write_new_link_in_tx(
         provider_baseline,
     )
     .await?;
-    bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    db.bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE)
+        .await?;
     if conflicts_changed {
-        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        db.bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE)
+            .await?;
     }
     Ok(())
 }
 
-async fn finalize_existing_link(
+async fn finalize_existing_link<D: ProviderSyncStore>(
+    db: &D,
     mut transaction: Transaction<'_, Sqlite>,
     stored: TaskBoardExternalCreateIntent,
     mut item: TaskBoardItem,
@@ -191,6 +190,7 @@ async fn finalize_existing_link(
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
     let identity_changed = apply_provider_identity(&mut item, &stored, provider_target)?;
     let attached_item_revision = rewrite_linked_item_in_tx(
+        db,
         &mut transaction,
         &mut item,
         &stored.item_id,
@@ -213,7 +213,7 @@ async fn finalize_existing_link(
         provider_baseline,
     )
     .await?;
-    publish_linked_receipt_in_tx(&mut transaction, identity_changed, conflicts_changed).await?;
+    publish_linked_receipt_in_tx(db, &mut transaction, identity_changed, conflicts_changed).await?;
     commit(transaction, "task-board external create linked receipt").await?;
     let attached = attached_intent(stored, attached_at, attached_item_revision)?;
     Ok(finalize_result(
@@ -227,7 +227,8 @@ async fn finalize_existing_link(
 /// Move the item to a fresh revision only when the provider identity actually
 /// changed; an already-correct link keeps the revision the caller read, so a
 /// repeated finalize does not make every board client refetch.
-async fn rewrite_linked_item_in_tx(
+async fn rewrite_linked_item_in_tx<D: ProviderSyncStore>(
+    db: &D,
     transaction: &mut Transaction<'_, Sqlite>,
     item: &mut TaskBoardItem,
     item_id: &str,
@@ -238,19 +239,21 @@ async fn rewrite_linked_item_in_tx(
     if !identity_changed {
         return Ok(item_revision);
     }
-    ensure_workflow_item_mutation_allowed_in_tx(transaction, item_id).await?;
+    db.ensure_workflow_item_mutation_allowed_in_tx(transaction, item_id)
+        .await?;
     if item.updated_at.as_str() < attached_at {
         attached_at.clone_into(&mut item.updated_at);
     }
     let revision = item_revision + 1;
-    replace_item_in_tx(transaction, item, revision).await?;
+    db.replace_item_in_tx(transaction, item, revision).await?;
     Ok(revision)
 }
 
 /// Publish the scopes this receipt actually moved: the items scope when the
 /// identity changed and the orchestrator scope otherwise, plus a second
 /// orchestrator bump when superseded conflicts rode along with an item change.
-async fn publish_linked_receipt_in_tx(
+async fn publish_linked_receipt_in_tx<D: ProviderSyncStore>(
+    db: &D,
     transaction: &mut Transaction<'_, Sqlite>,
     identity_changed: bool,
     conflicts_changed: bool,
@@ -260,9 +263,10 @@ async fn publish_linked_receipt_in_tx(
     } else {
         ORCHESTRATOR_CHANGE_SCOPE
     };
-    bump_change_in_tx(transaction, scope).await?;
+    db.bump_change_in_tx(transaction, scope).await?;
     if identity_changed && conflicts_changed {
-        bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        db.bump_change_in_tx(transaction, ORCHESTRATOR_CHANGE_SCOPE)
+            .await?;
     }
     Ok(())
 }

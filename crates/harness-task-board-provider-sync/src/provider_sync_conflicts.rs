@@ -1,26 +1,31 @@
 use serde::de::DeserializeOwned;
 use sqlx::{SqliteConnection, query, query_as, query_scalar};
 
-use crate::daemon::db::task_board::items::bump_change_in_tx;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
-use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
-use crate::task_board::{
-    ExternalProvider, ExternalRefProvider, ExternalSyncField, TaskBoardSyncConflict,
-};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::external::ExternalProvider;
+use harness_task_board::external::ExternalSyncField;
+use harness_task_board::{ExternalRefProvider, TaskBoardSyncConflict};
+use harness_workspace::workspace::utc_now;
 
-use super::ORCHESTRATOR_CHANGE_SCOPE;
+use crate::store::ProviderSyncStore;
+use crate::support::{ORCHESTRATOR_CHANGE_SCOPE, db_error};
 
 #[derive(Debug, Default)]
-pub(super) struct SyncConflictReplacement {
+pub struct SyncConflictReplacement {
     changed_fields: Vec<String>,
 }
 
 impl SyncConflictReplacement {
-    pub(super) fn changed(&self) -> bool {
+    #[must_use]
+    pub fn changed(&self) -> bool {
         !self.changed_fields.is_empty()
     }
 
-    pub(super) fn changed_fields(&self) -> &[String] {
+    /// `provider_exclusion.rs`'s restore path (still in `harness-daemon`)
+    /// reads this off the replacement `replace_open_sync_conflicts_in_connection`
+    /// returns, so it stays `pub` even though nothing in this crate reads it.
+    #[must_use]
+    pub fn changed_fields(&self) -> &[String] {
         &self.changed_fields
     }
 
@@ -32,69 +37,10 @@ impl SyncConflictReplacement {
     }
 }
 
-impl AsyncDaemonDb {
-    /// # Errors
-    /// Returns [`CliError`] when the item revision has moved or the write fails.
-    pub async fn replace_open_task_board_sync_conflicts(
-        &self,
-        item_id: &str,
-        provider: ExternalProvider,
-        external_ref: &str,
-        item_revision: i64,
-        conflicts: &[TaskBoardSyncConflict],
-    ) -> Result<(), CliError> {
-        <Self as ProviderQueries>::replace_open_task_board_sync_conflicts(
-            self,
-            item_id,
-            provider,
-            external_ref,
-            item_revision,
-            conflicts,
-        )
-        .await
-    }
-
-    pub(crate) async fn supersede_open_task_board_sync_conflicts(
-        &self,
-        item_id: &str,
-        provider: ExternalProvider,
-        external_ref: &str,
-        item_revision: i64,
-        resolved_fields: &[ExternalSyncField],
-    ) -> Result<(), CliError> {
-        <Self as ProviderQueries>::supersede_open_task_board_sync_conflicts(
-            self,
-            item_id,
-            provider,
-            external_ref,
-            item_revision,
-            resolved_fields,
-        )
-        .await
-    }
-
-    /// # Errors
-    /// Returns [`CliError`] when the read fails.
-    // `pub`, not `pub(crate)`, and gated the same way as `daemon::state::test_support`:
-    // `tests/integration_daemon.rs`'s task-board sync scenarios read open
-    // conflicts back after a sync the same way this crate's own unit tests do,
-    // and that binary links `harness` as an ordinary dependency where
-    // `cfg(test)` is never set.
-    #[cfg(any(test, feature = "daemon-runtime"))]
-    pub async fn open_task_board_sync_conflicts(
-        &self,
-    ) -> Result<Vec<TaskBoardSyncConflict>, CliError> {
-        <Self as ProviderQueries>::open_task_board_sync_conflicts(self).await
-    }
-}
-
-/// Real implementations behind the matching [`ProviderQueries`] methods,
-/// called from the single consolidated trait impl in `provider_queries.rs`
-/// (a trait's methods can only be implemented in one `impl` block per type,
-/// so the per-area files hand `provider_queries.rs` a plain function instead
-/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
-pub(super) async fn replace_open_task_board_sync_conflicts(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the item revision has moved or the write fails.
+pub async fn replace_open_task_board_sync_conflicts<D: ProviderSyncStore>(
+    db: &D,
     item_id: &str,
     provider: ExternalProvider,
     external_ref: &str,
@@ -114,7 +60,8 @@ pub(super) async fn replace_open_task_board_sync_conflicts(
     )
     .await?;
     if replacement.changed() {
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+            .await?;
     }
     transaction
         .commit()
@@ -122,8 +69,10 @@ pub(super) async fn replace_open_task_board_sync_conflicts(
         .map_err(|error| db_error(format!("commit task-board sync conflicts: {error}")))
 }
 
-pub(super) async fn supersede_open_task_board_sync_conflicts(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the item revision has moved or the write fails.
+pub async fn supersede_open_task_board_sync_conflicts<D: ProviderSyncStore>(
+    db: &D,
     item_id: &str,
     provider: ExternalProvider,
     external_ref: &str,
@@ -145,7 +94,8 @@ pub(super) async fn supersede_open_task_board_sync_conflicts(
     )
     .await?;
     if changed {
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+        db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+            .await?;
     }
     transaction
         .commit()
@@ -153,9 +103,15 @@ pub(super) async fn supersede_open_task_board_sync_conflicts(
         .map_err(|error| db_error(format!("commit sync conflict supersession: {error}")))
 }
 
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+// `pub`, not crate-private: `tests/integration_daemon.rs` reads open
+// conflicts back after a sync the same way this crate's own unit tests do,
+// and that binary links `harness` as an ordinary dependency where
+// `cfg(test)` is never set. Matches `daemon::state::test_support`'s gate.
 #[cfg(any(test, feature = "daemon-runtime"))]
-pub(super) async fn open_task_board_sync_conflicts(
-    db: &AsyncDaemonDb,
+pub async fn open_task_board_sync_conflicts<D: ProviderSyncStore>(
+    db: &D,
 ) -> Result<Vec<TaskBoardSyncConflict>, CliError> {
     let rows = query_as::<_, ConflictRow>(
         "SELECT conflict_id, item_id, provider, external_ref, field,
@@ -170,7 +126,11 @@ pub(super) async fn open_task_board_sync_conflicts(
     rows.into_iter().map(ConflictRow::into_conflict).collect()
 }
 
-pub(super) async fn replace_open_sync_conflicts_in_connection(
+/// # Errors
+/// Returns [`CliError`] when the conflicts don't match the caller's provider
+/// scope or item revision, the item is missing or has moved, or the write
+/// fails.
+pub async fn replace_open_sync_conflicts_in_connection(
     connection: &mut SqliteConnection,
     item_id: &str,
     provider: ExternalProvider,
@@ -197,7 +157,7 @@ pub(super) async fn replace_open_sync_conflicts_in_connection(
     Ok(replacement)
 }
 
-pub(super) async fn supersede_open_sync_conflicts_in_connection(
+pub(crate) async fn supersede_open_sync_conflicts_in_connection(
     connection: &mut SqliteConnection,
     item_id: &str,
     provider: ExternalProvider,

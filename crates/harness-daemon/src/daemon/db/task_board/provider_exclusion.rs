@@ -12,7 +12,6 @@ use super::items::{
 };
 use super::lane_order::LaneTransitionKind;
 use super::provider_queries::ProviderQueries;
-use super::provider_sync_conflicts::replace_open_sync_conflicts_in_connection;
 use super::triage_apply::reapply_active_override_outcome_in_tx;
 use super::triage_apply_rules::apply_active_triage_in_tx;
 use super::triage_audit::ProviderExclusionConflictAudit;
@@ -25,6 +24,7 @@ use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict, TaskBoardTombstoneCause,
     TaskBoardTriageOverride, canonicalize_labels, is_exclusion_label,
 };
+use harness_task_board_provider_sync::replace_open_sync_conflicts_in_connection;
 
 impl AsyncDaemonDb {
     /// Tombstones an already-visible, pre-dispatch item because the provider
