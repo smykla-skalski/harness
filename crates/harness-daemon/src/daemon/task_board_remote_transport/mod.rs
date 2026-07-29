@@ -11,6 +11,30 @@
 //! the same cycle once `db` was slated to become its own crate, so
 //! `wire.rs`/`wire_*.rs` moved into the task-board domain crate both `db`
 //! and this module's `controller`/`routes` code already depend on.
+//!
+//! The `routes*` files need `crate::daemon::http`'s `DaemonHttpState` type to
+//! make `utoipa_axum::OpenApiRouter::merge` type-check against `http`'s own
+//! routes, which used to mean importing it from `http` - and `http` merges
+//! this module's routes into its own `OpenApiRouter`, so that import was a
+//! real cycle. Naming the concrete types locally from the generic
+//! `crate::daemon::server_state::DaemonHttpState` instead breaks it: this
+//! alias resolves to the exact same monomorphized type `http`'s own alias
+//! does, so `OpenApiRouter::merge` still type-checks, without this module
+//! reaching into `http` to get there.
+//!
+//! `Companion` is named directly as `CompanionRouter` here rather than left
+//! as a fourth bare parameter threaded through this module's functions: the
+//! `routes*` handlers already call `crate::daemon::http`'s `require_async_db`
+//! and `require_execution_remote_client`, which take the concrete
+//! `http::DaemonHttpState`, so a generic `Companion` would fail to unify at
+//! those call sites regardless of what `.merge()` alone would allow. Since a
+//! real, load-bearing dependency on `http`'s auth/db helpers already exists
+//! here, naming `CompanionRouter` directly does not introduce a new one.
+pub(crate) type DaemonHttpState = crate::daemon::server_state::DaemonHttpState<
+    crate::daemon::db::DaemonDb,
+    crate::daemon::db::AsyncDaemonDb,
+    crate::daemon::http::companion::CompanionRouter,
+>;
 
 pub(crate) mod client;
 mod client_cleanup;

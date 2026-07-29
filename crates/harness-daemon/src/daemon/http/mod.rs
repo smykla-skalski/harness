@@ -1,8 +1,6 @@
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use axum::Router;
@@ -16,27 +14,20 @@ use axum::serve::{IncomingStream, Listener};
 use tokio::net::TcpListener;
 #[cfg(test)]
 use tokio::runtime::{Handle, RuntimeFlavor};
-use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard, broadcast, watch};
+use tokio::sync::watch;
 #[cfg(test)]
 use tokio::task::block_in_place;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
-use crate::daemon::agent_acp::AcpAgentManagerHandle;
-use crate::daemon::agent_tui::AgentTuiManagerHandle;
-use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
-use crate::daemon::protocol::StreamEvent;
-use crate::daemon::remote_pairing::{
-    RemotePairingEvent, RemotePairingRateLimiter, RemotePairingStatusRateLimiter,
-};
+use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
+use crate::daemon::server_state;
 use crate::daemon::service::{
     WakeDispatch, register_local_clone_progress_sender,
     register_task_board_working_copy_progress_sender, run_local_clone_gc,
     run_task_board_working_copy_gc,
 };
-use crate::daemon::state::DaemonManifest;
-use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer};
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -50,7 +41,6 @@ mod improver;
 mod managed_agents;
 pub mod openapi;
 mod openrouter_models;
-mod recovery_snapshot_cache;
 mod remote_clients;
 mod remote_limits;
 mod remote_pairing;
@@ -76,7 +66,6 @@ mod tasks;
 mod tests;
 mod voice;
 
-pub use auth::DaemonHttpAuthMode;
 pub(crate) use auth::{authenticated_remote_client, require_execution_remote_client};
 pub use companion::{
     CompanionConfigError, CompanionRouteConfig, CompanionRouter, DEFAULT_COMPANION_PATH_PREFIX,
@@ -87,35 +76,21 @@ pub(crate) use managed_agents::{
     managed_agent_snapshot_async, run_acp_agent_blocking, run_codex_agent_blocking,
     run_terminal_agent_blocking,
 };
-pub use recovery_snapshot_cache::RecoverySnapshotCache;
 pub(crate) use remote_limits::prepare_remote_websocket_upgrade;
-pub use remote_limits::{RemoteRequestLimitConfig, RemoteRequestLimits};
 pub(crate) use response::{error_status_and_body, extract_request_id};
 pub(crate) use sessions_adopt::{
     adopt_session, adoption_error_status_and_body, record_adopt_in_db,
 };
+// `server_state` hosts the generic `DaemonHttpState`/`AsyncDaemonDbSlot` and
+// their satellites; this is the one place that ties `Db`/`AsyncDb` down to the
+// daemon's actual database types, so every other module keeps reaching these
+// names through `crate::daemon::http` exactly as before.
+pub use server_state::{
+    DaemonHttpAuthMode, ManagedAgentMutationGuard, ManagedAgentMutationLocks,
+    RecoverySnapshotCache, RemoteRequestLimitConfig, RemoteRequestLimits,
+};
 
-#[derive(Clone, Default)]
-pub struct AsyncDaemonDbSlot {
-    inner: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
-}
-
-impl AsyncDaemonDbSlot {
-    #[must_use]
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
-    #[must_use]
-    pub(crate) fn from_inner(inner: Arc<OnceLock<Arc<AsyncDaemonDb>>>) -> Self {
-        Self { inner }
-    }
-
-    #[must_use]
-    pub(crate) fn get(&self) -> Option<&Arc<AsyncDaemonDb>> {
-        self.inner.get()
-    }
-}
+pub type AsyncDaemonDbSlot = server_state::AsyncDaemonDbSlot<AsyncDaemonDb>;
 
 pub(crate) fn require_async_db<'a>(
     state: &'a DaemonHttpState,
@@ -206,45 +181,14 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
     }
 }
 
-#[derive(Clone)]
-pub struct DaemonHttpState {
-    pub token: String,
-    pub auth_mode: DaemonHttpAuthMode,
-    pub remote_domain: Option<String>,
-    /// Companion service this daemon forwards a configured path subtree to.
-    /// `None` leaves the router, the auth layer, and every response exactly as
-    /// they are without companion routing.
-    pub companion: Option<CompanionRouter>,
-    pub remote_request_limits: Option<RemoteRequestLimits>,
-    pub remote_pairing_limiter: Arc<Mutex<RemotePairingRateLimiter>>,
-    pub remote_pairing_status_limiter: Arc<Mutex<RemotePairingStatusRateLimiter>>,
-    pub sender: broadcast::Sender<StreamEvent>,
-    /// Fan-out channel carrying events serialized once into a shared
-    /// [`PreparedBroadcast`]. Connection relays and SSE streams subscribe here
-    /// instead of re-serializing each event per subscriber.
-    pub prepared_sender: broadcast::Sender<Arc<PreparedBroadcast>>,
-    /// Pairing changes, for the remote clients holding `/v1/remote/ws` open.
-    ///
-    /// Its own channel rather than a variant on [`Self::sender`], which feeds
-    /// `/v1/ws` and `/v1/stream`: those reach every `read` client, and a pairing
-    /// change must reach only the credential that minted it.
-    pub remote_pairing_events: broadcast::Sender<Arc<RemotePairingEvent>>,
-    pub manifest: DaemonManifest,
-    pub daemon_epoch: String,
-    pub replay_buffer: Arc<Mutex<ReplayBuffer>>,
-    pub db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    pub async_db: AsyncDaemonDbSlot,
-    pub db_path: Option<PathBuf>,
-    pub codex_controller: CodexControllerHandle,
-    pub agent_tui_manager: AgentTuiManagerHandle,
-    pub acp_agent_manager: AcpAgentManagerHandle,
-    pub managed_agent_mutation_locks: ManagedAgentMutationLocks,
-    /// Single-flight cache for the global `sessions_updated` recovery snapshot.
-    /// When many relays lag past the replay buffer at once they would each
-    /// rebuild the same snapshot; holding this lock across the rebuild
-    /// collapses the herd into one build per change generation.
-    pub recovery_snapshot: Arc<AsyncMutex<RecoverySnapshotCache>>,
-}
+// Every route handler, WebSocket relay, and service function names this
+// alias, never `server_state::DaemonHttpState` directly. `task_board_remote_transport`
+// ties the same three types down independently rather than importing this
+// alias, to avoid the cycle its own doc comment explains; both resolve to the
+// identical monomorphized type, which is what lets its routes merge into this
+// module's `OpenApiRouter`.
+pub type DaemonHttpState =
+    server_state::DaemonHttpState<DaemonDb, AsyncDaemonDb, companion::CompanionRouter>;
 
 /// Build the default remote pairing rate limiter used by daemon HTTP state.
 #[must_use]
@@ -264,75 +208,6 @@ impl DaemonHttpState {
         WakeDispatch::new(Some(&self.agent_tui_manager), Some(&self.acp_agent_manager))
             .with_codex(Some(&self.codex_controller))
     }
-}
-
-type ManagedAgentMutationKey = (String, String);
-type ManagedAgentMutationLane = Arc<AsyncMutex<()>>;
-type ManagedAgentMutationMap = BTreeMap<ManagedAgentMutationKey, ManagedAgentMutationLane>;
-type ManagedAgentMutationMapGuard<'a> = MutexGuard<'a, ManagedAgentMutationMap>;
-
-#[derive(Clone, Default)]
-pub struct ManagedAgentMutationLocks {
-    inner: Arc<Mutex<ManagedAgentMutationMap>>,
-}
-
-impl ManagedAgentMutationLocks {
-    pub async fn lock(&self, session_id: &str, agent_id: &str) -> ManagedAgentMutationGuard {
-        let key = (session_id.to_string(), agent_id.to_string());
-        let lock = {
-            let mut inner = mutation_lock_map(&self.inner);
-            inner
-                .entry(key.clone())
-                .or_insert_with(|| Arc::new(AsyncMutex::new(())))
-                .clone()
-        };
-        let guard = lock.clone().lock_owned().await;
-        ManagedAgentMutationGuard {
-            key,
-            lock,
-            locks: self.clone(),
-            guard: Some(guard),
-        }
-    }
-}
-
-#[must_use]
-pub struct ManagedAgentMutationGuard {
-    key: (String, String),
-    lock: Arc<AsyncMutex<()>>,
-    locks: ManagedAgentMutationLocks,
-    guard: Option<OwnedMutexGuard<()>>,
-}
-
-impl Drop for ManagedAgentMutationGuard {
-    fn drop(&mut self) {
-        let Some(guard) = self.guard.take() else {
-            return;
-        };
-        drop(guard);
-        let mut inner = mutation_lock_map(&self.locks.inner);
-        // Drop idle keys so the map reflects live contention instead of history.
-        if Arc::strong_count(&self.lock) == 2 {
-            inner.remove(&self.key);
-        }
-    }
-}
-
-fn mutation_lock_map(mutex: &Mutex<ManagedAgentMutationMap>) -> ManagedAgentMutationMapGuard<'_> {
-    mutex
-        .lock()
-        .unwrap_or_else(recover_poisoned_mutation_lock_map)
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn recover_poisoned_mutation_lock_map(
-    error: PoisonError<ManagedAgentMutationMapGuard<'_>>,
-) -> ManagedAgentMutationMapGuard<'_> {
-    tracing::warn!(%error, "recovering poisoned managed-agent mutation map");
-    error.into_inner()
 }
 
 /// Serve the daemon's HTTP API.

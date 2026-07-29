@@ -27,28 +27,13 @@ pub use crate::daemon::task_board_remote_transport::routes::{
     EXECUTION_OPERATIONS, execution_operation,
 };
 
-/// Error envelope returned by daemon handlers on failure.
-///
-/// Mirrors the dominant shape produced by `error_status_and_body`
-/// (`{"error": {"code", "message", "details"}}`). A few endpoints emit
-/// alternate ad-hoc error shapes for specific conditions; those are noted in
-/// the relevant operation descriptions.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DaemonErrorBody {
-    pub error: DaemonErrorDetail,
-}
-
-/// Structured error detail carried by [`DaemonErrorBody`].
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DaemonErrorDetail {
-    /// Stable machine-readable error code (for example `SESSION_SCOPE_DENIED`).
-    pub code: String,
-    /// Human-readable error message.
-    pub message: String,
-    /// Optional additional context lines.
-    #[serde(default)]
-    pub details: Vec<String>,
-}
+// `DaemonErrorBody`/`DaemonErrorDetail` live in `server_state`, not here:
+// `task_board_remote_transport`'s own `#[utoipa::path]` response annotations
+// need them, and importing them from `http` would reopen the cycle this
+// module's `execution_routes` merge already had to route around. Re-exported
+// so every existing `super::openapi::DaemonErrorBody` caller in `http` is
+// unaffected.
+pub use crate::daemon::server_state::{DaemonErrorBody, DaemonErrorDetail};
 
 /// Ad-hoc error body emitted by a few session endpoints that predate the
 /// standard [`DaemonErrorBody`] envelope. It always carries a short string

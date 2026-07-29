@@ -14,6 +14,7 @@ use crate::daemon::remote_auth::{
     authorize_remote_execution_operation, authorize_remote_http_route,
 };
 use crate::daemon::remote_identity::RemoteStoredClient;
+pub(crate) use crate::daemon::server_state::DaemonHttpAuthMode;
 use crate::daemon::task_board_remote_transport::routes::execution_operation;
 
 use super::auth_audit::RemoteHttpAuditContext;
@@ -23,13 +24,6 @@ const REMOTE_AUTH_STORE_UNAVAILABLE_MESSAGE: &str = "remote authentication store
 
 tokio::task_local! {
     static REMOTE_HTTP_CLIENT: RemoteStoredClient;
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DaemonHttpAuthMode {
-    #[default]
-    Local,
-    Remote,
 }
 
 #[derive(Clone, Copy)]

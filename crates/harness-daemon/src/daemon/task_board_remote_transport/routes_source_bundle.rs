@@ -3,10 +3,10 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
 
+use super::DaemonHttpState;
 use super::routes_support::{assignment_route, map_route_result, wire_error};
 use crate::daemon::db::utc_now;
-use crate::daemon::http::DaemonHttpState;
-use crate::daemon::http::openapi::DaemonErrorBody;
+use crate::daemon::server_state::DaemonErrorBody;
 use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest,
 };
