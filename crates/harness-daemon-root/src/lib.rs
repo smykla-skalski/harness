@@ -27,8 +27,11 @@ mod tests;
 // `session_service_daemon_*` scenarios (in the root `harness` crate) can fake
 // a running daemon, since that binary links `harness` as an ordinary
 // dependency where `cfg(test)` is never set. Gating on `daemon-runtime`
-// rather than always-on keeps it out of the default-feature build.
-#[cfg(any(test, feature = "daemon-runtime"))]
+// rather than always-on keeps it out of the default-feature build; `harness-daemon`'s
+// own `direct_session_start` unit test reaches this module the same way but
+// through `test-support` instead, since it needs `read_http_request` and
+// `write_http_response` without pulling in the rest of the daemon-runtime build.
+#[cfg(any(test, feature = "daemon-runtime", feature = "test-support"))]
 pub mod test_support;
 
 pub use harness_infra::persistence::flock::FlockGuard;
