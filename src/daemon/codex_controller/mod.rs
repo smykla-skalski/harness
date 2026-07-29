@@ -14,6 +14,7 @@ mod orchestration;
 mod orchestration_registration;
 mod rpc;
 mod transcript;
+mod turn_lifecycle;
 mod wire;
 mod worker;
 mod worker_control;
@@ -24,3 +25,4 @@ mod worker_state;
 mod tests;
 
 pub use handle::CodexControllerHandle;
+pub use turn_lifecycle::CodexAgentTurnRuntime;
