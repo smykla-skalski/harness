@@ -31,6 +31,17 @@ fn compiler_binds_documented_actions_to_exact_head_capabilities() {
 }
 
 #[test]
+fn compiler_rejects_duplicate_capabilities_without_the_outer_validator() {
+    let mut result = safe_result();
+    result.required_tools.push("task_board.audit".into());
+
+    assert_eq!(
+        compile_task_board_dependency_action_plan(&result),
+        Err(TaskBoardDependencyTriageError::InvalidRequiredTool)
+    );
+}
+
+#[test]
 fn model_supplied_action_arguments_are_rejected_by_the_wire_schema() {
     let mut payload = serde_json::to_value(safe_result()).expect("serialize result");
     payload["next_steps"][0]["command"] = serde_json::json!("rm -rf workspace");

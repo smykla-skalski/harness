@@ -170,11 +170,13 @@ pub trait TaskBoardDependencyActionCapabilityRegistry: Send + Sync {
 pub fn compile_task_board_dependency_action_plan(
     result: &TaskBoardDependencyTriageResult,
 ) -> Result<TaskBoardDependencyActionPlan, TaskBoardDependencyTriageError> {
-    let capabilities = result
-        .required_tools
-        .iter()
-        .map(|tool| TaskBoardDependencyActionCapability::try_from(tool.as_str()))
-        .collect::<Result<BTreeSet<_>, _>>()?;
+    let mut capabilities = BTreeSet::new();
+    for tool in &result.required_tools {
+        let capability = TaskBoardDependencyActionCapability::try_from(tool.as_str())?;
+        if !capabilities.insert(capability) {
+            return Err(TaskBoardDependencyTriageError::InvalidRequiredTool);
+        }
+    }
     let actions = result
         .next_steps
         .iter()
