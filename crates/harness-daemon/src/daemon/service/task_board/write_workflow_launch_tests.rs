@@ -6,8 +6,8 @@ use tempfile::tempdir;
 use super::*;
 use crate::daemon::service::sync_task_board_github_tokens;
 use crate::task_board::{
-    TaskBoardGitHubTokensSyncRequest, TaskBoardOrchestratorSettings, TaskBoardPullRequestHeadIdentity,
-    TaskBoardWorkflowKind,
+    TaskBoardGitHubTokensSyncRequest, TaskBoardOrchestratorSettings,
+    TaskBoardPullRequestHeadIdentity, TaskBoardWorkflowKind,
 };
 
 fn dependency_item() -> TaskBoardItem {
@@ -35,14 +35,19 @@ fn dependency_identity_freezes_the_pull_request_head_over_the_worktree() {
     let runtime = tokio::runtime::Runtime::new().expect("runtime");
     runtime.block_on(async {
         let item = dependency_item();
-        let (pull_request, base_head_revision) =
-            resolve_write_identity(&item, "/nonexistent/worktree", Some(frozen_identity("cafef00d")))
-                .await
-                .expect("dependency identity resolves without a worktree checkout");
+        let (pull_request, base_head_revision) = resolve_write_identity(
+            &item,
+            "/nonexistent/worktree",
+            Some(frozen_identity("cafef00d")),
+        )
+        .await
+        .expect("dependency identity resolves without a worktree checkout");
 
         assert_eq!(base_head_revision, "cafef00d");
         assert_eq!(
-            pull_request.and_then(|identity| identity.head).map(|head| head.revision),
+            pull_request
+                .and_then(|identity| identity.head)
+                .map(|head| head.revision),
             Some("cafef00d".to_string())
         );
     });
@@ -77,7 +82,9 @@ fn stale_pull_request_head_stops_before_agent_work() {
 
     let message = error.to_string();
     assert!(
-        message.contains("stale head") && message.contains("cafef00d") && message.contains("deadbeef"),
+        message.contains("stale head")
+            && message.contains("cafef00d")
+            && message.contains("deadbeef"),
         "stale head reason must name both revisions: {message}"
     );
 }

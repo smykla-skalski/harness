@@ -213,13 +213,16 @@ async fn resolve_write_identity(
     // worktree HEAD. The worktree starts on the repository default branch and the
     // worker checks out this frozen revision before implementing, so the base
     // revision is the pull request head and the two need not match at launch.
-    let identity = pull_request
-        .ok_or_else(|| invalid_transition("PrFix launch has no frozen pull request head"))?;
+    let identity = pull_request.ok_or_else(|| {
+        invalid_transition("dependency workflow launch has no frozen pull request head")
+    })?;
     let remote_head = identity
         .head
         .as_ref()
         .map(|head| head.revision.clone())
-        .ok_or_else(|| invalid_transition("PrFix launch has no frozen pull request head"))?;
+        .ok_or_else(|| {
+            invalid_transition("dependency workflow launch has no frozen pull request head")
+        })?;
     Ok((Some(identity), remote_head))
 }
 
@@ -236,7 +239,7 @@ fn stop_on_stale_pull_request_head(
     };
     if fresh.repository != frozen.repository || fresh.number != frozen.number {
         return Err(invalid_transition(format!(
-            "PrFix pull request identity changed since launch: frozen '{}#{}', now '{}#{}'",
+            "dependency pull request identity changed since launch: frozen '{}#{}', now '{}#{}'",
             frozen.repository, frozen.number, fresh.repository, fresh.number,
         )));
     }
@@ -246,7 +249,7 @@ fn stop_on_stale_pull_request_head(
         return Ok(());
     }
     Err(invalid_transition(format!(
-        "PrFix pull request '{}#{}' head changed since launch: frozen {}, now {} (stale head)",
+        "dependency pull request '{}#{}' head changed since launch: frozen {}, now {} (stale head)",
         frozen.repository,
         frozen.number,
         frozen_head.unwrap_or("<none>"),
