@@ -180,8 +180,13 @@ stop_repo_sccache_server() {
     return 0
   fi
   printf '  · %-46s   stopping\n' 'stop sccache server'
-  SCCACHE_SERVER_UDS="$uds" "$bin" --stop-server >/dev/null 2>&1 \
-    || printf '    (warning: sccache --stop-server exited non-zero; cache dirs may still be removed)\n'
+  # A failed stop leaves a server that may still hold the cache directory, so
+  # return non-zero and let the caller keep the cache rather than risk deleting
+  # it under a live server - the exact failure this script exists to prevent.
+  SCCACHE_SERVER_UDS="$uds" "$bin" --stop-server >/dev/null 2>&1 || {
+    printf '    (warning: sccache --stop-server failed; cache kept to avoid deleting under a live server)\n'
+    return 1
+  }
 }
 
 # sccache is reported but kept by default: its cache is valuable to keep warm
@@ -192,22 +197,33 @@ stop_repo_sccache_server() {
 # are the macOS defaults; ~/.cache/sccache is the Linux one (and sccache's
 # documented default there), which the previous version never listed.
 clean_sccache_caches() {
-  stop_repo_sccache_server
-
   local -a dirs=()
-  local dir total_kb=0 size_kb over_threshold remove reason
+  local dir total_kb=0 size_kb over_threshold remove='' reason
+
+  # A failed stop leaves a server that may still hold the cache directory, so
+  # keep the cache rather than risk deleting it under a live server. This
+  # overrides --force and the size threshold: deleting a cache the server still
+  # pins is the original write-error failure mode either flag would reintroduce.
+  if ! stop_repo_sccache_server; then
+    remove=0
+    reason='kept: sccache server did not stop; retry clean:caches or stop it manually'
+  fi
+
   for dir in \
     "$HOME/Library/Caches/Mozilla.sccache" \
     "$HOME/Library/Caches/sccache" \
     "$HOME/.cache/sccache"; do
     [[ -e "$dir" ]] || continue
-    # The macOS pair can both resolve to the same path when Library/Caches is a
-    # symlink or the user relocated Caches; counting one twice doubles the size.
+    # Resolve to the physical path before deduping. The macOS pair can alias the
+    # same directory through a symlinked Caches, and a literal-string compare
+    # would count that directory twice and double its weight against the threshold.
+    local resolved
+    resolved="$(CDPATH='' cd -P -- "$dir" 2>/dev/null && pwd -P)" || resolved="$dir"
     local existing
     for existing in "${dirs[@]:-}"; do
-      [[ "$existing" == "$dir" ]] && continue 2
+      [[ "$existing" == "$resolved" ]] && continue 2
     done
-    dirs+=("$dir")
+    dirs+=("$resolved")
     size_kb="$(path_size_kb "$dir")"
     total_kb=$((total_kb + size_kb))
   done
@@ -217,19 +233,21 @@ clean_sccache_caches() {
     return
   fi
 
-  over_threshold=0
-  (( total_kb > SCCACHE_REMOVE_THRESHOLD_KB )) && over_threshold=1
-  # --force always removes; the size threshold removes without it. Kept by
-  # default means a healthy 30G cache survives a routine clean:caches.
-  if (( FORCE )); then
-    remove=1
-    reason='--force'
-  elif (( over_threshold )); then
-    remove=1
-    reason="over $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB") threshold"
-  else
-    remove=0
-    reason="kept: under $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB"); pass -f/--force to remove"
+  # Decide removal only when the server stopped cleanly. The size threshold
+  # removes without --force; --force removes regardless of size.
+  if [[ -z "$remove" ]]; then
+    over_threshold=0
+    (( total_kb > SCCACHE_REMOVE_THRESHOLD_KB )) && over_threshold=1
+    if (( FORCE )); then
+      remove=1
+      reason='--force'
+    elif (( over_threshold )); then
+      remove=1
+      reason="over $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB") threshold"
+    else
+      remove=0
+      reason="kept: under $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB"); pass -f/--force to remove"
+    fi
   fi
 
   printf '  · %-46s %8s  total\n' 'sccache cache' "$(bytes_to_human "$total_kb")"

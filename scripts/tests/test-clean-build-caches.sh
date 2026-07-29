@@ -374,6 +374,96 @@ scenario_dry_run_keeps_small_sccache_cache() {
   pass
 }
 
+# Regression for a Copilot finding: if the sccache server cannot be stopped,
+# the cache must be kept even under --force, because deleting it under a live
+# server is the exact write-error failure mode this script exists to prevent.
+# Simulated by pointing SCCACHE_BIN at a fake binary that fails --stop-server
+# while a real Unix socket satisfies the [[ -S ]] guard, so the stop path is
+# taken and fails.
+scenario_keeps_cache_when_stop_fails_even_under_force() {
+  start_test "sccache cache kept under --force when the server fails to stop"
+  if ! command -v python3 >/dev/null 2>&1; then
+    log "  SKIP: python3 unavailable to create a test socket"
+    pass
+    return
+  fi
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output=""
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+
+  # A fake stop binary that is executable and always exits non-zero. The guard
+  # checks [[ -x "$bin" ]], so it has to be a real executable on disk.
+  local fake_bin="$repo/fake-bin/sccache-stop"
+  mkdir -p "$repo/fake-bin"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fake_bin"
+  chmod +x "$fake_bin"
+
+  # A fake cargo-local.sh whose --print-env names the failing binary and a real
+  # socket path. stop_repo_sccache_server calls this to resolve SCCACHE_BIN/UDS.
+  local socket="$repo/fake-tmp/fake-socket.sock"
+  cat > "$repo/scripts/cargo-local.sh" <<CARGO_LOCAL
+#!/usr/bin/env bash
+case "\${1:-}\${2:-}" in
+  --print-env)
+    printf 'SCCACHE_BIN=%s\n' "$fake_bin"
+    printf 'SCCACHE_SERVER_UDS=%s\n' "$socket"
+    ;;
+esac
+CARGO_LOCAL
+  chmod +x "$repo/scripts/cargo-local.sh"
+  # Bind a real Unix socket so [[ -S ]] passes and the stop path actually runs.
+  python3 - "$socket" <<'PY' 2>/dev/null
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(sys.argv[1])
+s.listen(1)
+PY
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --force 2>&1)" || true
+
+  # The stop must warn, and the cache must survive despite --force.
+  grep -Fq 'sccache --stop-server failed' <<<"$output" || { fail "expected stop-failure warning, got: $output"; return 1; }
+  if [[ ! -e "$repo/fake-home/Library/Caches/Mozilla.sccache/blob" ]]; then
+    fail "cache removed under --force despite a failed server stop"
+    return 1
+  fi
+  pass
+}
+
+# Regression for a Copilot finding: two candidate paths that alias the same
+# physical directory through a symlink must count once, not twice, or a symlinked
+# Caches could double the weight and falsely trip the 100G threshold. Here the
+# Mozilla.sccache and Library/Caches/sccache entries point at one real directory.
+scenario_dedupes_symlinked_sccache_cache_dirs() {
+  start_test "symlinked sccache cache dirs are deduped to their physical path"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output=""
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+  # Make the second macOS path a symlink to the first, so they alias one dir.
+  ln -s "$repo/fake-home/Library/Caches/Mozilla.sccache" "$repo/fake-home/Library/Caches/sccache"
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --dry-run 2>&1)" || { fail "dry-run exited non-zero: $output"; return 1; }
+
+  # The total line must list only one directory's size (4K), not double it.
+  local total_line
+  total_line="$(grep -F 'sccache cache' <<<"$output" | grep -F 'total')" || { fail "no sccache total line: $output"; return 1; }
+  if grep -Eq '8[.]0K' <<<"$total_line"; then
+    fail "symlinked dir counted twice: $total_line"
+    return 1
+  fi
+  pass
+}
+
 scenario_dry_run_keeps_leased_segment
 scenario_dry_run_sweeps_only_stale_test_temp_dirs
 scenario_missing_common_repo_root_lib_aborts_safely
@@ -386,6 +476,8 @@ scenario_sccache_is_gated_not_unconditional
 scenario_sccache_covers_linux_cache_path
 scenario_force_help_mentions_sccache
 scenario_dry_run_keeps_small_sccache_cache
+scenario_keeps_cache_when_stop_fails_even_under_force
+scenario_dedupes_symlinked_sccache_cache_dirs
 
 log "clean-build-caches tests: $PASS_COUNT passed, $FAIL_COUNT failed"
 if (( FAIL_COUNT > 0 )); then
