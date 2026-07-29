@@ -676,6 +676,7 @@ mod tests {
             checks: vec![CheckGate {
                 name: "build".to_owned(),
                 state: CheckState::Success,
+                details_url: None,
             }],
             required_check_names: vec!["build".to_owned()],
             review: ReviewGate {

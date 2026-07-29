@@ -43,6 +43,8 @@ impl CheckState {
 pub struct CheckGate {
     pub name: String,
     pub state: CheckState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details_url: Option<String>,
 }
 
 /// GitHub's aggregate review decision for the pull request.

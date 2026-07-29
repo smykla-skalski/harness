@@ -301,7 +301,7 @@ fn the_projection_captures_each_check_state() {
         "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
             { "__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS" },
             { "__typename": "CheckRun", "name": "lint", "status": "IN_PROGRESS", "conclusion": Value::Null },
-            { "__typename": "CheckRun", "name": "flaky", "status": "COMPLETED", "conclusion": "FAILURE" },
+            { "__typename": "CheckRun", "name": "flaky", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "https://github.com/octo/harness/actions/runs/17" },
             { "__typename": "CheckRun", "name": "optional", "status": "COMPLETED", "conclusion": "SKIPPED" },
             { "__typename": "StatusContext", "context": "legacy-ci", "state": "PENDING" }
         ] } } } } ] }
@@ -311,6 +311,14 @@ fn the_projection_captures_each_check_state() {
     assert_eq!(gates.check_state("build"), Some(CheckState::Success));
     assert_eq!(gates.check_state("lint"), Some(CheckState::Pending));
     assert_eq!(gates.check_state("flaky"), Some(CheckState::Failure));
+    assert_eq!(
+        gates
+            .checks
+            .iter()
+            .find(|check| check.name == "flaky")
+            .and_then(|check| check.details_url.as_deref()),
+        Some("https://github.com/octo/harness/actions/runs/17")
+    );
     assert_eq!(gates.check_state("optional"), Some(CheckState::Skipped));
     assert_eq!(gates.check_state("legacy-ci"), Some(CheckState::Pending));
 }

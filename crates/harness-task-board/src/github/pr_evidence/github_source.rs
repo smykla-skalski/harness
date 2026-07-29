@@ -39,8 +39,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
               contexts(first: 100) {
                 nodes {
                   __typename
-                  ... on CheckRun { name status conclusion }
-                  ... on StatusContext { context state }
+                  ... on CheckRun { name status conclusion detailsUrl }
+                  ... on StatusContext { context state targetUrl }
                 }
               }
             }
@@ -341,10 +341,14 @@ struct RollupContext {
     status: Option<String>,
     #[serde(default)]
     conclusion: Option<String>,
+    #[serde(rename = "detailsUrl", default)]
+    details_url: Option<String>,
     #[serde(default)]
     context: Option<String>,
     #[serde(default)]
     state: Option<String>,
+    #[serde(rename = "targetUrl", default)]
+    target_url: Option<String>,
 }
 
 impl RollupContext {
@@ -353,10 +357,12 @@ impl RollupContext {
             "CheckRun" => Some(CheckGate {
                 name: self.name.clone()?,
                 state: check_run_state(self.status.as_deref(), self.conclusion.as_deref()),
+                details_url: self.details_url.clone(),
             }),
             "StatusContext" => Some(CheckGate {
                 name: self.context.clone()?,
                 state: status_context_state(self.state.as_deref()),
+                details_url: self.target_url.clone(),
             }),
             _ => None,
         }

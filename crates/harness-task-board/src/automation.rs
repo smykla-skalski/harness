@@ -11,6 +11,7 @@ use crate::TaskBoardWorkflowKind;
 
 mod admission;
 mod attempt_result_validation;
+mod dependency_check_resume;
 mod dependency_triage;
 mod dependency_triage_actions;
 mod dependency_triage_routing;
@@ -45,6 +46,7 @@ pub use admission::*;
 // root crate's `pub use harness_task_board::*;` facade, and `pub(crate)` no
 // longer reaches that far once the two crates are separate compilation units.
 pub use attempt_result_validation::*;
+pub use dependency_check_resume::*;
 pub use dependency_triage::*;
 pub use dependency_triage_actions::*;
 pub use dependency_triage_routing::*;

@@ -30,6 +30,7 @@ fn mergeable_evidence() -> PullRequestEvidence {
             checks: vec![CheckGate {
                 name: "build".to_string(),
                 state: CheckState::Success,
+                details_url: None,
             }],
             required_check_names: vec!["build".to_string()],
             review: ReviewGate {
