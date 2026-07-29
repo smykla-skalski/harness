@@ -127,7 +127,7 @@ impl RestartDriver {
 
     #[expect(
         clippy::needless_pass_by_value,
-        reason = "retries clone the caller body for each request attempt"
+        reason = "owned by value so callers pass owned json! temporaries; borrowed per attempt"
     )]
     fn send(&self, method: &str, path: &str, body: Option<Value>) -> (u16, Value) {
         let url = format!(
@@ -147,8 +147,8 @@ impl RestartDriver {
             }
             .bearer_auth(&self.token)
             .timeout(DAEMON_HTTP_TIMEOUT);
-            if let Some(body) = body.clone() {
-                builder = builder.json(&body);
+            if let Some(body) = body.as_ref() {
+                builder = builder.json(body);
             }
             match runtime.block_on(async { builder.send().await }) {
                 Ok(response) => {
