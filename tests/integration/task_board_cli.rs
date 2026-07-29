@@ -11,7 +11,7 @@ use harness::daemon::protocol::{
     TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse,
 };
 use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
-use harness::task_board::dispatch::DispatchLifecycle;
+use harness::task_board::dispatch::dispatch_lifecycle_planned;
 use harness::task_board::transport::{
     TaskBoardCommand, TaskBoardDispatchDeliverArgs, TaskBoardDispatchPickArgs,
     TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyGrantRevokeArgs,
@@ -194,7 +194,7 @@ fn applied_dispatch() -> DispatchAppliedTask {
         board_item_id: item.id.clone(),
         session_id: "session-1".to_string(),
         work_item_id: "work-1".to_string(),
-        lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator).applied(),
+        lifecycle: dispatch_lifecycle_planned(&worker, &reviewer, &evaluator).applied(),
         item,
         read_only_workflow: None,
         write_workflow: None,
