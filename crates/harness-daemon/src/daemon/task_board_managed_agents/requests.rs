@@ -8,8 +8,9 @@ use crate::task_board::{
     AgentMode, DispatchAppliedTask, TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION,
     TaskBoardAttemptResultArtifact, TaskBoardImplementationResult, TaskBoardItem,
     TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReadOnlyWorkflowLaunch,
-    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWriteWorkflowLaunch,
-    WorkerPromptContext, render_worker_prompt,
+    TaskBoardReportOnlyReviewFinding, TaskBoardReviewFindingLocation,
+    TaskBoardReviewFindingSeverity, TaskBoardReviewResult, TaskBoardReviewerOutcome,
+    TaskBoardWriteWorkflowLaunch, WorkerPromptContext, render_worker_prompt,
 };
 use harness_kernel::errors::CliError;
 
@@ -240,7 +241,15 @@ fn read_only_review_prompt(
                 verdict: TaskBoardPhaseVerdict::Pass,
                 head_revision: launch.exact_head_revision.clone(),
                 summary: "concise review conclusion".into(),
-                findings: vec!["actionable finding when changes are required".into()],
+                findings: Vec::new(),
+                structured_findings: vec![TaskBoardReportOnlyReviewFinding {
+                    severity: TaskBoardReviewFindingSeverity::Medium,
+                    location: TaskBoardReviewFindingLocation {
+                        path: "path/to/file.rs".into(),
+                        line: Some(1),
+                    },
+                    evidence: "actionable finding when changes are required".into(),
+                }],
             },
         }),
     };

@@ -191,6 +191,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         55 => 56,
         // v57 adds the durable pull_request_actions ledger.
         56 => 57,
+        // v58 adds append-only AI review reports.
+        57 => 58,
         _ => u64::MAX,
     }
 }

@@ -198,6 +198,7 @@ fn result_for_phase(
                     head_revision: SOURCE_REVISION.into(),
                     summary: "reviewed remotely".into(),
                     findings: Vec::new(),
+                    structured_findings: Vec::new(),
                 },
             }),
         ),

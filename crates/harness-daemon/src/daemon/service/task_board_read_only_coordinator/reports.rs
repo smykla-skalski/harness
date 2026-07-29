@@ -140,16 +140,25 @@ async fn handle_run_status(
                 return Ok(());
             }
             let detail = run.error.as_deref().unwrap_or("Codex Report run failed");
+            super::review_report_retention::retain_failed_review_run(
+                db, execution, attempt, &run, detail,
+            )
+            .await?;
             record_retry_or_human(db, execution, attempt, detail, now).await
         }
         CodexRunStatus::Cancelled => {
+            let reason = "Codex Report run was cancelled";
+            super::review_report_retention::retain_cancelled_review_run(
+                db, execution, attempt, &run, reason,
+            )
+            .await?;
             transition_attempt(
                 db,
                 attempt,
                 TaskBoardAttemptState::Cancelled,
                 now,
                 None,
-                Some("Codex Report run was cancelled"),
+                Some(reason),
                 None,
             )
             .await?;

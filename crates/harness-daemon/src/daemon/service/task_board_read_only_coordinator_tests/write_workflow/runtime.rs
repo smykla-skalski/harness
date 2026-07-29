@@ -55,6 +55,7 @@ impl PlannedRun {
                     head_revision: head.into(),
                     summary: "reviewed exact head".into(),
                     findings: Vec::new(),
+                    structured_findings: Vec::new(),
                 },
             }),
         }

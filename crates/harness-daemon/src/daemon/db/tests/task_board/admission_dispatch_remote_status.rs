@@ -350,6 +350,7 @@ fn completed_status(offer: &RemoteOfferRequest) -> RemoteStatusResponse {
                 head_revision: "1111111111111111111111111111111111111111".into(),
                 summary: "remote review passed".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     };

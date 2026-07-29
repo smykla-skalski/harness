@@ -16,7 +16,8 @@ use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardImplementationResult, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
-    TaskBoardReadOnlyRunContext, TaskBoardReviewResult, TaskBoardReviewerOutcome,
+    TaskBoardReadOnlyRunContext, TaskBoardReportOnlyReviewFinding, TaskBoardReviewFindingLocation,
+    TaskBoardReviewFindingSeverity, TaskBoardReviewResult, TaskBoardReviewerOutcome,
     TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord,
     validate_task_board_read_only_run_context,
 };
@@ -257,7 +258,15 @@ fn review_prompt(
                 verdict: TaskBoardPhaseVerdict::Pass,
                 head_revision: exact_head.to_string(),
                 summary: "concise review conclusion".into(),
-                findings: vec!["actionable finding when changes are required".into()],
+                findings: Vec::new(),
+                structured_findings: vec![TaskBoardReportOnlyReviewFinding {
+                    severity: TaskBoardReviewFindingSeverity::Medium,
+                    location: TaskBoardReviewFindingLocation {
+                        path: "path/to/file.rs".into(),
+                        line: Some(1),
+                    },
+                    evidence: "actionable finding when changes are required".into(),
+                }],
             },
         }),
     };

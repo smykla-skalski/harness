@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::TaskBoardReportOnlyReviewFinding;
 use crate::{ExternalRefProvider, TaskBoardReviewerProfile, TaskBoardWorkflowKind};
 
 pub const TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION: u32 = 1;
@@ -100,6 +101,8 @@ pub struct TaskBoardReviewResult {
     pub summary: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub findings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub structured_findings: Vec<TaskBoardReportOnlyReviewFinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

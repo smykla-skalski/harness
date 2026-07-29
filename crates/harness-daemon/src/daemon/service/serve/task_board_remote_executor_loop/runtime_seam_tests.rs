@@ -172,6 +172,7 @@ fn completed_message(record: &TaskBoardRemoteAssignmentRecord) -> String {
                 head_revision: head,
                 summary: "deterministic completed Probe".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     })

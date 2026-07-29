@@ -62,6 +62,7 @@ fn outcome(
             head_revision: head_revision.into(),
             summary: "review complete".into(),
             findings: Vec::new(),
+            structured_findings: Vec::new(),
         },
     }
 }

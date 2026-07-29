@@ -255,6 +255,7 @@ fn typed_review_result(prepared: &PreparedRemoteOffer) -> RemoteTypedResult {
                     .expect("review exact head"),
                 summary: "remote review passed".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     };

@@ -377,6 +377,7 @@ fn review_outcome(summary: &str) -> TaskBoardReviewerOutcome {
             head_revision: "head-amber".into(),
             summary: summary.into(),
             findings: Vec::new(),
+            structured_findings: Vec::new(),
         },
     }
 }
