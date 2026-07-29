@@ -2,7 +2,7 @@ use std::env::temp_dir;
 use std::fs::{File, Metadata, OpenOptions, Permissions};
 use std::io::{Error, ErrorKind, Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 use nix::unistd::{Gid, Uid, fchown};
@@ -288,6 +288,8 @@ fn create_parent<'a>(path: &'a Path, label: &str) -> Result<&'a Path, CliError> 
 
 fn validate_trusted_ancestors(path: &Path, label: &str) -> Result<(), CliError> {
     let expected_uid = Uid::effective().as_raw();
+    let canonical_manifest_dir = canonical_test_boundary(Path::new(env!("CARGO_MANIFEST_DIR")));
+    let canonical_temp_dir = canonical_test_boundary(&temp_dir());
     for ancestor in path.parent().into_iter().flat_map(Path::ancestors) {
         let metadata = match fs::symlink_metadata(ancestor) {
             Ok(metadata) => metadata,
@@ -313,7 +315,13 @@ fn validate_trusted_ancestors(path: &Path, label: &str) -> Result<(), CliError> 
                 metadata.uid()
             )));
         }
-        if is_test_temp_boundary(ancestor, &metadata, expected_uid) {
+        if is_test_temp_boundary(
+            ancestor,
+            &metadata,
+            expected_uid,
+            canonical_manifest_dir.as_deref(),
+            canonical_temp_dir.as_deref(),
+        ) {
             break;
         }
         let writable = metadata.mode() & 0o022 != 0;
@@ -329,15 +337,36 @@ fn validate_trusted_ancestors(path: &Path, label: &str) -> Result<(), CliError> 
     Ok(())
 }
 
-fn is_test_temp_boundary(path: &Path, metadata: &Metadata, expected_uid: u32) -> bool {
+// Resolved once per walk, not per ancestor; `cfg!(test)`-gated because these boundaries only
+// ever gate this crate's own test fixtures and production installs shouldn't pay for the syscall.
+fn canonical_test_boundary(path: &Path) -> Option<PathBuf> {
+    if cfg!(test) {
+        path.canonicalize().ok()
+    } else {
+        None
+    }
+}
+
+fn is_test_temp_boundary(
+    path: &Path,
+    metadata: &Metadata,
+    expected_uid: u32,
+    canonical_manifest_dir: Option<&Path>,
+    canonical_temp_dir: Option<&Path>,
+) -> bool {
     if !cfg!(test) || metadata.uid() != expected_uid {
         return false;
     }
     // `hardened_tempdir_in(CARGO_MANIFEST_DIR)` fixtures live inside the crate's own checkout,
     // whose mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the
     // developer's or CI's own tree, not attacker controlled, so trust it regardless of write bits.
-    let crate_manifest_dir = path == Path::new(env!("CARGO_MANIFEST_DIR"));
-    let secure_session_temp = path == temp_dir() && metadata.mode() & 0o022 == 0;
+    // Match each boundary's canonical form too: a caller may hand this walk a path that was
+    // already resolved by its own `canonicalize()`, in which case the raw special path never
+    // appears as an ancestor even when we're really looking at the same directory.
+    let crate_manifest_dir =
+        path == Path::new(env!("CARGO_MANIFEST_DIR")) || canonical_manifest_dir == Some(path);
+    let secure_session_temp =
+        (path == temp_dir() || canonical_temp_dir == Some(path)) && metadata.mode() & 0o022 == 0;
     crate_manifest_dir || secure_session_temp
 }
 
