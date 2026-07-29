@@ -38,6 +38,11 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("append AI review report")
             .await?;
         if let Some(existing) = load_by_id(&mut transaction, &report.report_id).await? {
+            transaction.rollback().await.map_err(|error| {
+                db_error(format!(
+                    "rollback unchanged AI review report append: {error}"
+                ))
+            })?;
             if existing == *report {
                 return Ok(false);
             }
