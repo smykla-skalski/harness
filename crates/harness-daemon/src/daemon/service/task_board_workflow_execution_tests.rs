@@ -228,7 +228,7 @@ async fn completed_attempt_replay_survives_phase_advance_but_conflict_fails() {
     );
     assert_eq!(
         published.transition.phase,
-        Some(TaskBoardExecutionPhase::Publish)
+        Some(TaskBoardExecutionPhase::Cleanup)
     );
 
     let sequence = test.db.current_change_sequence().await.expect("sequence");
@@ -296,7 +296,7 @@ async fn attempt_create_and_cas_are_fenced_by_durable_parent_phase() {
     );
     assert_eq!(
         published.transition.phase,
-        Some(TaskBoardExecutionPhase::Publish)
+        Some(TaskBoardExecutionPhase::Cleanup)
     );
 
     let sequence = test.db.current_change_sequence().await.expect("sequence");
