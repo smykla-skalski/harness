@@ -43,8 +43,7 @@ enum TaskBoardStepFlowRecoveryResolver {
   static func resolve(_ inputs: TaskBoardStepFlowRecoveryInputs) -> TaskBoardStepRecoveredFlow {
     let retainedItems = recoveryItems(
       liveItems: inputs.taskBoardItems,
-      recentDispatch: inputs.recentDispatch,
-      lastRun: inputs.lastRun
+      recentDispatch: inputs.recentDispatch
     )
     if let explicitID = inputs.lockedItemID
       ?? inputs.delivery?.applied.item.id
@@ -148,22 +147,25 @@ enum TaskBoardStepFlowRecoveryResolver {
     )
   }
 
+  // The orchestrator's own last-run summary now carries only a thin dispatch/
+  // evaluation projection (board id + title, not the full TaskBoardItem), so
+  // it can no longer seed this fallback cache directly. A
+  // recently-dispatched item still comes through `recentDispatch` (the direct
+  // dispatch endpoint's own full response) with no loss; an item the
+  // background orchestrator touched with no matching live item and no recent
+  // local dispatch simply falls out of the cache instead of showing a
+  // reconstructed partial item.
   private static func recoveryItems(
     liveItems: [TaskBoardItem],
-    recentDispatch: TaskBoardDispatchSummary?,
-    lastRun: TaskBoardOrchestratorRunSummary?
+    recentDispatch: TaskBoardDispatchSummary?
   ) -> [TaskBoardItem] {
     var itemsByID = Dictionary(
       liveItems.map { ($0.id, $0) },
       uniquingKeysWith: { first, _ in first }
     )
-    for applied in (recentDispatch?.applied ?? []) + (lastRun?.dispatch?.applied ?? [])
+    for applied in recentDispatch?.applied ?? []
     where itemsByID[applied.item.id] == nil {
       itemsByID[applied.item.id] = applied.item
-    }
-    for item in (lastRun?.evaluation?.records ?? []).compactMap(\.item)
-    where itemsByID[item.id] == nil {
-      itemsByID[item.id] = item
     }
     return Array(itemsByID.values)
   }
@@ -177,7 +179,27 @@ enum TaskBoardStepFlowRecoveryResolver {
     {
       return latestEvaluation.records.last { $0.boardItemId == itemID }
     }
-    return inputs.lastRun?.evaluation?.records.last { $0.boardItemId == itemID }
+    // `lastRun.evaluation.records` is the thin orchestrator-status projection
+    // (no embedded `TaskBoardItem`), so it is widened back into the full
+    // record shape with `item: nil` rather than changing this function's
+    // (and every downstream `TaskBoardStepStage*` consumer's) return type.
+    guard
+      let thin = inputs.lastRun?.evaluation?.records.last(where: { $0.boardItemId == itemID })
+    else {
+      return nil
+    }
+    return TaskBoardEvaluationRecord(
+      boardItemId: thin.boardItemId,
+      sessionId: thin.sessionId,
+      workItemId: thin.workItemId,
+      outcome: thin.outcome,
+      taskStatus: thin.taskStatus,
+      boardStatus: thin.boardStatus,
+      workflowStatus: thin.workflowStatus,
+      updated: thin.updated,
+      reason: thin.reason,
+      item: nil
+    )
   }
 
   private static func dispatchPlan(

@@ -169,8 +169,13 @@ extension RecordingHarnessClient {
         dryRun: false,
         sync: TaskBoardSyncSummary(total: 1, providers: []),
         audit: TaskBoardAuditSummary(total: 1, ready: 1, blocked: 0, deleted: 0, byStatus: []),
-        dispatch: TaskBoardDispatchSummary(plans: [], applied: []),
-        evaluation: TaskBoardEvaluationSummary(total: 1, evaluated: 1, updated: 1, completed: 1),
+        dispatch: TaskBoardOrchestratorDispatchOutcome(plans: [], applied: []),
+        evaluation: TaskBoardOrchestratorEvaluationOutcome(
+          total: 1,
+          evaluated: 1,
+          updated: 1,
+          completed: 1
+        ),
         policyTraceIds: ["trace-1"]
       ),
       workflowExecutionCounts: [

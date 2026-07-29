@@ -175,7 +175,7 @@ struct TaskBoardStepFlowRecoveryTests {
       workflow: TaskBoardWorkflowState(status: .failed, currentStepId: "blocked"),
       updatedAt: "2026-07-19T12:04:00Z"
     )
-    let completedRecord = TaskBoardEvaluationRecord(
+    let completedRecord = TaskBoardOrchestratorEvaluationRecord(
       boardItemId: staleFailed.id,
       outcome: .completed,
       taskStatus: .done,
@@ -186,7 +186,7 @@ struct TaskBoardStepFlowRecoveryTests {
       targetItem: topTodo,
       taskBoardItems: [topTodo, blocked, staleFailed],
       evaluation: EvaluationContext(
-        lastRun: lastRun(evaluation: TaskBoardEvaluationSummary(records: [completedRecord]))
+        lastRun: lastRun(evaluation: TaskBoardOrchestratorEvaluationOutcome(records: [completedRecord]))
       )
     )
 
@@ -233,7 +233,7 @@ struct TaskBoardStepFlowRecoveryTests {
       workflow: TaskBoardWorkflowState(status: .failed, currentStepId: "blocked")
     )
     let other = item(id: "other", status: .inProgress)
-    let olderCompleted = TaskBoardEvaluationRecord(
+    let olderCompleted = TaskBoardOrchestratorEvaluationRecord(
       boardItemId: failed.id,
       outcome: .completed,
       taskStatus: .done,
@@ -252,7 +252,7 @@ struct TaskBoardStepFlowRecoveryTests {
         baselineRunID: "current-run",
         lastRun: lastRun(
           runID: "current-run",
-          evaluation: TaskBoardEvaluationSummary(records: [olderCompleted])
+          evaluation: TaskBoardOrchestratorEvaluationOutcome(records: [olderCompleted])
         )
       )
     )
@@ -268,14 +268,14 @@ struct TaskBoardStepFlowRecoveryTests {
       status: .blocked,
       workflow: TaskBoardWorkflowState(status: .failed, currentStepId: "blocked")
     )
-    let durableRecord = TaskBoardEvaluationRecord(
+    let durableRecord = TaskBoardOrchestratorEvaluationRecord(
       boardItemId: staleBlocked.id,
       outcome: .blocked,
       taskStatus: .blocked,
-      item: staleBlocked
+      itemTitle: staleBlocked.title
     )
     let durable = EvaluationContext(
-      lastRun: lastRun(evaluation: TaskBoardEvaluationSummary(records: [durableRecord]))
+      lastRun: lastRun(evaluation: TaskBoardOrchestratorEvaluationOutcome(records: [durableRecord]))
     )
     let topTodo = item(id: "top-todo", status: .todo)
     let recovered = recover(
