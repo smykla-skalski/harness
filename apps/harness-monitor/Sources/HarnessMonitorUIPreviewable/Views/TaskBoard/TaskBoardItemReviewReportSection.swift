@@ -60,6 +60,7 @@ struct TaskBoardItemReviewReportSection: View {
           HStack(spacing: HarnessMonitorTheme.spacingSM) {
             ProgressView()
               .controlSize(.small)
+              .accessibilityLabel("Review in progress")
             TaskBoardReviewStatusPill(
               title: "Running",
               systemImage: "bolt.fill",
