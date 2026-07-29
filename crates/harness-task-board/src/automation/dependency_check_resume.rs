@@ -112,13 +112,9 @@ pub fn task_board_dependency_check_wait(
         && route.source_result.repository == route.repository
         && route.source_result.pull_request_number == route.pull_request_number
         && route.source_result.exact_head_revision == route.exact_head_revision;
-    let pending_checks_are_required = pending_checks.iter().all(|name| {
-        required_checks.contains(name)
-            && matches!(
-                evidence.gates.check_state(name),
-                None | Some(CheckState::Pending)
-            )
-    });
+    let pending_checks_are_required = pending_checks
+        .iter()
+        .all(|name| required_checks.contains(name));
     if route.route_id.trim().is_empty()
         || route.repository.trim().is_empty()
         || route.pull_request_number == 0

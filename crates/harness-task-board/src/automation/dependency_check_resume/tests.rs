@@ -191,6 +191,16 @@ fn required_checks_can_start_waiting_before_their_rollup_appears() {
     assert_eq!(wait.required_checks, vec!["build"]);
 }
 
+#[test]
+fn settled_checks_can_start_an_observer_after_route_persistence() {
+    let initial = evidence(CheckState::Success, Some("https://checks/build"));
+
+    let wait = task_board_dependency_check_wait(&waiting_route(), &initial)
+        .expect("settled required check can resume immediately");
+
+    assert_eq!(wait.required_checks, vec!["build"]);
+}
+
 async fn observe(
     source: &Source,
     wait: &TaskBoardDependencyCheckWait,
