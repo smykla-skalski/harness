@@ -99,7 +99,7 @@ fn notification_parser_extracts_handled_shapes_tolerantly() {
 }
 
 #[test]
-fn result_parsers_extract_ids_from_app_server_responses() {
+fn thread_result_parser_extracts_id_and_model_from_app_server_response() {
     assert_eq!(
         thread_result_from_result(&json!({
             "thread": { "id": "thread-1" },

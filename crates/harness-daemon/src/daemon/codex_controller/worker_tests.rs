@@ -48,7 +48,7 @@ async fn initialize_sends_initialized_notification_before_thread_requests() {
 }
 
 #[tokio::test]
-async fn thread_start_records_the_effective_requested_model() {
+async fn thread_start_sends_requested_model_and_records_effective_model() {
     let (controller, _db, _tempdir) = super::super::tests::test_support::controller_with_db();
     let (_control_tx, control_rx) = mpsc::unbounded_channel();
     let mut snapshot =
