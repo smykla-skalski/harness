@@ -55,7 +55,7 @@ Sources: `cargo run --quiet -- observe scan --help`; `cargo run --quiet -- obser
 
 Nested families currently expose: `task {create, assign, list, update, checkpoint, submit-for-review, claim-review, submit-review, respond-review, arbitrate}`, `signal {send, list}`, and `agents {start, attach, list, show, input, resize, stop, steer, interrupt, approve}`.
 
-Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session signal --help`; `cargo run --quiet -- session agents --help`; `crates/harness-session/src/transport/mod.rs:28-173`.
+Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session signal --help`; `cargo run --quiet -- session agents --help`; `src/session/transport/mod.rs:28-173`.
 
 ## `session start` reference
 
@@ -67,7 +67,7 @@ Sources: `cargo run --quiet -- session --help`; `cargo run --quiet -- session si
 | Project-dir behavior | Defaults to cwd and also reads `CLAUDE_PROJECT_DIR` |
 | Session-id behavior | Auto-generated if omitted |
 
-Sources: `cargo run --quiet -- session start --help`; `crates/harness-session/src/transport/session_commands.rs:11-42`; `crates/harness-session/src/transport/support.rs:11-18`.
+Sources: `cargo run --quiet -- session start --help`; `src/session/transport/session_commands.rs:11-42`; `src/session/transport/support.rs:11-18`.
 
 ## Useful `session` follow-ons
 
@@ -78,4 +78,4 @@ Sources: `cargo run --quiet -- session start --help`; `crates/harness-session/sr
 | `harness session status <SESSION_ID>` | Current session snapshot; supports `--json` |
 | `harness session list` | Discover active sessions before joining or observing; `--all` includes archived sessions |
 
-Sources: `cargo run --quiet -- session observe --help`; `cargo run --quiet -- session sync --help`; `cargo run --quiet -- session status --help`; `cargo run --quiet -- session list --help`; `crates/harness-session/src/transport/session_commands.rs:217-257`; `crates/harness-session/src/transport/session_commands.rs:259-293`; `crates/harness-session/src/transport/session_commands.rs:344-431`.
+Sources: `cargo run --quiet -- session observe --help`; `cargo run --quiet -- session sync --help`; `cargo run --quiet -- session status --help`; `cargo run --quiet -- session list --help`; `src/session/transport/session_commands.rs:217-257`; `src/session/transport/session_commands.rs:259-293`; `src/session/transport/session_commands.rs:344-431`.
