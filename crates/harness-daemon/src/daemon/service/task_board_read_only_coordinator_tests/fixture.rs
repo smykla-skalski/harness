@@ -402,38 +402,3 @@ pub(super) async fn admission_state(fixture: &Fixture) -> String {
     .await
     .expect("load admission state")
 }
-
-pub(super) async fn seed_publish_attempt(
-    label: &str,
-    parent_state: TaskBoardExecutionState,
-    attempt_state: TaskBoardAttemptState,
-) -> Fixture {
-    let fixture = Box::pin(seed_execution_at_phase(
-        label,
-        TaskBoardWorkflowKind::PR_REVIEW,
-        crate::task_board::TaskBoardExecutionPhase::Publish,
-        parent_state,
-        None,
-    ))
-    .await;
-    fixture
-        .test
-        .db
-        .create_task_board_execution_attempt(&TaskBoardExecutionAttemptRecord {
-            execution_id: fixture.execution_id.clone(),
-            action_key: "publish".into(),
-            attempt: 1,
-            idempotency_key: format!("publish-{}-1", fixture.execution_id),
-            state: attempt_state,
-            failure_class: None,
-            available_at: None,
-            error: None,
-            artifact: None,
-            started_at: NOW.into(),
-            updated_at: NOW.into(),
-            completed_at: None,
-        })
-        .await
-        .expect("seed publish attempt");
-    fixture
-}

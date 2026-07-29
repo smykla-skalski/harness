@@ -1,8 +1,6 @@
 mod driver;
 mod fixture;
-mod lifecycle_recovery;
 mod prepared_report_fixture;
-mod publish_claim_races;
 mod quorum;
 mod recovery;
 mod recovery_liveness;
@@ -67,7 +65,7 @@ async fn local_review_completes_evaluation_cleanup_and_atomic_projection() {
 }
 
 #[tokio::test]
-async fn pr_review_completes_exact_head_publish_and_cleanup() {
+async fn pr_review_completes_exact_head_report_and_cleanup_without_publication() {
     let fixture = Box::pin(seed_execution(
         "pr-lifecycle",
         TaskBoardWorkflowKind::PR_REVIEW,
@@ -88,9 +86,9 @@ async fn pr_review_completes_exact_head_publish_and_cleanup() {
         execution.transition.execution_state,
         TaskBoardExecutionState::Completed
     );
-    assert_attempts_completed(&execution, &["cleanup", "publish", "review:reviewer-amber"]);
+    assert_attempts_completed(&execution, &["cleanup", "review:reviewer-amber"]);
     assert_eq!(runtime.start_count(), 1);
-    assert_eq!(runtime.publish_count(), 1);
+    assert_eq!(runtime.publish_count(), 0);
     assert_terminal_projection(
         &fixture,
         TaskBoardStatus::Done,
@@ -99,63 +97,9 @@ async fn pr_review_completes_exact_head_publish_and_cleanup() {
     .await;
 }
 
-#[tokio::test]
-async fn stale_pr_head_before_publish_is_fenced_without_publish_claim() {
-    let fixture = Box::pin(seed_execution(
-        "pr-stale",
-        TaskBoardWorkflowKind::PR_REVIEW,
-        TaskBoardExecutionState::Pending,
-        None,
-    ))
-    .await;
-    let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
-    drive_to_phase(&fixture, &runtime, TaskBoardExecutionPhase::Publish).await;
-    runtime.set_head("head-replaced");
-
-    tick(&fixture, &runtime, NOW).await;
-
-    let execution = load_execution(&fixture).await;
-    assert_eq!(
-        execution.transition.execution_state,
-        TaskBoardExecutionState::HumanRequired
-    );
-    assert_eq!(
-        execution.transition.exact_head_revision.as_deref(),
-        Some(FROZEN_HEAD)
-    );
-    assert_eq!(
-        execution.blocked_reason.as_deref(),
-        Some("exact_head_changed_before_publish")
-    );
-    assert!(
-        execution
-            .attempts
-            .iter()
-            .all(|attempt| attempt.action_key != "publish")
-    );
-    assert_eq!(runtime.publish_count(), 0);
-    tick(&fixture, &runtime, NOW).await;
-    assert_terminal_projection(
-        &fixture,
-        TaskBoardStatus::HumanRequired,
-        TaskBoardWorkflowStatus::Paused,
-    )
-    .await;
-}
-
 async fn tick(fixture: &Fixture, runtime: &FakeReadOnlyRuntime, now: &str) {
     HeadlessWorkflowDriver::new(fixture, runtime)
         .tick(now)
-        .await;
-}
-
-async fn drive_to_phase(
-    fixture: &Fixture,
-    runtime: &FakeReadOnlyRuntime,
-    phase: TaskBoardExecutionPhase,
-) {
-    HeadlessWorkflowDriver::new(fixture, runtime)
-        .drive_to_phase(phase, NOW, 12)
         .await;
 }
 
