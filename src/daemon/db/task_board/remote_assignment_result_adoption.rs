@@ -70,7 +70,7 @@ impl AsyncDaemonDb {
         {
             TerminalAdoptionScreen::Settled { context, outcome } => {
                 commit_adoption(transaction, context).await?;
-                Ok(outcome)
+                Ok(*outcome)
             }
             TerminalAdoptionScreen::Proceed(proceed) => {
                 // The adoption write reaches the result-import evidence loaders
