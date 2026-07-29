@@ -21,6 +21,8 @@
 //! separately scoped problem; this trait is provider-sync's own narrow
 //! answer, covering only the handful of helpers this crate calls.
 
+use std::future::Future;
+
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use harness_kernel::errors::CliError;
@@ -31,42 +33,42 @@ pub trait ProviderSyncStore: Send + Sync {
 
     /// # Errors
     /// Returns [`CliError`] when the transaction cannot be started.
-    async fn begin_immediate_transaction(
+    fn begin_immediate_transaction(
         &self,
         context: &str,
-    ) -> Result<Transaction<'_, Sqlite>, CliError>;
+    ) -> impl Future<Output = Result<Transaction<'_, Sqlite>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on write failure.
-    async fn bump_change_in_tx(
+    fn bump_change_in_tx(
         &self,
         transaction: &mut Transaction<'_, Sqlite>,
         scope: &str,
-    ) -> Result<i64, CliError>;
+    ) -> impl Future<Output = Result<i64, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on read failure.
-    async fn load_item_in_tx(
+    fn load_item_in_tx(
         &self,
         transaction: &mut Transaction<'_, Sqlite>,
         item_id: &str,
-    ) -> Result<Option<(TaskBoardItem, i64)>, CliError>;
+    ) -> impl Future<Output = Result<Option<(TaskBoardItem, i64)>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] when the item has a side effect in flight that
     /// forbids this mutation.
-    async fn ensure_workflow_item_mutation_allowed_in_tx(
+    fn ensure_workflow_item_mutation_allowed_in_tx(
         &self,
         transaction: &mut Transaction<'_, Sqlite>,
         item_id: &str,
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on write or validation failure.
-    async fn replace_item_in_tx(
+    fn replace_item_in_tx(
         &self,
         transaction: &mut Transaction<'_, Sqlite>,
         item: &TaskBoardItem,
         revision: i64,
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 }

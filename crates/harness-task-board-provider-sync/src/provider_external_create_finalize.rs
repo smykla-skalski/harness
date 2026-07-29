@@ -89,8 +89,7 @@ pub async fn finalize_task_board_external_create_intent<D: ProviderSyncStore>(
             transaction,
             stored,
             item,
-            item_revision,
-            &attached_at,
+            (item_revision, &attached_at),
             provider_target.as_deref(),
             &expected.provider_baseline,
         )
@@ -101,8 +100,7 @@ pub async fn finalize_task_board_external_create_intent<D: ProviderSyncStore>(
         transaction,
         stored,
         item,
-        item_revision,
-        &attached_at,
+        (item_revision, &attached_at),
         provider_target.as_deref(),
         &expected.provider_baseline,
     )
@@ -114,11 +112,11 @@ async fn finalize_new_link<D: ProviderSyncStore>(
     mut transaction: Transaction<'_, Sqlite>,
     stored: TaskBoardExternalCreateIntent,
     mut item: TaskBoardItem,
-    item_revision: i64,
-    attached_at: &str,
+    at: (i64, &str),
     provider_target: Option<&str>,
     provider_baseline: &ExternalRef,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
+    let (item_revision, attached_at) = at;
     db.ensure_workflow_item_mutation_allowed_in_tx(&mut transaction, &stored.item_id)
         .await?;
     apply_provider_identity(&mut item, &stored, provider_target)?;
@@ -183,11 +181,11 @@ async fn finalize_existing_link<D: ProviderSyncStore>(
     mut transaction: Transaction<'_, Sqlite>,
     stored: TaskBoardExternalCreateIntent,
     mut item: TaskBoardItem,
-    item_revision: i64,
-    attached_at: &str,
+    at: (i64, &str),
     provider_target: Option<&str>,
     provider_baseline: &ExternalRef,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
+    let (item_revision, attached_at) = at;
     let identity_changed = apply_provider_identity(&mut item, &stored, provider_target)?;
     let attached_item_revision = rewrite_linked_item_in_tx(
         db,
