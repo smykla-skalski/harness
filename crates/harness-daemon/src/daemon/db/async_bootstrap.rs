@@ -193,6 +193,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         56 => 57,
         // v58 adds append-only AI review reports.
         57 => 58,
+        // v59 adds the durable agent_turn_runs table for non-Codex report runs.
+        58 => 59,
         _ => u64::MAX,
     }
 }

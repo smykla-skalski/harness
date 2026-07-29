@@ -337,6 +337,7 @@ pub fn repair_current_schema_shape(
     super::schema_v56::run(conn)?;
     super::schema_v57::run(conn)?;
     super::schema_v58::run(conn)?;
+    super::schema_v59::run(conn)?;
     super::schema_repairs_external_creates::require_complete_shape(conn)?;
     super::schema_repairs_wake_events::require_complete_shape(conn)?;
     super::schema_repairs_admission::require_complete_shape(conn)?;

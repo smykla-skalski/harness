@@ -38,6 +38,8 @@ pub(crate) use super::{
 };
 
 mod activity_fold;
+mod async_agent_turn_runs;
+pub(crate) use async_agent_turn_runs::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 mod async_agents;
 mod async_bootstrap;
 mod async_change_tracking;
@@ -344,7 +346,7 @@ impl fmt::Debug for DaemonDb {
 // assert a freshly migrated database's stamped version against this
 // constant, the same reason `AsyncDaemonDb` above is `pub` rather than
 // `pub(crate)`.
-pub const SCHEMA_VERSION: &str = "58";
+pub const SCHEMA_VERSION: &str = "59";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]
