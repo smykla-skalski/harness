@@ -13,8 +13,6 @@
 //! forward into the matching trait method, so nothing outside `db/task_board`
 //! has to change to keep calling them by the same name.
 
-use async_trait::async_trait;
-
 use super::items::TaskBoardMutation;
 use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -28,7 +26,6 @@ use crate::task_board::{
     TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent, TaskBoardSyncConflict,
 };
 
-#[async_trait]
 pub(crate) trait ProviderQueries: Send + Sync {
     async fn hide_task_board_item_for_provider_exclusion(
         &self,
@@ -198,7 +195,6 @@ pub(crate) trait ProviderQueries: Send + Sync {
 /// area's query logic, kept in the file the query has always lived in
 /// (`provider_exclusion.rs`, `provider_sync.rs`, and so on) so this file
 /// stays a pure interface plus wiring, not a 20-method dumping ground.
-#[async_trait]
 impl ProviderQueries for AsyncDaemonDb {
     async fn hide_task_board_item_for_provider_exclusion(
         &self,
