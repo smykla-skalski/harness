@@ -4004,7 +4004,6 @@ dependencies = [
  "chrono",
  "clap",
  "harness-kernel",
- "harness-workspace",
  "regex",
  "serde",
  "serde_json",
