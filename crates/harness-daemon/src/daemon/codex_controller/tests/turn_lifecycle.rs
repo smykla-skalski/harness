@@ -1,5 +1,7 @@
 use serde_json::json;
 
+use harness_kernel::errors::{CliError, CliErrorKind};
+
 use crate::agents::turn::{
     AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnId, AgentTurnRequest,
     AgentTurnRuntime, AgentTurnStatus,
@@ -144,45 +146,50 @@ async fn codex_cancellation_uses_the_shared_terminal_state() {
 async fn failed_codex_turns_use_shared_recovery_categories() {
     let (controller, db, _tempdir) = controller_with_db();
     let runtime = CodexAgentTurnRuntime::new(controller, SESSION_ID);
+    let mismatch_error = CliError::from(CliErrorKind::workflow_parse(
+        "codex app-server model mismatch: unsupported model selection: requested \
+         'gpt-5.3-codex-spark', effective 'gpt-5.5'",
+    ))
+    .to_string();
     let cases = [
         (
-            "HTTP 401 unauthorized",
+            "HTTP 401 unauthorized".to_string(),
             AgentTurnFailureCategory::Authentication,
             false,
             AgentTurnFailureStage::Execution,
         ),
         (
-            "HTTP 429 rate limit",
+            "HTTP 429 rate limit".to_string(),
             AgentTurnFailureCategory::RateLimited,
             true,
             AgentTurnFailureStage::Execution,
         ),
         (
-            "unsupported model gpt-x",
+            "unsupported model gpt-x".to_string(),
             AgentTurnFailureCategory::UnsupportedModel,
             false,
             AgentTurnFailureStage::Execution,
         ),
         (
-            "codex app-server model mismatch: unsupported model selection: requested 'gpt-5.3-codex-spark', effective 'gpt-5.5'",
+            mismatch_error,
             AgentTurnFailureCategory::UnsupportedModel,
             false,
             AgentTurnFailureStage::Start,
         ),
         (
-            "connection closed",
+            "connection closed".to_string(),
             AgentTurnFailureCategory::Transport,
             false,
             AgentTurnFailureStage::Execution,
         ),
         (
-            "provider refused prompt",
+            "provider refused prompt".to_string(),
             AgentTurnFailureCategory::ProviderRejected,
             false,
             AgentTurnFailureStage::Execution,
         ),
         (
-            "unrecognized failure",
+            "unrecognized failure".to_string(),
             AgentTurnFailureCategory::Unknown,
             false,
             AgentTurnFailureStage::Execution,
@@ -192,7 +199,7 @@ async fn failed_codex_turns_use_shared_recovery_categories() {
     for (sequence, (detail, category, retry_safe, stage)) in cases.into_iter().enumerate() {
         let mut snapshot = report_snapshot(CodexRunStatus::Failed);
         snapshot.run_id = format!("codex-failure-{sequence}");
-        snapshot.error = Some(detail.into());
+        snapshot.error = Some(detail.clone());
         db.lock()
             .expect("db lock")
             .save_codex_run(&snapshot)

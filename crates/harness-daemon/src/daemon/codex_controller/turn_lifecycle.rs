@@ -138,12 +138,19 @@ fn codex_effective_model(snapshot: &CodexRunSnapshot) -> Option<String> {
 fn codex_failure(error: Option<&str>) -> AgentTurnFailure {
     let raw_detail = error.unwrap_or("Codex execution failed without an error detail");
     let category = AgentTurnFailureCategory::from_message(raw_detail);
-    let stage = if raw_detail.starts_with(wire::MODEL_MISMATCH_DETAIL) {
+    let stage = if is_model_mismatch(raw_detail) {
         AgentTurnFailureStage::Start
     } else {
         AgentTurnFailureStage::Execution
     };
     AgentTurnFailure::new(category, stage, bounded_redacted_detail(raw_detail))
+}
+
+fn is_model_mismatch(detail: &str) -> bool {
+    detail
+        .strip_prefix("[WORKFLOW_PARSE] ")
+        .unwrap_or(detail)
+        .starts_with(wire::MODEL_MISMATCH_DETAIL)
 }
 
 fn bounded_redacted_detail(detail: &str) -> String {
