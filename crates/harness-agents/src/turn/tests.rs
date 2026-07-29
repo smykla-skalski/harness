@@ -2,7 +2,10 @@ use std::future::Future;
 use std::task::{Context, Poll, Waker};
 
 use super::fake::{FakeAgentTurnPlan, FakeAgentTurnRuntime};
-use super::{AgentTurnRequest, AgentTurnRuntime, AgentTurnStatus};
+use super::{
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnRequest,
+    AgentTurnRuntime, AgentTurnStatus,
+};
 
 #[test]
 fn fake_runtime_completes_one_stable_result() {
@@ -55,7 +58,12 @@ fn assert_result_models(result: &super::AgentTurnResult) {
 
 #[test]
 fn fake_runtime_exposes_failed_terminal_state_without_a_completed_result() {
-    let runtime = FakeAgentTurnRuntime::new([FakeAgentTurnPlan::fail()]);
+    let expected = AgentTurnFailure::new(
+        AgentTurnFailureCategory::RateLimited,
+        AgentTurnFailureStage::Execution,
+        "provider rate limit",
+    );
+    let runtime = FakeAgentTurnRuntime::new([FakeAgentTurnPlan::failed(expected.clone())]);
     let id = ready(runtime.start(AgentTurnRequest {
         prompt: "prepare report".into(),
         requested_model: None,
@@ -75,6 +83,10 @@ fn fake_runtime_exposes_failed_terminal_state_without_a_completed_result() {
         AgentTurnStatus::Failed
     );
     assert!(ready(runtime.result(&id)).expect("load result").is_none());
+    assert_eq!(
+        ready(runtime.failure(&id)).expect("load failure"),
+        Some(expected)
+    );
 }
 
 #[test]
@@ -99,6 +111,12 @@ fn cancellation_is_idempotent_and_terminal() {
         runtime.advance(&id).expect("advance cancelled"),
         AgentTurnStatus::Cancelled
     );
+    let failure = ready(runtime.failure(&id))
+        .expect("load cancellation")
+        .expect("cancelled failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::Cancelled);
+    assert_eq!(failure.stage, AgentTurnFailureStage::Cancellation);
+    assert!(!failure.automatic_retry_safe);
 }
 
 #[test]

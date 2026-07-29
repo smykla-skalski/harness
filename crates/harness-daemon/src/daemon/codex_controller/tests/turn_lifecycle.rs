@@ -1,4 +1,7 @@
-use crate::agents::turn::{AgentTurnId, AgentTurnRequest, AgentTurnRuntime, AgentTurnStatus};
+use crate::agents::turn::{
+    AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnId, AgentTurnRequest,
+    AgentTurnRuntime, AgentTurnStatus,
+};
 use crate::daemon::codex_controller::CodexAgentTurnRuntime;
 use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
 
@@ -32,6 +35,27 @@ async fn shared_lifecycle_starts_a_codex_report_run() {
         assert_eq!(snapshot.mode, CodexRunMode::Report);
         assert_eq!(snapshot.prompt, "Prepare the report");
         assert_eq!(snapshot.model.as_deref(), Some("gpt-5.5"));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unsupported_codex_model_uses_shared_start_failure() {
+    with_isolated_async_harness_env(|_| async move {
+        let (controller, _db, _tempdir) = controller_with_db();
+        let runtime = CodexAgentTurnRuntime::new(controller, SESSION_ID);
+        let error = runtime
+            .start(AgentTurnRequest {
+                prompt: "Prepare the report".into(),
+                requested_model: Some("unsupported model".into()),
+            })
+            .await
+            .expect_err("unsupported model must fail");
+
+        let failure = runtime.classify_error(AgentTurnFailureStage::Start, &error);
+        assert_eq!(failure.category, AgentTurnFailureCategory::UnsupportedModel);
+        assert_eq!(failure.stage, AgentTurnFailureStage::Start);
+        assert!(!failure.automatic_retry_safe);
     })
     .await;
 }
@@ -88,6 +112,92 @@ async fn codex_cancellation_uses_the_shared_terminal_state() {
         AgentTurnStatus::Cancelled
     );
     assert!(runtime.result(&id).await.expect("load result").is_none());
+    let failure = runtime
+        .failure(&id)
+        .await
+        .expect("load cancellation")
+        .expect("cancelled failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::Cancelled);
+    assert_eq!(failure.stage, AgentTurnFailureStage::Cancellation);
+    assert!(!failure.automatic_retry_safe);
+}
+
+#[tokio::test]
+async fn failed_codex_turns_use_shared_recovery_categories() {
+    let (controller, db, _tempdir) = controller_with_db();
+    let runtime = CodexAgentTurnRuntime::new(controller, SESSION_ID);
+    let cases = [
+        (
+            "HTTP 401 unauthorized",
+            AgentTurnFailureCategory::Authentication,
+            false,
+        ),
+        (
+            "HTTP 429 rate limit",
+            AgentTurnFailureCategory::RateLimited,
+            true,
+        ),
+        (
+            "unsupported model gpt-x",
+            AgentTurnFailureCategory::UnsupportedModel,
+            false,
+        ),
+        (
+            "connection closed",
+            AgentTurnFailureCategory::Transport,
+            false,
+        ),
+        (
+            "provider refused prompt",
+            AgentTurnFailureCategory::ProviderRejected,
+            false,
+        ),
+        (
+            "unrecognized failure",
+            AgentTurnFailureCategory::Unknown,
+            false,
+        ),
+    ];
+
+    for (sequence, (detail, category, retry_safe)) in cases.into_iter().enumerate() {
+        let mut snapshot = report_snapshot(CodexRunStatus::Failed);
+        snapshot.run_id = format!("codex-failure-{sequence}");
+        snapshot.error = Some(detail.into());
+        db.lock()
+            .expect("db lock")
+            .save_codex_run(&snapshot)
+            .expect("save failed run");
+        let id = AgentTurnId::new(snapshot.run_id).expect("turn id");
+        let failure = runtime
+            .failure(&id)
+            .await
+            .expect("load failure")
+            .expect("failed turn failure");
+        assert_eq!(failure.category, category, "{detail}");
+        assert_eq!(failure.stage, AgentTurnFailureStage::Execution);
+        assert_eq!(failure.automatic_retry_safe, retry_safe, "{detail}");
+    }
+}
+
+#[tokio::test]
+async fn codex_failure_detail_redacts_credentials() {
+    let (controller, db, _tempdir) = controller_with_db();
+    let mut snapshot = report_snapshot(CodexRunStatus::Failed);
+    snapshot.error = Some("connection closed token=super-secret".into());
+    db.lock()
+        .expect("db lock")
+        .save_codex_run(&snapshot)
+        .expect("save failed run");
+    let runtime = CodexAgentTurnRuntime::new(controller, SESSION_ID);
+    let id = AgentTurnId::new(snapshot.run_id).expect("turn id");
+
+    let failure = runtime
+        .failure(&id)
+        .await
+        .expect("load failure")
+        .expect("failed turn failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::Transport);
+    assert!(!failure.detail.contains("super-secret"));
 }
 
 #[tokio::test]

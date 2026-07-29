@@ -75,6 +75,9 @@ pub use harness_protocol::managed_agents::acp::{
     AcpAgentInspectSnapshotSchema, AcpAgentSnapshotSchema, AcpAgentStartRequestSchema,
     AcpPermissionBatchSchema,
 };
+pub use harness_protocol::managed_agents::runtime_failures::{
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
+};
 #[cfg(feature = "daemon-runtime")]
 pub use manager::AcpWakePrompt;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]

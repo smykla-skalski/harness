@@ -6,6 +6,9 @@ use agent_client_protocol::schema::v1::{
     StopReason, TextContent,
 };
 use agent_client_protocol::{Agent, ConnectionTo};
+use harness_protocol::managed_agents::runtime_failures::{
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
+};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 

@@ -316,10 +316,16 @@ fn error_outcome(
     session_id: &SessionId,
     error: &OpenRouterError,
 ) -> agent_client_protocol::Result<StopReason> {
-    let message = format!("openrouter error: {error}");
-    tracing::warn!(%error, "openrouter turn failed");
+    let failure = error.turn_failure();
+    let message = format!("openrouter error: {}", failure.detail);
+    tracing::warn!(
+        category = ?failure.category,
+        detail = %failure.detail,
+        "openrouter turn failed"
+    );
     let chunk = ContentChunk::new(ContentBlock::Text(TextContent::new(format!(
-        "[openrouter error] {error}"
+        "[openrouter error] {}",
+        failure.detail
     ))));
     if let Err(send_error) = connection.send_notification(SessionNotification::new(
         session_id.clone(),
@@ -329,10 +335,10 @@ fn error_outcome(
     }
     match error {
         OpenRouterError::Moderation { .. } => Ok(StopReason::Refusal),
-        _ => Err(agent_client_protocol::Error::new(
-            OPENROUTER_TURN_FAILED,
-            message,
-        )),
+        _ => {
+            let failure = serde_json::to_value(failure).ok();
+            Err(agent_client_protocol::Error::new(OPENROUTER_TURN_FAILED, message).data(failure))
+        }
     }
 }
 

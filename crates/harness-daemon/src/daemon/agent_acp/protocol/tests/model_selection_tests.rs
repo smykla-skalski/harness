@@ -1,3 +1,4 @@
+use crate::daemon::agent_acp::{AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage};
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, InitializeRequest, InitializeResponse, NewSessionRequest,
     NewSessionResponse, PromptRequest, PromptResponse, SessionConfigKind, SessionConfigOption,
@@ -222,5 +223,11 @@ async fn unsupported_model_fails_before_prompt() {
             .to_string()
             .contains("does not accept 'unsupported/model'")
     );
+    let failure: AgentTurnFailure =
+        serde_json::from_value(error.data.expect("unsupported model failure data"))
+            .expect("decode unsupported model failure");
+    assert_eq!(failure.category, AgentTurnFailureCategory::UnsupportedModel);
+    assert_eq!(failure.stage, AgentTurnFailureStage::Start);
+    assert!(!failure.automatic_retry_safe);
     assert!(operations.is_empty(), "agent work began: {operations:?}");
 }

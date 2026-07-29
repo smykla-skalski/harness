@@ -6,6 +6,9 @@
 
 use std::time::Duration;
 
+use harness_protocol::managed_agents::runtime_failures::{
+    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -42,6 +45,74 @@ impl From<reqwest::Error> for OpenRouterError {
     fn from(error: reqwest::Error) -> Self {
         OpenRouterError::Transport(error)
     }
+}
+
+impl OpenRouterError {
+    #[must_use]
+    pub fn turn_failure(&self) -> AgentTurnFailure {
+        let (category, detail) = match self {
+            Self::SerializeRequest(_) => (
+                AgentTurnFailureCategory::Unknown,
+                "OpenRouter request serialization failed".to_owned(),
+            ),
+            Self::Transport(_) | Self::ReadBody(_) => (
+                AgentTurnFailureCategory::Transport,
+                "OpenRouter transport failed".to_owned(),
+            ),
+            Self::Deserialize(_) => (
+                AgentTurnFailureCategory::Transport,
+                "OpenRouter response stream was malformed".to_owned(),
+            ),
+            Self::IncompleteStream => (
+                AgentTurnFailureCategory::Transport,
+                "OpenRouter response stream ended before [DONE]".to_owned(),
+            ),
+            Self::AuthenticationFailed { .. } => (
+                AgentTurnFailureCategory::Authentication,
+                "OpenRouter rejected its credential".to_owned(),
+            ),
+            Self::Moderation { .. } => (
+                AgentTurnFailureCategory::ProviderRejected,
+                "OpenRouter rejected the prompt".to_owned(),
+            ),
+            Self::RateLimited { retry_after } => (
+                AgentTurnFailureCategory::RateLimited,
+                retry_detail(*retry_after),
+            ),
+            Self::Overloaded { status } => (
+                AgentTurnFailureCategory::Transport,
+                format!("OpenRouter provider unavailable with HTTP {status}"),
+            ),
+            Self::ApiError { status, body } => (
+                api_failure_category(*status, body),
+                format!("OpenRouter rejected the request with HTTP {status}"),
+            ),
+        };
+        AgentTurnFailure::new(category, AgentTurnFailureStage::Execution, detail)
+    }
+}
+
+fn api_failure_category(status: u16, body: &str) -> AgentTurnFailureCategory {
+    let category = AgentTurnFailureCategory::from_message(body);
+    if category != AgentTurnFailureCategory::Unknown {
+        category
+    } else if status >= 500 {
+        AgentTurnFailureCategory::Transport
+    } else {
+        AgentTurnFailureCategory::ProviderRejected
+    }
+}
+
+fn retry_detail(retry_after: Option<Duration>) -> String {
+    retry_after.map_or_else(
+        || "OpenRouter rate limit reached".to_owned(),
+        |delay| {
+            format!(
+                "OpenRouter rate limit reached; retry after {} seconds",
+                delay.as_secs()
+            )
+        },
+    )
 }
 
 /// Classify a non-2xx HTTP response into the matching error variant.
@@ -108,5 +179,50 @@ mod tests {
     #[test]
     fn parse_retry_after_rejects_garbage() {
         assert_eq!(parse_retry_after("soon"), None);
+    }
+
+    #[test]
+    fn maps_provider_errors_to_shared_recovery_categories() {
+        use harness_protocol::managed_agents::runtime_failures::AgentTurnFailureCategory;
+
+        let cases = [
+            (
+                OpenRouterError::AuthenticationFailed {
+                    body: "secret response".into(),
+                },
+                AgentTurnFailureCategory::Authentication,
+                false,
+            ),
+            (
+                OpenRouterError::RateLimited { retry_after: None },
+                AgentTurnFailureCategory::RateLimited,
+                true,
+            ),
+            (
+                OpenRouterError::Overloaded { status: 503 },
+                AgentTurnFailureCategory::Transport,
+                false,
+            ),
+            (
+                OpenRouterError::IncompleteStream,
+                AgentTurnFailureCategory::Transport,
+                false,
+            ),
+            (
+                OpenRouterError::ApiError {
+                    status: 400,
+                    body: "rejected".into(),
+                },
+                AgentTurnFailureCategory::ProviderRejected,
+                false,
+            ),
+        ];
+
+        for (error, category, retry_safe) in cases {
+            let failure = error.turn_failure();
+            assert_eq!(failure.category, category);
+            assert_eq!(failure.automatic_retry_safe, retry_safe);
+            assert!(!failure.detail.contains("secret response"));
+        }
     }
 }

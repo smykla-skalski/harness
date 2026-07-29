@@ -2875,6 +2875,8 @@ const ACP_DESCRIPTOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 const ACP_DESCRIPTOR_EMIT_ONLY: &[&str] = &["AcpAgentDescriptor", "DoctorProbe"];
 const ACP_INSPECT_WIRE_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/managed_agents/acp/snapshot_wire.rs");
+const RUNTIME_FAILURES_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/managed_agents/runtime_failures.rs");
 const ACP_INSPECT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpInspectWireTypes.generated.swift";
 // The acp inspect response backing /v1/managed-agents/acp/inspect. The rich AcpAgentSnapshot
 // /AcpAgentInspectSnapshot carry NO serde derive (borrowed-serialize optimization), so the
@@ -2891,6 +2893,9 @@ const ACP_INSPECT_EMIT_ONLY: &[&str] = &[
     "AcpAgentSessionState",
     "AcpAgentTurnResult",
     "AcpSessionConfigOptionState",
+    "AgentTurnFailure",
+    "AgentTurnFailureCategory",
+    "AgentTurnFailureStage",
 ];
 const ACP_PERMISSION_ITEM_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_PERMISSION_WIRE_SOURCE: &str =
@@ -3453,7 +3458,11 @@ fn modules() -> Vec<GeneratedModule> {
             output: ACP_INSPECT_OUTPUT,
             description: "the Rust acp inspect response and its owned snapshot decode",
             defaults: &[ACP_MODELS_SOURCE],
-            sources: &[ACP_MODELS_SOURCE, ACP_INSPECT_WIRE_SOURCE],
+            sources: &[
+                ACP_MODELS_SOURCE,
+                ACP_INSPECT_WIRE_SOURCE,
+                RUNTIME_FAILURES_SOURCE,
+            ],
         },
         GeneratedModule {
             output: ACP_PERMISSION_OUTPUT,
