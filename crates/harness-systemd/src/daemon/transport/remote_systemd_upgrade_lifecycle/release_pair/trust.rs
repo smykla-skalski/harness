@@ -69,7 +69,10 @@ fn validate_trusted_ancestors(label: &str, path: &Path) -> Result<(), CliError> 
         // whose mode tracks the host umask (e.g. 002 leaves a worktree group-writable). That's the
         // developer's or CI's own tree, not attacker controlled, so trust it before the writability
         // check below would otherwise reject it.
-        if cfg!(test) && ancestor == Path::new(env!("CARGO_MANIFEST_DIR")) {
+        if cfg!(test)
+            && ancestor == Path::new(env!("CARGO_MANIFEST_DIR"))
+            && metadata.uid() == trusted_uid()
+        {
             break;
         }
         let sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
