@@ -27,14 +27,12 @@
 //! (`items.rs`, `items_write.rs`, `items_lifecycle.rs`, `items_parent.rs`),
 //! so this file stays a pure interface plus wiring.
 
-use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
 
 use super::items::ParentAssignmentValidation;
 use crate::daemon::db::CliError;
 use crate::task_board::{TaskBoardItem, TaskBoardTriageOverride};
 
-#[async_trait]
 pub(in crate::daemon::db::task_board) trait TaskBoardItemTxExt {
     async fn load_item_in_tx(
         &mut self,
@@ -84,7 +82,6 @@ pub(in crate::daemon::db::task_board) trait TaskBoardItemTxExt {
     async fn items_change_sequence_in_tx(&mut self) -> Result<i64, CliError>;
 }
 
-#[async_trait]
 impl TaskBoardItemTxExt for Transaction<'_, Sqlite> {
     async fn load_item_in_tx(
         &mut self,
