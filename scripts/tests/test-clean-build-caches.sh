@@ -128,6 +128,8 @@ make_shared_target_fixture() {
   mkdir -p "$repo/scripts/lib"
   mkdir -p "$repo/fake-home"
   cp "$SCRIPT" "$repo/scripts/clean-build-caches.sh"
+  cp "$ROOT/scripts/sccache-cleanup-audit.py" "$repo/scripts/sccache-cleanup-audit.py"
+  cp "$ROOT/scripts/lib/sccache_processes.py" "$repo/scripts/lib/sccache_processes.py"
   cp "$ROOT/scripts/lib/common-repo-root.sh" "$repo/scripts/lib/common-repo-root.sh"
   cp "$ROOT/scripts/lib/cargo-lane.sh" "$repo/scripts/lib/cargo-lane.sh"
 
@@ -374,6 +376,82 @@ scenario_dry_run_keeps_small_sccache_cache() {
   pass
 }
 
+scenario_normal_cleanup_keeps_small_sccache_cache_and_live_server() {
+  start_test "normal cleanup keeps a small sccache cache and does not stop its server"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local stop_log="$TEST_TMP_ROOT/stop.log"
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+  cat > "$repo/scripts/cargo-local.sh" <<CARGO_LOCAL
+#!/usr/bin/env bash
+printf 'SCCACHE_BIN=%s\n' "$repo/fake-bin/sccache"
+printf 'SCCACHE_SERVER_UDS=%s\n' "$repo/fake-tmp/live.sock"
+CARGO_LOCAL
+  mkdir -p "$repo/fake-bin"
+  cat > "$repo/fake-bin/sccache" <<CARGO_CACHE
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$stop_log"
+CARGO_CACHE
+  chmod +x "$repo/scripts/cargo-local.sh" "$repo/fake-bin/sccache"
+  python3 - "$repo/fake-tmp/live.sock" <<'PY'
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(sys.argv[1])
+PY
+
+  (cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    PATH="/usr/bin:/bin" ./scripts/clean-build-caches.sh >/dev/null)
+
+  [[ -e "$repo/fake-home/Library/Caches/Mozilla.sccache/blob" ]] || {
+    fail "normal cleanup removed the below-threshold cache"
+    return
+  }
+  [[ ! -e "$stop_log" ]] || {
+    fail "normal cleanup stopped the server despite keeping its cache"
+    return
+  }
+  [[ ! -e "$repo/.cache/diagnostics/sccache-cleanup.jsonl" ]] || {
+    fail "non-destructive cleanup wrote a destructive audit event"
+    return
+  }
+  pass
+}
+
+scenario_destructive_dry_run_is_write_free() {
+  start_test "destructive dry-run reports attribution without writing or deleting"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output=""
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    PATH="/usr/bin:/bin" ./scripts/clean-build-caches.sh --dry-run --force)"
+
+  [[ -e "$repo/fake-home/Library/Caches/Mozilla.sccache/blob" ]] || {
+    fail "dry-run deleted the cache"
+    return
+  }
+  [[ ! -e "$repo/.cache/diagnostics/sccache-cleanup.jsonl" ]] || {
+    fail "dry-run wrote the audit log"
+    return
+  }
+  grep -Fq 'audit preview:' <<<"$output" || {
+    fail "dry-run omitted the audit preview: $output"
+    return
+  }
+  grep -Fq '"reason":"--force"' <<<"$output" || {
+    fail "dry-run preview omitted the removal reason: $output"
+    return
+  }
+  pass
+}
+
 # Regression for a Copilot finding: if the sccache server cannot be stopped,
 # the cache must be kept even under --force, because deleting it under a live
 # server is the exact write-error failure mode this script exists to prevent.
@@ -432,6 +510,51 @@ PY
     fail "cache removed under --force despite a failed server stop"
     return 1
   fi
+  local audit="$repo/.cache/diagnostics/sccache-cleanup.jsonl"
+  [[ -s "$audit" ]] || {
+    fail "failed stop did not leave an audit event"
+    return 1
+  }
+  grep -Fq '"stop_outcome":"failed"' "$audit" || {
+    fail "failed stop audit omitted its outcome: $(<"$audit")"
+    return 1
+  }
+  pass
+}
+
+scenario_authorized_removal_is_audited_before_cache_deletion() {
+  start_test "authorized sccache removal leaves durable attribution"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+
+  (cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    PATH="/usr/bin:/bin" ./scripts/clean-build-caches.sh --force >/dev/null)
+
+  [[ ! -e "$repo/fake-home/Library/Caches/Mozilla.sccache" ]] || {
+    fail "authorized removal left the cache behind"
+    return
+  }
+  local audit="$repo/.cache/diagnostics/sccache-cleanup.jsonl"
+  [[ -s "$audit" ]] || {
+    fail "authorized removal produced no audit event"
+    return
+  }
+  local required
+  for required in timestamp mode cache_paths measured_size_kb reason threshold_kb \
+    server_socket server_pids stop_outcome; do
+    grep -Fq "\"$required\":" "$audit" || {
+      fail "audit omitted $required: $(<"$audit")"
+      return
+    }
+  done
+  grep -Fq '"reason":"--force"' "$audit" || {
+    fail "audit omitted force attribution: $(<"$audit")"
+    return
+  }
   pass
 }
 
@@ -478,7 +601,10 @@ scenario_sccache_is_gated_not_unconditional
 scenario_sccache_covers_linux_cache_path
 scenario_force_help_mentions_sccache
 scenario_dry_run_keeps_small_sccache_cache
+scenario_normal_cleanup_keeps_small_sccache_cache_and_live_server
+scenario_destructive_dry_run_is_write_free
 scenario_keeps_cache_when_stop_fails_even_under_force
+scenario_authorized_removal_is_audited_before_cache_deletion
 scenario_dedupes_symlinked_sccache_cache_dirs
 
 log "clean-build-caches tests: $PASS_COUNT passed, $FAIL_COUNT failed"

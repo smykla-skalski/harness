@@ -5,6 +5,7 @@ import argparse
 import ast
 import os
 import platform
+import select
 import signal
 import subprocess
 import sys
@@ -14,6 +15,11 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Iterable
+
+SCRIPT_ROOT = Path(__file__).resolve().parent
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+from lib.sccache_processes import socket_owners_under
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -66,6 +72,7 @@ class Task:
     priority: int = 0
     group: str = ""
     group_limit: int = 0
+    cache_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -97,6 +104,8 @@ def _environment(
     run_token: str,
 ) -> dict[str, str]:
     environment = os.environ.copy()
+    if not task.cache_enabled:
+        environment["SCCACHE_BIN"] = ""
     for variable in SESSION_VARIABLES:
         environment.pop(variable, None)
     environment.update(task.environment)
@@ -168,6 +177,64 @@ def _signal_pids(pids: Iterable[int], sent_signal: signal.Signals) -> None:
             pass
 
 
+def _signal_and_wait_for_pid_exits(
+    pids: tuple[int, ...],
+    sent_signal: signal.Signals,
+    timeout_seconds: float,
+) -> set[int]:
+    if not pids:
+        return set()
+    if platform.system() == "Darwin":
+        queue = select.kqueue()
+        try:
+            registered = set()
+            for pid in pids:
+                try:
+                    queue.control(
+                        [
+                            select.kevent(
+                                pid,
+                                filter=select.KQ_FILTER_PROC,
+                                flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT,
+                                fflags=select.KQ_NOTE_EXIT,
+                            )
+                        ],
+                        0,
+                        0,
+                    )
+                except OSError:
+                    continue
+                registered.add(pid)
+            _signal_pids(pids, sent_signal)
+            if not registered:
+                return set()
+            events = queue.control(None, len(registered), timeout_seconds)
+            exited = {event.ident for event in events}
+        finally:
+            queue.close()
+        return registered - exited
+    if platform.system() == "Linux" and hasattr(os, "pidfd_open"):
+        selector = select.poll()
+        descriptors = {}
+        try:
+            for pid in pids:
+                try:
+                    descriptor = os.pidfd_open(pid)
+                except ProcessLookupError:
+                    continue
+                descriptors[descriptor] = pid
+                selector.register(descriptor, select.POLLIN)
+            _signal_pids(pids, sent_signal)
+            events = selector.poll(int(timeout_seconds * 1000))
+            exited = {descriptors[descriptor] for descriptor, _ in events}
+        finally:
+            for descriptor in descriptors:
+                os.close(descriptor)
+        return set(pids) - exited
+    _signal_pids(pids, sent_signal)
+    return set(pids)
+
+
 def _process_commands() -> dict[int, str]:
     completed = subprocess.run(
         ("/bin/ps", "-ww", "-Ao", "pid=,command="),
@@ -204,18 +271,21 @@ def _terminate_owned_processes(sandbox_root: Path) -> None:
         return f"{sandbox_root}/" in command or _test_jobserver_token(command) == run_token
 
     processes = _process_commands()
+    socket_owners = socket_owners_under(sandbox_root)
     pids = [
         pid
         for pid, command in processes.items()
-        if pid != os.getpid() and owned(command)
+        if pid != os.getpid() and (owned(command) or pid in socket_owners)
     ]
-    _signal_pids(pids, signal.SIGTERM)
-    deadline = time.monotonic() + 0.5
-    while pids and time.monotonic() < deadline:
-        time.sleep(0.02)
-        current = _process_commands()
-        pids = [pid for pid in pids if pid in current and owned(current[pid])]
-    _signal_pids(pids, signal.SIGKILL)
+    remaining = _signal_and_wait_for_pid_exits(tuple(pids), signal.SIGTERM, 0.5)
+    current = _process_commands()
+    current_socket_owners = socket_owners_under(sandbox_root)
+    still_owned = [
+        pid
+        for pid in remaining
+        if pid in current and (owned(current[pid]) or pid in current_socket_owners)
+    ]
+    _signal_and_wait_for_pid_exits(tuple(still_owned), signal.SIGKILL, 0.5)
 
 
 def _terminate_process_group(process: subprocess.Popen[str]) -> None:
@@ -556,6 +626,8 @@ def _root_python_tasks(host_os: str) -> list[Task]:
     tests = (
         ("root python: disable fsmonitor dormant", "test_disable_fsmonitor_dormant.py"),
         ("root python: parallel script runner", "test_parallel_script_tests.py"),
+        ("root python: sccache cleanup audit", "test_sccache_cleanup_audit.py"),
+        ("root python: sccache processes", "test_sccache_processes.py"),
         ("root python: seed Rust build lane", "test_seed_rust_build_lane.py"),
     )
     task_groups = [
@@ -751,6 +823,7 @@ def build_tasks(suite: str, host_os: str | None = None) -> tuple[Task, ...]:
         priority=600,
         weight=2,
     )
+    cargo_tasks = [replace(task, cache_enabled=True) for task in cargo_tasks]
     return tuple(
         _round_robin(
             (

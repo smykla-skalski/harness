@@ -71,6 +71,8 @@ TOTAL_RECLAIMED_KB=0
 # given. 100 GiB is well above the 30G budget a healthy server settles at.
 SCCACHE_REMOVE_THRESHOLD_KB=$((100 * 1024 * 1024))
 readonly SCCACHE_REMOVE_THRESHOLD_KB
+SCCACHE_AUDIT_LOG="$ROOT/.cache/diagnostics/sccache-cleanup.jsonl"
+readonly SCCACHE_AUDIT_LOG
 # Rust's tempfile crate names temp dirs `.tmp` plus six random characters, and
 # nothing reclaims one whose owning process died mid-write. An ACP probe leak
 # left 27498 of them holding 177G because no cleanup path looked at $TMPDIR.
@@ -173,11 +175,27 @@ stop_repo_sccache_server() {
   env="$("$ROOT/scripts/cargo-local.sh" --print-env 2>/dev/null || true)"
   uds="$(awk -F= '/^SCCACHE_SERVER_UDS=/ {print $2; exit}' <<<"$env")"
   bin="$(awk -F= '/^SCCACHE_BIN=/ {print $2; exit}' <<<"$env")"
-  [[ -n "$uds" && -n "$bin" ]] || return 0
-  [[ -S "$uds" && -x "$bin" ]] || return 0
+  SCCACHE_SELECTED_SOCKET="$uds"
+  SCCACHE_SELECTED_PIDS=""
+  if [[ -n "$uds" ]]; then
+    while IFS= read -r pid; do
+      if [[ "$pid" =~ ^[0-9]+$ ]]; then
+        SCCACHE_SELECTED_PIDS="${SCCACHE_SELECTED_PIDS}${pid}"$'\n'
+      fi
+    done < <(python3 "$ROOT/scripts/lib/sccache_processes.py" --socket "$uds" 2>/dev/null || true)
+  fi
+  [[ -n "$uds" && -n "$bin" ]] || {
+    SCCACHE_STOP_OUTCOME="server-unidentified"
+    return 0
+  }
+  [[ -S "$uds" && -x "$bin" ]] || {
+    SCCACHE_STOP_OUTCOME="server-absent"
+    return 0
+  }
 
   if (( DRY_RUN )); then
     printf '  · %-46s   (dry-run) %s\n' 'stop sccache server' "--stop-server"
+    SCCACHE_STOP_OUTCOME="dry-run-would-stop"
     return 0
   fi
   printf '  · %-46s   stopping\n' 'stop sccache server'
@@ -186,8 +204,38 @@ stop_repo_sccache_server() {
   # it under a live server - the exact failure this script exists to prevent.
   SCCACHE_SERVER_UDS="$uds" "$bin" --stop-server >/dev/null 2>&1 || {
     printf '    (warning: sccache --stop-server failed; cache kept to avoid deleting under a live server)\n'
+    SCCACHE_STOP_OUTCOME="failed"
     return 1
   }
+  SCCACHE_STOP_OUTCOME="stopped"
+}
+
+write_sccache_cleanup_audit() {
+  local preview="$1" mode reason total_kb
+  shift
+  mode="normal"
+  (( AGGRESSIVE )) && mode="aggressive"
+  (( FORCE )) && mode="$mode+force"
+  reason="$1"
+  total_kb="$2"
+  shift 2
+  local -a command=(
+    python3 "$ROOT/scripts/sccache-cleanup-audit.py"
+    --log "$SCCACHE_AUDIT_LOG"
+    --mode "$mode"
+    --size-kb "$total_kb"
+    "--reason=$reason"
+    --threshold-kb "$SCCACHE_REMOVE_THRESHOLD_KB"
+    --server-socket "$SCCACHE_SELECTED_SOCKET"
+    --stop-outcome "$SCCACHE_STOP_OUTCOME"
+  )
+  local path pid
+  for path in "$@"; do command+=(--cache-path "$path"); done
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] && command+=(--server-pid "$pid")
+  done <<<"$SCCACHE_SELECTED_PIDS"
+  (( preview )) && command+=(--preview)
+  "${command[@]}"
 }
 
 # sccache is reported but kept by default: its cache is valuable to keep warm
@@ -199,16 +247,7 @@ stop_repo_sccache_server() {
 # documented default there), which the previous version never listed.
 clean_sccache_caches() {
   local -a dirs=()
-  local dir total_kb=0 size_kb over_threshold remove='' reason
-
-  # A failed stop leaves a server that may still hold the cache directory, so
-  # keep the cache rather than risk deleting it under a live server. This
-  # overrides --force and the size threshold: deleting a cache the server still
-  # pins is the original write-error failure mode either flag would reintroduce.
-  if ! stop_repo_sccache_server; then
-    remove=0
-    reason='kept: sccache server did not stop; retry clean:caches or stop it manually'
-  fi
+  local dir total_kb=0 size_kb over_threshold remove='' reason audit_reason
 
   for dir in \
     "$HOME/Library/Caches/Mozilla.sccache" \
@@ -238,20 +277,38 @@ clean_sccache_caches() {
     return
   fi
 
-  # Decide removal only when the server stopped cleanly. The size threshold
-  # removes without --force; --force removes regardless of size.
-  if [[ -z "$remove" ]]; then
-    over_threshold=0
-    (( total_kb > SCCACHE_REMOVE_THRESHOLD_KB )) && over_threshold=1
-    if (( FORCE )); then
-      remove=1
-      reason='--force'
-    elif (( over_threshold )); then
-      remove=1
-      reason="over $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB") threshold"
-    else
+  over_threshold=0
+  (( total_kb > SCCACHE_REMOVE_THRESHOLD_KB )) && over_threshold=1
+  if (( FORCE )); then
+    remove=1
+    reason='--force'
+  elif (( over_threshold )); then
+    # Multiple servers enforce independent 30G limits while writing the same
+    # directory, so leaked servers can collectively outrun one server's budget.
+    # The 100G host guard remains the final disk-safety boundary.
+    remove=1
+    reason="over $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB") threshold"
+  else
+    remove=0
+    reason="kept: under $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB"); pass -f/--force to remove"
+  fi
+
+  SCCACHE_SELECTED_SOCKET=""
+  SCCACHE_SELECTED_PIDS=""
+  SCCACHE_STOP_OUTCOME="not-needed"
+  if (( remove )); then
+    audit_reason="$reason"
+    if ! stop_repo_sccache_server; then
       remove=0
-      reason="kept: under $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB"); pass -f/--force to remove"
+      reason='kept: sccache server did not stop; retry clean:caches or stop it manually'
+    fi
+    if (( DRY_RUN )); then
+      printf '    audit preview: '
+      write_sccache_cleanup_audit 1 "$audit_reason" "$total_kb" "${dirs[@]}"
+    elif ! write_sccache_cleanup_audit 0 "$audit_reason" "$total_kb" "${dirs[@]}" >/dev/null; then
+      printf '    (warning: sccache cleanup audit failed; cache kept)\n'
+      remove=0
+      reason='kept: destructive cleanup could not be audited'
     fi
   fi
 
