@@ -5,7 +5,12 @@ mod client;
 mod mapping;
 mod queries;
 mod service;
-mod types;
+// `types` moved to `harness-protocol` (pure wire data, see that crate's
+// `daemon::reviews` doc comment); this alias keeps `timeline::types::X`
+// resolving for `mapping`/`service`/`tests` exactly as it did when the
+// module was local, and the `pub use types::{...}` below keeps this crate's
+// own flattened `timeline::X` surface unchanged too.
+use harness_protocol::daemon::reviews::timeline::types;
 
 pub use client::TimelineGitHubClient;
 
@@ -53,58 +58,9 @@ pub use types::{
     ReviewTimelineEntry, SimpleActorEventEntry, SimpleActorEventKind, UnknownEntry,
 };
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsTimelineRequest {
-    pub pull_request_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<String>,
-    pub page_size: u32,
-    pub direction: TimelinePageDirection,
-    #[serde(default)]
-    pub force_refresh: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<String>, format = DateTime)]
-    pub pull_request_updated_at: Option<DateTime<Utc>>,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum TimelinePageDirection {
-    Older,
-    Newer,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsTimelineResponse {
-    pub pull_request_id: String,
-    pub entries: Vec<ReviewTimelineEntry>,
-    pub page_info: TimelinePageInfo,
-    pub viewer_can_comment: bool,
-    #[schema(value_type = String, format = DateTime)]
-    pub fetched_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TimelinePageInfo {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub start_cursor: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub end_cursor: Option<String>,
-    pub has_older: bool,
-    pub has_newer: bool,
-}
+// The request/response/page-info wire types used to be defined directly in
+// this file; they're pure data with no impl blocks, so they moved to
+// `harness-protocol` alongside the entry-kind enum tree above.
+pub use harness_protocol::daemon::reviews::timeline::{
+    ReviewsTimelineRequest, ReviewsTimelineResponse, TimelinePageDirection, TimelinePageInfo,
+};

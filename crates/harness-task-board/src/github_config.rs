@@ -122,14 +122,14 @@ fn default_branch_prefix() -> String {
     "c/".to_string()
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum GitHubMergeMethod {
-    #[default]
-    Squash,
-    Merge,
-    Rebase,
-}
+/// Lives in `harness-protocol` (`harness_protocol::daemon::reviews::github_merge_method`)
+/// rather than here: 5 of `harness-reviews`'s wire types embed it directly,
+/// and `harness-protocol` cannot depend on this crate (which itself depends
+/// on `harness-protocol`) to reach it, so it moved alongside them instead.
+/// Pure data with zero inherent methods, so the move needed no behavior
+/// change - re-exported here unchanged so nothing in this crate sees a
+/// difference.
+pub use harness_protocol::daemon::reviews::github_merge_method::GitHubMergeMethod;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GitHubAutomationLabels {

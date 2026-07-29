@@ -5,6 +5,7 @@ use std::fs;
 use crate::daemon::state::daemon_root;
 use crate::reviews::{
     LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
+    local_clone_list_entry_from_registry,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -62,7 +63,7 @@ pub async fn list_review_local_clones() -> Result<Vec<LocalCloneListEntry>, CliE
     Ok(registry
         .entries
         .iter()
-        .map(|(key, entry)| LocalCloneListEntry::from_registry_entry(key, entry))
+        .map(|(key, entry)| local_clone_list_entry_from_registry(key, entry))
         .collect())
 }
 
@@ -99,7 +100,7 @@ pub async fn delete_review_local_clone(
     Ok(registry
         .entries
         .iter()
-        .map(|(key, entry)| LocalCloneListEntry::from_registry_entry(key, entry))
+        .map(|(key, entry)| local_clone_list_entry_from_registry(key, entry))
         .collect())
 }
 

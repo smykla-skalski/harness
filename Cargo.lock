@@ -4001,8 +4001,11 @@ name = "harness-protocol"
 version = "55.0.0"
 dependencies = [
  "base64 0.23.0",
+ "chrono",
  "clap",
  "harness-kernel",
+ "harness-workspace",
+ "regex",
  "serde",
  "serde_json",
  "temp-env",

@@ -4,6 +4,28 @@
 
 import Foundation
 
+public enum FilesLargeDiffStrategyWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case autoLocalClone = "auto_local_clone"
+  case forceGitHubRest = "force_github_rest"
+
+  public var id: String { rawValue }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let rawValue = try container.decode(String.self)
+    switch rawValue {
+    case "auto_local_clone": self = .autoLocalClone
+    case "force_github_rest", "force_git_hub_rest": self = .forceGitHubRest
+    default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot initialize FilesLargeDiffStrategyWire from invalid String value \(rawValue)")
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+}
+
 public struct ReviewsFilesListRequestWire: Codable, Equatable, Sendable {
   public var pullRequestId: String
   public var forceRefresh: Bool
@@ -595,28 +617,6 @@ public struct ReviewsFilesViewedResponseWire: Codable, Equatable, Sendable {
     case pullRequestId = "pull_request_id"
     case results
     case fetchedAt = "fetched_at"
-  }
-}
-
-public enum FilesLargeDiffStrategyWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case autoLocalClone = "auto_local_clone"
-  case forceGitHubRest = "force_github_rest"
-
-  public var id: String { rawValue }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    let rawValue = try container.decode(String.self)
-    switch rawValue {
-    case "auto_local_clone": self = .autoLocalClone
-    case "force_github_rest", "force_git_hub_rest": self = .forceGitHubRest
-    default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot initialize FilesLargeDiffStrategyWire from invalid String value \(rawValue)")
-    }
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(rawValue)
   }
 }
 

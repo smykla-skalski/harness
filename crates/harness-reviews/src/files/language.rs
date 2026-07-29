@@ -4,48 +4,7 @@
 //! Swift Monitor mirrors this same table in `B.1` so cached metadata round-
 //! trips have stable values across daemon/client.
 
-use serde::{Deserialize, Serialize};
-
-/// Compact enum of source languages the diff renderer recognizes. Kept narrow
-/// on purpose: tokenizers only exist for these; anything else falls through to
-/// the diff-only renderer (no syntax highlighting).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum HarnessCodeLanguage {
-    Codeowners,
-    Config,
-    Dockerfile,
-    Diff,
-    Feature,
-    #[default]
-    Generic,
-    Go,
-    GoModule,
-    Gitignore,
-    Html,
-    Javascript,
-    Json,
-    Lua,
-    Makefile,
-    Markdown,
-    Powershell,
-    Proto,
-    Python,
-    Rego,
-    Rust,
-    Ruby,
-    Shell,
-    Sql,
-    Stylesheet,
-    Swift,
-    Template,
-    Terraform,
-    Toml,
-    Typescript,
-    Vue,
-    Xml,
-    Yaml,
-}
+pub use harness_protocol::daemon::reviews::files::HarnessCodeLanguage;
 
 /// Infer a `HarnessCodeLanguage` from a repo-relative path.
 ///

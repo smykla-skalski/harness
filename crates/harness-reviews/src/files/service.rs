@@ -14,18 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// User-facing toggle in Settings. Picked from the `SwiftUI` Picker;
-/// serialized through to the daemon on each request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum FilesLargeDiffStrategy {
-    /// For PRs above the threshold, use the local bare clone.
-    #[default]
-    AutoLocalClone,
-    /// Always use GitHub REST regardless of size (no local clones).
-    #[serde(rename = "force_github_rest", alias = "force_git_hub_rest")]
-    ForceGitHubRest,
-}
+pub use harness_protocol::daemon::reviews::files::FilesLargeDiffStrategy;
 
 /// Configuration knobs the selector reads. Settings-fed; defaults match the
 /// plan.

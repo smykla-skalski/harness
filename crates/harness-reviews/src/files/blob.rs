@@ -15,7 +15,11 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+
+pub use harness_protocol::daemon::reviews::files::blob::{
+    ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse,
+};
 
 /// Lightweight projection returned by GitHub blob fetches before a daemon
 /// response is assembled.
@@ -29,68 +33,9 @@ pub struct BlobTextProjection {
     pub is_too_large: bool,
 }
 
-use super::ReviewsRateLimitSnapshot;
-
 /// Cap on a single blob byte size we'll return to the client. Larger blobs
 /// get a placeholder response with a "Open on github.com" affordance.
 pub(crate) const BLOB_BYTES_CAP: u64 = 5 * 1024 * 1024;
-
-/// Recognized image-content MIME types we'll preview inline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ReviewImageMime {
-    Png,
-    Jpeg,
-    Gif,
-    Svg,
-}
-
-impl ReviewImageMime {
-    /// IANA MIME type string.
-    #[must_use]
-    pub fn mime_type(self) -> &'static str {
-        match self {
-            Self::Png => "image/png",
-            Self::Jpeg => "image/jpeg",
-            Self::Gif => "image/gif",
-            Self::Svg => "image/svg+xml",
-        }
-    }
-}
-
-/// Request the bytes for one image blob by repository node id + git OID.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsFilesBlobRequest {
-    pub repository_id: String,
-    pub oid: String,
-    pub path: String,
-}
-
-impl ReviewsFilesBlobRequest {
-    #[must_use]
-    pub fn normalized_oid(&self) -> String {
-        self.oid.trim().to_lowercase()
-    }
-}
-
-/// Response carrying the blob bytes (base64-encoded for JSON transport) +
-/// metadata + a per-call rate-limit snapshot.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewsFilesBlobResponse {
-    pub path: String,
-    pub oid: String,
-    pub mime: ReviewImageMime,
-    /// Base64-encoded bytes. Empty for `is_too_large == true`.
-    pub content_base64: String,
-    pub byte_size: u64,
-    #[serde(default)]
-    pub is_truncated: bool,
-    #[serde(default)]
-    pub is_too_large: bool,
-    pub fetched_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rate_limit_snapshot: Option<ReviewsRateLimitSnapshot>,
-}
 
 /// Infer the image MIME from a path extension. Returns `None` if the path is
 /// not a previewable image (PNG/JPG/JPEG/GIF/SVG).

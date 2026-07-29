@@ -55,7 +55,10 @@ pub use enums::{
 pub use file_comment::{
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
 };
-pub(crate) use files::local_clone::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+pub(crate) use files::local_clone::{
+    LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
+    local_clone_list_entry_from_registry,
+};
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use files::preview_from_patch;
 #[cfg(any(test, feature = "daemon-runtime"))]

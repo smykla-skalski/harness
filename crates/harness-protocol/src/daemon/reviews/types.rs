@@ -2,7 +2,7 @@
 //!
 //! Houses the request and response DTOs along with the shared
 //! [`ReviewTarget`] / [`ReviewActionResult`] structs. Behavior lives in
-//! [`crate::logic`]; enum variants live in [`crate::enums`].
+//! [`super::logic`]; enum variants live in [`super::enums`].
 
 use std::collections::BTreeMap;
 

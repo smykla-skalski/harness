@@ -16,21 +16,27 @@
 //! declaration carried: real production code for daemon builds, invisible
 //! in root's plain default build, matching the feature this crate already
 //! defined for `files::patch_rest`.
+//!
+//! `body_update`, `enums`, `file_comment`, `logic`, `types`, and
+//! `validation` are pure-data wire types plus their inherent `impl` blocks,
+//! so they now live in `harness-protocol` (see
+//! `harness_protocol::daemon::reviews`'s own doc comment) and are
+//! re-exported here unchanged so nothing downstream sees a difference.
 
 pub mod avatar;
 pub mod backports;
-pub mod body_update;
-pub mod enums;
-pub mod file_comment;
+pub use harness_protocol::daemon::reviews::body_update;
+pub use harness_protocol::daemon::reviews::enums;
+pub use harness_protocol::daemon::reviews::file_comment;
 pub mod files;
 pub mod github;
-pub mod logic;
+pub use harness_protocol::daemon::reviews::logic;
 #[cfg(feature = "daemon-runtime")]
 pub mod policy;
 pub mod review_thread_resolve;
 pub mod timeline;
-pub mod types;
-pub mod validation;
+pub use harness_protocol::daemon::reviews::types;
+pub use harness_protocol::daemon::reviews::validation;
 
 pub use avatar::{ReviewsAvatarRequest, ReviewsAvatarResponse, fetch_review_avatar};
 pub use body_update::{
