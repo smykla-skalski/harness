@@ -15,13 +15,49 @@ const LANES: [&str; 3] = [
     BRIDGE_CAPABILITY_AGENT_TUI,
 ];
 
+/// Outcome of consulting the ACP runtime probe on the readiness path.
+///
+/// `Pending` means the process-local probe cache has not produced a result
+/// yet (cold cache or an in-flight refresh). The distinction matters because a
+/// pending probe must not be reported as a definitive "runtime unavailable":
+/// that transient false negative is what this type exists to prevent.
+pub(crate) enum RuntimeProbe<'a> {
+    Ready(&'a AcpRuntimeProbeResponse),
+    Pending,
+}
+
+/// Authoritative provider-credential assessment for the requested runtime.
+///
+/// The provider is asked whether the configured credential is accepted, rather
+/// than trusting mere presence. `Rejected` and `Unverified` carry a redacted
+/// detail (an HTTP status or transport reason) that never contains the secret.
+pub(crate) enum CredentialAssessment {
+    /// The runtime needs no provider credential.
+    NotRequired,
+    /// A credential is required but none is configured.
+    Missing,
+    /// A configured credential was rejected by the provider.
+    Rejected(String),
+    /// The provider could not be reached to validate the credential.
+    Unverified(String),
+    /// The provider accepted the configured credential.
+    Accepted,
+}
+
 pub(crate) struct HeadlessReadinessInputs<'a> {
     pub request: &'a HeadlessReadinessRequest,
     pub daemon_version: &'a str,
     pub bridge: &'a BridgeStatusReport,
-    pub runtime_probe: &'a AcpRuntimeProbeResponse,
-    pub openrouter_configured: bool,
+    pub runtime_probe: RuntimeProbe<'a>,
+    pub credential: CredentialAssessment,
+    pub model_available: bool,
     pub orchestrator_active: bool,
+}
+
+enum RuntimeOutcome {
+    Available,
+    Unavailable,
+    ProbePending,
 }
 
 #[expect(
@@ -33,8 +69,7 @@ struct ReadinessEvaluation<'a> {
     compatible: bool,
     lane_known: bool,
     lane_available: bool,
-    credential_ready: bool,
-    runtime_available: bool,
+    runtime_outcome: RuntimeOutcome,
     model_available: bool,
 }
 
@@ -54,20 +89,18 @@ pub(crate) fn build_headless_readiness_report(
     let lane_available = lanes
         .iter()
         .any(|lane| lane.name == selected_lane && lane.available);
-    let runtime_available = runtime_available(inputs, selected_lane, lane_available);
+    let runtime_outcome = runtime_outcome(inputs, selected_lane, lane_available);
+    let runtime_available = matches!(runtime_outcome, RuntimeOutcome::Available);
     let model_effective =
         models::effective_model(&inputs.request.runtime, Some(&inputs.request.model));
-    let model_available =
-        models::validate_model(&inputs.request.runtime, &inputs.request.model).is_ok();
-    let credential = credential_status(inputs);
+    let credential = credential_report(&inputs.credential, &inputs.request.runtime);
     let evaluation = ReadinessEvaluation {
         selected_lane,
         compatible,
         lane_known: LANES.contains(&selected_lane),
         lane_available,
-        credential_ready: !credential.required || credential.configured == Some(true),
-        runtime_available,
-        model_available,
+        runtime_outcome,
+        model_available: inputs.model_available,
     };
     let unmet_requirements = collect_unmet_requirements(inputs, &evaluation, &credential);
 
@@ -93,7 +126,7 @@ pub(crate) fn build_headless_readiness_report(
         model: HeadlessReadinessModel {
             requested: inputs.request.model.clone(),
             effective: model_effective,
-            available: model_available,
+            available: inputs.model_available,
         },
         orchestrator_active: inputs.orchestrator_active,
         unmet_requirements,
@@ -132,25 +165,8 @@ fn collect_unmet_requirements(
             evaluation.selected_lane
         ),
     );
-    push_failure(
-        &mut reasons,
-        evaluation.credential_ready,
-        format!(
-            "{} credential is not configured",
-            credential
-                .provider
-                .as_deref()
-                .unwrap_or("required provider")
-        ),
-    );
-    push_failure(
-        &mut reasons,
-        !evaluation.lane_known || evaluation.runtime_available,
-        format!(
-            "runtime '{}' is unavailable on lane '{}'",
-            inputs.request.runtime, evaluation.selected_lane
-        ),
-    );
+    push_credential_failure(&mut reasons, &inputs.credential, credential);
+    push_runtime_failure(&mut reasons, inputs, evaluation);
     push_failure(
         &mut reasons,
         evaluation.model_available,
@@ -165,6 +181,54 @@ fn collect_unmet_requirements(
         "task-board orchestrator mode is not active".to_string(),
     );
     reasons
+}
+
+fn push_credential_failure(
+    reasons: &mut Vec<String>,
+    assessment: &CredentialAssessment,
+    credential: &HeadlessReadinessCredential,
+) {
+    let provider = credential
+        .provider
+        .as_deref()
+        .unwrap_or("required provider");
+    match assessment {
+        CredentialAssessment::NotRequired | CredentialAssessment::Accepted => {}
+        CredentialAssessment::Missing => {
+            reasons.push(format!("{provider} credential is not configured"));
+        }
+        CredentialAssessment::Rejected(detail) => {
+            reasons.push(format!(
+                "{provider} credential was rejected by the provider ({detail})"
+            ));
+        }
+        CredentialAssessment::Unverified(detail) => {
+            reasons.push(format!(
+                "{provider} credential could not be verified with the provider ({detail})"
+            ));
+        }
+    }
+}
+
+fn push_runtime_failure(
+    reasons: &mut Vec<String>,
+    inputs: &HeadlessReadinessInputs<'_>,
+    evaluation: &ReadinessEvaluation<'_>,
+) {
+    if !evaluation.lane_known {
+        return;
+    }
+    match evaluation.runtime_outcome {
+        RuntimeOutcome::Available => {}
+        RuntimeOutcome::Unavailable => reasons.push(format!(
+            "runtime '{}' is unavailable on lane '{}'",
+            inputs.request.runtime, evaluation.selected_lane
+        )),
+        RuntimeOutcome::ProbePending => reasons.push(format!(
+            "runtime probe for lane '{}' has not completed; readiness is unknown",
+            evaluation.selected_lane
+        )),
+    }
 }
 
 fn default_lane(runtime: &str) -> &'static str {
@@ -197,46 +261,71 @@ fn lane_status(bridge: &BridgeStatusReport, lane: &str) -> HeadlessReadinessLane
     }
 }
 
-fn runtime_available(
+fn runtime_outcome(
     inputs: &HeadlessReadinessInputs<'_>,
     selected_lane: &str,
     lane_available: bool,
-) -> bool {
+) -> RuntimeOutcome {
     if !lane_available {
-        return false;
+        return RuntimeOutcome::Unavailable;
     }
     match selected_lane {
-        BRIDGE_CAPABILITY_CODEX => inputs.request.runtime == "codex",
-        BRIDGE_CAPABILITY_ACP => inputs
-            .runtime_probe
-            .probes
-            .iter()
-            .find(|probe| probe.agent_id == inputs.request.runtime)
-            .is_some_and(|probe| {
-                probe.binary_present && probe.auth_state != AcpAuthState::Unavailable
-            }),
-        BRIDGE_CAPABILITY_AGENT_TUI => matches!(
+        BRIDGE_CAPABILITY_CODEX => bool_outcome(inputs.request.runtime == "codex"),
+        BRIDGE_CAPABILITY_ACP => match &inputs.runtime_probe {
+            RuntimeProbe::Pending => RuntimeOutcome::ProbePending,
+            RuntimeProbe::Ready(probe) => bool_outcome(
+                probe
+                    .probes
+                    .iter()
+                    .find(|probe| probe.agent_id == inputs.request.runtime)
+                    .is_some_and(|probe| {
+                        probe.binary_present && probe.auth_state != AcpAuthState::Unavailable
+                    }),
+            ),
+        },
+        BRIDGE_CAPABILITY_AGENT_TUI => bool_outcome(matches!(
             inputs.request.runtime.as_str(),
             "claude" | "codex" | "copilot" | "gemini" | "opencode" | "vibe"
-        ),
-        _ => false,
+        )),
+        _ => RuntimeOutcome::Unavailable,
     }
 }
 
-fn credential_status(inputs: &HeadlessReadinessInputs<'_>) -> HeadlessReadinessCredential {
-    if inputs.request.runtime == "openrouter" {
-        HeadlessReadinessCredential {
-            provider: Some("openrouter".to_string()),
-            required: true,
-            configured: Some(inputs.openrouter_configured),
-        }
+fn bool_outcome(available: bool) -> RuntimeOutcome {
+    if available {
+        RuntimeOutcome::Available
     } else {
-        HeadlessReadinessCredential {
+        RuntimeOutcome::Unavailable
+    }
+}
+
+fn credential_report(
+    assessment: &CredentialAssessment,
+    runtime: &str,
+) -> HeadlessReadinessCredential {
+    match assessment {
+        CredentialAssessment::NotRequired => HeadlessReadinessCredential {
             provider: None,
             required: false,
             configured: None,
-        }
+        },
+        CredentialAssessment::Accepted => HeadlessReadinessCredential {
+            provider: credential_provider(runtime).map(str::to_string),
+            required: true,
+            configured: Some(true),
+        },
+        CredentialAssessment::Missing
+        | CredentialAssessment::Rejected(_)
+        | CredentialAssessment::Unverified(_) => HeadlessReadinessCredential {
+            provider: credential_provider(runtime).map(str::to_string),
+            required: true,
+            configured: Some(false),
+        },
     }
+}
+
+fn credential_provider(runtime: &str) -> Option<&'static str> {
+    (runtime == "openrouter").then_some("openrouter")
 }
 
 fn push_failure(reasons: &mut Vec<String>, passed: bool, reason: String) {
@@ -246,181 +335,5 @@ fn push_failure(reasons: &mut Vec<String>, passed: bool, reason: String) {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use crate::daemon::state::HostBridgeCapabilityManifest;
-
-    use super::*;
-    use crate::agents::acp::probe::AcpRuntimeProbe;
-
-    fn ready_bridge() -> BridgeStatusReport {
-        let capabilities = LANES
-            .into_iter()
-            .map(|lane| {
-                (
-                    lane.to_string(),
-                    HostBridgeCapabilityManifest {
-                        enabled: true,
-                        healthy: true,
-                        transport: "test".to_string(),
-                        endpoint: Some("test".to_string()),
-                        metadata: BTreeMap::new(),
-                    },
-                )
-            })
-            .collect();
-        BridgeStatusReport {
-            running: true,
-            socket_path: Some("test".to_string()),
-            pid: Some(1),
-            started_at: None,
-            uptime_seconds: None,
-            capabilities,
-        }
-    }
-
-    fn probe(runtime: &str, available: bool) -> AcpRuntimeProbeResponse {
-        AcpRuntimeProbeResponse {
-            probes: vec![AcpRuntimeProbe {
-                agent_id: runtime.to_string(),
-                display_name: runtime.to_string(),
-                binary_present: available,
-                auth_state: if available {
-                    AcpAuthState::Unknown
-                } else {
-                    AcpAuthState::Unavailable
-                },
-                version: None,
-                install_hint: None,
-            }],
-            checked_at: "test".to_string(),
-        }
-    }
-
-    fn request(runtime: &str, model: &str) -> HeadlessReadinessRequest {
-        HeadlessReadinessRequest {
-            client_version: "test".to_string(),
-            client_wire_version: DAEMON_WIRE_VERSION,
-            runtime: runtime.to_string(),
-            model: model.to_string(),
-            lane: None,
-        }
-    }
-
-    #[test]
-    fn ready_openrouter_report_contains_no_credential_value() {
-        let request = request("openrouter", "deepseek/deepseek-v4-flash");
-        let bridge = ready_bridge();
-        let runtime_probe = probe("openrouter", true);
-        let report = build_headless_readiness_report(&HeadlessReadinessInputs {
-            request: &request,
-            daemon_version: "test",
-            bridge: &bridge,
-            runtime_probe: &runtime_probe,
-            openrouter_configured: true,
-            orchestrator_active: true,
-        });
-
-        assert!(report.ready);
-        assert_eq!(report.selected_lane, "acp");
-        assert_eq!(report.credential.provider.as_deref(), Some("openrouter"));
-        assert_eq!(report.credential.configured, Some(true));
-        assert!(report.unmet_requirements.is_empty());
-        let json = serde_json::to_string(&report).expect("serialize report");
-        assert!(!json.contains("api_key"));
-        assert!(!json.contains("token"));
-    }
-
-    #[test]
-    fn unmet_requirements_are_accumulated_in_one_report() {
-        let mut request = request("openrouter", "not-a-model");
-        request.client_wire_version = DAEMON_WIRE_VERSION + 1;
-        let bridge = BridgeStatusReport::not_running();
-        let runtime_probe = probe("openrouter", false);
-        let report = build_headless_readiness_report(&HeadlessReadinessInputs {
-            request: &request,
-            daemon_version: "test",
-            bridge: &bridge,
-            runtime_probe: &runtime_probe,
-            openrouter_configured: false,
-            orchestrator_active: false,
-        });
-
-        assert!(!report.ready);
-        for fragment in [
-            "incompatible",
-            "bridge is unreachable",
-            "lane 'acp' is unavailable",
-            "credential is not configured",
-            "runtime 'openrouter' is unavailable",
-            "model 'not-a-model' is unavailable",
-            "orchestrator mode is not active",
-        ] {
-            assert!(
-                report
-                    .unmet_requirements
-                    .iter()
-                    .any(|reason| reason.contains(fragment)),
-                "missing reason containing '{fragment}'"
-            );
-        }
-    }
-
-    #[test]
-    fn codex_defaults_to_structured_codex_lane() {
-        let request = request("codex", "gpt-5.4-mini");
-        let bridge = ready_bridge();
-        let runtime_probe = probe("codex", false);
-        let report = build_headless_readiness_report(&HeadlessReadinessInputs {
-            request: &request,
-            daemon_version: "test",
-            bridge: &bridge,
-            runtime_probe: &runtime_probe,
-            openrouter_configured: false,
-            orchestrator_active: true,
-        });
-
-        assert!(report.ready);
-        assert_eq!(report.selected_lane, "codex");
-        assert!(report.runtime.available);
-        assert!(report.model.available);
-    }
-
-    #[test]
-    fn disabled_lane_is_not_reported_as_unhealthy() {
-        let mut bridge = ready_bridge();
-        bridge
-            .capabilities
-            .get_mut(BRIDGE_CAPABILITY_ACP)
-            .expect("ACP capability")
-            .enabled = false;
-
-        let status = lane_status(&bridge, BRIDGE_CAPABILITY_ACP);
-
-        assert!(!status.available);
-        assert_eq!(status.reason.as_deref(), Some("capability is disabled"));
-    }
-
-    #[test]
-    fn unknown_lane_does_not_cascade_into_unavailable_failures() {
-        let mut request = request("codex", "gpt-5.4-mini");
-        request.lane = Some("unknown".to_string());
-        let bridge = ready_bridge();
-        let runtime_probe = probe("codex", true);
-
-        let report = build_headless_readiness_report(&HeadlessReadinessInputs {
-            request: &request,
-            daemon_version: "test",
-            bridge: &bridge,
-            runtime_probe: &runtime_probe,
-            openrouter_configured: false,
-            orchestrator_active: true,
-        });
-
-        assert_eq!(
-            report.unmet_requirements,
-            vec!["unknown execution lane 'unknown'"]
-        );
-    }
-}
+#[path = "headless_readiness_tests.rs"]
+mod tests;

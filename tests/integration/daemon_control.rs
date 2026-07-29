@@ -20,6 +20,7 @@ use super::helpers::{ManagedChild, TcpPortLease, test_session_uuid};
 
 mod bridge;
 mod daemon_api;
+mod headless_readiness;
 mod lifecycle;
 mod live_agents_headless;
 pub(crate) mod process;
