@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use fs_err;
-
 use crate::adapters::adapter_for;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::write_text;

@@ -30,7 +30,7 @@ Sources: `harness-hook --help`; `harness-hook session-start --help`; `harness-ho
 
 Copilot, Codex, Vibe, and OpenCode use `"$PWD"` for `--project-dir`; Claude uses `"$CLAUDE_PROJECT_DIR"`; Gemini uses `"${CLAUDE_PROJECT_DIR:-$GEMINI_PROJECT_DIR}"`.
 
-Sources: `crates/harness-hooks/src/wrapper/registrations.rs:4-37`; `crates/harness-hooks/src/wrapper/registrations.rs:52-75`; `crates/harness-hooks/src/wrapper/registrations.rs:166-180`.
+Sources: `crates/harness-hooks/src/wrapper/registrations.rs:4-38`; `crates/harness-hooks/src/wrapper/registrations.rs:53-76`; `crates/harness-hooks/src/wrapper/registrations.rs:167-181`.
 
 ## Daemon command map
 
