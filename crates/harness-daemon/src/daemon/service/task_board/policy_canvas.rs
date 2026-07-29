@@ -386,7 +386,7 @@ pub(crate) async fn promote_policy_pipeline(
     feed_gate_cache(&workspace);
     bump_change_policy(db).await;
     Ok(PolicyPipelinePromoteResponse {
-        document: response.document,
+        revision: response.document.revision,
         trace_id: response.trace_id,
     })
 }

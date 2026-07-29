@@ -6,8 +6,8 @@ use crate::daemon::protocol::{
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
     TaskBoardAutomationRunDetailRequest, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardOrchestratorStatus, WsRequest, WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
@@ -176,7 +176,9 @@ pub(super) async fn dispatch_task_board_orchestrator_run_once(
     else {
         return invalid_params(request);
     };
-    let result = Box::pin(task_board_route_executor::run_once(state, body)).await;
+    let result = Box::pin(task_board_route_executor::run_once(state, body))
+        .await
+        .map(TaskBoardOrchestratorStatus::from);
     super::record_task_board_audit_result(
         state,
         "task_board.orchestrator_run_once",
