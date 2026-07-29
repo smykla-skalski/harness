@@ -3,8 +3,9 @@ use serde_json::json;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::agents::turn::{
-    AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnId, AgentTurnRequest,
-    AgentTurnRuntime, AgentTurnStatus,
+    AgentTurnFailureCategory, AgentTurnFailureStage, AgentTurnId, AgentTurnPullRequest,
+    AgentTurnPullRequestContext, AgentTurnReadOnlyContent, AgentTurnRequest, AgentTurnRuntime,
+    AgentTurnStatus,
 };
 use crate::daemon::codex_controller::CodexAgentTurnRuntime;
 use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
@@ -14,6 +15,7 @@ use super::test_support::{
 };
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
+const HEAD_REVISION: &str = "0123456789abcdef0123456789abcdef01234567";
 
 #[tokio::test]
 async fn shared_lifecycle_starts_a_codex_report_run() {
@@ -26,6 +28,7 @@ async fn shared_lifecycle_starts_a_codex_report_run() {
             .start(AgentTurnRequest {
                 prompt: "Prepare the report".into(),
                 requested_model: Some("gpt-5.5".into()),
+                pull_request: None,
             })
             .await
             .expect("start Codex turn");
@@ -52,6 +55,7 @@ async fn unsupported_codex_model_uses_shared_start_failure() {
             .start(AgentTurnRequest {
                 prompt: "Prepare the report".into(),
                 requested_model: Some("unsupported model".into()),
+                pull_request: None,
             })
             .await
             .expect_err("unsupported model must fail");
@@ -72,11 +76,33 @@ async fn completed_codex_turn_returns_one_stable_report() {
     snapshot.model = Some("gpt-5.3-codex-spark".into());
     super::super::handle::record_snapshot_event(
         &mut snapshot,
+        "source/bound",
+        "Bound pull request source".into(),
+        &json!({
+            "repository": "smykla-skalski/harness",
+            "pullRequestNumber": 894,
+            "headRevision": HEAD_REVISION,
+            "readOnly": true
+        }),
+    );
+    super::super::handle::record_snapshot_event(
+        &mut snapshot,
         "thread/start",
         "Codex thread ready".into(),
         &json!({
             "thread": { "id": "thread-1" },
             "model": "gpt-5.3-codex-spark"
+        }),
+    );
+    super::super::handle::record_snapshot_event(
+        &mut snapshot,
+        "source/bound",
+        "Observed a later pull request head".into(),
+        &json!({
+            "repository": "smykla-skalski/harness",
+            "pullRequestNumber": 894,
+            "headRevision": "ffffffffffffffffffffffffffffffffffffffff",
+            "readOnly": true
         }),
     );
     db.lock()
@@ -102,6 +128,7 @@ async fn completed_codex_turn_returns_one_stable_report() {
         result.effective_model.as_deref(),
         Some("gpt-5.3-codex-spark")
     );
+    assert_eq!(result.source_revision.as_deref(), Some(HEAD_REVISION));
     assert_eq!(
         runtime.result(&id).await.expect("reload result"),
         Some(result)
@@ -110,6 +137,68 @@ async fn completed_codex_turn_returns_one_stable_report() {
         runtime.cancel(&id).await.expect("cancel completed turn"),
         AgentTurnStatus::Completed
     );
+}
+
+#[tokio::test]
+async fn source_bound_codex_turn_persists_exact_read_only_context_before_work() {
+    with_isolated_async_harness_env(|_| async move {
+        let (controller, _db, _tempdir) = controller_with_db();
+        let runtime = CodexAgentTurnRuntime::new(controller.clone(), SESSION_ID);
+
+        let id = runtime
+            .start(AgentTurnRequest {
+                prompt: "Review the supplied changes".into(),
+                requested_model: Some("gpt-5.5".into()),
+                pull_request: Some(pull_request_context(HEAD_REVISION)),
+            })
+            .await
+            .expect("start source-bound Codex turn");
+
+        let snapshot = controller.run(id.as_str()).expect("load Codex run");
+        assert!(snapshot.prompt.contains("smykla-skalski/harness#894"));
+        assert!(snapshot.prompt.contains(HEAD_REVISION));
+        assert!(snapshot.prompt.contains("untrusted pull request content"));
+        assert!(snapshot.prompt.contains("diff --git"));
+        let source = snapshot
+            .events
+            .iter()
+            .find(|event| event.kind == "source/bound")
+            .expect("persisted source binding");
+        assert_eq!(source.payload["repository"], "smykla-skalski/harness");
+        assert_eq!(source.payload["pullRequestNumber"], 894);
+        assert_eq!(source.payload["headRevision"], HEAD_REVISION);
+        assert_eq!(source.payload["readOnly"], true);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn mismatched_codex_context_fails_before_a_run_is_created() {
+    with_isolated_async_harness_env(|_| async move {
+        let (controller, _db, _tempdir) = controller_with_db();
+        let runtime = CodexAgentTurnRuntime::new(controller.clone(), SESSION_ID);
+        let mut context = pull_request_context(HEAD_REVISION);
+        context.content.pull_request.head_revision = "f".repeat(40);
+
+        let error = runtime
+            .start(AgentTurnRequest {
+                prompt: "Review the supplied changes".into(),
+                requested_model: Some("gpt-5.5".into()),
+                pull_request: Some(context),
+            })
+            .await
+            .expect_err("mismatched source must fail");
+
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+        assert!(
+            controller
+                .list_runs(SESSION_ID)
+                .expect("list Codex runs")
+                .runs
+                .is_empty()
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -294,4 +383,19 @@ fn report_snapshot(status: CodexRunStatus) -> crate::daemon::protocol::CodexRunS
     snapshot.mode = CodexRunMode::Report;
     snapshot.pending_approvals.clear();
     snapshot
+}
+
+fn pull_request_context(head_revision: &str) -> AgentTurnPullRequestContext {
+    let pull_request = AgentTurnPullRequest {
+        repository: "smykla-skalski/harness".into(),
+        number: 894,
+        head_revision: head_revision.into(),
+    };
+    AgentTurnPullRequestContext {
+        pull_request: pull_request.clone(),
+        content: AgentTurnReadOnlyContent {
+            pull_request,
+            body: "diff --git a/src/lib.rs b/src/lib.rs".into(),
+        },
+    }
 }

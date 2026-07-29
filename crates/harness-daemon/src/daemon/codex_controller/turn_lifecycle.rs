@@ -56,25 +56,28 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
     }
 
     async fn start(&self, request: AgentTurnRequest) -> Result<AgentTurnId, CliError> {
-        let snapshot = self.controller.start_run(
+        let request = request.into_validated()?;
+        let codex_request = CodexRunRequest {
+            actor: Some("agent-turn-lifecycle".into()),
+            prompt: request.prompt,
+            mode: CodexRunMode::Report,
+            role: SessionRole::Worker,
+            fallback_role: None,
+            capabilities: Vec::new(),
+            name: Some("Codex report turn".into()),
+            persona: None,
+            resume_thread_id: None,
+            task_id: None,
+            board_item_id: None,
+            workflow_execution_id: None,
+            model: request.requested_model,
+            effort: None,
+            allow_custom_model: false,
+        };
+        let snapshot = self.controller.start_agent_turn(
             &self.session_id,
-            &CodexRunRequest {
-                actor: Some("agent-turn-lifecycle".into()),
-                prompt: request.prompt,
-                mode: CodexRunMode::Report,
-                role: SessionRole::Worker,
-                fallback_role: None,
-                capabilities: Vec::new(),
-                name: Some("Codex report turn".into()),
-                persona: None,
-                resume_thread_id: None,
-                task_id: None,
-                board_item_id: None,
-                workflow_execution_id: None,
-                model: request.requested_model,
-                effort: None,
-                allow_custom_model: false,
-            },
+            &codex_request,
+            request.pull_request.as_ref(),
         )?;
         AgentTurnId::new(snapshot.run_id)
     }
@@ -89,6 +92,7 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
             return Ok(None);
         }
         let effective_model = codex_effective_model(&snapshot);
+        let source_revision = super::turn_source::source_revision(&snapshot);
         let report = snapshot
             .final_message
             .filter(|report| !report.trim().is_empty())
@@ -103,6 +107,7 @@ impl AgentTurnRuntime for CodexAgentTurnRuntime {
             stop_reason: "end_turn".into(),
             requested_model: snapshot.model,
             effective_model,
+            source_revision,
         }))
     }
 

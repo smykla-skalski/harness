@@ -1,3 +1,4 @@
+use super::super::queued_run::{QueuedRunIdentity, queued_run_snapshot};
 use super::*;
 use crate::daemon::protocol::CodexRunMode;
 use crate::session::types::SessionRole;
@@ -25,11 +26,14 @@ fn queued_run_snapshot_copies_binding_and_normalizes_optional_values() {
     let snapshot = queued_run_snapshot(
         "session-1",
         &request,
-        "run-1".to_string(),
-        "/tmp/project".to_string(),
         "investigate",
-        Some("agent-1".to_string()),
-        "Codex".to_string(),
+        QueuedRunIdentity::for_session(
+            "run-1".to_string(),
+            "/tmp/project".to_string(),
+            "agent-1".to_string(),
+            "Codex".to_string(),
+        ),
+        None,
     );
 
     assert_eq!(snapshot.model, None);
@@ -68,11 +72,13 @@ fn the_persisted_prompt_is_the_one_the_request_carried() {
     let snapshot = queued_run_snapshot(
         "session-1",
         &request,
-        "run-1".to_string(),
-        "/tmp/project".to_string(),
         prompt,
+        QueuedRunIdentity::standalone(
+            "run-1".to_string(),
+            "/tmp/project".to_string(),
+            "Codex".to_string(),
+        ),
         None,
-        "Codex".to_string(),
     );
 
     assert_eq!(snapshot.prompt, request.prompt.trim());
