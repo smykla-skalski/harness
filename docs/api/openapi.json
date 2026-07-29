@@ -14030,6 +14030,17 @@
             ],
             "description": "Why the most recent prompt turn stopped, as reported by the agent."
           },
+          "last_turn_result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AcpAgentTurnResult",
+                "description": "Atomic terminal result for the most recent completed prompt turn."
+              }
+            ]
+          },
           "title": {
             "type": [
               "string",
@@ -14254,6 +14265,22 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "AcpAgentTurnResult": {
+        "type": "object",
+        "description": "One completed ACP prompt turn, assembled from its ordered message chunks.",
+        "required": [
+          "report",
+          "stop_reason"
+        ],
+        "properties": {
+          "report": {
+            "type": "string"
+          },
+          "stop_reason": {
+            "type": "string"
           }
         }
       },

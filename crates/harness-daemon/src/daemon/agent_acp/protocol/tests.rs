@@ -29,6 +29,7 @@ mod lifecycle_tests;
 mod model_selection_tests;
 mod remote_transport_tests;
 mod telemetry_tests;
+mod turn_result_tests;
 
 use agents::{
     run_agent_recording_startup_config_order, run_agent_with_stale_notification,

@@ -44,6 +44,7 @@ use super::tool_translator::{
 
 /// Maximum number of tool-call loops per user turn.
 pub const MAX_TOOL_ITERATIONS: u32 = 10;
+const OPENROUTER_TURN_FAILED: i32 = -32092;
 
 /// Drive one ACP `session/prompt` turn to completion. Mutates the session's
 /// history via `store`. Returns the `StopReason` to embed in the
@@ -54,10 +55,10 @@ pub async fn drive_turn(
     store: &SessionStore,
     session_id: &SessionId,
     user_prompt: Vec<ContentBlock>,
-) -> StopReason {
+) -> agent_client_protocol::Result<StopReason> {
     store.reset_cancel(session_id).await;
     let Some(initial) = store.snapshot(session_id).await else {
-        return StopReason::Refusal;
+        return Ok(StopReason::Refusal);
     };
 
     let user_message = user_message_from_content(&user_prompt);
@@ -66,26 +67,29 @@ pub async fn drive_turn(
     for _ in 0..MAX_TOOL_ITERATIONS {
         let snapshot = match store.snapshot(session_id).await {
             Some(snapshot) => snapshot,
-            None => return StopReason::Refusal,
+            None => return Ok(StopReason::Refusal),
         };
         if snapshot.cancel_flag.load(Ordering::SeqCst) {
-            return StopReason::Cancelled;
+            return Ok(StopReason::Cancelled);
         }
         let request = build_request(&snapshot);
         let stream = match client.stream_chat(request).await {
             Ok(stream) => stream,
-            Err(error) => return error_to_stop_reason(connection, session_id, &error),
+            Err(error) => return error_outcome(connection, session_id, &error),
         };
         let outcome = drain_stream(connection, session_id, &snapshot.cancel_flag, stream).await;
         let turn = match outcome {
             Ok(turn) => turn,
-            Err(stop_reason) => return stop_reason,
+            Err(TurnFailure::Cancelled) => return Ok(StopReason::Cancelled),
+            Err(TurnFailure::Provider(error)) => {
+                return error_outcome(connection, session_id, &error);
+            }
         };
         if !turn.finished_with_tool_calls || turn.tool_calls.is_empty() {
             store
                 .extend_history(session_id, vec![assistant_text_message(&turn.text)])
                 .await;
-            return StopReason::EndTurn;
+            return Ok(StopReason::EndTurn);
         }
         store
             .extend_history(session_id, vec![assistant_tool_message(&turn)])
@@ -100,7 +104,7 @@ pub async fn drive_turn(
         .await;
         store.extend_history(session_id, tool_messages).await;
     }
-    StopReason::MaxTurnRequests
+    Ok(StopReason::MaxTurnRequests)
 }
 
 #[derive(Debug, Default)]
@@ -108,6 +112,12 @@ struct TurnResult {
     text: String,
     tool_calls: Vec<AssistantToolCall>,
     finished_with_tool_calls: bool,
+}
+
+#[derive(Debug)]
+enum TurnFailure {
+    Cancelled,
+    Provider(OpenRouterError),
 }
 
 async fn drain_stream(
@@ -120,17 +130,17 @@ async fn drain_stream(
                 + Send,
         >,
     >,
-) -> Result<TurnResult, StopReason> {
+) -> Result<TurnResult, TurnFailure> {
     let mut text = String::new();
     let mut accumulator: BTreeMap<u32, PartialToolCall> = BTreeMap::new();
     let mut finished_with_tool_calls = false;
     while let Some(chunk_result) = stream.next().await {
         if cancel_flag.load(Ordering::SeqCst) {
-            return Err(StopReason::Cancelled);
+            return Err(TurnFailure::Cancelled);
         }
         let chunk = match chunk_result {
             Ok(chunk) => chunk,
-            Err(error) => return Err(error_to_stop_reason(connection, session_id, &error)),
+            Err(error) => return Err(TurnFailure::Provider(error)),
         };
         for choice in chunk.choices {
             absorb_choice_delta(
@@ -301,11 +311,11 @@ fn build_request(snapshot: &SessionSnapshot) -> ChatRequest {
     }
 }
 
-fn error_to_stop_reason(
+fn error_outcome(
     connection: &ConnectionTo<Client>,
     session_id: &SessionId,
     error: &OpenRouterError,
-) -> StopReason {
+) -> agent_client_protocol::Result<StopReason> {
     let message = format!("openrouter error: {error}");
     tracing::warn!(%error, "openrouter turn failed");
     let chunk = ContentChunk::new(ContentBlock::Text(TextContent::new(format!(
@@ -313,13 +323,16 @@ fn error_to_stop_reason(
     ))));
     if let Err(send_error) = connection.send_notification(SessionNotification::new(
         session_id.clone(),
-        SessionUpdate::AgentMessageChunk(chunk),
+        SessionUpdate::AgentThoughtChunk(chunk),
     )) {
         tracing::warn!(%send_error, "failed to surface openrouter error to client");
     }
     match error {
-        OpenRouterError::Moderation { .. } => StopReason::Refusal,
-        _ => StopReason::EndTurn,
+        OpenRouterError::Moderation { .. } => Ok(StopReason::Refusal),
+        _ => Err(agent_client_protocol::Error::new(
+            OPENROUTER_TURN_FAILED,
+            message,
+        )),
     }
 }
 

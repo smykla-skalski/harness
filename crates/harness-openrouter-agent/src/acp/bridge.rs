@@ -92,7 +92,7 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
                 connection.spawn({
                     let connection = connection.clone();
                     async move {
-                        let stop_reason = drive_turn(
+                        let outcome = drive_turn(
                             &connection,
                             &client,
                             &store,
@@ -100,7 +100,12 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
                             request.prompt,
                         )
                         .await;
-                        responder.respond(PromptResponse::new(stop_reason))
+                        match outcome {
+                            Ok(stop_reason) => {
+                                responder.respond(PromptResponse::new(stop_reason))
+                            }
+                            Err(error) => responder.respond_with_error(error),
+                        }
                     }
                 })?;
                 Ok(())

@@ -94,6 +94,7 @@ pub struct AcpSessionSupervisor {
     event_emitter: OnceLock<Arc<dyn WatchdogEventEmitter>>,
     handshake: OnceLock<AcpAgentHandshake>,
     session_state: Mutex<Option<AcpAgentSessionState>>,
+    turn_report: Mutex<Option<String>>,
 }
 
 impl AcpSessionSupervisor {
@@ -126,6 +127,7 @@ impl AcpSessionSupervisor {
             event_emitter: OnceLock::new(),
             handshake: OnceLock::new(),
             session_state: Mutex::new(None),
+            turn_report: Mutex::new(None),
         }
     }
 
@@ -160,6 +162,41 @@ impl AcpSessionSupervisor {
             .lock()
             .expect("session state lock")
             .clone()
+    }
+
+    /// Start collecting assistant text for one prompt turn.
+    ///
+    /// # Panics
+    /// Panics if the report mutex is poisoned.
+    pub fn begin_turn_report(&self) {
+        *self.turn_report.lock().expect("turn report lock") = Some(String::new());
+    }
+
+    /// Append one ordered assistant-text fragment when a turn is active.
+    ///
+    /// # Panics
+    /// Panics if the report mutex is poisoned.
+    pub fn append_turn_report(&self, fragment: &str) {
+        if let Some(report) = self.turn_report.lock().expect("turn report lock").as_mut() {
+            report.push_str(fragment);
+        }
+    }
+
+    /// Consume the active report buffer at its terminal response.
+    ///
+    /// # Panics
+    /// Panics if the report mutex is poisoned.
+    #[must_use]
+    pub fn take_turn_report(&self) -> Option<String> {
+        self.turn_report.lock().expect("turn report lock").take()
+    }
+
+    /// Drop partial output after a failed or interrupted prompt.
+    ///
+    /// # Panics
+    /// Panics if the report mutex is poisoned.
+    pub fn discard_turn_report(&self) {
+        self.turn_report.lock().expect("turn report lock").take();
     }
 
     /// Attach a sink that receives watchdog state transitions.

@@ -356,6 +356,13 @@ pub struct AcpAgentHandshake {
     pub supports_logout: bool,
 }
 
+/// One completed ACP prompt turn, assembled from its ordered message chunks.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
+pub struct AcpAgentTurnResult {
+    pub report: String,
+    pub stop_reason: String,
+}
+
 /// Live per-session agent state assembled from ACP session notifications.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 pub struct AcpAgentSessionState {
@@ -372,6 +379,9 @@ pub struct AcpAgentSessionState {
     /// Why the most recent prompt turn stopped, as reported by the agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_stop_reason: Option<String>,
+    /// Atomic terminal result for the most recent completed prompt turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_turn_result: Option<AcpAgentTurnResult>,
 }
 
 /// One session an agent reports from `session/list`.

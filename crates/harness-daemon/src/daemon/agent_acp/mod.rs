@@ -67,8 +67,8 @@ mod spawn_credential;
 
 pub use harness_protocol::managed_agents::acp::{
     AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState,
-    AcpAgentSnapshot, AcpAgentStartRequest, AcpEndpoint, AcpMcpEnvVariable, AcpMcpHttpHeader,
-    AcpMcpServer, AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem,
+    AcpAgentSnapshot, AcpAgentStartRequest, AcpAgentTurnResult, AcpEndpoint, AcpMcpEnvVariable,
+    AcpMcpHttpHeader, AcpMcpServer, AcpPermissionBatch, AcpPermissionDecision, AcpPermissionItem,
     AcpPermissionOption, AcpSessionConfigOptionState, AcpSessionListPage, AcpSessionSummary,
 };
 pub use harness_protocol::managed_agents::acp::{

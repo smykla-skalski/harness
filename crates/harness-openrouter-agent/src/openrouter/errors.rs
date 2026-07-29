@@ -18,6 +18,8 @@ pub enum OpenRouterError {
     ReadBody(#[source] reqwest::Error),
     #[error("failed to parse OpenRouter response: {0}")]
     Deserialize(#[source] serde_json::Error),
+    #[error("OpenRouter stream ended before [DONE]")]
+    IncompleteStream,
     /// HTTP 401 / 402 from `OpenRouter` — bad or unauthorized key.
     #[error("OpenRouter authentication failed: {body}")]
     AuthenticationFailed { body: String },

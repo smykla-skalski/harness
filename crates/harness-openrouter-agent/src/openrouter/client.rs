@@ -117,6 +117,7 @@ impl OpenRouterClient {
                     yield chunk;
                 }
             }
+            Err(OpenRouterError::IncompleteStream)?;
         };
         Ok(Box::pin(stream))
     }

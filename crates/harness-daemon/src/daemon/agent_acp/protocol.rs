@@ -429,24 +429,38 @@ async fn send_prompt_or_cancel(
     prompt: String,
 ) -> AcpResult<bool> {
     let _guard = supervisor.enter_pending_request_with_reason(Some("session/prompt"));
+    session_state::begin_turn(supervisor);
     let request = PromptRequest::new(
         session_id.clone(),
         vec![ContentBlock::Text(TextContent::new(prompt))],
     );
     let mut prompt = Box::pin(connection.send_request(request).block_task());
-    tokio::select! {
+    let outcome = tokio::select! {
         result = timeout(prompt_timeout, &mut prompt) => {
-            let response = result.map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
-            session_state::record_stop_reason(supervisor, &response);
-            Ok(false)
+            match result {
+                Ok(response) => response.map(|response| (false, response)),
+                Err(_) => Err(deadline_error("session/prompt", prompt_timeout)),
+            }
         }
         Some(()) = cancel_rx.recv() => {
-            send_cancel_notification(connection, session_id)?;
-            let response = timeout(prompt_timeout, prompt)
-                .await
-                .map_err(|_| deadline_error("session/prompt", prompt_timeout))??;
+            let response = match send_cancel_notification(connection, session_id) {
+                Ok(()) => timeout(prompt_timeout, prompt)
+                    .await
+                    .map_err(|_| deadline_error("session/prompt", prompt_timeout))
+                    .and_then(std::convert::identity),
+                Err(error) => Err(error),
+            };
+            response.map(|response| (true, response))
+        }
+    };
+    match outcome {
+        Ok((cancelled, response)) => {
             session_state::record_stop_reason(supervisor, &response);
-            Ok(true)
+            Ok(cancelled)
+        }
+        Err(error) => {
+            session_state::discard_turn(supervisor);
+            Err(error)
         }
     }
 }
