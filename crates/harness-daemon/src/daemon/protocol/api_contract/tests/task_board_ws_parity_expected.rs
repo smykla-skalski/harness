@@ -3,8 +3,7 @@ use super::*;
 // Each `_part_N` helper below is a slice of the same literal table, split
 // purely to keep every function under the repo's line cap; there is no
 // per-part meaning; `expected_task_board_ws_parity` below is the real API.
-fn expected_task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
-{
+fn task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Get,
@@ -93,8 +92,7 @@ fn expected_task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str,
     ]
 }
 
-fn expected_task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
-{
+fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Post,
@@ -183,8 +181,7 @@ fn expected_task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str,
     ]
 }
 
-fn expected_task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
-{
+fn task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Get,
@@ -273,8 +270,7 @@ fn expected_task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str,
     ]
 }
 
-fn expected_task_board_ws_parity_part_4() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
-{
+fn task_board_ws_parity_part_4() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Post,
@@ -363,8 +359,7 @@ fn expected_task_board_ws_parity_part_4() -> Vec<(HttpRouteMethod, &'static str,
     ]
 }
 
-fn expected_task_board_ws_parity_part_5() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
-{
+fn task_board_ws_parity_part_5() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Post,
@@ -453,8 +448,7 @@ fn expected_task_board_ws_parity_part_5() -> Vec<(HttpRouteMethod, &'static str,
     ]
 }
 
-fn expected_task_board_ws_parity_part_6() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)>
-{
+fn task_board_ws_parity_part_6() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     vec![
         (
             HttpRouteMethod::Get,
@@ -544,11 +538,11 @@ fn expected_task_board_ws_parity_part_6() -> Vec<(HttpRouteMethod, &'static str,
 pub(super) fn expected_task_board_ws_parity()
 -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     let mut expected = Vec::new();
-    expected.extend(expected_task_board_ws_parity_part_1());
-    expected.extend(expected_task_board_ws_parity_part_2());
-    expected.extend(expected_task_board_ws_parity_part_3());
-    expected.extend(expected_task_board_ws_parity_part_4());
-    expected.extend(expected_task_board_ws_parity_part_5());
-    expected.extend(expected_task_board_ws_parity_part_6());
+    expected.extend(task_board_ws_parity_part_1());
+    expected.extend(task_board_ws_parity_part_2());
+    expected.extend(task_board_ws_parity_part_3());
+    expected.extend(task_board_ws_parity_part_4());
+    expected.extend(task_board_ws_parity_part_5());
+    expected.extend(task_board_ws_parity_part_6());
     expected
 }
