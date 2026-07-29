@@ -426,6 +426,13 @@ pub(super) async fn stamp_admitting_execution_in_tx(
 ) -> Result<(), CliError> {
     item.workflow.execution_id = Some(workflow_execution_id.to_string());
     item.workflow.status = TaskBoardWorkflowStatus::Admitting;
+    // A rolled-back dispatch leaves the prior run's branch, worktree, and step on
+    // the ticket, so clear them here: the new execution has not launched, and
+    // pairing its id with a dead execution's launch data would misread the
+    // Admitting window. Completion repopulates all three when the worker starts.
+    item.workflow.branch = None;
+    item.workflow.worktree = None;
+    item.workflow.current_step_id = None;
     item.updated_at = utc_now();
     replace_item_in_tx(transaction, &item, item_revision).await
 }
