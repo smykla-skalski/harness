@@ -29,10 +29,10 @@ const PREPARATION_LEASE_SECONDS: i64 = 30;
 mod helpers;
 use helpers::{
     PREPARATION_MAX_ATTEMPTS, PreparationClaim, active_reservation, apply_preparation_to_item,
-    claim_preparation_intent_in_tx, claimed_attempts_in_tx, clear_admitting_execution_in_tx,
-    commit_preparation, ensure_preparation_claim, fail_preparation_admission_in_tx,
-    insert_preparation, preparation_retry_delay_seconds, rearm_preparation_in_tx,
-    screen_preparation_claim_in_tx, stamp_admitting_execution_in_tx, validate_reservable_item,
+    claim_preparation_intent_in_tx, claimed_attempts_in_tx, commit_preparation,
+    ensure_preparation_claim, fail_preparation_admission_in_tx, insert_preparation,
+    preparation_retry_delay_seconds, rearm_preparation_in_tx, screen_preparation_claim_in_tx,
+    stamp_admitting_execution_in_tx, validate_reservable_item,
 };
 
 pub(crate) use helpers::PREPARATION_MAX_ATTEMPTS as TASK_BOARD_PREPARATION_MAX_ATTEMPTS;
@@ -454,16 +454,11 @@ impl AsyncDaemonDb {
             .await?;
         let attempts = claimed_attempts_in_tx(&mut transaction, claim).await?;
         if attempts >= PREPARATION_MAX_ATTEMPTS {
+            // Retiring the intent clears the Admitting stamp inside
+            // `fail_preparation_admission_in_tx`, so the ticket drops back to
+            // Idle and a fresh dispatch mints a new execution instead of finding
+            // a dead one.
             fail_preparation_admission_in_tx(&mut transaction, &claim.intent_id, reason).await?;
-            // The intent is retired, so release the Admitting stamp too: clear the
-            // owning execution and drop the ticket back to Idle so a fresh
-            // dispatch mints a new execution instead of finding a dead one.
-            clear_admitting_execution_in_tx(
-                &mut transaction,
-                &claim.preparation.board_item_id,
-                &claim.preparation.workflow_execution_id,
-            )
-            .await?;
             commit_preparation(transaction, "task board preparation give-up").await?;
             return Ok(TaskBoardPreparationRelease::GaveUp { attempts });
         }

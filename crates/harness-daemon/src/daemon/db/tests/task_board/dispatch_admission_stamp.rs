@@ -199,3 +199,143 @@ async fn admitting_stamp_clears_a_prior_execution_launch_data() {
         "admitting must not pair a new execution with a dead run's launch data"
     );
 }
+
+#[tokio::test]
+async fn a_failed_admission_clears_the_dead_execution_owner() {
+    let dir = tempdir().expect("tempdir");
+    let db_path = dir.path().join("harness.db");
+    let db = AsyncDaemonDb::connect(&db_path).await.expect("open db");
+    db.create_task_board_item(approved_write_item(TaskBoardItem::new(
+        "task-stale-admit".to_owned(),
+        "Stale admit".to_owned(),
+        "Body".to_owned(),
+        "2026-07-11T10:00:00Z".to_owned(),
+    )))
+    .await
+    .expect("create item");
+    let plan = build_dispatch_plans_with_policy(
+        &[db.task_board_item("task-stale-admit").await.expect("item")],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
+    let reserved = db
+        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
+        .await
+        .expect("reserve dispatch");
+    let (intent_id, dead_execution) = match reserved {
+        ReservedTaskBoardDispatch::Preparing {
+            intent_id,
+            preparation,
+        } => (intent_id, preparation.workflow_execution_id),
+        ReservedTaskBoardDispatch::Applied(_) | ReservedTaskBoardDispatch::Blocked(_) => {
+            panic!("a fresh reservation must enter preparation")
+        }
+    };
+    let admitted = db.task_board_item("task-stale-admit").await.expect("item");
+    assert_eq!(admitted.workflow.status, TaskBoardWorkflowStatus::Admitting);
+    assert_eq!(
+        admitted.workflow.execution_id.as_deref(),
+        Some(dead_execution.as_str())
+    );
+
+    // Change the ticket before the preparation claim starts, so the frozen item
+    // revision the reservation captured no longer matches.
+    db.update_task_board_item("task-stale-admit", |item| {
+        item.body = "Body changed before the claim".to_owned();
+        Ok(true)
+    })
+    .await
+    .expect("mutate item before claim");
+
+    // The claim rejects the stale revision and fails the intent terminally.
+    let error = db
+        .attempt_task_board_dispatch_preparation_claim(&intent_id)
+        .await
+        .expect_err("a stale item revision must refuse the claim");
+    assert!(
+        error.to_string().contains("revision changed"),
+        "the refusal must name the stale revision, got {error}"
+    );
+
+    // The failed admission must not leave the ticket pinned to the dead execution.
+    let cleared = db.task_board_item("task-stale-admit").await.expect("item");
+    assert_eq!(
+        cleared.workflow.status,
+        TaskBoardWorkflowStatus::Idle,
+        "a failed admission must not leave the ticket stuck in Admitting"
+    );
+    assert!(
+        cleared.workflow.execution_id.is_none(),
+        "the dead execution must not stay named as the ticket's owner"
+    );
+    let (status, last_error): (String, Option<String>) = sqlx::query_as(
+        "SELECT status, last_error FROM task_board_dispatch_intents WHERE intent_id = ?1",
+    )
+    .bind(&intent_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("load failed intent");
+    assert_eq!(status, "failed", "the stale intent must record its failure");
+    assert!(
+        last_error
+            .as_deref()
+            .is_some_and(|error| error.contains("revision changed")),
+        "the intent must expose the failure behind it, got {last_error:?}"
+    );
+
+    // The cleared state is durable: a fresh connection to the same file reads the
+    // ticket back as Idle rather than resurrecting the Admitting stamp.
+    let reopened = AsyncDaemonDb::connect(&db_path).await.expect("reopen db");
+    let persisted = reopened
+        .task_board_item("task-stale-admit")
+        .await
+        .expect("item");
+    assert_eq!(persisted.workflow.status, TaskBoardWorkflowStatus::Idle);
+    assert!(persisted.workflow.execution_id.is_none());
+
+    // The next eligible dispatch starts exactly one new execution.
+    let retry_plan = build_dispatch_plans_with_policy(
+        &[persisted],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
+    let retry = reopened
+        .reserve_task_board_dispatch(&retry_plan, "control-plane", Some("/tmp/project"), false)
+        .await
+        .expect("reserve after failure");
+    let live_execution = match retry {
+        ReservedTaskBoardDispatch::Preparing {
+            intent_id: retry_intent,
+            preparation,
+        } => {
+            assert_ne!(retry_intent, intent_id, "a retry must not reuse the dead intent");
+            preparation.workflow_execution_id
+        }
+        ReservedTaskBoardDispatch::Applied(_) | ReservedTaskBoardDispatch::Blocked(_) => {
+            panic!("a failed intent must not block a fresh reservation")
+        }
+    };
+    assert_ne!(
+        live_execution, dead_execution,
+        "a fresh dispatch must mint its own execution, not resurrect the dead one"
+    );
+    let readmitted = reopened
+        .task_board_item("task-stale-admit")
+        .await
+        .expect("item");
+    assert_eq!(
+        readmitted.workflow.execution_id.as_deref(),
+        Some(live_execution.as_str()),
+        "the ticket must name exactly the one new execution"
+    );
+    assert_eq!(
+        readmitted.workflow.status,
+        TaskBoardWorkflowStatus::Admitting
+    );
+}
