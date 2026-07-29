@@ -12,6 +12,7 @@
 mod budget;
 mod cache;
 mod client;
+mod execute;
 mod mutation;
 mod predictor;
 mod raw;
