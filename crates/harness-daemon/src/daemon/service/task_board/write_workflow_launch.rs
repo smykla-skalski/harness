@@ -171,6 +171,7 @@ pub(crate) async fn validate_write_workflow_launch(
         .map_err(|error| invalid_transition(error.to_string()))?;
     let (pull_request, base_head_revision) =
         resolve_write_identity(&item, worktree(&item)?, pull_request).await?;
+    stop_on_stale_pull_request_head(pull_request.as_ref(), launch.pull_request.as_ref())?;
     let stable = item.workflow_kind == launch.workflow_kind
         && item.agent_mode == AgentMode::Headless
         && snapshot.execution_repository == launch.execution_repository
@@ -204,23 +205,45 @@ async fn resolve_write_identity(
     worktree: &str,
     pull_request: Option<TaskBoardPullRequestIdentity>,
 ) -> Result<(Option<TaskBoardPullRequestIdentity>, String), CliError> {
-    let local_head = super::read_only_workflow_launch::resolve_worktree_head(worktree).await?;
     if !item.workflow_kind.has_dependency_update_intent() {
+        let local_head = super::read_only_workflow_launch::resolve_worktree_head(worktree).await?;
         return Ok((None, local_head));
     }
+    // A dependency update freezes the pull request's own head, not the session
+    // worktree HEAD. The worktree starts on the repository default branch and the
+    // worker checks out this frozen revision before implementing, so the base
+    // revision is the pull request head and the two need not match at launch.
     let identity = pull_request
         .ok_or_else(|| invalid_transition("PrFix launch has no frozen pull request head"))?;
     let remote_head = identity
         .head
         .as_ref()
-        .map(|head| head.revision.as_str())
+        .map(|head| head.revision.clone())
         .ok_or_else(|| invalid_transition("PrFix launch has no frozen pull request head"))?;
-    if remote_head != local_head {
-        return Err(invalid_transition(
-            "PrFix worktree HEAD does not match its pull request head",
-        ));
+    Ok((Some(identity), remote_head))
+}
+
+/// Stop a dependency launch whose live pull request head no longer matches the frozen head,
+/// before any agent work starts, with a reason that names the stale revision.
+fn stop_on_stale_pull_request_head(
+    fresh: Option<&TaskBoardPullRequestIdentity>,
+    frozen: Option<&TaskBoardPullRequestIdentity>,
+) -> Result<(), CliError> {
+    let (Some(fresh), Some(frozen)) = (fresh, frozen) else {
+        return Ok(());
+    };
+    let fresh_head = fresh.head.as_ref().map(|head| head.revision.as_str());
+    let frozen_head = frozen.head.as_ref().map(|head| head.revision.as_str());
+    if fresh_head == frozen_head {
+        return Ok(());
     }
-    Ok((Some(identity), local_head))
+    Err(invalid_transition(format!(
+        "PrFix pull request '{}#{}' head changed since launch: frozen {}, now {} (stale head)",
+        frozen.repository,
+        frozen.number,
+        frozen_head.unwrap_or("<none>"),
+        fresh_head.unwrap_or("<none>"),
+    )))
 }
 
 fn requested_pull_request(

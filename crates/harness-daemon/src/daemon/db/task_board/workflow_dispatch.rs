@@ -14,9 +14,10 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, advance_task_board_workflow,
     approval_gate, bind_plan_approval, build_planning_result,
-    resolve_task_board_pull_request_identity, start_task_board_workflow,
-    task_board_read_only_execution_repository, validate_task_board_read_only_item_revisions,
-    validate_task_board_read_only_run_context, validate_task_board_workflow_execution,
+    confirm_frozen_pull_request_identity, resolve_task_board_pull_request_identity,
+    start_task_board_workflow, task_board_read_only_execution_repository,
+    validate_task_board_read_only_item_revisions, validate_task_board_read_only_run_context,
+    validate_task_board_workflow_execution,
 };
 
 pub(super) async fn insert_started_read_only_workflow_in_tx(
@@ -204,6 +205,35 @@ pub(super) async fn insert_started_write_workflow_in_tx(
     Ok(())
 }
 
+/// Confirm the launch's frozen pull request still matches the item at durable start.
+///
+/// The item never records the pull request head, so a dependency launch's frozen head cannot be
+/// re-derived here and is trusted as captured at preparation; only the repository and number are
+/// re-checked. A live head change is caught later at worker start, which re-reads GitHub.
+fn confirm_write_launch_pull_request(
+    item: &TaskBoardItem,
+    launch: &TaskBoardWriteWorkflowLaunch,
+) -> Result<(), CliError> {
+    match item.workflow_kind {
+        TaskBoardWorkflowKind::DefaultTask => {
+            if launch.pull_request.is_some() {
+                return Err(db_error(
+                    "write workflow launch changed before durable start",
+                ));
+            }
+            Ok(())
+        }
+        kind if kind.has_dependency_update_intent() => {
+            let frozen = launch.pull_request.as_ref().ok_or_else(|| {
+                db_error("dependency workflow launch has no frozen pull request")
+            })?;
+            confirm_frozen_pull_request_identity(item, frozen, true)
+                .map_err(|error| db_error(error.to_string()))
+        }
+        _ => Err(db_error("dispatch is not a write workflow")),
+    }
+}
+
 fn validate_write_launch(
     item: &TaskBoardItem,
     item_revision: i64,
@@ -223,14 +253,7 @@ fn validate_write_launch(
         .ok_or_else(|| db_error("workflow item revision is out of range"))?;
     let execution_repository = task_board_read_only_execution_repository(item)
         .map_err(|error| db_error(error.to_string()))?;
-    let pull_request = match item.workflow_kind {
-        TaskBoardWorkflowKind::DefaultTask => None,
-        kind if kind.has_dependency_update_intent() => Some(
-            resolve_task_board_pull_request_identity(item)
-                .map_err(|error| db_error(error.to_string()))?,
-        ),
-        _ => return Err(db_error("dispatch is not a write workflow")),
-    };
+    confirm_write_launch_pull_request(item, launch)?;
     let PlanApprovalGate::Approved {
         approved_by,
         approved_at,
@@ -243,7 +266,6 @@ fn validate_write_launch(
     if item.agent_mode != AgentMode::Headless
         || item.workflow_kind != launch.workflow_kind
         || execution_repository != launch.execution_repository
-        || pull_request != launch.pull_request
         || item_revision != started_revision
         || item.session_id.as_deref() != Some(launch.run_context.session_id.as_str())
         || item.title != launch.run_context.title

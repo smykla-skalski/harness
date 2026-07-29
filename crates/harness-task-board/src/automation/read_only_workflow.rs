@@ -24,6 +24,8 @@ pub enum TaskBoardReadOnlyWorkflowContractError {
     IncompleteRunContext,
     #[error("read-only workflow item revision fence is invalid")]
     InvalidItemRevisionFence,
+    #[error("pull request identity no longer matches the item's active pull request")]
+    PullRequestIdentityChanged,
 }
 
 /// Validate the monotonic item revision fence carried by a read-only launch.
@@ -90,6 +92,11 @@ pub fn task_board_read_only_execution_repository(
 
 /// Resolve one active GitHub pull-request identity and bind it to the execution repository.
 ///
+/// The returned identity carries no head: a board item records only the repository and number,
+/// never the head branch or revision. The frozen head is captured once from a live GitHub read at
+/// launch and threaded through the workflow launch, so any later re-derivation compares against
+/// that frozen head rather than expecting the item to reproduce it.
+///
 /// # Errors
 ///
 /// Returns an error when the item does not have exactly one active GitHub pull request, its
@@ -141,6 +148,33 @@ fn parse_pull_request_reference(
         number,
         head: None,
     })
+}
+
+/// Confirm that a frozen pull-request identity still describes the item's active pull request.
+///
+/// Durable start and worker start re-run this against the live item. The item exposes only the
+/// repository and number, so the check matches on those and treats the launch's frozen head as
+/// authoritative; an unchanged pull request whose head the item cannot reproduce is never mistaken
+/// for a changed identity. When `require_head` is set, a dependency-update launch that lost its
+/// frozen head is rejected instead of silently starting without one.
+///
+/// # Errors
+///
+/// Returns an error when the item no longer resolves to the frozen repository and number, when the
+/// item's pull request can no longer be resolved, or when a required frozen head is absent.
+pub fn confirm_frozen_pull_request_identity(
+    item: &TaskBoardItem,
+    frozen: &TaskBoardPullRequestIdentity,
+    require_head: bool,
+) -> Result<(), TaskBoardReadOnlyWorkflowContractError> {
+    let derived = resolve_task_board_pull_request_identity(item)?;
+    if derived.repository != frozen.repository || derived.number != frozen.number {
+        return Err(TaskBoardReadOnlyWorkflowContractError::PullRequestIdentityChanged);
+    }
+    if require_head && frozen.head.is_none() {
+        return Err(TaskBoardReadOnlyWorkflowContractError::IncompletePullRequest);
+    }
+    Ok(())
 }
 
 fn is_active_github_pull_request(reference: &ExternalRef) -> bool {
@@ -219,6 +253,56 @@ mod tests {
             error,
             TaskBoardReadOnlyWorkflowContractError::PullRequestRepositoryMismatch
         );
+    }
+
+    fn frozen(repository: &str, number: u64, with_head: bool) -> TaskBoardPullRequestIdentity {
+        TaskBoardPullRequestIdentity {
+            repository: repository.into(),
+            number,
+            head: with_head.then(|| crate::TaskBoardPullRequestHeadIdentity {
+                repository: repository.into(),
+                branch: "renovate/dependency-update".into(),
+                revision: "cafef00d".into(),
+            }),
+        }
+    }
+
+    #[test]
+    fn frozen_identity_matches_the_items_repository_and_number() {
+        let item = item();
+
+        confirm_frozen_pull_request_identity(&item, &frozen("acme/widgets", 17, true), true)
+            .expect("unchanged pull request confirms");
+        confirm_frozen_pull_request_identity(&item, &frozen("acme/widgets", 17, false), false)
+            .expect("read-only style headless identity confirms when the head is not required");
+    }
+
+    #[test]
+    fn frozen_identity_rejects_a_missing_required_head() {
+        let item = item();
+
+        let error =
+            confirm_frozen_pull_request_identity(&item, &frozen("acme/widgets", 17, false), true)
+                .expect_err("a dependency launch without a frozen head must be rejected");
+
+        assert_eq!(
+            error,
+            TaskBoardReadOnlyWorkflowContractError::IncompletePullRequest
+        );
+    }
+
+    #[test]
+    fn frozen_identity_rejects_a_changed_repository_or_number() {
+        let item = item();
+
+        for changed in [frozen("acme/widgets", 18, true), frozen("acme/other", 17, true)] {
+            let error = confirm_frozen_pull_request_identity(&item, &changed, true)
+                .expect_err("a changed pull request identity must be rejected");
+            assert_eq!(
+                error,
+                TaskBoardReadOnlyWorkflowContractError::PullRequestIdentityChanged
+            );
+        }
     }
 
     fn item() -> TaskBoardItem {
