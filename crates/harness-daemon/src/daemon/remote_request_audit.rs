@@ -369,7 +369,7 @@ mod tests {
     fn unauthenticated_audit_limiter_caps_global_writes_and_records_one_aggregate_signal() {
         let now = Instant::now();
         let mut limiter =
-            RemoteUnauthenticatedAuditLimiter::new_for_tests(2, 2, 8, Duration::from_secs(60));
+            RemoteUnauthenticatedAuditLimiter::new_for_tests(2, 2, 8, Duration::from_mins(1));
 
         assert_eq!(
             limiter.admit_at_for_tests("203.0.113.10", now),
@@ -393,7 +393,7 @@ mod tests {
     fn unauthenticated_audit_limiter_bounds_and_expires_remote_address_keys() {
         let now = Instant::now();
         let mut limiter =
-            RemoteUnauthenticatedAuditLimiter::new_for_tests(8, 8, 2, Duration::from_secs(60));
+            RemoteUnauthenticatedAuditLimiter::new_for_tests(8, 8, 2, Duration::from_mins(1));
 
         for remote_addr in ["203.0.113.10", "203.0.113.11", "203.0.113.12"] {
             assert_eq!(
@@ -404,7 +404,7 @@ mod tests {
         assert_eq!(limiter.tracked_addresses_for_tests(), 2);
 
         assert_eq!(
-            limiter.admit_at_for_tests("203.0.113.13", now + Duration::from_secs(60)),
+            limiter.admit_at_for_tests("203.0.113.13", now + Duration::from_mins(1)),
             RemoteUnauthenticatedAuditAdmission::Audit
         );
         assert_eq!(limiter.tracked_addresses_for_tests(), 1);

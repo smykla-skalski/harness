@@ -241,7 +241,7 @@ async fn remote_acme_renewal_loop_stops_while_check_is_in_flight() {
         fixture.tls.clone(),
         Arc::clone(&issuer),
         shutdown_rx,
-        Duration::from_secs(60),
+        Duration::from_mins(1),
         || at("2026-07-10T00:00:00Z"),
     );
 

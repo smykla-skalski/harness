@@ -22,12 +22,12 @@ use runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
 async fn local_review_completes_evaluation_cleanup_and_atomic_projection() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "local-lifecycle",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Pending,
         None,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([
         PlannedReport::passing_review(),
@@ -68,12 +68,12 @@ async fn local_review_completes_evaluation_cleanup_and_atomic_projection() {
 
 #[tokio::test]
 async fn pr_review_completes_exact_head_publish_and_cleanup() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "pr-lifecycle",
         TaskBoardWorkflowKind::PR_REVIEW,
         TaskBoardExecutionState::Pending,
         None,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
 
@@ -101,12 +101,12 @@ async fn pr_review_completes_exact_head_publish_and_cleanup() {
 
 #[tokio::test]
 async fn stale_pr_head_before_publish_is_fenced_without_publish_claim() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "pr-stale",
         TaskBoardWorkflowKind::PR_REVIEW,
         TaskBoardExecutionState::Pending,
         None,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
     drive_to_phase(&fixture, &runtime, TaskBoardExecutionPhase::Publish).await;

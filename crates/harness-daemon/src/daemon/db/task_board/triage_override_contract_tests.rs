@@ -249,7 +249,7 @@ async fn set_and_clear_each_record_exactly_one_typed_audit_event() {
 #[tokio::test]
 async fn effective_outcome_falls_back_to_the_automatic_decision_when_no_override_is_active() {
     let (_directory, db) = connect().await;
-    seed_decided_todo(&db, "item-1").await;
+    Box::pin(seed_decided_todo(&db, "item-1")).await;
 
     let mut transaction = db
         .begin_immediate_transaction("read override")

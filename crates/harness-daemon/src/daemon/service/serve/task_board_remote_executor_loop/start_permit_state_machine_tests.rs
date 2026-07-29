@@ -47,7 +47,7 @@ async fn provisioned_authority() -> ProvisionedAuthority {
     let (origin, revision) = git_repository(fixture._temp.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
-    let (accepted, authority) = claim_start_authority(&fixture, &request).await;
+    let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
     let authorized = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&authorized).expect("remote executor identity");
     let workspace = prepare_remote_workspace(
@@ -70,7 +70,7 @@ async fn provisioned_authority() -> ProvisionedAuthority {
 
 #[tokio::test]
 async fn start_io_permit_claim_is_acquired_then_replayed_and_stale_is_explicit() {
-    let staged = provisioned_authority().await;
+    let staged = Box::pin(provisioned_authority()).await;
     // A permit time before authority acquisition can never acquire: explicit Stale.
     let stale = staged
         .fixture
@@ -122,7 +122,7 @@ fn persisted_permit_without_a_run_converges_after_restart_and_releases_capacity(
 }
 
 async fn persisted_permit_without_a_run_converges_body() {
-    let staged = provisioned_authority().await;
+    let staged = Box::pin(provisioned_authority()).await;
     // Acquire and persist the permit, then model a crash before the deterministic
     // run row landed: the permit is durable but no run exists.
     let _permit = staged
@@ -196,7 +196,7 @@ fn persisted_permit_with_missing_session_converges_without_recreation() {
 }
 
 async fn persisted_permit_with_missing_session_converges_body() {
-    let staged = provisioned_authority().await;
+    let staged = Box::pin(provisioned_authority()).await;
     let _permit = staged
         .fixture
         .db
@@ -261,7 +261,7 @@ async fn persisted_permit_with_missing_session_converges_body() {
 
 #[tokio::test]
 async fn valid_pre_permit_run_stops_without_adoption_after_restart() {
-    let staged = provisioned_authority().await;
+    let staged = Box::pin(provisioned_authority()).await;
     let claimed = load_assignment(&staged.fixture.db, &staged.accepted.assignment_id).await;
     persist_exact_run(
         &staged.fixture.db,
@@ -313,7 +313,7 @@ async fn valid_pre_permit_run_stops_without_adoption_after_restart() {
 
 #[tokio::test]
 async fn unattached_active_run_converges_to_terminal_failure_after_restart() {
-    let staged = provisioned_authority().await;
+    let staged = Box::pin(provisioned_authority()).await;
     let permit = staged
         .fixture
         .db

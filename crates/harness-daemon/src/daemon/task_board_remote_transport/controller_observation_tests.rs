@@ -22,7 +22,7 @@ const ROTATED_TOKEN_ENV: &str = "HARNESS_REMOTE_AUTHORITY_ROTATED_TOKEN";
 
 #[tokio::test]
 async fn advertisement_receipt_time_is_captured_after_the_network_response() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     let sent = Utc::now();
     let received = sent + Duration::seconds(5);
     let advertisement = RemoteHostAdvertisement {
@@ -79,7 +79,7 @@ async fn advertisement_receipt_time_is_captured_after_the_network_response() {
 
 #[tokio::test]
 async fn advertisement_response_cannot_cross_a_trust_rotation() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     let sent = Utc::now();
     let old_tls = test_tls_material();
     let old_server = spawn_barrier_server(
@@ -217,7 +217,7 @@ async fn execute_trust_rotation_barrier(
 
 #[tokio::test]
 async fn disabled_host_rejects_advertisement_before_io() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     let tls = test_tls_material();
     let (endpoint, requests) = spawn_probe_server(&tls).await;
     let config = remote_host_config(&endpoint, &tls, &format!("env://{TOKEN_ENV}"), false);

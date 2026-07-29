@@ -32,7 +32,7 @@ fn daemon_serve_config_can_select_remote_http_auth_mode() {
 fn with_isolated_transport_env<F: FnOnce()>(ws_url: Option<&str>, f: F) {
     let tmp = tempfile::tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
-        temp_env::with_var("HARNESS_CODEX_WS_URL", ws_url, f)
+        temp_env::with_var("HARNESS_CODEX_WS_URL", ws_url, f);
     });
 }
 

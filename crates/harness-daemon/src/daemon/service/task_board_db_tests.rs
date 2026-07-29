@@ -86,7 +86,7 @@ async fn a_requested_status_creates_the_item_in_that_lane() {
     }))
     .expect("create request");
 
-    let created = create_task_board_item_db(&db, &create)
+    let created = Box::pin(create_task_board_item_db(&db, &create))
         .await
         .expect("create item");
 
@@ -96,7 +96,7 @@ async fn a_requested_status_creates_the_item_in_that_lane() {
 /// Omitting the status still creates through the triage path (unlike an
 /// explicit status, which suppresses it), so an older client that never
 /// learned the field still creates a usable item -- one placed by the same
-/// BuiltInV1 rules as any other label-less create, which demote it to
+/// `BuiltInV1` rules as any other label-less create, which demote it to
 /// Inbox.
 #[tokio::test]
 async fn an_omitted_status_still_lands_in_the_default_lane() {
@@ -106,7 +106,7 @@ async fn an_omitted_status_still_lands_in_the_default_lane() {
         serde_json::from_value(serde_json::json!({ "title": "No lane chosen" }))
             .expect("create request");
 
-    let created = create_task_board_item_db(&db, &create)
+    let created = Box::pin(create_task_board_item_db(&db, &create))
         .await
         .expect("create item");
 
@@ -127,7 +127,7 @@ async fn a_requested_status_survives_automatic_triage() {
     }))
     .expect("create request");
 
-    let created = create_task_board_item_db(&db, &create)
+    let created = Box::pin(create_task_board_item_db(&db, &create))
         .await
         .expect("create item");
 
@@ -149,7 +149,7 @@ async fn an_omitted_status_leaves_placement_to_triage() {
     .expect("create request");
     create.status = None;
 
-    let created = create_task_board_item_db(&db, &create)
+    let created = Box::pin(create_task_board_item_db(&db, &create))
         .await
         .expect("create item");
 
@@ -167,7 +167,7 @@ async fn a_blank_title_is_refused_and_persists_nothing() {
         serde_json::from_value(serde_json::json!({ "title": "   ", "status": "todo" }))
             .expect("create request");
 
-    let error = create_task_board_item_db(&db, &create)
+    let error = Box::pin(create_task_board_item_db(&db, &create))
         .await
         .expect_err("a blank title is refused");
     assert!(error.message().contains("title"), "unexpected: {error}");
@@ -193,7 +193,7 @@ async fn moving_an_item_re_resolves_its_project() {
     }))
     .expect("create request");
 
-    let created = create_task_board_item_db(&db, &create)
+    let created = Box::pin(create_task_board_item_db(&db, &create))
         .await
         .expect("create item");
     let first = created

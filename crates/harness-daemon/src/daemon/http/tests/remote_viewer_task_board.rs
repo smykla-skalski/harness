@@ -43,7 +43,7 @@ async fn run_remote_viewer_projection_flow() {
     register_remote_client(&state, VIEWER_ID, RemoteRole::Viewer);
     register_remote_client(&state, OPERATOR_ID, RemoteRole::Operator);
     seed_sensitive_item(&state).await;
-    seed_triage_item(&state).await;
+    Box::pin(seed_triage_item(&state)).await;
     seed_paged_items(&state).await;
 
     let (base_url, server) = serve_http(state).await;

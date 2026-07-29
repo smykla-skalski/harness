@@ -19,13 +19,13 @@ use super::task_board_workflow_test_support::{
 #[tokio::test]
 async fn active_execution_create_is_idempotent_and_rejects_competing_contracts() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-lantern",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let sequence = test.db.current_change_sequence().await.expect("sequence");
 
@@ -65,13 +65,13 @@ async fn active_execution_create_is_idempotent_and_rejects_competing_contracts()
 #[tokio::test]
 async fn execution_cas_rejects_stale_guards_without_change_churn() {
     let test = TestDatabase::open().await;
-    let current = create_execution(
+    let current = Box::pin(create_execution(
         &test.db,
         "task-compass",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let mut updated = current.clone();
     updated.transition.execution_state = TaskBoardExecutionState::Blocked;
@@ -138,13 +138,13 @@ async fn execution_cas_rejects_stale_guards_without_change_churn() {
 #[tokio::test]
 async fn execution_cas_fences_same_state_record_content() {
     let test = TestDatabase::open().await;
-    let current = create_execution(
+    let current = Box::pin(create_execution(
         &test.db,
         "task-content-fence",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let expected = TaskBoardWorkflowExecutionCas::from(&current);
     let mut first = current.clone();
@@ -193,13 +193,13 @@ async fn execution_cas_fences_same_state_record_content() {
 #[tokio::test]
 async fn execution_cas_fences_concurrent_child_evidence() {
     let test = TestDatabase::open().await;
-    let current = create_execution(
+    let current = Box::pin(create_execution(
         &test.db,
         "task-child-fence",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let expected = TaskBoardWorkflowExecutionCas::from(&current);
     let attempt = preparing_attempt(
@@ -231,13 +231,13 @@ async fn execution_cas_fences_concurrent_child_evidence() {
 #[tokio::test]
 async fn malformed_json_and_missing_exact_head_fail_closed() {
     let test = TestDatabase::open().await;
-    let malformed = create_execution(
+    let malformed = Box::pin(create_execution(
         &test.db,
         "task-prism",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     query(
         "UPDATE task_board_workflow_executions
@@ -255,13 +255,13 @@ async fn malformed_json_and_missing_exact_head_fail_closed() {
         .expect_err("malformed execution must fail closed");
     assert!(error.to_string().contains("workflow execution artifacts"));
 
-    let pr = create_execution(
+    let pr = Box::pin(create_execution(
         &test.db,
         "task-headless-pr",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-indigo"),
-    )
+    ))
     .await;
     query(
         "UPDATE task_board_workflow_executions
@@ -284,13 +284,13 @@ async fn malformed_json_and_missing_exact_head_fail_closed() {
 #[tokio::test]
 async fn same_phase_cas_cannot_replace_pr_identity_or_exact_head() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-frozen-pr",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let expected = TaskBoardWorkflowExecutionCas::from(&record);
     let mut changed_head = record.clone();
@@ -322,13 +322,13 @@ async fn same_phase_cas_cannot_replace_pr_identity_or_exact_head() {
 #[tokio::test]
 async fn review_attempt_result_rejects_a_stale_exact_head() {
     let test = TestDatabase::open().await;
-    let record = create_execution(
+    let record = Box::pin(create_execution(
         &test.db,
         "task-review-attempt",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-amber"),
-    )
+    ))
     .await;
     let attempt = preparing_attempt(
         &record.execution_id,
@@ -372,21 +372,21 @@ async fn review_attempt_result_rejects_a_stale_exact_head() {
 #[tokio::test]
 async fn ready_queue_is_due_bounded_and_deterministic() {
     let test = TestDatabase::open().await;
-    let first = create_execution(
+    let first = Box::pin(create_execution(
         &test.db,
         "task-a",
         TaskBoardWorkflowKind::Review,
         reviewers(1, 1),
         Some("head-a"),
-    )
+    ))
     .await;
-    let second = create_execution(
+    let second = Box::pin(create_execution(
         &test.db,
         "task-b",
         TaskBoardWorkflowKind::PR_REVIEW,
         reviewers(1, 1),
         Some("head-b"),
-    )
+    ))
     .await;
 
     let ready = test

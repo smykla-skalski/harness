@@ -25,7 +25,7 @@ struct RestartedExecutor {
 
 #[tokio::test]
 async fn start_authority_wins_expiry_recovery_and_survives_restart() {
-    let restarted = prepare_restarted_executor().await;
+    let restarted = Box::pin(prepare_restarted_executor()).await;
     let owner = adopt_restarted_executor(&restarted).await;
     persist_normal_runtime_thread(&restarted, &owner).await;
     let successor = transfer_lifecycle_owner(&restarted, &owner).await;
@@ -70,7 +70,7 @@ async fn persist_normal_runtime_thread(
 
 async fn prepare_restarted_executor() -> RestartedExecutor {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(

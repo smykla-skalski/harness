@@ -26,10 +26,10 @@ const WORKER_ID: &str = "codex-run-1";
 
 #[tokio::test(flavor = "multi_thread")]
 async fn rate_only_committed_usage_is_excluded_from_worker_recovery() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, _tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
-        let (intent_id, dispatch) = seed_committed_admission(&db, &["rate"]).await;
+        let (intent_id, dispatch) = Box::pin(seed_committed_admission(&db, &["rate"])).await;
 
         let recoveries = db
             .task_board_admission_worker_recoveries()
@@ -39,20 +39,20 @@ async fn rate_only_committed_usage_is_excluded_from_worker_recovery() {
         assert!(recoveries.is_empty());
         assert!(!intent_id.is_empty());
         assert_eq!(dispatch.board_item_id, ITEM_ID);
-        controller
-            .reconcile_task_board_admission_workers_after_restart()
+        Box::pin(controller.reconcile_task_board_admission_workers_after_restart())
             .await
             .expect("ignore finite-only accounting during restart");
-    })
+    }))
     .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn pending_compensation_is_owned_by_dispatch_recovery_after_restart() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, _tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
-        let (intent_id, _) = seed_committed_admission(&db, &["concurrency", "rate"]).await;
+        let (intent_id, _) =
+            Box::pin(seed_committed_admission(&db, &["concurrency", "rate"])).await;
         sqlx::query(
             "UPDATE task_board_dispatch_intents
              SET status = 'starting', compensation_pending = 1,
@@ -66,8 +66,7 @@ async fn pending_compensation_is_owned_by_dispatch_recovery_after_restart() {
         .await
         .expect("mark pending worker compensation");
 
-        controller
-            .reconcile_task_board_admission_workers_after_restart()
+        Box::pin(controller.reconcile_task_board_admission_workers_after_restart())
             .await
             .expect("leave pending compensation to dispatch recovery");
 
@@ -88,16 +87,16 @@ async fn pending_compensation_is_owned_by_dispatch_recovery_after_restart() {
             .expect("load unchanged item");
         assert_eq!(item.status, TaskBoardStatus::InProgress);
         assert_eq!(item.workflow.status, TaskBoardWorkflowStatus::Running);
-    })
+    }))
     .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn non_completed_intent_with_active_concurrency_fails_recovery_closed() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, _tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
-        let (intent_id, _) = seed_committed_admission(&db, &["concurrency"]).await;
+        let (intent_id, _) = Box::pin(seed_committed_admission(&db, &["concurrency"])).await;
         sqlx::query(
             "UPDATE task_board_dispatch_intents SET status = 'failed'
              WHERE intent_id = ?1",
@@ -107,8 +106,7 @@ async fn non_completed_intent_with_active_concurrency_fails_recovery_closed() {
         .await
         .expect("create impossible active-concurrency state");
 
-        let error = controller
-            .reconcile_task_board_admission_workers_after_restart()
+        let error = Box::pin(controller.reconcile_task_board_admission_workers_after_restart())
             .await
             .expect_err("impossible active concurrency must fail closed");
         assert!(error.to_string().contains("non-completed intent"));
@@ -116,20 +114,20 @@ async fn non_completed_intent_with_active_concurrency_fails_recovery_closed() {
             ledger_state(&db, &intent_id, "concurrency").await.0,
             "committed"
         );
-    })
+    }))
     .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn missing_run_blocks_linked_task_and_board_without_refunding_rate_usage() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
-        let (intent_id, _) = seed_committed_admission(&db, &["concurrency", "rate"]).await;
+        let (intent_id, _) =
+            Box::pin(seed_committed_admission(&db, &["concurrency", "rate"])).await;
         let mut events = controller.state.sender.subscribe();
 
-        controller
-            .reconcile_task_board_admission_workers_after_restart()
+        Box::pin(controller.reconcile_task_board_admission_workers_after_restart())
             .await
             .expect("reconcile missing durable run");
 
@@ -179,16 +177,17 @@ async fn missing_run_blocks_linked_task_and_board_without_refunding_rate_usage()
             "unexpected recovery event: {}",
             published.event
         );
-    })
+    }))
     .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn terminal_save_releases_concurrency_before_board_reconciliation() {
-    with_isolated_async_harness_env(|_| async move {
+    Box::pin(with_isolated_async_harness_env(|_| async move {
         let (controller, db, _tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
-        let (intent_id, _) = seed_committed_admission(&db, &["concurrency", "rate"]).await;
+        let (intent_id, _) =
+            Box::pin(seed_committed_admission(&db, &["concurrency", "rate"])).await;
         let mut run = codex_run_snapshot(CodexRunStatus::Running);
         run.task_id = Some(TASK_ID.into());
         run.board_item_id = Some(ITEM_ID.into());
@@ -217,7 +216,7 @@ async fn terminal_save_releases_concurrency_before_board_reconciliation() {
             ledger_state(&db, &intent_id, "rate").await,
             ("committed".into(), None)
         );
-    })
+    }))
     .await;
 }
 

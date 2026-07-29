@@ -49,7 +49,7 @@ async fn begin_derives_create_fields_from_the_atomic_snapshot() {
         let mut board_item = item(item_id);
         board_item.status = status;
         board_item.project_id = project_id.map(ToOwned::to_owned);
-        create_item(&db, board_item).await;
+        Box::pin(create_item(&db, board_item)).await;
 
         let intent = start(&db, item_id, provider, "scope", target).await;
 
@@ -61,7 +61,7 @@ async fn begin_derives_create_fields_from_the_atomic_snapshot() {
 async fn create_key_lookup_tracks_every_durable_state() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-key-state")).await;
+    Box::pin(create_item(&db, item("task-create-key-state"))).await;
     let intent = begin(&db, "task-create-key-state", ExternalProvider::GitHub).await;
 
     assert_eq!(
@@ -105,8 +105,8 @@ async fn create_key_lookup_tracks_every_durable_state() {
 async fn create_key_identity_is_unique_within_a_provider() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-key-github-owner")).await;
-    create_item(&db, item("task-key-github-other")).await;
+    Box::pin(create_item(&db, item("task-key-github-owner"))).await;
+    Box::pin(create_item(&db, item("task-key-github-other"))).await;
     let github = begin(&db, "task-key-github-owner", ExternalProvider::GitHub).await;
     let github_other = begin(&db, "task-key-github-other", ExternalProvider::GitHub).await;
 
@@ -138,7 +138,7 @@ async fn provider_wide_in_flight_recovery_is_scope_independent_and_deterministic
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
     for item_id in ["task-inflight-a", "task-inflight-b", "task-inflight-c"] {
-        create_item(&db, item(item_id)).await;
+        Box::pin(create_item(&db, item(item_id))).await;
     }
     let first = start(
         &db,
@@ -196,7 +196,7 @@ async fn provider_wide_in_flight_recovery_is_scope_independent_and_deterministic
 async fn recovery_accepts_edited_and_closed_provider_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-recovery-drift")).await;
+    Box::pin(create_item(&db, item("task-recovery-drift"))).await;
     let intent = begin(&db, "task-recovery-drift", ExternalProvider::GitHub).await;
     let (outcome, baseline) = current_provider_evidence();
 
@@ -230,7 +230,7 @@ async fn recovery_accepts_edited_and_closed_provider_evidence() {
 async fn recovery_accepts_a_github_issue_moved_from_the_original_repository() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-recovery-github-moved")).await;
+    Box::pin(create_item(&db, item("task-recovery-github-moved"))).await;
     let intent = begin(&db, "task-recovery-github-moved", ExternalProvider::GitHub).await;
     let reference = ExternalTaskRef::new(ExternalProvider::GitHub, "moved/repository#74")
         .with_url("https://example.invalid/issues/74");
@@ -273,7 +273,7 @@ async fn recovery_accepts_a_github_issue_moved_from_the_original_repository() {
 async fn moved_github_recovery_accepts_an_already_converged_local_identity() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-recovery-github-converged")).await;
+    Box::pin(create_item(&db, item("task-recovery-github-converged"))).await;
     let intent = begin(
         &db,
         "task-recovery-github-converged",
@@ -330,7 +330,7 @@ async fn moved_github_recovery_accepts_an_already_converged_local_identity() {
 async fn recovery_rejects_incomplete_or_internally_inconsistent_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-recovery-invalid")).await;
+    Box::pin(create_item(&db, item("task-recovery-invalid"))).await;
     let intent = begin(&db, "task-recovery-invalid", ExternalProvider::GitHub).await;
     let (outcome, baseline) = current_provider_evidence();
     let mut cases = Vec::new();
@@ -379,7 +379,7 @@ async fn recovery_rejects_incomplete_or_internally_inconsistent_evidence() {
 async fn persisted_changed_fields_must_match_the_derived_create_contract() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-fields-corrupt")).await;
+    Box::pin(create_item(&db, item("task-create-fields-corrupt"))).await;
     let intent = begin(&db, "task-create-fields-corrupt", ExternalProvider::GitHub).await;
     sqlx::query(
         "UPDATE task_board_external_create_intents

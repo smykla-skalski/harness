@@ -56,7 +56,7 @@ pub(crate) struct ControllerFixture {
 }
 
 pub(crate) async fn controller_fixture(capacity: u32) -> ControllerFixture {
-    controller_fixture_with_retry_attempts(capacity, None).await
+    Box::pin(controller_fixture_with_retry_attempts(capacity, None)).await
 }
 
 pub(super) async fn controller_fixture_with_retry_attempts(
@@ -68,7 +68,7 @@ pub(super) async fn controller_fixture_with_retry_attempts(
         .await
         .expect("open controller db");
     configure_controller(&db, max_attempts).await;
-    let execution = review_execution(&db).await;
+    let execution = Box::pin(review_execution(&db)).await;
     let attempt = review_attempt(&execution.execution_id, 1, NOW);
     db.create_task_board_execution_attempt(&attempt)
         .await
@@ -263,7 +263,7 @@ async fn configure_controller(db: &AsyncDaemonDb, max_attempts: Option<u32>) {
 }
 
 async fn review_execution(db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecord {
-    seeded_review_execution(db, "remote", None).await
+    Box::pin(seeded_review_execution(db, "remote", None)).await
 }
 
 /// Seed a second remote-eligible review candidate beside the fixture's own.
@@ -276,7 +276,7 @@ pub(crate) async fn add_review_candidate(
     label: &str,
     pull_request: Option<TaskBoardPullRequestIdentity>,
 ) -> TaskBoardWorkflowExecutionRecord {
-    let execution = seeded_review_execution(db, label, pull_request).await;
+    let execution = Box::pin(seeded_review_execution(db, label, pull_request)).await;
     let mut attempt = review_attempt(&execution.execution_id, 1, NOW);
     // The fixture's own attempt already holds the unlabelled key.
     attempt.idempotency_key = format!("review-attempt-{label}-1");

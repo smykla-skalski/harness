@@ -19,7 +19,7 @@ const PUBLICATION_URL: &str = "https://github.com/example/repo/pull/42";
 
 #[tokio::test]
 async fn verification_retry_updates_parent_and_exact_attempt_atomically() {
-    let (db, _temp, current) = verification_fixture("atomic-success").await;
+    let (db, _temp, current) = Box::pin(verification_fixture("atomic-success")).await;
     let (updated_parent, updated_attempt) = retry_update(&current);
 
     let combined = db
@@ -45,7 +45,7 @@ async fn verification_retry_updates_parent_and_exact_attempt_atomically() {
 
 #[tokio::test]
 async fn same_state_attempt_drift_stales_full_record_without_partial_update() {
-    let (db, _temp, current) = verification_fixture("attempt-drift").await;
+    let (db, _temp, current) = Box::pin(verification_fixture("attempt-drift")).await;
     let (updated_parent, updated_attempt) = retry_update(&current);
     let mut drifted = current.attempts[0].clone();
     drifted.error = Some("concurrent verifier detail".into());
@@ -75,7 +75,7 @@ async fn same_state_attempt_drift_stales_full_record_without_partial_update() {
 
 #[tokio::test]
 async fn parent_drift_stales_atomic_retry_without_overwriting_either_record() {
-    let (db, _temp, current) = verification_fixture("parent-drift").await;
+    let (db, _temp, current) = Box::pin(verification_fixture("parent-drift")).await;
     let (updated_parent, updated_attempt) = retry_update(&current);
     let mut drifted = current.clone();
     drifted
@@ -110,7 +110,7 @@ async fn parent_drift_stales_atomic_retry_without_overwriting_either_record() {
 
 #[tokio::test]
 async fn child_update_failure_rolls_back_parent_update() {
-    let (db, _temp, current) = verification_fixture("child-rollback").await;
+    let (db, _temp, current) = Box::pin(verification_fixture("child-rollback")).await;
     let (updated_parent, updated_attempt) = retry_update(&current);
     sqlx::query(
         "CREATE TRIGGER fail_verification_attempt_update

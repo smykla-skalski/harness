@@ -15,7 +15,7 @@ const RESULT: &str = "2222222222222222222222222222222222222222";
 
 #[tokio::test]
 async fn controller_source_upload_receipt_is_current_trust_fenced_and_restart_safe() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let (offer, content) = bundle_offer(&fixture.request);
     insert_central_offer(&fixture.db, &offer).await;
     let request = RemoteSourceBundleUploadRequest::seal(offer.clone(), &content)
@@ -65,7 +65,7 @@ async fn controller_source_upload_receipt_is_current_trust_fenced_and_restart_sa
 
 #[tokio::test]
 async fn controller_source_upload_receipt_rejects_generation_principal_and_digest_conflicts() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let (offer, content) = bundle_offer(&fixture.request);
     insert_central_offer(&fixture.db, &offer).await;
     let request = RemoteSourceBundleUploadRequest::seal(offer.clone(), &content)

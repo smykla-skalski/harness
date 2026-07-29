@@ -10,8 +10,11 @@ use super::{
 
 #[tokio::test]
 async fn exhausted_publication_verification_preserves_non_authoritative_mutation_evidence() {
-    let fixture =
-        seed_write_execution_with_retry_limit("write-publication-verification-exhausted", 1).await;
+    let fixture = Box::pin(seed_write_execution_with_retry_limit(
+        "write-publication-verification-exhausted",
+        1,
+    ))
+    .await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
@@ -95,7 +98,10 @@ async fn exhausted_publication_verification_preserves_non_authoritative_mutation
 
 #[tokio::test]
 async fn permanent_post_publish_verification_failure_preserves_provisional_evidence() {
-    let fixture = seed_write_execution("write-publication-verification-rejected").await;
+    let fixture = Box::pin(seed_write_execution(
+        "write-publication-verification-rejected",
+    ))
+    .await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
@@ -154,8 +160,11 @@ async fn permanent_post_publish_verification_failure_preserves_provisional_evide
 
 #[tokio::test]
 async fn later_retry_exhaustion_transfers_durable_attempt_evidence() {
-    let fixture =
-        seed_write_execution_with_retry_limit("write-publication-later-exhaustion", 2).await;
+    let fixture = Box::pin(seed_write_execution_with_retry_limit(
+        "write-publication-later-exhaustion",
+        2,
+    ))
+    .await;
     let runtime = FakeWriteRuntime::new([
         PlannedRun::implementation(1, 1, BASE_HEAD, FIRST_HEAD),
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),

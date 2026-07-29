@@ -25,8 +25,8 @@ mod corruption;
 
 #[tokio::test]
 async fn exact_cleanup_handoff_releases_a_detached_terminal_generation_once() {
-    let fixture = controller_fixture(1).await;
-    let cancelled = cancel_controller_assignment(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let cancelled = Box::pin(cancel_controller_assignment(&fixture)).await;
     let settlement = settle_controller_assignment(&fixture, &cancelled).await;
     assert!(
         fixture
@@ -82,8 +82,8 @@ async fn exact_cleanup_handoff_releases_a_detached_terminal_generation_once() {
 
 #[tokio::test]
 async fn terminal_cleanup_handoff_survives_parent_deletion_after_exact_settlement() {
-    let fixture = controller_fixture(1).await;
-    let superseded = superseded_detached_controller_assignment(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let superseded = Box::pin(superseded_detached_controller_assignment(&fixture)).await;
     record_pending_cleanup_handoff(&fixture, &superseded).await;
     let settlement = settle_controller_assignment(&fixture, &superseded).await;
     let cleanup = RemoteCleanupObservationRequest::for_settlement(&settlement)
@@ -172,7 +172,7 @@ async fn record_pending_cleanup_handoff(
 async fn cancel_controller_assignment(
     fixture: &ControllerFixture,
 ) -> super::TaskBoardRemoteAssignmentRecord {
-    let accepted = accept_controller(fixture).await;
+    let accepted = Box::pin(accept_controller(fixture)).await;
     let request = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: fixture.request.binding.clone(),
@@ -202,16 +202,14 @@ async fn cancel_controller_assignment(
         .await
         .expect("claim cleanup cancel authority")
         .expect("cleanup cancel remains active");
-    match fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:11Z",
-        )
-        .await
-        .expect("persist cleanup cancel response")
+    match Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("persist cleanup cancel response")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected cancelled controller assignment, got {other:?}"),
@@ -221,7 +219,7 @@ async fn cancel_controller_assignment(
 async fn superseded_detached_controller_assignment(
     fixture: &ControllerFixture,
 ) -> super::TaskBoardRemoteAssignmentRecord {
-    let accepted = accept_controller(fixture).await;
+    let accepted = Box::pin(accept_controller(fixture)).await;
     restore_parent_to_targetless_preparing(fixture).await;
     match fixture
         .db

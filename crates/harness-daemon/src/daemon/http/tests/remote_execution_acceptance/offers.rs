@@ -75,11 +75,15 @@ const REPOSITORY_CASES: [RepositoryCase; 5] = [
 fn authenticated_two_daemon_offer_acceptance_covers_repository_source_matrix() {
     run_deep_acceptance_async(|| async {
         let tls = test_tls_material();
-        with_acceptance_environment(&tls, "remote-acceptance-offer-matrix", async {
-            for case in REPOSITORY_CASES {
-                run_repository_case(&tls, &case).await;
-            }
-        })
+        Box::pin(with_acceptance_environment(
+            &tls,
+            "remote-acceptance-offer-matrix",
+            async {
+                for case in REPOSITORY_CASES {
+                    Box::pin(run_repository_case(&tls, &case)).await;
+                }
+            },
+        ))
         .await;
     });
 }
@@ -97,7 +101,7 @@ async fn run_repository_case(tls: &TestTlsMaterial, case: &RepositoryCase) {
         .async_db
         .get()
         .expect("matrix controller database");
-    let execution_id = seed_repository_case(&fixture, controller_db, case).await;
+    let execution_id = Box::pin(seed_repository_case(&fixture, controller_db, case)).await;
 
     drive(controller_db, "seal matrix offer").await;
     let offered = assignment(controller_db, &execution_id).await;
@@ -113,11 +117,11 @@ async fn run_repository_case(tls: &TestTlsMaterial, case: &RepositoryCase) {
         "authenticate source and offer matrix executor",
     )
     .await;
-    assert_accepted_without_claim(
+    Box::pin(assert_accepted_without_claim(
         controller_db,
         executor.async_db.get().expect("executor db"),
         &offer,
-    )
+    ))
     .await;
     server.stop().await;
 }
@@ -271,10 +275,8 @@ fn execution_record(
         ownership: TaskBoardExecutionOwnership {
             host_id: None,
             fencing_epoch: 0,
-            resources: case
-                .workflow
-                .is_write()
-                .then(|| {
+            resources: if case.workflow.is_write() {
+                {
                     BTreeMap::from([
                         (
                             "admission_owner".into(),
@@ -282,13 +284,15 @@ fn execution_record(
                         ),
                         ("task_id".into(), format!("matrix-task-{execution_id}")),
                     ])
-                })
-                .unwrap_or_else(|| {
+                }
+            } else {
+                {
                     BTreeMap::from([(
                         "admission_owner".into(),
                         crate::daemon::db::workflow_owner(execution_id),
                     )])
-                }),
+                }
+            },
         },
         available_at: None,
         blocked_reason: None,
@@ -424,20 +428,17 @@ pub(super) async fn assert_accepted_without_claim(
         .task_board_remote_source_bundle(&executor)
         .await
         .expect("load executor source receipt");
-    match offer.source.requires_upload() {
-        true => {
-            let outbound = outbound.expect("outbound source receipt");
-            assert_eq!(outbound.offer, *offer);
-            let inbound = inbound.expect("executor source receipt");
-            assert_eq!(inbound.offer, *offer);
-            assert_eq!(
-                inbound.materialized_request().expect("materialize source"),
-                outbound
-            );
-        }
-        false => {
-            assert!(outbound.is_none());
-            assert!(inbound.is_none());
-        }
+    if offer.source.requires_upload() {
+        let outbound = outbound.expect("outbound source receipt");
+        assert_eq!(outbound.offer, *offer);
+        let inbound = inbound.expect("executor source receipt");
+        assert_eq!(inbound.offer, *offer);
+        assert_eq!(
+            inbound.materialized_request().expect("materialize source"),
+            outbound
+        );
+    } else {
+        assert!(outbound.is_none());
+        assert!(inbound.is_none());
     }
 }

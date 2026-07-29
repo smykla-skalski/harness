@@ -17,9 +17,9 @@ const REASON: &str = "operator requested exact remote cancellation";
 
 #[tokio::test]
 async fn exact_remote_cancel_persists_one_replayable_pr7_intent() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
     assert!(
         fixture
             .db
@@ -29,7 +29,7 @@ async fn exact_remote_cancel_persists_one_replayable_pr7_intent() {
             .cancelable_targets
             .is_empty()
     );
-    let claimed = claim_remote_controller(&fixture, &offered).await;
+    let claimed = Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let before = fixture
         .db
         .task_board_automation_snapshot()
@@ -112,10 +112,10 @@ async fn exact_remote_cancel_persists_one_replayable_pr7_intent() {
 
 #[tokio::test]
 async fn stale_exact_target_is_rejected_without_workflow_mutation() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let before = fixture
         .db
         .task_board_workflow_execution(&fixture.execution.execution_id)
@@ -162,10 +162,10 @@ async fn stale_exact_target_is_rejected_without_workflow_mutation() {
 
 #[tokio::test]
 async fn concurrent_identical_cancels_converge_without_rejected_audit() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let target = fixture
         .db
         .task_board_automation_cancel_target(&fixture.execution.execution_id)
@@ -215,10 +215,10 @@ async fn concurrent_identical_cancels_converge_without_rejected_audit() {
 
 #[tokio::test]
 async fn audit_insert_failure_rolls_back_cancel_intent() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let before = fixture
         .db
         .task_board_workflow_execution(&fixture.execution.execution_id)
@@ -265,10 +265,10 @@ async fn audit_insert_failure_rolls_back_cancel_intent() {
 
 #[tokio::test]
 async fn malformed_snapshot_does_not_reclassify_durable_cancel() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     let target = fixture
         .db
         .task_board_automation_cancel_target(&fixture.execution.execution_id)
@@ -325,10 +325,10 @@ async fn malformed_snapshot_does_not_reclassify_durable_cancel() {
 
 #[tokio::test]
 async fn ineligible_first_scan_page_does_not_hide_exact_target() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     initialize_automation_control(&fixture.db).await;
-    let offered = accept_remote_controller(&fixture).await;
-    claim_remote_controller(&fixture, &offered).await;
+    let offered = Box::pin(accept_remote_controller(&fixture)).await;
+    Box::pin(claim_remote_controller(&fixture, &offered)).await;
     for index in 0..101 {
         seed_ineligible_remote_execution(&fixture.db, &fixture.execution.execution_id, index).await;
     }
@@ -348,9 +348,9 @@ async fn ineligible_first_scan_page_does_not_hide_exact_target() {
 
 #[tokio::test]
 async fn eligible_remote_cancel_targets_truncate_at_one_hundred() {
-    let fixture = remote_controller_fixture(101).await;
+    let fixture = Box::pin(remote_controller_fixture(101)).await;
     initialize_automation_control(&fixture.db).await;
-    seed_cancelable_controller_targets(&fixture, 101).await;
+    Box::pin(seed_cancelable_controller_targets(&fixture, 101)).await;
 
     let snapshot = fixture
         .db

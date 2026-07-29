@@ -19,7 +19,7 @@ const DEADLINE: &str = "2026-07-19T10:10:00Z";
 
 #[tokio::test]
 async fn controller_upload_replays_immutable_receipt_without_a_second_request() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     let (offer, content) = bundle_offer(&fixture.request);
     fixture
         .db
@@ -82,7 +82,7 @@ async fn controller_upload_replays_immutable_receipt_without_a_second_request() 
 
 #[tokio::test]
 async fn controller_upload_replay_rejects_wrong_principal_and_digest_without_network() {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     let (offer, content) = bundle_offer(&fixture.request);
     fixture
         .db

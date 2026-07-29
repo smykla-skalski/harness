@@ -69,7 +69,7 @@ async fn active_local_executor_fences_identity_replacement_and_capacity() {
 #[tokio::test]
 async fn cleaned_unknown_allows_host_replacement_and_clear_without_losing_history() {
     let fixture = executor_fixture(1).await;
-    let (unknown, settlement) = unknown_workspace_assignment(&fixture).await;
+    let (unknown, settlement) = Box::pin(unknown_workspace_assignment(&fixture)).await;
     let mut replacement = fixture
         .db
         .task_board_orchestrator_settings()

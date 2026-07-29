@@ -5,7 +5,7 @@ use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecution
 
 #[tokio::test]
 async fn controller_offer_rejects_archival_idempotency_collision_without_mutation() {
-    let fixture = controller_fixture(2).await;
+    let fixture = Box::pin(controller_fixture(2)).await;
     // A frozen legacy (archival) row already owns this offer's idempotency key
     // under a different assignment id. The partial unique index, the typed
     // collision query, and the active-state idempotency guards all scope to
@@ -31,7 +31,7 @@ async fn controller_offer_rejects_archival_idempotency_collision_without_mutatio
 
 #[tokio::test]
 async fn controller_offer_rejects_archival_assignment_id_collision_without_mutation() {
-    let fixture = controller_fixture(2).await;
+    let fixture = Box::pin(controller_fixture(2)).await;
     // The archival row shares the offer's assignment id. The primary key would
     // also reject the insert, but the fence converts it to a deterministic
     // ConcurrentModification before any mutation is attempted.
@@ -59,7 +59,7 @@ async fn controller_offer_rejects_archival_assignment_id_collision_without_mutat
 
 #[tokio::test]
 async fn controller_offer_rejects_archival_generation_collision_without_mutation() {
-    let fixture = controller_fixture(2).await;
+    let fixture = Box::pin(controller_fixture(2)).await;
     // The archival row preserves the offer's exact (execution_id, fencing_epoch)
     // generation under an otherwise-distinct identity. The current execution-epoch
     // unique index scopes to legacy_migrated = 0, so only the fence catches it.
@@ -85,7 +85,7 @@ async fn controller_offer_rejects_archival_generation_collision_without_mutation
 
 #[tokio::test]
 async fn controller_offer_replays_unchanged_beside_noncolliding_archival_row() {
-    let fixture = controller_fixture(2).await;
+    let fixture = Box::pin(controller_fixture(2)).await;
     // A fully distinct archival row must never interfere with the current exact
     // replay path: the fence is a pure no-op when nothing collides.
     insert_archival_assignment(

@@ -53,9 +53,14 @@ struct ImportCandidate {
 
 async fn import_candidate(label: &str) -> ImportCandidate {
     let mut git = ImportGitFixture::new();
-    let prepared = prepare_remote_implementation_offer(label, git.worktree(), &git.base).await;
+    let prepared = Box::pin(prepare_remote_implementation_offer(
+        label,
+        git.worktree(),
+        &git.base,
+    ))
+    .await;
     git.bind_session_branch(&prepared);
-    offer_and_accept(&prepared).await;
+    Box::pin(offer_and_accept(&prepared)).await;
     let (response, result_entry) = terminal_response(&prepared, &git);
     record_terminal_status(&prepared, &response).await;
     store_artifact(
@@ -97,15 +102,13 @@ async fn offer_and_accept(prepared: &PreparedRemoteOffer) {
         .await
         .expect("claim offer authority")
         .expect("offer remains active");
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared.offer),
-            PRINCIPAL,
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared.offer),
+        PRINCIPAL,
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer");
     let assignment = prepared
         .db
         .task_board_remote_assignment(&prepared.offer.binding.assignment_id)
@@ -122,25 +125,23 @@ async fn offer_and_accept(prepared: &PreparedRemoteOffer) {
     // Record the executor's claim response so the controller settles the claim I/O
     // authority the same way the live path does; the terminal import target is then
     // authority-free.
-    prepared
-        .db
-        .record_task_board_remote_assignment_claim(
-            &claim,
-            &RemoteClaimResponse {
-                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                binding: prepared.offer.binding.clone(),
-                offer_request_sha256: prepared.offer.request_sha256.clone(),
-                lease: RemoteLease {
-                    lease_id: claim.lease_id.clone(),
-                    expires_at: "2026-07-19T10:01:00Z".into(),
-                },
-                claimed_at: "2026-07-19T10:00:02Z".into(),
+    Box::pin(prepared.db.record_task_board_remote_assignment_claim(
+        &claim,
+        &RemoteClaimResponse {
+            schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+            binding: prepared.offer.binding.clone(),
+            offer_request_sha256: prepared.offer.request_sha256.clone(),
+            lease: RemoteLease {
+                lease_id: claim.lease_id.clone(),
+                expires_at: "2026-07-19T10:01:00Z".into(),
             },
-            PRINCIPAL,
-            "2026-07-19T10:00:02Z",
-        )
-        .await
-        .expect("record remote claim response");
+            claimed_at: "2026-07-19T10:00:02Z".into(),
+        },
+        PRINCIPAL,
+        "2026-07-19T10:00:02Z",
+    ))
+    .await
+    .expect("record remote claim response");
 }
 
 fn terminal_response(

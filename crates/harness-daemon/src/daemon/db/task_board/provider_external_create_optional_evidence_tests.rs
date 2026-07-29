@@ -7,7 +7,7 @@ use crate::task_board::ExternalProvider;
 async fn github_recovery_accepts_none_revision_and_project_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-github-optional")).await;
+    Box::pin(create_item(&db, item("task-create-github-optional"))).await;
     let intent = begin(&db, "task-create-github-optional", ExternalProvider::GitHub).await;
     let (mut outcome, mut baseline) =
         create_evidence(&intent, "example/repository#81", "revision-1");
@@ -46,7 +46,7 @@ async fn github_recovery_accepts_none_revision_and_project_evidence() {
 async fn optional_project_and_revision_evidence_must_match_exactly() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-optional-mismatch")).await;
+    Box::pin(create_item(&db, item("task-create-optional-mismatch"))).await;
     let intent = begin(
         &db,
         "task-create-optional-mismatch",
@@ -102,7 +102,11 @@ async fn optional_project_and_revision_evidence_must_match_exactly() {
 async fn github_supplied_project_must_match_the_external_identity() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-github-project-mismatch")).await;
+    Box::pin(create_item(
+        &db,
+        item("task-create-github-project-mismatch"),
+    ))
+    .await;
     let intent = begin(
         &db,
         "task-create-github-project-mismatch",

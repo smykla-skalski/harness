@@ -13,7 +13,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_response_settlement() {
-    let state = central_offer().await;
+    let state = Box::pin(central_offer()).await;
     let stale_stop = prepare_stop(&state, "raced offer authority")
         .await
         .expect("capture stop before offer authority");
@@ -34,7 +34,7 @@ async fn offer_authority_fences_stop_until_response_settlement() {
     let request = state.fixture.request.clone();
 
     temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let call = tokio::spawn(async move { controller.offer(&db, &request).await });
+        let call = tokio::spawn(async move { Box::pin(controller.offer(&db, &request)).await });
         seen.await
             .expect("offer reached server after authority claim");
         let stop_error = apply_stop(&state, &stale_stop)
@@ -57,8 +57,8 @@ async fn offer_authority_fences_stop_until_response_settlement() {
 
 #[tokio::test]
 async fn claim_authority_fences_stop_and_settles_attempt_running() {
-    let state = central_offer().await;
-    persist_acceptance(&state).await;
+    let state = Box::pin(central_offer()).await;
+    Box::pin(persist_acceptance(&state)).await;
     let stale_stop = prepare_stop(&state, "raced claim authority")
         .await
         .expect("capture stop before claim authority");
@@ -80,7 +80,8 @@ async fn claim_authority_fences_stop_and_settles_attempt_running() {
     let request_for_call = request.clone();
 
     temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let call = tokio::spawn(async move { controller.claim(&db, &request_for_call).await });
+        let call =
+            tokio::spawn(async move { Box::pin(controller.claim(&db, &request_for_call)).await });
         seen.await
             .expect("claim reached server after authority claim");
         let stop_error = apply_stop(&state, &stale_stop)
@@ -113,7 +114,7 @@ async fn claim_authority_fences_stop_and_settles_attempt_running() {
 
 #[tokio::test]
 async fn expired_accepted_offer_is_retained_but_claim_has_zero_network_io() {
-    let state = expired_central_offer().await;
+    let state = Box::pin(expired_central_offer()).await;
     let response = accepted_offer(&state);
     let tls = test_tls_material();
     let BarrierServer {
@@ -132,36 +133,38 @@ async fn expired_accepted_offer_is_retained_but_claim_has_zero_network_io() {
         [state.offered_at.clone(), utc_now(), utc_now()],
     ));
 
-    let claim_error = temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let call_controller = Arc::clone(&controller);
-        let db = state.fixture.db.clone();
-        let request = state.fixture.request.clone();
-        let call = tokio::spawn(async move { call_controller.offer(&db, &request).await });
-        seen.await.expect("late offer reached server before expiry");
-        release.send(()).expect("release offer after expiry");
-        let first = call
-            .await
-            .expect("late offer controller task")
-            .expect("retain late accepted offer");
-        assert_eq!(first.0, response);
-        assert!(matches!(
-            first.1,
-            TaskBoardRemoteMutationOutcome::Updated(_)
-        ));
-        let replay = controller
-            .offer(&state.fixture.db, &state.fixture.request)
-            .await
-            .expect("replay immutable late acceptance");
-        assert_eq!(replay.0, response);
-        assert!(matches!(
-            replay.1,
-            TaskBoardRemoteMutationOutcome::Replayed(_)
-        ));
-        controller
-            .claim(&state.fixture.db, &claim_request(&state))
-            .await
-            .expect_err("expired L1 must fail before claim network I/O")
-    })
+    let claim_error = Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("authority-secret"))],
+        async {
+            let call_controller = Arc::clone(&controller);
+            let db = state.fixture.db.clone();
+            let request = state.fixture.request.clone();
+            let call =
+                tokio::spawn(async move { Box::pin(call_controller.offer(&db, &request)).await });
+            seen.await.expect("late offer reached server before expiry");
+            release.send(()).expect("release offer after expiry");
+            let first = call
+                .await
+                .expect("late offer controller task")
+                .expect("retain late accepted offer");
+            assert_eq!(first.0, response);
+            assert!(matches!(
+                first.1,
+                TaskBoardRemoteMutationOutcome::Updated(_)
+            ));
+            let replay = Box::pin(controller.offer(&state.fixture.db, &state.fixture.request))
+                .await
+                .expect("replay immutable late acceptance");
+            assert_eq!(replay.0, response);
+            assert!(matches!(
+                replay.1,
+                TaskBoardRemoteMutationOutcome::Replayed(_)
+            ));
+            Box::pin(controller.claim(&state.fixture.db, &claim_request(&state)))
+                .await
+                .expect_err("expired L1 must fail before claim network I/O")
+        },
+    ))
     .await;
     assert_concurrent_database_error(claim_error);
     assert_eq!(requests.await.expect("replay server"), 1);

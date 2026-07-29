@@ -10,11 +10,11 @@ use super::{load_execution, tick};
 
 #[tokio::test]
 async fn concurrent_reconcilers_claim_one_publish_side_effect() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-exclusive",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.block_publish();
@@ -57,11 +57,11 @@ async fn concurrent_reconcilers_claim_one_publish_side_effect() {
 
 #[tokio::test]
 async fn recovered_running_publish_accepts_exact_head_approval_without_mutation() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-recovered-approved",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.set_approved(true);
@@ -88,11 +88,11 @@ async fn recovered_running_publish_accepts_exact_head_approval_without_mutation(
 
 #[tokio::test]
 async fn recovered_running_publish_absent_fails_closed_without_retry() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-recovered-absent",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
 
@@ -118,11 +118,11 @@ async fn recovered_running_publish_absent_fails_closed_without_retry() {
 
 #[tokio::test]
 async fn unknown_publish_child_repairs_parent_without_publish_or_verification() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-unknown-crash-gap",
         TaskBoardExecutionState::Starting,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     let execution = load_execution(&fixture).await;
     let current = execution.attempts[0].clone();
@@ -168,11 +168,11 @@ async fn unknown_publish_child_repairs_parent_without_publish_or_verification() 
 
 #[tokio::test]
 async fn ambiguous_publish_absent_never_reposts_on_later_ticks() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-error-absent",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.set_publish_error("approval response was lost", false);
@@ -194,11 +194,11 @@ async fn ambiguous_publish_absent_never_reposts_on_later_ticks() {
 
 #[tokio::test]
 async fn young_running_publish_waits_without_verification_or_mutation() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-young-running",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     set_publish_deadline(&fixture, RETRY_AT).await;
     let runtime = FakeReadOnlyRuntime::new([]);
@@ -214,11 +214,11 @@ async fn young_running_publish_waits_without_verification_or_mutation() {
 
 #[tokio::test]
 async fn unavailable_approval_verification_fails_closed_as_unknown() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-verification-unknown",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.set_verification_error("approval lookup unavailable");
@@ -241,11 +241,11 @@ async fn unavailable_approval_verification_fails_closed_as_unknown() {
 
 #[tokio::test]
 async fn ambiguous_publish_error_completes_when_exact_head_approval_is_observed() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-error-applied",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.set_publish_error("approval response was lost", true);
@@ -263,11 +263,11 @@ async fn ambiguous_publish_error_completes_when_exact_head_approval_is_observed(
 
 #[tokio::test]
 async fn starting_publish_revision_drift_is_rejected_by_atomic_claim() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-starting-fenced",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     fixture
         .test
@@ -310,11 +310,11 @@ async fn starting_publish_revision_drift_is_rejected_by_atomic_claim() {
 
 #[tokio::test]
 async fn running_publish_claim_rejects_public_item_mutation() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-running-fenced",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Running,
-    )
+    ))
     .await;
     let before = fixture
         .test
@@ -350,11 +350,11 @@ async fn running_publish_claim_rejects_public_item_mutation() {
 
 #[tokio::test]
 async fn successful_publish_requires_final_exact_head_verification() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-success-head-drift",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.block_publish();
@@ -381,7 +381,7 @@ async fn successful_publish_requires_final_exact_head_verification() {
 
 #[tokio::test]
 async fn stale_parent_state_claim_prevents_report_start_and_publish() {
-    let report = seed_execution(
+    let report = Box::pin(seed_execution(
         "stale-report-parent",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
@@ -392,7 +392,7 @@ async fn stale_parent_state_claim_prevents_report_start_and_publish() {
             error: None,
             completed_at: None,
         }),
-    )
+    ))
     .await;
     let stale_report = load_execution(&report).await;
     stop_parent_after_load(&report).await;
@@ -410,11 +410,11 @@ async fn stale_parent_state_claim_prevents_report_start_and_publish() {
     assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
     assert_eq!(report_runtime.start_count(), 0);
 
-    let publish = seed_publish_attempt(
+    let publish = Box::pin(seed_publish_attempt(
         "stale-publish-parent",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let stale_publish = load_execution(&publish).await;
     stop_parent_after_load(&publish).await;

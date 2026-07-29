@@ -11,7 +11,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn terminal_local_start_charges_prepared_admission_before_release() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)

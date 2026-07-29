@@ -92,7 +92,12 @@ async fn fork_offer_requires_and_freezes_the_exact_source_repository_checkout() 
         .await
         .expect("claim fork assignment");
     assert!(matches!(
-        authorize_and_start_executor(&configured, &accepted.assignment_id, STARTED_AT).await,
+        Box::pin(authorize_and_start_executor(
+            &configured,
+            &accepted.assignment_id,
+            STARTED_AT
+        ))
+        .await,
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
 }
@@ -249,7 +254,7 @@ async fn assert_unknown_assignment_keeps_capacity(fixture: &ExecutorFixture) {
             .is_none()
     );
 
-    change_executor_capacity(&fixture, 2).await;
+    change_executor_capacity(fixture, 2).await;
     let sequence = fixture
         .db
         .current_change_sequence()
@@ -309,10 +314,13 @@ async fn expired_unclaimed_host_offer_is_safely_superseded() {
 
 #[tokio::test]
 async fn started_evidence_and_typed_terminal_status_survive_unknown_reconciliation() {
-    let fixture = controller_fixture(1).await;
-    let accepted = super::remote_assignment_generation_tests::accept_controller(&fixture).await;
-    let claimed =
-        super::remote_assignment_generation_tests::claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted =
+        Box::pin(super::remote_assignment_generation_tests::accept_controller(&fixture)).await;
+    let claimed = Box::pin(super::remote_assignment_generation_tests::claim_controller(
+        &fixture, &accepted,
+    ))
+    .await;
     let running_request =
         super::remote_assignment_generation_tests::status_request(&fixture.request, &claimed);
     let running =

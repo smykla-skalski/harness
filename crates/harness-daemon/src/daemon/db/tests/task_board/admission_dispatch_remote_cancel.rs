@@ -13,8 +13,12 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn cancel_adopts_unreported_start_evidence_and_accounts_exactly_once() {
-    let prepared = prepare_remote_offer_with_policy("admission-cancel-started", true).await;
-    accept_prepared_offer(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(
+        "admission-cancel-started",
+        true,
+    ))
+    .await;
+    Box::pin(accept_prepared_offer(&prepared)).await;
     let request = cancel_request(&prepared);
     prepared
         .db
@@ -28,16 +32,14 @@ async fn cancel_adopts_unreported_start_evidence_and_accounts_exactly_once() {
         Some("2026-07-19T10:00:03Z"),
         Some("workspace-cancel"),
     );
-    prepared
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            "executor-a",
-            "2026-07-19T10:00:06Z",
-        )
-        .await
-        .expect("record cancel with unreported start evidence");
+    Box::pin(prepared.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        "executor-a",
+        "2026-07-19T10:00:06Z",
+    ))
+    .await
+    .expect("record cancel with unreported start evidence");
 
     let assignment = load_assignment(&prepared).await;
     assert_eq!(assignment.state, TaskBoardRemoteAssignmentState::Cancelled);
@@ -87,16 +89,14 @@ async fn cancel_adopts_unreported_start_evidence_and_accounts_exactly_once() {
         .current_change_sequence()
         .await
         .expect("load terminal sequence");
-    prepared
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            "executor-a",
-            "2026-07-19T10:00:07Z",
-        )
-        .await
-        .expect("replay exact cancel response");
+    Box::pin(prepared.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        "executor-a",
+        "2026-07-19T10:00:07Z",
+    ))
+    .await
+    .expect("replay exact cancel response");
     assert_eq!(
         prepared
             .db
@@ -113,8 +113,12 @@ async fn cancel_adopts_unreported_start_evidence_and_accounts_exactly_once() {
 
 #[tokio::test]
 async fn empty_cancel_response_preserves_claim_and_releases_uncharged_reservation() {
-    let prepared = prepare_remote_offer_with_policy("admission-cancel-claimed", true).await;
-    let accepted = accept_prepared_offer(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(
+        "admission-cancel-claimed",
+        true,
+    ))
+    .await;
+    let accepted = Box::pin(accept_prepared_offer(&prepared)).await;
     let claim = RemoteClaimRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: prepared.offer.binding.clone(),
@@ -130,25 +134,23 @@ async fn empty_cancel_response_preserves_claim_and_releases_uncharged_reservatio
         .await
         .expect("claim claim authority")
         .expect("claim remains active");
-    prepared
-        .db
-        .record_task_board_remote_assignment_claim(
-            &claim,
-            &RemoteClaimResponse {
-                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                binding: prepared.offer.binding.clone(),
-                offer_request_sha256: prepared.offer.request_sha256.clone(),
-                lease: RemoteLease {
-                    lease_id: claim.lease_id.clone(),
-                    expires_at: "2026-07-19T10:01:00Z".into(),
-                },
-                claimed_at: "2026-07-19T10:00:02Z".into(),
+    Box::pin(prepared.db.record_task_board_remote_assignment_claim(
+        &claim,
+        &RemoteClaimResponse {
+            schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+            binding: prepared.offer.binding.clone(),
+            offer_request_sha256: prepared.offer.request_sha256.clone(),
+            lease: RemoteLease {
+                lease_id: claim.lease_id.clone(),
+                expires_at: "2026-07-19T10:01:00Z".into(),
             },
-            "executor-a",
-            "2026-07-19T10:00:02Z",
-        )
-        .await
-        .expect("record controller claim");
+            claimed_at: "2026-07-19T10:00:02Z".into(),
+        },
+        "executor-a",
+        "2026-07-19T10:00:02Z",
+    ))
+    .await
+    .expect("record controller claim");
     let request = cancel_request(&prepared);
     prepared
         .db
@@ -157,16 +159,14 @@ async fn empty_cancel_response_preserves_claim_and_releases_uncharged_reservatio
         .expect("claim cancel authority")
         .expect("claimed assignment remains cancellable");
     let response = cancel_response(&request, None, None, None);
-    prepared
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            "executor-a",
-            "2026-07-19T10:00:05Z",
-        )
-        .await
-        .expect("record empty cancel evidence");
+    Box::pin(prepared.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        "executor-a",
+        "2026-07-19T10:00:05Z",
+    ))
+    .await
+    .expect("record empty cancel evidence");
     let assignment = load_assignment(&prepared).await;
     assert_eq!(
         assignment.claimed_at.as_deref(),
@@ -204,15 +204,13 @@ async fn accept_prepared_offer(
         .await
         .expect("claim offer authority")
         .expect("offer remains active");
-    match prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared.offer),
-            "executor-a",
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer")
+    match Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared.offer),
+        "executor-a",
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer")
     {
         crate::daemon::db::task_board::TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected accepted assignment, got {other:?}"),

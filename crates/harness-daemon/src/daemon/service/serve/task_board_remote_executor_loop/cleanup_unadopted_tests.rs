@@ -27,75 +27,81 @@ fn invalid_unadopted_run_cleans_after_exact_stop_and_settlement() {
 }
 
 async fn invalid_unadopted_run_cleans_after_exact_stop_and_settlement_body() {
-    with_isolated_sessions("remote-unadopted-stop-cleanup", async {
-        let (fixture, claimed, authority, identity, workspace) = claimed_executor_workspace().await;
-        let permit = fixture
-            .db
-            .claim_task_board_remote_executor_start_io_permit(&authority, &workspace, STARTED_AT)
-            .await
-            .expect("claim exact Start I/O permit")
-            .expect_acquired("Start I/O remains permitted");
-        let mut invalid = run_snapshot(&claimed, &authority, &workspace);
-        invalid.prompt = "mismatched executor launch".into();
-        invalid.status = CodexRunStatus::Cancelled;
-        invalid.updated_at = UNKNOWN_AT.into();
-        fixture
-            .db
-            .save_codex_run(&invalid)
-            .await
-            .expect("persist invalid stopped executor run");
-        let pending = fixture
-            .db
-            .claim_task_board_remote_executor_stop_pending(
-                &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit)),
-                &invalid,
-                TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
-                UNKNOWN_AT,
+    Box::pin(with_isolated_sessions(
+        "remote-unadopted-stop-cleanup",
+        async {
+            let (fixture, claimed, authority, identity, workspace) =
+                Box::pin(claimed_executor_workspace()).await;
+            let permit = fixture
+                .db
+                .claim_task_board_remote_executor_start_io_permit(
+                    &authority, &workspace, STARTED_AT,
+                )
+                .await
+                .expect("claim exact Start I/O permit")
+                .expect_acquired("Start I/O remains permitted");
+            let mut invalid = run_snapshot(&claimed, &authority, &workspace);
+            invalid.prompt = "mismatched executor launch".into();
+            invalid.status = CodexRunStatus::Cancelled;
+            invalid.updated_at = UNKNOWN_AT.into();
+            fixture
+                .db
+                .save_codex_run(&invalid)
+                .await
+                .expect("persist invalid stopped executor run");
+            let pending = fixture
+                .db
+                .claim_task_board_remote_executor_stop_pending(
+                    &TaskBoardRemoteExecutorStopAuthority::Start(Box::new(permit)),
+                    &invalid,
+                    TaskBoardRemoteExecutorStopReason::StartEvidenceInvalid,
+                    UNKNOWN_AT,
+                )
+                .await
+                .expect("claim exact stop-only authority")
+                .expect("stop-only authority");
+            let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
+                .db
+                .settle_task_board_remote_executor_stop_pending(&pending, UNKNOWN_AT)
+                .await
+                .expect("settle exact stopped run")
+            else {
+                panic!("stopped run did not become unknown");
+            };
+            settle_unknown(&fixture, &unknown).await;
+            assert_eq!(active_count(&fixture).await, 1);
+
+            reconcile_remote_executor_assignment(
+                &executor_state(&fixture.db, "successor-instance"),
+                &fixture.db,
+                &unknown.assignment_id,
             )
             .await
-            .expect("claim exact stop-only authority")
-            .expect("stop-only authority");
-        let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
-            .db
-            .settle_task_board_remote_executor_stop_pending(&pending, UNKNOWN_AT)
-            .await
-            .expect("settle exact stopped run")
-        else {
-            panic!("stopped run did not become unknown");
-        };
-        settle_unknown(&fixture, &unknown).await;
-        assert_eq!(active_count(&fixture).await, 1);
+            .expect("clean stopped unadopted run");
 
-        reconcile_remote_executor_assignment(
-            &executor_state(&fixture.db, "successor-instance"),
-            &fixture.db,
-            &unknown.assignment_id,
-        )
-        .await
-        .expect("clean stopped unadopted run");
-
-        let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
-        assert_eq!(cleaned.state, TaskBoardRemoteAssignmentState::Unknown);
-        assert!(cleaned.cleanup_completed_at.is_some());
-        assert_eq!(active_count(&fixture).await, 0);
-        assert!(
-            fixture
-                .db
-                .codex_run(&identity.run_id)
-                .await
-                .unwrap()
-                .is_none()
-        );
-        assert!(!workspace.exists());
-        assert!(
-            fixture
-                .db
-                .task_board_remote_settlement_receipt(&unknown.assignment_id)
-                .await
-                .expect("load immutable settlement receipt")
-                .is_some()
-        );
-    })
+            let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
+            assert_eq!(cleaned.state, TaskBoardRemoteAssignmentState::Unknown);
+            assert!(cleaned.cleanup_completed_at.is_some());
+            assert_eq!(active_count(&fixture).await, 0);
+            assert!(
+                fixture
+                    .db
+                    .codex_run(&identity.run_id)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(!workspace.exists());
+            assert!(
+                fixture
+                    .db
+                    .task_board_remote_settlement_receipt(&unknown.assignment_id)
+                    .await
+                    .expect("load immutable settlement receipt")
+                    .is_some()
+            );
+        },
+    ))
     .await;
 }
 
@@ -105,53 +111,57 @@ fn crash_after_session_files_before_db_row_cleans_exact_orphan() {
 }
 
 async fn crash_after_session_files_before_db_row_cleans_exact_orphan_body() {
-    with_isolated_sessions("remote-orphan-session-cleanup", async {
-        let (fixture, claimed, authority, identity, workspace) = claimed_executor_workspace().await;
-        assert!(workspace.exists());
-        assert!(
-            fixture
+    Box::pin(with_isolated_sessions(
+        "remote-orphan-session-cleanup",
+        async {
+            let (fixture, claimed, authority, identity, workspace) =
+                Box::pin(claimed_executor_workspace()).await;
+            assert!(workspace.exists());
+            assert!(
+                fixture
+                    .db
+                    .delete_session_row(&identity.session_id)
+                    .await
+                    .expect("remove crash-gap session row")
+            );
+            let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
                 .db
-                .delete_session_row(&identity.session_id)
+                .expire_task_board_remote_executor_start_without_run(
+                    &authority,
+                    super::super::REMOTE_START_EXPIRED_REASON,
+                    EXPIRED_AT,
+                )
                 .await
-                .expect("remove crash-gap session row")
-        );
-        let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
-            .db
-            .expire_task_board_remote_executor_start_without_run(
-                &authority,
-                super::super::REMOTE_START_EXPIRED_REASON,
-                EXPIRED_AT,
+                .expect("expire token with no durable run")
+            else {
+                panic!("token-owned crash gap did not expire");
+            };
+            assert_eq!(claimed.assignment_id, unknown.assignment_id);
+            settle_unknown(&fixture, &unknown).await;
+            assert_eq!(active_count(&fixture).await, 1);
+
+            reconcile_remote_executor_assignment(
+                &executor_state(&fixture.db, "restarted-instance"),
+                &fixture.db,
+                &unknown.assignment_id,
             )
             .await
-            .expect("expire token with no durable run")
-        else {
-            panic!("token-owned crash gap did not expire");
-        };
-        assert_eq!(claimed.assignment_id, unknown.assignment_id);
-        settle_unknown(&fixture, &unknown).await;
-        assert_eq!(active_count(&fixture).await, 1);
+            .expect("clean exact orphaned session tree");
 
-        reconcile_remote_executor_assignment(
-            &executor_state(&fixture.db, "restarted-instance"),
-            &fixture.db,
-            &unknown.assignment_id,
-        )
-        .await
-        .expect("clean exact orphaned session tree");
-
-        let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
-        assert!(cleaned.cleanup_completed_at.is_some());
-        assert_eq!(active_count(&fixture).await, 0);
-        assert!(!workspace.exists());
-        assert!(
-            fixture
-                .db
-                .resolve_session(&identity.session_id)
-                .await
-                .expect("reload orphaned session")
-                .is_none()
-        );
-    })
+            let cleaned = load_assignment(&fixture, &unknown.assignment_id).await;
+            assert!(cleaned.cleanup_completed_at.is_some());
+            assert_eq!(active_count(&fixture).await, 0);
+            assert!(!workspace.exists());
+            assert!(
+                fixture
+                    .db
+                    .resolve_session(&identity.session_id)
+                    .await
+                    .expect("reload orphaned session")
+                    .is_none()
+            );
+        },
+    ))
     .await;
 }
 
@@ -243,43 +253,49 @@ fn non_codex_no_run_start_failure_settles_failed_at_claimed() {
 }
 
 async fn non_codex_no_run_start_failure_settles_failed_at_claimed_body() {
-    with_isolated_sessions("remote-sandbox-no-run-failure", async {
-        let (fixture, claimed, authority, identity, workspace) = claimed_executor_workspace().await;
-        let permit = fixture
-            .db
-            .claim_task_board_remote_executor_start_io_permit(&authority, &workspace, STARTED_AT)
-            .await
-            .expect("claim exact Start I/O permit")
-            .expect_acquired("Start I/O remains permitted");
-        // No run is persisted, so this is a proven no-run failure for a code other
-        // than the transient preflight sentinel - it must still settle, not stick.
-        let response =
-            failed_at_claimed_status(&claimed, "SANDBOX001", TaskBoardFailureClass::Permanent);
-        let TaskBoardRemoteMutationOutcome::Updated(failed) = fixture
-            .db
-            .fail_task_board_remote_executor_start_without_run(&permit, &response)
-            .await
-            .expect("seal a non-preflight no-run Start failure")
-        else {
-            panic!("non-preflight no-run Start failure did not settle Failed");
-        };
-        assert_eq!(failed.state, TaskBoardRemoteAssignmentState::Failed);
-        assert_eq!(failed.error.as_deref(), Some("SANDBOX001"));
-        assert_eq!(
-            failed
-                .status_response
-                .and_then(|status| status.failure_class),
-            Some(TaskBoardFailureClass::Permanent)
-        );
-        assert!(
-            fixture
+    Box::pin(with_isolated_sessions(
+        "remote-sandbox-no-run-failure",
+        async {
+            let (fixture, claimed, authority, identity, workspace) =
+                Box::pin(claimed_executor_workspace()).await;
+            let permit = fixture
                 .db
-                .codex_run(&identity.run_id)
+                .claim_task_board_remote_executor_start_io_permit(
+                    &authority, &workspace, STARTED_AT,
+                )
                 .await
-                .unwrap()
-                .is_none()
-        );
-    })
+                .expect("claim exact Start I/O permit")
+                .expect_acquired("Start I/O remains permitted");
+            // No run is persisted, so this is a proven no-run failure for a code other
+            // than the transient preflight sentinel - it must still settle, not stick.
+            let response =
+                failed_at_claimed_status(&claimed, "SANDBOX001", TaskBoardFailureClass::Permanent);
+            let TaskBoardRemoteMutationOutcome::Updated(failed) = fixture
+                .db
+                .fail_task_board_remote_executor_start_without_run(&permit, &response)
+                .await
+                .expect("seal a non-preflight no-run Start failure")
+            else {
+                panic!("non-preflight no-run Start failure did not settle Failed");
+            };
+            assert_eq!(failed.state, TaskBoardRemoteAssignmentState::Failed);
+            assert_eq!(failed.error.as_deref(), Some("SANDBOX001"));
+            assert_eq!(
+                failed
+                    .status_response
+                    .and_then(|status| status.failure_class),
+                Some(TaskBoardFailureClass::Permanent)
+            );
+            assert!(
+                fixture
+                    .db
+                    .codex_run(&identity.run_id)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        },
+    ))
     .await;
 }
 
@@ -452,8 +468,8 @@ pub(super) async fn load_assignment(
         .expect("remote assignment exists")
 }
 
-/// The settled-cleanup chain (reconcile -> settle -> cleanup_executor_session ->
-/// destroy_executor_session) nests a future too deep for the default libtest
+/// The settled-cleanup chain (reconcile -> settle -> `cleanup_executor_session` ->
+/// `destroy_executor_session`) nests a future too deep for the default libtest
 /// stack in debug builds, so these cases drive it off a 32 MiB thread. Built
 /// inside the thread so `temp_env` isolation need not be `Send`.
 pub(super) fn run_deep_cleanup_async<F>(build: impl FnOnce() -> F + Send + 'static)

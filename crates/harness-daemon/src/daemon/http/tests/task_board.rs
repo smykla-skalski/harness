@@ -68,8 +68,20 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    run_task_board_http_item_scope_flow(&client, &base_url, &state, &project_dir).await;
-    run_task_board_http_run_once_flow(&client, &base_url, &state, &project_dir).await;
+    Box::pin(run_task_board_http_item_scope_flow(
+        &client,
+        &base_url,
+        &state,
+        &project_dir,
+    ))
+    .await;
+    Box::pin(run_task_board_http_run_once_flow(
+        &client,
+        &base_url,
+        &state,
+        &project_dir,
+    ))
+    .await;
 
     server.abort();
     let _ = server.await;
@@ -89,7 +101,12 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
         json!({ "step_mode": true }),
     )
     .await;
-    seed_ready_board_item(&state, "board-step-held", "Held step item").await;
+    Box::pin(seed_ready_board_item(
+        &state,
+        "board-step-held",
+        "Held step item",
+    ))
+    .await;
 
     let response = dispatch_http_item(&client, &base_url, "board-step-held", &project_dir).await;
     let applied = first_applied(&response);
@@ -150,8 +167,18 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
         &required_string(applied, "work_item_id"),
     );
 
-    seed_ready_board_item(&state, "board-step-broad-high", "Broad high item").await;
-    seed_ready_board_item(&state, "board-step-broad-low", "Broad low item").await;
+    Box::pin(seed_ready_board_item(
+        &state,
+        "board-step-broad-high",
+        "Broad high item",
+    ))
+    .await;
+    Box::pin(seed_ready_board_item(
+        &state,
+        "board-step-broad-low",
+        "Broad low item",
+    ))
+    .await;
     put_json(
         &client,
         &base_url,
@@ -193,8 +220,13 @@ async fn run_task_board_pick_preview() {
     allow_fallback_spawn_for_test(&state).await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
-    seed_ready_board_item(&state, "board-pick-low", "Low item").await;
-    seed_ready_board_item(&state, "board-pick-high", "High item").await;
+    Box::pin(seed_ready_board_item(&state, "board-pick-low", "Low item")).await;
+    Box::pin(seed_ready_board_item(
+        &state,
+        "board-pick-high",
+        "High item",
+    ))
+    .await;
     put_json(
         &client,
         &base_url,
@@ -246,12 +278,17 @@ async fn run_task_board_http_item_scope_flow(
     state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
-    seed_ready_board_item(state, "board-http-dispatch", "HTTP dispatch item").await;
-    seed_ready_board_item(
+    Box::pin(seed_ready_board_item(
+        state,
+        "board-http-dispatch",
+        "HTTP dispatch item",
+    ))
+    .await;
+    Box::pin(seed_ready_board_item(
         state,
         "board-http-dispatch-other",
         "HTTP dispatch other item",
-    )
+    ))
     .await;
     let dispatch = dispatch_http_item(client, base_url, "board-http-dispatch", project_dir).await;
     let applied = first_applied(&dispatch);
@@ -315,12 +352,17 @@ async fn run_task_board_http_run_once_flow(
     state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
-    seed_ready_board_item(state, "board-http-run-once", "HTTP run once item").await;
-    seed_ready_board_item(
+    Box::pin(seed_ready_board_item(
+        state,
+        "board-http-run-once",
+        "HTTP run once item",
+    ))
+    .await;
+    Box::pin(seed_ready_board_item(
         state,
         "board-http-run-once-other",
         "HTTP run once other item",
-    )
+    ))
     .await;
     let run_once = post_json(
         client,
@@ -463,7 +505,7 @@ async fn run_task_board_http_plan_revoke_flow() {
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    seed_ready_board_item(&state, "board-revoke-1", "Revoke me").await;
+    Box::pin(seed_ready_board_item(&state, "board-revoke-1", "Revoke me")).await;
     let path = http_paths::TASK_BOARD_PLAN_REVOKE.replace("{item_id}", "board-revoke-1");
     let response = post_json(&client, &base_url, &path, json!({})).await;
 

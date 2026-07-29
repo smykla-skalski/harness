@@ -38,7 +38,7 @@ async fn settled_cleaned_outbound_bytes_prune_without_reopening_authority() {
         .expect("enable implementation capability");
     let (offer, content) = snapshot_offer(&fixture.request);
     let accepted = accept_and_mirror_source(&fixture, &offer, &content).await;
-    let cancelled = cancel_settle_and_cleanup(&fixture, &offer, &accepted).await;
+    let cancelled = Box::pin(cancel_settle_and_cleanup(&fixture, &offer, &accepted)).await;
     assert_settled_source_retention(&fixture, &offer, &cancelled).await;
 }
 
@@ -172,16 +172,20 @@ async fn assert_settled_source_retention(
 
 #[tokio::test]
 async fn remote_reassigned_predecessor_prunes_only_after_exact_successor_handoff() {
-    let prepared = prepare_remote_implementation_offer(
+    let prepared = Box::pin(prepare_remote_implementation_offer(
         "source-retention-reassignment",
         "/tmp/source-retention-reassignment",
         SOURCE_REVISION,
-    )
+    ))
     .await;
     let (predecessor_offer, content) = snapshot_offer(&prepared.offer);
     persist_predecessor(&prepared, &predecessor_offer, &content).await;
-    let successor_offer =
-        persist_exact_successor_handoff(&prepared, &predecessor_offer, &content).await;
+    let successor_offer = Box::pin(persist_exact_successor_handoff(
+        &prepared,
+        &predecessor_offer,
+        &content,
+    ))
+    .await;
     assert_reassigned_source_retention(&prepared, &predecessor_offer, &successor_offer, &content)
         .await;
 }

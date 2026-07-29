@@ -9,7 +9,7 @@ use harness_kernel::errors::CliError;
 #[tokio::test]
 async fn report_claim_rejects_live_item_revision_drift() {
     let (db, _temp) = workflow_database().await;
-    let execution = seed_starting_report(&db, "claim-item-drift").await;
+    let execution = Box::pin(seed_starting_report(&db, "claim-item-drift")).await;
     db.update_task_board_item(&execution.item_id, |item| {
         item.title = "Changed before report claim".into();
         Ok(true)
@@ -30,7 +30,7 @@ async fn report_claim_rejects_live_item_revision_drift() {
 #[tokio::test]
 async fn report_claim_rejects_live_settings_revision_drift() {
     let (db, _temp) = workflow_database().await;
-    let execution = seed_starting_report(&db, "claim-settings-drift").await;
+    let execution = Box::pin(seed_starting_report(&db, "claim-settings-drift")).await;
     db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
         .await
         .expect("advance settings revision");
@@ -47,7 +47,7 @@ async fn report_claim_rejects_live_settings_revision_drift() {
 #[tokio::test]
 async fn side_effect_claim_updates_parent_and_child_and_fences_terminal_writer() {
     let (db, _temp) = workflow_database().await;
-    let execution = seed_starting_report(&db, "claim-terminal-fence").await;
+    let execution = Box::pin(seed_starting_report(&db, "claim-terminal-fence")).await;
     let claimed = claim_report(&db, &execution)
         .await
         .expect("claim report")
@@ -106,7 +106,7 @@ async fn seed_starting_report(
     db: &AsyncDaemonDb,
     label: &str,
 ) -> crate::task_board::TaskBoardWorkflowExecutionRecord {
-    let execution = create_execution(db, label, "2026-07-17T09:00:00Z").await;
+    let execution = Box::pin(create_execution(db, label, "2026-07-17T09:00:00Z")).await;
     db.create_task_board_execution_attempt(&TaskBoardExecutionAttemptRecord {
         execution_id: execution.execution_id.clone(),
         action_key: "review:reviewer".into(),

@@ -73,7 +73,7 @@ fn sync_v43_refuses_lost_dispatch_uniqueness_and_both_malformed_admission_tables
     for table in ADMISSION_TABLES {
         let db = legacy_v40_fixture();
         run(db.connection()).expect("migrate strict remote execution ledger");
-        corrupt_table(db.connection(), *table);
+        corrupt_table(db.connection(), table);
 
         let error =
             crate::daemon::db::schema_repairs_remote_execution::repair_and_stamp(db.connection())
@@ -84,7 +84,7 @@ fn sync_v43_refuses_lost_dispatch_uniqueness_and_both_malformed_admission_tables
                 .contains("incompatible remote execution ledger schema"),
             "{table}: {error}"
         );
-        assert!(column_exists(db.connection(), *table, "sentinel"));
+        assert!(column_exists(db.connection(), table, "sentinel"));
     }
 }
 

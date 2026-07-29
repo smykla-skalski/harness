@@ -16,7 +16,7 @@ async fn settings_can_win_during_provisioning_and_force_exact_cleanup() {
     let (origin, revision) = git_repository(fixture._temp.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
-    let (accepted, authority) = claim_start_authority(&fixture, &request).await;
+    let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
     let authorized = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&authorized).expect("remote executor identity");
     let barrier = install_remote_session_creation_barrier(&authority.sha256);
@@ -73,7 +73,7 @@ async fn final_start_io_permit_fences_settings_until_adoption() {
     let (origin, revision) = git_repository(fixture._temp.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
-    let (accepted, authority) = claim_start_authority(&fixture, &request).await;
+    let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
     let authorized = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&authorized).expect("remote executor identity");
     let workspace = prepare_remote_workspace(

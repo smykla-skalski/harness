@@ -45,7 +45,7 @@ fn sync_v43_upgrade_persists_exact_legacy_marker_across_reopen() {
 
 #[tokio::test]
 async fn v43_upgrade_marks_and_consumes_only_the_exact_legacy_starting_generation() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let path = fixture._temp.path().join("controller.db");
     let snapshot_revision = fixture.execution.snapshot.configuration_revision;
     seed_targetless_starting(&fixture.db, &fixture.execution).await;

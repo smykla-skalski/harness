@@ -16,7 +16,7 @@ async fn due_active_poll_observes_completed_and_failed_before_renewal() {
         TaskBoardRemoteAssignmentState::Completed,
         TaskBoardRemoteAssignmentState::Failed,
     ] {
-        let assignment = active_assignment("2026-07-19T10:00:30Z").await;
+        let assignment = Box::pin(active_assignment("2026-07-19T10:00:30Z")).await;
         let terminal_record = record_in_state(&assignment, terminal);
         let renewal_record = assignment.clone();
         let replay_record = assignment.clone();
@@ -25,7 +25,7 @@ async fn due_active_poll_observes_completed_and_failed_before_renewal() {
         let status_probe = Arc::clone(&status_calls);
         let renew_probe = Arc::clone(&renew_calls);
 
-        super::super::poll_active_assignment_with(
+        Box::pin(super::super::poll_active_assignment_with(
             &assignment,
             move |_| {
                 status_probe.fetch_add(1, Ordering::SeqCst);
@@ -38,7 +38,7 @@ async fn due_active_poll_observes_completed_and_failed_before_renewal() {
             },
             move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
             || "2026-07-19T10:00:30Z".into(),
-        )
+        ))
         .await
         .expect("observe terminal executor status before due renewal");
 
@@ -49,7 +49,7 @@ async fn due_active_poll_observes_completed_and_failed_before_renewal() {
 
 #[tokio::test]
 async fn disabled_active_poll_observes_status_without_renewal() {
-    let assignment = active_assignment("2026-07-19T10:00:30Z").await;
+    let assignment = Box::pin(active_assignment("2026-07-19T10:00:30Z")).await;
     let running = assignment.clone();
     let renewal_record = assignment.clone();
     let replay_record = assignment.clone();
@@ -58,7 +58,7 @@ async fn disabled_active_poll_observes_status_without_renewal() {
     let status_probe = Arc::clone(&status_calls);
     let renew_probe = Arc::clone(&renew_calls);
 
-    super::super::poll_active_assignment_with(
+    Box::pin(super::super::poll_active_assignment_with(
         &assignment,
         move |_| {
             status_probe.fetch_add(1, Ordering::SeqCst);
@@ -71,7 +71,7 @@ async fn disabled_active_poll_observes_status_without_renewal() {
         },
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
         || "2026-07-19T10:00:30Z".into(),
-    )
+    ))
     .await
     .expect("observe active disabled executor without renewal");
 
@@ -81,7 +81,7 @@ async fn disabled_active_poll_observes_status_without_renewal() {
 
 #[tokio::test]
 async fn active_poll_uses_fresh_post_status_time_for_renewal() {
-    let assignment = active_assignment("2026-07-19T10:01:00Z").await;
+    let assignment = Box::pin(active_assignment("2026-07-19T10:01:00Z")).await;
     assert!(
         !super::super::requests::renewal_is_due(&assignment, "2026-07-19T10:00:20Z")
             .expect("evaluate earlier cycle time")
@@ -92,7 +92,7 @@ async fn active_poll_uses_fresh_post_status_time_for_renewal() {
     let renew_calls = Arc::new(AtomicUsize::new(0));
     let renew_probe = Arc::clone(&renew_calls);
 
-    super::super::poll_active_assignment_with(
+    Box::pin(super::super::poll_active_assignment_with(
         &assignment,
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(running))),
         || ready(Ok(true)),
@@ -102,7 +102,7 @@ async fn active_poll_uses_fresh_post_status_time_for_renewal() {
         },
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
         || "2026-07-19T10:00:31Z".into(),
-    )
+    ))
     .await
     .expect("renew from fresh post-status time");
 
@@ -111,7 +111,7 @@ async fn active_poll_uses_fresh_post_status_time_for_renewal() {
 
 #[tokio::test]
 async fn pending_cancel_observes_status_without_renewal() {
-    let mut assignment = active_assignment("2026-07-19T10:00:30Z").await;
+    let mut assignment = Box::pin(active_assignment("2026-07-19T10:00:30Z")).await;
     assignment.controller_operation = Some(operation("cancel"));
     let running = assignment.clone();
     let renewal_record = assignment.clone();
@@ -119,7 +119,7 @@ async fn pending_cancel_observes_status_without_renewal() {
     let renew_calls = Arc::new(AtomicUsize::new(0));
     let renew_probe = Arc::clone(&renew_calls);
 
-    super::super::poll_active_assignment_with(
+    Box::pin(super::super::poll_active_assignment_with(
         &assignment,
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(running))),
         || ready(Ok(true)),
@@ -129,7 +129,7 @@ async fn pending_cancel_observes_status_without_renewal() {
         },
         move |_| ready(Ok(TaskBoardRemoteMutationOutcome::Updated(replay_record))),
         || "2026-07-19T10:00:30Z".into(),
-    )
+    ))
     .await
     .expect("observe pending cancellation before renewal");
 
@@ -138,7 +138,7 @@ async fn pending_cancel_observes_status_without_renewal() {
 
 #[tokio::test]
 async fn disabled_pending_renew_replays_before_status() {
-    let mut assignment = active_assignment("2026-07-19T10:00:30Z").await;
+    let mut assignment = Box::pin(active_assignment("2026-07-19T10:00:30Z")).await;
     assignment.controller_operation = Some(operation("renew"));
     let mut renewed = assignment.clone();
     renewed.controller_operation = None;
@@ -148,7 +148,7 @@ async fn disabled_pending_renew_replays_before_status() {
     let renew_stage = Arc::clone(&stage);
     let ordinary_renewal = assignment.clone();
 
-    super::super::poll_active_assignment_with(
+    Box::pin(super::super::poll_active_assignment_with(
         &assignment,
         move |_| {
             assert_eq!(status_stage.load(Ordering::SeqCst), 1);
@@ -163,7 +163,7 @@ async fn disabled_pending_renew_replays_before_status() {
             ready(Ok(TaskBoardRemoteMutationOutcome::Updated(renewed)))
         },
         || "2026-07-19T10:00:30Z".into(),
-    )
+    ))
     .await
     .expect("replay pending renewal before status");
 
@@ -171,7 +171,7 @@ async fn disabled_pending_renew_replays_before_status() {
 }
 
 async fn active_assignment(lease_expires_at: &str) -> TaskBoardRemoteAssignmentRecord {
-    let fixture = remote_controller_fixture(1).await;
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
     // The offer lease must equal offered_at + sealed lease_seconds; the in-memory expiry
     // is overridden below to drive each test's renewal-timing scenario.
     let mut assignment = match fixture

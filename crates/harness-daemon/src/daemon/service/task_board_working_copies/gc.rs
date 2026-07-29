@@ -141,7 +141,6 @@ pub struct WorkingCopyGcReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn seed(
         root: &WorkingCopyRoot,
@@ -206,10 +205,6 @@ mod tests {
         )
         .expect("gc");
         assert_eq!(report, WorkingCopyGcReport::default());
-        assert!(
-            !PathBuf::from(root.registry_path())
-                .to_string_lossy()
-                .is_empty()
-        );
+        assert!(!root.registry_path().to_string_lossy().is_empty());
     }
 }

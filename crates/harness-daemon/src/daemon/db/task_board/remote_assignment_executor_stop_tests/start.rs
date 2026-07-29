@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn crash_before_stop_io_restarts_in_stop_only_mode() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(
@@ -62,11 +62,11 @@ async fn crash_before_stop_io_restarts_in_stop_only_mode() {
         .is_none()
     );
     assert!(matches!(
-        db.adopt_task_board_remote_executor_start(
+        Box::pin(db.adopt_task_board_remote_executor_start(
             &permit,
             std::path::Path::new(&snapshot.project_dir),
             STARTED_AT,
-        )
+        ))
         .await
         .expect("restart adoption remains stop-only"),
         TaskBoardRemoteMutationOutcome::Stale(_)
@@ -77,7 +77,7 @@ async fn crash_before_stop_io_restarts_in_stop_only_mode() {
 #[tokio::test]
 async fn wrong_run_identity_cannot_persist_a_stop_marker() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(
@@ -134,7 +134,7 @@ async fn wrong_run_identity_cannot_persist_a_stop_marker() {
 #[tokio::test]
 async fn exact_run_with_invalid_launch_fields_can_stop_and_settle() {
     let fixture = executor_fixture(1).await;
-    let accepted = claim_executor(&fixture).await;
+    let accepted = Box::pin(claim_executor(&fixture)).await;
     let authority = fixture
         .db
         .claim_task_board_remote_executor_start_authority(

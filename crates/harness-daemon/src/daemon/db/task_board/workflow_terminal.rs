@@ -124,7 +124,7 @@ mod tests {
 
     #[tokio::test]
     async fn terminal_projection_updates_item_and_releases_admission_once() {
-        let (db, execution_id) = seeded_terminal_execution(true).await;
+        let (db, execution_id) = Box::pin(seeded_terminal_execution(true)).await;
 
         let projected = db
             .project_task_board_read_only_workflow_terminal(&execution_id)
@@ -163,7 +163,7 @@ mod tests {
 
     #[tokio::test]
     async fn item_identity_mismatch_releases_only_the_old_workflow_admission() {
-        let (db, execution_id) = seeded_terminal_execution(false).await;
+        let (db, execution_id) = Box::pin(seeded_terminal_execution(false)).await;
 
         let projected = db
             .project_task_board_read_only_workflow_terminal(&execution_id)
@@ -183,7 +183,7 @@ mod tests {
 
     #[tokio::test]
     async fn completed_projection_preserves_an_item_revision_change() {
-        let (db, execution_id) = seeded_terminal_execution(true).await;
+        let (db, execution_id) = Box::pin(seeded_terminal_execution(true)).await;
         sqlx::query("UPDATE task_board_items SET title = 'Edited', revision = 2 WHERE item_id = 'terminal-item'")
             .execute(db.pool())
             .await
@@ -207,7 +207,7 @@ mod tests {
 
     #[tokio::test]
     async fn human_required_projection_survives_an_item_revision_change() {
-        let (db, execution_id) = seeded_terminal_execution(true).await;
+        let (db, execution_id) = Box::pin(seeded_terminal_execution(true)).await;
         let current = db
             .task_board_workflow_execution(&execution_id)
             .await
@@ -249,7 +249,7 @@ mod tests {
 
     #[tokio::test]
     async fn startup_recovery_releases_only_owners_without_an_execution() {
-        let (db, execution_id) = seeded_active_execution().await;
+        let (db, execution_id) = Box::pin(seeded_active_execution()).await;
 
         let retained = db
             .recover_orphaned_task_board_read_only_workflow_admissions()
@@ -308,11 +308,11 @@ mod tests {
     }
 
     async fn seeded_terminal_execution(correct_identity: bool) -> (AsyncDaemonDb, String) {
-        seeded_execution(correct_identity, true).await
+        Box::pin(seeded_execution(correct_identity, true)).await
     }
 
     async fn seeded_active_execution() -> (AsyncDaemonDb, String) {
-        seeded_execution(true, false).await
+        Box::pin(seeded_execution(true, false)).await
     }
 
     async fn seeded_execution(correct_identity: bool, terminal: bool) -> (AsyncDaemonDb, String) {

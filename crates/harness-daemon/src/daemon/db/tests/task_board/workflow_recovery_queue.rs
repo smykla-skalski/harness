@@ -13,8 +13,8 @@ const LATE: &str = "2026-07-17T10:00:00Z";
 #[tokio::test]
 async fn recovery_cursor_survives_reopen_and_wraps() {
     let (db, temp) = workflow_database().await;
-    running_execution(&db, "a", EARLY).await;
-    running_execution(&db, "b", LATE).await;
+    Box::pin(running_execution(&db, "a", EARLY)).await;
+    Box::pin(running_execution(&db, "b", LATE)).await;
 
     assert_eq!(
         execution_ids::<1>(
@@ -52,8 +52,8 @@ async fn recovery_cursor_survives_reopen_and_wraps() {
 #[tokio::test]
 async fn zero_and_exact_limit_do_not_create_or_mutate_cursor_or_semantic_state() {
     let (db, _temp) = workflow_database().await;
-    let first = running_execution(&db, "a", EARLY).await;
-    let second = running_execution(&db, "b", LATE).await;
+    let first = Box::pin(running_execution(&db, "a", EARLY)).await;
+    let second = Box::pin(running_execution(&db, "b", LATE)).await;
     let sequence = db.current_change_sequence().await.expect("change sequence");
 
     assert!(
@@ -106,10 +106,10 @@ async fn zero_and_exact_limit_do_not_create_or_mutate_cursor_or_semantic_state()
 #[tokio::test]
 async fn recovery_cursor_partially_wraps_across_tied_timestamps() {
     let (db, _temp) = workflow_database().await;
-    running_execution(&db, "a", EARLY).await;
-    running_execution(&db, "b", MIDDLE).await;
-    let cursor = running_execution(&db, "c", LATE).await;
-    running_execution(&db, "d", LATE).await;
+    Box::pin(running_execution(&db, "a", EARLY)).await;
+    Box::pin(running_execution(&db, "b", MIDDLE)).await;
+    let cursor = Box::pin(running_execution(&db, "c", LATE)).await;
+    Box::pin(running_execution(&db, "d", LATE)).await;
     store_cursor(&db, &cursor.updated_at, &cursor.execution_id).await;
 
     let page = db
@@ -130,9 +130,9 @@ async fn recovery_cursor_partially_wraps_across_tied_timestamps() {
 #[tokio::test]
 async fn vanished_cursor_target_wraps_from_queue_start() {
     let (db, _temp) = workflow_database().await;
-    running_execution(&db, "a", EARLY).await;
-    running_execution(&db, "b", MIDDLE).await;
-    let vanished = running_execution(&db, "c", LATE).await;
+    Box::pin(running_execution(&db, "a", EARLY)).await;
+    Box::pin(running_execution(&db, "b", MIDDLE)).await;
+    let vanished = Box::pin(running_execution(&db, "c", LATE)).await;
     store_cursor(&db, &vanished.updated_at, &vanished.execution_id).await;
     query("DELETE FROM task_board_workflow_executions WHERE execution_id = ?1")
         .bind(&vanished.execution_id)
@@ -155,8 +155,8 @@ async fn vanished_cursor_target_wraps_from_queue_start() {
 #[tokio::test]
 async fn concurrent_recovery_selectors_advance_successive_windows() {
     let (db, temp) = workflow_database().await;
-    running_execution(&db, "a", EARLY).await;
-    running_execution(&db, "b", LATE).await;
+    Box::pin(running_execution(&db, "a", EARLY)).await;
+    Box::pin(running_execution(&db, "b", LATE)).await;
     let other = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open concurrent selector");
@@ -188,7 +188,7 @@ async fn remote_candidates_and_local_recovery_use_independent_restart_safe_curso
             20..=27 => TaskBoardExecutionState::Starting,
             _ => TaskBoardExecutionState::Preparing,
         };
-        mixed_execution(&db, index, state).await;
+        Box::pin(mixed_execution(&db, index, state)).await;
     }
 
     let first_remote = db
@@ -255,8 +255,8 @@ async fn remote_candidates_and_local_recovery_use_independent_restart_safe_curso
 #[tokio::test]
 async fn malformed_candidate_rolls_back_cursor() {
     let (db, _temp) = workflow_database().await;
-    running_execution(&db, "a", EARLY).await;
-    running_execution(&db, "b", LATE).await;
+    Box::pin(running_execution(&db, "a", EARLY)).await;
+    Box::pin(running_execution(&db, "b", LATE)).await;
     db.recoverable_task_board_workflow_executions(1)
         .await
         .expect("select first recovery page");
@@ -306,8 +306,8 @@ async fn malformed_candidate_rolls_back_cursor() {
 #[tokio::test]
 async fn malformed_candidate_attempt_rolls_back_cursor() {
     let (db, _temp) = workflow_database().await;
-    running_execution(&db, "a", EARLY).await;
-    running_execution(&db, "b", LATE).await;
+    Box::pin(running_execution(&db, "a", EARLY)).await;
+    Box::pin(running_execution(&db, "b", LATE)).await;
     db.recoverable_task_board_workflow_executions(1)
         .await
         .expect("select first recovery page");
@@ -342,8 +342,18 @@ async fn malformed_candidate_attempt_rolls_back_cursor() {
 #[tokio::test]
 async fn selection_preserves_timestamps_and_later_execution_cas() {
     let (db, _temp) = workflow_database().await;
-    let first = running_execution(&db, "a", "2026-07-17T09:30:00.123456789Z").await;
-    let second = running_execution(&db, "b", "2099-07-17T09:30:00.987654321Z").await;
+    let first = Box::pin(running_execution(
+        &db,
+        "a",
+        "2026-07-17T09:30:00.123456789Z",
+    ))
+    .await;
+    let second = Box::pin(running_execution(
+        &db,
+        "b",
+        "2099-07-17T09:30:00.987654321Z",
+    ))
+    .await;
     let sequence = db.current_change_sequence().await.expect("change sequence");
 
     let page = db
@@ -377,7 +387,7 @@ async fn running_execution(
     item_id: &str,
     updated_at: &str,
 ) -> TaskBoardWorkflowExecutionRecord {
-    let execution = create_execution(db, item_id, EARLY).await;
+    let execution = Box::pin(create_execution(db, item_id, EARLY)).await;
     set_state(
         db,
         execution,
@@ -394,7 +404,12 @@ async fn mixed_execution(
     state: TaskBoardExecutionState,
 ) -> TaskBoardWorkflowExecutionRecord {
     let timestamp = format!("2026-07-17T09:{index:02}:00Z");
-    let execution = create_execution(db, &format!("mixed-{index:02}"), &timestamp).await;
+    let execution = Box::pin(create_execution(
+        db,
+        &format!("mixed-{index:02}"),
+        &timestamp,
+    ))
+    .await;
     set_state(db, execution, state, None, &timestamp).await
 }
 

@@ -22,7 +22,7 @@ const OWNER: &str = "instance-a";
 
 #[tokio::test]
 async fn completed_review_persists_once_and_replays_after_restart() {
-    let (fixture, record, snapshot) = completed_review_fixture().await;
+    let (fixture, record, snapshot) = Box::pin(completed_review_fixture()).await;
     let TerminalEvidence::Completed { artifacts, .. } =
         completed_evidence(&record, &snapshot, Path::new(&snapshot.project_dir))
             .await
@@ -31,13 +31,13 @@ async fn completed_review_persists_once_and_replays_after_restart() {
         panic!("completed review produced failed evidence");
     };
 
-    persist_terminal_snapshot(
+    Box::pin(persist_terminal_snapshot(
         &fixture.db,
         OWNER,
         &record,
         &snapshot,
         Path::new(&snapshot.project_dir),
-    )
+    ))
     .await
     .expect("persist terminal review evidence");
     let committed = fixture
@@ -75,7 +75,7 @@ async fn completed_review_persists_once_and_replays_after_restart() {
 
 #[tokio::test]
 async fn completed_run_without_a_result_fails_closed_without_artifacts() {
-    let (fixture, record, mut snapshot) = completed_review_fixture().await;
+    let (fixture, record, mut snapshot) = Box::pin(completed_review_fixture()).await;
     snapshot.final_message = None;
     fixture
         .db
@@ -83,13 +83,13 @@ async fn completed_run_without_a_result_fails_closed_without_artifacts() {
         .await
         .expect("persist invalid completed run");
 
-    persist_terminal_snapshot(
+    Box::pin(persist_terminal_snapshot(
         &fixture.db,
         OWNER,
         &record,
         &snapshot,
         Path::new(&snapshot.project_dir),
-    )
+    ))
     .await
     .expect("persist fail-closed terminal evidence");
     let failed = fixture
@@ -114,7 +114,7 @@ async fn completed_run_without_a_result_fails_closed_without_artifacts() {
 
 #[tokio::test]
 async fn oversized_completed_result_persists_only_small_failed_evidence() {
-    let (fixture, record, mut snapshot) = completed_review_fixture().await;
+    let (fixture, record, mut snapshot) = Box::pin(completed_review_fixture()).await;
     let mut result = review_result(&record);
     let TaskBoardAttemptResultArtifact::Review(review) = &mut result.artifact else {
         panic!("review fixture produced another result kind");
@@ -129,13 +129,13 @@ async fn oversized_completed_result_persists_only_small_failed_evidence() {
         .await
         .expect("persist oversized completed run evidence");
 
-    persist_terminal_snapshot(
+    Box::pin(persist_terminal_snapshot(
         &fixture.db,
         OWNER,
         &record,
         &snapshot,
         Path::new(&snapshot.project_dir),
-    )
+    ))
     .await
     .expect("persist bounded fail-closed terminal evidence");
     let failed = fixture
@@ -186,8 +186,12 @@ async fn completed_review_fixture() -> (
             .expect("claim executor assignment"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
-    authorize_and_start_remote_executor(&fixture, &accepted.assignment_id, "2026-07-19T10:00:20Z")
-        .await;
+    Box::pin(authorize_and_start_remote_executor(
+        &fixture,
+        &accepted.assignment_id,
+        "2026-07-19T10:00:20Z",
+    ))
+    .await;
     let record = fixture
         .db
         .task_board_remote_assignment(&accepted.assignment_id)

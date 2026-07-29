@@ -22,7 +22,7 @@ const SCAN_AT: &str = "2026-07-20T12:00:00Z";
 
 #[tokio::test]
 async fn controller_scan_replays_a_durable_active_generation_across_restart() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     assert!(matches!(
         offer_controller(&fixture).await,
         TaskBoardRemoteOfferOutcome::Created(_)
@@ -69,7 +69,7 @@ async fn controller_scan_replays_a_durable_active_generation_across_restart() {
 
 #[tokio::test]
 async fn malformed_controller_generation_is_quarantined_without_reblocking_the_scan() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     assert!(matches!(
         offer_controller(&fixture).await,
         TaskBoardRemoteOfferOutcome::Created(_)
@@ -131,8 +131,8 @@ async fn malformed_controller_generation_is_quarantined_without_reblocking_the_s
 
 #[tokio::test]
 async fn terminal_handoff_retry_does_not_hold_the_global_progression_gate() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let request = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: fixture.request.binding.clone(),
@@ -164,11 +164,13 @@ async fn terminal_handoff_retry_does_not_hold_the_global_progression_gate() {
         .expect("claim terminal handoff cancellation")
         .expect("terminal handoff cancellation remains active");
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_assignment_cancel(&request, &response, HOST, CLAIMED_AT)
-            .await
-            .expect("persist terminal projection handoff"),
+        Box::pin(
+            fixture
+                .db
+                .record_task_board_remote_assignment_cancel(&request, &response, HOST, CLAIMED_AT)
+        )
+        .await
+        .expect("persist terminal projection handoff"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
 
@@ -208,8 +210,8 @@ async fn terminal_handoff_retry_does_not_hold_the_global_progression_gate() {
 
 #[tokio::test]
 async fn late_local_fallback_with_retained_lease_is_not_scan_visible() {
-    let fixture = controller_fixture(1).await;
-    let assignment = late_accept_local_fallback(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let assignment = Box::pin(late_accept_local_fallback(&fixture)).await;
     assert_eq!(assignment.state, TaskBoardRemoteAssignmentState::Superseded);
     assert_eq!(assignment.lease_id.as_deref(), Some("lease-l1"));
 
@@ -237,8 +239,8 @@ async fn late_local_fallback_with_retained_lease_is_not_scan_visible() {
 
 #[tokio::test]
 async fn quarantined_local_fallback_with_retained_lease_does_not_block_progression() {
-    let fixture = controller_fixture(1).await;
-    let assignment = late_accept_local_fallback(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let assignment = Box::pin(late_accept_local_fallback(&fixture)).await;
 
     // A daemon predating the resolved-handoff scan exclusion could have quarantined this
     // generation under the progression code. The global gate must still treat the resolved
@@ -297,11 +299,13 @@ async fn late_accept_local_fallback(
         }),
         rejection_code: None,
     };
-    match fixture
-        .db
-        .record_task_board_remote_offer_response(&response, HOST, AFTER_EXPIRY)
-        .await
-        .expect("record late accepted offer")
+    match Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &response,
+        HOST,
+        AFTER_EXPIRY,
+    ))
+    .await
+    .expect("record late accepted offer")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected local fallback from a late acceptance, got {other:?}"),

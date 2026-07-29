@@ -115,7 +115,7 @@ async fn held_fixture() -> HeldFixture {
 
 #[tokio::test]
 async fn held_delivery_rechecks_kill_switch_then_advances_worker_state() {
-    let fixture = held_fixture().await;
+    let fixture = Box::pin(held_fixture()).await;
     fixture
         .db
         .update_policy_workspace(|workspace| {
@@ -188,7 +188,7 @@ async fn held_delivery_rechecks_kill_switch_then_advances_worker_state() {
 
 #[tokio::test]
 async fn failed_worker_start_restores_unexpired_one_shot_grant() {
-    let fixture = held_fixture().await;
+    let fixture = Box::pin(held_fixture()).await;
     let claim = fixture
         .db
         .claim_held_task_board_dispatch(&fixture.item_id)
@@ -275,7 +275,7 @@ async fn missing_held_delivery_states_the_real_reason_not_a_session_conflict() {
 
 #[tokio::test]
 async fn expired_or_revision_stale_grant_cannot_claim_held_delivery() {
-    let fixture = held_fixture().await;
+    let fixture = Box::pin(held_fixture()).await;
     sqlx::query(
         "UPDATE policy_approval_grants
          SET created_at = '2020-01-01T00:00:00Z', expiry_seconds = 1
@@ -301,7 +301,7 @@ async fn expired_or_revision_stale_grant_cannot_claim_held_delivery() {
         1
     );
 
-    let fixture = held_fixture().await;
+    let fixture = Box::pin(held_fixture()).await;
     fixture
         .db
         .update_policy_workspace(|workspace| {
@@ -391,7 +391,7 @@ fn approval_graph(revision: u64) -> PolicyGraph {
 #[tokio::test]
 async fn an_unrenderable_prompt_leaves_the_dispatch_held_and_the_grant_live() {
     let _lock = crate::task_board::prompt_catalog::prompt_catalog_test_lock();
-    let fixture = held_fixture().await;
+    let fixture = Box::pin(held_fixture()).await;
     let _installed = crate::task_board::prompt_catalog::scoped_prompt_catalog(
         crate::task_board::prompt_catalog::PromptCatalog::from_json(
             br#"{"worker": "Do {{ board_item_id }} for {{ project_id }}"}"#,

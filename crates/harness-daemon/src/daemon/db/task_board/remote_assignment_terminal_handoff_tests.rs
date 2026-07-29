@@ -32,8 +32,8 @@ async fn detached_completed_or_failed_cannot_record_terminal_cleanup_or_settleme
         TaskBoardRemoteAssignmentState::Completed,
         TaskBoardRemoteAssignmentState::Failed,
     ] {
-        let fixture = controller_fixture(1).await;
-        let assignment = detached_terminal_assignment(&fixture, state).await;
+        let fixture = Box::pin(controller_fixture(1)).await;
+        let assignment = Box::pin(detached_terminal_assignment(&fixture, state)).await;
         restore_parent_to_targetless_preparing(&fixture).await;
         let parent = load_parent(&fixture).await;
         let sequence = fixture
@@ -86,8 +86,8 @@ async fn detached_completed_or_failed_cannot_record_terminal_cleanup_or_settleme
 
 #[tokio::test]
 async fn exact_detached_superseded_cleanup_handoff_replays() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     restore_parent_to_targetless_preparing(&fixture).await;
     let assignment = match fixture
         .db
@@ -117,9 +117,9 @@ async fn exact_detached_superseded_cleanup_handoff_replays() {
 
 #[tokio::test]
 async fn recovered_unknown_definitive_evidence_handoff_is_exact_and_replayable() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let running_request = status_request(&fixture.request, &claimed);
     fixture
         .db
@@ -199,9 +199,12 @@ async fn set_item_to_active_remote_execution(fixture: &ControllerFixture) {
 
 #[tokio::test]
 async fn result_adopted_handoff_is_exact_and_replayable() {
-    let fixture = controller_fixture(1).await;
-    let assignment =
-        detached_terminal_assignment(&fixture, TaskBoardRemoteAssignmentState::Failed).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let assignment = Box::pin(detached_terminal_assignment(
+        &fixture,
+        TaskBoardRemoteAssignmentState::Failed,
+    ))
+    .await;
     let parent = load_parent(&fixture).await;
 
     assert!(matches!(
@@ -260,8 +263,8 @@ pub(crate) async fn detached_terminal_assignment(
     fixture: &ControllerFixture,
     state: TaskBoardRemoteAssignmentState,
 ) -> super::TaskBoardRemoteAssignmentRecord {
-    let accepted = accept_controller(fixture).await;
-    let claimed = claim_controller(fixture, &accepted).await;
+    let accepted = Box::pin(accept_controller(fixture)).await;
+    let claimed = Box::pin(claim_controller(fixture, &accepted)).await;
     let running_request = status_request(&fixture.request, &claimed);
     let running = fixture
         .db

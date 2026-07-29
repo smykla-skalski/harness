@@ -13,7 +13,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn offer_response_cannot_cross_a_host_trust_rotation() {
-    let state = central_offer().await;
+    let state = Box::pin(central_offer()).await;
     let response = accepted_offer(&state);
     let tls = test_tls_material();
     let server = spawn_barrier_server(
@@ -26,7 +26,7 @@ async fn offer_response_cannot_cross_a_host_trust_rotation() {
     let request = state.fixture.request.clone();
 
     temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let call = tokio::spawn(async move { controller.offer(&db, &request).await });
+        let call = tokio::spawn(async move { Box::pin(controller.offer(&db, &request)).await });
         server.seen.await.expect("offer reached executor");
         rotate_host_trust(&state.fixture.db).await;
         server
@@ -61,8 +61,8 @@ async fn offer_response_cannot_cross_a_host_trust_rotation() {
 
 #[tokio::test]
 async fn status_evidence_cannot_cross_a_host_trust_rotation() {
-    let state = prepared_acceptance("status-trust-rotation").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("status-trust-rotation")).await;
+    Box::pin(persist_claim(&state)).await;
     let request = status_request(&state);
     let response = completed_status(&state);
     let tls = test_tls_material();
@@ -115,7 +115,7 @@ async fn status_evidence_cannot_cross_a_host_trust_rotation() {
 
 #[tokio::test]
 async fn claim_response_cannot_cross_a_host_trust_rotation() {
-    let state = prepared_acceptance("claim-trust-rotation").await;
+    let state = Box::pin(prepared_acceptance("claim-trust-rotation")).await;
     let request = claim_request(&state);
     let response = claim_response(&state);
     let tls = test_tls_material();
@@ -135,7 +135,7 @@ async fn claim_response_cannot_cross_a_host_trust_rotation() {
     let db = state.prepared.db.clone();
 
     temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let call = tokio::spawn(async move { controller.claim(&db, &request).await });
+        let call = tokio::spawn(async move { Box::pin(controller.claim(&db, &request)).await });
         server.seen.await.expect("claim reached executor");
         rotate_host_trust(&state.prepared.db).await;
         server
@@ -162,8 +162,8 @@ async fn claim_response_cannot_cross_a_host_trust_rotation() {
 
 #[tokio::test]
 async fn renewal_response_cannot_cross_a_host_trust_rotation() {
-    let state = prepared_acceptance("renew-trust-rotation").await;
-    persist_claim(&state).await;
+    let state = Box::pin(prepared_acceptance("renew-trust-rotation")).await;
+    Box::pin(persist_claim(&state)).await;
     let request = renewal_request(&state);
     let response = renewal_response(&state);
     let tls = test_tls_material();
@@ -210,7 +210,7 @@ async fn renewal_response_cannot_cross_a_host_trust_rotation() {
 
 #[tokio::test]
 async fn cancel_response_cannot_cross_a_host_trust_rotation() {
-    let state = prepared_acceptance("cancel-trust-rotation").await;
+    let state = Box::pin(prepared_acceptance("cancel-trust-rotation")).await;
     let request = cancel_request(&state.prepared.offer, "lease-admission");
     let response = cancel_response(&state.prepared.offer, &state.times.before_expiry);
     let tls = test_tls_material();
@@ -230,7 +230,7 @@ async fn cancel_response_cannot_cross_a_host_trust_rotation() {
     let db = state.prepared.db.clone();
 
     temp_env::async_with_vars([(TOKEN_ENV, Some("authority-secret"))], async {
-        let call = tokio::spawn(async move { controller.cancel(&db, &request).await });
+        let call = tokio::spawn(async move { Box::pin(controller.cancel(&db, &request)).await });
         server.seen.await.expect("cancel reached executor");
         rotate_host_trust(&state.prepared.db).await;
         server
@@ -269,7 +269,7 @@ async fn cancel_response_cannot_cross_a_host_trust_rotation() {
 
 #[tokio::test]
 async fn settlement_response_cannot_cross_a_host_trust_rotation() {
-    let state = settlement_ready_controller("settlement-trust-rotation").await;
+    let state = Box::pin(settlement_ready_controller("settlement-trust-rotation")).await;
     let (request, response) = settlement(&state).await;
     let tls = test_tls_material();
     let server = spawn_barrier_server(

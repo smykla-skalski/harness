@@ -16,7 +16,7 @@ pub(super) const NOW: &str = "2026-07-17T10:00:00Z";
 #[tokio::test]
 async fn active_execution_adopts_only_the_exact_frozen_contract() {
     let (db, _temp) = workflow_database().await;
-    let record = create_execution(&db, "task-exact", "2026-07-17T09:00:00Z").await;
+    let record = Box::pin(create_execution(&db, "task-exact", "2026-07-17T09:00:00Z")).await;
     let sequence = db.current_change_sequence().await.expect("change sequence");
 
     let adopted = db
@@ -54,7 +54,12 @@ async fn active_execution_adopts_only_the_exact_frozen_contract() {
 #[tokio::test]
 async fn active_execution_rejects_conflicting_identity_or_frozen_contract() {
     let (db, _temp) = workflow_database().await;
-    let record = create_execution(&db, "task-conflict", "2026-07-17T09:00:00Z").await;
+    let record = Box::pin(create_execution(
+        &db,
+        "task-conflict",
+        "2026-07-17T09:00:00Z",
+    ))
+    .await;
     let sequence = db.current_change_sequence().await.expect("change sequence");
     let mut conflicting_id = record.clone();
     conflicting_id.execution_id = "execution-conflicting".into();
@@ -84,12 +89,42 @@ async fn active_execution_rejects_conflicting_identity_or_frozen_contract() {
 #[tokio::test]
 async fn admission_ready_and_recoverable_queues_are_disjoint_and_ordered() {
     let (db, _temp) = workflow_database().await;
-    let retry_due = create_execution(&db, "task-retry-due", "2026-07-17T09:00:00Z").await;
-    let _pending = create_execution(&db, "task-pending", "2026-07-17T09:45:00Z").await;
-    let retry_future = create_execution(&db, "task-retry-future", "2026-07-17T09:05:00Z").await;
-    let preparing = create_execution(&db, "task-preparing", "2026-07-17T09:10:00Z").await;
-    let starting = create_execution(&db, "task-starting", "2026-07-17T09:20:00Z").await;
-    let running = create_execution(&db, "task-running", "2026-07-17T09:30:00Z").await;
+    let retry_due = Box::pin(create_execution(
+        &db,
+        "task-retry-due",
+        "2026-07-17T09:00:00Z",
+    ))
+    .await;
+    let _pending = Box::pin(create_execution(
+        &db,
+        "task-pending",
+        "2026-07-17T09:45:00Z",
+    ))
+    .await;
+    let retry_future = Box::pin(create_execution(
+        &db,
+        "task-retry-future",
+        "2026-07-17T09:05:00Z",
+    ))
+    .await;
+    let preparing = Box::pin(create_execution(
+        &db,
+        "task-preparing",
+        "2026-07-17T09:10:00Z",
+    ))
+    .await;
+    let starting = Box::pin(create_execution(
+        &db,
+        "task-starting",
+        "2026-07-17T09:20:00Z",
+    ))
+    .await;
+    let running = Box::pin(create_execution(
+        &db,
+        "task-running",
+        "2026-07-17T09:30:00Z",
+    ))
+    .await;
     set_state(
         &db,
         retry_due,
@@ -184,7 +219,7 @@ async fn admission_ready_and_recoverable_queues_are_disjoint_and_ordered() {
 #[tokio::test]
 async fn terminal_queue_includes_unprojected_execution_without_a_concurrency_ledger() {
     let (db, _temp) = workflow_database().await;
-    let execution = create_unprojected_terminal_execution(&db, "task-no-ledger").await;
+    let execution = Box::pin(create_unprojected_terminal_execution(&db, "task-no-ledger")).await;
 
     let projectable = db
         .projectable_task_board_read_only_workflow_executions(10)
@@ -209,7 +244,7 @@ async fn terminal_queue_includes_unprojected_execution_without_a_concurrency_led
 #[tokio::test]
 async fn terminal_queue_excludes_no_ledger_execution_after_projection() {
     let (db, _temp) = workflow_database().await;
-    let execution = create_unprojected_terminal_execution(&db, "task-projected").await;
+    let execution = Box::pin(create_unprojected_terminal_execution(&db, "task-projected")).await;
 
     let projection = db
         .project_task_board_read_only_workflow_terminal(&execution.execution_id)
@@ -435,6 +470,5 @@ pub(super) fn execution_ids<const N: usize>(
         .map(|execution| execution.execution_id.as_str())
         .collect::<Vec<_>>()
         .try_into()
-        .ok()
         .expect("expected execution count")
 }

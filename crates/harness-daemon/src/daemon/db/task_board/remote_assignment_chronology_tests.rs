@@ -64,20 +64,19 @@ async fn malformed_and_noncanonical_persisted_times_fail_closed_on_load() {
         .bind(claimed_at)
         .execute(fixture.db.pool())
         .await;
-        match corruption {
-            Err(error) => assert!(error.to_string().contains("CHECK constraint failed")),
-            Ok(_) => {
-                let error = fixture
-                    .db
-                    .task_board_remote_assignment(&fixture.request.binding.assignment_id)
-                    .await
-                    .expect_err("noncanonical persisted time must fail closed");
-                assert!(
-                    error
-                        .to_string()
-                        .contains("durable remote assignment claim time")
-                );
-            }
+        if let Err(error) = corruption {
+            assert!(error.to_string().contains("CHECK constraint failed"))
+        } else {
+            let error = fixture
+                .db
+                .task_board_remote_assignment(&fixture.request.binding.assignment_id)
+                .await
+                .expect_err("noncanonical persisted time must fail closed");
+            assert!(
+                error
+                    .to_string()
+                    .contains("durable remote assignment claim time")
+            );
         }
     }
 }

@@ -8,7 +8,7 @@ use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, Task
 #[tokio::test]
 async fn same_evidence_with_missing_builtin_placement_reapplies_and_reports_retained_effect() {
     let (_directory, db) = connect().await;
-    let item_id = seed_decided_todo_item(&db).await;
+    let item_id = Box::pin(seed_decided_todo_item(&db)).await;
 
     let mut transaction = db
         .begin_immediate_transaction("test missing placement")
@@ -43,7 +43,7 @@ async fn same_evidence_with_missing_builtin_placement_reapplies_and_reports_reta
 #[tokio::test]
 async fn same_evidence_with_wrong_automatic_producer_reapplies_and_reports_retained_effect() {
     let (_directory, db) = connect().await;
-    let item_id = seed_decided_todo_item(&db).await;
+    let item_id = Box::pin(seed_decided_todo_item(&db)).await;
 
     let mut transaction = db
         .begin_immediate_transaction("test wrong producer")
@@ -144,7 +144,7 @@ async fn same_evidence_with_stale_inbox_placement_reports_retained_effect() {
 #[tokio::test]
 async fn human_suppressed_status_move_produces_no_retained_effect_audit() {
     let (_directory, db) = connect().await;
-    let item_id = seed_decided_todo_item(&db).await;
+    let item_id = Box::pin(seed_decided_todo_item(&db)).await;
 
     let mut transaction = db
         .begin_immediate_transaction("test suppressed move")

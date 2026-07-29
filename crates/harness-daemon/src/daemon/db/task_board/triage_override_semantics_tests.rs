@@ -48,7 +48,7 @@ async fn set_todo_promotes_a_inbox_item_with_ranked_placement() {
 #[tokio::test]
 async fn set_undecided_demotes_an_automatically_placed_todo_item_to_inbox() {
     let (_directory, db) = connect().await;
-    seed_decided_todo(&db, "item-1").await;
+    Box::pin(seed_decided_todo(&db, "item-1")).await;
     let expected_item_revision = revision(&db, "item-1").await;
     let expected_items_change_seq = seq(&db).await;
 
@@ -131,7 +131,7 @@ async fn automatic_evaluation_keeps_deciding_but_never_moves_placement_while_ove
 #[tokio::test]
 async fn clear_reconciles_the_latest_automatic_decision_without_new_decision_history() {
     let (_directory, db) = connect().await;
-    seed_decided_todo(&db, "item-1").await;
+    Box::pin(seed_decided_todo(&db, "item-1")).await;
     let expected_item_revision = revision(&db, "item-1").await;
     let expected_items_change_seq = seq(&db).await;
     db.set_task_board_triage_override(TaskBoardTriageOverrideSetInput {
@@ -265,7 +265,7 @@ async fn set_todo_override_moves_a_manually_anchored_inbox_item_to_todo() {
 #[tokio::test]
 async fn clear_reconciles_a_manually_anchored_item_to_the_latest_decision() {
     let (_directory, db) = connect().await;
-    seed_decided_todo(&db, "item-1").await;
+    Box::pin(seed_decided_todo(&db, "item-1")).await;
     let expected_item_revision = revision(&db, "item-1").await;
     let expected_items_change_seq = seq(&db).await;
     db.set_task_board_triage_override(TaskBoardTriageOverrideSetInput {
@@ -384,7 +384,7 @@ async fn anchor_manually(db: &AsyncDaemonDb, item_id: &str, position: u32) {
 #[tokio::test]
 async fn set_agreeing_with_an_existing_builtin_placement_preserves_its_producer() {
     let (_directory, db) = connect().await;
-    seed_decided_todo(&db, "item-1").await;
+    Box::pin(seed_decided_todo(&db, "item-1")).await;
     let expected_item_revision = revision(&db, "item-1").await;
     let expected_items_change_seq = seq(&db).await;
 

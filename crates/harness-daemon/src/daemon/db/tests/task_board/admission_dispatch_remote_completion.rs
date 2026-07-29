@@ -10,7 +10,7 @@ use crate::task_board::TaskBoardWorkflowExecutionCas;
 
 #[tokio::test]
 async fn remote_claim_keeps_finite_admission_reserved_until_exact_start_evidence() {
-    let prepared = claimed_remote_without_start("admission-remote-start").await;
+    let prepared = Box::pin(claimed_remote_without_start("admission-remote-start")).await;
     let status_request = remote_status_request(&prepared.offer);
 
     assert_claim_does_not_commit(&prepared).await;
@@ -28,7 +28,7 @@ async fn remote_claim_keeps_finite_admission_reserved_until_exact_start_evidence
 
 #[tokio::test]
 async fn workflow_prepared_remote_claim_blocks_public_item_mutation() {
-    let prepared = claimed_remote_without_start("admission-remote-mutation").await;
+    let prepared = Box::pin(claimed_remote_without_start("admission-remote-mutation")).await;
     let error = prepared
         .db
         .update_task_board_item(&prepared.execution.item_id, |item| {
@@ -45,7 +45,7 @@ async fn workflow_prepared_remote_claim_blocks_public_item_mutation() {
 }
 
 async fn claimed_remote_without_start(label: &str) -> PreparedRemoteOffer {
-    let prepared = prepare_remote_offer_with_policy(label, true).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(label, true)).await;
     prepared
         .db
         .offer_task_board_remote_assignment(
@@ -71,15 +71,13 @@ async fn claimed_remote_without_start(label: &str) -> PreparedRemoteOffer {
         .await
         .expect("claim offer I/O authority")
         .expect("remote offer stays active");
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared.offer),
-            "executor-a",
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared.offer),
+        "executor-a",
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer");
     // Grant the claim I/O authority (response treated as lost) so the claim-only status
     // reconstructs the claim and promotes the assignment.
     let accepted = prepared

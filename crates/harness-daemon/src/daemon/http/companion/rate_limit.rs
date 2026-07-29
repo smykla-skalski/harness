@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn ipv6_privacy_addresses_in_one_prefix_share_a_budget() {
         let now = Instant::now();
-        let mut limiter = OAuthStartRateLimiter::with_limits(1, 4, Duration::from_secs(60));
+        let mut limiter = OAuthStartRateLimiter::with_limits(1, 4, Duration::from_mins(1));
         let first = "2001:db8:1:2::1".parse().expect("first IPv6 address");
         let rotated = "2001:db8:1:2::2".parse().expect("rotated IPv6 address");
         let other_prefix = "2001:db8:1:3::1".parse().expect("other IPv6 prefix");
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn ipv4_mapped_ipv6_keeps_distinct_ipv4_budgets() {
         let now = Instant::now();
-        let mut limiter = OAuthStartRateLimiter::with_limits(1, 4, Duration::from_secs(60));
+        let mut limiter = OAuthStartRateLimiter::with_limits(1, 4, Duration::from_mins(1));
         let first = "::ffff:192.0.2.1".parse().expect("first mapped address");
         let second = "::ffff:192.0.2.2".parse().expect("second mapped address");
 
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn ipv4_loopback_representations_share_a_budget() {
         let now = Instant::now();
-        let mut limiter = OAuthStartRateLimiter::with_limits(1, 4, Duration::from_secs(60));
+        let mut limiter = OAuthStartRateLimiter::with_limits(1, 4, Duration::from_mins(1));
         let first = IpAddr::from([127, 0, 0, 2]);
         let native = IpAddr::from([127, 255, 255, 254]);
         let mapped = "::ffff:127.42.0.1"
@@ -237,7 +237,7 @@ mod tests {
             Err(1)
         );
         assert_eq!(
-            limiter.admit(source(1), now + Duration::from_secs(600)),
+            limiter.admit(source(1), now + Duration::from_mins(10)),
             Ok(())
         );
     }
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn a_window_boundary_cannot_double_one_sources_live_budget() {
         let now = Instant::now();
-        let mut limiter = OAuthStartRateLimiter::with_limits(2, 4, Duration::from_secs(60));
+        let mut limiter = OAuthStartRateLimiter::with_limits(2, 4, Duration::from_mins(1));
 
         assert_eq!(limiter.admit(source(1), now), Ok(()));
         assert_eq!(
@@ -253,11 +253,11 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            limiter.admit(source(1), now + Duration::from_secs(60)),
+            limiter.admit(source(1), now + Duration::from_mins(1)),
             Ok(())
         );
         assert_eq!(
-            limiter.admit(source(1), now + Duration::from_secs(60)),
+            limiter.admit(source(1), now + Duration::from_mins(1)),
             Err(59)
         );
     }
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn capacity_refuses_new_sources_without_evicting_active_budgets() {
         let now = Instant::now();
-        let mut limiter = OAuthStartRateLimiter::with_limits(1, 2, Duration::from_secs(60));
+        let mut limiter = OAuthStartRateLimiter::with_limits(1, 2, Duration::from_mins(1));
 
         assert_eq!(limiter.admit(source(1), now), Ok(()));
         assert_eq!(limiter.admit(source(2), now), Ok(()));
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(limiter.admit(source(1), now), Err(60));
 
         assert_eq!(
-            limiter.admit(source(3), now + Duration::from_secs(60)),
+            limiter.admit(source(3), now + Duration::from_mins(1)),
             Ok(())
         );
         assert_eq!(limiter.sources.len(), 1);

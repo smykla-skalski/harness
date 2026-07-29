@@ -79,7 +79,7 @@ fn only_ambiguous_renewal_failures_replay_the_exact_request() {
 
 #[tokio::test]
 async fn claim_and_lost_renewal_response_converge_through_durable_controller_cas() {
-    let (fixture, times) = prepared_controller_fixture().await;
+    let (fixture, times) = Box::pin(prepared_controller_fixture()).await;
 
     let claim_request = claim_request(&fixture.request, "lease-l1");
     let claim_response = claim_response(&fixture.request, &times.initial_expiry, &times.offered_at);
@@ -95,10 +95,10 @@ async fn claim_and_lost_renewal_response_converge_through_durable_controller_cas
     let client = pinned_client(&endpoint, &tls);
     let controller = RemoteExecutionControllerClient::new_for_tests(HOST_ID, client);
 
-    let (claim, renewal) =
-        temp_env::async_with_vars([(TOKEN_ENV, Some("controller-secret"))], async {
-            let claimed = controller
-                .claim(&fixture.db, &claim_request)
+    let (claim, renewal) = Box::pin(temp_env::async_with_vars(
+        [(TOKEN_ENV, Some("controller-secret"))],
+        async {
+            let claimed = Box::pin(controller.claim(&fixture.db, &claim_request))
                 .await
                 .expect("claim response is durably recorded");
             let renewed = controller
@@ -106,8 +106,9 @@ async fn claim_and_lost_renewal_response_converge_through_durable_controller_cas
                 .await
                 .expect("exact renewal replay converges");
             (claimed, renewed)
-        })
-        .await;
+        },
+    ))
+    .await;
     assert_eq!(claim.0, claim_response);
     assert!(matches!(
         claim.1,
@@ -150,7 +151,7 @@ pub(super) struct ControllerTimes {
 }
 
 pub(super) async fn prepared_controller_fixture() -> (RemoteControllerFixture, ControllerTimes) {
-    let mut fixture = remote_controller_fixture(1).await;
+    let mut fixture = Box::pin(remote_controller_fixture(1)).await;
     let now = Utc::now();
     let times = ControllerTimes {
         offered_at: canonical_time(now),
@@ -210,15 +211,13 @@ pub(super) async fn prepared_controller_fixture() -> (RemoteControllerFixture, C
             .expect("claim offer I/O authority")
             .is_some()
     );
-    fixture
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&fixture.request, &times.initial_expiry),
-            HOST_ID,
-            &times.offered_at,
-        )
-        .await
-        .expect("persist accepted offer");
+    Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &accepted_offer(&fixture.request, &times.initial_expiry),
+        HOST_ID,
+        &times.offered_at,
+    ))
+    .await
+    .expect("persist accepted offer");
     (fixture, times)
 }
 

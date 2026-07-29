@@ -139,7 +139,7 @@ async fn missing_worker_compensation_commits_usage_and_releases_concurrency() {
 #[tokio::test]
 async fn compensation_lane_shift_uses_one_final_sequence_and_matching_audit() {
     let db = test_db().await;
-    let (intent, claim_token) = prepare_compensation_lane_shift(&db).await;
+    let (intent, claim_token) = Box::pin(prepare_compensation_lane_shift(&db)).await;
     let anchored = db.task_board_items_snapshot(None).await.expect("snapshot");
     let anchor_revision = anchored
         .items
@@ -208,7 +208,11 @@ async fn compensation_lane_shift_uses_one_final_sequence_and_matching_audit() {
 async fn compensation_restart_accepts_terminal_release_and_retains_consumed_grant() {
     let db = test_db().await;
     configure_policy(&db, admission_policy(1)).await;
-    let fixture = begin_compensation_with_grant(&db, "admission-terminal-compensation").await;
+    let fixture = Box::pin(begin_compensation_with_grant(
+        &db,
+        "admission-terminal-compensation",
+    ))
+    .await;
 
     let pending_restart = db.reopen().await;
     assert!(
@@ -265,7 +269,7 @@ async fn begin_compensation_with_grant(
         "2026-07-17T10:00:00Z".to_string(),
     ));
     db.create_task_board_item(item).await.expect("create item");
-    let grant = approved_grant(&db, item_id).await;
+    let grant = approved_grant(db, item_id).await;
     let mut plan = build_dispatch_plans_with_policy(
         &[db.task_board_item(item_id).await.expect("load item")],
         None,

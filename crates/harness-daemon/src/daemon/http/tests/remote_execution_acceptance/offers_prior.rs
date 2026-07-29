@@ -18,15 +18,19 @@ use crate::task_board::{
 fn authenticated_two_daemon_offer_acceptance_uses_adopted_default_task_prior_bundle_for_review() {
     run_deep_acceptance_async(|| async {
         let tls = test_tls_material();
-        with_acceptance_environment(&tls, "remote-acceptance-prior-default-review", async {
-            run_default_task_review_prior_bundle_case(&tls).await;
-        })
+        Box::pin(with_acceptance_environment(
+            &tls,
+            "remote-acceptance-prior-default-review",
+            async {
+                Box::pin(run_default_task_review_prior_bundle_case(&tls)).await;
+            },
+        ))
         .await;
     });
 }
 
 async fn run_default_task_review_prior_bundle_case(tls: &TestTlsMaterial) {
-    let baseline = prepare_default_task_prior_phase_baseline(tls).await;
+    let baseline = Box::pin(prepare_default_task_prior_phase_baseline(tls)).await;
     let controller_db = baseline
         .controller
         .async_db
@@ -60,7 +64,7 @@ async fn run_default_task_review_prior_bundle_case(tls: &TestTlsMaterial) {
     assert_prior_review_offer(&offer, &baseline.base_revision, &baseline.result_head);
 
     drive(controller_db, "authenticate prior-bundle review offer").await;
-    assert_accepted_without_claim(
+    Box::pin(assert_accepted_without_claim(
         controller_db,
         baseline
             .executor
@@ -68,7 +72,7 @@ async fn run_default_task_review_prior_bundle_case(tls: &TestTlsMaterial) {
             .get()
             .expect("prior-bundle executor database"),
         &offer,
-    )
+    ))
     .await;
     baseline.server.stop().await;
 }

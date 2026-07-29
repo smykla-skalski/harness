@@ -24,8 +24,12 @@ async fn started_terminal_observation_keeps_committed_admission_and_remote_paren
         RemoteAssignmentWireState::Failed,
         RemoteAssignmentWireState::Superseded,
     ] {
-        let prepared = prepare_remote_offer_with_policy("admission-remote-terminal", true).await;
-        persist_remote_start(&prepared).await;
+        let prepared = Box::pin(prepare_remote_offer_with_policy(
+            "admission-remote-terminal",
+            true,
+        ))
+        .await;
+        Box::pin(persist_remote_start(&prepared)).await;
         let parent = prepared
             .db
             .task_board_workflow_execution(&prepared.execution_id)
@@ -97,7 +101,11 @@ async fn started_terminal_observation_keeps_committed_admission_and_remote_paren
 
 #[tokio::test]
 async fn terminal_before_remote_start_keeps_prepared_admission_reserved() {
-    let prepared = prepare_remote_offer_with_policy("admission-remote-unstarted", true).await;
+    let prepared = Box::pin(prepare_remote_offer_with_policy(
+        "admission-remote-unstarted",
+        true,
+    ))
+    .await;
     offer_remote(&prepared, "2026-07-19T10:00:00Z", "2026-07-19T10:01:00Z")
         .await
         .expect("offer remote assignment");
@@ -111,15 +119,13 @@ async fn terminal_before_remote_start_keeps_prepared_admission_reserved() {
         .await
         .expect("claim offer I/O authority")
         .expect("offer remains active");
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared.offer),
-            "executor-a",
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared.offer),
+        "executor-a",
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer");
     let before = prepared
         .db
         .task_board_item_snapshot("admission-remote-unstarted")
@@ -196,8 +202,8 @@ async fn terminal_before_remote_start_keeps_prepared_admission_reserved() {
 
 #[tokio::test]
 async fn remote_start_keeps_the_unconfigured_admission_frozen_after_policy_enablement() {
-    let prepared = prepare_remote_offer("admission-remote-unconfigured").await;
-    persist_remote_start(&prepared).await;
+    let prepared = Box::pin(prepare_remote_offer("admission-remote-unconfigured")).await;
+    Box::pin(persist_remote_start(&prepared)).await;
     let PreparedRemoteOffer {
         db,
         intent,
@@ -221,7 +227,7 @@ async fn remote_start_keeps_the_unconfigured_admission_frozen_after_policy_enabl
 
 #[tokio::test]
 async fn unavailable_offer_does_not_freeze_unconfigured_admission_authority() {
-    let prepared = prepare_remote_offer("admission-remote-unavailable").await;
+    let prepared = Box::pin(prepare_remote_offer("admission-remote-unavailable")).await;
     record_host_load(&prepared.db, 1, "2026-07-19T10:00:00Z").await;
     assert!(matches!(
         offer_remote(&prepared, "2026-07-19T10:00:00Z", "2026-07-19T10:01:00Z")
@@ -327,15 +333,13 @@ pub(super) async fn persist_remote_start(prepared: &PreparedRemoteOffer) {
         .await
         .expect("claim offer I/O authority")
         .expect("remote offer stays active");
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared.offer),
-            "executor-a",
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("record accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared.offer),
+        "executor-a",
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("record accepted offer");
     // Grant the claim I/O authority (its response is treated as lost) so the Running
     // status reconstructs the claim and durably confirms the start.
     let accepted = prepared

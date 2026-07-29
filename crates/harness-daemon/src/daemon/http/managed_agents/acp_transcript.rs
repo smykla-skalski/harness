@@ -135,52 +135,58 @@ mod tests {
 
     #[tokio::test]
     async fn transcript_requires_a_scoped_session_id() {
-        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-            let state = minimal_state();
-            let response = get_acp_transcript(
-                Query(AcpTranscriptQuery { session_id: None }),
-                auth_headers(),
-                State(state),
-            )
-            .await;
-            let (status, body) = response_json(response).await;
-            assert_eq!(status, StatusCode::BAD_REQUEST);
-            assert!(
-                body.to_string()
-                    .contains("session_id is required for ACP transcript reads"),
-                "expected usage error to mention canonical session_id"
-            );
-        })
+        Box::pin(temp_env::async_with_vars(
+            [("HARNESS_FEATURE_ACP", Some("1"))],
+            async {
+                let state = minimal_state();
+                let response = get_acp_transcript(
+                    Query(AcpTranscriptQuery { session_id: None }),
+                    auth_headers(),
+                    State(state),
+                )
+                .await;
+                let (status, body) = response_json(response).await;
+                assert_eq!(status, StatusCode::BAD_REQUEST);
+                assert!(
+                    body.to_string()
+                        .contains("session_id is required for ACP transcript reads"),
+                    "expected usage error to mention canonical session_id"
+                );
+            },
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn transcript_uses_session_id_scope() {
-        temp_env::async_with_vars([("HARNESS_FEATURE_ACP", Some("1"))], async {
-            let state = crate::daemon::http::tests::test_http_state_with_db();
-            let db = state.db.get().expect("db slot").clone();
-            {
-                let db = db.lock().expect("db lock");
-                let project = crate::daemon::http::tests::sample_project();
-                db.sync_project(&project).expect("sync project");
-                db.save_session_state(
-                    &project.project_id,
-                    &crate::daemon::http::tests::sample_session_state(),
+        Box::pin(temp_env::async_with_vars(
+            [("HARNESS_FEATURE_ACP", Some("1"))],
+            async {
+                let state = crate::daemon::http::tests::test_http_state_with_db();
+                let db = state.db.get().expect("db slot").clone();
+                {
+                    let db = db.lock().expect("db lock");
+                    let project = crate::daemon::http::tests::sample_project();
+                    db.sync_project(&project).expect("sync project");
+                    db.save_session_state(
+                        &project.project_id,
+                        &crate::daemon::http::tests::sample_session_state(),
+                    )
+                    .expect("save session state");
+                }
+                let response = get_acp_transcript(
+                    Query(AcpTranscriptQuery {
+                        session_id: Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into()),
+                    }),
+                    auth_headers(),
+                    State(state),
                 )
-                .expect("save session state");
-            }
-            let response = get_acp_transcript(
-                Query(AcpTranscriptQuery {
-                    session_id: Some("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into()),
-                }),
-                auth_headers(),
-                State(state),
-            )
-            .await;
-            let (status, body) = response_json(response).await;
-            assert_eq!(status, StatusCode::OK);
-            assert_eq!(body["entries"].as_array().map(Vec::len), Some(0));
-        })
+                .await;
+                let (status, body) = response_json(response).await;
+                assert_eq!(status, StatusCode::OK);
+                assert_eq!(body["entries"].as_array().map(Vec::len), Some(0));
+            },
+        ))
         .await;
     }
 }

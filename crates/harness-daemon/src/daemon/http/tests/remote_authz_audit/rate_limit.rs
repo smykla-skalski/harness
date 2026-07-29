@@ -17,7 +17,7 @@ async fn remote_authorization_audit_rate_limits_unauthenticated_writes_without_a
     let state = remote_state_with_viewer_config(RemoteRequestLimitConfig {
         max_unauthenticated_audit_attempts: 2,
         max_unauthenticated_audit_attempts_per_remote_addr: 2,
-        unauthenticated_audit_window: Duration::from_secs(60),
+        unauthenticated_audit_window: Duration::from_mins(1),
         ..RemoteRequestLimitConfig::default()
     });
     let audit_state = state.clone();

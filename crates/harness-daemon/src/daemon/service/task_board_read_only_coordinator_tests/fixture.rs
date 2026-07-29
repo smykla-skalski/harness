@@ -70,13 +70,13 @@ pub(super) async fn seed_execution(
     execution_state: TaskBoardExecutionState,
     attempt: Option<AttemptSeed>,
 ) -> Fixture {
-    seed_execution_at_phase(
+    Box::pin(seed_execution_at_phase(
         label,
         workflow_kind,
         crate::task_board::TaskBoardExecutionPhase::Review,
         execution_state,
         attempt,
-    )
+    ))
     .await
 }
 
@@ -88,7 +88,7 @@ async fn seed_execution_at_phase(
     attempt: Option<AttemptSeed>,
 ) -> Fixture {
     let test = TestDatabase::open().await;
-    let (item_id, execution_id) = seed_execution_in_database(
+    let (item_id, execution_id) = Box::pin(seed_execution_in_database(
         &test.db,
         label,
         workflow_kind,
@@ -96,7 +96,7 @@ async fn seed_execution_at_phase(
         execution_state,
         attempt,
         reviewers(1, 1),
-    )
+    ))
     .await;
     Fixture {
         test,
@@ -112,7 +112,7 @@ pub(super) async fn seed_execution_with_reviewers(
     required_approvals: u32,
 ) -> Fixture {
     let test = TestDatabase::open().await;
-    let (item_id, execution_id) = seed_execution_in_database(
+    let (item_id, execution_id) = Box::pin(seed_execution_in_database(
         &test.db,
         label,
         workflow_kind,
@@ -120,7 +120,7 @@ pub(super) async fn seed_execution_with_reviewers(
         TaskBoardExecutionState::Pending,
         None,
         reviewers(reviewer_count, required_approvals),
-    )
+    ))
     .await;
     Fixture {
         test,
@@ -137,7 +137,7 @@ pub(super) async fn seed_additional_execution(
     execution_state: TaskBoardExecutionState,
     attempt: Option<AttemptSeed>,
 ) -> (String, String) {
-    seed_execution_in_database(
+    Box::pin(seed_execution_in_database(
         db,
         label,
         workflow_kind,
@@ -145,7 +145,7 @@ pub(super) async fn seed_additional_execution(
         execution_state,
         attempt,
         reviewers(1, 1),
-    )
+    ))
     .await
 }
 
@@ -408,13 +408,13 @@ pub(super) async fn seed_publish_attempt(
     parent_state: TaskBoardExecutionState,
     attempt_state: TaskBoardAttemptState,
 ) -> Fixture {
-    let fixture = seed_execution_at_phase(
+    let fixture = Box::pin(seed_execution_at_phase(
         label,
         TaskBoardWorkflowKind::PR_REVIEW,
         crate::task_board::TaskBoardExecutionPhase::Publish,
         parent_state,
         None,
-    )
+    ))
     .await;
     fixture
         .test

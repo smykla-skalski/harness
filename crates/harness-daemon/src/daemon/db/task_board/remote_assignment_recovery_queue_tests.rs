@@ -10,7 +10,7 @@ const REPLACED_AT: &str = "2026-07-19T10:00:01Z";
 
 #[tokio::test]
 async fn deleted_assignment_cannot_leave_a_stale_quarantine_row() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = controller_assignment(&fixture).await;
     let candidate = raw_candidate(&assignment);
     query("DELETE FROM task_board_remote_assignments WHERE assignment_id = ?1")
@@ -32,7 +32,7 @@ async fn deleted_assignment_cannot_leave_a_stale_quarantine_row() {
 
 #[tokio::test]
 async fn replacement_generation_cannot_inherit_a_stale_quarantine_row() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = controller_assignment(&fixture).await;
     let candidate = raw_candidate(&assignment);
     replace_assignment_generation(&fixture, &assignment.assignment_id).await;
@@ -50,7 +50,7 @@ async fn replacement_generation_cannot_inherit_a_stale_quarantine_row() {
 
 #[tokio::test]
 async fn stale_recovery_snapshot_cannot_mutate_or_clear_a_replacement_generation() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = controller_assignment(&fixture).await;
     let (candidates, _) = due_assignment_page(&fixture.db, AFTER_EXPIRY)
         .await
@@ -88,7 +88,7 @@ async fn stale_recovery_snapshot_cannot_mutate_or_clear_a_replacement_generation
 
 #[tokio::test]
 async fn a_migrated_row_never_starves_or_is_mutated_by_current_recovery_across_restart() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = controller_assignment(&fixture).await;
     insert_migrated_row(&fixture, "legacy-superseded").await;
 

@@ -17,11 +17,11 @@ use crate::task_board::{TaskBoardExecutionState, TaskBoardRemoteAssignmentState}
 fn claimed_execution_settles_safely_after_two_daemon_restart() {
     run_deep_acceptance_async(|| async {
         let tls = test_tls_material();
-        with_acceptance_environment(
+        Box::pin(with_acceptance_environment(
             &tls,
             "remote-acceptance-restarted-lifecycle",
             run_restarted_lifecycle(&tls),
-        )
+        ))
         .await;
     });
 }
@@ -37,7 +37,7 @@ struct ClaimedRestartBoundary {
 
 async fn run_restarted_lifecycle(tls: &TestTlsMaterial) {
     let fixture = AcceptanceFixture::new();
-    let restart = reach_durable_claim_and_stop_old_daemons(&fixture, tls).await;
+    let restart = Box::pin(reach_durable_claim_and_stop_old_daemons(&fixture, tls)).await;
     let controller = fixture.controller_state("controller-acceptance-b");
     let executor = fixture.executor_state("executor-acceptance-b", false).await;
     let server =
@@ -61,12 +61,12 @@ async fn run_restarted_lifecycle(tls: &TestTlsMaterial) {
     drive(controller_db, "settle restarted executor Unknown").await;
     reconcile_executor_tick(&executor, "clean up restarted executor Unknown").await;
     drive(controller_db, "observe restarted executor cleanup").await;
-    assert_restarted_unknown_completion(
+    Box::pin(assert_restarted_unknown_completion(
         controller_db,
         executor_db,
         &restart.seeded.execution_id,
         &restart.assignment_id,
-    )
+    ))
     .await;
     server.stop().await;
 }
@@ -82,7 +82,7 @@ async fn reach_durable_claim_and_stop_old_daemons(
         .configure_controller(&controller, server.endpoint(), tls)
         .await;
     let controller_db = controller.async_db.get().expect("controller db");
-    let seeded = fixture.seed_default_task(controller_db).await;
+    let seeded = Box::pin(fixture.seed_default_task(controller_db)).await;
     let controller_assignment = offer_and_claim(controller_db, &seeded.execution_id).await;
     let executor_db = executor.async_db.get().expect("executor database");
     let executor_assignment =

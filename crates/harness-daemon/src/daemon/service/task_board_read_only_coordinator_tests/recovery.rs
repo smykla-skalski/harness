@@ -15,12 +15,12 @@ async fn retry_wait_child_recovers_running_starting_and_pending_parents_without_
         ("retry-starting", TaskBoardExecutionState::Starting),
         ("retry-pending", TaskBoardExecutionState::Pending),
     ] {
-        let fixture = seed_execution(
+        let fixture = Box::pin(seed_execution(
             label,
             TaskBoardWorkflowKind::Review,
             parent,
             Some(AttemptSeed::retry_wait(RETRY_AT)),
-        )
+        ))
         .await;
         let runtime = FakeReadOnlyRuntime::new([]);
 
@@ -50,12 +50,12 @@ async fn retry_wait_child_recovers_running_starting_and_pending_parents_without_
 
 #[tokio::test]
 async fn due_recovered_retry_progresses_to_attempt_n_plus_one() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "retry-progress",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
         Some(AttemptSeed::retry_wait(NOW)),
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
 
@@ -93,8 +93,13 @@ async fn unknown_and_cancelled_children_never_launch_attempt_n_plus_one() {
             TaskBoardTerminalOutcomeKind::HumanRequired,
         ),
     ] {
-        let fixture =
-            seed_execution(label, TaskBoardWorkflowKind::Review, parent, Some(seed)).await;
+        let fixture = Box::pin(seed_execution(
+            label,
+            TaskBoardWorkflowKind::Review,
+            parent,
+            Some(seed),
+        ))
+        .await;
         let runtime = FakeReadOnlyRuntime::new([]);
 
         tick(&fixture, &runtime, NOW).await;
@@ -120,12 +125,12 @@ async fn unknown_and_cancelled_children_never_launch_attempt_n_plus_one() {
 
 #[tokio::test]
 async fn provider_head_resolution_error_schedules_durable_retry_wait() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "provider-retry",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Pending,
         None,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
     runtime.set_head_error("provider exact-head lookup unavailable");
@@ -156,11 +161,11 @@ async fn provider_head_resolution_error_schedules_durable_retry_wait() {
 
 #[tokio::test]
 async fn starting_publish_child_repairs_running_parent_before_side_effect() {
-    let fixture = seed_publish_attempt(
+    let fixture = Box::pin(seed_publish_attempt(
         "publish-parent-repair",
         TaskBoardExecutionState::Running,
         TaskBoardAttemptState::Starting,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([]);
     runtime.block_publish();
@@ -198,12 +203,12 @@ async fn starting_publish_child_repairs_running_parent_before_side_effect() {
 
 #[tokio::test]
 async fn contextless_legacy_execution_fails_closed_without_launch() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "contextless",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Pending,
         None,
-    )
+    ))
     .await;
     sqlx::query(
         "UPDATE task_board_workflow_executions
@@ -232,12 +237,12 @@ async fn contextless_legacy_execution_fails_closed_without_launch() {
 
 #[tokio::test]
 async fn running_report_uses_frozen_context_until_settlement_rechecks_revision() {
-    let fixture = seed_execution(
+    let fixture = Box::pin(seed_execution(
         "frozen-context",
         TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Pending,
         None,
-    )
+    ))
     .await;
     let runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()]);
     tick(&fixture, &runtime, NOW).await;
@@ -303,8 +308,13 @@ async fn completed_review_head_drift_before_ingestion_requires_human_without_evi
         ("local-head-drift", TaskBoardWorkflowKind::Review),
         ("provider-head-drift", TaskBoardWorkflowKind::PR_REVIEW),
     ] {
-        let fixture =
-            seed_execution(label, workflow_kind, TaskBoardExecutionState::Pending, None).await;
+        let fixture = Box::pin(seed_execution(
+            label,
+            workflow_kind,
+            TaskBoardExecutionState::Pending,
+            None,
+        ))
+        .await;
         let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
         tick(&fixture, &runtime, NOW).await;
         tick(&fixture, &runtime, NOW).await;

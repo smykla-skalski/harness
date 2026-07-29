@@ -14,7 +14,7 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn confirmed_local_start_atomically_completes_prepared_admission() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
@@ -65,7 +65,7 @@ async fn confirmed_local_start_atomically_completes_prepared_admission() {
 
 #[tokio::test]
 async fn unconfigured_start_authorization_survives_policy_enablement() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch_without_policy().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch_without_policy()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
@@ -107,7 +107,7 @@ async fn unconfigured_start_authorization_survives_policy_enablement() {
 
 #[tokio::test]
 async fn configured_start_rejects_missing_frozen_admission_evidence() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
@@ -149,7 +149,7 @@ async fn configured_start_rejects_missing_frozen_admission_evidence() {
 
 #[tokio::test]
 async fn expired_first_start_reservation_is_reevaluated_before_local_target() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
@@ -214,7 +214,7 @@ async fn expired_first_start_reservation_is_reevaluated_before_local_target() {
 
 #[tokio::test]
 async fn blocked_expired_first_start_settles_durably_without_io() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
@@ -267,7 +267,7 @@ async fn blocked_expired_first_start_settles_durably_without_io() {
 
 #[tokio::test]
 async fn terminal_before_first_target_closes_prepared_dispatch_and_reservation() {
-    let (state, mut claim, _worktree) = claimed_read_only_dispatch().await;
+    let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
     seed_session(&db, &claim.applied.session_id).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)

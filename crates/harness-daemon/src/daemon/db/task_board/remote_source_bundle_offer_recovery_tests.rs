@@ -27,7 +27,7 @@ const SUCCESSOR_LEASE_EXPIRES: &str = "2026-07-19T10:01:03Z";
 
 #[tokio::test]
 async fn uploaded_source_and_absent_predecessor_offer_reassign_after_restart() {
-    let setup = source_backed_predecessor("source-offer-absent").await;
+    let setup = Box::pin(source_backed_predecessor("source-offer-absent")).await;
     setup
         .prepared
         .db
@@ -103,7 +103,7 @@ async fn uploaded_source_and_absent_predecessor_offer_reassign_after_restart() {
 
 #[tokio::test]
 async fn uploaded_source_and_accepted_predecessor_offer_continue_after_restart() {
-    let setup = source_backed_predecessor("source-offer-accepted").await;
+    let setup = Box::pin(source_backed_predecessor("source-offer-accepted")).await;
     setup
         .prepared
         .db
@@ -115,11 +115,13 @@ async fn uploaded_source_and_accepted_predecessor_offer_continue_after_restart()
     let trust = successor_trust(&restarted).await;
     let accepted = accepted_offer_response(&setup.offer);
 
-    let TaskBoardRemoteMutationOutcome::Updated(updated) = restarted
-        .record_task_board_remote_predecessor_offer_acceptance(&accepted, HOST, &trust, OFFERED_AT)
-        .await
-        .expect("adopt immutable predecessor offer acceptance")
-    else {
+    let TaskBoardRemoteMutationOutcome::Updated(updated) = Box::pin(
+        restarted.record_task_board_remote_predecessor_offer_acceptance(
+            &accepted, HOST, &trust, OFFERED_AT,
+        ),
+    )
+    .await
+    .expect("adopt immutable predecessor offer acceptance") else {
         panic!("predecessor acceptance did not update the original generation");
     };
     assert_eq!(updated.assignment_id, setup.offer.binding.assignment_id);
@@ -137,13 +139,13 @@ async fn uploaded_source_and_accepted_predecessor_offer_continue_after_restart()
         .await
         .expect("load predecessor acceptance sequence");
     assert!(matches!(
-        restarted
+        Box::pin(restarted
             .record_task_board_remote_predecessor_offer_acceptance(
                 &accepted,
                 HOST,
                 &trust,
                 "2026-07-19T10:00:04Z",
-            )
+            ))
             .await
             .expect("replay immutable predecessor acceptance"),
         TaskBoardRemoteMutationOutcome::Replayed(record)
@@ -165,11 +167,11 @@ struct SourceBackedSetup {
 }
 
 async fn source_backed_predecessor(label: &str) -> SourceBackedSetup {
-    let prepared = prepare_remote_implementation_offer(
+    let prepared = Box::pin(prepare_remote_implementation_offer(
         label,
         &format!("/tmp/{label}"),
         "1111111111111111111111111111111111111111",
-    )
+    ))
     .await;
     let (offer, content) = snapshot_offer(&prepared.offer);
     assert!(matches!(

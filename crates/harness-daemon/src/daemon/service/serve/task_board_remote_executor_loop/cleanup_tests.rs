@@ -33,7 +33,7 @@ async fn settled_unknown_cleanup_releases_capacity_and_survives_restart() {
             ("CLAUDE_SESSION_ID", Some("remote-cleanup-test")),
         ],
         Box::pin(async {
-            let (fixture, started, identity, workspace) = started_executor().await;
+            let (fixture, started, identity, workspace) = Box::pin(started_executor()).await;
             let mut run = fixture
                 .db
                 .codex_run(&identity.run_id)
@@ -140,13 +140,13 @@ async fn mark_and_settle_unknown(
 async fn settled_completed_cleanup_preserves_terminal_artifacts() {
     let xdg = tempfile::tempdir().expect("create isolated data root");
     let xdg_value = xdg.path().to_string_lossy().into_owned();
-    temp_env::async_with_vars(
+    Box::pin(temp_env::async_with_vars(
         [
             ("XDG_DATA_HOME", Some(xdg_value.as_str())),
             ("CLAUDE_SESSION_ID", Some("remote-artifact-cleanup-test")),
         ],
         async {
-            let (fixture, started, identity, workspace) = started_executor().await;
+            let (fixture, started, identity, workspace) = Box::pin(started_executor()).await;
             let mut run = fixture
                 .db
                 .codex_run(&identity.run_id)
@@ -164,13 +164,13 @@ async fn settled_completed_cleanup_preserves_terminal_artifacts() {
                 .save_codex_run(&run)
                 .await
                 .expect("persist completed executor run");
-            super::super::terminal::persist_terminal_snapshot(
+            Box::pin(super::super::terminal::persist_terminal_snapshot(
                 &fixture.db,
                 "instance-a",
                 &started,
                 &run,
                 &workspace,
-            )
+            ))
             .await
             .expect("persist executor terminal result");
             let completed = fixture
@@ -224,7 +224,7 @@ async fn settled_completed_cleanup_preserves_terminal_artifacts() {
             );
             assert!(!workspace.exists());
         },
-    )
+    ))
     .await;
 }
 
@@ -289,12 +289,13 @@ async fn started_executor() -> (
         .expect("claim exact Start I/O permit")
         .expect_acquired("Start I/O remains permitted");
     persist_run(&fixture, &authorized, &identity, &workspace).await;
-    let TaskBoardRemoteMutationOutcome::Updated(started) = fixture
-        .db
-        .adopt_task_board_remote_executor_start(&permit, &workspace, STARTED_AT)
-        .await
-        .expect("adopt executor start")
-    else {
+    let TaskBoardRemoteMutationOutcome::Updated(started) = Box::pin(
+        fixture
+            .db
+            .adopt_task_board_remote_executor_start(&permit, &workspace, STARTED_AT),
+    )
+    .await
+    .expect("adopt executor start") else {
         panic!("executor start did not update assignment");
     };
     (fixture, started, identity, workspace)

@@ -10,7 +10,7 @@ use crate::task_board::{
 #[tokio::test]
 async fn terminal_phase_cas_rejects_live_item_revision_drift() {
     let (db, _temp) = workflow_database().await;
-    let cleanup = cleanup_execution(&db, "terminal-item-drift").await;
+    let cleanup = Box::pin(cleanup_execution(&db, "terminal-item-drift")).await;
     db.update_task_board_item(&cleanup.item_id, |item| {
         item.title = "Changed before terminal settlement".into();
         Ok(true)
@@ -27,7 +27,7 @@ async fn terminal_phase_cas_rejects_live_item_revision_drift() {
 #[tokio::test]
 async fn terminal_phase_cas_rejects_live_settings_revision_drift() {
     let (db, _temp) = workflow_database().await;
-    let cleanup = cleanup_execution(&db, "terminal-settings-drift").await;
+    let cleanup = Box::pin(cleanup_execution(&db, "terminal-settings-drift")).await;
     db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
         .await
         .expect("advance settings revision");
@@ -40,7 +40,7 @@ async fn terminal_phase_cas_rejects_live_settings_revision_drift() {
 #[tokio::test]
 async fn terminal_phase_cas_commits_when_live_revisions_match() {
     let (db, _temp) = workflow_database().await;
-    let cleanup = cleanup_execution(&db, "terminal-current").await;
+    let cleanup = Box::pin(cleanup_execution(&db, "terminal-current")).await;
 
     let outcome = settle_terminal(&db, &cleanup).await;
 
@@ -55,7 +55,7 @@ async fn terminal_phase_cas_commits_when_live_revisions_match() {
 }
 
 async fn cleanup_execution(db: &AsyncDaemonDb, label: &str) -> TaskBoardWorkflowExecutionRecord {
-    let mut current = create_execution(db, label, "2026-07-17T09:00:00Z").await;
+    let mut current = Box::pin(create_execution(db, label, "2026-07-17T09:00:00Z")).await;
     for updated_at in ["2026-07-17T09:01:00Z", "2026-07-17T09:02:00Z"] {
         let mut updated = current.clone();
         updated.transition = advance_task_board_workflow(

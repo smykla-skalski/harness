@@ -8,7 +8,8 @@ use crate::task_board::{
 
 #[tokio::test]
 async fn read_only_launch_rejects_item_revision_aba_before_publication() {
-    let (db, intent, preparation, launch) = reserved_read_only("revision-aba-publish", false).await;
+    let (db, intent, preparation, launch) =
+        Box::pin(reserved_read_only("revision-aba-publish", false)).await;
     mutate_title_round_trip(&db, &preparation.preparation.board_item_id).await;
 
     let error = db
@@ -31,7 +32,7 @@ async fn read_only_launch_rejects_item_revision_aba_before_publication() {
 #[tokio::test]
 async fn read_only_publication_rebuilds_context_from_transaction_owned_item() {
     let (db, _, preparation, mut launch) =
-        reserved_read_only("transaction-owned-context", false).await;
+        Box::pin(reserved_read_only("transaction-owned-context", false)).await;
     launch.run_context.title = "forged title".into();
     launch.run_context.body = "forged body".into();
     launch.run_context.tags = vec!["forged".into()];
@@ -75,7 +76,7 @@ async fn read_only_publication_rebuilds_context_from_transaction_owned_item() {
 #[tokio::test]
 async fn read_only_publication_rejects_forged_workflow_identity() {
     let (db, _, preparation, mut launch) =
-        reserved_read_only("forged-workflow-identity", false).await;
+        Box::pin(reserved_read_only("forged-workflow-identity", false)).await;
     launch.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
 
     let error = db
@@ -94,7 +95,8 @@ async fn read_only_publication_rejects_forged_workflow_identity() {
 
 #[tokio::test]
 async fn read_only_reservation_rejects_item_revision_aba_before_preparation_claim() {
-    let (db, intent, item_id, _) = reserved_read_only_unclaimed("revision-aba-claim", false).await;
+    let (db, intent, item_id, _) =
+        Box::pin(reserved_read_only_unclaimed("revision-aba-claim", false)).await;
     mutate_title_round_trip(&db, &item_id).await;
 
     let error = db
@@ -115,7 +117,8 @@ async fn read_only_reservation_rejects_item_revision_aba_before_preparation_clai
 
 #[tokio::test]
 async fn legacy_read_only_preparation_fails_closed_while_write_preparation_claims() {
-    let (db, read_only_intent, _, _) = reserved_read_only_unclaimed("legacy-revision", false).await;
+    let (db, read_only_intent, _, _) =
+        Box::pin(reserved_read_only_unclaimed("legacy-revision", false)).await;
     sqlx::query(
         "UPDATE task_board_dispatch_intents
          SET payload_json = json_remove(payload_json, '$.source_item_revision')
@@ -150,7 +153,7 @@ async fn legacy_read_only_preparation_fails_closed_while_write_preparation_claim
 
 #[tokio::test]
 async fn read_only_launch_rejects_item_revision_aba_before_pending_claim() {
-    let (db, intent, applied) = publish_read_only("revision-aba-pending", false).await;
+    let (db, intent, applied) = Box::pin(publish_read_only("revision-aba-pending", false)).await;
     mutate_title_round_trip(&db, &applied.board_item_id).await;
 
     let error = db
@@ -187,7 +190,7 @@ async fn read_only_launch_rejects_item_revision_aba_before_pending_claim() {
 
 #[tokio::test]
 async fn starting_read_only_launch_blocks_public_item_mutation() {
-    let (db, intent, applied) = publish_read_only("starting-mutation-gate", false).await;
+    let (db, intent, applied) = Box::pin(publish_read_only("starting-mutation-gate", false)).await;
     let before = db
         .task_board_item_snapshot(&applied.board_item_id)
         .await
@@ -220,7 +223,7 @@ async fn starting_read_only_launch_blocks_public_item_mutation() {
 
 #[tokio::test]
 async fn read_only_completion_rechecks_revision_after_start_authorization() {
-    let (db, intent, applied) = publish_read_only("revision-aba-completion", false).await;
+    let (db, intent, applied) = Box::pin(publish_read_only("revision-aba-completion", false)).await;
     let launch = applied
         .read_only_workflow
         .as_ref()
@@ -277,7 +280,7 @@ async fn read_only_completion_rechecks_revision_after_start_authorization() {
 
 #[tokio::test]
 async fn held_read_only_launch_advances_revision_fence_through_completion() {
-    let (db, intent, applied) = publish_read_only("held-revision-offsets", true).await;
+    let (db, intent, applied) = Box::pin(publish_read_only("held-revision-offsets", true)).await;
     let published = applied
         .read_only_workflow
         .as_ref()
@@ -325,7 +328,7 @@ async fn held_read_only_launch_advances_revision_fence_through_completion() {
 
 #[tokio::test]
 async fn held_read_only_launch_rejects_item_revision_aba_before_claim() {
-    let (db, intent, applied) = publish_read_only("held-revision-aba", true).await;
+    let (db, intent, applied) = Box::pin(publish_read_only("held-revision-aba", true)).await;
     mutate_title_round_trip(&db, &applied.board_item_id).await;
 
     let error = db
@@ -352,7 +355,8 @@ async fn reserved_read_only(
     ClaimedTaskBoardDispatchPreparation,
     TaskBoardReadOnlyWorkflowLaunch,
 ) {
-    let (db, intent, item_id, launch) = reserved_read_only_unclaimed(label, hold_worker).await;
+    let (db, intent, item_id, launch) =
+        Box::pin(reserved_read_only_unclaimed(label, hold_worker)).await;
     let claimed = db
         .claim_task_board_dispatch_preparation(&intent)
         .await
@@ -437,7 +441,7 @@ async fn publish_read_only(
     label: &str,
     hold_worker: bool,
 ) -> (TestDb, String, DispatchAppliedTask) {
-    let (db, intent, preparation, launch) = reserved_read_only(label, hold_worker).await;
+    let (db, intent, preparation, launch) = Box::pin(reserved_read_only(label, hold_worker)).await;
     let applied = db
         .complete_task_board_dispatch_preparation_with_workflow(
             &preparation,

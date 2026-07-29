@@ -120,7 +120,7 @@ async fn external_ref_creation_rejects_client_sync_state() {
         id: Some("task-ref-create".into()),
     };
 
-    let item = create_task_board_item_db(&db, &request)
+    let item = Box::pin(create_task_board_item_db(&db, &request))
         .await
         .expect("create item");
 

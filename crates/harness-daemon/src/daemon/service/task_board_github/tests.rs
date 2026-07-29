@@ -398,8 +398,7 @@ fn git_ref_exists(dir: &Path, reference: &str) -> bool {
     command
         .args(["rev-parse", "--verify", "--quiet", reference])
         .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
+        .is_ok_and(|status| status.success())
 }
 
 fn remote_repo_path(repo: &Path) -> PathBuf {

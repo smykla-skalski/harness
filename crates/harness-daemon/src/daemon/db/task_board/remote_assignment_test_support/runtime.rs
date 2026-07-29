@@ -26,11 +26,13 @@ pub(crate) async fn authorize_and_start_executor(
         .expect("authorized executor assignment");
     let (project_dir, permit) =
         persist_executor_run(fixture, &assignment, &authority, started_at).await;
-    fixture
-        .db
-        .adopt_task_board_remote_executor_start(&permit, Path::new(&project_dir), started_at)
-        .await
-        .expect("adopt durable executor start")
+    Box::pin(fixture.db.adopt_task_board_remote_executor_start(
+        &permit,
+        Path::new(&project_dir),
+        started_at,
+    ))
+    .await
+    .expect("adopt durable executor start")
 }
 
 pub(crate) async fn persist_executor_run(

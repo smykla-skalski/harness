@@ -36,7 +36,7 @@ async fn run_broken_edit_during_hold(sandbox: &std::path::Path) {
     let project_dir = sandbox.join("deliver-broken-project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
     let (state, base_url, server, client) =
-        held_step_mode_item(&project_dir, "board-deliver-broken").await;
+        Box::pin(held_step_mode_item(&project_dir, "board-deliver-broken")).await;
 
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Work on {{ task_body }}"}"#)
@@ -116,7 +116,7 @@ async fn run_edit_during_hold_reports_started_prompt(sandbox: &std::path::Path) 
     let project_dir = sandbox.join("deliver-edited-project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
     let (state, base_url, server, client) =
-        held_step_mode_item(&project_dir, "board-deliver-edited").await;
+        Box::pin(held_step_mode_item(&project_dir, "board-deliver-edited")).await;
 
     let _installed = scoped_prompt_catalog(
         PromptCatalog::from_json(br#"{"worker": "Work on {{ title }}"}"#).expect("parse overrides"),
@@ -176,7 +176,7 @@ async fn held_step_mode_item(
         json!({ "step_mode": true }),
     )
     .await;
-    seed_ready_board_item(&state, item_id, "Held delivery item").await;
+    Box::pin(seed_ready_board_item(&state, item_id, "Held delivery item")).await;
     let response = dispatch_http_item(&client, &base_url, item_id, project_dir).await;
     assert_eq!(
         first_applied(&response)["item"]["workflow"]["current_step_id"].as_str(),

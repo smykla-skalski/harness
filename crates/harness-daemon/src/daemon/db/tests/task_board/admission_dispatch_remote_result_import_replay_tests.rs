@@ -4,7 +4,7 @@ use crate::task_board::{TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind};
 
 #[tokio::test]
 async fn production_orchestration_imports_adopts_and_cleans_exactly_once() {
-    let candidate = import_candidate("result-import-production-orchestration").await;
+    let candidate = Box::pin(import_candidate("result-import-production-orchestration")).await;
 
     let TaskBoardRemoteResultAdoptionOutcome::Updated(adopted) =
         crate::daemon::service::import_and_adopt_task_board_remote_implementation_result(
@@ -60,7 +60,7 @@ async fn production_orchestration_imports_adopts_and_cleans_exactly_once() {
 
 #[tokio::test]
 async fn durable_git_coordinate_drift_projects_manual_required_before_mutation() {
-    let candidate = import_candidate("result-import-coordinate-drift").await;
+    let candidate = Box::pin(import_candidate("result-import-coordinate-drift")).await;
     let mut request = candidate.request.clone();
     request.git_dir = candidate
         .git
@@ -118,7 +118,7 @@ async fn durable_git_coordinate_drift_projects_manual_required_before_mutation()
 
 #[tokio::test]
 async fn import_refuses_a_non_session_branch_before_git_mutation() {
-    let candidate = import_candidate("result-import-wrong-branch").await;
+    let candidate = Box::pin(import_candidate("result-import-wrong-branch")).await;
     let mut request = candidate.request.clone();
     request.branch_ref = "refs/heads/not-the-session".into();
 
@@ -162,7 +162,7 @@ async fn journal_evidence_drift_cannot_advance_git_or_import_state() {
         ("status", "status_sha256"),
         ("bundle", "bundle_sha256"),
     ] {
-        let candidate = import_candidate(&format!("result-import-{label}-drift")).await;
+        let candidate = Box::pin(import_candidate(&format!("result-import-{label}-drift"))).await;
         candidate
             .prepared
             .db
@@ -229,7 +229,7 @@ async fn noncanonical_durable_import_row_fails_restart_decode() {
         ("trailing-separator", "worktree_path", "/tmp/result-import/"),
         ("branch-dotdot", "branch_ref", "refs/heads/../other"),
     ] {
-        let candidate = import_candidate(&format!("result-import-corrupt-{label}")).await;
+        let candidate = Box::pin(import_candidate(&format!("result-import-corrupt-{label}"))).await;
         candidate
             .prepared
             .db
@@ -266,7 +266,7 @@ async fn noncanonical_durable_import_row_fails_restart_decode() {
 
 #[tokio::test]
 async fn implementation_adoption_consumes_applied_journal_atomically() {
-    let candidate = import_candidate("result-import-adoption").await;
+    let candidate = Box::pin(import_candidate("result-import-adoption")).await;
     let applied = import_result(&candidate, &candidate.parent).await;
     let parent = load_parent(&candidate.prepared).await;
 
@@ -353,7 +353,7 @@ async fn implementation_adoption_consumes_applied_journal_atomically() {
 
 #[tokio::test]
 async fn adopted_import_artifacts_survive_retention_until_the_workflow_concludes() {
-    let candidate = import_candidate("result-import-retention").await;
+    let candidate = Box::pin(import_candidate("result-import-retention")).await;
     candidate
         .prepared
         .db
@@ -432,7 +432,7 @@ async fn conclude_parent_workflow(candidate: &ImportCandidate) {
 
 #[tokio::test]
 async fn manual_import_artifacts_remain_subject_to_bounded_retention() {
-    let candidate = import_candidate("result-import-manual-retention").await;
+    let candidate = Box::pin(import_candidate("result-import-manual-retention")).await;
     candidate
         .prepared
         .db

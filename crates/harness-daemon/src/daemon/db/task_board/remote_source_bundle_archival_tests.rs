@@ -400,7 +400,7 @@ fn rival_offer(
     offer.seal().expect("seal rival offer")
 }
 
-/// Insert a truthful current (legacy_migrated = 0) Offered assignment straight
+/// Insert a truthful current (`legacy_migrated` = 0) Offered assignment straight
 /// from a sealed rival offer. An Offered row deliberately carries no offer
 /// receipt, matching the controller-side generation the assignment fence must
 /// catch without relying on a receipt.

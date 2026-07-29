@@ -20,32 +20,32 @@ async fn run_task_board_http_catalog_flow() {
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    seed_catalog_board_item(
+    Box::pin(seed_catalog_board_item(
         &state,
         "board-http-catalog-a",
         "HTTP catalog alpha todo",
         "project-alpha",
         AgentMode::Planning,
         TaskBoardStatus::Todo,
-    )
+    ))
     .await;
-    seed_catalog_board_item(
+    Box::pin(seed_catalog_board_item(
         &state,
         "board-http-catalog-b",
         "HTTP catalog alpha running",
         "project-alpha",
         AgentMode::Planning,
         TaskBoardStatus::InProgress,
-    )
+    ))
     .await;
-    seed_catalog_board_item(
+    Box::pin(seed_catalog_board_item(
         &state,
         "board-http-catalog-c",
         "HTTP catalog beta todo",
         "project-beta",
         AgentMode::Evaluate,
         TaskBoardStatus::Todo,
-    )
+    ))
     .await;
 
     let projects = get_json(&client, &base_url, http_paths::TASK_BOARD_PROJECTS).await;

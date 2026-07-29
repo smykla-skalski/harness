@@ -24,8 +24,8 @@ async fn failure_receipt_model_rejects_resealed_semantic_corruption() {
         Corruption::AuthorityDigest,
         Corruption::PermitDigest,
     ] {
-        let pending = pending_permit(false).await;
-        let failed = fail_without_run(&pending).await;
+        let pending = Box::pin(pending_permit(false)).await;
+        let failed = Box::pin(fail_without_run(&pending)).await;
         let mut receipt = receipt_from(&failed);
         corrupt(&mut receipt, corruption);
         let json = canonical_json(&receipt).expect("serialize resealed receipt");
@@ -54,7 +54,7 @@ async fn failure_receipt_model_rejects_resealed_semantic_corruption() {
 
 #[tokio::test]
 async fn no_run_failure_rejects_a_durable_deterministic_run_without_mutation() {
-    let pending = pending_permit(true).await;
+    let pending = Box::pin(pending_permit(true)).await;
     let before = pending
         .fixture
         .db

@@ -26,7 +26,7 @@ const PARENT_SHA256: &str = "777777777777777777777777777777777777777777777777777
 
 #[tokio::test]
 async fn disabled_r2_lifecycle_operations_use_the_frozen_generation_and_survive_restart() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = created_assignment(&fixture).await;
     let r1 = assignment
         .configuration_revision
@@ -106,7 +106,7 @@ async fn disabled_r2_lifecycle_operations_use_the_frozen_generation_and_survive_
 
 #[tokio::test]
 async fn successor_r2_fences_lifecycle_calls_but_not_fresh_offer_or_renew() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = created_assignment(&fixture).await;
     let r1 = assignment
         .configuration_revision
@@ -168,7 +168,7 @@ async fn successor_r2_fences_lifecycle_calls_but_not_fresh_offer_or_renew() {
 
 #[tokio::test]
 async fn cleanup_observation_rolls_a_stale_per_call_fence_after_restart() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let assignment = created_assignment(&fixture).await;
     let r1 = fixture
         .db

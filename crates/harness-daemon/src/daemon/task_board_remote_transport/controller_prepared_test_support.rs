@@ -31,7 +31,7 @@ pub(super) struct LifecycleTimes {
 }
 
 pub(super) async fn prepared_acceptance(item_id: &str) -> PreparedLifecycle {
-    let mut prepared = prepare_remote_offer(item_id).await;
+    let mut prepared = Box::pin(prepare_remote_offer(item_id)).await;
     let now = Utc::now();
     let times = LifecycleTimes {
         offered_at: canonical_time(now),
@@ -71,15 +71,13 @@ pub(super) async fn prepared_acceptance(item_id: &str) -> PreparedLifecycle {
         .await
         .expect("claim offer authority")
         .is_some());
-    prepared
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_offer(&prepared, &times),
-            HOST_ID,
-            &times.offered_at,
-        )
-        .await
-        .expect("persist accepted offer");
+    Box::pin(prepared.db.record_task_board_remote_offer_response(
+        &accepted_offer(&prepared, &times),
+        HOST_ID,
+        &times.offered_at,
+    ))
+    .await
+    .expect("persist accepted offer");
     PreparedLifecycle { prepared, times }
 }
 
@@ -98,17 +96,14 @@ pub(super) async fn persist_claim(state: &PreparedLifecycle) {
             .expect("claim claim authority")
             .is_some()
     );
-    state
-        .prepared
-        .db
-        .record_task_board_remote_assignment_claim(
-            &request,
-            &claim_response(state),
-            HOST_ID,
-            &state.times.before_expiry,
-        )
-        .await
-        .expect("persist claimed state");
+    Box::pin(state.prepared.db.record_task_board_remote_assignment_claim(
+        &request,
+        &claim_response(state),
+        HOST_ID,
+        &state.times.before_expiry,
+    ))
+    .await
+    .expect("persist claimed state");
 }
 
 pub(super) fn claim_request(state: &PreparedLifecycle) -> RemoteClaimRequest {

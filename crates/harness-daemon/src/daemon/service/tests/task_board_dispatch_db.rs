@@ -127,10 +127,10 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 .expect("reclaim preparation")
                 .expect("expired preparation");
             assert_ne!(reclaimed.claim_token, first_claim.claim_token);
-            let applied = temp_env::async_with_vars(
+            let applied = Box::pin(temp_env::async_with_vars(
                 [(HARNESS_GITHUB_TOKEN_ENV, Some("fixture-token"))],
                 task_board::prepare_claimed_task_board_dispatch(&db, &reclaimed),
-            )
+            ))
             .await
             .expect("resume preparation");
             assert_eq!(applied.session_id, preparation.session_id);
@@ -235,7 +235,7 @@ fn read_only_dispatch_rejects_aba_after_claim_before_late_head_resolution() {
                 .expect("item mutation");
             }
 
-            let (_, error) = task_board::prepare_claimed_task_board_dispatch(&db, &claim)
+            let (_, error) = Box::pin(task_board::prepare_claimed_task_board_dispatch(&db, &claim))
                 .await
                 .expect_err("late production capture must reject revision ABA");
 

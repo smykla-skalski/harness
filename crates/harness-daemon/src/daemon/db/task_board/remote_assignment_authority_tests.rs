@@ -13,7 +13,7 @@ use harness_kernel::errors::CliError;
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_atomic_settlement() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let TaskBoardRemoteOfferOutcome::Created(_) = offer_controller(&fixture).await else {
         panic!("controller offer was not created");
     };
@@ -35,15 +35,13 @@ async fn offer_authority_fences_stop_until_atomic_settlement() {
         .expect_err("owned offer I/O must fence stop");
     assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
 
-    fixture
-        .db
-        .record_task_board_remote_offer_response(
-            &accepted_response(&fixture.request),
-            HOST,
-            "2026-07-19T10:00:03Z",
-        )
-        .await
-        .expect("settle accepted offer");
+    Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &accepted_response(&fixture.request),
+        HOST,
+        "2026-07-19T10:00:03Z",
+    ))
+    .await
+    .expect("settle accepted offer");
     let settled = load_execution(&fixture).await;
     assert!(
         !settled
@@ -85,7 +83,7 @@ async fn offer_authority_fences_stop_until_atomic_settlement() {
 
 #[tokio::test]
 async fn io_authority_persists_the_canonical_monotonic_authority_time() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let _ = offer_controller(&fixture).await;
     fixture
         .db
@@ -100,7 +98,7 @@ async fn io_authority_persists_the_canonical_monotonic_authority_time() {
 
 #[tokio::test]
 async fn late_first_acceptance_retains_l1_and_switches_once_to_local_fallback() {
-    let fixture = controller_fixture(1).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
     let _ = offer_controller(&fixture).await;
     fixture
         .db
@@ -109,11 +107,13 @@ async fn late_first_acceptance_retains_l1_and_switches_once_to_local_fallback() 
         .expect("claim offer authority")
         .expect("offer authority");
     let response = accepted_response(&fixture.request);
-    let late = match fixture
-        .db
-        .record_task_board_remote_offer_response(&response, HOST, AFTER_EXPIRY)
-        .await
-        .expect("retain late acceptance")
+    let late = match Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &response,
+        HOST,
+        AFTER_EXPIRY,
+    ))
+    .await
+    .expect("retain late acceptance")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected one local fallback, got {other:?}"),
@@ -136,11 +136,13 @@ async fn late_first_acceptance_retains_l1_and_switches_once_to_local_fallback() 
         .await
         .expect("sequence");
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_offer_response(&response, HOST, "2026-07-19T10:03:00Z",)
-            .await
-            .expect("replay immutable late acceptance"),
+        Box::pin(fixture.db.record_task_board_remote_offer_response(
+            &response,
+            HOST,
+            "2026-07-19T10:03:00Z",
+        ))
+        .await
+        .expect("replay immutable late acceptance"),
         TaskBoardRemoteMutationOutcome::Replayed(_)
     ));
     assert_eq!(
@@ -167,7 +169,7 @@ async fn late_first_acceptance_retains_l1_and_switches_once_to_local_fallback() 
 #[tokio::test]
 async fn persisted_malformed_authority_fails_closed_on_load_and_cas() {
     for corruption in ["both", "bad_digest", "wrong_state"] {
-        let fixture = controller_fixture(1).await;
+        let fixture = Box::pin(controller_fixture(1)).await;
         let _ = offer_controller(&fixture).await;
         fixture
             .db

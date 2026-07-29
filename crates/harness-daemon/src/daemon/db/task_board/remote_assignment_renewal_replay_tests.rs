@@ -11,9 +11,9 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn lost_renewal_response_replay_converges_before_expiry_without_restarting() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let status_request = status_request(&fixture.request, &claimed);
     fixture
         .db
@@ -102,9 +102,9 @@ async fn lost_renewal_response_replay_converges_before_expiry_without_restarting
 
 #[tokio::test]
 async fn renew_token_survives_recovery_so_a_late_renewal_response_unstrands() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
-    let claimed = claim_controller(&fixture, &accepted).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
+    let claimed = Box::pin(claim_controller(&fixture, &accepted)).await;
     let status_request = status_request(&fixture.request, &claimed);
     fixture
         .db

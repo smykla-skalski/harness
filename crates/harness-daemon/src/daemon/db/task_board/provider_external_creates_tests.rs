@@ -14,7 +14,7 @@ use crate::task_board::{
 async fn concurrent_begin_admits_one_create_and_reuses_immutable_cross_scope_snapshot() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-reuse")).await;
+    Box::pin(create_item(&db, item("task-create-reuse"))).await;
     let before = sequence(&db).await;
     let first_db = db.clone();
     let second_db = db.clone();
@@ -102,7 +102,7 @@ async fn begin_rejects_linked_or_tombstoned_items_without_churn() {
     linked.external_refs.push(
         ExternalTaskRef::new(ExternalProvider::GitHub, "example/repository#9").into_core_ref(),
     );
-    create_item(&db, linked).await;
+    Box::pin(create_item(&db, linked)).await;
     let before_linked = sequence(&db).await;
 
     let linked_error = db
@@ -117,7 +117,7 @@ async fn begin_rejects_linked_or_tombstoned_items_without_churn() {
     assert_eq!(linked_error.code(), "WORKFLOW_CONCURRENT");
     assert_eq!(sequence(&db).await, before_linked);
 
-    create_item(&db, item("task-create-tombstone")).await;
+    Box::pin(create_item(&db, item("task-create-tombstone"))).await;
     db.delete_task_board_item("task-create-tombstone")
         .await
         .expect("tombstone item");
@@ -139,7 +139,7 @@ async fn begin_rejects_linked_or_tombstoned_items_without_churn() {
 async fn record_persists_exact_evidence_and_rejects_valid_drift_without_churn() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-record")).await;
+    Box::pin(create_item(&db, item("task-create-record"))).await;
     let intent = begin(&db, "task-create-record", ExternalProvider::GitHub).await;
     let (outcome, baseline) = create_evidence(&intent, "example/repository#41", "revision-1");
     let before = sequence(&db).await;
@@ -183,7 +183,7 @@ async fn record_persists_exact_evidence_and_rejects_valid_drift_without_churn() 
 async fn record_rejects_provider_revision_project_and_identity_mismatch() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-mismatch")).await;
+    Box::pin(create_item(&db, item("task-create-mismatch"))).await;
     let intent = begin(&db, "task-create-mismatch", ExternalProvider::GitHub).await;
     let (outcome, baseline) = create_evidence(&intent, "example/repository#42", "revision-1");
     let before = sequence(&db).await;
@@ -206,8 +206,8 @@ async fn record_rejects_provider_revision_project_and_identity_mismatch() {
 async fn created_recovery_is_global_and_hard_delete_retains_active_evidence() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-github")).await;
-    create_item(&db, item("task-create-github-edited")).await;
+    Box::pin(create_item(&db, item("task-create-github"))).await;
+    Box::pin(create_item(&db, item("task-create-github-edited"))).await;
     let github = begin(&db, "task-create-github", ExternalProvider::GitHub).await;
     let edited = begin(&db, "task-create-github-edited", ExternalProvider::GitHub).await;
     let github = record(&db, &github, "example/repository#43").await;
@@ -266,7 +266,7 @@ async fn created_recovery_is_global_and_hard_delete_retains_active_evidence() {
 async fn inconsistent_persisted_create_evidence_fails_closed_on_read() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-corrupt")).await;
+    Box::pin(create_item(&db, item("task-create-corrupt"))).await;
     let intent = begin(&db, "task-create-corrupt", ExternalProvider::GitHub).await;
     let created = record(&db, &intent, "example/repository#44").await;
     sqlx::query(
@@ -303,7 +303,7 @@ fn transition_timestamp_fails_closed_at_the_persisted_range_boundary() {
 async fn record_and_finalize_advance_persisted_clock_without_wall_clock_rollover() {
     let dir = tempdir().expect("tempdir");
     let db = connect(&dir).await;
-    create_item(&db, item("task-create-monotonic")).await;
+    Box::pin(create_item(&db, item("task-create-monotonic"))).await;
     let intent = begin(&db, "task-create-monotonic", ExternalProvider::GitHub).await;
     sqlx::query(
         "UPDATE task_board_external_create_intents

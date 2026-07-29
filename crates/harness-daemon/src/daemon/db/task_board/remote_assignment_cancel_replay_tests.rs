@@ -9,8 +9,8 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn controller_cancel_response_is_fenced_and_exactly_replayed() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let request = cancel_request(
         &fixture,
         accepted.lease_id.as_deref().expect("accepted lease"),
@@ -22,16 +22,14 @@ async fn controller_cancel_response_is_fenced_and_exactly_replayed() {
         .await
         .expect("claim cancel authority")
         .expect("cancel remains active");
-    let cancelled = fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:11Z",
-        )
-        .await
-        .expect("persist cancel response");
+    let cancelled = Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("persist cancel response");
     assert!(matches!(
         cancelled,
         TaskBoardRemoteMutationOutcome::Updated(ref record)
@@ -40,13 +38,13 @@ async fn controller_cancel_response_is_fenced_and_exactly_replayed() {
                 && record.completed_at.as_deref() == Some(CLAIMED_AT)
                 && record.error.as_deref() == Some("operator requested cancellation")
     ));
-    assert_cancel_replay_is_exact(&fixture, &request, &response).await;
+    Box::pin(assert_cancel_replay_is_exact(&fixture, &request, &response)).await;
 }
 
 #[tokio::test]
 async fn claimed_cancel_without_immutable_claim_receipt_is_stale_without_mutation() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let request = cancel_request(
         &fixture,
         accepted.lease_id.as_deref().expect("accepted lease"),
@@ -71,14 +69,14 @@ async fn claimed_cancel_without_immutable_claim_receipt_is_stale_without_mutatio
     let response = claimed_cancel_response(&fixture, &request);
 
     assert!(matches!(
-        fixture
+        Box::pin(fixture
             .db
             .record_task_board_remote_assignment_cancel(
                 &request,
                 &response,
                 HOST,
                 "2026-07-19T10:00:11Z",
-            )
+            ))
             .await
             .expect("reject claimed cancel without receipt"),
         TaskBoardRemoteMutationOutcome::Stale(record) if record == before
@@ -104,10 +102,10 @@ async fn claimed_cancel_without_immutable_claim_receipt_is_stale_without_mutatio
 
 #[tokio::test]
 async fn claimed_cancel_with_immutable_claim_receipt_is_exactly_replayed() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let lease_id = accepted.lease_id.as_deref().expect("accepted lease");
-    persist_claim_receipt(&fixture, lease_id).await;
+    Box::pin(persist_claim_receipt(&fixture, lease_id)).await;
     let request = cancel_request(&fixture, lease_id);
     let response = claimed_cancel_response(&fixture, &request);
     fixture
@@ -117,16 +115,14 @@ async fn claimed_cancel_with_immutable_claim_receipt_is_exactly_replayed() {
         .expect("claim cancel authority")
         .expect("cancel remains active");
 
-    let cancelled = fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:11Z",
-        )
-        .await
-        .expect("persist claimed cancel response");
+    let cancelled = Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("persist claimed cancel response");
     assert!(matches!(
         cancelled,
         TaskBoardRemoteMutationOutcome::Updated(ref record)
@@ -134,15 +130,15 @@ async fn claimed_cancel_with_immutable_claim_receipt_is_exactly_replayed() {
                 && record.claim_receipt.is_some()
                 && record.claimed_at.as_deref() == Some(CLAIMED_AT)
     ));
-    assert_cancel_replay_is_exact(&fixture, &request, &response).await;
+    Box::pin(assert_cancel_replay_is_exact(&fixture, &request, &response)).await;
 }
 
 #[tokio::test]
 async fn claimed_cancel_response_preserves_durable_claim_evidence() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let lease_id = accepted.lease_id.as_deref().expect("accepted lease");
-    persist_claim_receipt(&fixture, lease_id).await;
+    Box::pin(persist_claim_receipt(&fixture, lease_id)).await;
     let request = cancel_request(&fixture, lease_id);
     // An executor that claimed but never started reports an empty cancel: the durable
     // claim is preserved (never erased) while the assignment terminates.
@@ -154,16 +150,14 @@ async fn claimed_cancel_response_preserves_durable_claim_evidence() {
         .expect("claim omitted-evidence cancellation")
         .expect("omitted-evidence cancellation remains active");
 
-    let cancelled = fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:11Z",
-        )
-        .await
-        .expect("cancel preserves the durable claim");
+    let cancelled = Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:11Z",
+    ))
+    .await
+    .expect("cancel preserves the durable claim");
     assert!(matches!(
         cancelled,
         TaskBoardRemoteMutationOutcome::Updated(ref record)
@@ -173,15 +167,15 @@ async fn claimed_cancel_response_preserves_durable_claim_evidence() {
                 && record.started_at.is_none()
                 && record.workspace_ref.is_none()
     ));
-    assert_cancel_replay_is_exact(&fixture, &request, &response).await;
+    Box::pin(assert_cancel_replay_is_exact(&fixture, &request, &response)).await;
 }
 
 #[tokio::test]
 async fn claimed_cancel_response_cannot_change_durable_run_evidence() {
-    let fixture = controller_fixture(1).await;
-    let accepted = accept_controller(&fixture).await;
+    let fixture = Box::pin(controller_fixture(1)).await;
+    let accepted = Box::pin(accept_controller(&fixture)).await;
     let lease_id = accepted.lease_id.as_deref().expect("accepted lease");
-    persist_claim_receipt(&fixture, lease_id).await;
+    Box::pin(persist_claim_receipt(&fixture, lease_id)).await;
     let request = cancel_request(&fixture, lease_id);
     fixture
         .db
@@ -214,14 +208,14 @@ async fn claimed_cancel_response_cannot_change_durable_run_evidence() {
 
     for response in conflicting_cancel_responses(&fixture, &request) {
         assert!(matches!(
-            fixture
+            Box::pin(fixture
                 .db
                 .record_task_board_remote_assignment_cancel(
                     &request,
                     &response,
                     HOST,
                     "2026-07-19T10:00:21Z",
-                )
+                ))
                 .await
                 .expect("reject conflicting durable run evidence"),
             TaskBoardRemoteMutationOutcome::Stale(record) if record == before
@@ -373,11 +367,13 @@ async fn persist_claim_receipt(fixture: &ControllerFixture, lease_id: &str) {
         .await
         .expect("claim remote claim authority")
         .expect("claim remains active");
-    fixture
-        .db
-        .record_task_board_remote_assignment_claim(&request, &response, HOST, CLAIMED_AT)
-        .await
-        .expect("persist immutable claim receipt");
+    Box::pin(
+        fixture
+            .db
+            .record_task_board_remote_assignment_claim(&request, &response, HOST, CLAIMED_AT),
+    )
+    .await
+    .expect("persist immutable claim receipt");
 }
 
 async fn assert_cancel_replay_is_exact(
@@ -391,16 +387,14 @@ async fn assert_cancel_replay_is_exact(
         .await
         .expect("sequence");
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_assignment_cancel(
-                request,
-                response,
-                HOST,
-                "2026-07-19T10:00:12Z",
-            )
-            .await
-            .expect("replay cancel response"),
+        Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+            request,
+            response,
+            HOST,
+            "2026-07-19T10:00:12Z",
+        ))
+        .await
+        .expect("replay cancel response"),
         TaskBoardRemoteMutationOutcome::Replayed(_)
     ));
     let mut conflicting = response.clone();
@@ -409,14 +403,14 @@ async fn assert_cancel_replay_is_exact(
         .seal(request)
         .expect("seal conflicting cancel response");
     assert!(matches!(
-        fixture
+        Box::pin(fixture
             .db
             .record_task_board_remote_assignment_cancel(
                 request,
                 &conflicting,
                 HOST,
                 "2026-07-19T10:00:14Z",
-            )
+            ))
             .await
             .expect("reject conflicting cancel response"),
         TaskBoardRemoteMutationOutcome::Stale(record)

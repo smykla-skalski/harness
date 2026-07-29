@@ -22,10 +22,10 @@ const CLEANED_AT: &str = "2026-07-19T10:00:50Z";
 
 #[tokio::test]
 async fn cleanup_pending_controller_generation_decisively_owns_one_capacity_slot() {
-    let fixture = controller_fixture(2).await;
-    let settlement = claimed_cancelled_settlement(&fixture).await;
-    let first = remote_candidate(&fixture, "first").await;
-    let second = remote_candidate(&fixture, "second").await;
+    let fixture = Box::pin(controller_fixture(2)).await;
+    let settlement = Box::pin(claimed_cancelled_settlement(&fixture)).await;
+    let first = Box::pin(remote_candidate(&fixture, "first")).await;
+    let second = Box::pin(remote_candidate(&fixture, "second")).await;
 
     assert!(matches!(
         offer_candidate(&fixture, &first, "2026-07-19T10:00:31Z").await,
@@ -149,8 +149,8 @@ async fn offer_candidate(
 }
 
 async fn claimed_cancelled_settlement(fixture: &ControllerFixture) -> RemoteSettledRequest {
-    let accepted = accept_controller(fixture).await;
-    let claimed = claim_controller(fixture, &accepted).await;
+    let accepted = Box::pin(accept_controller(fixture)).await;
+    let claimed = Box::pin(claim_controller(fixture, &accepted)).await;
     let request = RemoteCancelRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: fixture.request.binding.clone(),
@@ -181,16 +181,14 @@ async fn claimed_cancelled_settlement(fixture: &ControllerFixture) -> RemoteSett
         .await
         .expect("claim capacity cancel authority")
         .expect("capacity cancellation remains active");
-    let cancelled = match fixture
-        .db
-        .record_task_board_remote_assignment_cancel(
-            &request,
-            &response,
-            HOST,
-            "2026-07-19T10:00:21Z",
-        )
-        .await
-        .expect("persist capacity cancellation")
+    let cancelled = match Box::pin(fixture.db.record_task_board_remote_assignment_cancel(
+        &request,
+        &response,
+        HOST,
+        "2026-07-19T10:00:21Z",
+    ))
+    .await
+    .expect("persist capacity cancellation")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected cancelled capacity owner, got {other:?}"),

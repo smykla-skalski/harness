@@ -27,7 +27,12 @@ pub(super) async fn unknown_workspace_assignment(
         .claim_task_board_remote_assignment(&claim, PRINCIPAL, CLAIMED_AT)
         .await
         .expect("claim executor assignment");
-    authorize_and_start_executor(fixture, &accepted.assignment_id, STARTED_AT).await;
+    Box::pin(authorize_and_start_executor(
+        fixture,
+        &accepted.assignment_id,
+        STARTED_AT,
+    ))
+    .await;
     let TaskBoardRemoteMutationOutcome::Updated(unknown) = fixture
         .db
         .mark_task_board_remote_assignment_unknown(
@@ -112,7 +117,12 @@ pub(super) async fn completed_assignment_with_artifact(
         .claim_task_board_remote_assignment(&claim, PRINCIPAL, CLAIMED_AT)
         .await
         .expect("claim executor assignment");
-    authorize_and_start_executor(fixture, &accepted.assignment_id, STARTED_AT).await;
+    Box::pin(authorize_and_start_executor(
+        fixture,
+        &accepted.assignment_id,
+        STARTED_AT,
+    ))
+    .await;
     let started = fixture
         .db
         .task_board_remote_assignment(&accepted.assignment_id)

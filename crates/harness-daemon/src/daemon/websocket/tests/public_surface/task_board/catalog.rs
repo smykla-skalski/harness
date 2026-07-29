@@ -15,32 +15,32 @@ fn websocket_task_board_catalog_routes_use_real_state() {
                     .await;
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
-            seed_catalog_board_item(
+            Box::pin(seed_catalog_board_item(
                 &state,
                 "board-ws-catalog-a",
                 "WS catalog alpha todo",
                 "project-alpha",
                 AgentMode::Planning,
                 TaskBoardStatus::Todo,
-            )
+            ))
             .await;
-            seed_catalog_board_item(
+            Box::pin(seed_catalog_board_item(
                 &state,
                 "board-ws-catalog-b",
                 "WS catalog alpha running",
                 "project-alpha",
                 AgentMode::Planning,
                 TaskBoardStatus::InProgress,
-            )
+            ))
             .await;
-            seed_catalog_board_item(
+            Box::pin(seed_catalog_board_item(
                 &state,
                 "board-ws-catalog-c",
                 "WS catalog beta todo",
                 "project-beta",
                 AgentMode::Evaluate,
                 TaskBoardStatus::Todo,
-            )
+            ))
             .await;
 
             let projects_response = dispatch(

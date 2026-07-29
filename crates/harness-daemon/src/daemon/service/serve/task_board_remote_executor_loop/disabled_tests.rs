@@ -38,7 +38,7 @@ pub(super) enum SettingsDrift {
 #[tokio::test]
 async fn settings_winner_revokes_start_before_any_workspace_or_codex_io() {
     for drift in [SettingsDrift::Disabled, SettingsDrift::RevisionOnly] {
-        let (fixture, accepted) = live_claimed_fixture().await;
+        let (fixture, accepted) = Box::pin(live_claimed_fixture()).await;
         drift_executor_settings(&fixture.db, drift).await;
         let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
 
@@ -59,7 +59,7 @@ async fn settings_winner_revokes_start_before_any_workspace_or_codex_io() {
 
 #[tokio::test]
 async fn predecessor_claim_without_run_converges_unknown_without_executor_io() {
-    let (fixture, accepted) = live_claimed_fixture().await;
+    let (fixture, accepted) = Box::pin(live_claimed_fixture()).await;
     let state = executor_state(&fixture.db, "successor-instance");
 
     reconcile_remote_executor_assignment(&state, &fixture.db, &accepted.assignment_id)
@@ -87,7 +87,7 @@ async fn predecessor_claim_without_run_converges_unknown_without_executor_io() {
 
 #[tokio::test]
 async fn start_authority_is_durable_before_checkout_io() {
-    let (fixture, accepted) = live_claimed_fixture().await;
+    let (fixture, accepted) = Box::pin(live_claimed_fixture()).await;
     let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
 
     let error = reconcile_remote_executor_assignment(&state, &fixture.db, &accepted.assignment_id)
@@ -111,7 +111,7 @@ async fn expired_provisioning_permit_cleans_partial_workspace_before_unknown() {
     let (origin, revision) = git_repository(fixture._temp.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
-    let (accepted, authority) = claim_start_authority(&fixture, &request).await;
+    let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
     let claimed = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&claimed).expect("remote executor identity");
     let workspace = prepare_remote_workspace(

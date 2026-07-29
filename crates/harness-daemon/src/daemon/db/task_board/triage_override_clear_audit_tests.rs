@@ -7,7 +7,7 @@ use crate::task_board::{TaskBoardStatus, TriageVerdict};
 #[tokio::test]
 async fn clear_audit_identifies_a_fresh_automatic_decision_generation() {
     let (_directory, db) = connect().await;
-    seed_decided_todo(&db, "item-1").await;
+    Box::pin(seed_decided_todo(&db, "item-1")).await;
     db.set_task_board_triage_override(TaskBoardTriageOverrideSetInput {
         item_id: "item-1".into(),
         verdict: TriageVerdict::Todo,

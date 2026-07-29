@@ -56,7 +56,7 @@ async fn record_decision(
 #[tokio::test]
 async fn current_requires_an_existing_item_and_returns_optional_record() {
     let (_directory, db) = connect().await;
-    seed_item(&db, "item-1").await;
+    Box::pin(seed_item(&db, "item-1")).await;
 
     let empty = db
         .task_board_triage_current("item-1")
@@ -104,7 +104,7 @@ async fn current_requires_an_existing_item_and_returns_optional_record() {
 #[tokio::test]
 async fn history_is_bounded_descending_and_keyset_stable() {
     let (_directory, db) = connect().await;
-    seed_item(&db, "item-1").await;
+    Box::pin(seed_item(&db, "item-1")).await;
     for (digit, cause, decided_at) in [
         ('1', TriageCause::Initial, "2026-07-23T01:00:00Z"),
         ('2', TriageCause::FingerprintChanged, "2026-07-23T02:00:00Z"),
@@ -162,7 +162,7 @@ async fn history_is_bounded_descending_and_keyset_stable() {
 #[tokio::test]
 async fn history_rejects_invalid_cursors_and_corrupt_rows() {
     let (_directory, db) = connect().await;
-    seed_item(&db, "item-1").await;
+    Box::pin(seed_item(&db, "item-1")).await;
     record_decision(
         &db,
         "item-1",

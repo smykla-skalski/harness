@@ -303,7 +303,7 @@ mod tests {
         };
         let (body, lease) = stream_body(
             upstream,
-            Instant::now() + Duration::from_secs(60),
+            Instant::now() + Duration::from_mins(1),
             "http://127.0.0.1:8787",
         );
         let mut response = Response::new(body);
@@ -335,7 +335,7 @@ mod tests {
             Ok::<_, Infallible>(Frame::data(Bytes::from_static(b"first"))),
             Ok(Frame::data(Bytes::from_static(b"second"))),
         ]);
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + Duration::from_mins(1);
         let (body, lease) = stream_body(StreamBody::new(frames), deadline, "http://127.0.0.1:8787");
         let mut response = Response::new(body);
         response.extensions_mut().insert(lease);

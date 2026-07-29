@@ -38,12 +38,22 @@ pub(super) struct AuthorityFixture {
 }
 
 pub(super) async fn central_offer() -> AuthorityFixture {
-    central_offer_at(Utc::now(), 600, Utc::now() + Duration::hours(1)).await
+    Box::pin(central_offer_at(
+        Utc::now(),
+        600,
+        Utc::now() + Duration::hours(1),
+    ))
+    .await
 }
 
 pub(super) async fn expired_central_offer() -> AuthorityFixture {
     let now = Utc::now();
-    central_offer_at(now - Duration::minutes(2), 60, now + Duration::minutes(10)).await
+    Box::pin(central_offer_at(
+        now - Duration::minutes(2),
+        60,
+        now + Duration::minutes(10),
+    ))
+    .await
 }
 
 async fn central_offer_at(
@@ -51,7 +61,7 @@ async fn central_offer_at(
     lease_seconds: u32,
     deadline: DateTime<Utc>,
 ) -> AuthorityFixture {
-    let mut fixture = remote_controller_fixture(1).await;
+    let mut fixture = Box::pin(remote_controller_fixture(1)).await;
     let offered_at = canonical_time(offered);
     let initial_expiry = canonical_time(offered + Duration::seconds(i64::from(lease_seconds)));
     fixture.request.lease_seconds = lease_seconds;
@@ -116,12 +126,13 @@ pub(super) async fn persist_acceptance(state: &AuthorityFixture) {
             .expect("claim offer authority")
             .is_some()
     );
-    state
-        .fixture
-        .db
-        .record_task_board_remote_offer_response(&accepted_offer(state), HOST_ID, &state.offered_at)
-        .await
-        .expect("persist accepted offer");
+    Box::pin(state.fixture.db.record_task_board_remote_offer_response(
+        &accepted_offer(state),
+        HOST_ID,
+        &state.offered_at,
+    ))
+    .await
+    .expect("persist accepted offer");
 }
 
 pub(super) fn accepted_offer(state: &AuthorityFixture) -> RemoteOfferResponse {

@@ -82,7 +82,7 @@ mod tests {
         let request = ReviewsFilesPreviewRequest {
             pull_request_id: "PR_1".into(),
             head_ref_oid_expected: "head".into(),
-            paths: vec![" src/lib.rs ".into(), "".into()],
+            paths: vec![" src/lib.rs ".into(), String::new()],
             number: Some(7),
             repository_full_name: Some("owner/repo".into()),
             base_ref_oid_expected: Some("base".into()),

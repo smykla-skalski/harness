@@ -16,16 +16,16 @@ use crate::task_board::{
 
 pub(crate) async fn seed_cancelable_controller_targets(fixture: &ControllerFixture, count: u32) {
     assert!(count > 0, "cancelable target fixture needs one target");
-    offer_and_claim(
+    Box::pin(offer_and_claim(
         fixture,
         &fixture.execution,
         &fixture.attempt,
         &fixture.request,
-    )
+    ))
     .await;
     for index in 1..count {
-        let (execution, attempt, request) = candidate(fixture, index).await;
-        offer_and_claim(fixture, &execution, &attempt, &request).await;
+        let (execution, attempt, request) = Box::pin(candidate(fixture, index)).await;
+        Box::pin(offer_and_claim(fixture, &execution, &attempt, &request)).await;
     }
 }
 
@@ -127,25 +127,23 @@ async fn offer_and_claim(
         .await
         .expect("claim cancelable target offer authority")
         .expect("cancelable target offer remains active");
-    let accepted = match fixture
-        .db
-        .record_task_board_remote_offer_response(
-            &RemoteOfferResponse {
-                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                binding: request.binding.clone(),
-                offer_request_sha256: request.request_sha256.clone(),
-                disposition: RemoteOfferDisposition::Accepted,
-                lease: Some(RemoteLease {
-                    lease_id: lease_id.clone(),
-                    expires_at: LEASE_EXPIRES.into(),
-                }),
-                rejection_code: None,
-            },
-            HOST,
-            "2026-07-19T10:00:01Z",
-        )
-        .await
-        .expect("accept cancelable target offer")
+    let accepted = match Box::pin(fixture.db.record_task_board_remote_offer_response(
+        &RemoteOfferResponse {
+            schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+            binding: request.binding.clone(),
+            offer_request_sha256: request.request_sha256.clone(),
+            disposition: RemoteOfferDisposition::Accepted,
+            lease: Some(RemoteLease {
+                lease_id: lease_id.clone(),
+                expires_at: LEASE_EXPIRES.into(),
+            }),
+            rejection_code: None,
+        },
+        HOST,
+        "2026-07-19T10:00:01Z",
+    ))
+    .await
+    .expect("accept cancelable target offer")
     {
         TaskBoardRemoteMutationOutcome::Updated(record) => record,
         other => panic!("expected accepted cancelable target, got {other:?}"),
@@ -158,25 +156,23 @@ async fn offer_and_claim(
         .expect("claim cancelable target authority")
         .expect("cancelable target claim remains active");
     assert!(matches!(
-        fixture
-            .db
-            .record_task_board_remote_assignment_claim(
-                &claim,
-                &RemoteClaimResponse {
-                    schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-                    binding: request.binding.clone(),
-                    offer_request_sha256: request.request_sha256.clone(),
-                    lease: RemoteLease {
-                        lease_id,
-                        expires_at: LEASE_EXPIRES.into(),
-                    },
-                    claimed_at: CLAIMED_AT.into(),
+        Box::pin(fixture.db.record_task_board_remote_assignment_claim(
+            &claim,
+            &RemoteClaimResponse {
+                schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+                binding: request.binding.clone(),
+                offer_request_sha256: request.request_sha256.clone(),
+                lease: RemoteLease {
+                    lease_id,
+                    expires_at: LEASE_EXPIRES.into(),
                 },
-                HOST,
-                "2026-07-19T10:00:11Z",
-            )
-            .await
-            .expect("persist cancelable target claim"),
+                claimed_at: CLAIMED_AT.into(),
+            },
+            HOST,
+            "2026-07-19T10:00:11Z",
+        ))
+        .await
+        .expect("persist cancelable target claim"),
         TaskBoardRemoteMutationOutcome::Updated(_)
     ));
 }

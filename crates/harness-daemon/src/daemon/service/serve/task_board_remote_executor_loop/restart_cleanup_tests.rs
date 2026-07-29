@@ -16,7 +16,7 @@ const SUCCESSOR_INSTANCE: &str = "instance-b";
 
 #[tokio::test]
 async fn successor_cleans_predecessor_session_before_revoking_start_permit() {
-    let (fixture, accepted, authority, workspace) = predecessor_partial_workspace().await;
+    let (fixture, accepted, authority, workspace) = Box::pin(predecessor_partial_workspace()).await;
     let session_root = workspace.parent().expect("session root").to_path_buf();
     assert_eq!(executor_session_count(&fixture.db).await, 1);
 
@@ -43,7 +43,7 @@ async fn successor_cleans_predecessor_session_before_revoking_start_permit() {
 
 #[tokio::test]
 async fn successor_cleans_rowless_predecessor_workspace_before_revoking_start_permit() {
-    let (fixture, accepted, authority, workspace) = predecessor_partial_workspace().await;
+    let (fixture, accepted, authority, workspace) = Box::pin(predecessor_partial_workspace()).await;
     let session_root = workspace.parent().expect("session root").to_path_buf();
     assert!(
         fixture
@@ -77,7 +77,7 @@ async fn predecessor_partial_workspace() -> (
     let (origin, revision) = git_repository(fixture._temp.path());
     configure_checkout(&fixture.db, &origin).await;
     let request = request_for_revision(&fixture.request, &revision);
-    let (accepted, authority) = claim_start_authority(&fixture, &request).await;
+    let (accepted, authority) = Box::pin(claim_start_authority(&fixture, &request)).await;
     let claimed = load_assignment(&fixture.db, &accepted.assignment_id).await;
     let identity = remote_executor_identity(&claimed).expect("remote executor identity");
     assert_eq!(
