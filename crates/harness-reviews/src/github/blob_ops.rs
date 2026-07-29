@@ -5,10 +5,12 @@ use reqwest::Method;
 use serde_json::json;
 use std::time::Duration;
 
-use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
-use crate::reviews::files::blob::BlobTextProjection;
-use crate::reviews::files::blob::blob_exceeds_cap;
-use crate::reviews::files::patch_rest::split_repo_full_name;
+use crate::files::blob::BlobTextProjection;
+use crate::files::blob::blob_exceeds_cap;
+use crate::files::list::fetch_files;
+use crate::files::patch_rest::split_repo_full_name;
+use crate::files::{ReviewsFilesListRequest, ReviewsFilesListResponse};
+use harness_github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::{ReviewsGitHubClient, normalize_git_blob_base64};
@@ -17,11 +19,14 @@ use super::queries::{self, PULL_REQUEST_BODY_QUERY, UPDATE_PULL_REQUEST_BODY_MUT
 use super::types::{PullRequestBodyResponse, UpdatePullRequestBodyResponse};
 
 impl ReviewsGitHubClient {
-    pub(crate) async fn fetch_pull_request_files(
+    /// # Errors
+    ///
+    /// Returns an error if the REST files-list fetch fails.
+    pub async fn fetch_pull_request_files(
         &self,
-        request: &super::super::ReviewsFilesListRequest,
-    ) -> Result<super::super::ReviewsFilesListResponse, CliError> {
-        super::super::files::list::fetch_files(&self.client, request, Utc::now())
+        request: &ReviewsFilesListRequest,
+    ) -> Result<ReviewsFilesListResponse, CliError> {
+        fetch_files(&self.client, request, Utc::now())
             .await
             .map_err(|err| CliErrorKind::workflow_io(format!("reviews files list: {err}")).into())
     }
@@ -30,7 +35,11 @@ impl ReviewsGitHubClient {
     /// against one (pullRequestId, path) pair. The mutation response is
     /// inspected only for success/failure; daemon-side drift detection
     /// happens before this method is called.
-    pub(crate) async fn toggle_pull_request_file_viewed(
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL mutation fails.
+    pub async fn toggle_pull_request_file_viewed(
         &self,
         pull_request_id: &str,
         path: &str,
@@ -65,7 +74,11 @@ impl ReviewsGitHubClient {
     /// return empty content (`text == null` on the GraphQL side);
     /// callers should fall through to a REST raw-bytes fetch when the
     /// `byte_size` is non-zero but the content is empty.
-    pub(crate) async fn fetch_repository_blob_text(
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL fetch fails or the blob is not found.
+    pub async fn fetch_repository_blob_text(
         &self,
         repository_id: &str,
         oid: &str,
@@ -140,7 +153,12 @@ impl ReviewsGitHubClient {
     /// Fetch one git blob through GitHub REST and return its base64 payload.
     /// Used as the binary-image fallback after GraphQL has resolved the
     /// repository `nameWithOwner`.
-    pub(crate) async fn fetch_repository_blob_base64(
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `repo_full_name` is not `owner/name`, the REST
+    /// fetch fails, or the response is not base64-encoded.
+    pub async fn fetch_repository_blob_base64(
         &self,
         repo_full_name: &str,
         oid: &str,
@@ -197,7 +215,11 @@ impl ReviewsGitHubClient {
         })
     }
 
-    pub(crate) async fn fetch_pull_request_body(
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL fetch fails, the pull request is not
+    /// found, or its `updatedAt` timestamp fails to parse.
+    pub async fn fetch_pull_request_body(
         &self,
         pull_request_id: &str,
     ) -> Result<(String, DateTime<Utc>), CliError> {
@@ -225,7 +247,11 @@ impl ReviewsGitHubClient {
         Ok((node.body.unwrap_or_default(), updated_at))
     }
 
-    pub(crate) async fn update_pull_request_body(
+    /// # Errors
+    ///
+    /// Returns an error if the GraphQL mutation fails, GitHub rejects the
+    /// body update, or the response's `updatedAt` timestamp fails to parse.
+    pub async fn update_pull_request_body(
         &self,
         pull_request_id: &str,
         body: &str,

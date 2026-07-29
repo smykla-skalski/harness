@@ -2,45 +2,50 @@ use std::collections::BTreeMap;
 #[cfg(test)]
 use std::time::Duration;
 
-use crate::github_api::GitHubProtectedClient;
-use crate::task_board::github::GitHubApiAutomationClient;
+use harness_github_api::GitHubProtectedClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::github::GitHubApiAutomationClient;
 
 use super::super::{ReviewItem, ReviewRepositoryLabel};
 
 #[cfg(test)]
-pub(in crate::reviews) const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+pub(crate) const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(test)]
-pub(in crate::reviews) const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
+pub(crate) const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
 
-pub(in crate::reviews) const GRAPHQL_PAGE_SIZE: u32 = 100;
-pub(in crate::reviews) const SEARCH_PAGE_CAP: u32 = 10;
-pub(in crate::reviews) const REPOSITORY_CATALOG_PAGE_CAP: u32 = 5;
-pub(in crate::reviews) const SCOPE_QUERY_CAP: usize = 50;
-pub(in crate::reviews) const NODES_BATCH_SIZE: usize = 50;
+pub(crate) const GRAPHQL_PAGE_SIZE: u32 = 100;
+pub(crate) const SEARCH_PAGE_CAP: u32 = 10;
+pub(crate) const REPOSITORY_CATALOG_PAGE_CAP: u32 = 5;
+pub(crate) const SCOPE_QUERY_CAP: usize = 50;
+pub(crate) const NODES_BATCH_SIZE: usize = 50;
 
-pub(crate) struct ReviewsFetch {
+pub struct ReviewsFetch {
     pub items: Vec<ReviewItem>,
     pub repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
 }
 
-pub(crate) struct ReviewsFetchByIds {
+pub struct ReviewsFetchByIds {
     pub items: Vec<ReviewItem>,
     pub missing: Vec<String>,
     pub repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
 }
 
-pub(crate) struct ReviewsGitHubClient {
+pub struct ReviewsGitHubClient {
     pub(super) client: GitHubProtectedClient,
     pub(super) automation: GitHubApiAutomationClient,
 }
 
 impl ReviewsGitHubClient {
-    pub(crate) const fn protected(&self) -> &GitHubProtectedClient {
+    #[must_use]
+    pub const fn protected(&self) -> &GitHubProtectedClient {
         &self.client
     }
 
-    pub(crate) fn new(token: &str) -> Result<Self, CliError> {
+    /// # Errors
+    ///
+    /// Returns an error if `token` is blank or the underlying REST/GraphQL
+    /// clients fail to construct.
+    pub fn new(token: &str) -> Result<Self, CliError> {
         let token = token.trim();
         if token.is_empty() {
             return Err(CliErrorKind::workflow_io("reviews github token missing").into());

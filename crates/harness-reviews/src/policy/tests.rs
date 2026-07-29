@@ -10,26 +10,25 @@ use super::actions::{
 };
 use super::evidence::review_target_policy_evidence;
 use super::workflow::ensure_reviews_auto_workflow;
-use crate::reviews::{
+use crate::{
     ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
     ReviewTargetFlags,
 };
-use crate::task_board::github::GitHubMergeMethod;
-use crate::task_board::policy_graph::{
+use harness_kernel::errors::CliError;
+use harness_task_board::github::GitHubMergeMethod;
+use harness_task_board::policy_graph::{
     PolicyGraph, PolicyGraphMode, PolicyWaitCondition, store_gate_policy,
 };
-use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
-use crate::task_board::policy_runtime::models::{
+use harness_task_board::policy_runtime::executor::PolicyRuntimeExecutor;
+use harness_task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject,
     PolicyRunTrigger,
 };
-use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
-use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
-use crate::task_board::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
-use harness_kernel::errors::CliError;
+use harness_task_board::policy_runtime::providers::PolicyProviderRegistry;
+use harness_task_board::policy_runtime::repository::PolicyRuntimeRepository;
+use harness_task_board::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
 
-#[test]
-fn review_target_maps_into_policy_evidence() {
+fn draft_conflicted_review_target() -> ReviewTarget {
     let mut target = review_target_fixture();
     target.flags.is_draft = true;
     target.review_status = ReviewReviewStatus::ReviewRequired;
@@ -39,8 +38,12 @@ fn review_target_maps_into_policy_evidence() {
     target.viewer_has_active_approval = Some(false);
     target.auto_merge_enabled = Some(false);
     target.approval_requirement_satisfied_after_viewer_approval = Some(true);
+    target
+}
 
-    let evidence = review_target_policy_evidence(&target);
+#[test]
+fn review_target_maps_draft_and_conflict_flags_into_policy_evidence() {
+    let evidence = review_target_policy_evidence(&draft_conflicted_review_target());
 
     assert_eq!(evidence.review_is_open, Some(true));
     assert_eq!(evidence.review_is_draft, Some(true));
@@ -48,6 +51,12 @@ fn review_target_maps_into_policy_evidence() {
     assert_eq!(evidence.review_has_no_decision, Some(false));
     assert_eq!(evidence.review_has_merge_conflicts, Some(true));
     assert_eq!(evidence.review_policy_blocked, Some(true));
+}
+
+#[test]
+fn review_target_maps_approval_and_merge_flags_into_policy_evidence() {
+    let evidence = review_target_policy_evidence(&draft_conflicted_review_target());
+
     assert_eq!(evidence.review_viewer_can_update, Some(true));
     assert_eq!(evidence.review_has_conflict_markers, Some(true));
     assert_eq!(evidence.review_viewer_has_active_approval, Some(false));
@@ -72,7 +81,7 @@ async fn reviews_provider_approves_then_waits_for_checks_before_merge() {
         .start(
             PolicyRunTrigger::Manual,
             reviews_policy_run_request(
-                review_target_fixture(),
+                &review_target_fixture(),
                 GitHubMergeMethod::Squash,
                 PolicyWaitCondition::Event {
                     event_key: "reviews.checks_passed".to_owned(),
@@ -108,7 +117,7 @@ fn run_start_request_reads_merge_method_from_method_key() {
         "method": "merge",
         "trigger": "manual",
     });
-    let request: crate::reviews::ReviewsPolicyRunStartRequest =
+    let request: crate::ReviewsPolicyRunStartRequest =
         serde_json::from_value(body).expect("deserialize start request");
     assert_eq!(request.method, GitHubMergeMethod::Merge);
 }
@@ -124,7 +133,7 @@ fn run_start_request_ignores_legacy_merge_method_key() {
         "merge_method": "merge",
         "trigger": "manual",
     });
-    let request: crate::reviews::ReviewsPolicyRunStartRequest =
+    let request: crate::ReviewsPolicyRunStartRequest =
         serde_json::from_value(body).expect("deserialize start request");
     assert_eq!(request.method, GitHubMergeMethod::default());
 }
@@ -136,7 +145,7 @@ fn preview_request_reads_merge_method_from_method_key() {
         "target": review_target_fixture(),
         "method": "rebase",
     });
-    let request: crate::reviews::ReviewsPolicyPreviewRequest =
+    let request: crate::ReviewsPolicyPreviewRequest =
         serde_json::from_value(body).expect("deserialize preview request");
     assert_eq!(request.method, GitHubMergeMethod::Rebase);
 }
@@ -369,9 +378,7 @@ fn write_enforced_reviews_auto_policy(root: &Path) {
 }
 
 fn test_runtime_repository() -> PolicyRuntimeRepository {
-    let temp = tempdir().expect("create tempdir");
-    let root = temp.path().to_path_buf();
-    std::mem::forget(temp);
+    let root = tempdir().expect("create tempdir").keep();
     PolicyRuntimeRepository::new(root)
 }
 
@@ -386,7 +393,7 @@ fn review_target_fixture() -> ReviewTarget {
         head_sha: "abc123".to_owned(),
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::ReviewRequired,
-        check_status: crate::reviews::ReviewCheckStatus::Success,
+        check_status: crate::ReviewCheckStatus::Success,
         flags: ReviewTargetFlags {
             is_draft: false,
             policy_blocked: false,
@@ -403,11 +410,10 @@ fn review_target_fixture() -> ReviewTarget {
 }
 
 fn reviews_policy_run_request(
-    target: ReviewTarget,
+    target: &ReviewTarget,
     method: GitHubMergeMethod,
     wait: PolicyWaitCondition,
 ) -> PolicyRunRequest {
-    let merge_target = target.clone();
     PolicyRunRequest {
         workflow_id: "reviews_auto".to_owned(),
         subject: PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number)),
@@ -426,7 +432,7 @@ fn reviews_policy_run_request(
                 provider: "reviews".to_owned(),
                 action_key: "reviews.merge".to_owned(),
                 payload: Some(json!({
-                    "target": merge_target,
+                    "target": target,
                     "merge_method": method,
                 })),
             }),

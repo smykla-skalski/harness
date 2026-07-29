@@ -9,6 +9,7 @@ publish = false
 harness-github-api = { path = "../harness-github-api", version = "54.0.0" }
 harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "54.0.0" }
 harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
 async-trait = "0.1.83"
 base64 = "0.23.0"
@@ -20,6 +21,7 @@ gix = { version = "0.86.0", features = [
     "index",
     "blocking-http-transport-reqwest-rust-tls",
 ] }
+regex = "1.11.1"
 reqwest = { version = "0.13.2", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -32,13 +34,24 @@ utoipa = "5.5.0"
 [dev-dependencies]
 axum = { version = "=0.8.9", features = ["http2", "json", "ws"] }
 harness-github-api = { path = "../harness-github-api", version = "54.0.0", features = ["test-support"] }
+harness-task-board = { path = "../harness-task-board", version = "54.0.0", features = ["test-support"] }
 tempfile = "=3.27.0"
 
 [features]
-# Gates the REST patch fetcher (`files::patch_rest::fetch_patches`), which
-# only the daemon binary calls; matches the root crate's own feature of the
-# same name, forwarded from there for the same reason.
-daemon-runtime = []
+# Gates the REST patch fetcher (`files::patch_rest::fetch_patches`) and the
+# whole `policy` module (the PR merge-policy action executor/provider and
+# its task-board policy-graph/policy-runtime wiring), neither of which
+# anything but the daemon binary calls; matches the root crate's own
+# feature of the same name, forwarded from there for the same reason.
+daemon-runtime = ["harness-task-board/daemon-runtime"]
+# Exposes `policy::authored_reviews_policy_plan` (normally `cfg(test)`-only)
+# to the root crate's own tests, which depend on this crate as an ordinary
+# library and so never see its `cfg(test)` items. Matches
+# `harness-task-board`'s and `harness-github-api`'s own `test-support`
+# feature. Forwards to `harness-task-board`'s own feature of the same name
+# because `authored_reviews_policy_plan` reaches its `cfg(test)`-only
+# `cached_gate_policy` re-export too.
+test-support = ["harness-task-board/test-support"]
 
 # Matches the root crate's lint set rather than the lighter one the facade
 # crates carry, for the same reason harness-kernel, harness-workspace,

@@ -1,9 +1,11 @@
+use std::time::Duration;
+
 use super::queries::{NODES_BY_IDS_QUERY, SEARCH_QUERY};
 use super::resolve::PULL_REQUEST_BY_REFERENCE_QUERY;
 use super::types::PageInfo;
 use super::types::RepositoryLabelNode;
 use super::*;
-use crate::reviews::ReviewRepositoryLabel;
+use crate::ReviewRepositoryLabel;
 
 mod check_contexts;
 
@@ -95,7 +97,7 @@ fn search_descriptor_marks_forced_refreshes_uncacheable() {
     let forced = super::fetch::search_descriptor(&request);
     assert_eq!(
         forced.priority,
-        crate::github_api::GitHubPriority::FreshRead
+        harness_github_api::GitHubPriority::FreshRead
     );
     assert!(forced.cache_policy.force_refresh);
 
@@ -103,7 +105,7 @@ fn search_descriptor_marks_forced_refreshes_uncacheable() {
     let background = super::fetch::search_descriptor(&request);
     assert_eq!(
         background.priority,
-        crate::github_api::GitHubPriority::Background
+        harness_github_api::GitHubPriority::Background
     );
     assert!(!background.cache_policy.force_refresh);
 }
@@ -176,7 +178,7 @@ fn append_repository_labels_preserves_color_into_response_struct() {
 }
 
 #[test]
-fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
+fn search_query_requests_author_association_and_viewer_scoped_review_fields() {
     assert!(
         SEARCH_QUERY.contains("authorAssociation"),
         "search query must request authorAssociation for row halo semantics"
@@ -193,6 +195,10 @@ fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
         !SEARCH_QUERY.contains("reviewRequests(first: 100)"),
         "search query must avoid fetching every requested reviewer"
     );
+}
+
+#[test]
+fn nodes_query_requests_author_association_and_viewer_scoped_review_fields() {
     assert!(
         NODES_BY_IDS_QUERY.contains("authorAssociation"),
         "nodes query must request authorAssociation for refresh parity"
@@ -209,6 +215,10 @@ fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
         !NODES_BY_IDS_QUERY.contains("reviewRequests(first: 100)"),
         "nodes query must avoid fetching every requested reviewer"
     );
+}
+
+#[test]
+fn reference_query_requests_viewer_scoped_review_fields() {
     assert!(
         PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReview { state commit { oid } }"),
         "reference query must bind the viewer-specific latest review to its commit"
@@ -238,16 +248,13 @@ fn page_limit_requires_cursor_for_continuation() {
 
 #[test]
 fn production_github_timeouts_match_documented_ceilings() {
-    assert_eq!(
-        GITHUB_HTTP_CONNECT_TIMEOUT,
-        std::time::Duration::from_secs(30)
-    );
-    assert_eq!(GITHUB_HTTP_READ_TIMEOUT, std::time::Duration::from_secs(60));
+    assert_eq!(GITHUB_HTTP_CONNECT_TIMEOUT, Duration::from_secs(30));
+    assert_eq!(GITHUB_HTTP_READ_TIMEOUT, Duration::from_mins(1));
 }
 
 #[test]
 fn protected_github_client_rejects_empty_token() {
-    let Err(error) = crate::github_api::GitHubProtectedClient::new("  ") else {
+    let Err(error) = harness_github_api::GitHubProtectedClient::new("  ") else {
         panic!("empty token should fail");
     };
 

@@ -5,8 +5,8 @@
 //! that choose to include it. Runtime planners must still require an active
 //! enforced policy canvas.
 
-use crate::task_board::policy::PolicyReasonCode;
-use crate::task_board::policy_graph::{
+use harness_task_board::policy::PolicyReasonCode;
+use harness_task_board::policy_graph::{
     PORT_DEFAULT, PORT_ELSE, PORT_FAIL, PORT_IN, PORT_MISSING, PORT_PASS, PORT_THEN,
     PolicyActionStep, PolicyEventWait, PolicyEvidenceCheck, PolicyEvidenceField,
     PolicyEvidencePredicate, PolicyFinishNode, PolicyGraph, PolicyGraphDecision, PolicyGraphEdge,
@@ -69,6 +69,12 @@ fn node(
 }
 
 fn reviews_auto_nodes() -> Vec<PolicyGraphNode> {
+    let mut nodes = reviews_auto_conflict_and_eligibility_nodes();
+    nodes.extend(reviews_auto_approval_and_merge_nodes());
+    nodes
+}
+
+fn reviews_auto_conflict_and_eligibility_nodes() -> Vec<PolicyGraphNode> {
     vec![
         node(
             ENTRY_ID,
@@ -126,6 +132,11 @@ fn reviews_auto_nodes() -> Vec<PolicyGraphNode> {
             &[PORT_IN],
             &[PORT_THEN, PORT_ELSE],
         ),
+    ]
+}
+
+fn reviews_auto_approval_and_merge_nodes() -> Vec<PolicyGraphNode> {
+    vec![
         node(
             APPROVE_ID,
             "Approve",
@@ -282,6 +293,12 @@ fn edge(
 }
 
 fn reviews_auto_edges() -> Vec<PolicyGraphEdge> {
+    let mut edges = reviews_auto_conflict_and_eligibility_edges();
+    edges.extend(reviews_auto_approval_and_merge_edges());
+    edges
+}
+
+fn reviews_auto_conflict_and_eligibility_edges() -> Vec<PolicyGraphEdge> {
     vec![
         edge(
             "reviews-auto-entry-conflict",
@@ -357,6 +374,11 @@ fn reviews_auto_edges() -> Vec<PolicyGraphEdge> {
             APPROVE_ID,
             PolicyGraphEdgeCondition::ConditionFalse,
         ),
+    ]
+}
+
+fn reviews_auto_approval_and_merge_edges() -> Vec<PolicyGraphEdge> {
+    vec![
         edge(
             "reviews-auto-approve-auto-merge",
             APPROVE_ID,

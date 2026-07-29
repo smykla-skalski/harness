@@ -3,9 +3,7 @@ use super::super::{
     ReviewReviewEventState, ReviewReviewStatus,
 };
 
-pub(in crate::reviews::github) fn map_pull_request_state(
-    value: Option<&str>,
-) -> ReviewPullRequestState {
+pub(in crate::github) fn map_pull_request_state(value: Option<&str>) -> ReviewPullRequestState {
     match value {
         Some("OPEN") => ReviewPullRequestState::Open,
         Some("CLOSED") => ReviewPullRequestState::Closed,
@@ -14,7 +12,7 @@ pub(in crate::reviews::github) fn map_pull_request_state(
     }
 }
 
-pub(in crate::reviews::github) fn map_mergeable_state(value: Option<&str>) -> ReviewMergeableState {
+pub(in crate::github) fn map_mergeable_state(value: Option<&str>) -> ReviewMergeableState {
     match value {
         Some("MERGEABLE") => ReviewMergeableState::Mergeable,
         Some("CONFLICTING") => ReviewMergeableState::Conflicting,
@@ -22,7 +20,7 @@ pub(in crate::reviews::github) fn map_mergeable_state(value: Option<&str>) -> Re
     }
 }
 
-pub(in crate::reviews::github) fn map_review_status(value: Option<&str>) -> ReviewReviewStatus {
+pub(in crate::github) fn map_review_status(value: Option<&str>) -> ReviewReviewStatus {
     match value {
         Some("APPROVED") => ReviewReviewStatus::Approved,
         Some("CHANGES_REQUESTED") => ReviewReviewStatus::ChangesRequested,
@@ -31,9 +29,7 @@ pub(in crate::reviews::github) fn map_review_status(value: Option<&str>) -> Revi
     }
 }
 
-pub(in crate::reviews::github) fn map_check_run_status(
-    value: Option<&str>,
-) -> ReviewCheckRunStatus {
+pub(in crate::github) fn map_check_run_status(value: Option<&str>) -> ReviewCheckRunStatus {
     match value {
         Some("COMPLETED") => ReviewCheckRunStatus::Completed,
         Some("IN_PROGRESS") => ReviewCheckRunStatus::InProgress,
@@ -44,9 +40,7 @@ pub(in crate::reviews::github) fn map_check_run_status(
     }
 }
 
-pub(in crate::reviews::github) fn map_check_conclusion(
-    value: Option<&str>,
-) -> ReviewCheckConclusion {
+pub(in crate::github) fn map_check_conclusion(value: Option<&str>) -> ReviewCheckConclusion {
     match value {
         Some("SUCCESS") => ReviewCheckConclusion::Success,
         Some("FAILURE") => ReviewCheckConclusion::Failure,
@@ -61,7 +55,7 @@ pub(in crate::reviews::github) fn map_check_conclusion(
     }
 }
 
-pub(in crate::reviews::github) fn map_status_context_conclusion(
+pub(in crate::github) fn map_status_context_conclusion(
     value: Option<&str>,
 ) -> ReviewCheckConclusion {
     match value {
@@ -71,9 +65,7 @@ pub(in crate::reviews::github) fn map_status_context_conclusion(
     }
 }
 
-pub(in crate::reviews::github) fn map_review_event_state(
-    value: Option<&str>,
-) -> ReviewReviewEventState {
+pub(in crate::github) fn map_review_event_state(value: Option<&str>) -> ReviewReviewEventState {
     match value {
         Some("APPROVED") => ReviewReviewEventState::Approved,
         Some("CHANGES_REQUESTED") => ReviewReviewEventState::ChangesRequested,

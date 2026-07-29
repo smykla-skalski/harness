@@ -389,6 +389,14 @@ fn auto_approvable_accepts_unreviewed_open_prs() {
     assert!(!already_approved.is_auto_approvable());
 }
 
+fn assert_array_field(object: &serde_json::Map<String, serde_json::Value>, field: &str) {
+    assert!(object.contains_key(field), "{field} key must be emitted");
+    assert!(
+        object[field].as_array().is_some(),
+        "{field} must be an array"
+    );
+}
+
 #[test]
 fn serialized_item_always_emits_array_fields_for_swift_decoders() {
     let item = sample_item(
@@ -398,34 +406,11 @@ fn serialized_item_always_emits_array_fields_for_swift_decoders() {
         false,
     );
     let value = serde_json::to_value(&item).expect("serialize");
-
     let object = value.as_object().expect("item is an object");
-    assert!(object.contains_key("labels"), "labels key must be emitted");
-    assert!(object.contains_key("checks"), "checks key must be emitted");
-    assert!(
-        object.contains_key("reviews"),
-        "reviews key must be emitted"
-    );
-    assert!(
-        object.contains_key("required_failed_check_names"),
-        "required_failed_check_names key must be emitted"
-    );
-    assert!(
-        object["labels"].as_array().is_some(),
-        "labels must be an array"
-    );
-    assert!(
-        object["checks"].as_array().is_some(),
-        "checks must be an array"
-    );
-    assert!(
-        object["reviews"].as_array().is_some(),
-        "reviews must be an array"
-    );
-    assert!(
-        object["required_failed_check_names"].as_array().is_some(),
-        "required_failed_check_names must be an array"
-    );
+
+    for field in ["labels", "checks", "reviews", "required_failed_check_names"] {
+        assert_array_field(object, field);
+    }
 }
 
 #[test]

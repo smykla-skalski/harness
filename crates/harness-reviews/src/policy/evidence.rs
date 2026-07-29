@@ -1,11 +1,11 @@
-use crate::reviews::{
+use crate::{
     ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
     ReviewTarget,
 };
-use crate::task_board::PolicyEvidence;
+use harness_task_board::PolicyEvidence;
 
 #[must_use]
-pub(crate) fn review_target_policy_evidence(target: &ReviewTarget) -> PolicyEvidence {
+pub fn review_target_policy_evidence(target: &ReviewTarget) -> PolicyEvidence {
     PolicyEvidence {
         checks_green: Some(target.check_status == ReviewCheckStatus::Success),
         reviewer_verdict_approved: Some(target.review_status == ReviewReviewStatus::Approved),

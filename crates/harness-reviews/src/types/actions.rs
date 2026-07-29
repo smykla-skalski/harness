@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::github::GitHubMergeMethod;
+use harness_task_board::github::GitHubMergeMethod;
 
 use super::super::enums::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewCheckStatus,

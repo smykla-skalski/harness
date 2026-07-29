@@ -1,12 +1,12 @@
 use chrono::Utc;
 
-use crate::reviews::{
+use crate::{
     PullRequestReview, ReviewAuthorAssociation, ReviewCheckStatus, ReviewItem, ReviewItemFlags,
     ReviewMergeableState, ReviewPullRequestState, ReviewReviewEventState, ReviewReviewStatus,
 };
 
 use super::{apply_policy_review_metadata, viewer_approval_matches_head};
-use crate::reviews::github::types::{ViewerLatestReviewNode, ViewerReviewCommitNode};
+use crate::github::types::{ViewerLatestReviewNode, ViewerReviewCommitNode};
 
 fn review(author: &str, state: ReviewReviewEventState) -> PullRequestReview {
     PullRequestReview {

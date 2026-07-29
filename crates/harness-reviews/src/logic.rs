@@ -2,7 +2,7 @@
 //!
 //! Holds the serde default helpers, normalization helper, and impl blocks
 //! that derive request/response state from the structs declared in
-//! [`crate::reviews::types`].
+//! [`crate::types`].
 
 use std::collections::{BTreeMap, BTreeSet};
 

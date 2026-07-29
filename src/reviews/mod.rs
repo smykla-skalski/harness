@@ -1,14 +1,22 @@
-// `avatar`, `enums`, `file_comment`, `files`, `review_thread_resolve`, and
-// `timeline` moved into `harness-reviews`: they carry no `task_board`
-// dependency. `backports`, `body_update`, `github`, `logic`, `policy`, and
-// `types` stay here — they either reach into `task_board` directly, or hold
-// inherent impls on wire types `task_board` still owns, and task_board's own
-// extraction into a crate isn't finished yet.
+// Deliberate public API facade, not scaffolding: `backports`, `body_update`,
+// `github`, `logic`, `policy`, `types`, and `validation` moved into
+// `harness_reviews` in this slice, completing the extraction the earlier
+// `avatar`/`enums`/`file_comment`/`files`/`review_thread_resolve`/`timeline`
+// slice started. `body_update`, `github`, `policy`, and `types` get wrapper
+// modules below because this file still needs to reach them by name
+// (`pub use body_update::{...}`, `github::ReviewsGitHubClient`, and so on);
+// `backports`, `logic`, and `validation` have no such call site here (their
+// exported items are inherent impls on `types`'s structs, reachable through
+// those structs without a module-qualified path) and so need no wrapper.
+// Each wrapper restores its outside callers exactly the way root's own
+// `task_board/mod.rs` restores task_board's extracted domains through its
+// own `pub use harness_task_board::*;`.
 mod avatar {
     pub use harness_reviews::avatar::*;
 }
-mod backports;
-mod body_update;
+mod body_update {
+    pub use harness_reviews::body_update::*;
+}
 mod enums {
     pub use harness_reviews::enums::*;
 }
@@ -18,18 +26,22 @@ mod file_comment {
 pub(crate) mod files {
     pub use harness_reviews::files::*;
 }
-mod github;
-mod logic;
+mod github {
+    pub use harness_reviews::github::*;
+}
 #[cfg(feature = "daemon-runtime")]
-pub(crate) mod policy;
+pub(crate) mod policy {
+    pub use harness_reviews::policy::*;
+}
 pub(crate) mod review_thread_resolve {
     pub use harness_reviews::review_thread_resolve::*;
 }
 pub(crate) mod timeline {
     pub use harness_reviews::timeline::*;
 }
-mod types;
-mod validation;
+mod types {
+    pub use harness_reviews::types::*;
+}
 
 pub use avatar::{ReviewsAvatarRequest, ReviewsAvatarResponse, fetch_review_avatar};
 pub use body_update::{
@@ -80,14 +92,3 @@ pub use types::{
     ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
     ReviewsSummary,
 };
-
-// Re-exports used by `mod tests;` via `use super::*;`. These were previously
-// available because the module root pulled them in directly; keep them
-// scoped to test builds so the public API stays unchanged.
-#[cfg(test)]
-use crate::task_board::github::GitHubMergeMethod;
-#[cfg(test)]
-use chrono::{DateTime, Utc};
-
-#[cfg(test)]
-mod tests;

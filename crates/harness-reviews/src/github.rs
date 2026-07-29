@@ -16,9 +16,9 @@ mod types;
 // directly, so they need no re-export here.
 pub(super) use client::{GRAPHQL_PAGE_SIZE, SCOPE_QUERY_CAP};
 
-// Public re-export keeps `reviews::ReviewsGitHubClient` available to the
-// daemon service layer.
-pub(crate) use client::ReviewsGitHubClient;
+// Public re-export keeps `harness_reviews::github::ReviewsGitHubClient`
+// available to root's daemon service layer across the crate boundary.
+pub use client::ReviewsGitHubClient;
 
 // Re-exports for the `super::*` glob in `tests.rs` (kept identical to the
 // pre-split private imports). Gated on `cfg(test)` to avoid leaking the
@@ -33,7 +33,7 @@ use mapping::{next_cursor_or_scope_limit, parse_timestamp, scopes};
 
 // Lift the parent's shared review types into the `github` namespace so each
 // companion module can keep `use super::{ReviewItem, ...}` imports working
-// without reaching back into `crate::reviews::...`.
+// without reaching back into the crate root directly.
 pub(super) use super::{
     PullRequestReview, ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewCheck,
     ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus, ReviewItem,

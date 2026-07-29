@@ -1,34 +1,34 @@
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use std::path::Path;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::reviews::ReviewTarget;
-use crate::task_board::github::GitHubMergeMethod;
-use crate::task_board::policy::{
+use crate::ReviewTarget;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::github::GitHubMergeMethod;
+use harness_task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
-use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyGraph};
-#[cfg(test)]
-use crate::task_board::policy_graph::{PolicyGraphMode, cached_gate_policy};
-use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
-use crate::task_board::policy_runtime::models::{
+use harness_task_board::policy_graph::{CompiledWorkflowStep, PolicyGraph};
+#[cfg(any(test, feature = "test-support"))]
+use harness_task_board::policy_graph::{PolicyGraphMode, cached_gate_policy};
+use harness_task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
+use harness_task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
-use crate::task_board::policy_runtime::notification::{
+use harness_task_board::policy_runtime::notification::{
     NOTIFICATION_ACTION_KEY, NOTIFICATION_PROVIDER,
 };
-use crate::task_board::policy_runtime::providers::{
+use harness_task_board::policy_runtime::providers::{
     PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::evidence::review_target_policy_evidence;
 const REVIEWS_PROVIDER: &str = "reviews";
 
 #[derive(Debug, Clone)]
-pub(crate) struct ReviewsPolicyPlan {
+pub struct ReviewsPolicyPlan {
     pub workflow_id: String,
     pub subject: PolicyRunSubject,
     pub subject_fingerprint: Option<String>,
@@ -39,7 +39,7 @@ pub(crate) struct ReviewsPolicyPlan {
 
 impl ReviewsPolicyPlan {
     #[must_use]
-    pub(crate) fn into_run_request(self) -> Option<PolicyRunRequest> {
+    pub fn into_run_request(self) -> Option<PolicyRunRequest> {
         if !self.actionable {
             return None;
         }
@@ -60,20 +60,20 @@ struct ReviewsPolicyActionPayload {
 }
 
 #[async_trait]
-pub(crate) trait ReviewsPolicyActionExecutor: Send + Sync {
+pub trait ReviewsPolicyActionExecutor: Send + Sync {
     async fn approve(&self, target: &ReviewTarget) -> Result<(), CliError>;
 
     async fn merge(&self, target: &ReviewTarget, method: GitHubMergeMethod)
     -> Result<(), CliError>;
 }
 
-pub(crate) struct ReviewsPolicyProvider<E> {
+pub struct ReviewsPolicyProvider<E> {
     executor: E,
 }
 
 impl<E> ReviewsPolicyProvider<E> {
     #[must_use]
-    pub(crate) fn new(executor: E) -> Self {
+    pub fn new(executor: E) -> Self {
         Self { executor }
     }
 }
@@ -113,8 +113,11 @@ where
     }
 }
 
-#[cfg(test)]
-pub(crate) fn authored_reviews_policy_plan(
+/// # Errors
+///
+/// Returns an error if a compiled workflow step names an unsupported reviews policy action.
+#[cfg(any(test, feature = "test-support"))]
+pub fn authored_reviews_policy_plan(
     root: &Path,
     workflow_id: &str,
     target: &ReviewTarget,
@@ -124,7 +127,10 @@ pub(crate) fn authored_reviews_policy_plan(
     authored_reviews_policy_plan_from_document(document.as_ref(), workflow_id, target, method)
 }
 
-pub(crate) fn authored_reviews_policy_plan_from_document(
+/// # Errors
+///
+/// Returns an error if a compiled workflow step names an unsupported reviews policy action.
+pub fn authored_reviews_policy_plan_from_document(
     document: Option<&PolicyGraph>,
     workflow_id: &str,
     target: &ReviewTarget,
@@ -230,7 +236,7 @@ pub(crate) fn authored_reviews_policy_plan_from_document(
     })
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 fn enforced_reviews_policy_document(root: &Path) -> Option<PolicyGraph> {
     let document = cached_gate_policy(root)?;
     (document.mode == PolicyGraphMode::Enforced).then(|| (**document).clone())
@@ -369,7 +375,8 @@ fn action_payload(
     })
 }
 
-pub(crate) fn planned_reviews_policy_run_matches_target(
+#[must_use]
+pub fn planned_reviews_policy_run_matches_target(
     steps: &[PolicyRunStep],
     target: &ReviewTarget,
 ) -> bool {

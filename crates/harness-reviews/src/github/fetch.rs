@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
-use crate::reviews::backports::BackportDetector;
+use crate::backports::BackportDetector;
+use harness_github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::{
@@ -44,7 +44,11 @@ pub(super) fn search_descriptor(request: &ReviewsQueryRequest) -> GitHubRequestD
 }
 
 impl ReviewsGitHubClient {
-    pub(crate) async fn fetch_updates(
+    /// # Errors
+    ///
+    /// Returns an error if the search query is malformed or any GraphQL
+    /// page fetch fails.
+    pub async fn fetch_updates(
         &self,
         request: &ReviewsQueryRequest,
     ) -> Result<ReviewsFetch, CliError> {
@@ -136,7 +140,10 @@ impl ReviewsGitHubClient {
         }
     }
 
-    pub(crate) async fn fetch_by_ids(
+    /// # Errors
+    ///
+    /// Returns an error if any GraphQL node-batch fetch fails.
+    pub async fn fetch_by_ids(
         &self,
         ids: &[String],
         request: &ReviewsRefreshRequest,
@@ -202,7 +209,11 @@ impl ReviewsGitHubClient {
         })
     }
 
-    pub(crate) async fn catalog_organization_repositories(
+    /// # Errors
+    ///
+    /// Returns an error if the organization is not found/accessible or any
+    /// GraphQL page fetch fails.
+    pub async fn catalog_organization_repositories(
         &self,
         organization: &str,
     ) -> Result<Vec<String>, CliError> {

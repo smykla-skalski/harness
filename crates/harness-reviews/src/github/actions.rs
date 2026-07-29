@@ -2,13 +2,13 @@ use std::slice;
 
 use serde_json::json;
 
-use crate::github_api::{
+use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
-use crate::task_board::github::{
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubMergeMethod,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::client::ReviewsGitHubClient;
 use super::mapping::{action_result, github_project_config};
@@ -31,11 +31,15 @@ impl ReviewsGitHubClient {
     /// source. Used to mark "(you)" on the current viewer's reviewer pill and
     /// surface the "Commenting as @viewer" caption in the composer. Failures
     /// remain non-fatal: the UI simply omits those affordances.
-    pub(crate) async fn fetch_viewer_login(&self) -> Option<String> {
+    pub async fn fetch_viewer_login(&self) -> Option<String> {
         self.client.viewer_login().await.ok()
     }
 
-    pub(crate) async fn approve(
+    /// # Errors
+    ///
+    /// Never returns `Err`; each target's outcome is captured in its own
+    /// [`ReviewActionResult`] instead.
+    pub async fn approve(
         &self,
         request: &ReviewsApproveRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
@@ -47,11 +51,19 @@ impl ReviewsGitHubClient {
         Ok(results)
     }
 
-    pub(crate) async fn policy_approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
+    /// # Errors
+    ///
+    /// Returns an error if the target has no exact head commit or the
+    /// GitHub GraphQL mutation fails.
+    pub async fn policy_approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
         approve_target(&self.client, target, POLICY_APPROVAL_OPERATION).await
     }
 
-    pub(crate) async fn comment(
+    /// # Errors
+    ///
+    /// Never returns `Err`; each target's outcome is captured in its own
+    /// [`ReviewActionResult`] instead.
+    pub async fn comment(
         &self,
         request: &ReviewsCommentRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
@@ -76,7 +88,10 @@ impl ReviewsGitHubClient {
         Ok(results)
     }
 
-    pub(crate) async fn add_file_comment(
+    /// # Errors
+    ///
+    /// Returns an error if the GitHub GraphQL mutation fails.
+    pub async fn add_file_comment(
         &self,
         request: &ReviewsFileCommentRequest,
     ) -> Result<ReviewsFileCommentResponse, CliError> {
@@ -151,7 +166,11 @@ impl ReviewsGitHubClient {
         Ok(request.response(request.thread_id.clone(), comment_id, url))
     }
 
-    pub(crate) async fn merge(
+    /// # Errors
+    ///
+    /// Never returns `Err`; each target's outcome is captured in its own
+    /// [`ReviewActionResult`] instead.
+    pub async fn merge(
         &self,
         request: &ReviewsMergeRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
@@ -163,7 +182,11 @@ impl ReviewsGitHubClient {
         Ok(results)
     }
 
-    pub(crate) async fn policy_merge(
+    /// # Errors
+    ///
+    /// Returns an error if the repository has no automation config or the
+    /// GitHub merge mutation fails.
+    pub async fn policy_merge(
         &self,
         target: &ReviewTarget,
         method: GitHubMergeMethod,
@@ -171,7 +194,11 @@ impl ReviewsGitHubClient {
         merge_target(&self.automation, target, method).await
     }
 
-    pub(crate) async fn rerun_checks(
+    /// # Errors
+    ///
+    /// Never returns `Err`; each target's outcome is captured in its own
+    /// [`ReviewActionResult`] instead.
+    pub async fn rerun_checks(
         &self,
         request: &ReviewsRerunChecksRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
@@ -218,7 +245,11 @@ impl ReviewsGitHubClient {
         Ok(results)
     }
 
-    pub(crate) async fn add_label(
+    /// # Errors
+    ///
+    /// Never returns `Err`; each target's outcome is captured in its own
+    /// [`ReviewActionResult`] instead.
+    pub async fn add_label(
         &self,
         request: &ReviewsLabelRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
@@ -245,7 +276,11 @@ impl ReviewsGitHubClient {
         Ok(results)
     }
 
-    pub(crate) async fn request_review(
+    /// # Errors
+    ///
+    /// Never returns `Err`; each target's outcome is captured in its own
+    /// [`ReviewActionResult`] instead.
+    pub async fn request_review(
         &self,
         request: &ReviewsRequestReviewRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
@@ -374,7 +409,7 @@ async fn merge_target(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::reviews::{
+    use crate::{
         ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
         ReviewTargetFlags,
     };

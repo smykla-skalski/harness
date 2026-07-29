@@ -4,8 +4,8 @@ use std::time::Duration;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
-use crate::reviews::backports::BackportDetector;
+use crate::backports::BackportDetector;
+use harness_github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use harness_kernel::errors::CliError;
 
 use super::client::{ReviewsFetchByIds, ReviewsGitHubClient};
@@ -132,7 +132,10 @@ impl ReferenceFreshness {
 }
 
 impl ReviewsGitHubClient {
-    pub(crate) async fn fetch_by_references(
+    /// # Errors
+    ///
+    /// Returns an error if any GraphQL fetch fails.
+    pub async fn fetch_by_references(
         &self,
         request: &ReviewsPullRequestResolveRequest,
     ) -> Result<ReviewsFetchByIds, CliError> {
@@ -140,7 +143,10 @@ impl ReviewsGitHubClient {
             .await
     }
 
-    pub(crate) async fn fetch_by_references_authoritative(
+    /// # Errors
+    ///
+    /// Returns an error if any GraphQL fetch fails.
+    pub async fn fetch_by_references_authoritative(
         &self,
         request: &ReviewsPullRequestResolveRequest,
     ) -> Result<ReviewsFetchByIds, CliError> {

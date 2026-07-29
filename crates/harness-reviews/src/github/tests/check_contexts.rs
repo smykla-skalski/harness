@@ -1,3 +1,5 @@
+use std::slice;
+
 use super::super::types::SearchResponse;
 use super::super::types::{CheckSuiteNode, StatusContextNode};
 use super::super::*;
@@ -65,8 +67,53 @@ fn append_check_contexts_drops_empty_and_non_web_details_urls() {
     assert!(item.checks.iter().all(|check| check.details_url.is_none()));
 }
 
-#[test]
-fn graphql_payload_preserves_check_urls_into_daemon_json() {
+struct CheckUrlFixture {
+    item: ReviewItem,
+    check_run_url: &'static str,
+    status_context_url: &'static str,
+}
+
+fn commits_with_check_contexts(check_run_url: &str, status_context_url: &str) -> serde_json::Value {
+    serde_json::json!({
+        "nodes": [
+            {
+                "commit": {
+                    "statusCheckRollup": {
+                        "contexts": {
+                            "pageInfo": {
+                                "hasNextPage": false,
+                                "endCursor": null
+                            },
+                            "nodes": [
+                                {
+                                    "name": "Analyze (go)",
+                                    "status": "COMPLETED",
+                                    "conclusion": "SUCCESS",
+                                    "url": check_run_url,
+                                    "checkSuite": { "id": "suite-1" }
+                                },
+                                {
+                                    "context": "legacy/ci",
+                                    "state": "FAILURE",
+                                    "targetUrl": status_context_url
+                                },
+                                {
+                                    "name": "Skipped url",
+                                    "status": "COMPLETED",
+                                    "conclusion": "SUCCESS",
+                                    "url": "mailto:ci@example.com",
+                                    "checkSuite": null
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ]
+    })
+}
+
+fn check_url_fixture() -> CheckUrlFixture {
     let check_run_url = "https://github.com/acme/api/actions/runs/42/job/99";
     let status_context_url = "https://ci.example.com/acme/api/42";
     let response: SearchResponse = serde_json::from_value(serde_json::json!({
@@ -113,43 +160,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                             "requiredStatusChecks": [{ "context": "Analyze (go)" }]
                         }
                     },
-                    "commits": {
-                        "nodes": [
-                            {
-                                "commit": {
-                                    "statusCheckRollup": {
-                                        "contexts": {
-                                            "pageInfo": {
-                                                "hasNextPage": false,
-                                                "endCursor": null
-                                            },
-                                            "nodes": [
-                                                {
-                                                    "name": "Analyze (go)",
-                                                    "status": "COMPLETED",
-                                                    "conclusion": "SUCCESS",
-                                                    "url": check_run_url,
-                                                    "checkSuite": { "id": "suite-1" }
-                                                },
-                                                {
-                                                    "context": "legacy/ci",
-                                                    "state": "FAILURE",
-                                                    "targetUrl": status_context_url
-                                                },
-                                                {
-                                                    "name": "Skipped url",
-                                                    "status": "COMPLETED",
-                                                    "conclusion": "SUCCESS",
-                                                    "url": "mailto:ci@example.com",
-                                                    "checkSuite": null
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        ]
-                    },
+                    "commits": commits_with_check_contexts(check_run_url, status_context_url),
                     "reviews": {
                         "pageInfo": {
                             "hasNextPage": false,
@@ -189,7 +200,22 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         .next()
         .expect("fixture node");
     let (mut item, _, _) = super::super::mapping::convert_node(node, None).expect("convert node");
-    super::super::mapping::apply_policy_review_metadata(std::slice::from_mut(&mut item));
+    super::super::mapping::apply_policy_review_metadata(slice::from_mut(&mut item));
+
+    CheckUrlFixture {
+        item,
+        check_run_url,
+        status_context_url,
+    }
+}
+
+#[test]
+fn graphql_payload_preserves_check_details_urls() {
+    let CheckUrlFixture {
+        item,
+        check_run_url,
+        status_context_url,
+    } = check_url_fixture();
 
     assert_eq!(item.checks.len(), 3);
     assert_eq!(item.checks[0].details_url.as_deref(), Some(check_run_url));
@@ -198,6 +224,16 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         Some(status_context_url)
     );
     assert_eq!(item.checks[2].details_url, None);
+    assert_eq!(
+        item.required_failed_check_names,
+        vec!["legacy/ci".to_string()]
+    );
+}
+
+#[test]
+fn graphql_payload_preserves_viewer_and_avatar_metadata() {
+    let CheckUrlFixture { item, .. } = check_url_fixture();
+
     assert!(item.viewer_can_merge_as_admin);
     assert!(item.flags.viewer_is_requested_reviewer);
     assert_eq!(item.viewer_has_active_approval, Some(true));
@@ -215,10 +251,15 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
             .and_then(|review| review.author_avatar_url.as_deref()),
         Some("https://avatars.githubusercontent.com/in/2740?v=4")
     );
-    assert_eq!(
-        item.required_failed_check_names,
-        vec!["legacy/ci".to_string()]
-    );
+}
+
+#[test]
+fn graphql_payload_preserves_check_urls_into_daemon_json() {
+    let CheckUrlFixture {
+        item,
+        check_run_url,
+        status_context_url,
+    } = check_url_fixture();
 
     let serialized = serde_json::to_value(&item).expect("serialize item");
     let checks = serialized["checks"].as_array().expect("checks");
@@ -325,12 +366,12 @@ pub(super) fn sample_review_item() -> ReviewItem {
         backport_source: None,
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
-        author_association: crate::reviews::ReviewAuthorAssociation::None,
+        author_association: crate::ReviewAuthorAssociation::None,
         state: ReviewPullRequestState::Open,
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::None,
         check_status: ReviewCheckStatus::None,
-        flags: crate::reviews::ReviewItemFlags {
+        flags: crate::ReviewItemFlags {
             policy_blocked: false,
             is_draft: false,
             viewer_can_update: true,

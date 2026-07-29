@@ -1,4 +1,4 @@
-use crate::reviews::backports::BackportDetector;
+use crate::backports::BackportDetector;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{

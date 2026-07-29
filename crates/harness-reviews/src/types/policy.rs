@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::github::GitHubMergeMethod;
+use harness_task_board::github::GitHubMergeMethod;
 
 use super::super::logic::default_reviews_policy_workflow_id;
 use super::ReviewTarget;
