@@ -305,7 +305,8 @@ impl RestartDriver {
     /// driven, so a restart failure names the same execution as the other
     /// stages.
     pub(super) fn restart(&mut self, correlation: &str) -> Result<(), RestartFailure> {
-        let before = self.daemon_pid();
+        let before_pid = self.daemon_pid();
+        let before_endpoint = self.endpoint.clone();
         let output = run_harness(&self.home, &self.xdg, &["daemon", "restart"]);
         if !output.status.success() {
             return Err(RestartFailure::new(
@@ -321,15 +322,21 @@ impl RestartDriver {
         if let Some(mut daemon) = self.daemon.take() {
             wait_for_child_exit(&mut daemon);
         }
-        let after = self.daemon_pid();
-        if after == before {
+        let after_pid = self.daemon_pid();
+        let (endpoint, token) = current_daemon_endpoint_and_token(&self.home, &self.xdg);
+        // The replacement is confirmed when the pid or the ephemeral endpoint
+        // changed. Requiring both to differ would flake on a reused pid, and
+        // requiring only the pid would flake if the OS reassigned it; `serve
+        // --port 0` rebinds a fresh port, so one of the two moves in practice.
+        if after_pid == before_pid && endpoint == before_endpoint {
             return Err(RestartFailure::new(
                 Stage::Restart,
                 correlation,
-                format!("restart did not replace the process (pid stayed {after})"),
+                format!(
+                    "restart did not replace the process (pid stayed {after_pid}, endpoint {endpoint})"
+                ),
             ));
         }
-        let (endpoint, token) = current_daemon_endpoint_and_token(&self.home, &self.xdg);
         self.endpoint = endpoint;
         self.token = token;
         self.runtime.attach(&self.home, &self.xdg)
