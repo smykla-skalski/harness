@@ -57,6 +57,20 @@ async fn launcher_starts_one_bound_codex_app_server_run() {
             snapshot.workflow_execution_id.as_deref(),
             Some("execution-1")
         );
+
+        let recovered = controller
+            .route_dependency_triage_and_start_fixer(
+                &result,
+                "acme/widgets",
+                17,
+                HEAD,
+                &store,
+                &binding,
+            )
+            .await
+            .expect("recover fixer");
+        assert!(!recovered.created);
+        assert_eq!(recovered.run.expect("recovered run").run_id, run.run_id);
     })
     .await;
 }

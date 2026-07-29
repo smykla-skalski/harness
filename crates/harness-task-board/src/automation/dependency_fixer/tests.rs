@@ -48,7 +48,7 @@ async fn dispatches_only_an_explicit_fix_route_with_all_evidence() {
 }
 
 #[tokio::test]
-async fn admitted_fix_route_starts_once_and_duplicate_does_not_restart() {
+async fn duplicate_fix_route_retries_the_deterministic_launcher() {
     let store = RouteStore::default();
     let launcher = Launcher::default();
     let result = route(TaskBoardDependencyTriageDisposition::FixRequired).source_result;
@@ -65,7 +65,7 @@ async fn admitted_fix_route_starts_once_and_duplicate_does_not_restart() {
     .await
     .expect("admitted fix dispatch");
     assert!(first.created);
-    assert!(first.run.is_some());
+    let first_run = first.run.expect("first run");
 
     let duplicate = route_and_dispatch_task_board_dependency_fix(
         &result,
@@ -79,8 +79,27 @@ async fn admitted_fix_route_starts_once_and_duplicate_does_not_restart() {
     .await
     .expect("duplicate fix route");
     assert!(!duplicate.created);
-    assert!(duplicate.run.is_none());
-    assert_eq!(launcher.start_count(), 1);
+    let duplicate_run = duplicate.run.expect("recovered run");
+    assert_eq!(duplicate_run.run_id, first_run.run_id);
+    assert_eq!(launcher.start_count(), 2);
+}
+
+#[test]
+fn dispatch_binding_rejects_surrounding_whitespace() {
+    let mut invalid = binding();
+    invalid.session_id.insert(0, ' ');
+
+    let error = task_board_dependency_fix_request(
+        &route(TaskBoardDependencyTriageDisposition::FixRequired),
+        &invalid,
+    )
+    .expect_err("non-canonical binding");
+
+    assert!(
+        error
+            .to_string()
+            .contains("incomplete exact-head context")
+    );
 }
 
 #[test]

@@ -111,7 +111,7 @@ pub fn task_board_dependency_fix_request(
         binding.workflow_execution_id.as_str(),
     ]
     .iter()
-    .any(|value| value.trim().is_empty())
+    .any(|value| value.trim().is_empty() || value.trim() != *value)
     {
         return Err(parse_error(
             "dependency fixer dispatch has incomplete exact-head context",
@@ -145,7 +145,7 @@ pub async fn dispatch_task_board_dependency_fix(
     launcher.start(&request).await
 }
 
-/// Route one validated triage result and start its fixer exactly once when required.
+/// Route one validated triage result and idempotently start its fixer when required.
 ///
 /// # Errors
 ///
@@ -168,7 +168,7 @@ pub async fn route_and_dispatch_task_board_dependency_fix(
             store,
         )
         .await?;
-    let run = if created && route.status == TaskBoardDependencyRouteStatus::FixRequested {
+    let run = if route.status == TaskBoardDependencyRouteStatus::FixRequested {
         Some(dispatch_task_board_dependency_fix(&route, binding, launcher).await?)
     } else {
         None
