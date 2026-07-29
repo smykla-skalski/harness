@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::compile_task_board_dependency_action_plan;
 use crate::normalize_repository_slug;
 
 pub const TASK_BOARD_DEPENDENCY_TRIAGE_SCHEMA_VERSION: u32 = 1;
@@ -125,6 +126,16 @@ pub enum TaskBoardDependencyTriageError {
     MissingSafetyAssumption,
     #[error("dependency triage result contains an invalid required tool")]
     InvalidRequiredTool,
+    #[error("dependency triage result selects unsupported action '{0}'")]
+    UnsupportedAction(String),
+    #[error("dependency triage result selects unsupported required tool '{0}'")]
+    UnsupportedRequiredTool(String),
+    #[error("dependency triage action plan contradicts its disposition")]
+    ActionPlanContradictsDisposition,
+    #[error("dependency triage actions and required tools do not match")]
+    ActionCapabilityMismatch,
+    #[error("dependency triage disposition cannot reach mutation capabilities")]
+    MutationForbidden,
     #[error("dependency triage result has invalid ordered next steps")]
     InvalidNextSteps,
     #[error("dependency triage disposition contradicts its evidence")]
@@ -184,7 +195,8 @@ pub fn validate_task_board_dependency_triage_result(
     }
     validate_required_tools(&result.required_tools)?;
     validate_next_steps(&result.next_steps)?;
-    validate_disposition(result)
+    validate_disposition(result)?;
+    compile_task_board_dependency_action_plan(result).map(|_| ())
 }
 
 fn validate_pull_request_identity(
@@ -336,10 +348,8 @@ mod tests {
     fn strict_result_round_trip_accepts_safe_exact_head() {
         let result = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         let report = serde_json::to_string(&result).expect("serialize result");
-
         let parsed = parse_task_board_dependency_triage_result(&report, "acme/widgets", 17, HEAD)
             .expect("valid structured result");
-
         assert_eq!(parsed, result);
     }
 
@@ -353,21 +363,18 @@ mod tests {
                 .to_string()
                 .contains("not valid JSON for the required schema")
         );
-
         let mut malformed = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         malformed.exact_head_revision = "not-a-revision".into();
         assert_eq!(
             validate(&malformed),
             Err(TaskBoardDependencyTriageError::InvalidHeadRevision)
         );
-
         let mut noncanonical = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         noncanonical.repository = " Acme/Widgets ".into();
         assert_eq!(
             validate(&noncanonical),
             Err(TaskBoardDependencyTriageError::PullRequestMismatch)
         );
-
         let mut stale = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         stale.exact_head_revision = "abcdefabcdefabcdefabcdefabcdefabcdefabcd".into();
         let stale = serde_json::to_string(&stale).expect("serialize stale result");
@@ -446,6 +453,27 @@ mod tests {
     fn result(
         disposition: TaskBoardDependencyTriageDisposition,
     ) -> TaskBoardDependencyTriageResult {
+        let (tool, action) = match disposition {
+            TaskBoardDependencyTriageDisposition::ReportOnly => {
+                ("task_board.audit", "complete_report")
+            }
+            TaskBoardDependencyTriageDisposition::HumanRequired => {
+                ("task_board.audit", "require_human")
+            }
+            TaskBoardDependencyTriageDisposition::WaitForChecks => {
+                ("github.read", "wait_for_checks")
+            }
+            TaskBoardDependencyTriageDisposition::FixRequired => {
+                ("codex.dispatch", "dispatch_fixer")
+            }
+            TaskBoardDependencyTriageDisposition::ContinueSafe => {
+                ("task_board.advance", "continue_workflow")
+            }
+        };
+        let mut required_tools = vec!["task_board.audit".into()];
+        if tool != "task_board.audit" {
+            required_tools.push(tool.into());
+        }
         TaskBoardDependencyTriageResult {
             schema_version: TASK_BOARD_DEPENDENCY_TRIAGE_SCHEMA_VERSION,
             repository: "acme/widgets".into(),
@@ -473,12 +501,19 @@ mod tests {
             },
             safety_assumption: "Patch update with a green exact-head gate set".into(),
             disposition,
-            required_tools: vec!["github.read".into()],
-            next_steps: vec![TaskBoardDependencyTriageStep {
-                order: 1,
-                action: "record_result".into(),
-                reason: "retain the exact-head decision".into(),
-            }],
+            required_tools,
+            next_steps: vec![
+                TaskBoardDependencyTriageStep {
+                    order: 1,
+                    action: "record_result".into(),
+                    reason: "retain the exact-head decision".into(),
+                },
+                TaskBoardDependencyTriageStep {
+                    order: 2,
+                    action: action.into(),
+                    reason: "apply the validated disposition".into(),
+                },
+            ],
         }
     }
 }
