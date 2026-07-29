@@ -21,6 +21,8 @@ on:
   push:
     branches:
       - main
+    # Keep this list in sync with the `paths-filter` step's `rust` filter
+    # below: they must cover the same Rust-relevant paths.
     paths:
       - ".github/workflows/harness-daemon-drift.yml"
       - "Cargo.toml"
@@ -49,6 +51,10 @@ jobs:
       # fail with no repository checked out yet. push already carries its own
       # `paths:` filter above and workflow_dispatch is an explicit manual
       # request, so both always run the real check regardless of this output.
+      #
+      # Keep this filter list in sync with `on.push.paths` above: they must
+      # cover the same Rust-relevant paths, or push and pull_request will
+      # disagree about what triggers the real check.
       - name: Determine if Rust-relevant paths changed
         id: filter
         if: github.event_name == 'pull_request'
@@ -66,6 +72,7 @@ jobs:
               - "crates/harness-workspace/**"
 
       - name: Checkout repository
+        if: github.event_name != 'pull_request' || steps.filter.outputs.rust == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # `.cargo/config.toml` pins the Linux linker to mold unconditionally, so
