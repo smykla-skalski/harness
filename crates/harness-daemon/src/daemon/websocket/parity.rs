@@ -14,11 +14,9 @@ use crate::daemon::http::{
 use crate::daemon::protocol::{
     AdoptSessionRequest, AgentRuntimeSessionRegistrationRequest,
     AgentRuntimeSessionRegistrationResponse, CodexApprovalDecisionRequest, CodexRunRequest,
-    CodexSteerRequest, HostBridgeReconfigureRequest, ManagedAgentSnapshot, SessionArchiveRequest,
-    SessionJoinRequest, SessionLeaveRequest, SessionMutationResponse, SessionTitleRequest,
-    SignalAckRequest, VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
-    VoiceTranscriptUpdateRequest, WsErrorPayload, WsRequest, WsResponse,
-    bind_control_plane_actor_value,
+    CodexSteerRequest, ManagedAgentSnapshot, SessionArchiveRequest, SessionJoinRequest,
+    SessionLeaveRequest, SessionMutationResponse, SessionTitleRequest, SignalAckRequest,
+    WsErrorPayload, WsRequest, WsResponse, bind_control_plane_actor_value,
 };
 use crate::daemon::service;
 use crate::daemon::voice::{
@@ -28,6 +26,11 @@ use crate::daemon::voice::{
 use crate::sandbox;
 use crate::session::adopter::AdoptionOutcome;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::daemon::summaries::HostBridgeReconfigureRequest;
+use harness_protocol::daemon::voice::{
+    VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
+    VoiceTranscriptUpdateRequest,
+};
 
 use super::frames::{error_response, error_response_with_payload};
 use super::mutations::{cli_error_response, dispatch_query_result};

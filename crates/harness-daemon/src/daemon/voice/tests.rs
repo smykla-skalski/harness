@@ -1,9 +1,7 @@
 use serde_json::json;
 
 use super::*;
-use crate::daemon::protocol::{
-    VoiceAudioFormatDescriptor, VoiceRouteTarget, VoiceRouteTargetKind, VoiceTranscriptSegment,
-};
+use harness_protocol::daemon::voice::{VoiceRouteTargetKind, VoiceTranscriptSegment};
 
 fn request() -> VoiceSessionStartRequest {
     VoiceSessionStartRequest {

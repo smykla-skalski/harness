@@ -10,9 +10,9 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::discovery::{self, AdoptionOutcome};
 use super::super::launchd;
-use super::super::protocol::DaemonControlResponse;
 use super::super::service;
 use super::super::state;
+use harness_protocol::daemon::summaries::DaemonControlResponse;
 
 const DAEMON_CONTROL_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(50);

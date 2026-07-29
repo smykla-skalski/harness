@@ -18134,6 +18134,7 @@
       },
       "HeadlessReadinessReport": {
         "type": "object",
+        "description": "Wire response for a headless execution readiness check.",
         "required": [
           "ready",
           "client",
@@ -18195,6 +18196,7 @@
       },
       "HeadlessReadinessRequest": {
         "type": "object",
+        "description": "Wire request for a headless execution readiness check.",
         "required": [
           "client_version",
           "client_wire_version",
