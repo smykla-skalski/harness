@@ -110,6 +110,33 @@ pub(crate) fn observe_sender() -> Option<broadcast::Sender<StreamEvent>> {
     Some(OBSERVE_RUNTIME.get()?.sender.clone())
 }
 
+/// Sets `OBSERVE_RUNTIME` and, only when this call actually wins that race,
+/// registers the same sender as the audit recorder's broadcast target.
+/// `OBSERVE_RUNTIME` and the recorder's sender registry are two independent
+/// `OnceLock`s; registering unconditionally would let a losing caller's
+/// sender end up backing audit pushes while a different caller's runtime
+/// stays the one actually active.
+fn install_observe_runtime(
+    sender: broadcast::Sender<StreamEvent>,
+    poll_interval: Duration,
+    db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
+    async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+) {
+    let broadcast_sender = sender.clone();
+    if OBSERVE_RUNTIME
+        .set(DaemonObserveRuntime {
+            sender,
+            poll_interval,
+            running_sessions: Arc::default(),
+            db,
+            async_db,
+        })
+        .is_ok()
+    {
+        super::audit_events::register_broadcast_sender(broadcast_sender);
+    }
+}
+
 pub(crate) const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);

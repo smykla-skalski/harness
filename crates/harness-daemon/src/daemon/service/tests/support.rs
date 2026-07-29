@@ -2,14 +2,12 @@ use super::*;
 
 pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
     let (sender, _) = broadcast::channel(8);
-    crate::daemon::audit_events::register_broadcast_sender(sender.clone());
-    let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
+    super::super::install_observe_runtime(
         sender,
         poll_interval,
-        running_sessions: Arc::default(),
-        db: Arc::new(OnceLock::new()),
-        async_db: Arc::new(OnceLock::new()),
-    });
+        Arc::new(OnceLock::new()),
+        Arc::new(OnceLock::new()),
+    );
 }
 
 pub(super) fn install_test_observe_async_db(async_db: Arc<crate::daemon::db::AsyncDaemonDb>) {

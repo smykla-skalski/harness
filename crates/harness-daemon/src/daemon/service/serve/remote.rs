@@ -24,7 +24,7 @@ use crate::workspace::orphan_cleanup::run_startup_sweep;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::{DaemonObserveRuntime, DaemonServeConfig, OBSERVE_RUNTIME, SHUTDOWN_SIGNAL};
+use super::super::{DaemonServeConfig, SHUTDOWN_SIGNAL};
 use super::background_tasks::{self, spawn_background_tasks};
 use super::binary_stamp::current_binary_stamp;
 use super::initialize_startup_state;
@@ -56,14 +56,12 @@ pub async fn serve_remote_https(
     let (sender, _) = broadcast::channel(256);
     let db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>> = Arc::new(OnceLock::new());
     let async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>> = Arc::new(OnceLock::new());
-    let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
-        sender: sender.clone(),
-        poll_interval: config.observe_interval,
-        running_sessions: Arc::default(),
-        db: db.clone(),
-        async_db: async_db.clone(),
-    });
-    crate::daemon::audit_events::register_broadcast_sender(sender.clone());
+    super::super::install_observe_runtime(
+        sender.clone(),
+        config.observe_interval,
+        db.clone(),
+        async_db.clone(),
+    );
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let prepared_sender = background_tasks::spawn_broadcast_fanout(&sender, &replay_buffer);
