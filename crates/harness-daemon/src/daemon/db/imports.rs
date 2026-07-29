@@ -107,98 +107,8 @@ impl DaemonDb {
     /// # Errors
     /// Returns [`CliError`] on discovery, I/O, or SQL failures.
     pub fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
-        let prepared = Self::prepare_session_resync(session_id)?;
+        let prepared = prepare_session_resync(session_id)?;
         self.apply_prepared_session_resync(&prepared)
-    }
-
-    /// Prepare a session re-sync by loading all file-backed data before any
-    /// caller takes the shared daemon database lock.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery, I/O, or parse failures.
-    pub(crate) fn prepare_session_resync(
-        session_id: &str,
-    ) -> Result<PreparedSessionResync, CliError> {
-        let resolved = daemon_index::resolve_session(session_id)?;
-        Self::prepare_session_import_from_resolved(&resolved)
-    }
-
-    /// Prepare a session import from a pre-discovered resolved session.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on I/O or parse failures.
-    pub(crate) fn prepare_session_import_from_resolved(
-        resolved: &daemon_index::ResolvedSession,
-    ) -> Result<PreparedSessionResync, CliError> {
-        let log_entries =
-            daemon_index::load_log_entries(&resolved.project, &resolved.state.session_id)?;
-
-        let mut task_checkpoints = Vec::new();
-        for task_id in resolved.state.tasks.keys() {
-            let checkpoints = daemon_index::load_task_checkpoints(
-                &resolved.project,
-                &resolved.state.session_id,
-                task_id,
-            )?;
-            task_checkpoints.push(PreparedTaskCheckpointImport { checkpoints });
-        }
-
-        let signals = daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)?;
-        let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
-            &resolved.state,
-            |agent_id, runtime, session_key| {
-                daemon_index::load_conversation_events(
-                    &resolved.project,
-                    runtime,
-                    session_key,
-                    agent_id,
-                )
-            },
-        )?;
-
-        Ok(PreparedSessionResync {
-            resolved: resolved.clone(),
-            log_entries,
-            task_checkpoints,
-            signals,
-            activities,
-            conversation_events,
-        })
-    }
-
-    /// Prepare a transcript-only refresh for one runtime session within an
-    /// orchestration session. Falls back to full resync when no matching agent
-    /// can be found.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery, I/O, or parse failures.
-    pub(crate) fn prepare_runtime_transcript_resync(
-        session_id: &str,
-        runtime_name: &str,
-        runtime_session_id: &str,
-    ) -> Result<Option<PreparedRuntimeTranscriptResync>, CliError> {
-        let resolved = daemon_index::resolve_session(session_id)?;
-        let agents = prepare_runtime_transcript_resync_for_agents(
-            &resolved.state,
-            runtime_name,
-            runtime_session_id,
-            |agent_id, runtime, session_key| {
-                daemon_index::load_conversation_events(
-                    &resolved.project,
-                    runtime,
-                    session_key,
-                    agent_id,
-                )
-            },
-        )?;
-        if agents.is_empty() {
-            return Ok(None);
-        }
-
-        Ok(Some(PreparedRuntimeTranscriptResync {
-            session_id: resolved.state.session_id,
-            agents,
-        }))
     }
 
     /// Apply a previously prepared session re-sync to the daemon database.
@@ -295,6 +205,100 @@ impl DaemonDb {
         self.bump_change(&prepared.session_id)?;
         Ok(())
     }
+}
+
+/// Prepare a session re-sync by loading all file-backed data before any
+/// caller takes the shared daemon database lock.
+///
+/// Free function, not a `DaemonDb` method: it never touches `self`, so
+/// callers outside `db` (the watch loop, `service::read_reconciliation`)
+/// reach it without naming the concrete db type.
+///
+/// # Errors
+/// Returns [`CliError`] on discovery, I/O, or parse failures.
+pub(crate) fn prepare_session_resync(session_id: &str) -> Result<PreparedSessionResync, CliError> {
+    let resolved = daemon_index::resolve_session(session_id)?;
+    prepare_session_import_from_resolved(&resolved)
+}
+
+/// Prepare a session import from a pre-discovered resolved session. Free
+/// function for the same reason as [`prepare_session_resync`].
+///
+/// # Errors
+/// Returns [`CliError`] on I/O or parse failures.
+pub(crate) fn prepare_session_import_from_resolved(
+    resolved: &daemon_index::ResolvedSession,
+) -> Result<PreparedSessionResync, CliError> {
+    let log_entries =
+        daemon_index::load_log_entries(&resolved.project, &resolved.state.session_id)?;
+
+    let mut task_checkpoints = Vec::new();
+    for task_id in resolved.state.tasks.keys() {
+        let checkpoints = daemon_index::load_task_checkpoints(
+            &resolved.project,
+            &resolved.state.session_id,
+            task_id,
+        )?;
+        task_checkpoints.push(PreparedTaskCheckpointImport { checkpoints });
+    }
+
+    let signals = daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)?;
+    let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
+        &resolved.state,
+        |agent_id, runtime, session_key| {
+            daemon_index::load_conversation_events(
+                &resolved.project,
+                runtime,
+                session_key,
+                agent_id,
+            )
+        },
+    )?;
+
+    Ok(PreparedSessionResync {
+        resolved: resolved.clone(),
+        log_entries,
+        task_checkpoints,
+        signals,
+        activities,
+        conversation_events,
+    })
+}
+
+/// Prepare a transcript-only refresh for one runtime session within an
+/// orchestration session. Falls back to full resync when no matching agent
+/// can be found. Free function for the same reason as
+/// [`prepare_session_resync`].
+///
+/// # Errors
+/// Returns [`CliError`] on discovery, I/O, or parse failures.
+pub(crate) fn prepare_runtime_transcript_resync(
+    session_id: &str,
+    runtime_name: &str,
+    runtime_session_id: &str,
+) -> Result<Option<PreparedRuntimeTranscriptResync>, CliError> {
+    let resolved = daemon_index::resolve_session(session_id)?;
+    let agents = prepare_runtime_transcript_resync_for_agents(
+        &resolved.state,
+        runtime_name,
+        runtime_session_id,
+        |agent_id, runtime, session_key| {
+            daemon_index::load_conversation_events(
+                &resolved.project,
+                runtime,
+                session_key,
+                agent_id,
+            )
+        },
+    )?;
+    if agents.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(PreparedRuntimeTranscriptResync {
+        session_id: resolved.state.session_id,
+        agents,
+    }))
 }
 
 fn import_session_log(

@@ -311,7 +311,7 @@ pub(crate) fn refresh_resolved_session_from_files_if_newer(
     }
 
     let session_id = resolved.state.session_id.clone();
-    let prepared = super::db::DaemonDb::prepare_session_import_from_resolved(&file_resolved)?;
+    let prepared = super::db::prepare_session_import_from_resolved(&file_resolved)?;
     db.apply_prepared_session_resync(&prepared)?;
     *resolved = db
         .resolve_session(&session_id)?

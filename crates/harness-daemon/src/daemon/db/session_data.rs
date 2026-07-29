@@ -6,14 +6,15 @@ use crate::session::storage as session_storage;
 use crate::workspace::utc_now;
 
 use super::{
-    CliError, DaemonDb, SessionLogEntry, SessionState, TaskCheckpoint, db_error, u64_from_i64,
+    CliError, DaemonDb, SessionLogEntry, SessionState, TaskCheckpoint, db_error,
+    prepare_session_import_from_resolved, prepare_session_resync, u64_from_i64,
 };
 
 impl DaemonDb {
     fn refresh_session_state_for_mutation(&self, session_id: &str) -> Result<(), CliError> {
         let db_version = self.session_state_version(session_id)?;
         let Some(db_version) = db_version else {
-            let prepared = match Self::prepare_session_resync(session_id) {
+            let prepared = match prepare_session_resync(session_id) {
                 Ok(prepared) => Some(prepared),
                 Err(error) if error.code() == "KSRCLI090" => None,
                 Err(error) => return Err(error),
@@ -39,7 +40,7 @@ impl DaemonDb {
             project: daemon_index::discovered_project_for_checkout(project_dir),
             state: file_state,
         };
-        let prepared = Self::prepare_session_import_from_resolved(&resolved)?;
+        let prepared = prepare_session_import_from_resolved(&resolved)?;
         self.apply_prepared_session_resync(&prepared)?;
         Ok(())
     }

@@ -179,7 +179,7 @@ pub(crate) fn collect_background_session_candidates(
 pub(crate) fn prepare_background_session_import(
     resolved: &index::ResolvedSession,
 ) -> Option<db::PreparedSessionResync> {
-    db::DaemonDb::prepare_session_import_from_resolved(resolved)
+    db::prepare_session_import_from_resolved(resolved)
         .inspect_err(|error| log_background_session_prepare_error(error, resolved))
         .ok()
 }
