@@ -196,6 +196,7 @@ async fn public_routes_strip_credentials_while_rpc_uses_the_private_credential()
         .await
         .expect("health head");
     assert_eq!(health_head.status(), StatusCode::OK);
+    assert!(body_text(health_head).await.is_empty());
     assert_eq!(edge.count(), 0);
 
     let asset = edge

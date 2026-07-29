@@ -131,6 +131,9 @@ async fn health(request: Request) -> Response {
     if !matches!(request.method(), &Method::GET | &Method::HEAD) {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
+    if request.method() == Method::HEAD {
+        return StatusCode::OK.into_response();
+    }
     (
         StatusCode::OK,
         axum::Json(serde_json::json!({"status": "ok", "service": "sybra-gateway"})),
