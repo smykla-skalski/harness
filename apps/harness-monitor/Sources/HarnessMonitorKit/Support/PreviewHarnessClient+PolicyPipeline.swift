@@ -33,10 +33,7 @@ extension PreviewHarnessClient {
     request: PolicyPipelinePromoteRequest
   ) async throws -> PolicyPipelinePromoteResponse {
     PolicyPipelinePromoteResponse(
-      document: PreviewFixtures.policyCanvasPipelineDocument(
-        mode: .enforced,
-        revision: request.revision
-      ),
+      revision: request.revision,
       traceId: "trace-preview-policy-promote-\(request.revision)"
     )
   }

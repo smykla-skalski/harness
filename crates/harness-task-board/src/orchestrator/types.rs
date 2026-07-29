@@ -140,8 +140,15 @@ pub struct TaskBoardOrchestratorPreparedRun {
     pub audit: TaskBoardAuditSummary,
 }
 
+/// The orchestrator's full in-process status: what the daemon builds,
+/// mutates, and persists internally. Its embedded `last_run` carries the
+/// full `TaskBoardItem` (via `DispatchAppliedTask`/`TaskBoardEvaluationRecord`).
+/// The wire-facing `TaskBoardOrchestratorStatus`
+/// (`crate::wire::task_board_orchestrator_status`) is a separate, thin
+/// projection of this type, produced at the HTTP/WS boundary, that drops
+/// the embedded item down to the id and title real consumers use.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorStatus {
+pub struct TaskBoardOrchestratorStatusSnapshot {
     pub enabled: bool,
     pub running: bool,
     #[serde(default)]
@@ -336,7 +343,7 @@ const fn default_state_schema_version() -> u32 {
     CURRENT_ORCHESTRATOR_STATE_VERSION
 }
 
-impl TaskBoardOrchestratorStatus {
+impl TaskBoardOrchestratorStatusSnapshot {
     #[must_use]
     pub fn last_run_applied_count(&self) -> usize {
         self.last_run.as_ref().map_or(0, |run| {

@@ -258,17 +258,23 @@ public struct PolicyPipelinePromoteRequest: Codable, Equatable, Sendable {
   }
 }
 
+// Thin: the promote endpoint's real consumers never read the document back
+// off this response (Monitor's promote UI action calls the separate
+// make-live endpoint instead, whose response keeps the full document because
+// that endpoint's callers genuinely edit it). A caller that still wants the
+// graph after promoting reads it from the canvas/summary endpoints, same as
+// today.
 public struct PolicyPipelinePromoteResponse: Codable, Equatable, Sendable {
-  public var document: PolicyPipelineDocument
+  public var revision: UInt64
   public var traceId: String
 
-  public init(document: PolicyPipelineDocument, traceId: String) {
-    self.document = document
+  public init(revision: UInt64, traceId: String) {
+    self.revision = revision
     self.traceId = traceId
   }
 
   enum CodingKeys: String, CodingKey {
-    case document
+    case revision
     case traceId = "trace_id"
   }
 }

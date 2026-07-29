@@ -146,7 +146,7 @@ pub(super) async fn post_policy_simulate(
     post,
     path = "/v1/policy-pipeline/promote",
     tag = "policy",
-    description = "Promote a policy pipeline draft to the canvas's enforced live document and return the resulting document and trace ID. Internally this runs the same live-promotion path as `make-live`, including enabling global enforcement, but the response omits the enforcement flag and refreshed workspace",
+    description = "Promote a policy pipeline draft to the canvas's enforced live document and return its revision and trace ID. Internally this runs the same live-promotion path as `make-live`, including enabling global enforcement, but the response omits the promoted document, the enforcement flag, and the refreshed workspace; read the document back from the canvas/summary endpoints if needed",
     request_body = PolicyPipelinePromoteRequest,
     responses(
         (status = 200, description = "The promoted draft revision", body = PolicyPipelinePromoteResponse),

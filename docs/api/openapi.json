@@ -3340,7 +3340,7 @@
         "tags": [
           "policy"
         ],
-        "description": "Promote a policy pipeline draft to the canvas's enforced live document and return the resulting document and trace ID. Internally this runs the same live-promotion path as `make-live`, including enabling global enforcement, but the response omits the enforcement flag and refreshed workspace",
+        "description": "Promote a policy pipeline draft to the canvas's enforced live document and return its revision and trace ID. Internally this runs the same live-promotion path as `make-live`, including enabling global enforcement, but the response omits the promoted document, the enforcement flag, and the refreshed workspace; read the document back from the canvas/summary endpoints if needed",
         "operationId": "post_policy_promote",
         "requestBody": {
           "content": {
@@ -21784,13 +21784,16 @@
       },
       "PolicyPipelinePromoteResponse": {
         "type": "object",
+        "description": "Thin wire projection of `PolicyPipelinePromoteOutcome`: drops the embedded\n`PolicyGraph` because the promote endpoint's real consumers never read it\nback off the response (Monitor's promote UI action calls the separate\n`make-live` endpoint instead, whose own response genuinely needs the full\ngraph and is untouched here). A caller that still wants the graph after\npromoting reads it from the canvas/summary endpoints, the same place it\nalready comes from today.",
         "required": [
-          "document",
+          "revision",
           "trace_id"
         ],
         "properties": {
-          "document": {
-            "$ref": "#/components/schemas/PolicyGraph"
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           },
           "trace_id": {
             "type": "string"
@@ -30886,6 +30889,195 @@
           }
         }
       },
+      "TaskBoardOrchestratorAppliedTask": {
+        "type": "object",
+        "description": "Thin mirror of `DispatchAppliedTask`: drops the embedded `TaskBoardItem`\n(keeping only its title, the one field real consumers read off it) and\nthe `lifecycle`/`read_only_workflow`/`write_workflow` fields, which are\ndaemon-internal worker-claim bookkeeping that Swift already omits on\ndecode for the direct dispatch endpoint.",
+        "required": [
+          "board_item_id",
+          "session_id",
+          "work_item_id",
+          "item_title"
+        ],
+        "properties": {
+          "board_item_id": {
+            "type": "string"
+          },
+          "item_title": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "work_item_id": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskBoardOrchestratorDispatchOutcome": {
+        "type": "object",
+        "description": "Thin mirror of `DispatchExecutionSummary`. `plans` rides through\nunchanged: `DispatchPlan` names no `TaskBoardItem`, only a `board_item_id`\nkey, so it carries no domain-entity closure to strip.",
+        "required": [
+          "applied"
+        ],
+        "properties": {
+          "applied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardOrchestratorAppliedTask"
+            }
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchFailure"
+            }
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchPlan"
+            }
+          }
+        }
+      },
+      "TaskBoardOrchestratorEvaluationOutcome": {
+        "type": "object",
+        "required": [
+          "total",
+          "evaluated",
+          "updated",
+          "skipped",
+          "completed",
+          "running",
+          "reviewing",
+          "blocked",
+          "failed",
+          "records"
+        ],
+        "properties": {
+          "blocked": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evaluated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardOrchestratorEvaluationRecord"
+            }
+          },
+          "reviewing": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "running": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "signal_failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationSignalFailure"
+            }
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "TaskBoardOrchestratorEvaluationRecord": {
+        "type": "object",
+        "description": "Thin mirror of `TaskBoardEvaluationRecord`: `item: Option<TaskBoardItem>`\nbecomes `item_title: Option<String>`, the only piece of it any consumer of\nthis specific embedding reads.",
+        "required": [
+          "board_item_id",
+          "outcome"
+        ],
+        "properties": {
+          "board_item_id": {
+            "type": "string"
+          },
+          "board_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardStatus"
+              }
+            ]
+          },
+          "item_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/TaskBoardEvaluationOutcome"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "task_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskStatus"
+              }
+            ]
+          },
+          "updated": {
+            "type": "boolean"
+          },
+          "work_item_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardWorkflowStatus"
+              }
+            ]
+          }
+        }
+      },
       "TaskBoardOrchestratorRunOnceRequest": {
         "type": "object",
         "properties": {
@@ -30925,14 +31117,7 @@
           }
         }
       },
-      "TaskBoardOrchestratorRunStatus": {
-        "type": "string",
-        "enum": [
-          "completed",
-          "failed"
-        ]
-      },
-      "TaskBoardOrchestratorRunSummary": {
+      "TaskBoardOrchestratorRunOutcome": {
         "type": "object",
         "required": [
           "run_id",
@@ -30956,7 +31141,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/DispatchExecutionSummary"
+                "$ref": "#/components/schemas/TaskBoardOrchestratorDispatchOutcome"
               }
             ]
           },
@@ -30975,7 +31160,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/TaskBoardEvaluationSummary"
+                "$ref": "#/components/schemas/TaskBoardOrchestratorEvaluationOutcome"
               }
             ]
           },
@@ -30998,6 +31183,13 @@
             "$ref": "#/components/schemas/TaskBoardSyncSummary"
           }
         }
+      },
+      "TaskBoardOrchestratorRunStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "failed"
+        ]
       },
       "TaskBoardOrchestratorSettings": {
         "type": "object",
@@ -31251,7 +31443,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/TaskBoardOrchestratorRunSummary"
+                "$ref": "#/components/schemas/TaskBoardOrchestratorRunOutcome"
               }
             ]
           },

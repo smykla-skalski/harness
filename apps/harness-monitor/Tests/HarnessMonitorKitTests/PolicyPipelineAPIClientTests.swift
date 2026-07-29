@@ -84,7 +84,7 @@ struct PolicyPipelineAPIClientTests {
     #expect(save.validation.isValid)
     #expect(simulation.decisions.first?.decision.decision == "allow")
     #expect(simulation.decisions.first?.visitedNodeIds.isEmpty == true)
-    #expect(promotion.document.mode == .enforced)
+    #expect(promotion.revision == 7)
     #expect(makeLive.globalPolicyEnforcementEnabled)
     #expect(makeLive.workspace.activeCanvasId == "canvas-primary")
     #expect(goLiveDiff.changedCount == 0)
@@ -178,7 +178,7 @@ struct PolicyPipelineAPIClientTests {
 
     #expect(get.mode == .draft)
     #expect(simulation.traceId == "trace-policy-1")
-    #expect(promotion.document.mode == .enforced)
+    #expect(promotion.revision == 7)
     #expect(audit.latestTraceId == "trace-policy-1")
     #expect(client.readCallCount(.policyPipeline) == 1)
     #expect(client.readCallCount(.policyPipelineAudit) == 1)

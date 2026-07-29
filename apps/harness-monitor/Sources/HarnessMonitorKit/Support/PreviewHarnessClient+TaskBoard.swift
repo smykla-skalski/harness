@@ -314,6 +314,10 @@ extension TaskBoardOrchestratorStatus {
 }
 
 extension TaskBoardOrchestratorRunSummary {
+  // Takes the direct dispatch/evaluate endpoints' own full results (with the
+  // embedded TaskBoardItem) so the preview daemon can reuse them, then
+  // projects to the thin orchestrator-status shape at this construction
+  // boundary - the same place the real daemon does it.
   static func previewRun(
     dryRun: Bool,
     sync: TaskBoardSyncSummary,
@@ -334,8 +338,43 @@ extension TaskBoardOrchestratorRunSummary {
         deleted: 0,
         byStatus: []
       ),
-      dispatch: dispatch,
-      evaluation: evaluation,
+      dispatch: TaskBoardOrchestratorDispatchOutcome(
+        plans: dispatch.plans,
+        applied: dispatch.applied.map {
+          TaskBoardOrchestratorAppliedTask(
+            boardItemId: $0.boardItemId,
+            sessionId: $0.sessionId,
+            workItemId: $0.workItemId,
+            itemTitle: $0.item.title
+          )
+        },
+        failures: dispatch.failures
+      ),
+      evaluation: TaskBoardOrchestratorEvaluationOutcome(
+        total: evaluation.total,
+        evaluated: evaluation.evaluated,
+        updated: evaluation.updated,
+        skipped: evaluation.skipped,
+        completed: evaluation.completed,
+        running: evaluation.running,
+        reviewing: evaluation.reviewing,
+        blocked: evaluation.blocked,
+        failed: evaluation.failed,
+        records: evaluation.records.map {
+          TaskBoardOrchestratorEvaluationRecord(
+            boardItemId: $0.boardItemId,
+            sessionId: $0.sessionId,
+            workItemId: $0.workItemId,
+            outcome: $0.outcome,
+            taskStatus: $0.taskStatus,
+            boardStatus: $0.boardStatus,
+            workflowStatus: $0.workflowStatus,
+            updated: $0.updated,
+            reason: $0.reason,
+            itemTitle: $0.item?.title
+          )
+        }
+      ),
       policyTraceIds: ["preview-policy"]
     )
   }

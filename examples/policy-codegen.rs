@@ -1336,16 +1336,22 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "GitHubRequestedReviewers",
     "GitHubAutomationToggles",
     "ProtectedPathRule",
-    // task_board orchestrator settings + status tree (orchestrator/types.rs). The settings nest
-    // the GitHubProjectConfigWire (via TYPE_RENAMES on the Rust alias) plus the inbox config;
-    // the status nests the run summary (sync/audit/dispatch/evaluation wires) and tick info. The
+    // task_board orchestrator settings + status tree (orchestrator/types.rs for the settings/tick
+    // info, wire/task_board_orchestrator_status.rs for the thin status/run-outcome projection).
+    // The settings nest the GitHubProjectConfigWire (via TYPE_RENAMES on the Rust alias) plus the
+    // inbox config; the status nests the thin run-outcome (sync/audit/dispatch/evaluation
+    // projections, not the full domain-item-carrying originals) and tick info. The
     // Workflow/TickPhase/RunStatus enums + TaskBoardStatus/TaskBoardWorkflowStatus ride bare.
     "TaskBoardOrchestratorSettings",
     "TaskBoardGitHubInboxConfig",
     "TaskBoardOrchestratorTickInfo",
-    "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
     "TaskBoardOrchestratorStatus",
+    "TaskBoardOrchestratorRunOutcome",
+    "TaskBoardOrchestratorDispatchOutcome",
+    "TaskBoardOrchestratorAppliedTask",
+    "TaskBoardOrchestratorEvaluationOutcome",
+    "TaskBoardOrchestratorEvaluationRecord",
     // task_board git runtime config tree (runtime_config.rs) + secret-handoff response
     // (daemon/protocol/task_board.rs). The signing mode is the decoder-agnostic hand open enum
     // TaskBoardGitSigningMode, referenced bare; everything else is a thin wire/model mirror.
@@ -1415,15 +1421,18 @@ const SKIP_TYPES: &[&str] = &[
     // save/promote/make-live responses already decode via the plain policy-wire
     // decoder and GraphPolicyGate is daemon-internal. Adding store.rs as a
     // policy-module source for the cluster wire types must not also emit these
-    // (bare names that would clash / produce dead types). The make-live request
-    // and response are hand-authored in HarnessMonitorPolicyPipelineModels
-    // because the app response also carries the post-promotion workspace snapshot
-    // the store.rs type does not model, and types `document` as the hand
-    // PolicyPipelineDocument rather than the bare generated PolicyGraph.
+    // (bare names that would clash / produce dead types). PolicyPipelinePromoteOutcome
+    // is the daemon's full internal promote result (apply_promote/apply_make_live);
+    // its thin wire projection, PolicyPipelinePromoteResponse (wire/task_board.rs),
+    // is hand-authored in HarnessMonitorPolicyPipelineModels instead, same as the
+    // make-live request/response, because the app response also carries the
+    // post-promotion workspace snapshot the store.rs type does not model, and
+    // types `document` as the hand PolicyPipelineDocument rather than the bare
+    // generated PolicyGraph.
     "GraphPolicyGate",
     "PolicyPipelineSaveResponse",
     "PolicyPipelinePromoteRequest",
-    "PolicyPipelinePromoteResponse",
+    "PolicyPipelinePromoteOutcome",
     "PolicyPipelineMakeLiveRequest",
     "PolicyPipelineMakeLiveResponse",
 ];
@@ -3078,20 +3087,31 @@ const GITHUB_CONFIG_EMIT_ONLY: &[&str] = &[
 ];
 const ORCHESTRATOR_TYPES_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/orchestrator/types.rs");
+const ORCHESTRATOR_STATUS_WIRE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/wire/task_board_orchestrator_status.rs");
 const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardOrchestratorWireTypes.generated.swift";
 // The orchestrator settings + status tree (orchestratorStatus/start/stop/run-once + settings get/
-// update). github_project rides the GitHubProjectConfigWire (TYPE_RENAMES on the alias); the run
-// summary nests the sync/audit/dispatch/evaluation wires; Workflow/TickPhase/RunStatus enums and
-// TaskBoardStatus/TaskBoardWorkflowStatus ride bare. policy.rs is a source so the policy_version
-// default fn resolves POLICY_VERSION.
+// update). github_project rides the GitHubProjectConfigWire (TYPE_RENAMES on the alias); the
+// thin status/run-outcome/dispatch-outcome/evaluation-outcome types come from
+// wire/task_board_orchestrator_status.rs instead of the full orchestrator/types.rs
+// TaskBoardOrchestratorStatusSnapshot/TaskBoardOrchestratorRunSummary the daemon threads
+// internally, so the wire contract never carries the embedded TaskBoardItem; Workflow/TickPhase/
+// RunStatus enums and TaskBoardStatus/TaskBoardWorkflowStatus ride bare, and DispatchPlan/
+// DispatchFailure/EvaluationSignalFailure resolve to the *Wire types the dispatch/evaluation
+// modules already emit. policy.rs is a source so the policy_version default fn resolves
+// POLICY_VERSION.
 const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardOrchestratorSettings",
     "TaskBoardRepositoryAutomationConfig",
     "TaskBoardGitHubInboxConfig",
     "TaskBoardOrchestratorTickInfo",
-    "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
     "TaskBoardOrchestratorStatus",
+    "TaskBoardOrchestratorRunOutcome",
+    "TaskBoardOrchestratorDispatchOutcome",
+    "TaskBoardOrchestratorAppliedTask",
+    "TaskBoardOrchestratorEvaluationOutcome",
+    "TaskBoardOrchestratorEvaluationRecord",
     "TaskBoardHeldDispatchSummary",
     "TaskBoardHeldDispatchItem",
 ];
@@ -3573,6 +3593,7 @@ fn modules() -> Vec<GeneratedModule> {
             ],
             sources: &[
                 ORCHESTRATOR_TYPES_SOURCE,
+                ORCHESTRATOR_STATUS_WIRE_SOURCE,
                 POLICY_SOURCE,
                 TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
             ],

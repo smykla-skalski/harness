@@ -44,7 +44,7 @@ async fn legacy_promote_alias_enables_global_enforcement() {
         .await
         .expect("load")
         .expect("workspace");
-    assert_eq!(response.document.revision, revision);
+    assert_eq!(response.revision, revision);
     assert!(loaded.global_policy_enforcement_enabled);
     assert_eq!(
         loaded
