@@ -13,7 +13,6 @@ use crate::agents::runtime::signal::{
     AckResult, SignalAck, acknowledge_signal as write_signal_ack,
 };
 use crate::agents::service as agents_service;
-use harness_protocol::agent::HookAgent;
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionState, SessionStatus, SessionTransition, TaskSource,
 };
@@ -22,6 +21,7 @@ use crate::session::{
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::agent::HookAgent;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;

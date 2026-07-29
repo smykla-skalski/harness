@@ -32,9 +32,9 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionState, TaskBoardOrchestratorSettings,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    remote_capability_for_phase, validate_task_board_attempt_update,
-    validate_task_board_execution_target_update, validate_task_board_workflow_execution,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord, remote_capability_for_phase,
+    validate_task_board_attempt_update, validate_task_board_execution_target_update,
+    validate_task_board_workflow_execution,
 };
 
 #[path = "remote_assignment_offer/capacity.rs"]

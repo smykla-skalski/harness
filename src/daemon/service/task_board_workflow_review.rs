@@ -112,8 +112,9 @@ fn apply_review_decision(
             record.blocked_reason = None;
         }
         TaskBoardReviewRoundDecision::ChangesRequired => {
-            if record.snapshot.workflow_kind.is_write() && record.artifacts.current_revision_cycle
-                < record.resolved_reviewers.max_revision_cycles
+            if record.snapshot.workflow_kind.is_write()
+                && record.artifacts.current_revision_cycle
+                    < record.resolved_reviewers.max_revision_cycles
             {
                 record.transition = restart_task_board_workflow_revision(&record.transition)
                     .map_err(|error| invalid_transition(error.to_string()))?;

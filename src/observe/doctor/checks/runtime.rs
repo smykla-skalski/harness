@@ -1,9 +1,9 @@
 use std::fs;
 use std::path::Path;
 
-use harness_protocol::agent::HookAgent;
 use crate::setup::wrapper::planned_agent_bootstrap_files;
 use crate::workspace::compact::{handoff_version, load_latest_compact_handoff};
+use harness_protocol::agent::HookAgent;
 
 use super::{DoctorCheck, error_check, ok_check, skipped_check};
 

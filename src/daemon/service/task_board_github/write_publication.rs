@@ -353,7 +353,11 @@ fn expected_publication_target(
     number: u64,
     observed_head: &str,
 ) -> Result<TaskBoardPullRequestIdentity, CliError> {
-    if execution.snapshot.workflow_kind.has_dependency_update_intent() {
+    if execution
+        .snapshot
+        .workflow_kind
+        .has_dependency_update_intent()
+    {
         return execution
             .transition
             .pull_request
@@ -419,7 +423,11 @@ fn validate_write_publication(
             "write workflow pull request does not match its frozen repository",
         ));
     }
-    if execution.snapshot.workflow_kind.has_dependency_update_intent() {
+    if execution
+        .snapshot
+        .workflow_kind
+        .has_dependency_update_intent()
+    {
         required_frozen_head(
             execution.transition.pull_request.as_ref().ok_or_else(|| {
                 invalid_transition("PrFix publication has no frozen pull request")

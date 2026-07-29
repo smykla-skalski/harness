@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use harness_protocol::agent::HookAgent;
 use crate::workspace::compact::compact_latest_path;
 use harness_kernel::errors::CliError;
+use harness_protocol::agent::HookAgent;
 
 mod checks;
 
@@ -126,8 +126,8 @@ mod tests {
     use fs_err as fs;
     use temp_env::with_vars;
 
-    use harness_protocol::agent::HookAgent;
     use crate::setup::wrapper::planned_agent_bootstrap_files;
+    use harness_protocol::agent::HookAgent;
 
     use super::{DoctorReport, build_report};
 

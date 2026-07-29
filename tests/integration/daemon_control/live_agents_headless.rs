@@ -145,8 +145,7 @@ fn openrouter_and_codex_complete_without_monitor() {
 
     let openrouter = run_openrouter(&home, &xdg, &project, &http, &openrouter_token)
         .unwrap_or_else(SmokeFailure::into_report);
-    let codex = run_codex(&home, &xdg, &project, &http)
-        .unwrap_or_else(SmokeFailure::into_report);
+    let codex = run_codex(&home, &xdg, &project, &http).unwrap_or_else(SmokeFailure::into_report);
     let reports = vec![openrouter, codex];
     println!(
         "{}",
@@ -202,26 +201,27 @@ fn run_openrouter(
     );
     let correlation_id = session.session_id.clone();
     let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/acp");
-    let started = http.request_json(
-        Method::POST,
-        &start_path,
-        Some(json!({
-            "descriptor_id": "openrouter",
-            "role": "worker",
-            "prompt": SMOKE_PROMPT,
-            "project_dir": project_arg,
-            "model": OPENROUTER_MODEL,
-        })),
-    )
-    .map_err(|error| {
-        SmokeFailure::new(
-            &correlation_id,
-            runtime,
-            OPENROUTER_MODEL,
-            "agent_start",
-            error,
+    let started = http
+        .request_json(
+            Method::POST,
+            &start_path,
+            Some(json!({
+                "descriptor_id": "openrouter",
+                "role": "worker",
+                "prompt": SMOKE_PROMPT,
+                "project_dir": project_arg,
+                "model": OPENROUTER_MODEL,
+            })),
         )
-    })?;
+        .map_err(|error| {
+            SmokeFailure::new(
+                &correlation_id,
+                runtime,
+                OPENROUTER_MODEL,
+                "agent_start",
+                error,
+            )
+        })?;
     let managed_agent_id = started
         .pointer("/snapshot/managed_agent_id")
         .and_then(Value::as_str)
@@ -333,15 +333,17 @@ fn openrouter_report(
     correlation_id: &str,
 ) -> Result<Option<String>, SmokeFailure> {
     let path = format!("/v1/managed-agents/acp/transcript?session_id={correlation_id}");
-    let transcript = http.request_json(Method::GET, &path, None).map_err(|error| {
-        SmokeFailure::new(
-            correlation_id,
-            "openrouter",
-            OPENROUTER_MODEL,
-            "result_collection",
-            error,
-        )
-    })?;
+    let transcript = http
+        .request_json(Method::GET, &path, None)
+        .map_err(|error| {
+            SmokeFailure::new(
+                correlation_id,
+                "openrouter",
+                OPENROUTER_MODEL,
+                "result_collection",
+                error,
+            )
+        })?;
     Ok(transcript["entries"].as_array().and_then(|entries| {
         entries
             .iter()
@@ -368,18 +370,19 @@ fn run_codex(
     );
     let correlation_id = session.session_id.clone();
     let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/codex");
-    let started = http.request_json(
-        Method::POST,
-        &start_path,
-        Some(json!({
-            "prompt": SMOKE_PROMPT,
-            "mode": "report",
-            "model": CODEX_MODEL,
-        })),
-    )
-    .map_err(|error| {
-        SmokeFailure::new(&correlation_id, runtime, CODEX_MODEL, "agent_start", error)
-    })?;
+    let started = http
+        .request_json(
+            Method::POST,
+            &start_path,
+            Some(json!({
+                "prompt": SMOKE_PROMPT,
+                "mode": "report",
+                "model": CODEX_MODEL,
+            })),
+        )
+        .map_err(|error| {
+            SmokeFailure::new(&correlation_id, runtime, CODEX_MODEL, "agent_start", error)
+        })?;
     let run_id = started
         .pointer("/snapshot/run_id")
         .and_then(Value::as_str)
@@ -394,14 +397,11 @@ fn run_codex(
         })?;
     let deadline = Instant::now() + SMOKE_TIMEOUT;
     loop {
-        let snapshot = http.request_json(
-            Method::GET,
-            &format!("/v1/managed-agents/{run_id}"),
-            None,
-        )
-        .map_err(|error| {
-            SmokeFailure::new(&correlation_id, runtime, CODEX_MODEL, "state_poll", error)
-        })?;
+        let snapshot = http
+            .request_json(Method::GET, &format!("/v1/managed-agents/{run_id}"), None)
+            .map_err(|error| {
+                SmokeFailure::new(&correlation_id, runtime, CODEX_MODEL, "state_poll", error)
+            })?;
         let run = &snapshot["snapshot"];
         let status = run["status"].as_str().unwrap_or("unknown");
         if !matches!(status, "queued" | "running" | "waiting_approval") {
