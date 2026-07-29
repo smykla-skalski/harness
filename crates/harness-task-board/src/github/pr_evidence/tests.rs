@@ -5,13 +5,29 @@ use crate::types::{TaskBoardStatus, TaskBoardWorkflowKind};
 
 use super::github_source::{PullRequestEvidenceResponse, pull_request_evidence_from_response};
 use super::{
-    InMemoryPullRequestEvidenceSource, PullRequestEvidence, PullRequestEvidenceRead,
-    PullRequestEvidenceSource, PullRequestIdentity, PullRequestLifecycle,
+    CheckState, InMemoryPullRequestEvidenceSource, Mergeability, PullRequestEvidence,
+    PullRequestEvidenceRead, PullRequestEvidenceSource, PullRequestIdentity, PullRequestLifecycle,
+    PullRequestMergeGates, ReviewDecision, ReviewGate,
 };
 
 fn identity() -> PullRequestIdentity {
     PullRequestIdentity::new("octo", "harness", 7)
         .with_url(Some("https://github.com/octo/harness/pull/7".to_string()))
+}
+
+fn default_gates() -> PullRequestMergeGates {
+    PullRequestMergeGates {
+        mergeability: Mergeability::Mergeable,
+        viewer_can_update: true,
+        viewer_can_merge_as_admin: false,
+        checks: Vec::new(),
+        required_check_names: Vec::new(),
+        review: ReviewGate {
+            decision: ReviewDecision::Approved,
+            current_approvals: 1,
+            required_approvals: 1,
+        },
+    }
 }
 
 fn evidence(lifecycle: PullRequestLifecycle, is_draft: bool) -> PullRequestEvidence {
@@ -21,6 +37,7 @@ fn evidence(lifecycle: PullRequestLifecycle, is_draft: bool) -> PullRequestEvide
         author: Some("octocat".to_string()),
         lifecycle,
         is_draft,
+        gates: default_gates(),
         observed_at: "2026-07-29T00:00:00Z".to_string(),
     }
 }
@@ -244,4 +261,155 @@ fn external_task_and_evidence_share_identity_facts() {
         discovered.pr_head_revision
     );
     assert_eq!(executed.author, discovered.pr_author);
+}
+
+fn gated_response(overrides: Value) -> Value {
+    let mut pull_request = json!({
+        "number": 7,
+        "url": "https://github.com/octo/harness/pull/7",
+        "headRefOid": "cafef00d",
+        "isDraft": false,
+        "state": "OPEN",
+        "author": { "login": "octocat" }
+    });
+    let (Value::Object(target), Value::Object(extra)) = (&mut pull_request, overrides) else {
+        panic!("overrides must be an object");
+    };
+    target.extend(extra);
+    json!({ "repository": { "pullRequest": pull_request } })
+}
+
+#[test]
+fn the_projection_captures_the_merge_and_review_gates() {
+    let read = project(gated_response(json!({
+        "mergeable": "CONFLICTING",
+        "viewerCanUpdate": true,
+        "viewerCanMergeAsAdmin": true,
+        "reviewDecision": "CHANGES_REQUESTED"
+    })));
+    let gates = &read.evidence().expect("found").gates;
+
+    assert_eq!(gates.mergeability, Mergeability::Conflicting);
+    assert!(gates.viewer_can_update);
+    assert!(gates.viewer_can_merge_as_admin);
+    assert_eq!(gates.review.decision, ReviewDecision::ChangesRequested);
+}
+
+#[test]
+fn the_projection_captures_each_check_state() {
+    let read = project(gated_response(json!({
+        "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
+            { "__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS" },
+            { "__typename": "CheckRun", "name": "lint", "status": "IN_PROGRESS", "conclusion": Value::Null },
+            { "__typename": "CheckRun", "name": "flaky", "status": "COMPLETED", "conclusion": "FAILURE" },
+            { "__typename": "CheckRun", "name": "optional", "status": "COMPLETED", "conclusion": "SKIPPED" },
+            { "__typename": "StatusContext", "context": "legacy-ci", "state": "PENDING" }
+        ] } } } } ] }
+    })));
+    let gates = &read.evidence().expect("found").gates;
+
+    assert_eq!(gates.check_state("build"), Some(CheckState::Success));
+    assert_eq!(gates.check_state("lint"), Some(CheckState::Pending));
+    assert_eq!(gates.check_state("flaky"), Some(CheckState::Failure));
+    assert_eq!(gates.check_state("optional"), Some(CheckState::Skipped));
+    assert_eq!(gates.check_state("legacy-ci"), Some(CheckState::Pending));
+}
+
+#[test]
+fn gate_predicates_reflect_conflict_and_changes_requested() {
+    let mut gates = default_gates();
+    gates.mergeability = Mergeability::Conflicting;
+    gates.review.decision = ReviewDecision::ChangesRequested;
+    assert!(gates.has_conflicts());
+    assert!(!gates.is_mergeable());
+    assert!(gates.review.changes_requested());
+}
+
+#[test]
+fn an_unknown_mergeability_never_reads_as_mergeable() {
+    let read = project(gated_response(json!({ "mergeable": "UNKNOWN" })));
+    let gates = &read.evidence().expect("found").gates;
+    assert_eq!(gates.mergeability, Mergeability::Unknown);
+    assert!(!gates.is_mergeable());
+    assert!(!gates.mergeability_known());
+    assert!(!gates.has_conflicts());
+}
+
+#[test]
+fn an_absent_mergeable_field_is_unknown_not_safe() {
+    // A pull request GitHub is still computing reports no `mergeable` value.
+    let read = project(gated_response(json!({})));
+    let gates = &read.evidence().expect("found").gates;
+    assert_eq!(gates.mergeability, Mergeability::Unknown);
+    assert!(!gates.is_mergeable());
+}
+
+#[test]
+fn a_missing_required_check_blocks_the_gate() {
+    let read = project(gated_response(json!({
+        "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
+            { "__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS" }
+        ] } } } } ] },
+        "baseRef": { "branchProtectionRule": {
+            "requiredStatusCheckContexts": ["build", "deploy"],
+            "requiredStatusChecks": []
+        } }
+    })));
+    let gates = &read.evidence().expect("found").gates;
+    assert!(!gates.required_checks_satisfied());
+    assert_eq!(gates.missing_required_checks(), vec!["deploy"]);
+    assert!(gates.unsatisfied_required_checks().is_empty());
+}
+
+#[test]
+fn a_pending_required_check_is_unsatisfied_but_not_missing() {
+    let read = project(gated_response(json!({
+        "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
+            { "__typename": "CheckRun", "name": "build", "status": "IN_PROGRESS", "conclusion": Value::Null }
+        ] } } } } ] },
+        "baseRef": { "branchProtectionRule": { "requiredStatusCheckContexts": ["build"], "requiredStatusChecks": [] } }
+    })));
+    let gates = &read.evidence().expect("found").gates;
+    assert!(!gates.required_checks_satisfied());
+    assert!(gates.missing_required_checks().is_empty());
+    assert_eq!(gates.unsatisfied_required_checks(), vec!["build"]);
+}
+
+#[test]
+fn current_approvals_counts_the_latest_decisive_review_per_author() {
+    let read = project(gated_response(json!({
+        "reviews": { "nodes": [
+            { "state": "APPROVED", "submittedAt": "2026-07-01T00:00:00Z", "author": { "login": "ann" } },
+            { "state": "CHANGES_REQUESTED", "submittedAt": "2026-07-02T00:00:00Z", "author": { "login": "ann" } },
+            { "state": "COMMENTED", "submittedAt": "2026-07-03T00:00:00Z", "author": { "login": "ann" } },
+            { "state": "APPROVED", "submittedAt": "2026-07-01T00:00:00Z", "author": { "login": "bob" } }
+        ] }
+    })));
+    let gates = &read.evidence().expect("found").gates;
+    // Ann's approval was superseded by a later change request; Bob still approves.
+    assert_eq!(gates.review.current_approvals, 1);
+}
+
+#[test]
+fn a_review_gate_needs_enough_current_approvals() {
+    let satisfied = ReviewGate {
+        decision: ReviewDecision::Approved,
+        current_approvals: 2,
+        required_approvals: 2,
+    };
+    assert!(satisfied.is_satisfied());
+
+    let short = ReviewGate {
+        decision: ReviewDecision::Approved,
+        current_approvals: 1,
+        required_approvals: 2,
+    };
+    assert!(!short.is_satisfied());
+
+    let unknown = ReviewGate {
+        decision: ReviewDecision::Unknown,
+        current_approvals: 5,
+        required_approvals: 1,
+    };
+    assert!(!unknown.is_satisfied());
 }
