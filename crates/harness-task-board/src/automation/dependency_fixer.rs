@@ -5,8 +5,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    TaskBoardDependencyRouteRecord, TaskBoardDependencyRouteStatus,
+    TaskBoardDependencyRouteOutcome, TaskBoardDependencyRouteRecord,
+    TaskBoardDependencyRouteStatus, TaskBoardDependencyRouteStore,
     TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageResult,
+    route_task_board_dependency_triage_result, valid_head_revision,
     validate_task_board_dependency_triage_result,
 };
 
@@ -56,6 +58,13 @@ pub struct TaskBoardDependencyFixResult {
     pub changed_paths: Vec<String>,
     pub validation: Vec<String>,
     pub remaining_blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskBoardDependencyFixDispatchOutcome {
+    pub route: TaskBoardDependencyRouteRecord,
+    pub created: bool,
+    pub run: Option<TaskBoardDependencyFixRun>,
 }
 
 #[async_trait]
@@ -134,6 +143,41 @@ pub async fn dispatch_task_board_dependency_fix(
 ) -> Result<TaskBoardDependencyFixRun, CliError> {
     let request = task_board_dependency_fix_request(route, binding)?;
     launcher.start(&request).await
+}
+
+/// Route one validated triage result and start its fixer exactly once when required.
+///
+/// # Errors
+///
+/// Returns route admission, validation, or launcher errors without dispatching non-fix outcomes.
+pub async fn route_and_dispatch_task_board_dependency_fix(
+    result: &TaskBoardDependencyTriageResult,
+    expected_repository: &str,
+    expected_pull_request_number: u64,
+    expected_head_revision: &str,
+    store: &dyn TaskBoardDependencyRouteStore,
+    binding: &TaskBoardDependencyFixBinding,
+    launcher: &dyn TaskBoardDependencyFixLauncher,
+) -> Result<TaskBoardDependencyFixDispatchOutcome, CliError> {
+    let TaskBoardDependencyRouteOutcome { route, created } =
+        route_task_board_dependency_triage_result(
+            result,
+            expected_repository,
+            expected_pull_request_number,
+            expected_head_revision,
+            store,
+        )
+        .await?;
+    let run = if created && route.status == TaskBoardDependencyRouteStatus::FixRequested {
+        Some(dispatch_task_board_dependency_fix(&route, binding, launcher).await?)
+    } else {
+        None
+    };
+    Ok(TaskBoardDependencyFixDispatchOutcome {
+        route,
+        created,
+        run,
+    })
 }
 
 /// Render the bounded repair task and its structured response contract.
@@ -241,13 +285,6 @@ fn validate_unique_text(values: &[String], label: &str) -> Result<(), CliError> 
         )));
     }
     Ok(())
-}
-
-fn valid_head_revision(revision: &str) -> bool {
-    matches!(revision.len(), 40 | 64)
-        && revision
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn parse_error(detail: impl Into<String>) -> CliError {

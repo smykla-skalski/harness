@@ -2,8 +2,10 @@ use async_trait::async_trait;
 use harness_kernel::errors::CliError;
 use harness_task_board::{
     TASK_BOARD_DEPENDENCY_FIXER_EFFORT, TASK_BOARD_DEPENDENCY_FIXER_MODEL,
+    TaskBoardDependencyFixBinding, TaskBoardDependencyFixDispatchOutcome,
     TaskBoardDependencyFixLauncher, TaskBoardDependencyFixRequest, TaskBoardDependencyFixRun,
-    render_task_board_dependency_fix_prompt,
+    TaskBoardDependencyRouteStore, TaskBoardDependencyTriageResult,
+    render_task_board_dependency_fix_prompt, route_and_dispatch_task_board_dependency_fix,
 };
 
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
@@ -20,6 +22,35 @@ impl CodexDependencyFixLauncher {
     #[must_use]
     pub fn new(controller: CodexControllerHandle) -> Self {
         Self { controller }
+    }
+}
+
+impl CodexControllerHandle {
+    /// Route validated dependency triage and start the bound fixer when it requires source changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns route admission, validation, persistence, or Codex startup errors.
+    pub async fn route_dependency_triage_and_start_fixer(
+        &self,
+        result: &TaskBoardDependencyTriageResult,
+        expected_repository: &str,
+        expected_pull_request_number: u64,
+        expected_head_revision: &str,
+        store: &dyn TaskBoardDependencyRouteStore,
+        binding: &TaskBoardDependencyFixBinding,
+    ) -> Result<TaskBoardDependencyFixDispatchOutcome, CliError> {
+        let launcher = CodexDependencyFixLauncher::new(self.clone());
+        route_and_dispatch_task_board_dependency_fix(
+            result,
+            expected_repository,
+            expected_pull_request_number,
+            expected_head_revision,
+            store,
+            binding,
+            &launcher,
+        )
+        .await
     }
 }
 

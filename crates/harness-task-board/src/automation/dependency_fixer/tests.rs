@@ -4,7 +4,8 @@ use super::*;
 use crate::{
     TaskBoardDependencyApprovalEvidence, TaskBoardDependencyCheck, TaskBoardDependencyCheckState,
     TaskBoardDependencyConflictEvidence, TaskBoardDependencyConflictState,
-    TaskBoardDependencyIdentity, TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
+    TaskBoardDependencyIdentity, TaskBoardDependencyRouteAdmission,
+    TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
 };
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -44,6 +45,42 @@ async fn dispatches_only_an_explicit_fix_route_with_all_evidence() {
         );
         assert_eq!(launcher.start_count(), before);
     }
+}
+
+#[tokio::test]
+async fn admitted_fix_route_starts_once_and_duplicate_does_not_restart() {
+    let store = RouteStore::default();
+    let launcher = Launcher::default();
+    let result = route(TaskBoardDependencyTriageDisposition::FixRequired).source_result;
+
+    let first = route_and_dispatch_task_board_dependency_fix(
+        &result,
+        "acme/widgets",
+        17,
+        HEAD,
+        &store,
+        &binding(),
+        &launcher,
+    )
+    .await
+    .expect("admitted fix dispatch");
+    assert!(first.created);
+    assert!(first.run.is_some());
+
+    let duplicate = route_and_dispatch_task_board_dependency_fix(
+        &result,
+        "acme/widgets",
+        17,
+        HEAD,
+        &store,
+        &binding(),
+        &launcher,
+    )
+    .await
+    .expect("duplicate fix route");
+    assert!(!duplicate.created);
+    assert!(duplicate.run.is_none());
+    assert_eq!(launcher.start_count(), 1);
 }
 
 #[test]
@@ -150,6 +187,28 @@ impl TaskBoardDependencyFixLauncher for Launcher {
             requested_model: TASK_BOARD_DEPENDENCY_FIXER_MODEL.into(),
             requested_effort: TASK_BOARD_DEPENDENCY_FIXER_EFFORT.into(),
         })
+    }
+}
+
+#[derive(Default)]
+struct RouteStore {
+    route: Mutex<Option<TaskBoardDependencyRouteRecord>>,
+}
+
+#[async_trait]
+impl TaskBoardDependencyRouteStore for RouteStore {
+    async fn admit(
+        &self,
+        route: TaskBoardDependencyRouteRecord,
+    ) -> Result<TaskBoardDependencyRouteAdmission, CliError> {
+        let mut stored = self.route.lock().expect("route lock");
+        if let Some(existing) = stored.as_ref() {
+            return Ok(TaskBoardDependencyRouteAdmission::Duplicate(Box::new(
+                existing.clone(),
+            )));
+        }
+        *stored = Some(route);
+        Ok(TaskBoardDependencyRouteAdmission::Claimed)
     }
 }
 
