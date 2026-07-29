@@ -169,8 +169,24 @@ pub fn parse_task_board_dependency_triage_result(
 ///
 /// # Errors
 ///
-/// Returns the first stable validation failure without interpreting any model-provided action.
+/// Returns the first stable validation failure after compiling model-provided actions into the
+/// documented typed plan. Validation never executes an action.
 pub fn validate_task_board_dependency_triage_result(
+    result: &TaskBoardDependencyTriageResult,
+    expected_repository: &str,
+    expected_pull_request_number: u64,
+    expected_head_revision: &str,
+) -> Result<(), TaskBoardDependencyTriageError> {
+    validate_task_board_dependency_triage_evidence(
+        result,
+        expected_repository,
+        expected_pull_request_number,
+        expected_head_revision,
+    )?;
+    compile_task_board_dependency_action_plan(result).map(|_| ())
+}
+
+pub(super) fn validate_task_board_dependency_triage_evidence(
     result: &TaskBoardDependencyTriageResult,
     expected_repository: &str,
     expected_pull_request_number: u64,
@@ -195,8 +211,7 @@ pub fn validate_task_board_dependency_triage_result(
     }
     validate_required_tools(&result.required_tools)?;
     validate_next_steps(&result.next_steps)?;
-    validate_disposition(result)?;
-    compile_task_board_dependency_action_plan(result).map(|_| ())
+    validate_disposition(result)
 }
 
 fn validate_pull_request_identity(
@@ -330,20 +345,16 @@ fn validate_disposition(
         Err(TaskBoardDependencyTriageError::DispositionContradictsEvidence)
     }
 }
-
 fn valid_head_revision(revision: &str) -> bool {
     matches!(revision.len(), 40 | 64)
         && revision
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
     const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
-
     #[test]
     fn strict_result_round_trip_accepts_safe_exact_head() {
         let result = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
@@ -352,7 +363,6 @@ mod tests {
             .expect("valid structured result");
         assert_eq!(parsed, result);
     }
-
     #[test]
     fn invalid_or_stale_results_fail_closed_with_visible_reasons() {
         let invalid_json =
@@ -389,15 +399,12 @@ mod tests {
         let mut pending = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
         assert_contradiction(&pending);
-
         let mut conflicted = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         conflicted.conflicts.state = TaskBoardDependencyConflictState::Conflicted;
         assert_contradiction(&conflicted);
-
         let mut under_approved = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         under_approved.approvals.current = 0;
         assert_contradiction(&under_approved);
-
         let mut no_checks = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         no_checks.checks.clear();
         assert_contradiction(&no_checks);
@@ -407,15 +414,12 @@ mod tests {
     fn wait_requires_pending_check_and_steps_are_strictly_ordered() {
         let wait = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         assert_contradiction(&wait);
-
         let mut pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
         assert_eq!(validate(&pending), Ok(()));
-
         let mut conflicted = pending.clone();
         conflicted.conflicts.state = TaskBoardDependencyConflictState::Conflicted;
         assert_contradiction(&conflicted);
-
         let mut failed_while_pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         failed_while_pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
         failed_while_pending.checks.push(TaskBoardDependencyCheck {
@@ -424,7 +428,6 @@ mod tests {
             details_url: None,
         });
         assert_contradiction(&failed_while_pending);
-
         let mut unordered = result(TaskBoardDependencyTriageDisposition::ContinueSafe);
         unordered.next_steps[0].order = 2;
         assert_eq!(
@@ -436,20 +439,17 @@ mod tests {
             Err(TaskBoardDependencyTriageError::InvalidNextSteps)
         );
     }
-
     fn assert_contradiction(result: &TaskBoardDependencyTriageResult) {
         assert_eq!(
             validate(result),
             Err(TaskBoardDependencyTriageError::DispositionContradictsEvidence)
         );
     }
-
     fn validate(
         result: &TaskBoardDependencyTriageResult,
     ) -> Result<(), TaskBoardDependencyTriageError> {
         validate_task_board_dependency_triage_result(result, "acme/widgets", 17, HEAD)
     }
-
     fn result(
         disposition: TaskBoardDependencyTriageDisposition,
     ) -> TaskBoardDependencyTriageResult {

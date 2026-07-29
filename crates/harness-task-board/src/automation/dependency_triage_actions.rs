@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageError,
-    TaskBoardDependencyTriageResult, validate_task_board_dependency_triage_result,
+    TaskBoardDependencyTriageResult, validate_task_board_dependency_triage_evidence,
 };
 
 #[derive(
@@ -268,27 +268,22 @@ async fn validated_plan_or_audit(
     expected_head_revision: &str,
     audit: &dyn TaskBoardDependencyActionAuditSink,
 ) -> Result<TaskBoardDependencyActionPlan, CliError> {
-    if let Err(error) = validate_task_board_dependency_triage_result(
+    let plan = validate_task_board_dependency_triage_evidence(
         result,
         expected_repository,
         expected_pull_request_number,
         expected_head_revision,
-    ) {
-        audit
-            .record(rejected_record(result, "<plan>", error.to_string()))
-            .await?;
-        return Err(CliErrorKind::workflow_parse(error.to_string()).into());
-    }
-    let plan = match compile_task_board_dependency_action_plan(result) {
-        Ok(plan) => plan,
+    )
+    .and_then(|()| compile_task_board_dependency_action_plan(result));
+    match plan {
+        Ok(plan) => Ok(plan),
         Err(error) => {
             audit
                 .record(rejected_record(result, "<plan>", error.to_string()))
                 .await?;
-            return Err(CliErrorKind::workflow_parse(error.to_string()).into());
+            Err(CliErrorKind::workflow_parse(error.to_string()).into())
         }
-    };
-    Ok(plan)
+    }
 }
 
 async fn preflight_capabilities(
