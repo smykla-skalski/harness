@@ -9,7 +9,7 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
 };
 

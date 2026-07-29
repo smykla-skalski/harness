@@ -5,8 +5,8 @@ use crate::daemon::db::{
     TaskBoardRemoteResultAdoptionOutcome, exact_active_remote_target, parent_points_to_assignment,
 };
 use crate::daemon::service::import_and_adopt_task_board_remote_implementation_result;
-use crate::daemon::task_board_remote_transport::wire::RemoteSettledRequest;
-use crate::daemon::task_board_remote_transport::wire_cleanup::RemoteCleanupObservationRequest;
+use crate::daemon::task_board_remote_wire::wire::RemoteSettledRequest;
+use crate::daemon::task_board_remote_wire::wire_cleanup::RemoteCleanupObservationRequest;
 use crate::workspace::utc_now;
 
 use crate::daemon::task_board_remote_transport::controller::{

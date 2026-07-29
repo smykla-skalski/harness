@@ -3,8 +3,8 @@ use super::controller_prepared_test_support::{
     failed_status, persist_claim, prepared_acceptance, status_request,
 };
 use super::routes_status::status_response as route_status_response;
-use super::wire::RemoteStatusResponse;
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
+use crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse;
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 
 #[tokio::test]

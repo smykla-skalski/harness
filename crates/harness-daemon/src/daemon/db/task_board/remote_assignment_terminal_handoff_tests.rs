@@ -8,7 +8,7 @@ use super::remote_assignment_test_support::{
     AFTER_EXPIRY, CLAIMED_AT, ControllerFixture, HOST, NOW, STARTED_AT, controller_fixture,
 };
 use super::workflow_execution_rows::{execution_json, label};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteSettledRequest,
     RemoteStatusRequest, RemoteStatusResponse, RemoteTypedResult,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -290,7 +290,7 @@ pub(crate) async fn detached_terminal_assignment(
 }
 
 fn terminal_status(
-    request: &crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
     state: TaskBoardRemoteAssignmentState,
 ) -> RemoteStatusResponse {

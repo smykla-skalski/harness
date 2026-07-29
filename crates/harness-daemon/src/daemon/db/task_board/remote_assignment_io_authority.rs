@@ -13,9 +13,9 @@ use super::remote_operation_trust::{
 };
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteAttemptBinding;
+use crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding;
 #[cfg(test)]
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
 use crate::task_board::TaskBoardExecutionAttemptRecord;

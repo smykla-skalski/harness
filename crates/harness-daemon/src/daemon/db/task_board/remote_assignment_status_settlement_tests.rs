@@ -7,7 +7,7 @@ use super::remote_assignment_test_support::{
     controller_fixture, controller_fixture_with_retry_attempts,
 };
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteStatusRequest,
     RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

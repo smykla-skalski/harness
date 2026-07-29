@@ -14,8 +14,8 @@ use super::remote_operation_trust::{
 use super::workflow_executions::load_execution_in_tx;
 use super::{ORCHESTRATOR_CHANGE_SCOPE, items::bump_change_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteClaimRequest;
-use crate::daemon::task_board_remote_transport::wire::{RemoteStatusRequest, RemoteStatusResponse};
+use crate::daemon::task_board_remote_wire::wire::RemoteClaimRequest;
+use crate::daemon::task_board_remote_wire::wire::{RemoteStatusRequest, RemoteStatusResponse};
 use crate::task_board::{
     TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE, TaskBoardExecutionState,
     TaskBoardRemoteAssignmentState,

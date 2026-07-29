@@ -12,7 +12,7 @@ use super::workflow_execution_attempts::{update_attempt_in_tx, validate_attempt_
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use super::workflow_terminal::project_terminal_execution_in_tx;
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{RemoteCancelRequest, RemoteClaimRequest};
+use crate::daemon::task_board_remote_wire::wire::{RemoteCancelRequest, RemoteClaimRequest};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE,

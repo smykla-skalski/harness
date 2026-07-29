@@ -5,7 +5,7 @@ use crate::daemon::db::{
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferWindow,
     workflow_owner,
 };
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteClaimResponse, RemoteLease, RemoteOfferDisposition, RemoteOfferRequest,
     RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

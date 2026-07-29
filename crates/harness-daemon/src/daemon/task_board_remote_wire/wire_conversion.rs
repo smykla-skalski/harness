@@ -1,4 +1,4 @@
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteHostAdvertisement, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{
@@ -6,7 +6,7 @@ use crate::task_board::{
     TaskBoardLocalExecutionHostConfig, TaskBoardPhaseCapabilityProfile,
 };
 
-pub(super) fn host_wire_advertisement(
+pub(crate) fn host_wire_advertisement(
     host: &TaskBoardLocalExecutionHostConfig,
     host_instance_id: &str,
     active_assignments: u32,
@@ -38,7 +38,7 @@ pub(super) fn host_wire_advertisement(
     Ok(advertisement)
 }
 
-pub(super) fn domain_host_advertisement(
+pub(crate) fn domain_host_advertisement(
     wire: RemoteHostAdvertisement,
 ) -> Result<TaskBoardExecutionHostAdvertisement, RemoteWireError> {
     wire.validate()?;

@@ -1,5 +1,5 @@
 use crate::daemon::db::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteAttemptBinding, RemoteLease,
     RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

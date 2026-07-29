@@ -16,7 +16,7 @@ use super::remote_settlement_receipts::{
 };
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence, db_error};
-use crate::daemon::task_board_remote_transport::wire_cleanup::{
+use crate::daemon::task_board_remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
 use crate::task_board::TaskBoardWorkflowExecutionCas;

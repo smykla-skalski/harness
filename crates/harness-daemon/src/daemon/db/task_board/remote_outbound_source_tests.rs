@@ -10,7 +10,7 @@ use super::remote_outbound_sources::{
     persist_outbound_source_in_tx, require_outbound_source_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest, RemoteSourceMaterial,
     test_codex_launch,
 };

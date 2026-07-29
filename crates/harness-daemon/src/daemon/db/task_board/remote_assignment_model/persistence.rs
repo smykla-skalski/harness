@@ -2,7 +2,7 @@ use sqlx::{Sqlite, Transaction, query};
 
 use super::{phase_label, to_i64};
 use crate::daemon::db::{CliError, TaskBoardRemoteLifecycleTrustSnapshot, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
+use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 
 pub(in crate::daemon::db::task_board) struct RemoteAssignmentInsertInput<'a> {
     pub(in crate::daemon::db::task_board) request: &'a RemoteOfferRequest,

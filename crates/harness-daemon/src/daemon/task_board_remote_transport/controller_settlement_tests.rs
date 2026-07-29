@@ -9,7 +9,7 @@ use super::controller_tests::{
     HOST_ID, ScriptedResponse, TOKEN_ENV, pinned_client, request_body, spawn_scripted_https_server,
     test_tls_material,
 };
-use super::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

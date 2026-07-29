@@ -14,7 +14,7 @@ use super::remote_operation_trust::{
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
 use crate::daemon::db::CliError;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteStatusRequest, RemoteStatusResponse,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

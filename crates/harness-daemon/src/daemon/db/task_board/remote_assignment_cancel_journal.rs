@@ -11,7 +11,7 @@ use super::remote_assignment_model::{
 use super::remote_operation_trust::TaskBoardRemoteOperationKind;
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteCancelRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

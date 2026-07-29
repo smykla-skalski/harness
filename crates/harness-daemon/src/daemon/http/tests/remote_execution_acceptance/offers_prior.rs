@@ -7,7 +7,7 @@ use super::offers::assert_accepted_without_claim;
 use crate::daemon::task_board_remote_transport::controller_authority_test_support::{
     TestTlsMaterial, test_tls_material,
 };
-use crate::daemon::task_board_remote_transport::wire::RemoteSourceMaterial;
+use crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
@@ -132,7 +132,7 @@ async fn advance_default_task_to_review(
 }
 
 fn assert_prior_review_offer(
-    offer: &crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
     base_revision: &str,
     result_revision: &str,
 ) {

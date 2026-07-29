@@ -12,7 +12,7 @@ use super::remote_operation_trust::{
 use super::remote_source_bundle_abandonment::load_abandonment_in_tx;
 use super::remote_source_bundles::load_source_bundle_collisions_in_tx;
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
 };

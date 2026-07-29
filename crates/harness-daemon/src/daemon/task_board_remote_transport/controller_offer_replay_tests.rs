@@ -6,12 +6,12 @@ use super::controller_authority_test_support::{
     test_tls_material, try_stop,
 };
 use super::controller_authority_tests::assert_concurrent_database_error;
-use super::wire::{
+use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome, utc_now};
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteLease,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome, utc_now};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]

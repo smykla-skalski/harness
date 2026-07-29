@@ -2,7 +2,7 @@ use sqlx::{query, query_scalar};
 
 use super::remote_assignment_executor_terminal_test_support::*;
 use super::{TaskBoardRemoteMutationOutcome, remote_assignment_test_support::PRINCIPAL};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactFetchRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};

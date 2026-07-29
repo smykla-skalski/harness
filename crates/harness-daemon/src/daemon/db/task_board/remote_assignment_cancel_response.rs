@@ -17,7 +17,7 @@ use super::remote_operation_trust::{
 };
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

@@ -21,7 +21,7 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus, StreamEvent};
 use crate::daemon::state::DaemonManifest;
-use crate::daemon::task_board_remote_transport::wire::{RemoteOfferRequest, RemoteSourceMaterial};
+use crate::daemon::task_board_remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 

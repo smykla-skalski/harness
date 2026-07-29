@@ -2,7 +2,9 @@
 
 use super::client::{RemoteExecutionHttpClient, RemoteExecutionHttpError};
 use super::routes_cleanup::CLEANUP_OBSERVATION_PATH;
-use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservationResponse};
+use crate::daemon::task_board_remote_wire::wire_cleanup::{
+    RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
+};
 
 impl RemoteExecutionHttpClient {
     pub(crate) async fn observe_cleanup(

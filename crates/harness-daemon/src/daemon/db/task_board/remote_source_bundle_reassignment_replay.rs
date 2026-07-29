@@ -9,7 +9,7 @@ use super::super::remote_source_bundle_reassignment_evidence::{
     SourceReassignmentEvidence, require_reassignment_evidence_in_tx,
 };
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest;
+use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 
 pub(super) async fn replayed_replacement_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,

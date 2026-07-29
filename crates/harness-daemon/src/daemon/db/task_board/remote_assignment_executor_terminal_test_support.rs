@@ -10,7 +10,7 @@ use super::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorLifecycleOwner,
     TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease,
     RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
     test_codex_launch,
@@ -171,7 +171,7 @@ fn terminal_response(
 
 fn result_for_phase(
     phase: TaskBoardExecutionPhase,
-    binding: &crate::daemon::task_board_remote_transport::wire::RemoteAttemptBinding,
+    binding: &crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding,
 ) -> TaskBoardLocalAttemptResult {
     let (head, artifact) = match phase {
         TaskBoardExecutionPhase::Implementation => (

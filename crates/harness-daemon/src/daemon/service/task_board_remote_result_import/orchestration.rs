@@ -6,7 +6,7 @@ use super::super::super::db::{
     AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRequest,
 };
-use super::super::super::task_board_remote_transport::wire::RemoteAssignmentWireState;
+use super::super::super::task_board_remote_wire::wire::RemoteAssignmentWireState;
 use crate::git::bundle::{GitBundleImportEvidence, GitBundleImportPlan};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionPhase, TaskBoardWorkflowExecutionCas,

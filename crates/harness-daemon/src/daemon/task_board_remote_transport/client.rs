@@ -20,14 +20,14 @@ use super::routes::{
 #[cfg(test)]
 use super::tls_pin::pinned_client_config_with_roots;
 use super::tls_pin::{RemoteTlsPinError, pinned_platform_client_config};
-use super::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
     RemoteCancelResponse, RemoteClaimRequest, RemoteClaimResponse, RemoteHostAdvertisement,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteOfferResponse,
     RemoteSettledRequest, RemoteSettledResponse, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteStatusRequest, RemoteStatusResponse, RemoteWireError,
 };
-use super::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
+use crate::daemon::task_board_remote_wire::wire_limits::MAX_REMOTE_LIFECYCLE_JSON_BYTES;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);

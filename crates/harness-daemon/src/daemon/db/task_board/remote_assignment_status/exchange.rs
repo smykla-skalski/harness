@@ -24,7 +24,7 @@ use super::super::remote_operation_trust::{
 use super::super::workflow_executions::load_execution_in_tx;
 use super::persist_lost_claim_receipt_in_tx;
 use crate::daemon::db::CliError;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

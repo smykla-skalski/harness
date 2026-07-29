@@ -13,9 +13,9 @@ use super::remote_claim_receipts::{
     claim_receipt_values, claim_response_for_record, exact_claim_response,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteClaimResponse;
-use crate::daemon::task_board_remote_transport::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::RemoteClaimResponse;
+use crate::daemon::task_board_remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

@@ -5,7 +5,7 @@ use super::remote_assignment_test_support::{
     HOST, INSTANCE, NOW, PRINCIPAL, REPOSITORY, SOURCE_REVISION, detached_offer, executor_fixture,
 };
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,
     test_codex_launch,

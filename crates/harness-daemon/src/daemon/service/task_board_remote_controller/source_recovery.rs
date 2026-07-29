@@ -7,7 +7,7 @@ use crate::daemon::db::{
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
 use crate::daemon::task_board_remote_transport::controller_offer_recovery::RemotePredecessorOfferRecoveryOutcome;
 use crate::daemon::task_board_remote_transport::controller_source_bundle::RemoteSourceBundleRecoveryOutcome;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferRequest, RemoteOfferResponse, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleUploadRequest,
 };

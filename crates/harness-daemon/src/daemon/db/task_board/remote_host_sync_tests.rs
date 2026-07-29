@@ -156,13 +156,13 @@ async fn assert_settlement_history(db: &AsyncDaemonDb, assignment_id: &str) {
     );
 }
 
-fn distinct_offer() -> crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest {
+fn distinct_offer() -> crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest {
     let mut request = detached_offer("assignment-executor-2", "attempt-key-2");
     request.binding.execution_id = "execution-detached-2".into();
     request.binding.action_key = "review:reviewer-2".into();
     request.binding.fencing_epoch = 2;
     // The launch must track the rebound binding execution id and action key.
-    request.launch = crate::daemon::task_board_remote_transport::wire::test_codex_launch(
+    request.launch = crate::daemon::task_board_remote_wire::wire::test_codex_launch(
         crate::task_board::TaskBoardExecutionPhase::Review,
         "execution-detached-2",
         "review:reviewer-2",

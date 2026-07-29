@@ -7,7 +7,7 @@ use super::{
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunStatus;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteCancelRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

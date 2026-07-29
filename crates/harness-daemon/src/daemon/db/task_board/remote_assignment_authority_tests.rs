@@ -1,6 +1,6 @@
 use super::remote_assignment_test_support::*;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{
@@ -211,7 +211,7 @@ fn assert_corruption_error(error: &CliError, corruption: &str) {
 }
 
 fn accepted_response(
-    request: &crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
 ) -> RemoteOfferResponse {
     RemoteOfferResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

@@ -1,6 +1,6 @@
 use sha2::{Digest, Sha256};
 
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceMaterial,
 };
 use crate::git::source_bundle_export::GitSourceBundleExport;

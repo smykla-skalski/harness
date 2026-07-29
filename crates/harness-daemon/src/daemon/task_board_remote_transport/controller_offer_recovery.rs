@@ -1,9 +1,11 @@
 use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
-use super::wire::{RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse};
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationTrustFence,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
 };
 
 #[derive(Debug)]

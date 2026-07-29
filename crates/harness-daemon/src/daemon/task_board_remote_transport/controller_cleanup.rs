@@ -1,8 +1,10 @@
 //! Controller-side authenticated cleanup observation and durable adoption.
 
 use super::controller::{RemoteExecutionControllerClient, RemoteExecutionControllerError};
-use super::wire_cleanup::{RemoteCleanupObservationRequest, RemoteCleanupObservationResponse};
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
+use crate::daemon::task_board_remote_wire::wire_cleanup::{
+    RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
+};
 
 impl RemoteExecutionControllerClient {
     pub(crate) async fn observe_cleanup(

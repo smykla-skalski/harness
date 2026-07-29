@@ -1,12 +1,12 @@
 use chrono::{Duration, SecondsFormat, Utc};
 
 use super::controller_authority_test_support::HOST_ID;
-use super::wire::{
+use crate::daemon::db::{PreparedRemoteOffer, TaskBoardRemoteOfferOutcome, prepare_remote_offer};
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteClaimRequest, RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest,
     RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferResponse, RemoteStatusRequest,
     RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::{PreparedRemoteOffer, TaskBoardRemoteOfferOutcome, prepare_remote_offer};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptCas,
@@ -210,7 +210,7 @@ pub(super) fn completed_status(state: &PreparedLifecycle) -> RemoteStatusRespons
     RemoteStatusResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: state.prepared.offer.binding.clone(),
-        state: super::wire::RemoteAssignmentWireState::Completed,
+        state: crate::daemon::task_board_remote_wire::wire::RemoteAssignmentWireState::Completed,
         offer_request_sha256: state.prepared.offer.request_sha256.clone(),
         status_sha256: String::new(),
         lease: Some(RemoteLease {
@@ -221,7 +221,8 @@ pub(super) fn completed_status(state: &PreparedLifecycle) -> RemoteStatusRespons
             RemoteTypedResult::seal(result, state.prepared.offer.request_sha256.clone())
                 .expect("seal typed remote review"),
         ),
-        output_artifacts: super::wire::RemoteArtifactManifest::default(),
+        output_artifacts:
+            crate::daemon::task_board_remote_wire::wire::RemoteArtifactManifest::default(),
         claimed_at: Some(state.times.before_expiry.clone()),
         started_at: Some(state.times.started_at.clone()),
         workspace_ref: Some("workspace-assignment-admission".into()),
@@ -240,7 +241,7 @@ pub(super) fn failed_status(
     RemoteStatusResponse {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: state.prepared.offer.binding.clone(),
-        state: super::wire::RemoteAssignmentWireState::Failed,
+        state: crate::daemon::task_board_remote_wire::wire::RemoteAssignmentWireState::Failed,
         offer_request_sha256: state.prepared.offer.request_sha256.clone(),
         status_sha256: String::new(),
         lease: Some(RemoteLease {
@@ -248,7 +249,8 @@ pub(super) fn failed_status(
             expires_at: state.times.l1_expires_at.clone(),
         }),
         result: None,
-        output_artifacts: super::wire::RemoteArtifactManifest::default(),
+        output_artifacts:
+            crate::daemon::task_board_remote_wire::wire::RemoteArtifactManifest::default(),
         claimed_at: Some(state.times.before_expiry.clone()),
         started_at: Some(state.times.started_at.clone()),
         workspace_ref: Some("workspace-assignment-admission".into()),

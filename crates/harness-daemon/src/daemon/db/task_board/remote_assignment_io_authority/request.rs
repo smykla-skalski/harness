@@ -1,6 +1,6 @@
 use super::TaskBoardRemoteIoAuthorityKind;
 use crate::daemon::db::task_board::remote_operation_trust::TaskBoardRemoteOperationTrustFence;
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAttemptBinding, RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest,
     RemoteOfferRequest,
 };

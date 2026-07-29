@@ -6,7 +6,7 @@ use super::{
 };
 use crate::daemon::db::remote_executor_identity_from_parts;
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAttemptBinding, RemoteOfferRequest,
     RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };

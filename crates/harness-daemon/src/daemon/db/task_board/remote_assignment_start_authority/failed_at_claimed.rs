@@ -17,7 +17,7 @@ use super::super::remote_start_failure_receipts::{
 };
 use super::{TaskBoardRemoteExecutorStartIoPermit, executor_start_io_permit};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::RemoteStatusResponse;
+use crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse;
 use crate::task_board::TaskBoardFailureClass;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 

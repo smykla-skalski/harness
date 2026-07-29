@@ -1,7 +1,7 @@
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferRequest, RemoteRepositorySelector, RemoteSourceMaterial,
 };
 use crate::task_board::{

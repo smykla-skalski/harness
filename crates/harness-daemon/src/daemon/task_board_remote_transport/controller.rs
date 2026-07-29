@@ -4,16 +4,16 @@ use std::fmt;
 use super::client::{RemoteExecutionHttpClient, RemoteExecutionHttpError};
 use super::controller_cancel_replay::durable_cancel_response;
 use super::controller_clock::ControllerClock;
-use super::wire::{
-    RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
-    RemoteClaimResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest,
-    RemoteOfferResponse, RemoteSettledRequest, RemoteSettledResponse, RemoteStatusRequest,
-    RemoteStatusResponse,
-};
 use crate::daemon::db::TaskBoardRemoteIoAuthority;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
+};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
+    RemoteClaimResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest,
+    RemoteOfferResponse, RemoteSettledRequest, RemoteSettledResponse, RemoteStatusRequest,
+    RemoteStatusResponse,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -338,7 +338,7 @@ impl RemoteExecutionControllerClient {
         assignment_id: &str,
         lease_id: &str,
         offer_digest: &str,
-        binding: &super::wire::RemoteAttemptBinding,
+        binding: &crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding,
     ) -> Result<TaskBoardRemoteAssignmentRecord, RemoteExecutionControllerError> {
         let record = self.preflight(db, assignment_id).await?;
         let offer = record.require_offer()?;

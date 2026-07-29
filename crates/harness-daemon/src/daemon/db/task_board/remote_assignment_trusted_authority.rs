@@ -10,7 +10,7 @@ use super::remote_operation_trust::{
 use super::{TaskBoardRemoteIoAuthority, TaskBoardRemoteIoAuthorityKind};
 use crate::daemon::db::db_error;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

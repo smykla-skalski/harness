@@ -11,7 +11,7 @@ use crate::daemon::db::TaskBoardRemoteOfferReceiptDisposition;
 use crate::daemon::task_board_remote_transport::controller_authority_test_support::{
     TestTlsMaterial, test_tls_material,
 };
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteOfferDisposition, RemoteRepositorySelector, RemoteSourceMaterial,
 };
 use crate::task_board::{
@@ -330,7 +330,7 @@ fn attempt_for(
 fn assert_repository_source(
     case: &RepositoryCase,
     source: &RemoteSourceMaterial,
-    manifest: &crate::daemon::task_board_remote_transport::wire::RemoteArtifactManifest,
+    manifest: &crate::daemon::task_board_remote_wire::wire::RemoteArtifactManifest,
 ) {
     match (case.source, source) {
         (
@@ -380,7 +380,7 @@ fn assert_repository_source(
 pub(super) async fn assert_accepted_without_claim(
     controller_db: &crate::daemon::db::AsyncDaemonDb,
     executor_db: &crate::daemon::db::AsyncDaemonDb,
-    offer: &crate::daemon::task_board_remote_transport::wire::RemoteOfferRequest,
+    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
 ) {
     let controller = controller_db
         .task_board_remote_assignment(&offer.binding.assignment_id)

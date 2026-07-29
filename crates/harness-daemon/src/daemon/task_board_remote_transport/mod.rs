@@ -3,6 +3,12 @@
 //! These types are deliberately not part of the daemon HTTP, WebSocket, MCP,
 //! or generated Swift contracts. The controller uses them only with an
 //! operator-configured, certificate-pinned execution host.
+//!
+//! The wire types this transport serializes live in the sibling
+//! `crate::daemon::task_board_remote_wire` module, not here: `db` needed a
+//! one-way dependency on them instead of the two-way cycle it had with this
+//! module, so `wire.rs`/`wire_*.rs` hoisted out to a shared sibling both `db`
+//! and this module's `controller`/`routes` code depend on.
 
 pub(crate) mod client;
 mod client_cleanup;
@@ -23,20 +29,6 @@ pub(crate) mod routes_source_bundle;
 mod routes_status;
 mod routes_support;
 pub(crate) mod tls_pin;
-pub(crate) mod wire;
-mod wire_artifacts;
-pub(crate) mod wire_cleanup;
-mod wire_conversion;
-mod wire_host;
-mod wire_launch;
-mod wire_lifecycle;
-mod wire_limits;
-mod wire_request_validation;
-mod wire_result;
-mod wire_source;
-mod wire_source_bundle;
-mod wire_source_bundle_recovery;
-mod wire_validation;
 
 #[cfg(test)]
 mod client_tests;
@@ -76,21 +68,3 @@ mod controller_trust_fence_tests;
 mod credentials_tests;
 #[cfg(test)]
 mod routes_status_tests;
-#[cfg(test)]
-mod wire_cancel_tests;
-#[cfg(test)]
-mod wire_launch_tests;
-#[cfg(test)]
-mod wire_limits_tests;
-#[cfg(test)]
-mod wire_provenance_tests;
-#[cfg(test)]
-mod wire_result_tests;
-#[cfg(test)]
-mod wire_source_bundle_recovery_tests;
-#[cfg(test)]
-mod wire_source_bundle_tests;
-#[cfg(test)]
-mod wire_source_tests;
-#[cfg(test)]
-mod wire_tests;

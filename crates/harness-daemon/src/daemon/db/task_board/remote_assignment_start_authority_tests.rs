@@ -9,7 +9,7 @@ use super::{
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopAuthority,
     TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;

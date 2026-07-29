@@ -9,7 +9,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::tests::task_board::{
     PreparedRemoteOffer, prepare_remote_implementation_offer,
 };
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

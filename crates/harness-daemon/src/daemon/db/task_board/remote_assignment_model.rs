@@ -3,7 +3,7 @@ use sqlx::{Sqlite, Transaction, query_as};
 
 use super::remote_claim_receipts::TaskBoardRemoteClaimReceipt;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_transport::wire::{
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest, RemoteStatusResponse,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};

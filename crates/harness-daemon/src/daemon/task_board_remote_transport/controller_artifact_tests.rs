@@ -9,11 +9,11 @@ use super::controller_authority_test_support::{
 use super::controller_prepared_test_support::{
     PreparedLifecycle, completed_status, persist_claim, prepared_acceptance, status_request,
 };
-use super::wire::{
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::task_board_remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
     RemoteArtifactManifest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::AsyncDaemonDb;
 
 const ARTIFACT_CONTENT: &[u8] = b"authenticated remote result bytes";
 const STORED_AT: &str = "2026-07-19T10:00:50Z";

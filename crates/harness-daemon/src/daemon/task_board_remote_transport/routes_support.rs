@@ -2,15 +2,15 @@ use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse as _, Response};
 
-use super::wire::{
-    RemoteAttemptBinding, RemoteLease, RemoteOfferDisposition, RemoteOfferRequest,
-    RemoteOfferResponse, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-};
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome,
     TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
 };
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
+use crate::daemon::task_board_remote_wire::wire::{
+    RemoteAttemptBinding, RemoteLease, RemoteOfferDisposition, RemoteOfferRequest,
+    RemoteOfferResponse, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+};
 use crate::task_board::{
     TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorSettings,
     TaskBoardRemoteAssignmentState, validate_local_execution_host_config,
