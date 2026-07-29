@@ -10,30 +10,7 @@ use super::remote_identity::INSERT_REMOTE_AUDIT_EVENT_SQL;
 use super::remote_identity_async::prune_remote_audit_events_in_transaction;
 use super::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome};
-
-/// What revoking did, and when the revocation it reports actually happened.
-///
-/// The timestamp is not always the request time: a second revoke reports the
-/// moment the device was really cut off, because a caller retrying otherwise
-/// cannot tell its own attempt apart from the one that did the work.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RemotePairingRevoked {
-    pub outcome: RemotePairingRevokeOutcome,
-    pub revoked_at: String,
-}
-
-/// What revoking found to do.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RemotePairingRevokeOutcome {
-    /// The device that claimed this link can no longer reach the daemon.
-    DeviceRevoked,
-    /// Nobody had claimed it, and now nobody can.
-    LinkWithdrawn,
-    /// Already revoked, by this route or by a client revoking itself.
-    AlreadyRevoked,
-    /// No such pairing.
-    NotFound,
-}
+use crate::daemon::remote_pairing_queries::{RemotePairingRevokeOutcome, RemotePairingRevoked};
 
 impl AsyncDaemonDb {
     /// Revoke a pairing and record who did it, atomically.
