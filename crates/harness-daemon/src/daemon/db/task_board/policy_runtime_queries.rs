@@ -8,8 +8,8 @@
 //! it persists task-board data: it depends on no other task-board area beyond
 //! the shared change-tracking bump every write in the seam already uses, and
 //! nothing in task-board's own feature set calls it back. Its real consumer
-//! is `service::reviews`, both directly (the read-only query methods below)
-//! and through the narrower [`PolicyActionStore`](crate::task_board::policy_runtime::store::PolicyActionStore)
+//! is `service::reviews`, both directly (the query and mutation methods
+//! below) and through the narrower [`PolicyActionStore`](crate::task_board::policy_runtime::store::PolicyActionStore)
 //! and [`PolicyRunStore`](crate::task_board::policy_runtime::store::PolicyRunStore)
 //! traits that `crate::daemon::policy_runtime_store` already adapts
 //! `AsyncDaemonDb` to. That one-directional, task-board-independent coupling
