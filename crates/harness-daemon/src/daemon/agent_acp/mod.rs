@@ -64,6 +64,7 @@ mod protocol;
 mod sandbox_proxy;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod spawn_credential;
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod turn_lifecycle;
 
 pub use harness_protocol::managed_agents::acp::{

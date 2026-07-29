@@ -1,4 +1,6 @@
+use std::future::Future;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
 
 use crate::agents::turn::{
     AgentTurnPullRequest, AgentTurnPullRequestContext, AgentTurnReadOnlyContent, AgentTurnRequest,
@@ -21,6 +23,8 @@ struct FakeManager {
     request: Mutex<Option<AcpAgentStartRequest>>,
     state: Mutex<AcpAgentSessionState>,
     stopped: Mutex<bool>,
+    stop_probe: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    stop_fails: Mutex<bool>,
 }
 
 impl FakeManager {
@@ -64,6 +68,15 @@ impl OpenRouterTurnManager for FakeManager {
     }
 
     fn stop(&self, _acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
+        if let Some(probe) = self.stop_probe.lock().expect("stop probe lock").take() {
+            probe();
+        }
+        if *self.stop_fails.lock().expect("stop failure lock") {
+            return Err(harness_kernel::errors::CliErrorKind::workflow_io(
+                "simulated stop failure",
+            )
+            .into());
+        }
         *self.stopped.lock().expect("stopped lock") = true;
         Ok(snapshot())
     }
@@ -133,6 +146,46 @@ async fn cancellation_is_idempotent_and_terminal() {
     assert!(*manager.stopped.lock().expect("stopped lock"));
     assert!(runtime.result(&id).await.expect("result").is_none());
     assert!(runtime.failure(&id).await.expect("failure").is_some());
+}
+
+#[tokio::test]
+async fn cancellation_is_terminal_before_the_agent_stops() {
+    let manager = Arc::new(FakeManager::default());
+    let runtime =
+        OpenRouterAgentTurnRuntime::with_manager(manager.clone(), "session-a".into(), None);
+    let id = runtime.start(request()).await.expect("start");
+    let runtime_during_stop = runtime.clone();
+    let id_during_stop = id.clone();
+    manager
+        .stop_probe
+        .lock()
+        .expect("stop probe lock")
+        .replace(Box::new(move || {
+            assert_eq!(
+                ready(runtime_during_stop.status(&id_during_stop)).expect("status during stop"),
+                AgentTurnStatus::Cancelled
+            );
+        }));
+
+    assert_eq!(
+        runtime.cancel(&id).await.expect("cancel"),
+        AgentTurnStatus::Cancelled
+    );
+}
+
+#[tokio::test]
+async fn failed_stop_rolls_back_the_terminal_marker() {
+    let manager = Arc::new(FakeManager::default());
+    let runtime =
+        OpenRouterAgentTurnRuntime::with_manager(manager.clone(), "session-a".into(), None);
+    let id = runtime.start(request()).await.expect("start");
+    *manager.stop_fails.lock().expect("stop failure lock") = true;
+
+    runtime.cancel(&id).await.expect_err("stop must fail");
+    assert_eq!(
+        runtime.status(&id).await.expect("running after rollback"),
+        AgentTurnStatus::Running
+    );
 }
 
 #[tokio::test]
@@ -209,5 +262,15 @@ fn inspect_snapshot(state: AcpAgentSessionState) -> AcpAgentInspectSnapshot {
         prompt_deadline_remaining_ms: 0,
         handshake: None,
         session_state: Some(state),
+    }
+}
+
+fn ready<T>(future: impl Future<Output = T>) -> T {
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
+    let mut future = Box::pin(future);
+    match future.as_mut().poll(&mut context) {
+        Poll::Ready(value) => value,
+        Poll::Pending => panic!("OpenRouter lifecycle future unexpectedly pending"),
     }
 }

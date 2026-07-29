@@ -141,7 +141,8 @@ impl AgentTurnResult {
         let reviewed_revision = self
             .source_revision
             .as_deref()
-            .filter(|revision| !revision.trim().is_empty())
+            .map(str::trim)
+            .filter(|revision| !revision.is_empty())
             .ok_or_else(|| {
                 CliErrorKind::invalid_transition(
                     "agent turn result has no immutable source revision",

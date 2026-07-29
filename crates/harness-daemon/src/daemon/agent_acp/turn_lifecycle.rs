@@ -99,6 +99,29 @@ impl OpenRouterAgentTurnRuntime {
         })
     }
 
+    fn begin_cancellation(&self, id: &AgentTurnId) -> Result<bool, CliError> {
+        let mut bindings = self.lock_bindings()?;
+        let binding = bindings.get_mut(id).ok_or_else(|| {
+            CliErrorKind::session_not_active(format!("OpenRouter turn '{id}' is unknown"))
+        })?;
+        if binding.cancelled {
+            return Ok(false);
+        }
+        binding.cancelled = true;
+        Ok(true)
+    }
+
+    fn rollback_cancellation(&self, id: &AgentTurnId) -> Result<(), CliError> {
+        let mut bindings = self.lock_bindings()?;
+        let binding = bindings.get_mut(id).ok_or_else(|| {
+            CliErrorKind::session_not_active(format!(
+                "OpenRouter turn '{id}' disappeared during cancellation rollback"
+            ))
+        })?;
+        binding.cancelled = false;
+        Ok(())
+    }
+
     fn inspect_turn(
         &self,
         id: &AgentTurnId,
@@ -210,19 +233,13 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
     }
 
     async fn cancel(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {
-        let binding = self.binding(id)?;
-        if binding.cancelled {
+        if !self.begin_cancellation(id)? {
             return Ok(AgentTurnStatus::Cancelled);
         }
-        self.manager.stop(id.as_str())?;
-        let mut bindings = self.lock_bindings()?;
-        let Some(binding) = bindings.get_mut(id) else {
-            return Err(CliErrorKind::session_not_active(format!(
-                "OpenRouter turn '{id}' disappeared during cancellation"
-            ))
-            .into());
-        };
-        binding.cancelled = true;
+        if let Err(error) = self.manager.stop(id.as_str()) {
+            self.rollback_cancellation(id)?;
+            return Err(error);
+        }
         Ok(AgentTurnStatus::Cancelled)
     }
 }
