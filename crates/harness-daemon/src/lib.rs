@@ -24,7 +24,6 @@ pub mod reviews;
 pub use harness_workspace::sandbox;
 pub mod session;
 pub mod setup;
-#[path = "../../../src/task_board/mod.rs"]
 pub mod task_board;
 pub mod telemetry {
     pub use harness_telemetry::*;
