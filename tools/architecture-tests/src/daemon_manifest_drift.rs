@@ -45,6 +45,7 @@ fn daemon_mirrored_source_stays_declared_in_both_manifests() {
     for mirrored in MIRRORED_ROOTS {
         collect_rs_files(&root.join(mirrored), &mut files);
     }
+    let cfg_test_only_child_modules = cfg_test_only_child_modules(&files);
 
     let mut used_deps = BTreeSet::new();
     let mut used_features = BTreeSet::new();
@@ -60,7 +61,8 @@ fn daemon_mirrored_source_stays_declared_in_both_manifests() {
             .expect("scanned file stays under the repository root")
             .display()
             .to_string();
-        if is_test_only_path(&relative) {
+        if is_test_only_path(&relative) || is_declared_test_only(file, &cfg_test_only_child_modules)
+        {
             continue;
         }
         // A file that mixes production code with an inline `#[cfg(test)] mod
@@ -137,21 +139,133 @@ fn collect_rs_files(start: &Path, files: &mut Vec<PathBuf>) {
 /// A whole file dedicated to tests never needs to build under
 /// `harness-daemon`, which disables every mirrored test target wholesale.
 /// Matches this repository's own naming convention for such a file: any
-/// path segment or `_`-delimited part of a filename that is exactly `test`
-/// or `tests` (`tests.rs`, `foo_tests.rs`, `test_support.rs`, anything under
-/// a `tests/` directory), not only the two written out here.
+/// path segment or `_`-delimited part of a filename that is exactly `tests`
+/// (`tests.rs`, `foo_tests.rs`, anything under a `tests/` directory).
+/// Deliberately excludes the singular `test`: this tree also has several
+/// `test_support.rs` / `test_seam.rs` files, and not all of them are
+/// test-only - `src/daemon/client/test_support.rs` is declared under
+/// `#[cfg(any(test, feature = "daemon-runtime"))]`, so it is genuinely
+/// production code once that feature is active. `is_declared_test_only`
+/// below covers the ones that really are test-only despite the singular
+/// name.
 fn is_test_only_path(relative: &str) -> bool {
     relative
         .split(['/', '_', '.'])
-        .any(|token| token == "test" || token == "tests")
+        .any(|token| token == "tests")
 }
 
-/// Drops every plain `#[cfg(test)]`-gated item from `contents`, block or
-/// bare statement, so a dev-only crate used solely there is invisible to the
-/// dependency scan below. Deliberately narrower than `#[cfg(any(test,
-/// feature = "daemon-runtime"))]` and similar: those also gate production
-/// reachability under a real feature, so stripping them would risk hiding a
-/// genuine production dependency instead of a dev-only one.
+/// A file that some *other* mirrored file declares as a bare `#[cfg(test)]
+/// mod <name>;` never needs to build under `harness-daemon` either, exactly
+/// like a directly test-only path above - but the attribute lives in the
+/// declaring file, not this one, so this file's own text carries no trace
+/// of it. Keyed by (declaring file's module directory, declared name)
+/// rather than by name alone: more than one directory in this tree declares
+/// a same-named `test_support` child with different gating, and only the
+/// full pair tells those apart. `#[cfg(any(test, feature = "..."))]` is
+/// deliberately not collected here either, for the same reason
+/// `strip_cfg_test_blocks` leaves it alone: it can gate real production
+/// reachability too.
+fn is_declared_test_only(file: &Path, declared: &BTreeSet<(PathBuf, String)>) -> bool {
+    let Some(stem) = file.file_stem().and_then(|stem| stem.to_str()) else {
+        return false;
+    };
+    if stem == "mod" {
+        let Some(parent) = file.parent() else {
+            return false;
+        };
+        let Some(name) = parent.file_name().and_then(|name| name.to_str()) else {
+            return false;
+        };
+        let Some(grandparent) = parent.parent() else {
+            return false;
+        };
+        declared.contains(&(grandparent.to_path_buf(), name.to_string()))
+    } else {
+        let Some(parent) = file.parent() else {
+            return false;
+        };
+        declared.contains(&(parent.to_path_buf(), stem.to_string()))
+    }
+}
+
+fn cfg_test_only_child_modules(files: &[PathBuf]) -> BTreeSet<(PathBuf, String)> {
+    let mut declared = BTreeSet::new();
+    for file in files {
+        let contents = fs::read_to_string(file)
+            .unwrap_or_else(|error| panic!("read {}: {error}", file.display()));
+        let module_dir = module_declaration_dir(file);
+        let mut pending = false;
+        for line in contents.lines() {
+            let trimmed = line.trim();
+            if is_pure_test_cfg_attribute(trimmed) {
+                pending = true;
+                continue;
+            }
+            if !pending {
+                continue;
+            }
+            if trimmed.starts_with('#') || trimmed.starts_with("//") {
+                continue;
+            }
+            pending = false;
+            if let Some(name) = bare_mod_declaration_name(trimmed) {
+                declared.insert((module_dir.clone(), name.to_string()));
+            }
+        }
+    }
+    declared
+}
+
+/// Where `file`'s own `mod child;` declarations resolve on disk: alongside
+/// it for a `name.rs` file, or in its own directory for a `mod.rs` file.
+fn module_declaration_dir(file: &Path) -> PathBuf {
+    let stem = file
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default();
+    let parent = file.parent().unwrap_or(file);
+    if stem == "mod" {
+        parent.to_path_buf()
+    } else {
+        parent.join(stem)
+    }
+}
+
+fn bare_mod_declaration_name(trimmed: &str) -> Option<&str> {
+    let mut rest = trimmed;
+    if let Some(after_paren) = rest.strip_prefix("pub(") {
+        let close = after_paren.find(')')?;
+        rest = after_paren[close + 1..].trim_start();
+    } else if let Some(after_pub) = rest.strip_prefix("pub ") {
+        rest = after_pub.trim_start();
+    }
+    let rest = rest.strip_prefix("mod ")?.trim();
+    let name = rest.strip_suffix(';')?.trim();
+    let is_plain_ident = !name.is_empty()
+        && name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_');
+    is_plain_ident.then_some(name)
+}
+
+/// `#[cfg(test)]` and `#[cfg(all(test, ...))]` both require `test` on their
+/// own, so both are unconditionally test-only regardless of any other
+/// condition alongside it. `#[cfg(any(test, ...))]` is different and
+/// deliberately excluded: an `any` can be true through its other branch
+/// alone, so it can gate real production reachability too (see
+/// `strip_cfg_test_blocks` and `cfg_test_only_child_modules`, the two
+/// callers that rely on this distinction).
+fn is_pure_test_cfg_attribute(trimmed: &str) -> bool {
+    trimmed.starts_with("#[cfg(test)]") || trimmed.starts_with("#[cfg(all(test,")
+}
+
+/// Drops every unconditionally test-only (`is_pure_test_cfg_attribute`)
+/// gated item from `contents`, block or bare statement, so a dev-only crate
+/// used solely there is invisible to the dependency scan below. Deliberately
+/// narrower than `#[cfg(any(test, feature = "daemon-runtime"))]` and
+/// similar: those also gate production reachability under a real feature,
+/// so stripping them would risk hiding a genuine production dependency
+/// instead of a dev-only one.
 fn strip_cfg_test_blocks(contents: &str) -> String {
     let mut kept = String::with_capacity(contents.len());
     let mut depth: i32 = 0;
@@ -177,7 +291,7 @@ fn strip_cfg_test_blocks(contents: &str) -> String {
         // fire back to `None` on the same line it just opened.
         let mut exclude_this_line = skip_from_depth.is_some();
         if skip_from_depth.is_none() {
-            if trimmed.starts_with("#[cfg(test)]") {
+            if is_pure_test_cfg_attribute(trimmed) {
                 pending_test_attribute = true;
                 exclude_this_line = true;
             } else if pending_test_attribute {
@@ -218,9 +332,12 @@ fn strip_cfg_test_blocks(contents: &str) -> String {
     kept
 }
 
-/// Every occurrence of `feature = "..."` inside a `#[cfg(...)]` /
-/// `#[cfg_attr(...)]` attribute, deliberately unfiltered by test-vs-production
-/// placement: see the call site for why.
+/// Every occurrence of the literal text `feature = "..."` anywhere in
+/// `contents`, deliberately unfiltered by test-vs-production placement (see
+/// the call site for why) and by attribute context: in practice this text
+/// only ever appears inside a `#[cfg(...)]` / `#[cfg_attr(...)]` attribute,
+/// so a plain substring scan already gets every real feature check without
+/// needing to parse the attribute around it.
 fn used_cfg_feature_names(contents: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let needle = "feature = \"";
