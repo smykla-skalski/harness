@@ -157,7 +157,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             &project_dir,
         )
         .expect("create task");
-        session_service::assign_task(
+        session_service::assign_task_local(
             SHARED_SESSION_ID,
             &task.task_id,
             &worker_agent_id,
@@ -165,7 +165,7 @@ fn index_round_trip_smoke_covers_public_surface() {
             &project_dir,
         )
         .expect("assign task");
-        let checkpoint = session_service::record_task_checkpoint(
+        let checkpoint = session_service::record_task_checkpoint_local(
             SHARED_SESSION_ID,
             &task.task_id,
             &worker_agent_id,

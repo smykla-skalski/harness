@@ -189,7 +189,7 @@ fn run_periodic_sweep(
             source: TaskSource::Observe,
             observe_issue_id: Some(&issue.id),
         };
-        let _ = service::create_task_with_source(session_id, &spec, actor, project_dir);
+        let _ = service::create_task_with_source_local(session_id, &spec, actor, project_dir);
 
         let heuristic_title = format!(
             "[heuristic_gap] Real-time missed {} at line {}",
@@ -209,7 +209,8 @@ fn run_periodic_sweep(
             source: TaskSource::Observe,
             observe_issue_id: None,
         };
-        let _ = service::create_task_with_source(session_id, &heuristic_spec, actor, project_dir);
+        let _ =
+            service::create_task_with_source_local(session_id, &heuristic_spec, actor, project_dir);
     }
 
     emit_watch_issues(&missed_issues, json);

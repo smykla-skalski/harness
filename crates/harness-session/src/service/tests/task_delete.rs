@@ -40,7 +40,7 @@ fn delete_task_tombstones_hides_and_logs_it() {
         )
         .expect("task");
 
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-000000000037",
             &task.task_id,
             &worker_id,
@@ -48,7 +48,7 @@ fn delete_task_tombstones_hides_and_logs_it() {
             project,
         )
         .expect("00000000-0000-4002-8000-000000000005");
-        delete_task(
+        delete_task_local(
             "00000000-0000-4002-8000-000000000037",
             &task.task_id,
             &leader_id,
@@ -133,7 +133,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
             project,
         )
         .expect("active task");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-000000000008",
             &active.task_id,
             &worker_id,
@@ -151,7 +151,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
             project,
         )
         .expect("queued task");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-000000000008",
             &queued.task_id,
             &worker_id,
@@ -160,7 +160,7 @@ fn delete_task_advances_queued_work_for_freed_worker() {
         )
         .expect("queue task");
 
-        delete_task(
+        delete_task_local(
             "00000000-0000-4002-8000-000000000008",
             &active.task_id,
             &leader_id,
@@ -240,7 +240,7 @@ fn observer_can_delete_task_in_leaderless_degraded_session() {
         )
         .expect("create task");
 
-        delete_task(
+        delete_task_local(
             "00000000-0000-4002-8000-000000000006",
             &task.task_id,
             &observer_id,

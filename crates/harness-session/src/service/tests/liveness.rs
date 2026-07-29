@@ -356,7 +356,7 @@ fn sync_liveness_returns_dead_agent_task_to_open() {
             project,
         )
         .expect("create task");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-00000000002d",
             &task.task_id,
             &worker_id,
@@ -368,7 +368,7 @@ fn sync_liveness_returns_dead_agent_task_to_open() {
         // signal would keep the worker in Idle and prevent the disconnect
         // transition this test is exercising.
         accept_task_start_signal("00000000-0000-4002-8000-00000000002d", &worker_id, project);
-        update_task(
+        update_task_local(
             "00000000-0000-4002-8000-00000000002d",
             &task.task_id,
             TaskStatus::InProgress,

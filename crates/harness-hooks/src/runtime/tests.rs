@@ -103,7 +103,7 @@ fn prepare_hook_execution_canonicalizes_relative_cwd_for_signal_pickup() {
             .expect("worker id")
             .clone();
 
-        session_service::send_signal(
+        session_service::send_signal_local(
             "9ac572ac-519a-5e3b-8664-4f0ac6d98454",
             &worker_id,
             "inject_context",
@@ -191,7 +191,7 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
             .expect("worker id")
             .clone();
 
-        let signal = session_service::send_signal(
+        let signal = session_service::send_signal_local(
             "dec9b13a-3611-5df4-bef6-9ff1a9939071",
             &worker_id,
             "inject_context",
@@ -340,7 +340,7 @@ fn collect_signal_context_marks_expired_signal_without_injecting_context() {
             .expect("worker id")
             .clone();
 
-        let signal = session_service::send_signal(
+        let signal = session_service::send_signal_local(
             "8376f66e-c41a-5e9d-a960-372529e9702f",
             &worker_id,
             "inject_context",

@@ -40,7 +40,7 @@ fn assign_task_keeps_task_open_until_worker_starts() {
         )
         .expect("task");
 
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-000000000003",
             &task.task_id,
             &worker_id,
@@ -61,7 +61,7 @@ fn assign_task_keeps_task_open_until_worker_starts() {
             Some(task.task_id.as_str()),
             "current_task_id is locked on this task while the start signal is in flight"
         );
-        let signals = list_signals(
+        let signals = list_signals_local(
             "00000000-0000-4002-8000-000000000003",
             Some(&worker_id),
             project,

@@ -4,8 +4,8 @@ use harness_kernel::errors::CliError;
 use harness_kernel::io;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::transport::support::daemon_client_error;
-use crate::wire::{ManagedAgentListResponse, ManagedAgentSnapshot};
+use crate::session::transport::support::daemon_client_error;
+use crate::session::wire::{ManagedAgentListResponse, ManagedAgentSnapshot};
 
 mod acp_sessions;
 mod attach;

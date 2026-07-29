@@ -31,7 +31,8 @@ fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
             .expect("worker id")
             .clone();
 
-        end_session("00000000-0000-4002-8000-000000000012", &leader_id, project).expect("end");
+        end_session_local("00000000-0000-4002-8000-000000000012", &leader_id, project)
+            .expect("end");
 
         let updated =
             session_status("00000000-0000-4002-8000-000000000012", project).expect("status");
@@ -45,8 +46,8 @@ fn end_session_sends_abort_leave_signal_and_disconnects_agents() {
                 .all(|agent| { agent.status.is_disconnected() && agent.current_task_id.is_none() })
         );
 
-        let signals =
-            list_signals("00000000-0000-4002-8000-000000000012", None, project).expect("signals");
+        let signals = list_signals_local("00000000-0000-4002-8000-000000000012", None, project)
+            .expect("signals");
         assert_eq!(signals.len(), 2);
         assert!(signals.iter().all(|record| {
             record.status == SessionSignalStatus::Pending
@@ -119,7 +120,7 @@ fn remove_agent_sends_abort_leave_signal_to_removed_agent() {
             .expect("worker id")
             .clone();
 
-        remove_agent(
+        remove_agent_local(
             "00000000-0000-4002-8000-000000000020",
             &worker_id,
             &leader_id,
@@ -133,7 +134,7 @@ fn remove_agent_sends_abort_leave_signal_to_removed_agent() {
         assert_eq!(worker.status, AgentStatus::Removed);
         assert!(worker.current_task_id.is_none());
 
-        let signals = list_signals(
+        let signals = list_signals_local(
             "00000000-0000-4002-8000-000000000020",
             Some(&worker_id),
             project,
@@ -193,7 +194,7 @@ fn end_session_fails_visibly_when_leave_signal_cannot_be_delivered() {
         })
         .expect("mark invalid runtime");
 
-        let error = end_session("00000000-0000-4002-8000-000000000011", &leader_id, project)
+        let error = end_session_local("00000000-0000-4002-8000-000000000011", &leader_id, project)
             .expect_err("end fails");
 
         assert_eq!(error.code(), "KSRCLI092");
@@ -205,7 +206,7 @@ fn end_session_fails_visibly_when_leave_signal_cannot_be_delivered() {
         assert_eq!(updated.status, SessionStatus::Active);
         assert_eq!(updated.metrics.active_agent_count, 2);
         assert!(
-            list_signals("00000000-0000-4002-8000-000000000011", None, project)
+            list_signals_local("00000000-0000-4002-8000-000000000011", None, project)
                 .expect("signals")
                 .is_empty()
         );

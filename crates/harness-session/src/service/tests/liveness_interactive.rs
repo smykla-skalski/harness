@@ -164,7 +164,7 @@ fn sync_liveness_keeps_pending_signal_available_for_stale_agent() {
         set_log_mtime_seconds_ago(&log_path, 1_200);
         write_agent_log_file(project, "claude", "test-service");
 
-        send_signal(
+        send_signal_local(
             "00000000-0000-4002-8000-000000000034",
             &worker_id,
             "inject_context",

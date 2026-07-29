@@ -46,7 +46,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         )
         .expect("queued");
 
-        drop_task(
+        drop_task_local(
             "00000000-0000-4002-8000-00000000000b",
             &task.task_id,
             &wire::TaskDropTarget::Agent {
@@ -58,7 +58,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         )
         .expect("drop");
 
-        let signal = list_signals(
+        let signal = list_signals_local(
             "00000000-0000-4002-8000-00000000000b",
             Some(&worker_id),
             project,
@@ -94,7 +94,7 @@ fn expired_task_start_signal_reopens_task_and_clears_assignment() {
         let worker = state.agents.get(&worker_id).expect("worker");
         assert!(worker.current_task_id.is_none());
 
-        let signals = list_signals(
+        let signals = list_signals_local(
             "00000000-0000-4002-8000-00000000000b",
             Some(&worker_id),
             project,

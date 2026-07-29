@@ -1,14 +1,14 @@
 use clap::{Args, ValueEnum};
 
-use harness_kernel::io;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io;
 use harness_protocol::managed_agents::tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest,
 };
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::transport::support::{daemon_client, daemon_client_error, print_json};
-use crate::wire::ManagedAgentSnapshot;
+use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
+use crate::session::wire::ManagedAgentSnapshot;
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum TuiKeyArg {

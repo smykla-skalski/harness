@@ -111,7 +111,7 @@ pub fn send_signal(
     // File-based fallback
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved).to_path_buf();
-    let _ = session_service::send_signal(
+    let _ = session_service::send_signal_local(
         session_id,
         &request.agent_id,
         &request.command,
@@ -435,7 +435,7 @@ pub fn cancel_signal(
         effective_project_dir(&resolved).to_path_buf()
     };
 
-    session_service::cancel_signal(
+    session_service::cancel_signal_local(
         session_id,
         &request.agent_id,
         &request.signal_id,

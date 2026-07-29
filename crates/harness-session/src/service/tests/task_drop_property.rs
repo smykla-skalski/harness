@@ -104,7 +104,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
                     project,
                 )
                 .expect("filler");
-                assign_task(
+                assign_task_local(
                     session_id,
                     &other_task.task_id,
                     &target_id,
@@ -116,7 +116,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
             }
             (PrevAssignee::OtherAgent, _) => {
                 let other = other_id.as_deref().expect("other agent id");
-                assign_task(session_id, &primary.task_id, other, &leader_id, project)
+                assign_task_local(session_id, &primary.task_id, other, &leader_id, project)
                     .expect("assign primary to other");
                 match target {
                     TargetBusyState::Free => None,
@@ -133,7 +133,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
                             project,
                         )
                         .expect("filler");
-                        assign_task(
+                        assign_task_local(
                             session_id,
                             &other_task.task_id,
                             &target_id,
@@ -149,7 +149,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
                 unreachable!("with prev=SameAsTarget the target holds the task, so it is not Free")
             }
             (PrevAssignee::SameAsTarget, TargetBusyState::LockedOnThisTask) => {
-                assign_task(
+                assign_task_local(
                     session_id,
                     &primary.task_id,
                     &target_id,
@@ -173,7 +173,7 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
             }
         };
 
-        drop_task(
+        drop_task_local(
             session_id,
             &primary.task_id,
             &wire::TaskDropTarget::Agent {
@@ -205,7 +205,8 @@ fn run_case(prev: PrevAssignee, target: TargetBusyState, expected: ExpectedOutco
                     Some(primary.task_id.as_str()),
                     "Started branch: target locked on this task"
                 );
-                let signals = list_signals(session_id, Some(&target_id), project).expect("signals");
+                let signals =
+                    list_signals_local(session_id, Some(&target_id), project).expect("signals");
                 assert!(
                     signals
                         .iter()

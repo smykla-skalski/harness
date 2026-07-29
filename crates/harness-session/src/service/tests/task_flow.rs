@@ -38,7 +38,7 @@ fn remove_agent_returns_tasks() {
             project,
         )
         .expect("task");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-000000000024",
             &task.task_id,
             &worker_id,
@@ -46,7 +46,7 @@ fn remove_agent_returns_tasks() {
             project,
         )
         .expect("00000000-0000-4002-8000-000000000005");
-        remove_agent(
+        remove_agent_local(
             "00000000-0000-4002-8000-000000000024",
             &worker_id,
             &leader_id,
@@ -104,7 +104,7 @@ fn drop_task_queues_for_busy_worker() {
             project,
         )
         .expect("active");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-00000000000d",
             &active.task_id,
             &worker_id,
@@ -122,7 +122,7 @@ fn drop_task_queues_for_busy_worker() {
         )
         .expect("queued");
 
-        drop_task(
+        drop_task_local(
             "00000000-0000-4002-8000-00000000000d",
             &queued.task_id,
             &wire::TaskDropTarget::Agent {
@@ -208,7 +208,7 @@ fn reassignable_drop_starts_on_free_worker() {
             project,
         )
         .expect("active");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-00000000000e",
             &active.task_id,
             &busy_worker,
@@ -226,7 +226,7 @@ fn reassignable_drop_starts_on_free_worker() {
         )
         .expect("task");
 
-        drop_task(
+        drop_task_local(
             "00000000-0000-4002-8000-00000000000e",
             &task.task_id,
             &wire::TaskDropTarget::Agent {
@@ -250,7 +250,7 @@ fn reassignable_drop_starts_on_free_worker() {
             Some(task.task_id.as_str()),
             "current_task_id is locked on this task while the start signal is in flight"
         );
-        let signals = list_signals(
+        let signals = list_signals_local(
             "00000000-0000-4002-8000-00000000000e",
             Some(&free_worker),
             project,
@@ -372,7 +372,7 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
             project,
         )
         .expect("active");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-00000000000a",
             &active.task_id,
             &worker_id,
@@ -389,7 +389,7 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
             project,
         )
         .expect("queued");
-        drop_task(
+        drop_task_local(
             "00000000-0000-4002-8000-00000000000a",
             &queued.task_id,
             &wire::TaskDropTarget::Agent {
@@ -401,7 +401,7 @@ fn locked_queue_advances_when_worker_finishes_current_task() {
         )
         .expect("drop");
 
-        update_task(
+        update_task_local(
             "00000000-0000-4002-8000-00000000000a",
             &active.task_id,
             TaskStatus::Done,
@@ -465,7 +465,7 @@ fn task_start_signal_acceptance_marks_task_in_progress() {
             project,
         )
         .expect("queued");
-        drop_task(
+        drop_task_local(
             "00000000-0000-4002-8000-000000000009",
             &task.task_id,
             &wire::TaskDropTarget::Agent {
@@ -477,7 +477,7 @@ fn task_start_signal_acceptance_marks_task_in_progress() {
         )
         .expect("drop");
 
-        let signal = list_signals(
+        let signal = list_signals_local(
             "00000000-0000-4002-8000-000000000009",
             Some(&worker_id),
             project,

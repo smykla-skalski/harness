@@ -2,7 +2,7 @@ use super::{
     CliError, CliErrorKind, Path, PathBuf, SessionMetrics, SessionRole, SessionState,
     SessionStatus, canonicalize_persisted_session_state, daemon_client_error,
     detail_to_session_state, load_state_or_err, reconcile_expired_pending_signals, session_index,
-    storage, summary_to_session_state, validate_policy_preset, wire,
+    storage, validate_policy_preset, wire,
 };
 use harness_daemon_client::DaemonClient;
 use harness_kernel::io::validate_safe_segment;
@@ -114,26 +114,18 @@ pub fn build_recovery_tui_request(
     })
 }
 
-/// List sessions for a project.
+/// List sessions for a project, reading local storage unconditionally.
+///
+/// Domain-only half of the former fused function; no daemon-side caller
+/// reaches this directly. The network wrapper lives at
+/// `harness::session::service::list_sessions` in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` on storage failures.
-pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<SessionState>, CliError> {
-    // No daemon-side caller reaches this directly, so it needs no
-    // tokio-runtime guard.
-    if let Some(client) = DaemonClient::try_connect() {
-        let summaries: Vec<wire::SessionSummary> = client
-            .get("/v1/sessions", &[])
-            .map_err(|error| daemon_client_error("list sessions", &error))?;
-        let mut sessions: Vec<SessionState> = summaries
-            .into_iter()
-            .filter(|summary| include_all || summary.status.is_default_visible())
-            .map(|summary| summary_to_session_state(&summary))
-            .collect();
-        sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
-        return Ok(sessions);
-    }
-
+pub fn list_sessions_local(
+    project_dir: &Path,
+    include_all: bool,
+) -> Result<Vec<SessionState>, CliError> {
     let session_ids = if include_all {
         storage::list_known_session_ids(project_dir)?
     } else {
@@ -158,29 +150,19 @@ pub fn list_sessions(project_dir: &Path, include_all: bool) -> Result<Vec<Sessio
     Ok(sessions)
 }
 
-/// List sessions across all known project contexts.
+/// List sessions across all known project contexts, using local discovery
+/// unconditionally.
 ///
 /// Uses `session::index`'s filesystem-scanning discovery to find sessions
 /// regardless of which project directory the caller is running from.
 ///
+/// Domain-only half of the former fused function; no daemon-side caller
+/// reaches this directly. The network wrapper lives at
+/// `harness::session::service::list_sessions_global` in the root crate.
+///
 /// # Errors
 /// Returns `CliError` on discovery failures.
-pub fn list_sessions_global(include_all: bool) -> Result<Vec<SessionState>, CliError> {
-    // No daemon-side caller reaches this directly, so it needs no
-    // tokio-runtime guard.
-    if let Some(client) = DaemonClient::try_connect() {
-        let summaries: Vec<wire::SessionSummary> = client
-            .get("/v1/sessions", &[])
-            .map_err(|error| daemon_client_error("list sessions", &error))?;
-        let mut sessions: Vec<SessionState> = summaries
-            .into_iter()
-            .filter(|summary| include_all || summary.status.is_default_visible())
-            .map(|summary| summary_to_session_state(&summary))
-            .collect();
-        sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
-        return Ok(sessions);
-    }
-
+pub fn list_sessions_global_local(include_all: bool) -> Result<Vec<SessionState>, CliError> {
     let resolved = session_index::discover_sessions(include_all)?;
     let mut sessions: Vec<SessionState> = resolved
         .into_iter()

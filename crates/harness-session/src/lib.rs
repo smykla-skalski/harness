@@ -1,8 +1,16 @@
 //! Multi-agent session foundation: role permissions, task ordering, persona
 //! resolution, external-session adoption, the on-disk session index, session
-//! storage/journal persistence, the session orchestration service,
-//! file-backed session observation, and the CLI command-surface transport
-//! layer over all of it.
+//! storage/journal persistence, the session orchestration service, and
+//! file-backed session observation.
+//!
+//! The CLI command-surface transport layer that used to live here moved to
+//! the root crate's `session::transport`: it decides whether to dial a live
+//! daemon, which is a user-facing concern rather than domain logic, and it
+//! kept this domain crate compiling in daemon-connection code that
+//! `harness-daemon` never needed. `service`'s own daemon-dialing halves split
+//! the same way; see `service::mod`'s doc comments for the functions that
+//! keep their former fused shape because a non-CLI, non-daemon production
+//! consumer (`harness-hooks`) still needs it.
 
 #![deny(unsafe_code)]
 
@@ -15,7 +23,6 @@ pub mod persona;
 pub mod roles;
 pub mod service;
 pub mod storage;
-pub mod transport;
 // Deliberate public API facade, not scaffolding: `harness::session::types`
 // stays a stable path for the root crate's existing callers. The physical
 // `types/` files are not part of this crate's build; `harness-protocol`
