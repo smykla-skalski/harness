@@ -57,9 +57,7 @@ impl TryFrom<&str> for TaskBoardDependencyActionKind {
             "wait_for_checks" => Ok(Self::WaitForChecks),
             "dispatch_fixer" => Ok(Self::DispatchFixer),
             "continue_workflow" => Ok(Self::ContinueWorkflow),
-            other => Err(TaskBoardDependencyTriageError::UnsupportedAction(
-                other.into(),
-            )),
+            _ => Err(TaskBoardDependencyTriageError::UnsupportedAction),
         }
     }
 }
@@ -100,9 +98,7 @@ impl TryFrom<&str> for TaskBoardDependencyActionCapability {
             "github.read" => Ok(Self::GitHubRead),
             "codex.dispatch" => Ok(Self::CodexDispatch),
             "task_board.advance" => Ok(Self::TaskBoardAdvance),
-            other => Err(TaskBoardDependencyTriageError::UnsupportedRequiredTool(
-                other.into(),
-            )),
+            _ => Err(TaskBoardDependencyTriageError::UnsupportedRequiredTool),
         }
     }
 }

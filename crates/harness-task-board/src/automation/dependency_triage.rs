@@ -126,10 +126,10 @@ pub enum TaskBoardDependencyTriageError {
     MissingSafetyAssumption,
     #[error("dependency triage result contains an invalid required tool")]
     InvalidRequiredTool,
-    #[error("dependency triage result selects unsupported action '{0}'")]
-    UnsupportedAction(String),
-    #[error("dependency triage result selects unsupported required tool '{0}'")]
-    UnsupportedRequiredTool(String),
+    #[error("dependency triage result selects an unsupported action")]
+    UnsupportedAction,
+    #[error("dependency triage result selects an unsupported required tool")]
+    UnsupportedRequiredTool,
     #[error("dependency triage action plan contradicts its disposition")]
     ActionPlanContradictsDisposition,
     #[error("dependency triage actions and required tools do not match")]

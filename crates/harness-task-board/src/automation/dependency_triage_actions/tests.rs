@@ -45,7 +45,7 @@ fn model_supplied_action_arguments_are_rejected_by_the_wire_schema() {
 #[tokio::test]
 async fn unknown_action_is_audited_before_any_capability_runs() {
     let mut result = safe_result();
-    result.next_steps[1].action = "run_shell".into();
+    result.next_steps[1].action = "run_shell\nFORGED_AUDIT".into();
     let registry = Registry::all();
     let audit = Audit::default();
 
@@ -63,6 +63,7 @@ async fn unknown_action_is_audited_before_any_capability_runs() {
         records[0].decision,
         TaskBoardDependencyActionAuditDecision::Rejected
     );
+    assert!(!records[0].reason.contains("FORGED_AUDIT"));
     assert_eq!(records[0].source_result, result);
 }
 
@@ -71,14 +72,15 @@ async fn unknown_tool_and_invalid_order_fail_before_any_capability_runs() {
     let registry = Registry::all();
     let audit = Audit::default();
     let mut unknown_tool = safe_result();
-    unknown_tool.required_tools[1] = "shell.exec".into();
+    unknown_tool.required_tools[1] = "shell.exec\nFORGED_AUDIT".into();
     assert!(
         execute(&unknown_tool, &registry, &audit)
             .await
             .expect_err("unknown tool")
             .to_string()
-            .contains("unsupported required tool")
+            .contains("invalid required tool")
     );
+    assert!(!audit.records()[0].reason.contains("FORGED_AUDIT"));
 
     let mut unordered = safe_result();
     unordered.next_steps.swap(0, 1);
