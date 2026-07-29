@@ -392,7 +392,11 @@ async fn fresh_merge_gate(
         .client
         .read_pull_request_evidence(context.config, pr_number)
         .await?;
-    match evaluate_action_gates(&read, verified_head, ActionGateRequirement::for_managed_merge()) {
+    match evaluate_action_gates(
+        &read,
+        verified_head,
+        ActionGateRequirement::for_managed_merge(),
+    ) {
         ActionGateDecision::Proceed(_) => Ok(MergeGate::Proceed),
         ActionGateDecision::Blocked(blocks) => {
             tracing::warn!(

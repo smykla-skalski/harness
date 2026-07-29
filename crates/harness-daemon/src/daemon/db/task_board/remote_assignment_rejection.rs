@@ -19,7 +19,7 @@ use super::workflow_execution_attempts::{
 };
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferResponse;
+use crate::task_board::remote_wire::wire::RemoteOfferResponse;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,

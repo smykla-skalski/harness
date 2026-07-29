@@ -1,6 +1,6 @@
 use super::super::completion_evidence_tests::remote_offer;
 use super::super::remote_start_tests::PreparedRemoteOffer;
-use crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial;
+use crate::task_board::remote_wire::wire::RemoteSourceMaterial;
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
 pub(crate) async fn prepare_remote_implementation_offer(

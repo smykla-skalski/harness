@@ -1,10 +1,10 @@
 use super::{RemoteAssignmentRow, parse_error, to_i64};
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardExecutionPhase;
+use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteStatusRequest, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardExecutionPhase;
 
 pub(super) fn decode_offer(json: &str) -> Result<RemoteOfferRequest, CliError> {
     let offer = serde_json::from_str::<RemoteOfferRequest>(json)

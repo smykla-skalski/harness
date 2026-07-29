@@ -10,8 +10,8 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
     TaskBoardRemoteOperationTrustFence,
 };
-use crate::daemon::task_board_remote_wire::wire_conversion::domain_host_advertisement;
 use crate::task_board::TaskBoardExecutionHostConfig;
+use crate::task_board::remote_wire::wire_conversion::domain_host_advertisement;
 
 impl RemoteExecutionControllerClient {
     pub(crate) fn connect(

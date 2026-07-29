@@ -13,12 +13,12 @@ use super::remote_claim_receipts::{
     claim_receipt_values, claim_response_for_record, exact_claim_response,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteClaimResponse;
-use crate::daemon::task_board_remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteClaimResponse;
+use crate::task_board::remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
+use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 impl AsyncDaemonDb {
     pub(crate) async fn claim_task_board_remote_assignment(

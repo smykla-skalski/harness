@@ -14,10 +14,10 @@ use super::client::{
 };
 use super::tls_pin::RemoteTlsPinError;
 use crate::daemon::remote_acme::RemoteCertificateBundle;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_spki_pin;
+use crate::task_board::remote_wire::wire::{
     RemoteHostAdvertisement, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::remote_spki_pin;
 use crate::task_board::{TaskBoardExecutionHostConfig, validate_execution_host_config};
 
 #[tokio::test]

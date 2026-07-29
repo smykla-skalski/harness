@@ -10,12 +10,12 @@ use crate::daemon::db::{
     remote_executor_fixture, remote_executor_identity,
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::git::bundle_export::GitBundleExportPlan;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteOfferRequest,
     RemoteSettledRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::git::bundle_export::GitBundleExportPlan;
 use crate::task_board::{TaskBoardLocalExecutionRepositoryConfig, TaskBoardWorkflowKind};
 
 const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";

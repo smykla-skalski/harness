@@ -13,19 +13,20 @@ const CLEANUP_RESPONSE_DOMAIN: &str = "harness.task-board.remote-cleanup-observa
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteCleanupObservationRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) lease_id: String,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) settlement_request_sha256: String,
-    pub(crate) request_sha256: String,
+pub struct RemoteCleanupObservationRequest {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub lease_id: String,
+    pub offer_request_sha256: String,
+    pub settlement_request_sha256: String,
+    pub request_sha256: String,
 }
 
 impl RemoteCleanupObservationRequest {
-    pub(crate) fn for_settlement(
-        settlement: &RemoteSettledRequest,
-    ) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `settlement` fails its own wire
+    /// contract or the derived request cannot be sealed.
+    pub fn for_settlement(settlement: &RemoteSettledRequest) -> Result<Self, RemoteWireError> {
         settlement.validate()?;
         Self {
             schema_version: settlement.schema_version,
@@ -38,13 +39,19 @@ impl RemoteCleanupObservationRequest {
         .seal()
     }
 
-    pub(crate) fn seal(mut self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(mut self) -> Result<Self, RemoteWireError> {
         self.request_sha256.clear();
         self.request_sha256 = domain_digest(CLEANUP_REQUEST_DOMAIN, &self)?;
         Ok(self)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         self.binding.validate()?;
         require_text("lease_id", &self.lease_id)?;
@@ -64,17 +71,20 @@ impl RemoteCleanupObservationRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteCleanupObservationResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) settlement_request_sha256: String,
-    pub(crate) cleanup_completed_at: String,
-    pub(crate) response_sha256: String,
+pub struct RemoteCleanupObservationResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub offer_request_sha256: String,
+    pub settlement_request_sha256: String,
+    pub cleanup_completed_at: String,
+    pub response_sha256: String,
 }
 
 impl RemoteCleanupObservationResponse {
-    pub(crate) fn for_completed(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or the derived response cannot be sealed.
+    pub fn for_completed(
         expected: &RemoteCleanupObservationRequest,
         cleanup_completed_at: String,
     ) -> Result<Self, RemoteWireError> {
@@ -89,7 +99,10 @@ impl RemoteCleanupObservationResponse {
         .seal(expected)
     }
 
-    pub(crate) fn seal(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or the response cannot be digested.
+    pub fn seal(
         mut self,
         expected: &RemoteCleanupObservationRequest,
     ) -> Result<Self, RemoteWireError> {
@@ -99,7 +112,11 @@ impl RemoteCleanupObservationResponse {
         Ok(self)
     }
 
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire
+    /// contract, this response does not echo `expected`, or its digest does
+    /// not match its own content.
+    pub fn validate(
         &self,
         expected: &RemoteCleanupObservationRequest,
     ) -> Result<(), RemoteWireError> {

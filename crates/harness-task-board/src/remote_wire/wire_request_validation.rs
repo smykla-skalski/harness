@@ -9,11 +9,17 @@ use super::wire::{
 use super::wire_limits::{MAX_REMOTE_OFFER_JSON_BYTES, require_serialized_size};
 
 impl RemoteOfferRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,
@@ -25,11 +31,17 @@ impl RemoteOfferRequest {
 }
 
 impl RemoteClaimRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,
@@ -41,11 +53,17 @@ impl RemoteClaimRequest {
 }
 
 impl RemoteStatusRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,
@@ -57,11 +75,17 @@ impl RemoteStatusRequest {
 }
 
 impl RemoteLeaseRenewRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,
@@ -73,11 +97,17 @@ impl RemoteLeaseRenewRequest {
 }
 
 impl RemoteCancelRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,
@@ -89,11 +119,17 @@ impl RemoteCancelRequest {
 }
 
 impl RemoteSettledRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,
@@ -105,11 +141,17 @@ impl RemoteSettledRequest {
 }
 
 impl RemoteArtifactFetchRequest {
-    pub(crate) fn seal(self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the request cannot be
+    /// digested.
+    pub fn seal(self) -> Result<Self, RemoteWireError> {
         seal_request(self, |value| &mut value.request_sha256)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract or its digest does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         validate_request(
             self,
             self.schema_version,

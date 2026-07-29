@@ -1,11 +1,11 @@
 use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_test_support::*;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteClaimResponse, RemoteLease,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferResponse,
     RemoteStatusRequest, RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn controller_offer_rejects_a_caller_supplied_lease_outside_the_sealed_duration() {
@@ -332,7 +332,7 @@ pub(crate) async fn claim_controller(
 }
 
 pub(crate) fn status_request(
-    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    offer: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
 ) -> RemoteStatusRequest {
     RemoteStatusRequest {

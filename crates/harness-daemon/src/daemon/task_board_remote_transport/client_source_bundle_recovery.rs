@@ -5,12 +5,12 @@ use super::routes::{
     SOURCE_BUNDLE_ABANDON_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_ABANDON_PATH,
     SOURCE_BUNDLE_HTTP_BODY_LIMIT_BYTES, SOURCE_BUNDLE_RECEIPT_PATH,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse, RemoteSourceBundleUploadRequest,
 };
 
-use crate::daemon::task_board_remote_wire::wire_limits::{
+use crate::task_board::remote_wire::wire_limits::{
     MAX_REMOTE_RECEIPT_JSON_BYTES, MAX_REMOTE_SOURCE_RECOVERY_RESPONSE_JSON_BYTES,
 };
 

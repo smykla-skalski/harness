@@ -12,7 +12,7 @@ use super::remote_assignment_model::{
 };
 use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteOfferRequest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse,
 };

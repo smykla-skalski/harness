@@ -1,6 +1,6 @@
 use super::*;
-use crate::daemon::task_board_remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
-use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use crate::remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
+use crate::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
 const COMPLETED_AT: &str = "2026-07-20T12:00:00Z";
 
@@ -24,7 +24,7 @@ fn cleanup_observation_seals_exact_generation_and_settlement() {
         Err(RemoteWireError::ResultBindingMismatch)
     ));
 
-    let mut wrong_settlement = request.clone();
+    let mut wrong_settlement = request;
     wrong_settlement.settlement_request_sha256 = "d".repeat(64);
     wrong_settlement.request_sha256.clear();
     let wrong_settlement = wrong_settlement

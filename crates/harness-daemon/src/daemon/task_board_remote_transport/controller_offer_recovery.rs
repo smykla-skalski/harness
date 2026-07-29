@@ -4,7 +4,7 @@ use super::controller::{
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationTrustFence,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
 };
 

@@ -13,12 +13,12 @@ use super::remote_operation_trust::{
 };
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding;
+use crate::task_board::TaskBoardExecutionAttemptRecord;
+use crate::task_board::remote_wire::wire::RemoteAttemptBinding;
 #[cfg(test)]
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
-use crate::task_board::TaskBoardExecutionAttemptRecord;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE,

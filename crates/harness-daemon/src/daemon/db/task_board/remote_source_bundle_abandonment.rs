@@ -12,7 +12,7 @@ use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, load_source_bundle_collisions_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse,

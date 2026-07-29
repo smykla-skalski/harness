@@ -18,7 +18,7 @@ use super::RemoteWorkerIdentity;
 use super::runtime::PreparedRemoteWorkerAction;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 

@@ -4,7 +4,7 @@ use sqlx::{Sqlite, Transaction, query_as};
 
 use super::remote_assignment_model::{concurrent, nonblank};
 use crate::daemon::db::{CliError, TaskBoardRemoteHostTrustFence, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{TaskBoardExecutionHostConfig, validate_execution_host_config};
 
 const LIFECYCLE_TRUST_SCHEMA_VERSION: u32 = 1;

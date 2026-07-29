@@ -30,7 +30,7 @@ use super::remote_source_bundle_reassignment_evidence::{
 use super::workflow_execution_attempts::attempt_cas_matches;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
 };
 use crate::task_board::{

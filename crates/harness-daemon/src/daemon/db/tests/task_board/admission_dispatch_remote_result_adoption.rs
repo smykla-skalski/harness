@@ -3,7 +3,7 @@ use sqlx::query;
 use super::completion_evidence_tests::intent_status;
 use super::ledger_kind_state;
 use crate::daemon::db::task_board::TaskBoardRemoteResultAdoptionOutcome;
-use crate::daemon::task_board_remote_wire::wire::RemoteTypedResult;
+use crate::task_board::remote_wire::wire::RemoteTypedResult;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionDiagnostic,
     TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionCas,

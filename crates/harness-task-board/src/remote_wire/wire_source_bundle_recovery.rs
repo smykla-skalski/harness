@@ -16,7 +16,7 @@ const RECEIPT_VERIFICATION_DOMAIN: &str =
 const ABANDON_REQUEST_DOMAIN: &str = "harness.task-board.remote-source-bundle-abandon-request.v1";
 const ABANDON_RESPONSE_DOMAIN: &str = "harness.task-board.remote-source-bundle-abandon-response.v1";
 
-pub(crate) const SOURCE_BUNDLE_ABANDON_REASON: &str = "executor_instance_replaced";
+pub const SOURCE_BUNDLE_ABANDON_REASON: &str = "executor_instance_replaced";
 
 #[derive(Serialize)]
 struct RemoteSourceBundleAbandonAuthority<'a> {
@@ -31,45 +31,49 @@ struct RemoteSourceBundleAbandonAuthority<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteSourceBundleReceiptVerificationResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) upload_request_sha256: String,
-    pub(crate) observed_host_instance_id: String,
-    pub(crate) checked_at: String,
+pub struct RemoteSourceBundleReceiptVerificationResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub offer_request_sha256: String,
+    pub upload_request_sha256: String,
+    pub observed_host_instance_id: String,
+    pub checked_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) receipt: Option<RemoteSourceBundleUploadResponse>,
-    pub(crate) response_sha256: String,
+    pub receipt: Option<RemoteSourceBundleUploadResponse>,
+    pub response_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteSourceBundleAbandonRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) offer: RemoteOfferRequest,
-    pub(crate) upload_request_sha256: String,
-    pub(crate) verified_absence: RemoteSourceBundleReceiptVerificationResponse,
-    pub(crate) reason: String,
-    pub(crate) request_sha256: String,
+pub struct RemoteSourceBundleAbandonRequest {
+    pub schema_version: u32,
+    pub offer: RemoteOfferRequest,
+    pub upload_request_sha256: String,
+    pub verified_absence: RemoteSourceBundleReceiptVerificationResponse,
+    pub reason: String,
+    pub request_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteSourceBundleAbandonResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) upload_request_sha256: String,
-    pub(crate) abandon_request_sha256: String,
-    pub(crate) abandoned_by_host_instance_id: String,
-    pub(crate) abandoned_at: String,
-    pub(crate) response_sha256: String,
+pub struct RemoteSourceBundleAbandonResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub upload_request_sha256: String,
+    pub abandon_request_sha256: String,
+    pub abandoned_by_host_instance_id: String,
+    pub abandoned_at: String,
+    pub response_sha256: String,
 }
 
 impl RemoteSourceBundleReceiptVerificationResponse {
-    pub(crate) fn seal(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `request` fails its own wire contract,
+    /// `receipt` does not match it, or the sealed response exceeds its size
+    /// limit.
+    pub fn seal(
         request: &RemoteSourceBundleUploadRequest,
         observed_host_instance_id: String,
         checked_at: String,
@@ -96,7 +100,11 @@ impl RemoteSourceBundleReceiptVerificationResponse {
         Ok(response)
     }
 
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `request` fails its own wire contract,
+    /// this response does not echo it, or its digest does not match its own
+    /// content.
+    pub fn validate(
         &self,
         request: &RemoteSourceBundleUploadRequest,
     ) -> Result<(), RemoteWireError> {
@@ -144,7 +152,11 @@ impl RemoteSourceBundleReceiptVerificationResponse {
 }
 
 impl RemoteSourceBundleAbandonRequest {
-    pub(crate) fn seal(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `upload` or `verified_absence` fail
+    /// their own wire contract, `verified_absence` still carries a receipt,
+    /// or the sealed request exceeds its size limit.
+    pub fn seal(
         upload: &RemoteSourceBundleUploadRequest,
         verified_absence: RemoteSourceBundleReceiptVerificationResponse,
     ) -> Result<Self, RemoteWireError> {
@@ -170,7 +182,11 @@ impl RemoteSourceBundleAbandonRequest {
         Ok(request)
     }
 
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request or its embedded offer and
+    /// verified-absence receipt fail their own wire contract, or its digest
+    /// does not match its own content.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         self.offer.validate()?;
         require_digest(
@@ -220,8 +236,12 @@ impl RemoteSourceBundleAbandonRequest {
         )
     }
 
+    /// # Errors
+    /// Returns [`RemoteWireError`] if a digest argument is malformed or
+    /// `abandon_request_sha256` does not match the digest derived from the
+    /// other arguments.
     #[cfg(test)]
-    pub(crate) fn validate_compact_authority(
+    pub fn validate_compact_authority(
         binding: &RemoteAttemptBinding,
         offer_request_sha256: &str,
         upload_request_sha256: &str,
@@ -259,7 +279,10 @@ impl RemoteSourceBundleAbandonRequest {
 }
 
 impl RemoteSourceBundleAbandonResponse {
-    pub(crate) fn seal(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `request` fails its own wire contract
+    /// or the sealed response exceeds its size limit.
+    pub fn seal(
         request: &RemoteSourceBundleAbandonRequest,
         abandoned_by_host_instance_id: String,
         abandoned_at: String,
@@ -284,7 +307,10 @@ impl RemoteSourceBundleAbandonResponse {
         Ok(response)
     }
 
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `request` fails its own wire contract
+    /// or this response does not echo it.
+    pub fn validate(
         &self,
         request: &RemoteSourceBundleAbandonRequest,
     ) -> Result<(), RemoteWireError> {
@@ -298,7 +324,11 @@ impl RemoteSourceBundleAbandonResponse {
         Ok(())
     }
 
-    pub(crate) fn validate_receipt(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if a digest argument is malformed, this
+    /// response does not echo the given binding and identifiers, or its
+    /// digest does not match its own content.
+    pub fn validate_receipt(
         &self,
         binding: &RemoteAttemptBinding,
         upload_request_sha256: &str,

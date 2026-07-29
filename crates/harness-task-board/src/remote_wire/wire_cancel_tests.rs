@@ -98,7 +98,7 @@ fn cancel_response_digest_binds_run_evidence_and_exact_request() {
         RemoteWireError::DigestMismatch("cancel_response_sha256")
     );
 
-    let mut other_request = request.clone();
+    let mut other_request = request;
     other_request.reason = "different cancellation".into();
     other_request = other_request.seal().expect("seal other cancel request");
     assert_eq!(
@@ -121,7 +121,7 @@ fn cancelled_status_confirms_every_cancel_request_field() {
     let other_reason = other_reason.seal().expect("seal other reason");
     assert!(!response.confirms_cancel(&other_reason));
 
-    let mut other_lease = request.clone();
+    let mut other_lease = request;
     other_lease.lease_id = "lease-2".into();
     let other_lease = other_lease.seal().expect("seal other lease");
     assert!(!response.confirms_cancel(&other_lease));

@@ -9,9 +9,9 @@ use super::super::remote_assignment_io_authority::active_target_matches;
 use super::super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent, to_i64};
 use super::model::TaskBoardRemoteResultImportRequest;
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse;
-use crate::daemon::task_board_remote_wire::wire::{RemoteAssignmentWireState, RemoteTypedResult};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteStatusResponse;
+use crate::task_board::remote_wire::wire::{RemoteAssignmentWireState, RemoteTypedResult};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord,

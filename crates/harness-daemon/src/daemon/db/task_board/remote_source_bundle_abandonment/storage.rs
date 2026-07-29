@@ -3,7 +3,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::TaskBoardRemoteSourceBundleAbandonment;
 use crate::daemon::db::task_board::remote_assignment_model::{nonblank, to_i64};
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse,
 };

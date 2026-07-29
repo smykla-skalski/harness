@@ -7,11 +7,11 @@ use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, accept_remote_executor,
     remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::git::source_bundle_export::GitSourceBundleExportPlan;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
     RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,
 };
-use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardLocalExecutionRepositoryConfig,
     TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowKind,

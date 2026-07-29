@@ -8,7 +8,7 @@ use crate::daemon::db::{
     accept_remote_executor, remote_controller_fixture, remote_executor_claim_request,
     remote_executor_fixture,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
     RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -273,7 +273,7 @@ async fn assert_claim_replay_rejects_conflicting_evidence(
 }
 
 fn renewal_request(
-    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    offer: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> RemoteLeaseRenewRequest {
     RemoteLeaseRenewRequest {
@@ -289,7 +289,7 @@ fn renewal_request(
 }
 
 fn cancel_request(
-    binding: &crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding,
+    binding: &crate::task_board::remote_wire::wire::RemoteAttemptBinding,
     lease_id: &str,
     offer_request_sha256: &str,
 ) -> RemoteCancelRequest {

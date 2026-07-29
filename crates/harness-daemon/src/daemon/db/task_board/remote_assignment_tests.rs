@@ -3,7 +3,7 @@ use super::{
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
     TaskBoardRemoteOfferReceiptDisposition,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteOfferRequest,
     RemoteSourceMaterial, RemoteStatusRequest, RemoteStatusResponse, RemoteTypedResult,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
@@ -423,7 +423,7 @@ async fn change_executor_capacity(fixture: &ExecutorFixture, capacity: u32) {
 }
 
 fn completed_status(
-    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
 ) -> RemoteStatusResponse {
     let result = TaskBoardLocalAttemptResult {
@@ -470,7 +470,7 @@ fn completed_status(
 }
 
 fn status_request(
-    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    offer: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     assignment: &super::TaskBoardRemoteAssignmentRecord,
 ) -> RemoteStatusRequest {
     RemoteStatusRequest {

@@ -9,9 +9,9 @@ use super::remote_assignment_model::{
 };
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{RemoteArtifactEntry, RemoteTypedResult};
 use crate::git::bundle::GitBundleImportEvidence;
 use crate::task_board::TaskBoardAttemptResultArtifact;
+use crate::task_board::remote_wire::wire::{RemoteArtifactEntry, RemoteTypedResult};
 use crate::task_board::{
     TASK_BOARD_REMOTE_RESULT_IMPORT_AUTHORITY_RESOURCE, TaskBoardExecutionAttemptRecord,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,

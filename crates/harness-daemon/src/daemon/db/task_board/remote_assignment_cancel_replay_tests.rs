@@ -1,11 +1,11 @@
 use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_generation_tests::accept_controller;
 use super::remote_assignment_test_support::*;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLease, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn controller_cancel_response_is_fenced_and_exactly_replayed() {

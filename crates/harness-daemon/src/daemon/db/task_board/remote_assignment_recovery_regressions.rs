@@ -9,7 +9,7 @@ use super::remote_operation_trust::{
 };
 use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_executions::update_execution_in_tx;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteClaimResponse, RemoteLease, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{
@@ -201,7 +201,7 @@ async fn assert_late_claim_recovery(preclaim_authority: bool) {
 
 async fn claim_only_operation_trust(
     fixture: &ControllerFixture,
-    request: &crate::daemon::task_board_remote_wire::wire::RemoteClaimRequest,
+    request: &crate::task_board::remote_wire::wire::RemoteClaimRequest,
 ) {
     let mut transaction = fixture
         .db

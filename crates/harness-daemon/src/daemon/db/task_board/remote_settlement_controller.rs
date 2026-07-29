@@ -15,7 +15,7 @@ use super::remote_settlement_receipts::{
     load_settlement_in_tx, require_current_settlement_window, require_exact_terminal_assignment,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{RemoteSettledRequest, RemoteSettledResponse};
+use crate::task_board::remote_wire::wire::{RemoteSettledRequest, RemoteSettledResponse};
 
 impl AsyncDaemonDb {
     /// Claim one exact terminal assignment generation before settlement I/O.

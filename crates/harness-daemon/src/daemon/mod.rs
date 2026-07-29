@@ -123,8 +123,6 @@ pub(crate) mod task_board_managed_agents;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_remote_transport;
 #[cfg(feature = "daemon-runtime")]
-pub(crate) mod task_board_remote_wire;
-#[cfg(feature = "daemon-runtime")]
 pub mod timeline;
 #[cfg(feature = "daemon-runtime")]
 pub mod transport;

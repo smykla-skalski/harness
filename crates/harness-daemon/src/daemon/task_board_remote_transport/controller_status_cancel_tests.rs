@@ -178,11 +178,11 @@ async fn completed_status_before_cancel_denies_cancel_with_zero_io() {
 fn spawn_status(
     controller: &Arc<super::controller::RemoteExecutionControllerClient>,
     state: &super::controller_prepared_test_support::PreparedLifecycle,
-    request: &crate::daemon::task_board_remote_wire::wire::RemoteStatusRequest,
+    request: &crate::task_board::remote_wire::wire::RemoteStatusRequest,
 ) -> tokio::task::JoinHandle<
     Result<
         (
-            crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse,
+            crate::task_board::remote_wire::wire::RemoteStatusResponse,
             TaskBoardRemoteMutationOutcome,
         ),
         super::controller::RemoteExecutionControllerError,
@@ -197,11 +197,11 @@ fn spawn_status(
 fn spawn_cancel(
     controller: &Arc<super::controller::RemoteExecutionControllerClient>,
     state: &super::controller_prepared_test_support::PreparedLifecycle,
-    request: &crate::daemon::task_board_remote_wire::wire::RemoteCancelRequest,
+    request: &crate::task_board::remote_wire::wire::RemoteCancelRequest,
 ) -> tokio::task::JoinHandle<
     Result<
         (
-            crate::daemon::task_board_remote_wire::wire::RemoteCancelResponse,
+            crate::task_board::remote_wire::wire::RemoteCancelResponse,
             TaskBoardRemoteMutationOutcome,
         ),
         super::controller::RemoteExecutionControllerError,

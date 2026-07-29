@@ -2,7 +2,7 @@ use super::wire::{
     MAX_REMOTE_TYPED_RESULT_BYTES, RemoteAttemptBinding, RemoteTypedResult, RemoteWireError,
 };
 use super::wire_tests::binding;
-use crate::task_board::{
+use crate::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardExecutionPhase, TaskBoardImplementationResult,
     TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,

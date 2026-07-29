@@ -18,7 +18,7 @@ use crate::daemon::db::task_board::{
     TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
 };
 use crate::daemon::service::import_task_board_remote_implementation_result;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteClaimResponse,
     RemoteLease, RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

@@ -21,9 +21,9 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus, StreamEvent};
 use crate::daemon::state::DaemonManifest;
-use crate::daemon::task_board_remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 
 pub(super) const EXECUTOR_INSTANCE: &str = "instance-a";
 const EXECUTOR_REPOSITORY: &str = "example/harness";

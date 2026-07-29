@@ -4,9 +4,9 @@ use super::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAttemptBinding, RemoteWireError,
     require_max_bytes, require_text, valid_repository_slug,
 };
-use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use crate::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
-pub(crate) const REMOTE_SOURCE_MATERIAL_SCHEMA_VERSION: u32 = 1;
+pub const REMOTE_SOURCE_MATERIAL_SCHEMA_VERSION: u32 = 1;
 const GIT_BUNDLE_MEDIA_TYPE: &str = "application/x-git-bundle";
 
 /// Immutable, host-independent source identity for one remote attempt.
@@ -16,7 +16,7 @@ const GIT_BUNDLE_MEDIA_TYPE: &str = "application/x-git-bundle";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) enum RemoteSourceMaterial {
+pub enum RemoteSourceMaterial {
     Repository {
         schema_version: u32,
         repository: String,
@@ -43,20 +43,22 @@ pub(crate) enum RemoteSourceMaterial {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) enum RemoteRepositorySelector {
+pub enum RemoteRepositorySelector {
     ExactRevision,
     Branch { branch: String, reference: String },
 }
 
 impl RemoteSourceMaterial {
-    pub(crate) const fn requires_upload(&self) -> bool {
+    #[must_use]
+    pub const fn requires_upload(&self) -> bool {
         matches!(
             self,
             Self::PriorPhaseBundle { .. } | Self::RepositorySnapshotBundle { .. }
         )
     }
 
-    pub(crate) fn repository(&self) -> &str {
+    #[must_use]
+    pub fn repository(&self) -> &str {
         match self {
             Self::Repository { repository, .. }
             | Self::PriorPhaseBundle { repository, .. }
@@ -64,7 +66,8 @@ impl RemoteSourceMaterial {
         }
     }
 
-    pub(crate) fn repository_revision(repository: &str, revision: &str) -> Self {
+    #[must_use]
+    pub fn repository_revision(repository: &str, revision: &str) -> Self {
         Self::Repository {
             schema_version: REMOTE_SOURCE_MATERIAL_SCHEMA_VERSION,
             repository: repository.to_owned(),
@@ -73,7 +76,8 @@ impl RemoteSourceMaterial {
         }
     }
 
-    pub(crate) fn repository_branch(repository: &str, branch: &str, revision: &str) -> Self {
+    #[must_use]
+    pub fn repository_branch(repository: &str, branch: &str, revision: &str) -> Self {
         Self::Repository {
             schema_version: REMOTE_SOURCE_MATERIAL_SCHEMA_VERSION,
             repository: repository.to_owned(),
@@ -85,7 +89,8 @@ impl RemoteSourceMaterial {
         }
     }
 
-    pub(crate) fn prior_phase_bundle(
+    #[must_use]
+    pub fn prior_phase_bundle(
         repository: &str,
         base_revision: &str,
         revision: &str,
@@ -101,7 +106,8 @@ impl RemoteSourceMaterial {
         }
     }
 
-    pub(crate) fn repository_snapshot_bundle(
+    #[must_use]
+    pub fn repository_snapshot_bundle(
         repository: &str,
         revision: &str,
         bundle: RemoteArtifactEntry,
@@ -115,7 +121,11 @@ impl RemoteSourceMaterial {
         }
     }
 
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError::InvalidSourceMaterial`] if the source does
+    /// not match its own contract or `binding`'s phase, workflow kind, and
+    /// prior-phase bundle requirements.
+    pub fn validate(
         &self,
         binding: &RemoteAttemptBinding,
         artifacts: &RemoteArtifactManifest,

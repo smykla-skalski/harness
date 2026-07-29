@@ -11,10 +11,10 @@ use super::remote_assignment_model::{
 use super::remote_operation_trust::TaskBoardRemoteOperationKind;
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE,
     TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE, TaskBoardWorkflowExecutionRecord,

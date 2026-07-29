@@ -13,8 +13,8 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{RemoteClaimRequest, RemoteClaimResponse};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{RemoteClaimRequest, RemoteClaimResponse};
 
 impl AsyncDaemonDb {
     pub(crate) async fn record_task_board_remote_assignment_claim(

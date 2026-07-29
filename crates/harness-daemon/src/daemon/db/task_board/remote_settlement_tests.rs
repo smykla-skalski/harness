@@ -6,11 +6,11 @@ use super::remote_settlement_test_support::{
 };
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteSettledRequest,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 const SETTLED_AT: &str = "2026-07-19T10:00:50Z";
 

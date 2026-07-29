@@ -9,7 +9,7 @@ use super::super::{
     TaskBoardRemoteMutationOutcome,
 };
 use super::{TaskBoardRemoteExecutorStartFailureReceipt, canonical_json, receipt_digest};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

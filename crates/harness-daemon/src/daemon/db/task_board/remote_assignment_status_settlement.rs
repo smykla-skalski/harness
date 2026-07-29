@@ -9,10 +9,10 @@ use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent
 use super::workflow_executions::load_execution_in_tx;
 use super::workflow_terminal::settle_prepared_dispatch_in_tx;
 use crate::daemon::db::CliError;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteClaimRequest, RemoteStatusResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionState,
     TaskBoardWorkflowExecutionRecord,

@@ -24,8 +24,8 @@ use super::workflow_first_start_admission::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_codex_requests::remote_codex_attempt_request;
-use crate::daemon::task_board_remote_wire::wire::{RemoteCodexLaunchEnvelope, RemoteOfferRequest};
 use crate::task_board::TaskBoardExecutionPhase;
+use crate::task_board::remote_wire::wire::{RemoteCodexLaunchEnvelope, RemoteOfferRequest};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,

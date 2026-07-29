@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse;
+use crate::task_board::remote_wire::wire::RemoteStatusResponse;
 use crate::task_board::{
     TaskBoardAttemptRetryDecision, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionDiagnostic, TaskBoardExecutionState, TaskBoardFailureClass,

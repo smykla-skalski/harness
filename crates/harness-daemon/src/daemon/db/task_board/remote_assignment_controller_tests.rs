@@ -1,7 +1,7 @@
 use super::remote_assignment_source::source_binding_matches;
 use super::remote_assignment_test_support::*;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{
@@ -93,22 +93,22 @@ async fn controller_offer_atomically_binds_and_exact_replay_is_a_noop() {
 async fn tampered_launch_contract_is_rejected_before_remote_persistence() {
     let fixture = Box::pin(controller_fixture(1)).await;
     for mutate in [
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.launch.persona = Some("different-reviewer".into());
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.launch.model = Some("different-model".into());
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.launch.effort = Some("low".into());
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request
                 .launch
                 .capabilities
                 .push("unexpected-capability".into());
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.launch.board_item_id = "other-item".into();
         },
     ] {
@@ -150,16 +150,16 @@ async fn wrong_base_or_head_is_rejected_before_assignment_or_target_mutation() {
     let fixture = Box::pin(controller_fixture(1)).await;
     for mutate in [
         // Canonical but wrong evidence reaches the frozen-execution check rather than wire validation.
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.binding.base_revision = "2222222222222222222222222222222222222222".into();
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.binding.expected_head_revision =
                 Some("2222222222222222222222222222222222222222".into());
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
             request.binding.repository = "example/other".into();
-            let crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial::Repository {
+            let crate::task_board::remote_wire::wire::RemoteSourceMaterial::Repository {
                 repository,
                 ..
             } = &mut request.source
@@ -168,8 +168,8 @@ async fn wrong_base_or_head_is_rejected_before_assignment_or_target_mutation() {
             };
             *repository = "example/other".into();
         },
-        |request: &mut crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest| {
-            let crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial::Repository {
+        |request: &mut crate::task_board::remote_wire::wire::RemoteOfferRequest| {
+            let crate::task_board::remote_wire::wire::RemoteSourceMaterial::Repository {
                 revision,
                 ..
             } = &mut request.source
@@ -230,29 +230,28 @@ async fn frozen_pull_request_head_binds_fork_repository_branch_ref_and_revision(
     request.binding.workflow_kind = TaskBoardWorkflowKind::PR_REVIEW;
     // The binding repository tracks the fork source the offer freezes.
     request.binding.repository = "contributor/harness".into();
-    request.source =
-        crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial::repository_branch(
-            "contributor/harness",
-            "feature/fix",
-            SOURCE_REVISION,
-        );
+    request.source = crate::task_board::remote_wire::wire::RemoteSourceMaterial::repository_branch(
+        "contributor/harness",
+        "feature/fix",
+        SOURCE_REVISION,
+    );
     request.request_sha256.clear();
     request = request.seal().expect("seal frozen fork source");
     request.validate().expect("validate frozen fork source");
     assert!(source_binding_matches(&request, &parent));
 
     for changed in [
-        crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial::repository_branch(
+        crate::task_board::remote_wire::wire::RemoteSourceMaterial::repository_branch(
             REPOSITORY,
             "feature/fix",
             SOURCE_REVISION,
         ),
-        crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial::repository_branch(
+        crate::task_board::remote_wire::wire::RemoteSourceMaterial::repository_branch(
             "contributor/harness",
             "feature/other",
             SOURCE_REVISION,
         ),
-        crate::daemon::task_board_remote_wire::wire::RemoteSourceMaterial::repository_branch(
+        crate::task_board::remote_wire::wire::RemoteSourceMaterial::repository_branch(
             "contributor/harness",
             "feature/fix",
             "2222222222222222222222222222222222222222",
@@ -360,7 +359,7 @@ fn target<'a>(
 }
 
 fn rejected_response(
-    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     reason: &str,
 ) -> RemoteOfferResponse {
     RemoteOfferResponse {

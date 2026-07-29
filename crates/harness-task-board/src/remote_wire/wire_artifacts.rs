@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::wire::{RemoteWireError, require_digest};
 
 const MAX_MANIFEST_ENTRIES: usize = 64;
-pub(crate) const MAX_REMOTE_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
+pub const MAX_REMOTE_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
 pub(super) const MAX_REMOTE_ARTIFACT_BYTES_USIZE: usize = 32 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_ARTIFACT_PATH_BYTES: usize = 512;
@@ -13,23 +13,27 @@ const MAX_ARTIFACT_PATH_BYTES: usize = 512;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteArtifactEntry {
-    pub(crate) relative_path: String,
-    pub(crate) sha256: String,
-    pub(crate) size_bytes: u64,
-    pub(crate) media_type: String,
+pub struct RemoteArtifactEntry {
+    pub relative_path: String,
+    pub sha256: String,
+    pub size_bytes: u64,
+    pub media_type: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteArtifactManifest {
+pub struct RemoteArtifactManifest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(crate) entries: Vec<RemoteArtifactEntry>,
+    pub entries: Vec<RemoteArtifactEntry>,
 }
 
 impl RemoteArtifactManifest {
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::InvalidManifest`] if an entry's path is
+    /// invalid, duplicated, oversized, or missing a digest, or if the
+    /// manifest's total size exceeds its bound.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         if self.entries.len() > MAX_MANIFEST_ENTRIES {
             return Err(RemoteWireError::InvalidManifest);
         }

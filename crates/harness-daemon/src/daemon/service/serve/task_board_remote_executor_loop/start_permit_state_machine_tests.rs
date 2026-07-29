@@ -22,7 +22,7 @@ use crate::daemon::db::{
     TaskBoardRemoteOfferOutcome, remote_executor_claim_request, remote_executor_fixture,
     remote_executor_identity,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};

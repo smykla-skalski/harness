@@ -6,7 +6,7 @@ use super::wire::{
     RemoteOfferResponse, RemoteSettledRequest, RemoteSourceMaterial, RemoteTypedResult,
     RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
-use crate::task_board::{
+use crate::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardExecutionPhase, TaskBoardLocalAttemptResult,
     TaskBoardPhaseVerdict, TaskBoardWorkflowKind,
@@ -66,7 +66,7 @@ fn sealed_offer_digest_binds_complete_attempt_and_repository_evidence() {
         "1111111111111111111111111111111111111111",
     );
     variants.push(workflow_kind_changed);
-    let mut deadline_changed = request.clone();
+    let mut deadline_changed = request;
     deadline_changed.deadline_at = "2026-07-19T12:11:00Z".into();
     variants.push(deadline_changed);
     for variant in variants {

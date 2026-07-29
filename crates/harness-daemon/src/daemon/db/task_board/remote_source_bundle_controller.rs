@@ -15,11 +15,11 @@ use super::remote_source_bundles::{
     load_source_bundle_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
+use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 impl AsyncDaemonDb {
     pub(crate) async fn exact_task_board_remote_source_bundle_upload_receipt(
@@ -199,7 +199,7 @@ fn require_unchanged_upload_response(
 impl AsyncDaemonDb {
     pub(crate) async fn insert_task_board_remote_source_bundle_offer_for_test(
         &self,
-        request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+        request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
         principal: &str,
         offered_at: &str,
         lease_expires_at: &str,

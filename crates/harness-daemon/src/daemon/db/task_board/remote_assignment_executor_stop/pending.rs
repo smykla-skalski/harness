@@ -12,7 +12,7 @@ use crate::daemon::db::task_board::remote_assignment_start_authority::{
 };
 use crate::daemon::db::{CliError, db_error};
 use crate::daemon::protocol::CodexRunSnapshot;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 

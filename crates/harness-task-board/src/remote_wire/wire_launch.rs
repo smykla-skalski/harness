@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 use super::wire::{RemoteAttemptBinding, RemoteWireError, require_text};
-use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
-use crate::task_board::TaskBoardExecutionPhase;
+use crate::TaskBoardExecutionPhase;
+use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
+use harness_protocol::session::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 
-pub(crate) const REMOTE_CODEX_LAUNCH_SCHEMA_VERSION: u32 = 1;
-pub(crate) const MAX_REMOTE_CODEX_PROMPT_BYTES: usize = 2 * 1024 * 1024;
+pub const REMOTE_CODEX_LAUNCH_SCHEMA_VERSION: u32 = 1;
+pub const MAX_REMOTE_CODEX_PROMPT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_CAPABILITIES: usize = 256;
 const MAX_LAUNCH_TEXT_BYTES: usize = 1_024;
 
@@ -14,31 +14,35 @@ const MAX_LAUNCH_TEXT_BYTES: usize = 1_024;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteCodexLaunchEnvelope {
-    pub(crate) schema_version: u32,
-    pub(crate) runtime: String,
-    pub(crate) actor: String,
-    pub(crate) prompt: String,
-    pub(crate) mode: CodexRunMode,
-    pub(crate) role: SessionRole,
-    pub(crate) fallback_role: SessionRole,
-    pub(crate) capabilities: Vec<String>,
-    pub(crate) display_name: String,
+pub struct RemoteCodexLaunchEnvelope {
+    pub schema_version: u32,
+    pub runtime: String,
+    pub actor: String,
+    pub prompt: String,
+    pub mode: CodexRunMode,
+    pub role: SessionRole,
+    pub fallback_role: SessionRole,
+    pub capabilities: Vec<String>,
+    pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) persona: Option<String>,
+    pub persona: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) task_id: Option<String>,
-    pub(crate) board_item_id: String,
-    pub(crate) workflow_execution_id: String,
+    pub task_id: Option<String>,
+    pub board_item_id: String,
+    pub workflow_execution_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) model: Option<String>,
+    pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) effort: Option<String>,
-    pub(crate) allow_custom_model: bool,
+    pub effort: Option<String>,
+    pub allow_custom_model: bool,
 }
 
 impl RemoteCodexLaunchEnvelope {
-    pub(crate) fn from_codex_request(
+    /// # Errors
+    /// Returns [`RemoteWireError::MissingField`] if `request` lacks a field
+    /// the sealed envelope requires, or [`RemoteWireError`] if the
+    /// assembled envelope fails its own wire contract.
+    pub fn from_codex_request(
         runtime: &str,
         request: &CodexRunRequest,
     ) -> Result<Self, RemoteWireError> {
@@ -78,7 +82,10 @@ impl RemoteCodexLaunchEnvelope {
         Ok(launch)
     }
 
-    pub(crate) fn validate(&self, binding: &RemoteAttemptBinding) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the envelope fails its own wire
+    /// contract or does not match `binding`'s execution and phase.
+    pub fn validate(&self, binding: &RemoteAttemptBinding) -> Result<(), RemoteWireError> {
         self.validate_common()?;
         if self.workflow_execution_id != binding.execution_id
             || !phase_launch_matches(binding.phase, self)
@@ -88,7 +95,8 @@ impl RemoteCodexLaunchEnvelope {
         Ok(())
     }
 
-    pub(crate) fn codex_request(&self) -> CodexRunRequest {
+    #[must_use]
+    pub fn codex_request(&self) -> CodexRunRequest {
         CodexRunRequest {
             actor: Some(self.actor.clone()),
             prompt: self.prompt.clone(),
@@ -173,8 +181,9 @@ fn bounded_text(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= MAX_LAUNCH_TEXT_BYTES
 }
 
-#[cfg(test)]
-pub(crate) fn test_codex_launch(
+#[cfg(any(test, feature = "test-support"))]
+#[must_use]
+pub fn test_codex_launch(
     phase: TaskBoardExecutionPhase,
     execution_id: &str,
     action_key: &str,

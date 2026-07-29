@@ -135,6 +135,8 @@ pub mod prompt_config;
 mod prompt_template;
 pub mod provider_credentials;
 pub mod remote_spki_pin;
+#[cfg(feature = "daemon-runtime")]
+pub mod remote_wire;
 pub mod runtime_config;
 pub mod store;
 pub mod summary;

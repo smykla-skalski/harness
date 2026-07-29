@@ -4,10 +4,10 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
 };
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 pub(super) fn status_update_allowed(
     record: &TaskBoardRemoteAssignmentRecord,

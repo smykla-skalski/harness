@@ -11,10 +11,10 @@ use crate::daemon::db::{
 };
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunSnapshot;
-use crate::daemon::task_board_remote_wire::wire::RemoteSettledRequest;
 use crate::session::storage as session_storage;
 use crate::session::types::SessionState;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteSettledRequest;
 use crate::workspace::harness_data_root;
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::layout::sessions_root;

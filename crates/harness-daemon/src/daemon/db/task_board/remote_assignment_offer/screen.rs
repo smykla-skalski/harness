@@ -9,7 +9,7 @@ use super::{
     PreparedRemoteOffer, commit_noop, prepare_remote_offer_in_tx, resolve_offer_collision,
 };
 use crate::daemon::db::CliError;
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
 
 /// Either the offer is already settled and the caller has nothing left to do

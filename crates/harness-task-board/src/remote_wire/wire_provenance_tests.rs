@@ -1,4 +1,5 @@
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
 use super::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
@@ -9,7 +10,7 @@ use super::wire::{
     RemoteTypedResult, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use super::wire_tests::{artifact, offer_request};
-use crate::task_board::{
+use crate::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardFailureClass, TaskBoardImplementationResult, TaskBoardLocalAttemptResult,
 };
@@ -37,7 +38,7 @@ fn fetched_artifact_must_match_requested_path_size_and_digest() {
         binding: request.binding.clone(),
         offer_request_sha256: request.offer_request_sha256.clone(),
         artifact: entry,
-        content_base64: base64::engine::general_purpose::STANDARD.encode(content),
+        content_base64: BASE64_STANDARD.encode(content),
     };
     assert_response_offer_digest(
         &response,
@@ -51,7 +52,7 @@ fn fetched_artifact_must_match_requested_path_size_and_digest() {
     );
 
     let mut tampered = response;
-    tampered.content_base64 = base64::engine::general_purpose::STANDARD.encode(b"other");
+    tampered.content_base64 = BASE64_STANDARD.encode(b"other");
     assert_eq!(
         tampered
             .validate(&request)
@@ -120,7 +121,7 @@ fn failed_status_requires_durable_claim_and_run_evidence() {
         started_at: None,
         workspace_ref: None,
         error_code: Some("worker_failed".into()),
-        failure_class: Some(crate::task_board::TaskBoardFailureClass::Transient),
+        failure_class: Some(crate::TaskBoardFailureClass::Transient),
         observed_at: "2026-07-19T12:02:00Z".into(),
     }
     .seal()
@@ -150,7 +151,7 @@ fn failed_at_claimed_status_without_start_evidence_round_trips() {
         started_at: None,
         workspace_ref: None,
         error_code: Some("CODEX001".into()),
-        failure_class: Some(crate::task_board::TaskBoardFailureClass::Transient),
+        failure_class: Some(crate::TaskBoardFailureClass::Transient),
         observed_at: "2026-07-19T12:02:00Z".into(),
     }
     .seal()
@@ -259,7 +260,7 @@ fn offer_claim_and_renew_echo_exact_original_offer_digest() {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: offer.binding.clone(),
         lease_id: lease.lease_id.clone(),
-        offer_request_sha256: offer.request_sha256.clone(),
+        offer_request_sha256: offer.request_sha256,
         request_sha256: String::new(),
     }
     .seal()
@@ -388,7 +389,7 @@ fn status_cancel_settle_and_artifact_fetch_bind_original_offer_digest() {
         malformed_settlement.validate(&settled),
         Err(RemoteWireError::InvalidDigest("settlement_request_sha256"))
     ));
-    let mut different_settlement = settled_response.clone();
+    let mut different_settlement = settled_response;
     different_settlement.settlement_request_sha256 = "b".repeat(64);
     assert!(matches!(
         different_settlement.validate(&settled),

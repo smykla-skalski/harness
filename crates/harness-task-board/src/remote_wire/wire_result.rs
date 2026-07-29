@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::task_board::{
+use crate::{
     TaskBoardAttemptResultArtifactExpectation, TaskBoardExecutionPhase,
     TaskBoardLocalAttemptResult, TaskBoardLocalAttemptResultExpectation,
     validate_task_board_local_attempt_result,
@@ -8,19 +8,22 @@ use crate::task_board::{
 
 use super::wire::{RemoteAttemptBinding, RemoteWireError, domain_digest, require_digest};
 
-pub(crate) const MAX_REMOTE_TYPED_RESULT_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_REMOTE_TYPED_RESULT_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteTypedResult {
-    pub(crate) offer_request_sha256: String,
-    pub(crate) result: TaskBoardLocalAttemptResult,
-    pub(crate) result_sha256: String,
+pub struct RemoteTypedResult {
+    pub offer_request_sha256: String,
+    pub result: TaskBoardLocalAttemptResult,
+    pub result_sha256: String,
 }
 
 impl RemoteTypedResult {
-    pub(crate) fn seal(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `offer_request_sha256` is not a valid
+    /// digest or the sealed result exceeds its size limit.
+    pub fn seal(
         result: TaskBoardLocalAttemptResult,
         offer_request_sha256: String,
     ) -> Result<Self, RemoteWireError> {
@@ -38,7 +41,11 @@ impl RemoteTypedResult {
         Ok(sealed)
     }
 
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the result exceeds its size limit,
+    /// its digest does not match its own content, or it does not match
+    /// `binding`'s expected offer digest or phase-specific artifact shape.
+    pub fn validate(
         &self,
         binding: &RemoteAttemptBinding,
         expected_offer_request_sha256: &str,
@@ -61,7 +68,10 @@ impl RemoteTypedResult {
         Ok(())
     }
 
-    pub(crate) fn validate_serialized_size(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::ResultTooLarge`] if the serialized result
+    /// exceeds [`MAX_REMOTE_TYPED_RESULT_BYTES`].
+    pub fn validate_serialized_size(&self) -> Result<(), RemoteWireError> {
         let bytes = serde_json::to_vec(self).map_err(|_| RemoteWireError::Serialization)?;
         if bytes.len() <= MAX_REMOTE_TYPED_RESULT_BYTES {
             Ok(())

@@ -1,11 +1,11 @@
 use super::client::RemoteExecutionHttpError;
 use super::controller::{RemoteExecutionControllerError, binding_error};
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 pub(super) fn durable_cancel_response(
     record: &TaskBoardRemoteAssignmentRecord,

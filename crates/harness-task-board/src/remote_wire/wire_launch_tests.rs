@@ -1,7 +1,7 @@
 use super::wire::{RemoteAttemptBinding, RemoteCodexLaunchEnvelope, RemoteWireError};
-use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
-use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
-use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use crate::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
+use harness_protocol::session::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 
 #[test]
 fn review_and_evaluate_launches_preserve_nondefault_profile_contract() {
@@ -133,6 +133,10 @@ fn binding(phase: TaskBoardExecutionPhase, action_key: &str) -> RemoteAttemptBin
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "checks every field of the round-tripped request in one pass"
+)]
 fn assert_request(actual: &CodexRunRequest, expected: &CodexRunRequest) {
     assert_eq!(actual.actor, expected.actor);
     assert_eq!(actual.prompt, expected.prompt);

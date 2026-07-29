@@ -4,9 +4,7 @@ use super::controller::{
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_wire::wire::{
-    RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
-};
+use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
 
 impl RemoteExecutionControllerClient {
     pub(crate) async fn reconcile_pending_renewal(

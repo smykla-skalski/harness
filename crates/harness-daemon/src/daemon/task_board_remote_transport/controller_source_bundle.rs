@@ -2,7 +2,7 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteOperationTrustFence};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
 
@@ -14,8 +14,8 @@ pub(crate) enum RemoteSourceBundleRecoveryOutcome {
         trust: TaskBoardRemoteOperationTrustFence,
     },
     Abandoned {
-        request: Box<crate::daemon::task_board_remote_wire::wire::RemoteSourceBundleAbandonRequest>,
-        response: crate::daemon::task_board_remote_wire::wire::RemoteSourceBundleAbandonResponse,
+        request: Box<crate::task_board::remote_wire::wire::RemoteSourceBundleAbandonRequest>,
+        response: crate::task_board::remote_wire::wire::RemoteSourceBundleAbandonResponse,
         trust: TaskBoardRemoteOperationTrustFence,
     },
 }
@@ -109,12 +109,11 @@ impl RemoteExecutionControllerClient {
                 trust,
             });
         }
-        let abandon =
-            crate::daemon::task_board_remote_wire::wire::RemoteSourceBundleAbandonRequest::seal(
-                request,
-                verification,
-            )
-            .map_err(super::client::RemoteExecutionHttpError::from)?;
+        let abandon = crate::task_board::remote_wire::wire::RemoteSourceBundleAbandonRequest::seal(
+            request,
+            verification,
+        )
+        .map_err(super::client::RemoteExecutionHttpError::from)?;
         let response = self.client.abandon_source_bundle(&abandon).await?;
         let stored = Box::pin(db.record_task_board_remote_source_bundle_abandonment(
             &abandon,

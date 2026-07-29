@@ -1,7 +1,7 @@
 use super::*;
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
 use crate::daemon::task_board_remote_transport::routes_cleanup::CLEANUP_OBSERVATION_PATH;
-use crate::daemon::task_board_remote_wire::wire_cleanup::{
+use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
 

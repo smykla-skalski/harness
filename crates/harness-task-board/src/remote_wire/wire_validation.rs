@@ -14,7 +14,7 @@ use super::wire::{
 use super::wire_limits::{
     MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_RECEIPT_JSON_BYTES, require_serialized_size,
 };
-use crate::task_board::TaskBoardFailureClass;
+use crate::TaskBoardFailureClass;
 
 impl RemoteLease {
     fn validate(&self) -> Result<(), RemoteWireError> {
@@ -25,7 +25,11 @@ impl RemoteLease {
 }
 
 impl RemoteOfferResponse {
-    pub(crate) fn validate(&self, expected: &RemoteOfferRequest) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or this response does not carry a lease-bearing acceptance or a
+    /// bounded rejection code consistent with its disposition.
+    pub fn validate(&self, expected: &RemoteOfferRequest) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         validate_operation_echo(
             &self.binding,
@@ -70,7 +74,10 @@ fn require_canonical_token(field: &'static str, value: &str) -> Result<(), Remot
 }
 
 impl RemoteClaimResponse {
-    pub(crate) fn validate(&self, expected: &RemoteClaimRequest) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or this response does not echo it.
+    pub fn validate(&self, expected: &RemoteClaimRequest) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         validate_operation_echo(
             &self.binding,
@@ -85,10 +92,10 @@ impl RemoteClaimResponse {
 }
 
 impl RemoteLeaseRenewResponse {
-    pub(crate) fn validate(
-        &self,
-        expected: &RemoteLeaseRenewRequest,
-    ) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or this response does not echo it.
+    pub fn validate(&self, expected: &RemoteLeaseRenewRequest) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         validate_operation_echo(
             &self.binding,
@@ -102,7 +109,12 @@ impl RemoteLeaseRenewResponse {
 }
 
 impl RemoteStatusResponse {
-    pub(crate) fn validate(&self, expected: &RemoteStatusRequest) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire
+    /// contract, this response does not echo it, its run evidence or
+    /// terminal state is inconsistent, or its digest does not match its own
+    /// content.
+    pub fn validate(&self, expected: &RemoteStatusRequest) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         self.binding.validate()?;
         require_digest("offer_request_sha256", &self.offer_request_sha256)?;
@@ -164,7 +176,8 @@ impl RemoteStatusResponse {
         require_serialized_size("status_response", self, MAX_REMOTE_LIFECYCLE_JSON_BYTES)
     }
 
-    pub(crate) fn confirms_cancel(&self, expected: &RemoteCancelRequest) -> bool {
+    #[must_use]
+    pub fn confirms_cancel(&self, expected: &RemoteCancelRequest) -> bool {
         self.schema_version == expected.schema_version
             && self.state == RemoteAssignmentWireState::Cancelled
             && self.binding == expected.binding
@@ -178,7 +191,10 @@ impl RemoteStatusResponse {
 }
 
 impl RemoteCancelResponse {
-    pub(crate) fn seal(mut self, expected: &RemoteCancelRequest) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or the response cannot be digested.
+    pub fn seal(mut self, expected: &RemoteCancelRequest) -> Result<Self, RemoteWireError> {
         expected.validate()?;
         self.cancel_response_sha256.clear();
         self.cancel_response_sha256 = domain_digest(
@@ -188,7 +204,12 @@ impl RemoteCancelResponse {
         Ok(self)
     }
 
-    pub(crate) fn validate(&self, expected: &RemoteCancelRequest) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire
+    /// contract, this response does not echo it, its run evidence or
+    /// terminal state is inconsistent, or its digest does not match its own
+    /// content.
+    pub fn validate(&self, expected: &RemoteCancelRequest) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         validate_operation_echo(
             &self.binding,
@@ -264,7 +285,10 @@ fn validate_cancel_run_evidence(response: &RemoteCancelResponse) -> Result<(), R
 }
 
 impl RemoteSettledResponse {
-    pub(crate) fn validate(&self, expected: &RemoteSettledRequest) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire contract
+    /// or this response does not echo it.
+    pub fn validate(&self, expected: &RemoteSettledRequest) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         validate_operation_echo(
             &self.binding,
@@ -282,7 +306,11 @@ impl RemoteSettledResponse {
 }
 
 impl RemoteArtifactFetchResponse {
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire
+    /// contract, this response does not echo it, or the decoded content
+    /// does not match the artifact's expected size and digest.
+    pub fn validate(
         &self,
         expected: &RemoteArtifactFetchRequest,
     ) -> Result<Vec<u8>, RemoteWireError> {

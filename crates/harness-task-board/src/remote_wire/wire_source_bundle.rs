@@ -18,28 +18,33 @@ const SOURCE_BUNDLE_RESPONSE_DOMAIN: &str = "harness.task-board.remote-source-bu
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteSourceBundleUploadRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) offer: RemoteOfferRequest,
-    pub(crate) content_base64: String,
-    pub(crate) request_sha256: String,
+pub struct RemoteSourceBundleUploadRequest {
+    pub schema_version: u32,
+    pub offer: RemoteOfferRequest,
+    pub content_base64: String,
+    pub request_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteSourceBundleUploadResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) upload_request_sha256: String,
-    pub(crate) artifact: RemoteArtifactEntry,
-    pub(crate) stored_at: String,
-    pub(crate) response_sha256: String,
+pub struct RemoteSourceBundleUploadResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub offer_request_sha256: String,
+    pub upload_request_sha256: String,
+    pub artifact: RemoteArtifactEntry,
+    pub stored_at: String,
+    pub response_sha256: String,
 }
 
 impl RemoteSourceBundleUploadRequest {
-    pub(crate) fn seal(offer: RemoteOfferRequest, content: &[u8]) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `offer` fails its own wire contract,
+    /// its source does not require an uploaded bundle, `content` does not
+    /// match the bundle's expected digest and size, or the sealed request
+    /// exceeds its size limit.
+    pub fn seal(offer: RemoteOfferRequest, content: &[u8]) -> Result<Self, RemoteWireError> {
         offer.validate()?;
         let artifact = source_bundle_entry(&offer)?;
         require_bundle_content(artifact, content)?;
@@ -58,7 +63,11 @@ impl RemoteSourceBundleUploadRequest {
         Ok(request)
     }
 
-    pub(crate) fn validate(&self) -> Result<Vec<u8>, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if the request fails its own wire
+    /// contract, its encoded content does not match the bundle's expected
+    /// digest and size, or its digest does not match its own content.
+    pub fn validate(&self) -> Result<Vec<u8>, RemoteWireError> {
         require_version(self.schema_version)?;
         self.offer.validate()?;
         require_digest("source_bundle_request_sha256", &self.request_sha256)?;
@@ -90,13 +99,20 @@ impl RemoteSourceBundleUploadRequest {
         Ok(content)
     }
 
-    pub(crate) fn artifact(&self) -> Result<&RemoteArtifactEntry, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::InvalidSourceMaterial`] if the offer's
+    /// source does not carry an uploaded bundle.
+    pub fn artifact(&self) -> Result<&RemoteArtifactEntry, RemoteWireError> {
         source_bundle_entry(&self.offer)
     }
 }
 
 impl RemoteSourceBundleUploadResponse {
-    pub(crate) fn seal(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire
+    /// contract, `stored_at` is not a canonical timestamp, or the sealed
+    /// response exceeds its size limit.
+    pub fn seal(
         expected: &RemoteSourceBundleUploadRequest,
         stored_at: String,
     ) -> Result<Self, RemoteWireError> {
@@ -120,7 +136,11 @@ impl RemoteSourceBundleUploadResponse {
         Ok(response)
     }
 
-    pub(crate) fn validate(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `expected` fails its own wire
+    /// contract or this response does not echo `expected`'s binding, offer,
+    /// upload request, and bundle.
+    pub fn validate(
         &self,
         expected: &RemoteSourceBundleUploadRequest,
     ) -> Result<(), RemoteWireError> {
@@ -135,7 +155,12 @@ impl RemoteSourceBundleUploadResponse {
         Ok(())
     }
 
-    pub(crate) fn validate_receipt(
+    /// # Errors
+    /// Returns [`RemoteWireError`] if `binding` or `artifact` fail their own
+    /// wire contract, this response does not echo the given binding, offer
+    /// digest, upload digest, and artifact, or its digest does not match
+    /// its own content.
+    pub fn validate_receipt(
         &self,
         binding: &RemoteAttemptBinding,
         offer_request_sha256: &str,

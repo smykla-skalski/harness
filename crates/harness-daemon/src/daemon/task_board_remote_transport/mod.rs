@@ -4,11 +4,13 @@
 //! or generated Swift contracts. The controller uses them only with an
 //! operator-configured, certificate-pinned execution host.
 //!
-//! The wire types this transport serializes live in the sibling
-//! `crate::daemon::task_board_remote_wire` module, not here: `db` needed a
-//! one-way dependency on them instead of the two-way cycle it had with this
-//! module, so `wire.rs`/`wire_*.rs` hoisted out to a shared sibling both `db`
-//! and this module's `controller`/`routes` code depend on.
+//! The wire types this transport serializes live in `harness_task_board`'s
+//! `remote_wire` module (reached here as `crate::task_board::remote_wire`),
+//! not here: `db` needed a one-way dependency on them instead of the
+//! two-way cycle it had with this module, and later a crate-level version of
+//! the same cycle once `db` was slated to become its own crate, so
+//! `wire.rs`/`wire_*.rs` moved into the task-board domain crate both `db`
+//! and this module's `controller`/`routes` code already depend on.
 
 pub(crate) mod client;
 mod client_cleanup;

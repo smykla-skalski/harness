@@ -137,7 +137,7 @@ async fn install_and_return() {
 
 fn assert_runtime_context(
     call: &RuntimeSeamCall,
-    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    offer: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     identity: &crate::daemon::db::TaskBoardRemoteExecutorIdentity,
 ) {
     assert_eq!(call.offer, *offer);

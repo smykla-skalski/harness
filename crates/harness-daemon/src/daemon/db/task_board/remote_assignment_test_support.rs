@@ -5,7 +5,7 @@ use tempfile::TempDir;
 use super::workflow_dispatch::workflow_owner;
 use super::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome};
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAttemptBinding, RemoteClaimRequest, RemoteCodexLaunchEnvelope,
     RemoteOfferRequest, RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
     test_codex_launch,

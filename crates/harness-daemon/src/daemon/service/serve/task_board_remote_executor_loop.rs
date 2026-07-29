@@ -8,8 +8,8 @@ use crate::daemon::db::{
     executor_start_io_permit, remote_executor_identity,
 };
 use crate::daemon::http::DaemonHttpState;
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use std::path::{Path, PathBuf};

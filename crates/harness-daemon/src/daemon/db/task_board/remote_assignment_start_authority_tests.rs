@@ -9,10 +9,10 @@ use super::{
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopAuthority,
     TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn renewed_claim_can_acquire_exact_start_authority_once() {

@@ -5,11 +5,11 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
-use crate::daemon::task_board_remote_wire::wire::RemoteAssignmentWireState;
-use crate::daemon::task_board_remote_wire::wire::RemoteCancelRequest;
-use crate::daemon::task_board_remote_wire::wire::RemoteLeaseRenewRequest;
-use crate::daemon::task_board_remote_wire::wire::RemoteStatusRequest;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteAssignmentWireState;
+use crate::task_board::remote_wire::wire::RemoteCancelRequest;
+use crate::task_board::remote_wire::wire::RemoteLeaseRenewRequest;
+use crate::task_board::remote_wire::wire::RemoteStatusRequest;
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
 

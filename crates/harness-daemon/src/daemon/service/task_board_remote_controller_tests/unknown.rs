@@ -5,11 +5,11 @@ use crate::daemon::db::{
     accept_remote_controller, claim_remote_controller, remote_controller_fixture,
     remote_controller_running_status, remote_controller_status_request,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse, RemoteStatusRequest,
     RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::task_board_remote_wire::wire_cleanup::{
+use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
 use crate::task_board::{
