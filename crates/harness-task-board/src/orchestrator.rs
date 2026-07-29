@@ -31,7 +31,6 @@ mod types;
 #[cfg(any(test, feature = "test-support"))]
 use self::run_record::{
     RunRecordInput, new_run_id, read_or_default, run_items_for_machine, run_record,
-    workflow_statuses,
 };
 #[cfg(feature = "daemon-runtime")]
 pub(crate) use self::settings::parse_persisted_settings_read_only;
@@ -393,8 +392,9 @@ impl TaskBoardOrchestrator {
     fn workflow_execution_counts(&self) -> Result<Vec<TaskBoardWorkflowExecutionCount>, CliError> {
         let machine = self.local_machine().ok();
         let items = run_items_for_machine(&self.board, None, None, machine.as_ref())?;
-        Ok(workflow_statuses()
-            .into_iter()
+        Ok(super::types::TaskBoardWorkflowStatus::all()
+            .iter()
+            .copied()
             .filter_map(|status| {
                 let count = items
                     .iter()

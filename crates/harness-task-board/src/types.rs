@@ -211,6 +211,15 @@ pub enum TaskBoardWorkflowStatus {
     Cancelled,
 }
 
+impl TaskBoardWorkflowStatus {
+    /// Every workflow status, derived from the `ValueEnum` variants so code that
+    /// aggregates across all statuses can never silently miss a newly added one.
+    #[must_use]
+    pub fn all() -> &'static [Self] {
+        <Self as ValueEnum>::value_variants()
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ValueEnum,
 )]

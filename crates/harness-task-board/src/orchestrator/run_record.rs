@@ -12,7 +12,7 @@ use super::super::evaluation::TaskBoardEvaluationSummary;
 use super::super::machines::Machine;
 use super::super::store::TaskBoardStore;
 use super::super::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
-use super::super::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
+use super::super::types::{TaskBoardItem, TaskBoardStatus};
 use super::types::{TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary};
 
 pub(super) struct RunRecordInput {
@@ -65,17 +65,6 @@ fn policy_trace_ids(
         }
     }
     trace_ids.into_iter().collect()
-}
-
-pub(super) const fn workflow_statuses() -> [TaskBoardWorkflowStatus; 6] {
-    [
-        TaskBoardWorkflowStatus::Idle,
-        TaskBoardWorkflowStatus::Running,
-        TaskBoardWorkflowStatus::Paused,
-        TaskBoardWorkflowStatus::Completed,
-        TaskBoardWorkflowStatus::Failed,
-        TaskBoardWorkflowStatus::Cancelled,
-    ]
 }
 
 pub(super) fn run_items_for_machine(

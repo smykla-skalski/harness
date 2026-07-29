@@ -152,8 +152,9 @@ async fn status_from_state(
             .as_ref()
             .is_none_or(|machine| machine.accepts_any(&item.target_project_types))
     });
-    let workflow_execution_counts = workflow_statuses()
-        .into_iter()
+    let workflow_execution_counts = TaskBoardWorkflowStatus::all()
+        .iter()
+        .copied()
         .filter_map(|status| {
             let count = items
                 .clone()
@@ -184,17 +185,6 @@ async fn status_from_state(
         automation,
         settings,
     })
-}
-
-const fn workflow_statuses() -> [TaskBoardWorkflowStatus; 6] {
-    [
-        TaskBoardWorkflowStatus::Idle,
-        TaskBoardWorkflowStatus::Running,
-        TaskBoardWorkflowStatus::Paused,
-        TaskBoardWorkflowStatus::Completed,
-        TaskBoardWorkflowStatus::Failed,
-        TaskBoardWorkflowStatus::Cancelled,
-    ]
 }
 
 #[cfg(test)]
