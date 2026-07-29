@@ -45,6 +45,7 @@ pub struct TaskBoardReportOnlyReviewReport {
     pub requested_model: String,
     pub effective_model: String,
     pub summary: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub findings: Vec<TaskBoardReportOnlyReviewFinding>,
 }
 
@@ -99,9 +100,13 @@ impl TaskBoardReportOnlyReviewRequest {
         &self.head_revision
     }
 
+    /// # Panics
+    /// Panics if `untrusted_content` fails to serialize to a JSON string;
+    /// `String` serialization never fails.
     #[must_use]
     pub fn prompt(&self) -> String {
-        let content = serde_json::Value::String(self.untrusted_content.clone()).to_string();
+        let content = serde_json::to_string(&self.untrusted_content)
+            .expect("serializing a string cannot fail");
         format!(
             "Perform exactly one report-only pull request review for immutable head \
              '{}'. Do not modify files, branches, pull requests, task state, or external \
