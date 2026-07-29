@@ -57,6 +57,121 @@ public struct TaskBoardOrchestratorTickInfo: Codable, Equatable, Sendable {
   }
 }
 
+/// Thin projection of an applied dispatch inside an orchestrator run: the
+/// direct dispatch endpoint's own `TaskBoardDispatchAppliedTask` carries the
+/// full `TaskBoardItem`, but the orchestrator status embedding only ever
+/// needs the title for display, so the wire contract stops short of the
+/// domain entity.
+public struct TaskBoardOrchestratorAppliedTask: Codable, Equatable, Identifiable, Sendable {
+  public let boardItemId: String
+  public let sessionId: String
+  public let workItemId: String
+  public let itemTitle: String
+
+  public var id: String { boardItemId }
+
+  public init(boardItemId: String, sessionId: String, workItemId: String, itemTitle: String) {
+    self.boardItemId = boardItemId
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+    self.itemTitle = itemTitle
+  }
+}
+
+public struct TaskBoardOrchestratorDispatchOutcome: Codable, Equatable, Sendable {
+  public let plans: [TaskBoardDispatchPlan]
+  public let applied: [TaskBoardOrchestratorAppliedTask]
+  public let failures: [TaskBoardDispatchFailure]
+
+  public init(
+    plans: [TaskBoardDispatchPlan] = [],
+    applied: [TaskBoardOrchestratorAppliedTask],
+    failures: [TaskBoardDispatchFailure] = []
+  ) {
+    self.plans = plans
+    self.applied = applied
+    self.failures = failures
+  }
+}
+
+/// Thin projection of an evaluation record inside an orchestrator run: see
+/// `TaskBoardOrchestratorAppliedTask` for why `item` becomes `itemTitle`.
+public struct TaskBoardOrchestratorEvaluationRecord: Codable, Equatable, Identifiable, Sendable {
+  public let boardItemId: String
+  public let sessionId: String?
+  public let workItemId: String?
+  public let outcome: TaskBoardEvaluationOutcome
+  public let taskStatus: TaskStatus?
+  public let boardStatus: TaskBoardStatus?
+  public let workflowStatus: TaskBoardWorkflowStatus?
+  public let updated: Bool
+  public let reason: String?
+  public let itemTitle: String?
+
+  public var id: String { boardItemId }
+
+  public init(
+    boardItemId: String,
+    sessionId: String? = nil,
+    workItemId: String? = nil,
+    outcome: TaskBoardEvaluationOutcome,
+    taskStatus: TaskStatus? = nil,
+    boardStatus: TaskBoardStatus? = nil,
+    workflowStatus: TaskBoardWorkflowStatus? = nil,
+    updated: Bool = false,
+    reason: String? = nil,
+    itemTitle: String? = nil
+  ) {
+    self.boardItemId = boardItemId
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+    self.outcome = outcome
+    self.taskStatus = taskStatus
+    self.boardStatus = boardStatus
+    self.workflowStatus = workflowStatus
+    self.updated = updated
+    self.reason = reason
+    self.itemTitle = itemTitle
+  }
+}
+
+public struct TaskBoardOrchestratorEvaluationOutcome: Codable, Equatable, Sendable {
+  public let total: Int
+  public let evaluated: Int
+  public let updated: Int
+  public let skipped: Int
+  public let completed: Int
+  public let running: Int
+  public let reviewing: Int
+  public let blocked: Int
+  public let failed: Int
+  public let records: [TaskBoardOrchestratorEvaluationRecord]
+
+  public init(
+    total: Int = 0,
+    evaluated: Int = 0,
+    updated: Int = 0,
+    skipped: Int = 0,
+    completed: Int = 0,
+    running: Int = 0,
+    reviewing: Int = 0,
+    blocked: Int = 0,
+    failed: Int = 0,
+    records: [TaskBoardOrchestratorEvaluationRecord] = []
+  ) {
+    self.total = total
+    self.evaluated = evaluated
+    self.updated = updated
+    self.skipped = skipped
+    self.completed = completed
+    self.running = running
+    self.reviewing = reviewing
+    self.blocked = blocked
+    self.failed = failed
+    self.records = records
+  }
+}
+
 public struct TaskBoardOrchestratorRunSummary: Codable, Equatable, Sendable {
   public let runId: String
   public let startedAt: String
@@ -65,8 +180,8 @@ public struct TaskBoardOrchestratorRunSummary: Codable, Equatable, Sendable {
   public let dryRun: Bool
   public let sync: TaskBoardSyncSummary
   public let audit: TaskBoardAuditSummary
-  public let dispatch: TaskBoardDispatchSummary?
-  public let evaluation: TaskBoardEvaluationSummary?
+  public let dispatch: TaskBoardOrchestratorDispatchOutcome?
+  public let evaluation: TaskBoardOrchestratorEvaluationOutcome?
   public let error: String?
   public let policyTraceIds: [String]
 
@@ -78,8 +193,8 @@ public struct TaskBoardOrchestratorRunSummary: Codable, Equatable, Sendable {
     dryRun: Bool,
     sync: TaskBoardSyncSummary,
     audit: TaskBoardAuditSummary,
-    dispatch: TaskBoardDispatchSummary? = nil,
-    evaluation: TaskBoardEvaluationSummary? = nil,
+    dispatch: TaskBoardOrchestratorDispatchOutcome? = nil,
+    evaluation: TaskBoardOrchestratorEvaluationOutcome? = nil,
     error: String? = nil,
     policyTraceIds: [String] = []
   ) {
@@ -122,9 +237,12 @@ extension TaskBoardOrchestratorRunSummary {
       dryRun: try container.decode(Bool.self, forKey: .dryRun),
       sync: try container.decode(TaskBoardSyncSummary.self, forKey: .sync),
       audit: try container.decode(TaskBoardAuditSummary.self, forKey: .audit),
-      dispatch: try container.decodeIfPresent(TaskBoardDispatchSummary.self, forKey: .dispatch),
+      dispatch: try container.decodeIfPresent(
+        TaskBoardOrchestratorDispatchOutcome.self,
+        forKey: .dispatch
+      ),
       evaluation: try container.decodeIfPresent(
-        TaskBoardEvaluationSummary.self,
+        TaskBoardOrchestratorEvaluationOutcome.self,
         forKey: .evaluation
       ),
       error: try container.decodeIfPresent(String.self, forKey: .error),

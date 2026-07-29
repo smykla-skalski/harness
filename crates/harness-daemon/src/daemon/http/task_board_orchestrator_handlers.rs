@@ -157,7 +157,8 @@ async fn post_task_board_orchestrator_run_once(
     let result = Box::pin(super::task_board_orchestrator_run_once::run(
         &state, &request,
     ))
-    .await;
+    .await
+    .map(TaskBoardOrchestratorStatus::from);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,

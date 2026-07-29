@@ -267,7 +267,7 @@ extension RecordingHarnessClient {
         return document
       }
     return PolicyPipelinePromoteResponse(
-      document: document,
+      revision: document.revision,
       traceId: "trace-policy-2"
     )
   }

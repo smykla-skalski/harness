@@ -206,9 +206,14 @@ pub use orchestrator::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
     TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
-    TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
-    TaskBoardWorkflowExecutionCount,
+    TaskBoardOrchestratorStatusSnapshot, TaskBoardOrchestratorTickInfo,
+    TaskBoardOrchestratorTickPhase, TaskBoardWorkflowExecutionCount,
 };
+// Thin wire projections of `TaskBoardOrchestratorStatusSnapshot`/`PolicyPipelinePromoteOutcome`,
+// named for the boundary they serve rather than the module they live in: the
+// daemon's `daemon::protocol::task_board` re-export list names both bare, and
+// relies on these exact names to stay free of the task-board/policy-graph
+// domain models.
 pub use planning::{
     PlanApprovalBlockReason, PlanApprovalGate, PlanningTransition, approval_gate, approve_plan,
     begin_planning, revoke_plan, submit_plan,
@@ -228,8 +233,8 @@ pub use policy_graph::{
     PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGoLiveDiff,
     PolicyPipelineGoLiveDiffEntry, PolicyPipelineGroup, PolicyPipelineLayout,
     PolicyPipelineMakeLiveRequest, PolicyPipelineMakeLiveResponse, PolicyPipelineMode,
-    PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort, PolicyPipelinePromoteRequest,
-    PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
+    PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort, PolicyPipelinePromoteOutcome,
+    PolicyPipelinePromoteRequest, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
     PolicyPipelineSimulationResult, PolicyPipelineValidation, PolicyPipelineValidationCode,
     PolicyPipelineValidationIssue, PolicyScenario, replay::PolicyPipelineReplayDecision,
     replay::PolicyPipelineReplayResult,
@@ -250,6 +255,7 @@ pub use runtime_config::{
 #[cfg(any(test, feature = "test-support"))]
 pub use store::TaskBoardStore;
 pub use store::default_board_root;
+pub use wire::{PolicyPipelinePromoteResponse, TaskBoardOrchestratorStatus};
 // Gated to match root's own re-narrowing import in `src/task_board/mod.rs`
 // exactly: an unconditional export here would make the glob re-export leak
 // this as public API whenever root's narrowing line's condition is false,

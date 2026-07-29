@@ -477,7 +477,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
         }),
     )
     .await;
-    assert_eq!(promote["document"]["mode"].as_str(), Some("enforced"));
+    assert_eq!(promote["revision"].as_u64(), Some(saved_revision));
 
     let audit = get_json(
         &client,

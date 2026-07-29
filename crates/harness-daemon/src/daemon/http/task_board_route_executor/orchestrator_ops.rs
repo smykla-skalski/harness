@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardOrchestratorStatusResponse,
+    TaskBoardOrchestratorStatus,
 };
 use crate::daemon::service;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -20,32 +20,35 @@ use super::run_blocking;
 
 pub(crate) async fn orchestrator_status(
     state: &DaemonHttpState,
-) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+) -> Result<TaskBoardOrchestratorStatus, CliError> {
     service::task_board_orchestrator_status_db(require_async_db(
         state,
         "task board orchestrator status",
     )?)
     .await
+    .map(Into::into)
 }
 
 pub(crate) async fn start_orchestrator(
     state: &DaemonHttpState,
-) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+) -> Result<TaskBoardOrchestratorStatus, CliError> {
     service::start_task_board_orchestrator_db(require_async_db(
         state,
         "task board orchestrator start",
     )?)
     .await
+    .map(Into::into)
 }
 
 pub(crate) async fn stop_orchestrator(
     state: &DaemonHttpState,
-) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+) -> Result<TaskBoardOrchestratorStatus, CliError> {
     service::stop_task_board_orchestrator_db(require_async_db(
         state,
         "task board orchestrator stop",
     )?)
     .await
+    .map(Into::into)
 }
 
 pub(crate) async fn automation_runs(

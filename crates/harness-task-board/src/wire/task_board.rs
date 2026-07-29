@@ -12,11 +12,11 @@ pub struct TaskBoardUpdatedPayload {
 
 use crate::{
     DispatchExecutionSummary, Machine, PolicyGraphMode, PolicyInput, PolicyPipelineAuditSummary,
-    PolicyPipelineDocument, PolicyPipelineGoLiveDiff, PolicyPipelineReplayResult,
-    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, PolicyScenario,
-    TaskBoardAuditSummary, TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary,
+    PolicyPipelineDocument, PolicyPipelineGoLiveDiff, PolicyPipelinePromoteOutcome,
+    PolicyPipelineReplayResult, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
+    PolicyScenario, TaskBoardAuditSummary, TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary,
     TaskBoardGitIdentityDefaults, TaskBoardGitRuntimeConfig, TaskBoardItem,
-    TaskBoardMachineSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus,
+    TaskBoardMachineSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatusSnapshot,
     TaskBoardProgressRollup, TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
     external::{ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection},
     planning::PlanningTransition,
@@ -362,11 +362,40 @@ pub type TaskBoardDispatchResponse = DispatchExecutionSummary;
 
 pub type TaskBoardEvaluationResponse = TaskBoardEvaluationSummary;
 pub type TaskBoardAuditResponse = TaskBoardAuditSummary;
-pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatus;
-pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatus;
+// Both aliases name the daemon's full in-process status (not the thin wire
+// `TaskBoardOrchestratorStatus` this crate also exports from
+// `wire::task_board_orchestrator_status`): the status/start/stop/run-once
+// HTTP and WS handlers convert to the thin type only at their own outermost
+// boundary, since run-once's worker-claim reconciliation and the durable
+// automation loop both need the embedded `TaskBoardItem`/`DispatchAppliedTask`
+// data to re-claim dispatches and persist `TaskBoardOrchestratorState`.
+pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatusSnapshot;
+pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatusSnapshot;
 pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;
 pub type TaskBoardGitRuntimeConfigResponse = TaskBoardGitRuntimeConfig;
 pub type TaskBoardGitIdentityDefaultsResponse = TaskBoardGitIdentityDefaults;
+
+/// Thin wire projection of `PolicyPipelinePromoteOutcome`: drops the embedded
+/// `PolicyGraph` because the promote endpoint's real consumers never read it
+/// back off the response (Monitor's promote UI action calls the separate
+/// `make-live` endpoint instead, whose own response genuinely needs the full
+/// graph and is untouched here). A caller that still wants the graph after
+/// promoting reads it from the canvas/summary endpoints, the same place it
+/// already comes from today.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PolicyPipelinePromoteResponse {
+    pub revision: u64,
+    pub trace_id: String,
+}
+
+impl From<PolicyPipelinePromoteOutcome> for PolicyPipelinePromoteResponse {
+    fn from(outcome: PolicyPipelinePromoteOutcome) -> Self {
+        Self {
+            revision: outcome.document.revision,
+            trace_id: outcome.trace_id,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardGitSigningVerifyRequest {

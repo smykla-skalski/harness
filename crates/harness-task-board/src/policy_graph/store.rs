@@ -44,8 +44,16 @@ pub struct PolicyPipelinePromoteRequest {
     pub canvas_id: Option<String>,
 }
 
+/// The full result of promoting a canvas: the daemon's own working type,
+/// threaded internally (`apply_make_live` reuses it to build its own
+/// response) and exercised directly by this crate's tests. The wire-facing
+/// `PolicyPipelinePromoteResponse` (`crate::wire::task_board`) is a
+/// separate, thin projection produced at the daemon's service boundary,
+/// since the promote endpoint's real consumers never read the embedded
+/// graph back off the response, and sibling endpoints already expose the
+/// full graph where callers actually edit it.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct PolicyPipelinePromoteResponse {
+pub struct PolicyPipelinePromoteOutcome {
     pub document: PolicyGraph,
     pub trace_id: String,
 }
@@ -279,7 +287,7 @@ pub fn apply_simulate(
 pub fn apply_promote(
     ws: &mut PolicyCanvasWorkspace,
     request: &PolicyPipelinePromoteRequest,
-) -> Result<PolicyPipelinePromoteResponse, CliError> {
+) -> Result<PolicyPipelinePromoteOutcome, CliError> {
     let canvas = active_canvas_mut_for_request(ws, request.canvas_id.as_deref())?;
     if canvas.document.revision != request.revision {
         return Err(CliErrorKind::concurrent_modification(format!(
@@ -321,7 +329,7 @@ pub fn apply_promote(
         .promoted(PolicyGraphMode::Enforced, request.revision)
         .map_err(|report| validation_error(&report))?;
     canvas.mark_live(document.clone());
-    Ok(PolicyPipelinePromoteResponse {
+    Ok(PolicyPipelinePromoteOutcome {
         document,
         trace_id: new_trace_id(),
     })

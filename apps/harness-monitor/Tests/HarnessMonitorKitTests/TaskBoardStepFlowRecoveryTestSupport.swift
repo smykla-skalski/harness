@@ -150,7 +150,7 @@ extension TaskBoardStepFlowRecoveryTests {
 
   func lastRun(
     runID: String = "run-1",
-    evaluation: TaskBoardEvaluationSummary? = nil
+    evaluation: TaskBoardOrchestratorEvaluationOutcome? = nil
   ) -> TaskBoardOrchestratorRunSummary {
     TaskBoardOrchestratorRunSummary(
       runId: runID,

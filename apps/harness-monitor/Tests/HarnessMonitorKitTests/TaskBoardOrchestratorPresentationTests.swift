@@ -8,27 +8,27 @@ struct TaskBoardOrchestratorPresentationTests {
   @Test("Applied count de-duplicates a board item updated by dispatch and evaluation")
   func appliedCountUsesUniqueBoardItemIDs() {
     let item = taskBoardItem(id: "board-1", status: .inProgress)
-    let dispatch = TaskBoardDispatchSummary(
+    let dispatch = TaskBoardOrchestratorDispatchOutcome(
       plans: [],
       applied: [
-        TaskBoardDispatchAppliedTask(
+        TaskBoardOrchestratorAppliedTask(
           boardItemId: item.id,
           sessionId: "sess-1",
           workItemId: "task-1",
-          item: item
+          itemTitle: item.title
         )
       ]
     )
-    let evaluation = TaskBoardEvaluationSummary(
+    let evaluation = TaskBoardOrchestratorEvaluationOutcome(
       total: 1,
       evaluated: 1,
       updated: 1,
       records: [
-        TaskBoardEvaluationRecord(
+        TaskBoardOrchestratorEvaluationRecord(
           boardItemId: item.id,
           outcome: .workerRunning,
           updated: true,
-          item: item
+          itemTitle: item.title
         )
       ]
     )
@@ -179,8 +179,8 @@ struct TaskBoardOrchestratorPresentationTests {
 
   @Test("Failed stage follows the last durable stage present in the run")
   func failedStageUsesDurableRunStages() {
-    let dispatch = TaskBoardDispatchSummary(plans: [], applied: [])
-    let evaluation = TaskBoardEvaluationSummary(total: 1)
+    let dispatch = TaskBoardOrchestratorDispatchOutcome(plans: [], applied: [])
+    let evaluation = TaskBoardOrchestratorEvaluationOutcome(total: 1)
 
     #expect(
       TaskBoardOrchestratorPresentation.failedStage(
@@ -287,8 +287,8 @@ struct TaskBoardOrchestratorPresentationTests {
   private func orchestratorRun(
     runID: String = "run-1",
     status: TaskBoardOrchestratorRunStatus = .completed,
-    dispatch: TaskBoardDispatchSummary? = nil,
-    evaluation: TaskBoardEvaluationSummary? = nil
+    dispatch: TaskBoardOrchestratorDispatchOutcome? = nil,
+    evaluation: TaskBoardOrchestratorEvaluationOutcome? = nil
   ) -> TaskBoardOrchestratorRunSummary {
     TaskBoardOrchestratorRunSummary(
       runId: runID,

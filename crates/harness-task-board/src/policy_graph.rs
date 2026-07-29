@@ -62,7 +62,7 @@ pub use scenario::{
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelineGoLiveDiff,
     PolicyPipelineGoLiveDiffEntry, PolicyPipelineMakeLiveRequest, PolicyPipelineMakeLiveResponse,
-    PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
+    PolicyPipelinePromoteOutcome, PolicyPipelinePromoteRequest, PolicyPipelineSaveResponse,
     PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult, apply_diff_against_live,
     apply_make_live, apply_promote, apply_save_canvas_draft, apply_save_draft, apply_simulate,
     audit_summary, read_active_document,

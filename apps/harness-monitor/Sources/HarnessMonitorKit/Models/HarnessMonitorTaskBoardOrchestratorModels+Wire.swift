@@ -1,8 +1,10 @@
 import Foundation
 
 // Wire maps for the orchestrator settings + status tree. The settings reuse the GitHubProjectConfig
-// sub-tree map and the inbox config; the status reuses the sync/audit/dispatch/evaluation
-// summary maps. enabledWorkflows/dispatchStatusFilter and the tick-phase/run-status enums ride bare
+// sub-tree map and the inbox config; the status's run outcome reuses the sync/audit summary maps
+// but owns its own thin dispatch/evaluation outcome maps (below) instead of the direct dispatch/
+// evaluate endpoints' full DispatchAppliedTask/TaskBoardEvaluationRecord (item -> itemTitle).
+// enabledWorkflows/dispatchStatusFilter and the tick-phase/run-status enums ride bare
 // (decoder-agnostic), so they carry across without a per-value map.
 
 extension TaskBoardGitHubInboxConfig {
@@ -42,8 +44,63 @@ extension TaskBoardOrchestratorTickInfo {
   }
 }
 
+extension TaskBoardOrchestratorAppliedTask {
+  init(wire: TaskBoardOrchestratorAppliedTaskWire) {
+    self.init(
+      boardItemId: wire.boardItemId,
+      sessionId: wire.sessionId,
+      workItemId: wire.workItemId,
+      itemTitle: wire.itemTitle
+    )
+  }
+}
+
+extension TaskBoardOrchestratorDispatchOutcome {
+  init(wire: TaskBoardOrchestratorDispatchOutcomeWire) {
+    self.init(
+      plans: wire.plans.map(TaskBoardDispatchPlan.init(wire:)),
+      applied: wire.applied.map(TaskBoardOrchestratorAppliedTask.init(wire:)),
+      failures: wire.failures.map(TaskBoardDispatchFailure.init(wire:))
+    )
+  }
+}
+
+extension TaskBoardOrchestratorEvaluationRecord {
+  init(wire: TaskBoardOrchestratorEvaluationRecordWire) {
+    self.init(
+      boardItemId: wire.boardItemId,
+      sessionId: wire.sessionId,
+      workItemId: wire.workItemId,
+      outcome: TaskBoardEvaluationOutcome(wire: wire.outcome),
+      taskStatus: wire.taskStatus,
+      boardStatus: wire.boardStatus,
+      workflowStatus: wire.workflowStatus.map(TaskBoardWorkflowStatus.init(wire:)),
+      updated: wire.updated,
+      reason: wire.reason,
+      itemTitle: wire.itemTitle
+    )
+  }
+}
+
+extension TaskBoardOrchestratorEvaluationOutcome {
+  init(wire: TaskBoardOrchestratorEvaluationOutcomeWire) {
+    self.init(
+      total: Int(wire.total),
+      evaluated: Int(wire.evaluated),
+      updated: Int(wire.updated),
+      skipped: Int(wire.skipped),
+      completed: Int(wire.completed),
+      running: Int(wire.running),
+      reviewing: Int(wire.reviewing),
+      blocked: Int(wire.blocked),
+      failed: Int(wire.failed),
+      records: wire.records.map(TaskBoardOrchestratorEvaluationRecord.init(wire:))
+    )
+  }
+}
+
 extension TaskBoardOrchestratorRunSummary {
-  init(wire: TaskBoardOrchestratorRunSummaryWire) {
+  init(wire: TaskBoardOrchestratorRunOutcomeWire) {
     self.init(
       runId: wire.runId,
       startedAt: wire.startedAt,
@@ -52,8 +109,8 @@ extension TaskBoardOrchestratorRunSummary {
       dryRun: wire.dryRun,
       sync: TaskBoardSyncSummary(wire: wire.sync),
       audit: TaskBoardAuditSummary(wire: wire.audit),
-      dispatch: wire.dispatch.map(TaskBoardDispatchSummary.init(wire:)),
-      evaluation: wire.evaluation.map(TaskBoardEvaluationSummary.init(wire:)),
+      dispatch: wire.dispatch.map(TaskBoardOrchestratorDispatchOutcome.init(wire:)),
+      evaluation: wire.evaluation.map(TaskBoardOrchestratorEvaluationOutcome.init(wire:)),
       error: wire.error,
       policyTraceIds: wire.policyTraceIds
     )
