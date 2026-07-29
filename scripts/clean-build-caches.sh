@@ -15,9 +15,10 @@
 #
 # sccache is reported but NOT removed by default. A running sccache server
 # pins its cache directory at startup, so deleting it out from under the server
-# turns every later compile into a write error until the server restarts; the
-# server is stopped first when removal does run. The cache is removed only when
-# its total size exceeds SCCACHE_REMOVE_THRESHOLD (100G) or --force/-f is given.
+# turns every later compile into a write error until the server restarts. The
+# server is stopped at the top of the sccache step (so it never outlives its
+# cache), and the cache is removed only when its total size exceeds
+# SCCACHE_REMOVE_THRESHOLD_KB (100G) or --force/-f is given.
 #
 # target/ is shared across every worktree via cargo-local.sh's
 # CARGO_TARGET_DIR: target/dev/local-v<format> for the main checkout, or

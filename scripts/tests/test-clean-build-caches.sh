@@ -435,30 +435,32 @@ PY
   pass
 }
 
-# Regression for a Copilot finding: two candidate paths that alias the same
-# physical directory through a symlink must count once, not twice, or a symlinked
-# Caches could double the weight and falsely trip the 100G threshold. Here the
-# Mozilla.sccache and Library/Caches/sccache entries point at one real directory.
+# Regression for a Copilot finding: two candidate paths that resolve to the same
+# physical directory must be deduped, so a symlinked Caches cannot produce two
+# per-dir lines for one cache. The observable invariant is the per-dir line
+# count: two aliasing candidates print one line, not two. (du -sk on a symlink
+# to a directory reports 0, so size alone would not prove dedup.)
 scenario_dedupes_symlinked_sccache_cache_dirs() {
   start_test "symlinked sccache cache dirs are deduped to their physical path"
   reset_tmp_root
   local repo="$TEST_TMP_ROOT/repo"
-  local output=""
+  local output="" per_dir_lines
 
   make_shared_target_fixture "$repo"
   mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
   echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
-  # Make the second macOS path a symlink to the first, so they alias one dir.
+  # Make the second macOS path a symlink to the first, so both candidates
+  # resolve to one physical directory.
   ln -s "$repo/fake-home/Library/Caches/Mozilla.sccache" "$repo/fake-home/Library/Caches/sccache"
 
   output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
     ./scripts/clean-build-caches.sh --dry-run 2>&1)" || { fail "dry-run exited non-zero: $output"; return 1; }
 
-  # The total line must list only one directory's size (4K), not double it.
-  local total_line
-  total_line="$(grep -F 'sccache cache' <<<"$output" | grep -F 'total')" || { fail "no sccache total line: $output"; return 1; }
-  if grep -Eq '8[.]0K' <<<"$total_line"; then
-    fail "symlinked dir counted twice: $total_line"
+  # Count the per-dir lines: they list the resolved relative paths and skip the
+  # 'total' summary line. Two aliasing candidates must collapse to one line.
+  per_dir_lines="$(grep -Fc 'Library/Caches/' <<<"$(grep -Fv 'total' <<<"$output")")"
+  if [[ "$per_dir_lines" != "1" ]]; then
+    fail "symlinked dir not deduped: expected 1 per-dir line, got $per_dir_lines: $output"
     return 1
   fi
   pass
