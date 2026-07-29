@@ -144,7 +144,7 @@ fn retry_update(
         .artifacts
         .diagnostics
         .push(TaskBoardExecutionDiagnostic {
-            code: "cleanup_verification_failed".into(),
+            code: "publish_verification_failed".into(),
             message: "GitHub cleanup confirmation is not visible yet".into(),
             recorded_at: UPDATED_AT.into(),
         });
