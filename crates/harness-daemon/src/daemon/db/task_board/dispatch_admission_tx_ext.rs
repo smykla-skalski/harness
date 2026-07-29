@@ -36,14 +36,12 @@
 //! (`admission_lifecycle.rs`, `dispatch_intents.rs`, `dispatch_intents_helpers.rs`),
 //! so this file stays a pure interface plus wiring.
 
-use async_trait::async_trait;
 use sqlx::{Sqlite, Transaction};
 
 use super::admission_lifecycle::TaskBoardAdmissionCheck;
 use crate::daemon::db::CliError;
 use crate::task_board::{DispatchAppliedTask, TaskBoardItem};
 
-#[async_trait]
 pub(in crate::daemon::db::task_board) trait TaskBoardDispatchAdmissionTxExt {
     async fn has_active_dispatch_reservation_in_tx(
         &mut self,
@@ -105,7 +103,6 @@ pub(in crate::daemon::db::task_board) trait TaskBoardDispatchAdmissionTxExt {
     ) -> Result<(), CliError>;
 }
 
-#[async_trait]
 impl TaskBoardDispatchAdmissionTxExt for Transaction<'_, Sqlite> {
     async fn has_active_dispatch_reservation_in_tx(
         &mut self,
