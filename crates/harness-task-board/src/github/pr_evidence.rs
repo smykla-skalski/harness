@@ -8,10 +8,15 @@ use harness_workspace::workspace::utc_now;
 
 use crate::normalize_repository_slug;
 
+mod action_gate;
 mod check_wait;
 mod gates;
 mod github_source;
 
+pub use action_gate::{
+    ActionGateBlock, ActionGateDecision, ActionGateRequirement, evaluate_action_gates,
+    verify_action_gates,
+};
 pub use check_wait::{
     CheckWait, CheckWaitControls, CheckWaitOutcome, CheckWaitProgress, poll_check_wait,
 };
