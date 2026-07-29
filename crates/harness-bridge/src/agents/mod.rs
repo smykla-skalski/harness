@@ -6,3 +6,4 @@ pub mod kind {
 
 pub use harness_agents::policy;
 pub use harness_agents::runtime;
+pub use harness_agents::turn;
