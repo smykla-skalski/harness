@@ -1,16 +1,16 @@
 use clap::Args;
 
-use harness_kernel::io;
-use crate::service;
-use crate::types::{
+use crate::session::service;
+use crate::session::types::{
     ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,
 };
-use crate::wire::{
+use crate::session::wire::{
     SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
 use harness_daemon_client::DaemonClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io;
 use harness_workspace::command_context::{AppContext, Execute};
 
 use super::support::{daemon_client_error, print_json, resolve_project_dir};

@@ -48,8 +48,12 @@ pub fn create_task(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    let _ =
-        session_service::create_task_with_source(session_id, &spec, &request.actor, project_dir)?;
+    let _ = session_service::create_task_with_source_local(
+        session_id,
+        &spec,
+        &request.actor,
+        project_dir,
+    )?;
     session_detail(session_id, db)
 }
 
@@ -113,7 +117,7 @@ pub fn delete_task(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::delete_task(session_id, task_id, &request.actor, project_dir)?;
+    session_service::delete_task_local(session_id, task_id, &request.actor, project_dir)?;
     session_detail(session_id, db)
 }
 
@@ -165,7 +169,7 @@ pub fn assign_task(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::assign_task(
+    session_service::assign_task_local(
         session_id,
         task_id,
         &request.agent_id,
@@ -225,7 +229,7 @@ pub fn drop_task(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::drop_task(
+    session_service::drop_task_local(
         session_id,
         task_id,
         &request.target,
@@ -352,7 +356,7 @@ pub fn update_task(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::update_task(
+    session_service::update_task_local(
         session_id,
         task_id,
         request.status,
@@ -406,7 +410,7 @@ pub fn checkpoint_task(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    let _ = session_service::record_task_checkpoint(
+    let _ = session_service::record_task_checkpoint_local(
         session_id,
         task_id,
         &request.actor,

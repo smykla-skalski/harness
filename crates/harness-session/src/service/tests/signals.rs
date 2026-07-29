@@ -19,15 +19,15 @@ fn list_sessions_returns_all_when_requested() {
             Some("00000000-0000-4002-8000-00000000003f"),
         )
         .expect("start two");
-        end_session(
+        end_session_local(
             "00000000-0000-4002-8000-00000000001a",
             first.leader_id.as_deref().expect("leader"),
             project,
         )
         .expect("end");
 
-        let active_only = list_sessions(project, false).expect("active list");
-        let all_sessions = list_sessions(project, true).expect("all list");
+        let active_only = list_sessions_local(project, false).expect("active list");
+        let all_sessions = list_sessions_local(project, true).expect("all list");
         assert_eq!(active_only.len(), 1);
         assert_eq!(all_sessions.len(), 2);
     });
@@ -83,14 +83,14 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
             Some("00000000-0000-4002-8000-000000000043"),
         )
         .expect("start ended");
-        end_session(
+        end_session_local(
             "00000000-0000-4002-8000-000000000043",
             ended.leader_id.as_deref().expect("leader"),
             project,
         )
         .expect("end session");
 
-        let visible_ids = list_sessions(project, false)
+        let visible_ids = list_sessions_local(project, false)
             .expect("default list")
             .into_iter()
             .map(|state| state.session_id)
@@ -116,7 +116,7 @@ fn list_sessions_default_visibility_includes_awaiting_leader_active_and_leaderle
                 .any(|id| id == "00000000-0000-4002-8000-000000000043")
         );
 
-        let all_ids = list_sessions(project, true)
+        let all_ids = list_sessions_local(project, true)
             .expect("all list")
             .into_iter()
             .map(|state| state.session_id)
@@ -166,7 +166,7 @@ fn checkpoint_record_updates_task_summary_and_log() {
         )
         .expect("task");
 
-        let checkpoint = record_task_checkpoint(
+        let checkpoint = record_task_checkpoint_local(
             "00000000-0000-4002-8000-000000000025",
             &task.task_id,
             &leader_id,
@@ -227,7 +227,7 @@ fn send_signal_lists_pending_signal_for_target_agent() {
             .expect("worker id")
             .clone();
 
-        send_signal(
+        send_signal_local(
             "00000000-0000-4002-8000-000000000027",
             &worker_id,
             "inject_context",
@@ -238,7 +238,7 @@ fn send_signal_lists_pending_signal_for_target_agent() {
         )
         .expect("signal");
 
-        let signals = list_signals(
+        let signals = list_signals_local(
             "00000000-0000-4002-8000-000000000027",
             Some(&worker_id),
             project,
@@ -310,7 +310,7 @@ fn list_signals_filters_shared_runtime_session_history() {
             .expect("beta worker id")
             .clone();
 
-        send_signal(
+        send_signal_local(
             "00000000-0000-4002-8000-000000000026",
             &worker_one,
             "inject_context",
@@ -320,7 +320,7 @@ fn list_signals_filters_shared_runtime_session_history() {
             project,
         )
         .expect("alpha signal");
-        send_signal(
+        send_signal_local(
             "00000000-0000-4002-8000-000000000040",
             &worker_two,
             "inject_context",
@@ -331,13 +331,13 @@ fn list_signals_filters_shared_runtime_session_history() {
         )
         .expect("beta signal");
 
-        let alpha_signals = list_signals(
+        let alpha_signals = list_signals_local(
             "00000000-0000-4002-8000-000000000026",
             Some(&worker_one),
             project,
         )
         .expect("alpha signals");
-        let beta_signals = list_signals(
+        let beta_signals = list_signals_local(
             "00000000-0000-4002-8000-000000000040",
             Some(&worker_two),
             project,
@@ -379,7 +379,7 @@ fn send_signal_denies_worker_actor() {
             .expect("worker id")
             .clone();
 
-        let error = send_signal(
+        let error = send_signal_local(
             "00000000-0000-4002-8000-000000000028",
             &worker_id,
             "inject_context",

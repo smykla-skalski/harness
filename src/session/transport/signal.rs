@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::service;
+use crate::session::service;
 use harness_kernel::errors::CliError;
 use harness_workspace::command_context::{AppContext, Execute};
 

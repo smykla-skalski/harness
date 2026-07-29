@@ -125,27 +125,52 @@ mod tests;
 // in the root crate call these directly for daemon-managed sessions.
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub use lifecycle::{apply_leave_session, apply_update_session_title};
+// `leave_session`, `start_session_with_policy`, and `join_session_with_fallback`
+// keep their former fused shape (dial-or-local in one function) instead of
+// splitting like their siblings below. `leave_session` has a genuine
+// production consumer outside the CLI and the daemon, `harness-hooks`,
+// which has no dependency path to the root crate's network wrapper.
+// `start_session_with_policy` and `join_session_with_fallback` are reached
+// directly, with no prior local resolution step, by `daemon::service::direct`'s
+// own no-local-database fallback - which is expected to dial a live,
+// database-backed daemon rather than fork state, and which `harness-daemon`
+// reaches through this crate directly (its own facade never goes through
+// the root crate). See `daemon::service::tests::direct_session_start` for
+// the test that proved splitting this one is unsafe.
 pub use lifecycle::{
-    assign_role, end_session, join_session, join_session_with_fallback, leave_session,
-    remove_agent, start_session, start_session_with_policy, transfer_leader, update_session_title,
+    assign_role_local, end_session_local, join_session, join_session_with_fallback, leave_session,
+    remove_agent_local, start_session, start_session_with_policy, transfer_leader_local,
+    update_session_title_local,
 };
 pub use liveness::{LivenessSyncResult, sync_agent_liveness};
+// `session_status`, `session_agent_is_alive`, `build_recovery_tui_request`,
+// and `resolve_session_project_dir` keep their former fused shape for the
+// same reason as `leave_session` above: `session_agent_is_alive` is a
+// `harness-hooks` production call site that transitively needs
+// `session_status`'s dial capability, and `resolve_session_project_dir` is
+// called from inside functions on both sides of that split.
 pub use queries::{
-    build_recovery_tui_request, list_sessions, list_sessions_global, resolve_session_project_dir,
-    session_agent_is_alive, session_status,
+    build_recovery_tui_request, list_sessions_global_local, list_sessions_local,
+    resolve_session_project_dir, session_agent_is_alive, session_status,
 };
 pub use review_tasks::{
     arbitrate, claim_review, respond_review, submit_for_review, submit_for_review_with_persona,
     submit_review,
 };
+// `register_agent_runtime_session` keeps its former fused shape: it is a
+// direct `harness-hooks` production call site with no CLI-transport caller
+// at all, so there is no network wrapper for it to split away from.
 pub use runtime_registration::register_agent_runtime_session;
+// `resolve_session_agent_for_runtime_session` and `record_signal_acknowledgment`
+// keep their former fused shape for the same `harness-hooks` reason as above.
 pub use signals::{
-    cancel_signal, list_signals, record_signal_acknowledgment,
-    resolve_session_agent_for_runtime_session, send_signal,
+    cancel_signal_local, list_signals_local, record_signal_acknowledgment,
+    resolve_session_agent_for_runtime_session, send_signal_local,
 };
 pub use tasks::{
-    assign_task, create_task, create_task_with_source, delete_task, drop_task, list_tasks,
-    record_task_checkpoint, update_task, update_task_queue_policy,
+    assign_task_local, create_task, create_task_with_source_local, delete_task_local,
+    drop_task_local, list_tasks, record_task_checkpoint_local, update_task_local,
+    update_task_queue_policy,
 };
 
 // The submodules below are private (`mod`, not `pub mod`) and re-exported

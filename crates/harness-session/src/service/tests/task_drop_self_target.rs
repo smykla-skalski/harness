@@ -36,10 +36,10 @@ fn drop_task_to_same_agent_after_assign_starts_instead_of_self_queueing() {
         )
         .expect("task");
 
-        assign_task(session_id, &task.task_id, &worker_id, &leader_id, project)
+        assign_task_local(session_id, &task.task_id, &worker_id, &leader_id, project)
             .expect("00000000-0000-4002-8000-000000000005");
 
-        drop_task(
+        drop_task_local(
             session_id,
             &task.task_id,
             &wire::TaskDropTarget::Agent {
@@ -59,7 +59,7 @@ fn drop_task_to_same_agent_after_assign_starts_instead_of_self_queueing() {
             task.queued_at.is_none(),
             "task must not be queued behind itself"
         );
-        let signals = list_signals(session_id, Some(&worker_id), project).expect("signals");
+        let signals = list_signals_local(session_id, Some(&worker_id), project).expect("signals");
         let start_signal = signals
             .iter()
             .find(|record| record.signal.command == START_TASK_SIGNAL_COMMAND)

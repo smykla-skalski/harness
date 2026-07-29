@@ -31,6 +31,19 @@ pub fn start_session(
 
 /// Start a new leaderless session with an optional policy preset.
 ///
+/// Unlike its siblings elsewhere in this file, this one keeps its former
+/// fused shape (dial-or-local in one function) rather than splitting: the
+/// daemon's own no-local-database fallback (`start_session_direct`) calls
+/// this directly, and when that daemon instance itself has no database it
+/// is expected to forward session creation to another, database-backed
+/// daemon over HTTP rather than fork local state - proven by
+/// `daemon::service::tests::direct_session_start::start_session_direct_without_db_forwards_policy_preset_to_daemon_client`,
+/// which runs synchronously (no tokio runtime) with a fake daemon standing
+/// in for that receiving daemon. `harness-daemon` reaches this function
+/// directly (its own `session.rs` facade points straight at this crate,
+/// never through the root crate's network wrapper), so the dial decision
+/// has to stay reachable from here.
+///
 /// # Errors
 /// Returns `CliError` on storage failures.
 pub fn start_session_with_policy(
@@ -105,6 +118,12 @@ pub fn join_session(
 }
 
 /// Register an agent into an existing session with an optional fallback role.
+///
+/// Keeps its former fused shape for the same reason `start_session_with_policy`
+/// above does: `join_session_direct`'s no-local-database fallback reaches
+/// this directly with no prior local resolution step, so it needs the real
+/// dial-or-local decision, and `harness-daemon`'s own facade points straight
+/// at this crate.
 ///
 /// # Errors
 /// Returns `CliError` if the session is not active or on storage failures.
@@ -191,28 +210,23 @@ pub fn join_session_with_fallback(
     Ok(state)
 }
 
-/// End a session that has not already ended (leader or control plane only).
+/// End a session that has not already ended (leader or control plane only),
+/// applying the mutation to local storage unconditionally.
+///
+/// Domain-only half of the former fused function: `daemon::service::mutations::sessions::end_session`
+/// calls this directly as its own no-database-row fallback, from inside the
+/// daemon's own async runtime, so it must never try to dial a live daemon
+/// itself. The network wrapper lives at `harness::session::service::end_session`
+/// in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission, workers have active tasks,
 /// or on storage failures.
-pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Result<(), CliError> {
-    // `daemon::service::mutations::sessions::end_session` calls this directly
-    // as its own no-database-row fallback, from inside the daemon's own async
-    // runtime, so the same self-call guard applies here.
-    if Handle::try_current().is_err()
-        && let Some(client) = DaemonClient::try_connect()
-    {
-        validate_safe_segment(session_id)?;
-        let request = wire::SessionEndRequest {
-            actor: actor_id.to_string(),
-        };
-        let _: wire::SessionDetail = client
-            .post(&format!("/v1/sessions/{session_id}/end"), &request)
-            .map_err(|error| daemon_client_error("end session", &error))?;
-        return Ok(());
-    }
-
+pub fn end_session_local(
+    session_id: &str,
+    actor_id: &str,
+    project_dir: &Path,
+) -> Result<(), CliError> {
     let now = utc_now();
     let mut leave_signals = Vec::new();
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
@@ -230,11 +244,18 @@ pub fn end_session(session_id: &str, actor_id: &str, project_dir: &Path) -> Resu
     Ok(())
 }
 
-/// Assign or change the role of an agent (leader only).
+/// Assign or change the role of an agent (leader only), applying the
+/// mutation to local storage unconditionally.
+///
+/// Domain-only half of the former fused function: `daemon::service::mutations::agents::change_role`
+/// calls this directly as its own no-database-row fallback, from inside the
+/// daemon's own async runtime, so it must never try to dial a live daemon
+/// itself. The network wrapper lives at `harness::session::service::assign_role`
+/// in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission or the agent is not found.
-pub fn assign_role(
+pub fn assign_role_local(
     session_id: &str,
     agent_id: &str,
     role: SessionRole,
@@ -242,26 +263,6 @@ pub fn assign_role(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    // `daemon::service::mutations::agents::change_role` calls this directly as
-    // its own no-database-row fallback, from inside the daemon's own async
-    // runtime, so the same self-call guard applies here.
-    if Handle::try_current().is_err()
-        && let Some(client) = DaemonClient::try_connect()
-    {
-        validate_safe_segment(session_id)?;
-        validate_safe_segment(agent_id)?;
-        let request = wire::RoleChangeRequest {
-            actor: actor_id.to_string(),
-            role,
-            reason: reason.map(ToString::to_string),
-        };
-        let url = format!("/v1/sessions/{session_id}/agents/{agent_id}/role");
-        let _: wire::SessionDetail = client
-            .post(&url, &request)
-            .map_err(|error| daemon_client_error("assign role", &error))?;
-        return Ok(());
-    }
-
     let now = utc_now();
     let mut from_role = SessionRole::Worker;
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
@@ -281,34 +282,23 @@ pub fn assign_role(
     Ok(())
 }
 
-/// Remove an agent from a session (leader only).
+/// Remove an agent from a session (leader only), applying the mutation to
+/// local storage unconditionally.
+///
+/// Domain-only half of the former fused function: `daemon::service::mutations::agents::remove_agent`
+/// calls this directly as its own no-database-row fallback, from inside the
+/// daemon's own async runtime, so it must never try to dial a live daemon
+/// itself. The network wrapper lives at `harness::session::service::remove_agent`
+/// in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission or the agent is not found.
-pub fn remove_agent(
+pub fn remove_agent_local(
     session_id: &str,
     agent_id: &str,
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    // `daemon::service::mutations::agents::remove_agent` calls this directly as
-    // its own no-database-row fallback, from inside the daemon's own async
-    // runtime, so the same self-call guard applies here.
-    if Handle::try_current().is_err()
-        && let Some(client) = DaemonClient::try_connect()
-    {
-        validate_safe_segment(session_id)?;
-        validate_safe_segment(agent_id)?;
-        let request = wire::AgentRemoveRequest {
-            actor: actor_id.to_string(),
-        };
-        let url = format!("/v1/sessions/{session_id}/agents/{agent_id}/remove");
-        let _: wire::SessionDetail = client
-            .post(&url, &request)
-            .map_err(|error| daemon_client_error("remove agent", &error))?;
-        return Ok(());
-    }
-
     let now = utc_now();
     let mut leave_signal = None;
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
@@ -329,35 +319,24 @@ pub fn remove_agent(
     Ok(())
 }
 
-/// Transfer leadership to another agent.
+/// Transfer leadership to another agent, applying the mutation to local
+/// storage unconditionally.
+///
+/// Domain-only half of the former fused function: `daemon::service::mutations::sessions::transfer_leader`
+/// calls this directly as its own no-database-row fallback, from inside the
+/// daemon's own async runtime, so it must never try to dial a live daemon
+/// itself. The network wrapper lives at `harness::session::service::transfer_leader`
+/// in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission or the target is not found.
-pub fn transfer_leader(
+pub fn transfer_leader_local(
     session_id: &str,
     new_leader_id: &str,
     reason: Option<&str>,
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    // `daemon::service::mutations::sessions::transfer_leader` calls this
-    // directly as its own no-database-row fallback, from inside the daemon's
-    // own async runtime, so the same self-call guard applies here.
-    if Handle::try_current().is_err()
-        && let Some(client) = DaemonClient::try_connect()
-    {
-        validate_safe_segment(session_id)?;
-        let request = wire::LeaderTransferRequest {
-            actor: actor_id.to_string(),
-            new_leader_id: new_leader_id.to_string(),
-            reason: reason.map(ToString::to_string),
-        };
-        let _: wire::SessionDetail = client
-            .post(&format!("/v1/sessions/{session_id}/leader"), &request)
-            .map_err(|error| daemon_client_error("transfer leader", &error))?;
-        return Ok(());
-    }
-
     let now = utc_now();
     let mut transfer = None;
     let layout = storage::layout_from_project_dir(project_dir, session_id)?;
@@ -444,28 +423,21 @@ pub fn leave_session(session_id: &str, agent_id: &str, project_dir: &Path) -> Re
     Ok(())
 }
 
-/// Update a session title.
+/// Update a session title, applying the mutation to local storage
+/// unconditionally.
+///
+/// Domain-only half of the former fused function; no daemon-side caller
+/// reaches this directly (unlike its siblings above). The network wrapper
+/// lives at `harness::session::service::update_session_title` in the root
+/// crate.
 ///
 /// # Errors
 /// Returns `CliError` if the session cannot be found or persisted.
-pub fn update_session_title(
+pub fn update_session_title_local(
     session_id: &str,
     title: &str,
     project_dir: &Path,
 ) -> Result<SessionState, CliError> {
-    // No daemon-side caller reaches this directly (unlike its siblings above),
-    // so it needs no tokio-runtime guard.
-    if let Some(client) = DaemonClient::try_connect() {
-        validate_safe_segment(session_id)?;
-        let request = wire::SessionTitleRequest {
-            title: title.to_string(),
-        };
-        let response: wire::SessionMutationResponse = client
-            .post(&format!("/v1/sessions/{session_id}/title"), &request)
-            .map_err(|error| daemon_client_error("update session title", &error))?;
-        return Ok(response.state);
-    }
-
     let project = resolve_session_project_dir(session_id, project_dir)?;
     let now = utc_now();
     let layout = storage::layout_from_project_dir(&project, session_id)?;

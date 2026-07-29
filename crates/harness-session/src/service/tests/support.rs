@@ -92,7 +92,7 @@ pub(super) fn accept_task_start_signal(session_id: &str, worker_id: &str, projec
     let worker = state.agents.get(worker_id).expect("worker registration");
     let runtime = runtime::runtime_for_name(worker.runtime.runtime_name()).expect("runtime");
     let worker_session_id = worker.agent_session_id.clone().expect("worker session id");
-    let signals = list_signals(session_id, Some(worker_id), project).expect("signals");
+    let signals = list_signals_local(session_id, Some(worker_id), project).expect("signals");
     let start_signal = signals
         .iter()
         .find(|record| record.signal.command == START_TASK_SIGNAL_COMMAND)

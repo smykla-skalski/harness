@@ -41,7 +41,7 @@ fn leave_session_marks_agent_disconnected() {
             project,
         )
         .expect("create task");
-        assign_task(
+        assign_task_local(
             "00000000-0000-4002-8000-000000000016",
             &task.task_id,
             &worker_id,

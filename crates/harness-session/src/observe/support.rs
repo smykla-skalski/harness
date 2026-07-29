@@ -96,7 +96,7 @@ pub(super) fn create_work_items_for_issues(
             source: TaskSource::Observe,
             observe_issue_id: Some(&issue.id),
         };
-        let _ = service::create_task_with_source(session_id, &spec, actor_id, project_dir)?;
+        let _ = service::create_task_with_source_local(session_id, &spec, actor_id, project_dir)?;
     }
     Ok(())
 }

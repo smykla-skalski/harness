@@ -12,12 +12,19 @@ use harness_daemon_client::DaemonClient;
 use harness_kernel::io::validate_safe_segment;
 use tokio::runtime::Handle;
 
-/// Send a file-backed signal to a running agent session.
+/// Send a file-backed signal to a running agent session, applying the
+/// mutation to local storage unconditionally.
+///
+/// Domain-only half of the former fused function: `daemon::service::signals::send_signal`
+/// calls this directly as its own no-database-row fallback, from inside the
+/// daemon's own async runtime, so it must never try to dial a live daemon
+/// itself. The network wrapper lives at `harness::session::service::send_signal`
+/// in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` if the caller lacks permission, the target agent is not
 /// active, or the runtime adapter is unknown.
-pub fn send_signal(
+pub fn send_signal_local(
     session_id: &str,
     agent_id: &str,
     command: &str,
@@ -26,35 +33,6 @@ pub fn send_signal(
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<SessionSignalRecord, CliError> {
-    // `daemon::service::signals::send_signal` calls this directly as its own
-    // no-database-row fallback, from inside the daemon's own async runtime, so
-    // the same self-call guard applies here.
-    if Handle::try_current().is_err()
-        && let Some(client) = DaemonClient::try_connect()
-    {
-        validate_safe_segment(session_id)?;
-        let request = wire::SignalSendRequest {
-            actor: actor_id.to_string(),
-            agent_id: agent_id.to_string(),
-            command: command.to_string(),
-            message: message.to_string(),
-            action_hint: action_hint.map(ToString::to_string),
-        };
-        let detail: wire::SessionDetail = client
-            .post(&format!("/v1/sessions/{session_id}/signal"), &request)
-            .map_err(|error| daemon_client_error("send signal", &error))?;
-        return detail
-            .signals
-            .into_iter()
-            .find(|signal| signal.signal.command == command && signal.agent_id == agent_id)
-            .ok_or_else(|| {
-                CliErrorKind::workflow_io(
-                    "daemon sent signal but returned no matching signal record",
-                )
-                .into()
-            });
-    }
-
     let now = utc_now();
     let mut runtime_name = String::new();
     let mut target_agent_session_id = None;
@@ -103,7 +81,8 @@ pub fn send_signal(
 }
 
 /// Cancel a pending signal by writing a rejected acknowledgment and moving the
-/// signal file out of pending.
+/// signal file out of pending, applying the mutation to local storage
+/// unconditionally.
 ///
 /// Signal delivery is passive: the runtime's agent hook cycles read pending
 /// signals and write acks. When a user cancels from the monitor, we write the
@@ -111,38 +90,23 @@ pub fn send_signal(
 /// deliver the signal, and the monitor shows a consistent state on its next
 /// snapshot.
 ///
+/// Domain-only half of the former fused function: `daemon::service::signals::cancel_signal`
+/// calls this directly and unconditionally (even with a local DB present,
+/// since the signal file itself is always file-backed), from inside the
+/// daemon's own async runtime, so it must never try to dial a live daemon
+/// itself. The network wrapper lives at `harness::session::service::cancel_signal`
+/// in the root crate.
+///
 /// # Errors
 /// Returns `CliError` when the session/agent cannot be resolved, the signal
 /// file cannot be found, or ack persistence fails.
-pub fn cancel_signal(
+pub fn cancel_signal_local(
     session_id: &str,
     agent_id: &str,
     signal_id: &str,
     actor_id: &str,
     project_dir: &Path,
 ) -> Result<(), CliError> {
-    // `daemon::service::signals::cancel_signal` calls this directly and
-    // unconditionally (even with a local DB present, since the signal file
-    // itself is always file-backed), from inside the daemon's own async
-    // runtime, so the same self-call guard applies here.
-    if Handle::try_current().is_err()
-        && let Some(client) = DaemonClient::try_connect()
-    {
-        validate_safe_segment(session_id)?;
-        let request = wire::SignalCancelRequest {
-            actor: actor_id.to_string(),
-            agent_id: agent_id.to_string(),
-            signal_id: signal_id.to_string(),
-        };
-        let _: wire::SessionDetail = client
-            .post(
-                &format!("/v1/sessions/{session_id}/signal-cancel"),
-                &request,
-            )
-            .map_err(|error| daemon_client_error("cancel signal", &error))?;
-        return Ok(());
-    }
-
     let state = load_state_or_err(session_id, project_dir)?;
     let agent = state.agents.get(agent_id).ok_or_else(|| {
         CliError::from(CliErrorKind::session_agent_conflict(format!(
@@ -188,32 +152,21 @@ pub fn cancel_signal(
     Ok(())
 }
 
-/// List all signals for a session, optionally narrowed to one agent.
+/// List all signals for a session, optionally narrowed to one agent, reading
+/// local storage unconditionally.
+///
+/// Domain-only half of the former fused function; no daemon-side caller
+/// reaches this directly. The network wrapper lives at
+/// `harness::session::service::list_signals` in the root crate.
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be loaded or runtime signal
 /// directories cannot be read.
-pub fn list_signals(
+pub fn list_signals_local(
     session_id: &str,
     agent_filter: Option<&str>,
     project_dir: &Path,
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
-    // No daemon-side caller reaches this directly, so it needs no
-    // tokio-runtime guard.
-    if let Some(client) = DaemonClient::try_connect() {
-        validate_safe_segment(session_id)?;
-        let detail: wire::SessionDetail = client
-            .get(&format!("/v1/sessions/{session_id}"), &[])
-            .map_err(|error| daemon_client_error("get session detail", &error))?;
-        let mut signals: Vec<SessionSignalRecord> = detail
-            .signals
-            .into_iter()
-            .filter(|signal| agent_filter.is_none_or(|filter| signal.agent_id == filter))
-            .collect();
-        signals.sort_by(|left, right| right.signal.created_at.cmp(&left.signal.created_at));
-        return Ok(signals);
-    }
-
     reconcile_expired_pending_signals(session_id, project_dir)?;
     let state = load_state_or_err(session_id, project_dir)?;
     let mut signals = Vec::new();

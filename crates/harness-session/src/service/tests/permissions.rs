@@ -38,7 +38,7 @@ fn removed_agent_loses_mutation_permissions() {
         )
         .expect("task");
 
-        remove_agent(
+        remove_agent_local(
             "00000000-0000-4002-8000-00000000001c",
             &worker_id,
             &leader_id,
@@ -46,7 +46,7 @@ fn removed_agent_loses_mutation_permissions() {
         )
         .expect("remove");
 
-        let error = update_task(
+        let error = update_task_local(
             "00000000-0000-4002-8000-00000000001c",
             &task.task_id,
             TaskStatus::Done,
@@ -88,7 +88,7 @@ fn assign_role_rejects_leader_changes() {
             .expect("worker id")
             .clone();
 
-        let error = assign_role(
+        let error = assign_role_local(
             "00000000-0000-4002-8000-000000000021",
             &worker_id,
             SessionRole::Leader,
@@ -139,7 +139,7 @@ fn assign_task_requires_active_assignee() {
         )
         .expect("task");
 
-        remove_agent(
+        remove_agent_local(
             "00000000-0000-4002-8000-000000000005",
             &worker_id,
             &leader_id,
@@ -147,7 +147,7 @@ fn assign_task_requires_active_assignee() {
         )
         .expect("remove");
 
-        let error = assign_task(
+        let error = assign_task_local(
             "00000000-0000-4002-8000-000000000005",
             &task.task_id,
             &worker_id,
@@ -201,7 +201,7 @@ fn improver_cannot_assign_tasks_under_swarm_contract() {
         )
         .expect("task");
 
-        let error = assign_task(
+        let error = assign_task_local(
             "00000000-0000-4002-8000-000000000004",
             &task.task_id,
             &improver_id,
@@ -254,7 +254,7 @@ fn leader_cannot_assign_task_to_observer() {
         )
         .expect("task");
 
-        let error = assign_task(
+        let error = assign_task_local(
             "00000000-0000-4002-8000-00000000001b",
             &task.task_id,
             &observer_id,
@@ -295,7 +295,7 @@ fn transfer_leader_requires_active_target() {
             .expect("worker id")
             .clone();
 
-        remove_agent(
+        remove_agent_local(
             "00000000-0000-4002-8000-00000000003b",
             &worker_id,
             &leader_id,
@@ -303,7 +303,7 @@ fn transfer_leader_requires_active_target() {
         )
         .expect("remove");
 
-        let error = transfer_leader(
+        let error = transfer_leader_local(
             "00000000-0000-4002-8000-00000000003b",
             &worker_id,
             None,
@@ -347,7 +347,7 @@ fn observer_transfer_leader_creates_pending_request() {
             .expect("observer id")
             .clone();
 
-        transfer_leader(
+        transfer_leader_local(
             "00000000-0000-4002-8000-000000000039",
             &observer_id,
             Some("leader is overloaded"),
@@ -401,7 +401,7 @@ fn current_leader_confirms_pending_transfer() {
             .expect("observer id")
             .clone();
 
-        transfer_leader(
+        transfer_leader_local(
             "00000000-0000-4002-8000-000000000038",
             &observer_id,
             Some("codex is ready"),
@@ -409,7 +409,7 @@ fn current_leader_confirms_pending_transfer() {
             project,
         )
         .expect("request transfer");
-        transfer_leader(
+        transfer_leader_local(
             "00000000-0000-4002-8000-000000000038",
             &observer_id,
             Some("approved"),
@@ -492,7 +492,7 @@ fn observer_transfer_leader_succeeds_when_current_leader_is_unresponsive() {
         })
         .expect("mark stale");
 
-        transfer_leader(
+        transfer_leader_local(
             "00000000-0000-4002-8000-00000000003a",
             &observer_id,
             Some("leader timed out"),

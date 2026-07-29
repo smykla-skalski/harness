@@ -5,9 +5,9 @@
 
 use clap::Args;
 
-use harness_kernel::io;
-use crate::transport::support::{daemon_client, daemon_client_error, print_json};
+use crate::session::transport::support::{daemon_client, daemon_client_error, print_json};
 use harness_kernel::errors::CliError;
+use harness_kernel::io;
 use harness_protocol::managed_agents::acp::AcpSessionListPage;
 use harness_workspace::command_context::{AppContext, Execute};
 

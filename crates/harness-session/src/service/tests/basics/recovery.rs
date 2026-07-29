@@ -82,7 +82,7 @@ fn build_recovery_tui_request_rejects_active_and_ended_sessions() {
             "leader recovery is only valid for awaiting_leader or leaderless_degraded sessions"
         ));
 
-        end_session(
+        end_session_local(
             &active.session_id,
             active.leader_id.as_deref().expect("leader"),
             project,

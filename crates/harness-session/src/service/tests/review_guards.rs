@@ -51,7 +51,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
         })
         .expect("block for arbitration");
 
-        let update = update_task(
+        let update = update_task_local(
             "00000000-0000-4002-8000-000000000001",
             &task.task_id,
             TaskStatus::Open,
@@ -62,7 +62,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
         .expect_err("generic update blocked");
         assert!(update.to_string().contains("arbitrate"));
 
-        let assign = assign_task(
+        let assign = assign_task_local(
             "00000000-0000-4002-8000-000000000001",
             &task.task_id,
             &worker_id,
@@ -72,7 +72,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
         .expect_err("assign blocked");
         assert!(assign.to_string().contains("arbitrate"));
 
-        let drop = drop_task(
+        let drop = drop_task_local(
             "00000000-0000-4002-8000-000000000001",
             &task.task_id,
             &wire::TaskDropTarget::Agent {
@@ -85,7 +85,7 @@ fn arbitration_blocked_task_rejects_generic_mutation_paths() {
         .expect_err("drop blocked");
         assert!(drop.to_string().contains("arbitrate"));
 
-        let checkpoint = record_task_checkpoint(
+        let checkpoint = record_task_checkpoint_local(
             "00000000-0000-4002-8000-000000000001",
             &task.task_id,
             &leader_id,

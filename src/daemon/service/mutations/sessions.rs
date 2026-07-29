@@ -38,7 +38,7 @@ pub fn transfer_leader(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::transfer_leader(
+    session_service::transfer_leader_local(
         session_id,
         &request.new_leader_id,
         request.reason.as_deref(),
@@ -86,7 +86,7 @@ pub fn end_session(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::end_session(session_id, &request.actor, project_dir)?;
+    session_service::end_session_local(session_id, &request.actor, project_dir)?;
     session_detail(session_id, db)
 }
 

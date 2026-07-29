@@ -42,7 +42,7 @@ pub fn change_role(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::assign_role(
+    session_service::assign_role_local(
         session_id,
         agent_id,
         request.role,
@@ -108,6 +108,6 @@ pub fn remove_agent(
 
     let resolved = index::resolve_session(session_id)?;
     let project_dir = effective_project_dir(&resolved);
-    session_service::remove_agent(session_id, agent_id, &request.actor, project_dir)?;
+    session_service::remove_agent_local(session_id, agent_id, &request.actor, project_dir)?;
     session_detail(session_id, db)
 }

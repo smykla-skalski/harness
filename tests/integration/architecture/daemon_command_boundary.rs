@@ -69,9 +69,20 @@ use super::helpers::collect_hits_in_paths;
 /// `support.rs` (its callers never wrote `crate::daemon::` themselves), the
 /// managed-agent surfaces were already grep-clean before the fix; the actual
 /// proof that they now hit the leaf client lives in the fake-daemon-backed
-/// daemon-routing suite, now `tests/integration/session_transport_managed_agents_daemon_routing`
-/// since `session::service` and `session::transport` both moved into the
-/// `harness-session` crate after this cascade landed.
+/// daemon-routing suite, `tests/integration/session_transport_managed_agents_daemon_routing`.
+///
+/// `session::transport` (issue #710) later moved out of the `harness-session`
+/// crate entirely, back into this root crate's `session::transport` module -
+/// harness-daemon depends on `harness-session` but never on this crate, so
+/// the CLI-facing command surface living here (rather than in the domain
+/// crate) is what actually keeps it out of the daemon's build. Several
+/// `session::service` functions split the same way into a domain-only
+/// `_local` half (still in `harness-session`, called directly by the
+/// daemon's own no-database fallbacks) and a network-dialing half that moved
+/// here as `session::service::{lifecycle,queries,signals,tasks}`. Both
+/// halves keep using the leaf `harness_daemon_client::DaemonClient` instead
+/// of this root crate's own typed `daemon::client` facade, so the new files
+/// join the same guard below.
 #[test]
 fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -86,17 +97,22 @@ fn daemon_command_surfaces_stay_off_the_root_daemon_facade() {
             "crates/harness-session/src/service/runtime_registration.rs",
             "crates/harness-session/src/service/signals.rs",
             "crates/harness-session/src/service/tasks.rs",
-            "crates/harness-session/src/transport/task.rs",
-            "crates/harness-session/src/transport/improver.rs",
-            "crates/harness-session/src/transport/recover.rs",
-            "crates/harness-session/src/transport/session_commands.rs",
-            "crates/harness-session/src/transport/support.rs",
-            "crates/harness-session/src/transport/managed_agents.rs",
-            "crates/harness-session/src/transport/managed_agents/acp_sessions.rs",
-            "crates/harness-session/src/transport/managed_agents/attach.rs",
-            "crates/harness-session/src/transport/managed_agents/codex.rs",
-            "crates/harness-session/src/transport/managed_agents/start.rs",
-            "crates/harness-session/src/transport/managed_agents/terminal.rs",
+            "src/session/service/mod.rs",
+            "src/session/service/lifecycle.rs",
+            "src/session/service/queries.rs",
+            "src/session/service/signals.rs",
+            "src/session/service/tasks.rs",
+            "src/session/transport/task.rs",
+            "src/session/transport/improver.rs",
+            "src/session/transport/recover.rs",
+            "src/session/transport/session_commands.rs",
+            "src/session/transport/support.rs",
+            "src/session/transport/managed_agents.rs",
+            "src/session/transport/managed_agents/acp_sessions.rs",
+            "src/session/transport/managed_agents/attach.rs",
+            "src/session/transport/managed_agents/codex.rs",
+            "src/session/transport/managed_agents/start.rs",
+            "src/session/transport/managed_agents/terminal.rs",
             "src/task_board/transport.rs",
             "src/task_board/transport/catalog.rs",
             "src/task_board/transport/dispatch.rs",

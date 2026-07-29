@@ -72,7 +72,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
         assert_eq!(resolved.orchestration_session_id, session_id);
         assert_eq!(resolved.session_agent_id, worker_id);
 
-        let task = create_task_with_source(
+        let task = create_task_with_source_local(
             session_id,
             &TaskSpec {
                 title: "investigate drift",
@@ -86,7 +86,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             project,
         )
         .expect("create task");
-        record_task_checkpoint(
+        record_task_checkpoint_local(
             session_id,
             &task.task_id,
             &leader_id,
@@ -95,7 +95,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             project,
         )
         .expect("checkpoint");
-        drop_task(
+        drop_task_local(
             session_id,
             &task.task_id,
             &wire::TaskDropTarget::Agent {
@@ -107,7 +107,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
         )
         .expect("drop task");
 
-        let start_signal = list_signals(session_id, Some(&worker_id), project)
+        let start_signal = list_signals_local(session_id, Some(&worker_id), project)
             .expect("signals")
             .into_iter()
             .find(|record| record.signal.command == START_TASK_SIGNAL_COMMAND)
@@ -136,7 +136,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
         )
         .expect("record ack");
 
-        let manual_signal = send_signal(
+        let manual_signal = send_signal_local(
             session_id,
             &worker_id,
             "inject_context",
@@ -146,7 +146,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             project,
         )
         .expect("send signal");
-        cancel_signal(
+        cancel_signal_local(
             session_id,
             &worker_id,
             &manual_signal.signal.signal_id,
@@ -154,7 +154,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
             project,
         )
         .expect("cancel signal");
-        update_task(
+        update_task_local(
             session_id,
             &task.task_id,
             TaskStatus::Done,
@@ -180,13 +180,13 @@ fn session_service_round_trip_smoke_covers_public_surface() {
                 .len(),
             1
         );
-        assert_eq!(list_sessions(project, false).expect("list").len(), 1);
+        assert_eq!(list_sessions_local(project, false).expect("list").len(), 1);
         assert_eq!(
             resolve_session_project_dir(session_id, project).expect("resolve project dir"),
             project
         );
         assert!(
-            list_signals(session_id, Some(&worker_id), project)
+            list_signals_local(session_id, Some(&worker_id), project)
                 .expect("final signals")
                 .iter()
                 .any(|record| {
@@ -195,7 +195,7 @@ fn session_service_round_trip_smoke_covers_public_surface() {
                 })
         );
 
-        end_session(session_id, &leader_id, project).expect("end");
+        end_session_local(session_id, &leader_id, project).expect("end");
         assert_eq!(
             session_status(session_id, project)
                 .expect("ended status")

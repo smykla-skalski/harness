@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 
 use clap::{Args, Subcommand};
 
-use crate::types::SessionRole;
-use crate::wire::ManagedAgentSnapshot;
-use harness_kernel::io;
+use crate::session::types::SessionRole;
+use crate::session::wire::ManagedAgentSnapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io;
+use harness_protocol::agent::HookAgent;
 use harness_protocol::daemon::{
     DAEMON_WIRE_VERSION, HeadlessReadinessReport, HeadlessReadinessRequest, http_paths,
 };
-use harness_protocol::agent::HookAgent;
 use harness_protocol::managed_agents::acp::{
     AcpAgentInspectResponse, AcpAgentStartRequest, AcpEndpoint,
 };
@@ -17,7 +17,7 @@ use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
 use harness_protocol::managed_agents::tui::AgentTuiStartRequest;
 use harness_workspace::command_context::{AppContext, Execute};
 
-use crate::transport::support::{
+use crate::session::transport::support::{
     agent_to_str, capability_args, daemon_client, daemon_client_error, print_json,
     resolve_project_dir,
 };

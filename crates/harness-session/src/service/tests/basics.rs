@@ -60,7 +60,7 @@ fn archived_session_is_hidden_from_local_queries_even_with_include_all() {
         .expect("archive state");
 
         assert!(
-            list_sessions(project, true)
+            list_sessions_local(project, true)
                 .expect("list archived session")
                 .is_empty()
         );
@@ -338,7 +338,7 @@ fn end_session_requires_leader() {
             .find(|id| id.starts_with("codex"))
             .expect("worker id")
             .clone();
-        let result = end_session(&state.session_id, &worker_id, project);
+        let result = end_session_local(&state.session_id, &worker_id, project);
         assert!(result.is_err());
     });
 }
@@ -353,7 +353,7 @@ fn control_plane_can_end_non_ended_sessions() {
             Some("00000000-0000-4002-8000-000000000010"),
         )
         .expect("start awaiting session");
-        end_session(&awaiting.session_id, CONTROL_PLANE_ACTOR_ID, project)
+        end_session_local(&awaiting.session_id, CONTROL_PLANE_ACTOR_ID, project)
             .expect("end awaiting leader session");
         assert_eq!(
             session_status(&awaiting.session_id, project)
@@ -377,7 +377,7 @@ fn control_plane_can_end_non_ended_sessions() {
             Ok(())
         })
         .expect("pause session");
-        end_session(&paused.session_id, CONTROL_PLANE_ACTOR_ID, project)
+        end_session_local(&paused.session_id, CONTROL_PLANE_ACTOR_ID, project)
             .expect("end paused session");
         assert_eq!(
             session_status(&paused.session_id, project)
@@ -408,7 +408,7 @@ fn control_plane_can_end_non_ended_sessions() {
             Ok(())
         })
         .expect("degrade session");
-        end_session(&degraded.session_id, CONTROL_PLANE_ACTOR_ID, project)
+        end_session_local(&degraded.session_id, CONTROL_PLANE_ACTOR_ID, project)
             .expect("end leaderless degraded session");
         assert_eq!(
             session_status(&degraded.session_id, project)
@@ -447,7 +447,7 @@ fn task_lifecycle() {
             list_tasks("00000000-0000-4002-8000-000000000023", None, project).expect("list");
         assert_eq!(tasks.len(), 1);
 
-        update_task(
+        update_task_local(
             "00000000-0000-4002-8000-000000000023",
             &item.task_id,
             TaskStatus::Done,
