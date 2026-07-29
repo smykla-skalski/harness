@@ -20,7 +20,6 @@ pub(crate) mod github_api {
 pub mod hooks;
 pub mod infra;
 pub mod observe;
-#[path = "../../../src/reviews/mod.rs"]
 pub mod reviews;
 pub use harness_workspace::sandbox;
 pub mod session;
