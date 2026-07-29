@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shlex
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -107,6 +108,24 @@ def pids_for_socket(path: Path) -> tuple[int, ...]:
         for pid, paths in owners.items()
         if any(_canonical_socket_path(owned) == target for owned in paths)
     )
+
+
+def process_command(pid: int) -> str:
+    completed = subprocess.run(
+        ("/bin/ps", "-ww", "-p", str(pid), "-o", "command="),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip() if completed.returncode == 0 else ""
+
+
+def is_sccache_server_command(command: str) -> bool:
+    try:
+        arguments = shlex.split(command)
+    except ValueError:
+        return False
+    return len(arguments) == 1 and Path(arguments[0]).name == "sccache"
 
 
 def _print_pids(pids: Iterable[int]) -> None:

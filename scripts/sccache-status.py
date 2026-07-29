@@ -12,10 +12,25 @@ from pathlib import Path
 SCRIPT_ROOT = Path(__file__).resolve().parent
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
-from lib.sccache_processes import pids_for_socket, socket_owners_under
+from lib.sccache_processes import (
+    is_sccache_server_command,
+    pids_for_socket,
+    process_command,
+    socket_owners_under,
+)
 
 
 ROOT = SCRIPT_ROOT.parent
+
+
+def _configured_wrapper() -> str:
+    config = ROOT / ".cargo" / "config.toml"
+    try:
+        text = config.read_text(encoding="utf-8")
+    except OSError:
+        return "unavailable"
+    match = re.search(r'^\s*rustc-wrapper\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    return match.group(1) if match else "unconfigured"
 
 
 def _cargo_environment() -> dict[str, str]:
@@ -144,9 +159,10 @@ def _server_inventory(configured: Path) -> tuple[str, int, int, tuple[str, ...]]
             if Path(path).parent.name.startswith("harness-sccache")
         }
         for pid, paths in owners.items()
+        if is_sccache_server_command(process_command(pid))
     }
     server_paths = {pid: paths for pid, paths in server_paths.items() if paths}
-    configured_pids = set(pids_for_socket(configured))
+    configured_pids = set(server_paths) & set(pids_for_socket(configured))
     orphan_pids = set(server_paths) - configured_pids
     orphan_paths = tuple(
         sorted(path for pid in orphan_pids for path in server_paths[pid])
@@ -172,6 +188,8 @@ def main() -> int:
     binary = environment.get("SCCACHE_BIN", "")
     uds = environment.get("SCCACHE_SERVER_UDS", "")
     print(f"cache_mode={environment.get('CACHE_MODE', 'unknown')}")
+    print(f"rustc_wrapper_config={_configured_wrapper()}")
+    print(f"rustc_wrapper_env={environment.get('RUSTC_WRAPPER', '') or 'unset'}")
     print(f"configured_socket={uds or 'unavailable'}")
     if not binary or not uds:
         print("sccache_status=disabled")
