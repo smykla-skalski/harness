@@ -171,7 +171,9 @@ async fn unknown_attempt_outcome_never_claims_terminal_success() {
 }
 
 #[tokio::test]
-async fn pr_review_publish_and_cleanup_require_evidence_then_finish_idempotently() {
+async fn pr_review_cleanup_requires_evidence_then_finishes_idempotently() {
+    // PR_REVIEW is report-only (#1113): approval advances straight from Review to
+    // Cleanup, with no Publish phase in between.
     let test = TestDatabase::open().await;
     let record = Box::pin(create_execution(
         &test.db,
@@ -181,7 +183,7 @@ async fn pr_review_publish_and_cleanup_require_evidence_then_finish_idempotently
         Some("head-amber"),
     ))
     .await;
-    let publish = outcome_record(
+    let cleanup = outcome_record(
         record_workflow_reviewer_outcome(
             &test.db,
             &TaskBoardWorkflowExecutionCas::from(&record),
@@ -192,32 +194,23 @@ async fn pr_review_publish_and_cleanup_require_evidence_then_finish_idempotently
         .expect("approve exact head"),
     );
     assert_eq!(
-        publish.transition.phase,
-        Some(TaskBoardExecutionPhase::Publish)
-    );
-
-    let waiting = advance(&test, &publish, "2026-07-15T10:02:00Z").await;
-    assert_eq!(
-        waiting.transition.phase,
-        Some(TaskBoardExecutionPhase::Publish)
-    );
-    assert_eq!(
-        waiting.blocked_reason.as_deref(),
-        Some("publish_evidence_pending")
-    );
-
-    let published =
-        completed_lifecycle_attempt(&test, &waiting, "publish", false, "2026-07-15T10:03:00Z")
-            .await;
-    let cleanup = advance(&test, &published, "2026-07-15T10:04:00Z").await;
-    assert_eq!(
         cleanup.transition.phase,
         Some(TaskBoardExecutionPhase::Cleanup)
     );
 
+    let waiting = advance(&test, &cleanup, "2026-07-15T10:02:00Z").await;
+    assert_eq!(
+        waiting.transition.phase,
+        Some(TaskBoardExecutionPhase::Cleanup)
+    );
+    assert_eq!(
+        waiting.blocked_reason.as_deref(),
+        Some("cleanup_evidence_pending")
+    );
+
     let cleaned =
-        completed_lifecycle_attempt(&test, &cleanup, "cleanup", true, "2026-07-15T10:05:00Z").await;
-    let terminal = advance(&test, &cleaned, "2026-07-15T10:06:00Z").await;
+        completed_lifecycle_attempt(&test, &waiting, "cleanup", true, "2026-07-15T10:03:00Z").await;
+    let terminal = advance(&test, &cleaned, "2026-07-15T10:04:00Z").await;
     assert_eq!(
         terminal.transition.phase,
         Some(TaskBoardExecutionPhase::Terminal)
@@ -228,7 +221,7 @@ async fn pr_review_publish_and_cleanup_require_evidence_then_finish_idempotently
     );
 
     let sequence = test.db.current_change_sequence().await.expect("sequence");
-    let duplicate = advance(&test, &terminal, "2026-07-15T10:07:00Z").await;
+    let duplicate = advance(&test, &terminal, "2026-07-15T10:05:00Z").await;
     assert_eq!(duplicate, terminal);
     assert_eq!(
         test.db.current_change_sequence().await.expect("sequence"),

@@ -216,7 +216,7 @@ async fn completed_attempt_replay_survives_phase_advance_but_conflict_fails() {
         .await
         .expect("load execution with completed attempt")
         .expect("durable execution");
-    let published = outcome_record(
+    let cleanup = outcome_record(
         record_workflow_reviewer_outcome(
             &test.db,
             &TaskBoardWorkflowExecutionCas::from(&current),
@@ -227,8 +227,8 @@ async fn completed_attempt_replay_survives_phase_advance_but_conflict_fails() {
         .expect("advance after review"),
     );
     assert_eq!(
-        published.transition.phase,
-        Some(TaskBoardExecutionPhase::Publish)
+        cleanup.transition.phase,
+        Some(TaskBoardExecutionPhase::Cleanup)
     );
 
     let sequence = test.db.current_change_sequence().await.expect("sequence");
@@ -284,7 +284,7 @@ async fn attempt_create_and_cas_are_fenced_by_durable_parent_phase() {
         .await
         .expect("load execution with initial attempt")
         .expect("durable execution");
-    let published = outcome_record(
+    let cleanup = outcome_record(
         record_workflow_reviewer_outcome(
             &test.db,
             &TaskBoardWorkflowExecutionCas::from(&current),
@@ -295,8 +295,8 @@ async fn attempt_create_and_cas_are_fenced_by_durable_parent_phase() {
         .expect("advance parent phase"),
     );
     assert_eq!(
-        published.transition.phase,
-        Some(TaskBoardExecutionPhase::Publish)
+        cleanup.transition.phase,
+        Some(TaskBoardExecutionPhase::Cleanup)
     );
 
     let sequence = test.db.current_change_sequence().await.expect("sequence");

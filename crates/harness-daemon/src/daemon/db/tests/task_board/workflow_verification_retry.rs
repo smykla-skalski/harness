@@ -15,7 +15,7 @@ use crate::task_board::{
 
 const UPDATED_AT: &str = "2026-07-17T10:01:00Z";
 const RETRY_AT: &str = "2026-07-17T10:05:00Z";
-const PUBLICATION_URL: &str = "https://github.com/example/repo/pull/42";
+const EXTERNAL_URL: &str = "https://github.com/example/repo/pull/42";
 
 #[tokio::test]
 async fn verification_retry_updates_parent_and_exact_attempt_atomically() {
@@ -145,20 +145,20 @@ fn retry_update(
         .diagnostics
         .push(TaskBoardExecutionDiagnostic {
             code: "publish_verification_failed".into(),
-            message: "GitHub head is not visible yet".into(),
+            message: "GitHub cleanup confirmation is not visible yet".into(),
             recorded_at: UPDATED_AT.into(),
         });
     parent.updated_at = UPDATED_AT.into();
     let mut attempt = current.attempts[0].clone();
     attempt.failure_class = Some(TaskBoardFailureClass::Transient);
-    attempt.error = Some("GitHub head is not visible yet".into());
+    attempt.error = Some("GitHub cleanup confirmation is not visible yet".into());
     attempt.available_at = Some(RETRY_AT.into());
     attempt.artifact = Some(TaskBoardAttemptResultArtifact::Lifecycle(
         TaskBoardLifecycleOutcome {
             mutated: true,
             terminal: false,
             provider_revision: None,
-            external_url: Some(PUBLICATION_URL.into()),
+            external_url: Some(EXTERNAL_URL.into()),
         },
     ));
     attempt.updated_at = UPDATED_AT.into();
@@ -174,7 +174,7 @@ fn assert_retry_evidence(execution: &TaskBoardWorkflowExecutionRecord) {
     assert!(matches!(
         execution.attempts[0].artifact.as_ref(),
         Some(TaskBoardAttemptResultArtifact::Lifecycle(outcome))
-            if outcome.mutated && outcome.external_url.as_deref() == Some(PUBLICATION_URL)
+            if outcome.mutated && outcome.external_url.as_deref() == Some(EXTERNAL_URL)
     ));
 }
 
@@ -236,7 +236,7 @@ async fn verification_fixture(
         resolved_reviewers: reviewers,
         transition: TaskBoardWorkflowTransitionState {
             workflow_kind: TaskBoardWorkflowKind::PR_REVIEW,
-            phase: Some(TaskBoardExecutionPhase::Publish),
+            phase: Some(TaskBoardExecutionPhase::Cleanup),
             execution_state: TaskBoardExecutionState::Running,
             pull_request: Some(pull_request),
             exact_head_revision: Some("published-head".into()),
@@ -259,9 +259,9 @@ async fn verification_fixture(
         .expect("create verification execution");
     db.create_task_board_execution_attempt(&TaskBoardExecutionAttemptRecord {
         execution_id,
-        action_key: "publish".into(),
+        action_key: "cleanup".into(),
         attempt: 1,
-        idempotency_key: format!("publish-{label}"),
+        idempotency_key: format!("cleanup-{label}"),
         state: TaskBoardAttemptState::Running,
         failure_class: None,
         available_at: None,
@@ -272,7 +272,7 @@ async fn verification_fixture(
         completed_at: None,
     })
     .await
-    .expect("create running publish attempt");
+    .expect("create running cleanup attempt");
     let current = load_execution(&db, &record.execution_id).await;
     (db, temp, current)
 }
