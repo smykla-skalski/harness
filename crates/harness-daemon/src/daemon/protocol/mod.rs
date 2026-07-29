@@ -12,6 +12,7 @@ pub use binding::{
     ControlPlaneActorRequest, bind_control_plane_actor_value, current_control_plane_actor_id,
     with_control_plane_actor,
 };
+pub use harness_protocol::daemon::DAEMON_WIRE_VERSION;
 pub use harness_protocol::daemon::audit::*;
 pub use harness_protocol::managed_agents::codex::*;
 pub use reviews::*;
