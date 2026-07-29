@@ -30,6 +30,17 @@ fn default_gates() -> PullRequestMergeGates {
     }
 }
 
+fn check_details_url<'gates>(
+    gates: &'gates PullRequestMergeGates,
+    name: &str,
+) -> Option<&'gates str> {
+    gates
+        .checks
+        .iter()
+        .find(|check| check.name == name)
+        .and_then(|check| check.details_url.as_deref())
+}
+
 fn evidence(lifecycle: PullRequestLifecycle, is_draft: bool) -> PullRequestEvidence {
     PullRequestEvidence {
         identity: identity(),
@@ -301,7 +312,7 @@ fn the_projection_captures_each_check_state() {
         "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
             { "__typename": "CheckRun", "name": "build", "status": "COMPLETED", "conclusion": "SUCCESS" },
             { "__typename": "CheckRun", "name": "lint", "status": "IN_PROGRESS", "conclusion": Value::Null },
-            { "__typename": "CheckRun", "name": "flaky", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "https://github.com/octo/harness/actions/runs/17" },
+            { "__typename": "CheckRun", "name": "flaky", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "  https://github.com/octo/harness/actions/runs/17  " },
             { "__typename": "CheckRun", "name": "optional", "status": "COMPLETED", "conclusion": "SKIPPED" },
             { "__typename": "StatusContext", "context": "legacy-ci", "state": "PENDING" }
         ] } } } } ] }
@@ -312,15 +323,28 @@ fn the_projection_captures_each_check_state() {
     assert_eq!(gates.check_state("lint"), Some(CheckState::Pending));
     assert_eq!(gates.check_state("flaky"), Some(CheckState::Failure));
     assert_eq!(
-        gates
-            .checks
-            .iter()
-            .find(|check| check.name == "flaky")
-            .and_then(|check| check.details_url.as_deref()),
+        check_details_url(gates, "flaky"),
         Some("https://github.com/octo/harness/actions/runs/17")
     );
     assert_eq!(gates.check_state("optional"), Some(CheckState::Skipped));
     assert_eq!(gates.check_state("legacy-ci"), Some(CheckState::Pending));
+}
+
+#[test]
+fn the_projection_normalizes_check_urls() {
+    let read = project(gated_response(json!({
+        "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "contexts": { "nodes": [
+            { "__typename": "CheckRun", "name": "unsafe", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "javascript:alert(1)" },
+            { "__typename": "StatusContext", "context": "legacy-ci", "state": "SUCCESS", "targetUrl": "  HTTPS://ci.example.test/run/17  " }
+        ] } } } } ] }
+    })));
+    let gates = &read.evidence().expect("found").gates;
+
+    assert_eq!(check_details_url(gates, "unsafe"), None);
+    assert_eq!(
+        check_details_url(gates, "legacy-ci"),
+        Some("HTTPS://ci.example.test/run/17")
+    );
 }
 
 #[test]

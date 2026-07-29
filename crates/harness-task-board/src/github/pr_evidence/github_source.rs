@@ -357,16 +357,25 @@ impl RollupContext {
             "CheckRun" => Some(CheckGate {
                 name: self.name.clone()?,
                 state: check_run_state(self.status.as_deref(), self.conclusion.as_deref()),
-                details_url: self.details_url.clone(),
+                details_url: normalized_details_url(self.details_url.as_deref()),
             }),
             "StatusContext" => Some(CheckGate {
                 name: self.context.clone()?,
                 state: status_context_state(self.state.as_deref()),
-                details_url: self.target_url.clone(),
+                details_url: normalized_details_url(self.target_url.as_deref()),
             }),
             _ => None,
         }
     }
+}
+
+fn normalized_details_url(details_url: Option<&str>) -> Option<String> {
+    let trimmed = details_url?.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    (lower.starts_with("https://") || lower.starts_with("http://")).then(|| trimmed.to_owned())
 }
 
 fn check_run_state(status: Option<&str>, conclusion: Option<&str>) -> CheckState {
