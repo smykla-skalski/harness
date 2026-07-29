@@ -257,6 +257,11 @@ async fn remote_pair_claim_redacts_store_failures() {
     let _ = server.await;
 }
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn remote_pair_claim_replaces_existing_stable_client() {
     let state = remote_pairing_state();

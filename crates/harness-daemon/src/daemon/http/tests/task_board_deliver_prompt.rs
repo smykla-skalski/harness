@@ -31,6 +31,10 @@ fn an_edit_during_hold_that_breaks_the_prompt_leaves_the_dispatch_deliverable() 
     });
 }
 
+// Held across every await in this test deliberately: the shared prompt-catalog fixture guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 async fn run_broken_edit_during_hold(sandbox: &std::path::Path) {
     let _lock = prompt_catalog_test_lock();
     let project_dir = sandbox.join("deliver-broken-project");
@@ -111,6 +115,10 @@ fn the_delivered_prompt_is_the_one_the_started_agent_received() {
     });
 }
 
+// Held across every await in this test deliberately: the shared prompt-catalog fixture guards a
+// process-global test resource, and the exclusivity has to span the whole
+// test body, not just the acquire call, or two tests could interleave.
+#[allow(clippy::await_holding_lock)]
 async fn run_edit_during_hold_reports_started_prompt(sandbox: &std::path::Path) {
     let _lock = prompt_catalog_test_lock();
     let project_dir = sandbox.join("deliver-edited-project");

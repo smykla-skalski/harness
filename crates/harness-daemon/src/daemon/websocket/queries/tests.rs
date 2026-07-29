@@ -48,6 +48,11 @@ async fn dispatch_read_query_runtime_session_resolve_returns_null_for_unknown_se
     assert!(result.get("resolved").is_some_and(Value::is_null));
 }
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn dispatch_read_query_health_succeeds_when_db_lock_is_held() {
     let state = test_http_state_with_db();

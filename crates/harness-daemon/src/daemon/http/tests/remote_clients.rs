@@ -12,6 +12,11 @@ use super::test_http_state_with_db;
 const VIEWER_ID: &str = "self-revoking-viewer";
 const OPERATOR_ID: &str = "unrelated-operator";
 
+// clippy's await-holding-lock check flags this guard through a later,
+// unrelated await even though nothing in between touches the lock; see
+// harness-github-api's acquire_global_budget_test_lock for the same
+// pattern with the same rationale.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn remote_client_self_revoke_revokes_only_authenticated_client_and_audits() {
     let mut state = test_http_state_with_db();
