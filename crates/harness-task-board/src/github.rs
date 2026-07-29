@@ -27,10 +27,11 @@ pub use evidence::{
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
 };
 pub use pr_evidence::{
-    CheckGate, CheckState, CheckWait, CheckWaitControls, CheckWaitOutcome, CheckWaitProgress,
-    GitHubPullRequestEvidenceSource, InMemoryPullRequestEvidenceSource, Mergeability,
-    PullRequestEvidence, PullRequestEvidenceRead, PullRequestEvidenceSource, PullRequestIdentity,
-    PullRequestLifecycle, PullRequestMergeGates, ReviewDecision, ReviewGate, poll_check_wait,
+    ActionGateBlock, ActionGateDecision, ActionGateRequirement, CheckGate, CheckState, CheckWait,
+    CheckWaitControls, CheckWaitOutcome, CheckWaitProgress, GitHubPullRequestEvidenceSource,
+    InMemoryPullRequestEvidenceSource, Mergeability, PullRequestEvidence, PullRequestEvidenceRead,
+    PullRequestEvidenceSource, PullRequestIdentity, PullRequestLifecycle, PullRequestMergeGates,
+    ReviewDecision, ReviewGate, evaluate_action_gates, poll_check_wait, verify_action_gates,
 };
 pub use publication::GitHubBranchState;
 pub use publication::{SigningVerifyOutcome, verify_signing_for_profile};
