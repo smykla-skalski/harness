@@ -213,14 +213,42 @@ struct TaskBoardOrchestratorSummaryView: View {
 
   @ViewBuilder
   private func evaluationPills(_ evaluation: TaskBoardEvaluationSummary) -> some View {
-    summaryPill("Eval", "\(evaluation.evaluated)/\(evaluation.total)")
-    if evaluation.updated != 0 {
-      summaryPill("Updated", "\(evaluation.updated)", tint: HarnessMonitorTheme.accent)
+    evaluationPills(
+      total: evaluation.total,
+      evaluated: evaluation.evaluated,
+      updated: evaluation.updated,
+      blocked: evaluation.blocked,
+      failed: evaluation.failed
+    )
+  }
+
+  @ViewBuilder
+  private func evaluationPills(_ evaluation: TaskBoardOrchestratorEvaluationOutcome) -> some View {
+    evaluationPills(
+      total: evaluation.total,
+      evaluated: evaluation.evaluated,
+      updated: evaluation.updated,
+      blocked: evaluation.blocked,
+      failed: evaluation.failed
+    )
+  }
+
+  @ViewBuilder
+  private func evaluationPills(
+    total: Int,
+    evaluated: Int,
+    updated: Int,
+    blocked: Int,
+    failed: Int
+  ) -> some View {
+    summaryPill("Eval", "\(evaluated)/\(total)")
+    if updated != 0 {
+      summaryPill("Updated", "\(updated)", tint: HarnessMonitorTheme.accent)
     }
-    if evaluation.failed != 0 || evaluation.blocked != 0 {
+    if failed != 0 || blocked != 0 {
       summaryPill(
         "Blocked",
-        "\(evaluation.failed + evaluation.blocked)",
+        "\(failed + blocked)",
         tint: HarnessMonitorTheme.danger
       )
     }
