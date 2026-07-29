@@ -4085,6 +4085,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness-sybra"
+version = "55.0.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "clap",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "libc",
+ "serde_json",
+ "serde_urlencoded",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "harness-systemd"
 version = "55.0.0"
 dependencies = [

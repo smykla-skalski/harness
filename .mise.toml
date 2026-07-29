@@ -316,8 +316,20 @@ depends = [
   "harness:check:binary-contracts",
   "harness:check:source-size",
   "harness:check:rust",
+  "sybra:check",
   "panel:frontend:lint",
 ]
+
+[tasks."sybra:check"]
+description = "Run standalone Sybra service tests and pedantic Rust lint"
+run = [
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-sybra --lib --bin harness-sybra",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-sybra",
+]
+
+[tasks."sybra:dev"]
+description = "Run the standalone Sybra gateway (pass listener, upstream, and token-file arguments after --)"
+run = "./scripts/cargo-local.sh run --locked -p harness-sybra --bin harness-sybra --"
 
 [tasks."panel:frontend:install"]
 description = "Install the panel frontend's pinned dependencies from its lockfile"

@@ -119,7 +119,7 @@ scenario_no_arguments_preserves_all_groups() {
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime \
     && assert_call_matches 2 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime \
     && assert_call_matches 4 \
@@ -127,13 +127,13 @@ scenario_no_arguments_preserves_all_groups() {
     && assert_call_matches 5 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd \
     && assert_call_matches 6 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib --bin harness-daemon \
     && grep -Fq "==> test:unit 1/6: root Harness library" "$SANDBOX/no-args.log" \
     && grep -Fq "==> test:unit 2/6: supporting workspace crates" "$SANDBOX/no-args.log" \
     && grep -Fq "==> test:unit 3/6: harness-agents (bridge-runtime feature)" "$SANDBOX/no-args.log" \
     && grep -Fq "==> test:unit 4/6: harness-task-board (daemon-runtime feature)" "$SANDBOX/no-args.log" \
     && grep -Fq "==> test:unit 5/6: Linux systemd crate" "$SANDBOX/no-args.log" \
-    && grep -Fq "==> test:unit 6/6: harness-daemon binary-only unit tests" "$SANDBOX/no-args.log"; then
+    && grep -Fq "==> test:unit 6/6: harness-daemon (own lib and binary unit tests)" "$SANDBOX/no-args.log"; then
     pass "no-argument invocation exercises and identifies all six groups"
   else
     fail "no-argument invocation did not preserve and identify all six groups: $(calls_snapshot)"
@@ -150,7 +150,7 @@ scenario_forwards_simple_filter_to_every_group() {
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 2 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace -E 'test(=path::to::test)' \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace -E 'test(=path::to::test)' \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime -E 'test(=path::to::test)' \
     && assert_call_matches 4 \
@@ -158,7 +158,7 @@ scenario_forwards_simple_filter_to_every_group() {
     && assert_call_matches 5 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E 'test(=path::to::test)' \
     && assert_call_matches 6 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon -E 'test(=path::to::test)'; then
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib --bin harness-daemon -E 'test(=path::to::test)'; then
     pass "a simple nextest filter reaches every package group, including harness-systemd and the harness-daemon bin"
   else
     fail "simple nextest filter was not forwarded to every group: $(calls_snapshot)"
@@ -176,7 +176,7 @@ scenario_preserves_multiword_single_token_filter() {
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime -E "$filter" \
     && assert_call_matches 2 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace -E "$filter" \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace -E "$filter" \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime -E "$filter" \
     && assert_call_matches 4 \
@@ -184,7 +184,7 @@ scenario_preserves_multiword_single_token_filter() {
     && assert_call_matches 5 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd -E "$filter" \
     && assert_call_matches 6 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon -E "$filter"; then
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib --bin harness-daemon -E "$filter"; then
     pass "a filter containing spaces survives as a single token in every group"
   else
     fail "multi-word single-token filter was split or mangled: $(calls_snapshot)"
@@ -208,7 +208,7 @@ scenario_rejects_shell_injection_attempt() {
     && assert_call_matches 1 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$payload" \
     && assert_call_matches 2 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace "$payload" \
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace "$payload" \
     && assert_call_matches 3 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime "$payload" \
     && assert_call_matches 4 \
@@ -216,7 +216,7 @@ scenario_rejects_shell_injection_attempt() {
     && assert_call_matches 5 \
       nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$payload" \
     && assert_call_matches 6 \
-      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --bin harness-daemon "$payload"; then
+      nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib --bin harness-daemon "$payload"; then
     pass "a shell metacharacter payload is forwarded as an inert literal argument"
   else
     fail "injection-attempt payload was not forwarded as an inert literal argument: $(calls_snapshot)"
