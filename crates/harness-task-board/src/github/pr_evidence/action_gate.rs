@@ -56,6 +56,23 @@ impl ActionGateRequirement {
         }
     }
 
+    /// The mechanical gates a merge managed by a separate approval policy must
+    /// still satisfy: an open, non-draft, conflict-free pull request on the
+    /// verified head with its required checks green and write access. It omits the
+    /// approval gate because a managed auto-merge decides review sufficiency
+    /// through its own consensus model, not GitHub's aggregate review decision.
+    #[must_use]
+    pub fn for_managed_merge() -> Self {
+        Self {
+            open: true,
+            not_draft: true,
+            mergeable: true,
+            required_checks: true,
+            approvals: false,
+            write_permission: true,
+        }
+    }
+
     /// What a comment must satisfy: nothing beyond the pull request still being
     /// present on the verified head. A comment is not a merge, so it does not
     /// require an open, mergeable, or approved state; it only refuses to post

@@ -3,7 +3,9 @@ use std::sync::Mutex;
 
 use crate::task_board::github::{
     GitHubAutomationClient, GitHubBranchState, GitHubCreatePullRequest, GitHubMergeEvidence,
-    GitHubMergeMethod, GitHubProjectConfig, GitHubPullRequestHandle,
+    GitHubMergeMethod, GitHubProjectConfig, GitHubPullRequestHandle, Mergeability,
+    PullRequestEvidence, PullRequestEvidenceRead, PullRequestIdentity, PullRequestLifecycle,
+    PullRequestMergeGates, ReviewDecision, ReviewGate,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -95,6 +97,44 @@ impl GitHubAutomationClient for FakeGitHubClient {
         _pull_request_number: u64,
     ) -> Result<GitHubMergeEvidence, CliError> {
         Ok(self.evidence.clone())
+    }
+
+    async fn read_pull_request_evidence(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+    ) -> Result<PullRequestEvidenceRead, CliError> {
+        let lifecycle = if self.pull_request.merged {
+            PullRequestLifecycle::Merged
+        } else if self.pull_request.open {
+            PullRequestLifecycle::Open
+        } else {
+            PullRequestLifecycle::Closed
+        };
+        let evidence = PullRequestEvidence {
+            identity: PullRequestIdentity::new(&config.owner, &config.repo, pull_request_number)
+                .with_url(self.pull_request.html_url.clone()),
+            head_revision: self.pull_request.head_sha.clone(),
+            author: None,
+            lifecycle,
+            // The stored handle keeps its original draft state; the merge-evidence
+            // snapshot carries the current one, after the ready-for-review step.
+            is_draft: self.evidence.pull_request.draft,
+            gates: PullRequestMergeGates {
+                mergeability: Mergeability::Mergeable,
+                viewer_can_update: true,
+                viewer_can_merge_as_admin: false,
+                checks: Vec::new(),
+                required_check_names: Vec::new(),
+                review: ReviewGate {
+                    decision: ReviewDecision::Approved,
+                    current_approvals: 1,
+                    required_approvals: 1,
+                },
+            },
+            observed_at: "2026-07-29T00:00:00Z".to_owned(),
+        };
+        Ok(PullRequestEvidenceRead::found(evidence))
     }
 
     async fn get_pull_request(
