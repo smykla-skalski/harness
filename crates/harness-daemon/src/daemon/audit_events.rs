@@ -1,14 +1,49 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
+use async_trait::async_trait;
 use serde_json::{Map, Value};
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
-use crate::daemon::service::observe_sender;
 use crate::daemon::state;
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
+
+/// Persistence contract the recorder needs from a db handle.
+///
+/// Kept to exactly the two operations the recorder calls, and generic over
+/// the implementer, so this module never names `db`'s concrete async
+/// connection type. `db` implements it once, next to that concrete type
+/// (`daemon/db/audit.rs`); every consumer here keeps passing a plain
+/// `&AsyncDaemonDb` and the compiler infers the rest.
+#[async_trait]
+pub(crate) trait AuditEventStore: Send + Sync {
+    /// # Errors
+    /// Returns [`CliError`] on persistence failure.
+    async fn upsert_audit_event(&self, event: &HarnessMonitorAuditEvent) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on persistence failure.
+    async fn insert_audit_event_if_absent(
+        &self,
+        event: &HarnessMonitorAuditEvent,
+    ) -> Result<bool, CliError>;
+}
+
+static AUDIT_BROADCAST_SENDER: OnceLock<broadcast::Sender<StreamEvent>> = OnceLock::new();
+
+/// Register the daemon-wide event-stream sender the recorder broadcasts
+/// through. `service`'s serve bootstrap calls this with the same sender it
+/// seeds its own observe runtime with, so this module never has to reach
+/// back into `service` to find it.
+pub(crate) fn register_broadcast_sender(sender: broadcast::Sender<StreamEvent>) {
+    let _ = AUDIT_BROADCAST_SENDER.set(sender);
+}
+
+fn broadcast_sender() -> Option<broadcast::Sender<StreamEvent>> {
+    AUDIT_BROADCAST_SENDER.get().cloned()
+}
 
 pub(crate) struct AuditEventDraft {
     pub source: &'static str,
@@ -39,8 +74,8 @@ pub(crate) struct AuditEventRecordDraft {
     pub related_urls: Vec<String>,
 }
 
-pub(crate) async fn record_audit_result<T>(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
+pub(crate) async fn record_audit_result<T, Db: AuditEventStore>(
+    async_db: Option<&Arc<Db>>,
     draft: AuditEventDraft,
     result: &Result<T, CliError>,
 ) {
@@ -48,11 +83,11 @@ pub(crate) async fn record_audit_result<T>(
         return;
     };
 
-    record_audit_result_in_db(async_db, draft, result).await;
+    record_audit_result_in_db(async_db.as_ref(), draft, result).await;
 }
 
-pub(crate) async fn record_audit_result_in_db<T>(
-    async_db: &AsyncDaemonDb,
+pub(crate) async fn record_audit_result_in_db<T, Db: AuditEventStore>(
+    async_db: &Db,
     draft: AuditEventDraft,
     result: &Result<T, CliError>,
 ) {
@@ -60,8 +95,8 @@ pub(crate) async fn record_audit_result_in_db<T>(
     persist_audit_event(async_db, &event).await;
 }
 
-pub(crate) async fn record_audit_event(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
+pub(crate) async fn record_audit_event<Db: AuditEventStore>(
+    async_db: Option<&Arc<Db>>,
     draft: AuditEventRecordDraft,
 ) {
     let Some(async_db) = async_db else {
@@ -86,14 +121,14 @@ pub(crate) async fn record_audit_event(
         legacy_message: draft.legacy_message,
         related_urls: draft.related_urls,
     };
-    persist_audit_event(async_db, &event).await;
+    persist_audit_event(async_db.as_ref(), &event).await;
 }
 
 #[expect(
     clippy::cognitive_complexity,
     reason = "audit persistence branches separately for db and legacy-event fallback"
 )]
-async fn persist_audit_event(async_db: &AsyncDaemonDb, event: &HarnessMonitorAuditEvent) {
+async fn persist_audit_event<Db: AuditEventStore>(async_db: &Db, event: &HarnessMonitorAuditEvent) {
     match async_db.upsert_audit_event(event).await {
         Ok(()) => broadcast_audit_event(event),
         Err(error) => {
@@ -113,8 +148,8 @@ async fn persist_audit_event(async_db: &AsyncDaemonDb, event: &HarnessMonitorAud
     }
 }
 
-pub(crate) async fn persist_audit_event_once_strict(
-    async_db: &AsyncDaemonDb,
+pub(crate) async fn persist_audit_event_once_strict<Db: AuditEventStore>(
+    async_db: &Db,
     event: &HarnessMonitorAuditEvent,
 ) -> Result<(), CliError> {
     if async_db.insert_audit_event_if_absent(event).await? {
@@ -128,7 +163,7 @@ pub(crate) async fn persist_audit_event_once_strict(
     reason = "audit push broadcasting has explicit early returns for each failure mode"
 )]
 pub(crate) fn broadcast_audit_event(event: &HarnessMonitorAuditEvent) {
-    let Some(sender) = observe_sender() else {
+    let Some(sender) = broadcast_sender() else {
         return;
     };
     let Ok(payload) = serde_json::to_value(event) else {

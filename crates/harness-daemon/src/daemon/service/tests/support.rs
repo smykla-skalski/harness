@@ -2,6 +2,7 @@ use super::*;
 
 pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
     let (sender, _) = broadcast::channel(8);
+    crate::daemon::audit_events::register_broadcast_sender(sender.clone());
     let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
         sender,
         poll_interval,

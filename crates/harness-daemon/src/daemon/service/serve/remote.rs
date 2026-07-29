@@ -63,6 +63,7 @@ pub async fn serve_remote_https(
         db: db.clone(),
         async_db: async_db.clone(),
     });
+    crate::daemon::audit_events::register_broadcast_sender(sender.clone());
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let prepared_sender = background_tasks::spawn_broadcast_fanout(&sender, &replay_buffer);

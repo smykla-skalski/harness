@@ -82,6 +82,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         db: db.clone(),
         async_db: async_db.clone(),
     });
+    crate::daemon::audit_events::register_broadcast_sender(sender.clone());
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let _shutdown_signal_guard =
         shutdown_signals::ShutdownSignalGuard::install(shutdown_tx.clone())?;
