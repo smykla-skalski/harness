@@ -7,7 +7,7 @@ async fn production_orchestration_imports_adopts_and_cleans_exactly_once() {
     let candidate = Box::pin(import_candidate("result-import-production-orchestration")).await;
 
     let TaskBoardRemoteResultAdoptionOutcome::Updated(adopted) =
-        crate::daemon::service::import_and_adopt_task_board_remote_implementation_result(
+        crate::daemon::task_board_remote_result_import::import_and_adopt_task_board_remote_implementation_result(
             &candidate.prepared.db,
             &candidate.prepared.offer.binding.assignment_id,
             1,
@@ -40,7 +40,7 @@ async fn production_orchestration_imports_adopts_and_cleans_exactly_once() {
     let reopened = candidate.prepared.db.reopen().await;
 
     assert!(matches!(
-        crate::daemon::service::import_and_adopt_task_board_remote_implementation_result(
+        crate::daemon::task_board_remote_result_import::import_and_adopt_task_board_remote_implementation_result(
             &reopened,
             &candidate.prepared.offer.binding.assignment_id,
             1,
@@ -318,7 +318,7 @@ async fn implementation_adoption_consumes_applied_journal_atomically() {
         TaskBoardRemoteResultAdoptionOutcome::Replayed(ref replayed) if replayed == &adopted
     ));
     let before_cleanup = candidate.prepared.db.reopen().await;
-    crate::daemon::service::cleanup_task_board_remote_result_import(
+    crate::daemon::task_board_remote_result_import::cleanup_task_board_remote_result_import(
         &before_cleanup,
         &candidate.prepared.offer.binding.assignment_id,
         1,
@@ -333,7 +333,7 @@ async fn implementation_adoption_consumes_applied_journal_atomically() {
         "adopted private import ref remained after exact cleanup"
     );
     let after_cleanup = candidate.prepared.db.reopen().await;
-    crate::daemon::service::cleanup_task_board_remote_result_import(
+    crate::daemon::task_board_remote_result_import::cleanup_task_board_remote_result_import(
         &after_cleanup,
         &candidate.prepared.offer.binding.assignment_id,
         1,

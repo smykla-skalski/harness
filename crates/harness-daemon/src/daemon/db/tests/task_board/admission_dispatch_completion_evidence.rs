@@ -241,10 +241,7 @@ pub(super) fn remote_offer(
     execution: &crate::task_board::TaskBoardWorkflowExecutionRecord,
     attempt: &crate::task_board::TaskBoardExecutionAttemptRecord,
 ) -> RemoteOfferRequest {
-    let request =
-        crate::daemon::task_board_read_only_coordinator::requests::remote_codex_attempt_request(
-            execution, attempt,
-        )
+    let request = harness_task_board_codex_requests::remote_codex_attempt_request(execution, attempt)
         .expect("build canonical remote Codex launch");
     RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

@@ -397,16 +397,18 @@ async fn internal_workflow_write_rejects_a_conflicting_return_to_a_triage_lane()
     let before_revision = revision(&db, "item-1").await;
     let before_seq = seq(&db).await;
     let before_audit_count = audit_count(&db).await;
-    let error = crate::daemon::service::approve_task_board_plan_db(
-        &db,
-        &crate::daemon::protocol::TaskBoardPlanApproveRequest {
-            id: "item-1".into(),
-            approved_by: "lead-1".into(),
-            approved_at: None,
-        },
-    )
-    .await
-    .expect_err("a real plan approval returning to a conflicting triage lane is rejected");
+    // Mirrors service's plan-approval transition (`approve_plan` then apply its
+    // status/planning fields) without depending on the service layer that owns it.
+    let error = db
+        .update_task_board_item("item-1", |item| {
+            let transition =
+                crate::task_board::approve_plan(item, "lead-1", "2026-07-23T00:00:00Z");
+            item.status = transition.to_status;
+            item.planning = transition.planning;
+            Ok(true)
+        })
+        .await
+        .expect_err("a real plan approval returning to a conflicting triage lane is rejected");
     assert!(error.to_string().contains("triage override"));
     assert_eq!(revision(&db, "item-1").await, before_revision);
     assert_eq!(seq(&db).await, before_seq);

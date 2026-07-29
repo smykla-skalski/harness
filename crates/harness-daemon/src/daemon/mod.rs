@@ -138,6 +138,8 @@ mod task_board_read_only_coordinator_tests;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_read_only_runtime;
 #[cfg(feature = "daemon-runtime")]
+pub(crate) mod task_board_remote_result_import;
+#[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_remote_transport;
 #[cfg(feature = "daemon-runtime")]
 pub mod timeline;
