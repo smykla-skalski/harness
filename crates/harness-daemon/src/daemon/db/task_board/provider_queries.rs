@@ -39,6 +39,28 @@ pub(crate) trait ProviderQueries: Send + Sync {
         conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<Option<TaskBoardMutation>, CliError>;
 
+    /// Restores a previously provider-exclusion-tombstoned item because the
+    /// provider no longer reports an exclusion label. `expected_revision`
+    /// and `context`'s stored provider ref both CAS against the exact state
+    /// the caller matched by; either moving, or the row no longer carrying
+    /// the `ProviderExclusion` cause, yields `NotApplied`. `patch` is the
+    /// normal reconciliation patch (parent tri-state included) applied the
+    /// same way any other reconcile applies one, so local state it never
+    /// mentions -- planning approval, workflow, session, work item linkage,
+    /// estimates, agent mode, a `Manual` lane anchor -- stays exactly as
+    /// stored. A rejected parent assignment (self, cycle, missing) is
+    /// isolated to that field, same as ordinary reconcile; the rest of the
+    /// patch still applies. A retained `BuiltInV1` decision's placement
+    /// effect is reconciled here too, without duplicating decision history,
+    /// and the whole restore is exactly one typed audit event. `conflicts`
+    /// is `None` outside `Both`+`Report` (conflict state untouched),
+    /// `Some(empty)` to supersede stale open rows in this same transaction
+    /// before the restore proceeds, or `Some(non-empty)` to publish
+    /// conflicts and return `ConflictPublished` without restoring, leaving
+    /// the tombstone in place.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item does not exist or the restore fails.
     async fn restore_task_board_item_for_provider_exclusion(
         &self,
         expected_item_id: &str,
