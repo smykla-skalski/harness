@@ -8,8 +8,8 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::budget::parse_retry_after;
 use super::client::GitHubProtectedClient;
 use super::response::{
-    GitHubApiResponse, budget_error, cache_state, context_error, http_status_error,
-    request_error, revalidated_response,
+    GitHubApiResponse, budget_error, cache_state, context_error, http_status_error, request_error,
+    revalidated_response,
 };
 use super::state::{GitHubMutationGuard, InflightGuard, InflightRole, register_inflight};
 use super::{

@@ -369,13 +369,20 @@ fn pull_request_intents_survive_a_markdown_round_trip() {
         ("review", TaskBoardWorkflowKind::PrReview),
         ("both", TaskBoardWorkflowKind::PrFixReview),
     ] {
-        let mut item =
-            TaskBoardItem::new(id.into(), id.into(), String::new(), "2026-05-14T00:00:00Z".into());
+        let mut item = TaskBoardItem::new(
+            id.into(),
+            id.into(),
+            String::new(),
+            "2026-05-14T00:00:00Z".into(),
+        );
         item.workflow_kind = kind;
         store.create(id, "body", item).expect("create item");
 
         let loaded = store.get(id).expect("load item");
-        assert_eq!(loaded.workflow_kind, kind, "{id} kind survives the round trip");
+        assert_eq!(
+            loaded.workflow_kind, kind,
+            "{id} kind survives the round trip"
+        );
     }
 
     // The both-intents ticket keeps both meanings rather than collapsing to one

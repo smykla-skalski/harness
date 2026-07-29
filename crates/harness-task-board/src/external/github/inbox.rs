@@ -286,7 +286,8 @@ impl GitHubInboxSyncClient {
         // `author:` qualifiers, so one combined clause would never match.
         for author in DEPENDENCY_BOT_AUTHORS {
             let query = dependency_author_query(repository, author);
-            items.extend(graphql::search_issue_pull_requests(&self.client, &query, &context).await?);
+            items
+                .extend(graphql::search_issue_pull_requests(&self.client, &query, &context).await?);
         }
         items.extend(
             graphql::search_issue_pull_requests(

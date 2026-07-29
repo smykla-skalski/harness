@@ -8,11 +8,11 @@ use harness_agents::runtime;
 use harness_agents::service::project_dir_for_context;
 use harness_agents::storage;
 use harness_infra::exec::RUNTIME;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session_resolution::trimmed_env;
 use harness_session::service as session_service;
 use harness_telemetry::{current_trace_id, record_hook_metrics};
 use harness_workspace::workspace::utc_now;
-use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_protocol::session_resolution::trimmed_env;
 
 use super::super::adapters::{HookAgent, adapter_for};
 use super::super::application::prepare_normalized_context;

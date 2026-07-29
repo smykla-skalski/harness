@@ -177,7 +177,10 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         Some(preparation.workflow_execution_id.as_str()),
         "a reserved ticket must expose its owning execution while still in Todo"
     );
-    assert_eq!(still_todo.workflow.status, TaskBoardWorkflowStatus::Admitting);
+    assert_eq!(
+        still_todo.workflow.status,
+        TaskBoardWorkflowStatus::Admitting
+    );
 
     let repeated = db
         .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)

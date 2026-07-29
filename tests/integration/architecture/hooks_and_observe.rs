@@ -178,7 +178,10 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         "crates/harness-hooks/src/application/context/interaction.rs should exist after the context split"
     );
 
-    let hydration = read_repo_file(root, "crates/harness-hooks/src/application/context/hydration.rs");
+    let hydration = read_repo_file(
+        root,
+        "crates/harness-hooks/src/application/context/hydration.rs",
+    );
     assert_file_contains_needles(
         &hydration,
         "crates/harness-hooks/src/application/context/hydration.rs should own",
@@ -189,7 +192,10 @@ fn hooks_transport_does_not_hydrate_session_defaults() {
         ],
     );
 
-    let interaction = read_repo_file(root, "crates/harness-hooks/src/application/context/interaction.rs");
+    let interaction = read_repo_file(
+        root,
+        "crates/harness-hooks/src/application/context/interaction.rs",
+    );
     assert_file_contains_needles(
         &interaction,
         "crates/harness-hooks/src/application/context/interaction.rs should own",
@@ -215,7 +221,8 @@ fn hook_application_owns_guard_context_hydration() {
         ],
     );
 
-    let application_context = read_repo_file(root, "crates/harness-hooks/src/application/context.rs");
+    let application_context =
+        read_repo_file(root, "crates/harness-hooks/src/application/context.rs");
     assert!(
         application_context.contains("pub struct GuardContext"),
         "crates/harness-hooks/src/application/context.rs should own the hook policy input context"
@@ -328,7 +335,8 @@ fn codex_adapter_root_stays_prod_only() {
         ],
     );
     assert!(
-        root.join("crates/harness-hooks/src/adapters/codex/tests.rs").exists(),
+        root.join("crates/harness-hooks/src/adapters/codex/tests.rs")
+            .exists(),
         "codex adapter split test module should exist"
     );
 }

@@ -5,10 +5,10 @@ use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::TaskBoardGitRuntimeConfig;
 use harness_github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
-use crate::TaskBoardGitRuntimeConfig;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::GitHubAutomationClient;

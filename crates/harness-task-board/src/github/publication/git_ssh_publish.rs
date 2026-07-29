@@ -9,8 +9,8 @@ use gix::{ObjectId, objs};
 use tokio::task::spawn_blocking;
 
 use crate::github::GitHubProjectConfig;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_github_api::begin_external_mutation;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::sandbox;
 
 use super::signing::{

@@ -470,7 +470,10 @@ fn dependency_author_query(repository: &GitHubRepository, author: &str) -> Strin
 /// Open pull requests carrying the dependency label, covering dependency
 /// updates opened by a human or a bot other than Renovate/Dependabot.
 fn dependency_label_query(repository: &GitHubRepository) -> String {
-    format!("repo:{} is:pr is:open label:dependencies", repository.slug())
+    format!(
+        "repo:{} is:pr is:open label:dependencies",
+        repository.slug()
+    )
 }
 
 pub(super) fn search_label_matches_filter(

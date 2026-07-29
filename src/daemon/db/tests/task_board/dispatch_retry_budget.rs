@@ -203,7 +203,10 @@ async fn an_exhausted_preparation_releases_its_item() {
             intent_id: retry_intent,
             preparation,
         } => {
-            assert_ne!(retry_intent, intent, "a retry must not reuse the dead intent");
+            assert_ne!(
+                retry_intent, intent,
+                "a retry must not reuse the dead intent"
+            );
             preparation.workflow_execution_id
         }
         ReservedTaskBoardDispatch::Applied(_) | ReservedTaskBoardDispatch::Blocked(_) => {
@@ -219,5 +222,8 @@ async fn an_exhausted_preparation_releases_its_item() {
         Some(retry_execution.as_str()),
         "a fresh dispatch must stamp its own execution, not resurrect the dead one"
     );
-    assert_eq!(readmitted.workflow.status, TaskBoardWorkflowStatus::Admitting);
+    assert_eq!(
+        readmitted.workflow.status,
+        TaskBoardWorkflowStatus::Admitting
+    );
 }
