@@ -3716,6 +3716,7 @@ dependencies = [
  "harness-session",
  "harness-systemd-protocol",
  "harness-task-board",
+ "harness-task-board-provider-sync",
  "harness-telemetry",
  "harness-testkit",
  "harness-workspace",
@@ -4199,6 +4200,21 @@ dependencies = [
  "tokio",
  "tracing",
  "utoipa",
+ "uuid",
+]
+
+[[package]]
+name = "harness-task-board-provider-sync"
+version = "55.0.0"
+dependencies = [
+ "chrono",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-task-board",
+ "harness-workspace",
+ "serde",
+ "serde_json",
+ "sqlx",
  "uuid",
 ]
 

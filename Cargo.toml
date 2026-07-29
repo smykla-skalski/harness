@@ -25,6 +25,7 @@ members = [
   "crates/harness-systemd",
   "crates/harness-systemd-protocol",
   "crates/harness-task-board",
+  "crates/harness-task-board-provider-sync",
   "crates/harness-telemetry",
   "crates/harness-workspace",
   "testkit",

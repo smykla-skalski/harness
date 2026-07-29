@@ -1,22 +1,24 @@
 use sqlx::{Sqlite, Transaction, query_as};
 use uuid::Uuid;
 
-use super::ORCHESTRATOR_CHANGE_SCOPE;
-use super::items::{bump_change_in_tx, load_item_in_tx};
-use super::provider_external_create_evidence::validate_create_evidence;
-use super::provider_external_create_rows::{
+use harness_kernel::errors::CliError;
+use harness_kernel::io;
+use harness_task_board::ExternalRef;
+use harness_task_board::external::{
+    ExternalCreateOutcome, ExternalProvider, TaskBoardExternalCreateBegin,
+    TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
+    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
+};
+use harness_workspace::workspace::utc_now;
+
+use crate::provider_external_create_evidence::validate_create_evidence;
+use crate::provider_external_create_rows::{
     ExternalCreateIntentRow, create_changed_fields, create_conflict, create_conflict_for,
     create_snapshot, insert_intent, load_intent_by_id, load_latest_intent, next_timestamp,
     provider_label, require_same_intent, update_created_evidence,
 };
-use super::provider_queries::ProviderQueries;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-use crate::infra::io;
-use crate::task_board::{
-    ExternalCreateOutcome, ExternalProvider, ExternalRef, TaskBoardExternalCreateBegin,
-    TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
-    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
-};
+use crate::store::ProviderSyncStore;
+use crate::support::{ORCHESTRATOR_CHANGE_SCOPE, db_error};
 
 const LIST_PENDING_INTENTS_SQL: &str =
     "SELECT intent_id, item_id, item_revision, provider, scope_id, create_key, state,
@@ -77,115 +79,15 @@ const LOAD_ATTACHED_RECEIPT_SQL: &str =
      WHERE item_id = ?1 AND provider = ?2 AND state = 'attached'
      ORDER BY updated_at DESC, intent_id DESC LIMIT 1";
 
-impl AsyncDaemonDb {
-    pub(crate) async fn begin_task_board_external_create_intent(
-        &self,
-        item_id: &str,
-        provider: ExternalProvider,
-        scope_id: &str,
-        provider_target: &str,
-    ) -> Result<TaskBoardExternalCreateBegin, CliError> {
-        <Self as ProviderQueries>::begin_task_board_external_create_intent(
-            self,
-            item_id,
-            provider,
-            scope_id,
-            provider_target,
-        )
-        .await
-    }
-
-    pub(crate) async fn record_task_board_external_create_outcome(
-        &self,
-        intent: &TaskBoardExternalCreateIntent,
-        outcome: &ExternalCreateOutcome,
-        provider_baseline: &ExternalRef,
-    ) -> Result<TaskBoardExternalCreateIntent, CliError> {
-        <Self as ProviderQueries>::record_task_board_external_create_outcome(
-            self,
-            intent,
-            outcome,
-            provider_baseline,
-        )
-        .await
-    }
-
-    pub(crate) async fn list_pending_task_board_external_create_intents(
-        &self,
-        provider: ExternalProvider,
-        scope_id: &str,
-    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::list_pending_task_board_external_create_intents(
-            self, provider, scope_id,
-        )
-        .await
-    }
-
-    pub(crate) async fn list_created_task_board_external_create_intents(
-        &self,
-    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::list_created_task_board_external_create_intents(self).await
-    }
-
-    pub(crate) async fn list_in_flight_task_board_external_create_intents(
-        &self,
-        provider: ExternalProvider,
-    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::list_in_flight_task_board_external_create_intents(self, provider)
-            .await
-    }
-
-    pub(crate) async fn list_pending_task_board_external_create_follow_ups(
-        &self,
-        provider: Option<ExternalProvider>,
-    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::list_pending_task_board_external_create_follow_ups(
-            self, provider,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_external_create_intent_by_create_key(
-        &self,
-        provider: ExternalProvider,
-        create_key: &str,
-    ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::task_board_external_create_intent_by_create_key(
-            self, provider, create_key,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_external_create_intent(
-        &self,
-        item_id: &str,
-        provider: ExternalProvider,
-    ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::task_board_external_create_intent(self, item_id, provider).await
-    }
-
-    /// # Errors
-    /// Returns [`CliError`] when the read fails.
-    pub async fn task_board_external_create_receipt(
-        &self,
-        item_id: &str,
-        provider: ExternalProvider,
-    ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
-        <Self as ProviderQueries>::task_board_external_create_receipt(self, item_id, provider).await
-    }
-}
-
-/// Real implementations behind the matching [`ProviderQueries`] methods,
-/// called from the single consolidated trait impl in `provider_queries.rs`
-/// (a trait's methods can only be implemented in one `impl` block per type,
-/// so the per-area files hand `provider_queries.rs` a plain function instead
-/// of each declaring their own `impl ProviderQueries for AsyncDaemonDb`).
+/// # Errors
+/// Returns [`CliError`] when the item is missing, tombstoned, already
+/// linked to this provider, or the write fails.
 #[expect(
     clippy::cognitive_complexity,
     reason = "create admission keeps durable-history, tombstone, and provider-link checks atomic"
 )]
-pub(super) async fn begin_task_board_external_create_intent(
-    db: &AsyncDaemonDb,
+pub async fn begin_task_board_external_create_intent<D: ProviderSyncStore>(
+    db: &D,
     item_id: &str,
     provider: ExternalProvider,
     scope_id: &str,
@@ -199,7 +101,8 @@ pub(super) async fn begin_task_board_external_create_intent(
         commit(transaction, "existing task-board external create intent").await?;
         return Ok(existing_begin(intent));
     }
-    let (item, item_revision) = load_item_in_tx(&mut transaction, item_id)
+    let (item, item_revision) = db
+        .load_item_in_tx(&mut transaction, item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
     if item.is_deleted() {
@@ -236,13 +139,17 @@ pub(super) async fn begin_task_board_external_create_intent(
         updated_at: now,
     };
     insert_intent(&mut transaction, &intent).await?;
-    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+        .await?;
     commit(transaction, "task-board external create intent begin").await?;
     Ok(TaskBoardExternalCreateBegin::Started(intent))
 }
 
-pub(super) async fn record_task_board_external_create_outcome(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the intent is missing, evidence conflicts with
+/// what is already stored, or the write fails.
+pub async fn record_task_board_external_create_outcome<D: ProviderSyncStore>(
+    db: &D,
     intent: &TaskBoardExternalCreateIntent,
     outcome: &ExternalCreateOutcome,
     provider_baseline: &ExternalRef,
@@ -271,7 +178,8 @@ pub(super) async fn record_task_board_external_create_outcome(
         &recorded_at,
     )
     .await?;
-    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    db.bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE)
+        .await?;
     commit(transaction, "task-board external create outcome").await?;
     let mut created = stored;
     created.state =
@@ -284,8 +192,10 @@ pub(super) async fn record_task_board_external_create_outcome(
     Ok(created)
 }
 
-pub(super) async fn list_pending_task_board_external_create_intents(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn list_pending_task_board_external_create_intents<D: ProviderSyncStore>(
+    db: &D,
     provider: ExternalProvider,
     scope_id: &str,
 ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
@@ -299,8 +209,10 @@ pub(super) async fn list_pending_task_board_external_create_intents(
     )
 }
 
-pub(super) async fn list_created_task_board_external_create_intents(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn list_created_task_board_external_create_intents<D: ProviderSyncStore>(
+    db: &D,
 ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
     load_intents(
         query_as::<_, ExternalCreateIntentRow>(LIST_CREATED_INTENTS_SQL)
@@ -310,8 +222,10 @@ pub(super) async fn list_created_task_board_external_create_intents(
     )
 }
 
-pub(super) async fn list_in_flight_task_board_external_create_intents(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn list_in_flight_task_board_external_create_intents<D: ProviderSyncStore>(
+    db: &D,
     provider: ExternalProvider,
 ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
     load_intents(
@@ -323,8 +237,10 @@ pub(super) async fn list_in_flight_task_board_external_create_intents(
     )
 }
 
-pub(super) async fn list_pending_task_board_external_create_follow_ups(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn list_pending_task_board_external_create_follow_ups<D: ProviderSyncStore>(
+    db: &D,
     provider: Option<ExternalProvider>,
 ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
     let rows = match provider {
@@ -343,8 +259,10 @@ pub(super) async fn list_pending_task_board_external_create_follow_ups(
     load_intents(rows, "list pending task-board external create follow-ups")
 }
 
-pub(super) async fn task_board_external_create_intent_by_create_key(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn task_board_external_create_intent_by_create_key<D: ProviderSyncStore>(
+    db: &D,
     provider: ExternalProvider,
     create_key: &str,
 ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
@@ -359,8 +277,10 @@ pub(super) async fn task_board_external_create_intent_by_create_key(
     )
 }
 
-pub(super) async fn task_board_external_create_intent(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn task_board_external_create_intent<D: ProviderSyncStore>(
+    db: &D,
     item_id: &str,
     provider: ExternalProvider,
 ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
@@ -368,8 +288,10 @@ pub(super) async fn task_board_external_create_intent(
     load_one(db, LOAD_ACTIVE_INTENT_SQL, item_id, provider).await
 }
 
-pub(super) async fn task_board_external_create_receipt(
-    db: &AsyncDaemonDb,
+/// # Errors
+/// Returns [`CliError`] when the read fails.
+pub async fn task_board_external_create_receipt<D: ProviderSyncStore>(
+    db: &D,
     item_id: &str,
     provider: ExternalProvider,
 ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
@@ -402,8 +324,8 @@ fn load_intents(
         .collect()
 }
 
-async fn load_one(
-    db: &AsyncDaemonDb,
+async fn load_one<D: ProviderSyncStore>(
+    db: &D,
     sql: &'static str,
     item_id: &str,
     provider: ExternalProvider,
