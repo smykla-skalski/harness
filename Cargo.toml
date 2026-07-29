@@ -33,7 +33,7 @@ members = [
 
 [package]
 name = "harness"
-version = "54.0.0"
+version = "55.0.0"
 edition = "2024"
 rust-version = "1.95"
 autoexamples = false
@@ -52,24 +52,24 @@ include = [
 ]
 
 [dependencies]
-harness-agents = { path = "crates/harness-agents", version = "54.0.0" }
-harness-command = { path = "crates/harness-command", version = "54.0.0" }
-harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0.0" }
-harness-feature-flags = { path = "crates/harness-feature-flags", version = "54.0.0" }
-harness-github-api = { path = "crates/harness-github-api", version = "54.0.0" }
-harness-hooks = { path = "crates/harness-hooks", version = "54.0.0" }
-harness-infra = { path = "crates/harness-infra", version = "54.0.0" }
-harness-kernel = { path = "crates/harness-kernel", version = "54.0.0" }
-harness-mcp = { path = "crates/harness-mcp", version = "54.0.0", optional = true }
-harness-observe = { path = "crates/harness-observe", version = "54.0.0" }
-harness-protocol = { path = "crates/harness-protocol", version = "54.0.0" }
-harness-reviews = { path = "crates/harness-reviews", version = "54.0.0" }
-harness-run = { path = "crates/harness-run", version = "54.0.0" }
-harness-session = { path = "crates/harness-session", version = "54.0.0" }
-harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "54.0.0", optional = true }
-harness-task-board = { path = "crates/harness-task-board", version = "54.0.0" }
-harness-telemetry = { path = "crates/harness-telemetry", version = "54.0.0" }
-harness-workspace = { path = "crates/harness-workspace", version = "54.0.0" }
+harness-agents = { path = "crates/harness-agents", version = "55.0.0" }
+harness-command = { path = "crates/harness-command", version = "55.0.0" }
+harness-daemon-client = { path = "crates/harness-daemon-client", version = "55.0.0" }
+harness-feature-flags = { path = "crates/harness-feature-flags", version = "55.0.0" }
+harness-github-api = { path = "crates/harness-github-api", version = "55.0.0" }
+harness-hooks = { path = "crates/harness-hooks", version = "55.0.0" }
+harness-infra = { path = "crates/harness-infra", version = "55.0.0" }
+harness-kernel = { path = "crates/harness-kernel", version = "55.0.0" }
+harness-mcp = { path = "crates/harness-mcp", version = "55.0.0", optional = true }
+harness-observe = { path = "crates/harness-observe", version = "55.0.0" }
+harness-protocol = { path = "crates/harness-protocol", version = "55.0.0" }
+harness-reviews = { path = "crates/harness-reviews", version = "55.0.0" }
+harness-run = { path = "crates/harness-run", version = "55.0.0" }
+harness-session = { path = "crates/harness-session", version = "55.0.0" }
+harness-systemd-protocol = { path = "crates/harness-systemd-protocol", version = "55.0.0", optional = true }
+harness-task-board = { path = "crates/harness-task-board", version = "55.0.0" }
+harness-telemetry = { path = "crates/harness-telemetry", version = "55.0.0" }
+harness-workspace = { path = "crates/harness-workspace", version = "55.0.0" }
 arc-swap = "1.9.1"
 bytes = "1.10.1"
 caseless = "0.2.2"
@@ -154,11 +154,11 @@ assert_cmd = "=2.2.2"
 predicates = "=3.1.4"
 tempfile = "=3.27.0"
 insta = "=1.48.0"
-harness-agents = { path = "crates/harness-agents", version = "54.0.0", features = ["test-support"] }
-harness-daemon-client = { path = "crates/harness-daemon-client", version = "54.0.0", features = ["test-support"] }
-harness-github-api = { path = "crates/harness-github-api", version = "54.0.0", features = ["test-support"] }
-harness-reviews = { path = "crates/harness-reviews", version = "54.0.0", features = ["test-support"] }
-harness-task-board = { path = "crates/harness-task-board", version = "54.0.0", features = ["test-support"] }
+harness-agents = { path = "crates/harness-agents", version = "55.0.0", features = ["test-support"] }
+harness-daemon-client = { path = "crates/harness-daemon-client", version = "55.0.0", features = ["test-support"] }
+harness-github-api = { path = "crates/harness-github-api", version = "55.0.0", features = ["test-support"] }
+harness-reviews = { path = "crates/harness-reviews", version = "55.0.0", features = ["test-support"] }
+harness-task-board = { path = "crates/harness-task-board", version = "55.0.0", features = ["test-support"] }
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 axum = { version = "=0.8.9", features = ["http2", "json", "ws"] }

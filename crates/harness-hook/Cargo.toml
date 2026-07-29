@@ -1,6 +1,6 @@
 [package]
 name = "harness-hook"
-version = "54.0.0"
+version = "55.0.0"
 edition = "2024"
 rust-version = "1.95"
 
@@ -14,15 +14,15 @@ test = false
 
 [dependencies]
 clap = { version = "4.6.0", features = ["derive", "env"] }
-harness-agents = { path = "../harness-agents", version = "54.0.0" }
-harness-daemon-client = { path = "../harness-daemon-client", version = "54.0.0" }
-harness-hooks = { path = "../harness-hooks", version = "54.0.0" }
-harness-infra = { path = "../harness-infra", version = "54.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "54.0.0" }
-harness-protocol = { path = "../harness-protocol", version = "54.0.0" }
-harness-session = { path = "../harness-session", version = "54.0.0" }
-harness-telemetry = { path = "../harness-telemetry", version = "54.0.0" }
+harness-agents = { path = "../harness-agents", version = "55.0.0" }
+harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
+harness-hooks = { path = "../harness-hooks", version = "55.0.0" }
+harness-infra = { path = "../harness-infra", version = "55.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.0" }
+harness-session = { path = "../harness-session", version = "55.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
 chrono = { version = "0.4.44", features = ["serde"] }
 fs-err = "3.3.0"
 fs2 = "0.4.3"
@@ -45,7 +45,7 @@ utoipa = "5.5.0"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-harness-daemon-client = { path = "../harness-daemon-client", version = "54.0.0", features = ["test-support"] }
+harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0", features = ["test-support"] }
 temp-env = "=0.3.6"
 tracing-subscriber = "=0.3.23"
 
