@@ -16,6 +16,19 @@ mod paths;
 
 #[cfg(test)]
 mod tests;
+// `pub`, not `pub(crate)`: the daemon-routing fixtures this crate's own unit
+// tests use are also the only way `tests/integration_daemon.rs`'s
+// `session_service_daemon_*` scenarios can fake a running daemon, since that
+// binary links `harness` as an ordinary dependency where `cfg(test)` is
+// never set. Gating on `daemon-runtime` rather than always-on keeps it out of
+// the default-feature build the same way the rest of this module's
+// daemon-only surface is gated. Lives here, not under the now-deleted
+// `daemon::client` facade it used to sit beside, because every type and
+// constant it fabricates (`DaemonManifest`, `DaemonOwnership`,
+// `ScopedDaemonRootOverride`, `DAEMON_LOCK_FILE`, `auth_token_path`,
+// `write_manifest`) is this module's own.
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub mod test_support;
 
 pub use crate::infra::persistence::flock::FlockGuard;
 pub use harness_protocol::daemon::{

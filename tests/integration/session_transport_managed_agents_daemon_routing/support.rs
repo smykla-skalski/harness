@@ -13,7 +13,7 @@ use std::thread;
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
-use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::daemon::state::test_support::install_fake_running_xdg_daemon;
 use harness::session::types::AgentStatus;
 use harness::session::wire::ManagedAgentSnapshot;
 use harness_protocol::managed_agents::acp::AcpAgentSnapshot;

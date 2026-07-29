@@ -10,7 +10,7 @@ use harness_testkit::with_isolated_harness_env;
 use serde_json::json;
 use tempfile::tempdir;
 
-use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::daemon::state::test_support::install_fake_running_xdg_daemon;
 use harness::session::service;
 
 pub(super) struct CapturedRequest {

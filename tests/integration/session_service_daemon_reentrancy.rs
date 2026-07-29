@@ -12,7 +12,7 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
 
-use harness::daemon::client::test_support::install_fake_running_xdg_daemon;
+use harness::daemon::state::test_support::install_fake_running_xdg_daemon;
 use harness::session::service::{join_session, leave_session, session_status, start_session};
 use harness::session::types::{SessionMetrics, SessionRole, SessionStatus};
 use harness::session::wire;

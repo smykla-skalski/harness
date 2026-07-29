@@ -46,8 +46,9 @@ pub enum ClientError {
 }
 
 /// Parses the daemon's `{"error":{"code","message"}}` envelope out of a
-/// non-success response body, mirroring the root facade's
-/// `daemon::client::http::parse_error_response`. Every caller that formats a
+/// non-success response body, mirroring `parse_error_response` from the root
+/// crate's `daemon::client::http` facade, which has since been deleted along
+/// with the rest of that dead client. Every caller that formats a
 /// `ClientError::Response` through `Display` - directly or via a
 /// `daemon_client_error`-style wrapper - gets the same clean message instead
 /// of a raw JSON dump; falls back to the full method/path/status/body when
@@ -339,12 +340,13 @@ enum Readiness {
     NotReady,
 }
 
-/// Mirrors the root facade's `daemon::client::http::mutation_timeout_for_path`.
-/// A handful of task-board and policy mutations are known long-running
-/// operations; without this, every `post`/`put` inherited the client's flat
-/// 5s default and would fail against a real daemon on anything slower than
-/// that, a regression the facade's callers never hit because it already
-/// special-cased these paths.
+/// Mirrors `mutation_timeout_for_path` from the root crate's `daemon::client::http`
+/// facade, which has since been deleted along with the rest of that dead
+/// client. A handful of task-board and policy mutations are known
+/// long-running operations; without this, every `post`/`put` inherited the
+/// client's flat 5s default and would fail against a real daemon on anything
+/// slower than that, a regression the facade's callers never hit because it
+/// already special-cased these paths.
 fn mutation_timeout_for_path(path: &str) -> Duration {
     if path == "/v1/sessions" {
         SESSION_START_TIMEOUT
