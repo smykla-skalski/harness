@@ -190,7 +190,7 @@ fn parse_output(
 /// before `components()` ever sees them. The component check stays for
 /// Windows correctness; the string checks are what actually reject those
 /// shapes here.
-fn validate_finding_path(value: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
+pub(super) fn validate_finding_path(value: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
     validate_nonempty("finding.location.path", value)?;
     let path = Path::new(value);
     let safe = value.trim() == value
@@ -223,7 +223,7 @@ fn has_drive_prefix(value: &str) -> bool {
     )
 }
 
-fn validate_head_revision(revision: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
+pub(super) fn validate_head_revision(revision: &str) -> Result<(), TaskBoardReportOnlyReviewError> {
     let valid_length = matches!(revision.len(), 40 | 64);
     if valid_length
         && revision
@@ -236,7 +236,7 @@ fn validate_head_revision(revision: &str) -> Result<(), TaskBoardReportOnlyRevie
     }
 }
 
-fn validate_nonempty(
+pub(super) fn validate_nonempty(
     field: &'static str,
     value: &str,
 ) -> Result<(), TaskBoardReportOnlyReviewError> {
