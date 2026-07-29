@@ -48,17 +48,20 @@ const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
     FROM task_board_external_refs WHERE item_id = ?1 ORDER BY position";
 
+// `pub`, not `pub(crate)`: `tests/integration_daemon.rs`'s task-board sync
+// scenarios read `item_revision` off a live mutation/snapshot the same way
+// this crate's own unit tests do, and that binary sees only `pub` items.
 #[derive(Debug)]
-pub(crate) struct TaskBoardMutation {
-    pub(crate) item: TaskBoardItem,
-    pub(crate) item_revision: i64,
-    pub(crate) change_revision: i64,
+pub struct TaskBoardMutation {
+    pub item: TaskBoardItem,
+    pub item_revision: i64,
+    pub change_revision: i64,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct TaskBoardItemSnapshot {
-    pub(crate) item: TaskBoardItem,
-    pub(crate) item_revision: i64,
+pub struct TaskBoardItemSnapshot {
+    pub item: TaskBoardItem,
+    pub item_revision: i64,
 }
 
 /// Which ingress point is driving a triage-evaluating update, so the same
@@ -82,14 +85,20 @@ pub(super) enum TaskBoardMutationKind {
 
 impl AsyncDaemonDb {
     /// Load one Task Board item, including tombstones.
-    pub(crate) async fn task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item does not exist or the load fails.
+    pub async fn task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
         self.task_board_item_snapshot(item_id)
             .await
             .map(|snapshot| snapshot.item)
     }
 
     /// Load one Task Board item with the row revision used by automation CAS.
-    pub(crate) async fn task_board_item_snapshot(
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item does not exist or the load fails.
+    pub async fn task_board_item_snapshot(
         &self,
         item_id: &str,
     ) -> Result<TaskBoardItemSnapshot, CliError> {

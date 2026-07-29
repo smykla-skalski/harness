@@ -20,7 +20,9 @@ const ATTEMPT_HEALTH_PREFIX: &str = "attempting:";
 type ProviderScopeRow = (Option<String>, String, i64, Option<String>);
 
 impl AsyncDaemonDb {
-    pub(crate) async fn task_board_provider_scope_state(
+    /// # Errors
+    /// Returns [`CliError`] when the read fails.
+    pub async fn task_board_provider_scope_state(
         &self,
         provider: ExternalProvider,
         scope_id: &str,

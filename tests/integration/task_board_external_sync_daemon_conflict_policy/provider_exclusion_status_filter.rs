@@ -1,9 +1,14 @@
 use tempfile::tempdir;
 
-use super::*;
-use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::store::TaskBoardItemPatch;
-use crate::task_board::{ExternalRefProvider, ProviderExclusionAuditContext};
+use harness::daemon::db::AsyncDaemonDb;
+use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::store::TaskBoardItemPatch;
+use harness::task_board::{
+    ExternalProvider, ExternalRefProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
+    ProviderExclusionAuditContext, TaskBoardStatus,
+};
+
+use super::support::{UpdateFakeSyncClient, linked_item, remote_task};
 
 #[tokio::test]
 async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone() {

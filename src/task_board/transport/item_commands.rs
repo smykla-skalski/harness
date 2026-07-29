@@ -26,7 +26,10 @@ use super::{
 /// -- this is their only copy now, not a duplicate of it. A daemon that keeps
 /// offering one more distinct cursor would otherwise grow the walk without
 /// bound.
-const TASK_BOARD_LIST_MAX_PAGES: usize = 200;
+// `pub`, not private: `tests/integration_daemon.rs`'s
+// `task_board_item_commands_daemon_routing` scenarios script exactly this
+// many mock pages to prove the page-cap fault fires.
+pub const TASK_BOARD_LIST_MAX_PAGES: usize = 200;
 
 impl Execute for TaskBoardCreateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -241,7 +244,14 @@ fn get_task_board_item(client: &DaemonClient, item_id: &str) -> Result<TaskBoard
 }
 
 /// Read one bounded page of matching task-board items.
-fn list_task_board_items_page(
+///
+/// # Errors
+/// Returns [`CliError`] when the request fails.
+// `pub`, not private: `tests/integration_daemon.rs`'s
+// `task_board_item_commands_daemon_routing` scenarios call this directly
+// against a fake daemon to prove the query-string rendering, the same reason
+// `daemon::db::AsyncDaemonDb`'s methods are `pub` there.
+pub fn list_task_board_items_page(
     client: &DaemonClient,
     request: &TaskBoardListItemsRequest,
 ) -> Result<TaskBoardListItemsResponse, CliError> {
@@ -270,7 +280,10 @@ fn list_task_board_items_page(
 /// Sequence-bound cursors prevent overlap in valid responses. Ids are still
 /// tracked so a malformed overlapping page cannot put duplicate rows in the
 /// returned board.
-fn list_task_board_items(
+///
+/// # Errors
+/// Returns [`CliError`] when a page cannot be read or the walk cannot advance.
+pub fn list_task_board_items(
     client: &DaemonClient,
     request: &TaskBoardListItemsRequest,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
@@ -397,8 +410,3 @@ fn undrained_task_board_read() -> CliError {
 fn item_path(item_id: &str) -> String {
     format!("/v1/task-board/items/{item_id}")
 }
-
-// Split into item_commands/tests.rs: with the ported page-walk mock-server
-// tests included, this file would otherwise clear the repo's line cap.
-#[cfg(test)]
-mod tests;

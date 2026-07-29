@@ -37,7 +37,10 @@ impl AsyncDaemonDb {
     /// `sync_state` for a later restore to recover. Records exactly one
     /// typed audit event, with every child unparented in the same
     /// transaction, even when the item has no lane anchor to change.
-    pub(crate) async fn hide_task_board_item_for_provider_exclusion(
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item does not exist or the hide fails.
+    pub async fn hide_task_board_item_for_provider_exclusion(
         &self,
         item_id: &str,
         expected_revision: i64,

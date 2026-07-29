@@ -1,14 +1,32 @@
-use std::net::TcpListener;
+//! Task-board item-command daemon-routing coverage.
+//!
+//! The id-escape rejection tests prove a path-separator or `..` segment never
+//! reaches the daemon at all. The page-walk tests exercise
+//! `item_commands::list_task_board_items`/`list_task_board_items_page`
+//! directly against a scripted fake HTTP daemon, because the behavior under
+//! test - stable query-string ordering, cursor-repeat and empty-cursor
+//! detection, and the page-count cap - lives entirely in that walk and would
+//! otherwise only be observable by parsing stdout off `Execute::execute()`.
+
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use super::*;
-use crate::daemon::client::test_support::{read_http_request, write_http_response};
-use crate::task_board::transport::item_args::TaskBoardItemFieldArgs;
-use crate::task_board::transport::{
-    TaskBoardUpdateClearEstimateArgs, TaskBoardUpdateClearLinkArgs, TaskBoardUpdateClearStateArgs,
+use harness_workspace::command_context::{AppContext, Execute};
+
+use harness::task_board::TaskBoardItem;
+use harness::task_board::transport::item_args::TaskBoardItemFieldArgs;
+use harness::task_board::transport::item_commands::{
+    TASK_BOARD_LIST_MAX_PAGES, list_task_board_items,
 };
-use crate::task_board::types::{AgentMode, TaskBoardPriority, TaskBoardStatus};
+use harness::task_board::transport::{
+    TaskBoardDeleteArgs, TaskBoardUpdateArgs, TaskBoardUpdateClearEstimateArgs,
+    TaskBoardUpdateClearLinkArgs, TaskBoardUpdateClearStateArgs,
+};
+use harness::task_board::types::{AgentMode, TaskBoardPriority, TaskBoardStatus};
+use harness::task_board::wire::TaskBoardListItemsRequest;
+use harness_daemon_client::DaemonClient;
 
 fn empty_fields() -> TaskBoardItemFieldArgs {
     TaskBoardItemFieldArgs {
@@ -87,6 +105,34 @@ fn client_with(endpoint: String) -> DaemonClient {
     DaemonClient::test_client(endpoint, "test-token")
 }
 
+fn read_request(stream: &mut TcpStream) -> String {
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+        .expect("read timeout");
+    let mut buffer = Vec::new();
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let read = stream.read(&mut chunk).expect("read request");
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+    String::from_utf8(buffer).expect("utf8 request")
+}
+
+fn write_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &str) {
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream.write_all(response.as_bytes()).expect("write");
+    stream.flush().expect("flush");
+}
+
 fn spawn_mock(
     response_status: &'static str,
     response_body: String,
@@ -97,10 +143,10 @@ fn spawn_mock(
     let captured = Arc::clone(&request_line);
     let handle = thread::spawn(move || {
         let (mut stream, _) = listener.accept().expect("accept");
-        let request = read_http_request(&mut stream);
+        let request = read_request(&mut stream);
         *captured.lock().expect("request capture") =
             request.lines().next().unwrap_or_default().to_string();
-        write_http_response(
+        write_response(
             &mut stream,
             response_status,
             "application/json",
@@ -122,12 +168,12 @@ fn spawn_mock_sequence(
     let handle = thread::spawn(move || {
         for response in responses {
             let (mut stream, _) = listener.accept().expect("accept");
-            let request = read_http_request(&mut stream);
+            let request = read_request(&mut stream);
             captured
                 .lock()
                 .expect("request capture")
                 .push(request.lines().next().unwrap_or_default().to_string());
-            write_http_response(&mut stream, "200 OK", "application/json", &response);
+            write_response(&mut stream, "200 OK", "application/json", &response);
         }
     });
     (endpoint, request_lines, handle)

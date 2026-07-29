@@ -14,8 +14,16 @@ mod catalog;
 mod dispatch;
 mod evaluate;
 mod host;
-mod item_args;
-mod item_commands;
+// `pub`, not private: `tests/integration_daemon.rs`'s
+// `task_board_item_commands_daemon_routing` scenarios build
+// `TaskBoardItemFieldArgs` literals directly the same way this crate's own
+// unit tests did.
+pub mod item_args;
+// `pub`, not private: `tests/integration_daemon.rs`'s
+// `task_board_item_commands_daemon_routing` scenarios exercise the
+// page-walk helpers below directly against a fake daemon, the same reason
+// `daemon::db::AsyncDaemonDb` is `pub` there.
+pub mod item_commands;
 mod orchestrator;
 mod orchestrator_tokens;
 mod planning;

@@ -32,7 +32,9 @@ impl SyncConflictReplacement {
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn replace_open_task_board_sync_conflicts(
+    /// # Errors
+    /// Returns [`CliError`] when the item revision has moved or the write fails.
+    pub async fn replace_open_task_board_sync_conflicts(
         &self,
         item_id: &str,
         provider: ExternalProvider,
@@ -92,8 +94,15 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit sync conflict supersession: {error}")))
     }
 
-    #[cfg(test)]
-    pub(crate) async fn open_task_board_sync_conflicts(
+    /// # Errors
+    /// Returns [`CliError`] when the read fails.
+    // `pub`, not `pub(crate)`, and gated the same way as `daemon::client::test_support`:
+    // `tests/integration_daemon.rs`'s task-board sync scenarios read open
+    // conflicts back after a sync the same way this crate's own unit tests do,
+    // and that binary links `harness` as an ordinary dependency where
+    // `cfg(test)` is never set.
+    #[cfg(any(test, feature = "daemon-runtime"))]
+    pub async fn open_task_board_sync_conflicts(
         &self,
     ) -> Result<Vec<TaskBoardSyncConflict>, CliError> {
         let rows = query_as::<_, ConflictRow>(
