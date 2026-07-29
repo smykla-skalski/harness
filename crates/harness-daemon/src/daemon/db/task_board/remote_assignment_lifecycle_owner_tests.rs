@@ -10,8 +10,8 @@ use super::{
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 
 struct RestartedExecutor {
     db: AsyncDaemonDb,

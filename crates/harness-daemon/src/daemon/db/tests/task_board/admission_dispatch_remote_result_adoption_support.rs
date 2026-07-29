@@ -12,7 +12,7 @@ use crate::daemon::db::task_board::remote_assignment_test_support::claim_request
 use crate::daemon::db::task_board::{
     TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteClaimResponse,
     RemoteLease, RemoteStatusResponse, RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

@@ -5,13 +5,13 @@ use crate::daemon::db::TaskBoardRemoteSettlementReceipt;
 use crate::daemon::db::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostSelection, TaskBoardRemotePriorPhaseBundle,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactManifest,
     RemoteAssignmentWireState, RemoteAttemptBinding, RemoteClaimRequest, RemoteCodexLaunchEnvelope,
     RemoteLeaseRenewRequest, RemoteOfferRequest, RemoteSettledRequest, RemoteSourceMaterial,
     RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::task_board_remote_wire::wire_cleanup::RemoteCleanupObservationRequest;
+use crate::task_board::remote_wire::wire_cleanup::RemoteCleanupObservationRequest;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardImplementationResult, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,

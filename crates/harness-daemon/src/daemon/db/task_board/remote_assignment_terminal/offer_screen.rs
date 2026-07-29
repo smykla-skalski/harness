@@ -9,7 +9,7 @@ use super::super::remote_assignment_rejection::apply_rejected_offer;
 use super::super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
 use super::super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx;
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{RemoteOfferDisposition, RemoteOfferResponse};
+use crate::task_board::remote_wire::wire::{RemoteOfferDisposition, RemoteOfferResponse};
 
 /// Either the screen already settled the transaction, or it hands both the
 /// transaction and the record back so the caller can go on writing.

@@ -10,7 +10,7 @@ use super::controller_authority_test_support::{
     remote_host_config, spawn_barrier_server, spawn_probe_server, test_tls_material,
 };
 use crate::daemon::db::{AsyncDaemonDb, remote_controller_fixture};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteHostAdvertisement, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{

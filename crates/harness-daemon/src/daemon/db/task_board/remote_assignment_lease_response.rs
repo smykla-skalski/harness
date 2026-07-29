@@ -13,10 +13,8 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
-    RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
-};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
 
 #[path = "remote_assignment_lease_response/replay.rs"]
 mod replay;

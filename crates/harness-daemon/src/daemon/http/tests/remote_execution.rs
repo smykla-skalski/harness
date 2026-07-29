@@ -12,7 +12,7 @@ use crate::daemon::task_board_remote_transport::routes::{
     ADVERTISE_PATH, ARTIFACT_PATH, CANCEL_PATH, CLAIM_PATH, LEASE_RENEW_PATH, OFFER_PATH,
     SETTLED_PATH, SOURCE_BUNDLE_PATH, STATUS_PATH,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactManifest, RemoteAssignmentWireState,
     RemoteAttemptBinding, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteHostAdvertisement, RemoteLeaseRenewRequest,

@@ -4,11 +4,11 @@ use super::remote_assignment_test_support::{
     DEADLINE, HOST, LEASE_EXPIRES, NOW, REPOSITORY, controller_fixture,
 };
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardWorkflowKind;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
 };
-use crate::task_board::TaskBoardWorkflowKind;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";
@@ -122,7 +122,7 @@ async fn controller_source_upload_receipt_rejects_generation_principal_and_diges
 
 async fn insert_central_offer(
     db: &AsyncDaemonDb,
-    request: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
 ) {
     db.insert_task_board_remote_source_bundle_offer_for_test(
         request,
@@ -136,9 +136,9 @@ async fn insert_central_offer(
 }
 
 fn bundle_offer(
-    template: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    template: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
 ) -> (
-    crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    crate::task_board::remote_wire::wire::RemoteOfferRequest,
     Vec<u8>,
 ) {
     let content = b"controller prior phase bundle bytes".to_vec();

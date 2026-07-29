@@ -6,7 +6,7 @@ use super::decode::{
 use super::failure_receipt::apply_start_failure_receipt;
 use super::{RemoteAssignmentRow, TaskBoardRemoteAssignmentRecord};
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
 
 struct DecodedRow {

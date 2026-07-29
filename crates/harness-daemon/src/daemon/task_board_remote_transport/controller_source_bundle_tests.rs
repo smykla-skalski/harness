@@ -6,11 +6,11 @@ use super::controller_authority_test_support::{
     spawn_barrier_server, test_tls_material,
 };
 use crate::daemon::db::{REMOTE_EXECUTOR_CLAIMED_AT, remote_controller_fixture};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardWorkflowKind;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
 };
-use crate::task_board::TaskBoardWorkflowKind;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";
@@ -139,9 +139,9 @@ async fn controller_upload_replay_rejects_wrong_principal_and_digest_without_net
 }
 
 fn bundle_offer(
-    template: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    template: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
 ) -> (
-    crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    crate::task_board::remote_wire::wire::RemoteOfferRequest,
     Vec<u8>,
 ) {
     let content = b"authenticated controller source bundle".to_vec();

@@ -13,17 +13,17 @@ use super::routes_support::{
 use crate::daemon::db::utc_now;
 use crate::daemon::http::openapi::DaemonErrorBody;
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
     RemoteSourceBundleUploadRequest, RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
     RemoteSettledResponse, RemoteSourceBundleUploadResponse, RemoteStatusResponse,
 };
-use crate::daemon::task_board_remote_wire::wire_conversion::host_wire_advertisement;
-use crate::daemon::task_board_remote_wire::wire_limits::{
+use crate::task_board::remote_wire::wire_conversion::host_wire_advertisement;
+use crate::task_board::remote_wire::wire_limits::{
     MAX_REMOTE_LIFECYCLE_JSON_BYTES, MAX_REMOTE_OFFER_JSON_BYTES,
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
 };

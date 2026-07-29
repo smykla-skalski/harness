@@ -18,7 +18,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::tests::task_board::{
     PreparedRemoteOffer, prepare_remote_implementation_offer,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteOfferRequest, RemoteSettledRequest,
     RemoteSourceBundleUploadRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -400,7 +400,7 @@ async fn supersede_for_reassignment(
 async fn outbound_source(
     db: &AsyncDaemonDb,
     offer: &RemoteOfferRequest,
-) -> Option<crate::daemon::task_board_remote_wire::wire::RemoteSourceBundleUploadRequest> {
+) -> Option<crate::task_board::remote_wire::wire::RemoteSourceBundleUploadRequest> {
     db.task_board_remote_outbound_source_upload(
         &offer.binding.assignment_id,
         offer.binding.fencing_epoch,

@@ -1,5 +1,4 @@
 mod api_contract;
-mod audit;
 mod binding;
 mod openrouter_models;
 mod reviews;
@@ -11,11 +10,11 @@ mod voice;
 mod websocket;
 
 pub use api_contract::*;
-pub use audit::*;
 pub use binding::{
     ControlPlaneActorRequest, bind_control_plane_actor_value, current_control_plane_actor_id,
     with_control_plane_actor,
 };
+pub use harness_protocol::daemon::audit::*;
 pub use harness_protocol::managed_agents::codex::*;
 pub use openrouter_models::*;
 pub use reviews::*;

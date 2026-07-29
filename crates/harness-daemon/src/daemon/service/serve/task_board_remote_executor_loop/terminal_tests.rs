@@ -9,7 +9,7 @@ use crate::daemon::db::{
     remote_executor_claim_request, remote_executor_fixture,
 };
 use crate::daemon::protocol::CodexRunStatus;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     MAX_REMOTE_TYPED_RESULT_BYTES, RemoteAssignmentWireState,
 };
 use crate::task_board::{

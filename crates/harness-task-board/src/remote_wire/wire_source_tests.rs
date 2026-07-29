@@ -3,7 +3,7 @@ use super::wire::{
     test_codex_launch,
 };
 use super::wire_tests::{artifact, offer_request};
-use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use crate::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
 #[test]
 fn same_repository_initial_source_is_exact_revision_and_digest_bound() {

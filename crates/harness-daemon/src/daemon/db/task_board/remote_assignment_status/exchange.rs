@@ -24,10 +24,10 @@ use super::super::remote_operation_trust::{
 use super::super::workflow_executions::load_execution_in_tx;
 use super::persist_lost_claim_receipt_in_tx;
 use crate::daemon::db::CliError;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 /// Why a status exchange never reaches the write path. Collapsing the four
 /// refusals into one value lets the recorder settle every one of them at a

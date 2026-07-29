@@ -1,12 +1,15 @@
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::remote_wire::wire::{
     RemoteHostAdvertisement, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::{
+use crate::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionHostAdvertisement,
     TaskBoardLocalExecutionHostConfig, TaskBoardPhaseCapabilityProfile,
 };
 
-pub(crate) fn host_wire_advertisement(
+/// # Errors
+/// Returns [`RemoteWireError`] if the assembled advertisement fails its own
+/// wire contract.
+pub fn host_wire_advertisement(
     host: &TaskBoardLocalExecutionHostConfig,
     host_instance_id: &str,
     active_assignments: u32,
@@ -38,7 +41,10 @@ pub(crate) fn host_wire_advertisement(
     Ok(advertisement)
 }
 
-pub(crate) fn domain_host_advertisement(
+/// # Errors
+/// Returns [`RemoteWireError`] if `wire` fails its own wire contract or
+/// carries a capability this crate does not recognize.
+pub fn domain_host_advertisement(
     wire: RemoteHostAdvertisement,
 ) -> Result<TaskBoardExecutionHostAdvertisement, RemoteWireError> {
     wire.validate()?;

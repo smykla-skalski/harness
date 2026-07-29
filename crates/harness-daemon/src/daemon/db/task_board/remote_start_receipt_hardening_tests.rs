@@ -9,10 +9,10 @@ use super::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
     TaskBoardRemoteMutationOutcome,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 const OWNER_REPLAY_AT: &str = "2026-07-19T10:00:40Z";
 const OWNER_TAKEOVER_AT: &str = "2026-07-19T10:00:51Z";

@@ -16,11 +16,11 @@ use super::remote_operation_trust::{
     consume_controller_operation_trust_in_tx, consume_successor_recovery_operation_trust_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteCancelRequest, RemoteLease, RemoteOfferDisposition,
     RemoteOfferResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 use sqlx::{Sqlite, Transaction, query};
 
 mod offer_screen;

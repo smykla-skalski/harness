@@ -9,13 +9,13 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest,
     RemoteOfferResponse, RemoteSettledRequest, RemoteSettledResponse, RemoteStatusRequest,
     RemoteStatusResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Authenticated, pinned controller-side connection to one configured executor.
@@ -338,7 +338,7 @@ impl RemoteExecutionControllerClient {
         assignment_id: &str,
         lease_id: &str,
         offer_digest: &str,
-        binding: &crate::daemon::task_board_remote_wire::wire::RemoteAttemptBinding,
+        binding: &crate::task_board::remote_wire::wire::RemoteAttemptBinding,
     ) -> Result<TaskBoardRemoteAssignmentRecord, RemoteExecutionControllerError> {
         let record = self.preflight(db, assignment_id).await?;
         let offer = record.require_offer()?;

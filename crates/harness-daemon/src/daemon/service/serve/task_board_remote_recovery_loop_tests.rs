@@ -7,7 +7,7 @@ use crate::daemon::db::{
     TaskBoardRemoteOfferOutcome, authorize_and_start_remote_executor, prepare_remote_offer,
     remote_executor_claim_request, remote_executor_fixture,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteOfferRequest, RemoteSettledRequest,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

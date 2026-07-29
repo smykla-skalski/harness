@@ -5,40 +5,44 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::task_board::{
+use crate::{
     TaskBoardExecutionPhase, TaskBoardFailureClass, TaskBoardWorkflowKind,
     normalize_repository_slug,
 };
 
 #[cfg(test)]
-pub(crate) use super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES;
+pub use super::wire_artifacts::MAX_REMOTE_ARTIFACT_BYTES;
 pub(super) use super::wire_artifacts::valid_artifact_path;
-pub(crate) use super::wire_artifacts::{RemoteArtifactEntry, RemoteArtifactManifest};
+pub use super::wire_artifacts::{RemoteArtifactEntry, RemoteArtifactManifest};
 
-pub(crate) use super::wire_host::RemoteHostAdvertisement;
-pub(crate) use super::wire_launch::RemoteCodexLaunchEnvelope;
-#[cfg(test)]
-pub(crate) use super::wire_launch::test_codex_launch;
-pub(crate) use super::wire_lifecycle::{
+pub use super::wire_host::RemoteHostAdvertisement;
+pub use super::wire_launch::RemoteCodexLaunchEnvelope;
+// `harness-daemon`'s own `db` and `service` tests build this crate as an
+// ordinary dependency, so a bare `cfg(test)` (scoped to this crate's own
+// test binary) would hide these from them; `test-support` is this crate's
+// established way to expose a test-only item across that crate boundary.
+#[cfg(any(test, feature = "test-support"))]
+pub use super::wire_launch::test_codex_launch;
+pub use super::wire_lifecycle::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteCancelRequest,
     RemoteCancelResponse, RemoteSettledRequest, RemoteSettledResponse,
 };
-#[cfg(test)]
-pub(crate) use super::wire_result::MAX_REMOTE_TYPED_RESULT_BYTES;
-pub(crate) use super::wire_result::RemoteTypedResult;
-pub(crate) use super::wire_source::{RemoteRepositorySelector, RemoteSourceMaterial};
-pub(crate) use super::wire_source_bundle::{
+#[cfg(any(test, feature = "test-support"))]
+pub use super::wire_result::MAX_REMOTE_TYPED_RESULT_BYTES;
+pub use super::wire_result::RemoteTypedResult;
+pub use super::wire_source::{RemoteRepositorySelector, RemoteSourceMaterial};
+pub use super::wire_source_bundle::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
-pub(crate) use super::wire_source_bundle_recovery::{
+pub use super::wire_source_bundle_recovery::{
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
     RemoteSourceBundleReceiptVerificationResponse,
 };
 
-pub(crate) const TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION: u32 = 1;
+pub const TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RemoteWireError {
+pub enum RemoteWireError {
     UnsupportedVersion,
     MissingField(&'static str),
     InvalidDigest(&'static str),
@@ -109,27 +113,31 @@ impl Error for RemoteWireError {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteAttemptBinding {
-    pub(crate) assignment_id: String,
-    pub(crate) execution_id: String,
-    pub(crate) phase: TaskBoardExecutionPhase,
-    pub(crate) workflow_kind: TaskBoardWorkflowKind,
-    pub(crate) action_key: String,
-    pub(crate) attempt: u32,
-    pub(crate) idempotency_key: String,
-    pub(crate) host_id: String,
-    pub(crate) host_instance_id: String,
-    pub(crate) fencing_epoch: u64,
-    pub(crate) configuration_revision: u64,
-    pub(crate) execution_record_sha256: String,
-    pub(crate) repository: String,
-    pub(crate) base_revision: String,
+pub struct RemoteAttemptBinding {
+    pub assignment_id: String,
+    pub execution_id: String,
+    pub phase: TaskBoardExecutionPhase,
+    pub workflow_kind: TaskBoardWorkflowKind,
+    pub action_key: String,
+    pub attempt: u32,
+    pub idempotency_key: String,
+    pub host_id: String,
+    pub host_instance_id: String,
+    pub fencing_epoch: u64,
+    pub configuration_revision: u64,
+    pub execution_record_sha256: String,
+    pub repository: String,
+    pub base_revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) expected_head_revision: Option<String>,
+    pub expected_head_revision: Option<String>,
 }
 
 impl RemoteAttemptBinding {
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if a required field is missing,
+    /// oversized, or not canonically formatted, or if the phase, workflow
+    /// kind, repository, or revision are invalid.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         for (name, value) in [
             ("assignment_id", self.assignment_id.as_str()),
             ("execution_id", self.execution_id.as_str()),
@@ -200,21 +208,21 @@ fn valid_revision(value: &str) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteOfferRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) lease_seconds: u32,
-    pub(crate) deadline_at: String,
-    pub(crate) launch: RemoteCodexLaunchEnvelope,
-    pub(crate) source: RemoteSourceMaterial,
-    pub(crate) artifacts: RemoteArtifactManifest,
-    pub(crate) request_sha256: String,
+pub struct RemoteOfferRequest {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub lease_seconds: u32,
+    pub deadline_at: String,
+    pub launch: RemoteCodexLaunchEnvelope,
+    pub source: RemoteSourceMaterial,
+    pub artifacts: RemoteArtifactManifest,
+    pub request_sha256: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]
-pub(crate) enum RemoteOfferDisposition {
+pub enum RemoteOfferDisposition {
     Accepted,
     Rejected,
 }
@@ -222,84 +230,84 @@ pub(crate) enum RemoteOfferDisposition {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteLease {
-    pub(crate) lease_id: String,
-    pub(crate) expires_at: String,
+pub struct RemoteLease {
+    pub lease_id: String,
+    pub expires_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteOfferResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) disposition: RemoteOfferDisposition,
+pub struct RemoteOfferResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub offer_request_sha256: String,
+    pub disposition: RemoteOfferDisposition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) lease: Option<RemoteLease>,
+    pub lease: Option<RemoteLease>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) rejection_code: Option<String>,
+    pub rejection_code: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteClaimRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) lease_id: String,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) request_sha256: String,
+pub struct RemoteClaimRequest {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub lease_id: String,
+    pub offer_request_sha256: String,
+    pub request_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteClaimResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) lease: RemoteLease,
-    pub(crate) claimed_at: String,
+pub struct RemoteClaimResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub offer_request_sha256: String,
+    pub lease: RemoteLease,
+    pub claimed_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteLeaseRenewRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) lease_id: String,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) extend_seconds: u32,
-    pub(crate) request_sha256: String,
+pub struct RemoteLeaseRenewRequest {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub lease_id: String,
+    pub offer_request_sha256: String,
+    pub extend_seconds: u32,
+    pub request_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteLeaseRenewResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) lease: RemoteLease,
+pub struct RemoteLeaseRenewResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub offer_request_sha256: String,
+    pub lease: RemoteLease,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteStatusRequest {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) lease_id: String,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) request_sha256: String,
+pub struct RemoteStatusRequest {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub lease_id: String,
+    pub offer_request_sha256: String,
+    pub request_sha256: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(utoipa::ToSchema)]
-pub(crate) enum RemoteAssignmentWireState {
+pub enum RemoteAssignmentWireState {
     Offered,
     Claimed,
     Running,
@@ -313,32 +321,35 @@ pub(crate) enum RemoteAssignmentWireState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteStatusResponse {
-    pub(crate) schema_version: u32,
-    pub(crate) binding: RemoteAttemptBinding,
-    pub(crate) state: RemoteAssignmentWireState,
-    pub(crate) offer_request_sha256: String,
-    pub(crate) status_sha256: String,
+pub struct RemoteStatusResponse {
+    pub schema_version: u32,
+    pub binding: RemoteAttemptBinding,
+    pub state: RemoteAssignmentWireState,
+    pub offer_request_sha256: String,
+    pub status_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) lease: Option<RemoteLease>,
+    pub lease: Option<RemoteLease>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) result: Option<RemoteTypedResult>,
-    pub(crate) output_artifacts: RemoteArtifactManifest,
+    pub result: Option<RemoteTypedResult>,
+    pub output_artifacts: RemoteArtifactManifest,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) claimed_at: Option<String>,
+    pub claimed_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) started_at: Option<String>,
+    pub started_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) workspace_ref: Option<String>,
+    pub workspace_ref: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) error_code: Option<String>,
+    pub error_code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) failure_class: Option<TaskBoardFailureClass>,
-    pub(crate) observed_at: String,
+    pub failure_class: Option<TaskBoardFailureClass>,
+    pub observed_at: String,
 }
 
 impl RemoteStatusResponse {
-    pub(crate) fn seal(mut self) -> Result<Self, RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError::Serialization`] if the response cannot be
+    /// digested.
+    pub fn seal(mut self) -> Result<Self, RemoteWireError> {
         self.status_sha256.clear();
         self.status_sha256 = domain_digest("harness.task-board.remote-status.v1", &self)?;
         Ok(self)

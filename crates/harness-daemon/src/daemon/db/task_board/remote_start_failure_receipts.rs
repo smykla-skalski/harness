@@ -7,11 +7,11 @@ use super::remote_assignment_start_authority::{
     start_io_permit_digest_from_evidence,
 };
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardFailureClass;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardFailureClass;
 
 const START_FAILURE_RECEIPT_DOMAIN: &str =
     "harness.task-board.remote-executor-start-failure-receipt.v1";

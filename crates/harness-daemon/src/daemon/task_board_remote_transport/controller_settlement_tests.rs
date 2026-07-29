@@ -9,7 +9,7 @@ use super::controller_tests::{
     HOST_ID, ScriptedResponse, TOKEN_ENV, pinned_client, request_body, spawn_scripted_https_server,
     test_tls_material,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -179,7 +179,7 @@ pub(super) async fn settlement_ready_controller(item_id: &str) -> PreparedLifecy
     status.state = RemoteAssignmentWireState::Unknown;
     status.result = None;
     status.output_artifacts =
-        crate::daemon::task_board_remote_wire::wire_artifacts::RemoteArtifactManifest::default();
+        crate::task_board::remote_wire::wire_artifacts::RemoteArtifactManifest::default();
     status.error_code = Some("remote_assignment_outcome_unknown".into());
     status.status_sha256.clear();
     let status = status.seal().expect("seal evidence-only terminal status");

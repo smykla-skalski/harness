@@ -7,7 +7,7 @@ use crate::daemon::db::{
     TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
 };
 use crate::daemon::http::{DaemonHttpState, require_async_db, require_execution_remote_client};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteLease, RemoteOfferDisposition, RemoteOfferRequest,
     RemoteOfferResponse, RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };

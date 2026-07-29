@@ -5,8 +5,8 @@ use std::path::Path;
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteExecutorStartIoPermit};
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::RemoteWorkerIdentity;

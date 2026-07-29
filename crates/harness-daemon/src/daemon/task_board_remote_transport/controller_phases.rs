@@ -14,11 +14,11 @@ use super::controller::{
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteCancelResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
     RemoteOfferRequest, RemoteOfferResponse,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 impl RemoteExecutionControllerClient {
     /// Returns the durable offer receipt for `request`, or `None` when the

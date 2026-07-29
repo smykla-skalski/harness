@@ -1,9 +1,9 @@
 use sha2::{Digest, Sha256};
 
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::git::source_bundle_export::GitSourceBundleExport;
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceMaterial,
 };
-use crate::git::source_bundle_export::GitSourceBundleExport;
 use harness_kernel::errors::CliError;
 
 #[derive(Debug, Clone)]

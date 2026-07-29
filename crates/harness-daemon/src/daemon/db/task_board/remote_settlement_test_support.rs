@@ -3,7 +3,7 @@ use sqlx::query;
 
 use super::remote_assignment_test_support::*;
 use super::{TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteMutationOutcome};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactManifest,
     RemoteAssignmentWireState, RemoteLease, RemoteSettledRequest, RemoteStatusResponse,
     RemoteTypedResult, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

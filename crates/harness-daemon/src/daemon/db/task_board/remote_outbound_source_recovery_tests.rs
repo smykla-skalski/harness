@@ -10,7 +10,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::tests::task_board::{
     PreparedRemoteOffer, prepare_remote_implementation_offer,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
@@ -240,7 +240,7 @@ fn test_assignment(offer: &RemoteOfferRequest) -> RemoteAssignmentInsertInput<'_
 
 async fn assert_recovery_defers(
     db: &AsyncDaemonDb,
-    offer: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    offer: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
     now: &str,
 ) {
     let batch = db

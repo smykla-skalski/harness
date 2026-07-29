@@ -16,9 +16,9 @@ use crate::daemon::db::{
 use crate::daemon::task_board_remote_transport::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError,
 };
-use crate::daemon::task_board_remote_wire::wire::RemoteStatusRequest;
 use crate::git::bundle_contract::MAX_REMOTE_GIT_BUNDLE_BYTES;
 use crate::git::source_bundle_export::GitSourceBundleExportPlan;
+use crate::task_board::remote_wire::wire::RemoteStatusRequest;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,

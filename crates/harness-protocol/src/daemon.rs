@@ -108,6 +108,12 @@ pub use task_board_list_bounds::{
 /// own doc comment for why).
 pub mod reviews;
 
+/// Harness Monitor audit-event DTOs. Pure data with no dependency beyond
+/// `serde`/`serde_json`, so they live here rather than in the daemon crate
+/// that used to define them, letting `db` and the rest of the daemon share
+/// one definition instead of `db` reaching back into the daemon for it.
+pub mod audit;
+
 // Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
 // route-table-derived `task_board_mcp_methods()`, which never chains in
 // `routes_task_board_orchestrator` or `routes_task_board_working_copies` --

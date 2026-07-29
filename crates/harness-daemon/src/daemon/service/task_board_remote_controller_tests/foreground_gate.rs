@@ -4,7 +4,7 @@ use crate::daemon::db::{
     TaskBoardRemoteControllerScanStep, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
 };
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLease, RemoteOfferDisposition, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

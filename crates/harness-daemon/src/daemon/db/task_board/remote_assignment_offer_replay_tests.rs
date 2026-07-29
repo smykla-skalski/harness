@@ -1,6 +1,6 @@
 use super::remote_assignment_test_support::*;
 use super::{TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceiptDisposition};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 

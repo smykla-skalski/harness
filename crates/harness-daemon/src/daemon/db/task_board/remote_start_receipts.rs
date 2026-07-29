@@ -10,10 +10,10 @@ use super::remote_assignment_start_authority::{
     start_io_permit_digest_from_evidence,
 };
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardExecutionPhase;
+use crate::task_board::remote_wire::wire::{
     RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardExecutionPhase;
 
 const START_RECEIPT_DOMAIN: &str = "harness.task-board.remote-executor-start-receipt.v1";
 const MAX_START_RECEIPT_BYTES: usize = 32_768;

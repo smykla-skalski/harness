@@ -6,7 +6,7 @@ use super::remote_assignment_test_support::{
     INSTANCE, NOW, PRINCIPAL, REPOSITORY, accept_executor, executor_fixture,
 };
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,
 };
@@ -417,9 +417,9 @@ async fn rejected_orphan_source_prunes_bytes_but_replays_compact_receipt_after_r
 }
 
 fn bundle_offer(
-    template: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    template: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
 ) -> (
-    crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    crate::task_board::remote_wire::wire::RemoteOfferRequest,
     Vec<u8>,
 ) {
     let content = b"durable prior phase bundle bytes".to_vec();
@@ -444,9 +444,9 @@ fn bundle_offer(
 }
 
 fn snapshot_offer(
-    template: &crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    template: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
 ) -> (
-    crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest,
+    crate::task_board::remote_wire::wire::RemoteOfferRequest,
     Vec<u8>,
 ) {
     let content = b"self-contained repository snapshot bundle".to_vec();

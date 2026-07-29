@@ -3,7 +3,7 @@ use super::wire::{
     RemoteSourceMaterial, RemoteWireError, test_codex_launch,
 };
 use super::wire_tests::{artifact, offer_request};
-use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use crate::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";

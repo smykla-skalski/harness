@@ -153,7 +153,7 @@ async fn failed_terminal_has_no_output_artifacts_and_replays_exactly() {
 
 async fn assert_rejected_without_artifacts(
     terminal: &TerminalExecutor,
-    response: &crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse,
+    response: &crate::task_board::remote_wire::wire::RemoteStatusResponse,
     artifacts: &[super::TaskBoardRemoteTerminalArtifact],
 ) {
     terminal

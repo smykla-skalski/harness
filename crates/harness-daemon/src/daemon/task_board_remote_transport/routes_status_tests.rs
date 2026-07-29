@@ -4,7 +4,7 @@ use super::controller_prepared_test_support::{
 };
 use super::routes_status::status_response as route_status_response;
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
-use crate::daemon::task_board_remote_wire::wire::RemoteStatusResponse;
+use crate::task_board::remote_wire::wire::RemoteStatusResponse;
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 
 #[tokio::test]

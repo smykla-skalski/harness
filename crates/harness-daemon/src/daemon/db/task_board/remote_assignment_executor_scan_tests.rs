@@ -161,16 +161,14 @@ async fn scan_wraps_and_revisits_a_row_after_durable_state_change() {
 
 // Each seeded assignment needs a distinct execution generation; the host inbox rejects
 // two offers that share (execution_id, action_key, attempt) or (execution_id, fencing_epoch).
-fn distinct_scan_offer(
-    index: usize,
-) -> crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest {
+fn distinct_scan_offer(index: usize) -> crate::task_board::remote_wire::wire::RemoteOfferRequest {
     let execution_id = format!("execution-scan-active-{index:03}");
     let mut request = detached_offer(
         &format!("assignment-scan-active-{index:03}"),
         &format!("scan-active-{index:03}"),
     );
     request.binding.execution_id = execution_id.clone();
-    request.launch = crate::daemon::task_board_remote_wire::wire::test_codex_launch(
+    request.launch = crate::task_board::remote_wire::wire::test_codex_launch(
         crate::task_board::TaskBoardExecutionPhase::Review,
         &execution_id,
         "review:reviewer",

@@ -2503,7 +2503,7 @@ const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
 const OPENROUTER_SOURCE: &str =
     include_str!("../crates/harness-daemon/src/daemon/protocol/openrouter_models.rs");
 const VOICE_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/protocol/voice.rs");
-const AUDIT_SOURCE: &str = include_str!("../crates/harness-daemon/src/daemon/protocol/audit.rs");
+const AUDIT_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon/audit.rs");
 // The shared protocol package owns the managed terminal snapshot/request types
 // and their defaults. Runtime-only PTY behavior remains in daemon/agent_tui.
 const AGENT_TUI_MODEL_SOURCE: &str =

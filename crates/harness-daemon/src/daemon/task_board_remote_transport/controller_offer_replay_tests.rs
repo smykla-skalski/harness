@@ -7,12 +7,12 @@ use super::controller_authority_test_support::{
 };
 use super::controller_authority_tests::assert_concurrent_database_error;
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome, utc_now};
-use crate::daemon::task_board_remote_wire::wire::{
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteLease,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_terminal() {

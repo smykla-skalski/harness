@@ -2,7 +2,7 @@
 
 use super::controller::{RemoteExecutionControllerClient, RemoteExecutionControllerError};
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
-use crate::daemon::task_board_remote_wire::wire_cleanup::{
+use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
 

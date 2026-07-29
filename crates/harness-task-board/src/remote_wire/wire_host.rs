@@ -7,21 +7,24 @@ use super::wire::{RemoteWireError, require_canonical_time, require_text, require
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub(crate) struct RemoteHostAdvertisement {
-    pub(crate) schema_version: u32,
-    pub(crate) host_id: String,
-    pub(crate) host_instance_id: String,
-    pub(crate) protocol_version: u32,
-    pub(crate) capabilities: BTreeSet<String>,
-    pub(crate) runtimes: BTreeSet<String>,
-    pub(crate) repositories: BTreeSet<String>,
-    pub(crate) capacity: u32,
-    pub(crate) active_assignments: u32,
-    pub(crate) sent_at: String,
+pub struct RemoteHostAdvertisement {
+    pub schema_version: u32,
+    pub host_id: String,
+    pub host_instance_id: String,
+    pub protocol_version: u32,
+    pub capabilities: BTreeSet<String>,
+    pub runtimes: BTreeSet<String>,
+    pub repositories: BTreeSet<String>,
+    pub capacity: u32,
+    pub active_assignments: u32,
+    pub sent_at: String,
 }
 
 impl RemoteHostAdvertisement {
-    pub(crate) fn validate(&self) -> Result<(), RemoteWireError> {
+    /// # Errors
+    /// Returns [`RemoteWireError`] if a required field is missing or
+    /// oversized, or the advertised capacity is invalid.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
         require_version(self.schema_version)?;
         require_text("host_id", &self.host_id)?;
         require_text("host_instance_id", &self.host_instance_id)?;

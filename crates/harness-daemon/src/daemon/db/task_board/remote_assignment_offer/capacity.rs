@@ -5,7 +5,7 @@ use sqlx::{Sqlite, Transaction, query_as};
 use super::super::remote_assignment_cleanup::active_remote_assignments_in_tx;
 use super::{canonical_time, remote_capability_for_phase, to_i64};
 use crate::daemon::db::{CliError, db_error};
-use crate::daemon::task_board_remote_wire::wire::RemoteOfferRequest;
+use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TaskBoardPhaseCapabilityProfile};
 
 pub(super) async fn host_has_capacity(
