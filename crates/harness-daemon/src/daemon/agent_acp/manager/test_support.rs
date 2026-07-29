@@ -86,7 +86,7 @@ pub(super) fn assert_some<T: std::fmt::Debug>(value: Option<T>, context: &str) -
     value
 }
 
-pub(super) fn seeded_manager() -> AcpAgentManagerHandle {
+pub(in crate::daemon::agent_acp) fn seeded_manager() -> AcpAgentManagerHandle {
     let (sender, _) = broadcast::channel(16);
     seeded_manager_with_sender(sender)
 }
@@ -217,11 +217,63 @@ pub(super) fn write_cancel_recording_acp_agent(path: &Path, cancel_log: &Path) {
 }
 
 #[cfg(unix)]
-pub(super) fn write_prompt_delaying_acp_agent(path: &Path, delay_seconds: f32) {
+pub(in crate::daemon::agent_acp) fn write_prompt_delaying_acp_agent(
+    path: &Path,
+    delay_seconds: f32,
+) {
     write_executable(
         path,
         &fake_acp_agent_script(None, Some(delay_seconds), None),
     );
+}
+
+/// Fake ACP agent that streams one `agent_message_chunk` carrying `report`,
+/// then ends the prompt turn with `stop_reason`. Lets a turn-lifecycle test
+/// observe a completed or refused report turn deterministically without a
+/// live `OpenRouter` backend. `report` must be simple ASCII text.
+#[cfg(unix)]
+pub(in crate::daemon::agent_acp) fn write_reporting_acp_agent(
+    path: &Path,
+    report: &str,
+    stop_reason: &str,
+) {
+    write_executable(path, &reporting_acp_agent_script(report, stop_reason));
+}
+
+#[cfg(unix)]
+fn reporting_acp_agent_script(report: &str, stop_reason: &str) -> String {
+    format!(
+        r#"#!/usr/bin/env python3
+import json
+import sys
+
+report = {report:?}
+stop_reason = "{stop_reason}"
+for line in sys.stdin:
+    message = json.loads(line)
+    method = message.get("method")
+    if method == "initialize":
+        result = {{"protocolVersion": message.get("params", {{}}).get("protocolVersion", 1),
+                  "agentCapabilities": {{}}}}
+    elif method == "session/new":
+        result = {{"sessionId": "acp-session-1"}}
+    elif method == "session/prompt":
+        session_id = message.get("params", {{}}).get("sessionId", "acp-session-1")
+        notification = {{"jsonrpc": "2.0", "method": "session/update",
+                        "params": {{"sessionId": session_id,
+                                   "update": {{"sessionUpdate": "agent_message_chunk",
+                                              "content": {{"type": "text", "text": report}}}}}}}}
+        print(json.dumps(notification), flush=True)
+        result = {{"stopReason": stop_reason}}
+    elif method == "session/cancel":
+        continue
+    else:
+        result = {{}}
+    if "id" in message:
+        print(json.dumps({{"jsonrpc": "2.0", "id": message["id"], "result": result}}),
+              flush=True)
+"#
+    )
 }
 
 #[cfg(unix)]

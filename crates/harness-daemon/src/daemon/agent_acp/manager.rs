@@ -45,7 +45,7 @@ mod session_access;
 #[cfg(all(test, feature = "daemon-runtime"))]
 mod shutdown_tests;
 #[cfg(all(test, feature = "daemon-runtime"))]
-mod test_support;
+pub(in crate::daemon::agent_acp) mod test_support;
 #[cfg(feature = "daemon-runtime")]
 use orchestration::DaemonAcpManagerPort;
 use port::BridgeAcpManagerPort;
