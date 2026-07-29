@@ -217,6 +217,7 @@ fn review_result(binding: &RemoteAttemptBinding) -> TaskBoardLocalAttemptResult 
                 head_revision: HEAD.into(),
                 summary: "reviewed".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     }

@@ -25,6 +25,7 @@ pub(super) async fn retain_completed_review_run(
         return Ok(());
     };
     report.summary = Some(result.summary.clone());
+    report.findings.clone_from(&result.structured_findings);
     if !result.findings.is_empty() {
         report.partial_output = Some(serde_json::to_string(&result.findings).map_err(|error| {
             invalid_transition(format!("serialize legacy AI review findings: {error}"))

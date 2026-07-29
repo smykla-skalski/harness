@@ -11,7 +11,8 @@ use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus}
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardEvaluationResult, TaskBoardImplementationResult, TaskBoardLifecycleOutcome,
-    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,
+    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReportOnlyReviewFinding,
+    TaskBoardReviewFindingLocation, TaskBoardReviewFindingSeverity, TaskBoardReviewResult,
     TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -44,6 +45,14 @@ impl PlannedReport {
                     head_revision: FROZEN_HEAD.into(),
                     summary: "exact-head review passed".into(),
                     findings: Vec::new(),
+                    structured_findings: vec![TaskBoardReportOnlyReviewFinding {
+                        severity: TaskBoardReviewFindingSeverity::High,
+                        location: TaskBoardReviewFindingLocation {
+                            path: "src/review.rs".into(),
+                            line: Some(41),
+                        },
+                        evidence: "review finding retained".into(),
+                    }],
                 },
             }),
             status: CodexRunStatus::Completed,
@@ -53,6 +62,18 @@ impl PlannedReport {
     pub(super) fn running_review() -> Self {
         let mut report = Self::passing_review();
         report.status = CodexRunStatus::Running;
+        report
+    }
+
+    pub(super) fn failed_review() -> Self {
+        let mut report = Self::passing_review();
+        report.status = CodexRunStatus::Failed;
+        report
+    }
+
+    pub(super) fn cancelled_review() -> Self {
+        let mut report = Self::passing_review();
+        report.status = CodexRunStatus::Cancelled;
         report
     }
 

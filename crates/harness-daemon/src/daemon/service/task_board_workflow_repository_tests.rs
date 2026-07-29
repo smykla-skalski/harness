@@ -349,6 +349,7 @@ async fn review_attempt_result_rejects_a_stale_exact_head() {
                 head_revision: "head-indigo".into(),
                 summary: "stale result".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         },
     ));

@@ -301,6 +301,7 @@ fn review_outcome(
             head_revision: head_revision.into(),
             summary: "reviewed exact head".into(),
             findings: Vec::new(),
+            structured_findings: Vec::new(),
         },
     }
 }

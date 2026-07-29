@@ -397,6 +397,7 @@ fn review_result(record: &TaskBoardRemoteAssignmentRecord) -> TaskBoardLocalAtte
                 head_revision: head,
                 summary: "reviewed remotely".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     }

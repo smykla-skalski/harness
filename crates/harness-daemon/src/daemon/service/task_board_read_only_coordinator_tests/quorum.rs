@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
 
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardReviewRoundDecision, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
+    TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardAttemptState,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardReviewRoundDecision,
+    TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 
-use super::fixture::{NOW, seed_execution_with_reviewers};
+use super::fixture::{Fixture, NOW, seed_execution_with_reviewers};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
@@ -56,12 +57,76 @@ async fn pull_request_review_runs_review_cleanup_and_terminal_without_publicatio
         reports[0].summary.as_deref(),
         Some("exact-head review passed")
     );
+    assert_eq!(reports[0].findings.len(), 1);
+    assert_eq!(reports[0].findings[0].location.path, "src/review.rs");
+    assert_eq!(reports[0].findings[0].location.line, Some(41));
     super::assert_terminal_projection(
         &fixture,
         TaskBoardStatus::Done,
         TaskBoardWorkflowStatus::Completed,
     )
     .await;
+}
+
+#[tokio::test]
+async fn failed_pull_request_review_retains_available_output_before_retry() {
+    let fixture = Box::pin(seed_execution_with_reviewers(
+        "failed-pull-request-review",
+        TaskBoardWorkflowKind::PR_REVIEW,
+        1,
+        1,
+    ))
+    .await;
+    let runtime = FakeReadOnlyRuntime::new([PlannedReport::failed_review()]);
+
+    let report = drive_until_report(&fixture, &runtime).await;
+
+    assert_eq!(report.status, TaskBoardAiReviewReportStatus::Failed);
+    assert_eq!(
+        report.terminal_reason.as_deref(),
+        Some("Codex Report run failed")
+    );
+    assert!(report.partial_output.is_some());
+}
+
+#[tokio::test]
+async fn cancelled_pull_request_review_retains_available_output_before_settlement() {
+    let fixture = Box::pin(seed_execution_with_reviewers(
+        "cancelled-pull-request-review",
+        TaskBoardWorkflowKind::PR_REVIEW,
+        1,
+        1,
+    ))
+    .await;
+    let runtime = FakeReadOnlyRuntime::new([PlannedReport::cancelled_review()]);
+
+    let report = drive_until_report(&fixture, &runtime).await;
+
+    assert_eq!(report.status, TaskBoardAiReviewReportStatus::Cancelled);
+    assert_eq!(
+        report.terminal_reason.as_deref(),
+        Some("Codex Report run was cancelled")
+    );
+    assert!(report.partial_output.is_some());
+}
+
+async fn drive_until_report(
+    fixture: &Fixture,
+    runtime: &FakeReadOnlyRuntime,
+) -> TaskBoardAiReviewReportRecord {
+    for _ in 0..4 {
+        super::tick(fixture, runtime, NOW).await;
+        let mut reports = fixture
+            .test
+            .db
+            .task_board_ai_review_reports(&fixture.item_id)
+            .await
+            .expect("load retained review reports");
+        if let Some(report) = reports.pop() {
+            return report;
+        }
+    }
+    panic!("review run did not retain a terminal report");
 }
 
 #[tokio::test]

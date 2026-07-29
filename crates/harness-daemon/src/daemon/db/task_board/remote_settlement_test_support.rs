@@ -208,6 +208,7 @@ fn completed_status(
                 head_revision: exact_head_revision,
                 summary: "review passed".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     };

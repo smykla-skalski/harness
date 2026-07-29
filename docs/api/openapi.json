@@ -32337,6 +32337,26 @@
           }
         }
       },
+      "TaskBoardReportOnlyReviewFinding": {
+        "type": "object",
+        "required": [
+          "severity",
+          "location",
+          "evidence"
+        ],
+        "properties": {
+          "evidence": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/TaskBoardReviewFindingLocation"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/TaskBoardReviewFindingSeverity"
+          }
+        },
+        "additionalProperties": false
+      },
       "TaskBoardRepositoryAutomationConfig": {
         "type": "object",
         "required": [
@@ -32462,6 +32482,35 @@
           }
         }
       },
+      "TaskBoardReviewFindingLocation": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardReviewFindingSeverity": {
+        "type": "string",
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ]
+      },
       "TaskBoardReviewResult": {
         "type": "object",
         "required": [
@@ -32478,6 +32527,12 @@
           },
           "head_revision": {
             "type": "string"
+          },
+          "structured_findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardReportOnlyReviewFinding"
+            }
           },
           "summary": {
             "type": "string"

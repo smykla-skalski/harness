@@ -199,6 +199,7 @@ pub(super) fn completed_status(state: &PreparedLifecycle) -> RemoteStatusRespons
                 head_revision: head,
                 summary: "remote review passed".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     };

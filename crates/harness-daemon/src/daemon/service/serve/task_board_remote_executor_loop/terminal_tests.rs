@@ -244,6 +244,7 @@ fn review_result(
                 head_revision: head,
                 summary: "reviewed remotely".into(),
                 findings: Vec::new(),
+                structured_findings: Vec::new(),
             },
         }),
     }

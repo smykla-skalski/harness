@@ -318,6 +318,7 @@ fn terminal_status(
                                         .into(),
                                     summary: "review passed".into(),
                                     findings: Vec::new(),
+                                    structured_findings: Vec::new(),
                                 },
                             },
                         ),
