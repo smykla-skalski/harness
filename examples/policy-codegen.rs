@@ -2371,6 +2371,13 @@ fn emit_enum_item(
 }
 
 const POLICY_SOURCE: &str = include_str!("../crates/harness-task-board/src/policy.rs");
+// PolicyDecision/PolicyReasonCode/POLICY_VERSION relocated to
+// `harness-protocol` (issue #1145): pure data, needed there because
+// DispatchPlan/DispatchBlockReason embed PolicyDecision directly. The
+// evaluation engine (PolicyGate/BuiltInPolicyGate/PolicyInput and friends)
+// stayed in POLICY_SOURCE above.
+const POLICY_DECISION_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/policy_decision.rs");
 const POLICY_GRAPH_SOURCE: &str = include_str!("../crates/harness-task-board/src/policy_graph.rs");
 const POLICY_MODELS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/models.rs");
@@ -2380,6 +2387,14 @@ const POLICY_DEFAULTS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/defaults.rs");
 const POLICY_STORE_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/store.rs");
+// PolicyPipelinePromoteRequest/PolicyPipelineMakeLiveRequest (from this file)
+// and PolicyPipelinePromoteResponse (from wire/task_board.rs, see
+// TASK_BOARD_PROTOCOL_SOURCE) relocated to `harness-protocol` (issue #1145):
+// pure primitive data, needed there because `daemon::protocol::task_board`
+// re-exports all three directly. PolicyPipelinePromoteOutcome and the rest
+// of the policy-graph engine stayed in POLICY_STORE_SOURCE above.
+const POLICY_PIPELINE_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/policy_pipeline.rs");
 const POLICY_SCENARIO_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/policy_graph/scenario.rs");
 const POLICY_REPLAY_SOURCE: &str =
@@ -2658,10 +2673,25 @@ const SESSION_TASKS_SOURCE: &str =
 const TASK_BOARD_PROTOCOL_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/wire/task_board.rs");
 const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../crates/harness-task-board/src/types.rs");
+// TaskBoardStatus/TaskBoardItemKind/TaskBoardPriority/AgentMode/
+// TaskBoardWorkflowStatus relocated to `harness-protocol` (issue #1145): pure
+// data, needed there because TaskBoardOrchestratorSettings's closure and the
+// dispatch/summary wire types embed them directly. TaskBoardItem and
+// TaskBoardWorkflowState stayed in TASK_BOARD_TYPES_SOURCE above, so both
+// join every module that used to read these five enums from that file alone.
+const TASK_BOARD_PROTOCOL_TYPES_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/types.rs");
+// `PrIntentSet`/`TaskBoardWorkflowKind` relocated to `harness-protocol`
+// (issue #1145): pure data, moved in full, so `harness-task-board::item_intent`
+// now only re-exports them and this constant repoints there directly.
 const TASK_BOARD_ITEM_INTENT_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/item_intent.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/item_intent.rs");
+// `ExternalRef`/`ExternalRefProvider`/`ExternalRefSyncState`/`PlanningState`/
+// `TaskUsage` relocated to `harness-protocol` (issue #1145): pure data, moved
+// in full, so `harness-task-board::item_fields` now only re-exports them and
+// this constant repoints there directly.
 const TASK_BOARD_ITEM_FIELDS_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/item_fields.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/item_fields.rs");
 const TASK_BOARD_LANE_SOURCE: &str = include_str!("../crates/harness-task-board/src/lane.rs");
 const TASK_BOARD_PROGRESS_ROLLUP_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/progress_rollup.rs");
@@ -2679,6 +2709,13 @@ const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowKind",
 ];
 const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../crates/harness-task-board/src/summary.rs");
+// TaskBoardAuditSummary/TaskBoardStatusCount/TaskBoardSyncSummary/
+// TaskBoardProviderSyncSummary relocated to `harness-protocol` (issue #1145):
+// pure data, needed there because TaskBoardOrchestratorRunOutcome embeds
+// TaskBoardAuditSummary/TaskBoardSyncSummary directly. TaskBoardProjectSummary/
+// TaskBoardMachineSummary stayed in TASK_BOARD_SUMMARY_SOURCE above.
+const TASK_BOARD_PROTOCOL_SUMMARY_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/summary.rs");
 const TASK_BOARD_PROJECT_SOURCE: &str = include_str!("../crates/harness-task-board/src/project.rs");
 const TASK_BOARD_PROJECT_COLOR_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/project_color.rs");
@@ -2808,6 +2845,13 @@ const TASK_BOARD_PLANNING_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMo
 const TASK_BOARD_PLANNING_EMIT_ONLY: &[&str] = &["PlanningTransition", "TaskBoardPlanningResponse"];
 const TASK_BOARD_EVALUATION_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/evaluation.rs");
+// TaskBoardEvaluationOutcome/EvaluationSignalFailure relocated to
+// `harness-protocol` (issue #1145): pure data, needed there because
+// TaskBoardOrchestratorEvaluationOutcome/Record embed them directly.
+// TaskBoardEvaluationSummary/TaskBoardEvaluationRecord stayed in
+// TASK_BOARD_EVALUATION_SOURCE above.
+const TASK_BOARD_PROTOCOL_EVALUATION_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/evaluation.rs");
 const TASK_BOARD_EVALUATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEvaluationWireTypes.generated.swift";
 // The evaluate-endpoint summary, its records, outcome enum and signal-failure
 // (evaluation.rs). The record carries the rerouted TaskBoardItemWire and references
@@ -2821,6 +2865,18 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_DISPATCH_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/dispatch.rs");
+// DispatchPlan and its pure-data closure (DispatchReadiness/DispatchBlockReason/
+// SessionIntent/TaskCreationIntent/WorkerIntent/ReviewerIntent/EvaluatorIntent/
+// FollowUpPhase/DispatchFailure/DispatchFailureKind) relocated to
+// `harness-protocol` (issue #1145). DispatchExecutionSummary/DispatchAppliedTask
+// stayed in TASK_BOARD_DISPATCH_SOURCE above.
+const TASK_BOARD_PROTOCOL_DISPATCH_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/dispatch.rs");
+// PlanApprovalBlockReason relocated to `harness-protocol` (issue #1145), same
+// module doc as TASK_BOARD_PLANNING_SOURCE above; joins this module the same
+// way that source already did, since DispatchBlockReason::PlanApproval embeds it.
+const TASK_BOARD_PROTOCOL_PLANNING_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/planning.rs");
 const TASK_BOARD_STEPS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/wire/task_board_steps.rs");
 const TASK_BOARD_DISPATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardDispatchWireTypes.generated.swift";
@@ -3032,8 +3088,12 @@ const AGENT_REGISTRATION_EMIT_ONLY: &[&str] = &[
     "RuntimeCapabilities",
     "HookIntegrationDescriptor",
 ];
+// This file's git runtime config and token-sync tree relocated to
+// `harness-protocol` (issue #1145): pure data, moved in full, so
+// `harness-task-board::runtime_config` now only re-exports it and this
+// constant repoints there directly.
 const TASK_BOARD_CREDENTIAL_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/runtime_config.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/runtime_config.rs");
 const TASK_BOARD_CREDENTIAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardCredentialWireTypes.generated.swift";
 // The two token-sync response bodies (GitHub/OpenRouter) the orchestrator credential
 // endpoints return - tiny bool/count structs. The big git-runtime-config tree and the request
@@ -3049,9 +3109,18 @@ const BRIDGE_STATUS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 // already-generated HostBridgeCapabilityManifestWire (daemon-state cluster) bare; pid/uptime
 // narrow UInt -> Int in the map. The bridge-internal/persisted types stay out of the allow-list.
 const BRIDGE_STATUS_EMIT_ONLY: &[&str] = &["BridgeStatusReport"];
-const SYNC_SUMMARY_SOURCE: &str = include_str!("../crates/harness-task-board/src/summary.rs");
+// TaskBoardSyncSummary/TaskBoardProviderSyncSummary relocated to
+// `harness-protocol` (issue #1145): pure data, both moved in full out of the
+// old summary.rs, so this constant repoints there directly.
+const SYNC_SUMMARY_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/summary.rs");
+// ExternalProvider/ExternalSyncField/ExternalSyncAction/ExternalSyncOperation
+// relocated to `harness-protocol` (issue #1145): pure data, needed there
+// because TaskBoardProviderSyncSummary/TaskBoardSyncSummary embed them
+// directly. `ExternalSyncDirection` stayed behind in
+// `harness-task-board::external::sync`, which this module never read.
 const EXTERNAL_SYNC_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/external/sync.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/external.rs");
 const SYNC_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSyncSummaryWireTypes.generated.swift";
 // The task_board sync summary (syncTaskBoard endpoint + nested in the orchestrator run summary).
 // ExternalProvider/ExternalSyncAction are decoder-agnostic hand enums (TaskBoardExternalProvider/
@@ -3063,8 +3132,12 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
 ];
+// GitHubAutomationSettings/GitHubProjectConfig and the rest of this file's
+// tree relocated to `harness-protocol` (issue #1145): pure data plus pure
+// string-matching logic, moved in full, so `harness-task-board::github_config`
+// now only re-exports them and this constant repoints there directly.
 const GITHUB_CONFIG_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/github_config.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/github_config.rs");
 // GitHubMergeMethod itself moved to harness-protocol (issue #1056, alongside
 // the reviews wire types that embed it - see harness-protocol's
 // daemon::reviews module doc); github_config.rs now only re-exports it. Its
@@ -3094,8 +3167,22 @@ const GITHUB_CONFIG_EMIT_ONLY: &[&str] = &[
 ];
 const ORCHESTRATOR_TYPES_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/orchestrator/types.rs");
+// TaskBoardOrchestratorSettings/SettingsUpdateRequest/RunOnceRequest/
+// TaskBoardGitHubInboxConfig/TaskBoardHeldDispatchSummary/Item/
+// TaskBoardOrchestratorTickInfo/Phase/TaskBoardOrchestratorRunStatus/
+// TaskBoardWorkflowExecutionCount relocated to `harness-protocol` (issue
+// #1145): pure data, needed there because TaskBoardOrchestratorStatus embeds
+// TaskBoardOrchestratorSettings directly. TaskBoardOrchestratorStatusSnapshot/
+// State/RunSummary/DispatchInput/PreparedRun stayed in ORCHESTRATOR_TYPES_SOURCE
+// above.
+const TASK_BOARD_PROTOCOL_ORCHESTRATOR_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/daemon/task_board/orchestrator.rs");
+// This file's six thin wire-status types relocated to `harness-protocol`
+// (issue #1145): pure data, moved in full (the `From` impls that built them
+// stayed behind as free functions, which this tool never parsed), so this
+// constant repoints there directly.
 const ORCHESTRATOR_STATUS_WIRE_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/wire/task_board_orchestrator_status.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/orchestrator_status.rs");
 const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardOrchestratorWireTypes.generated.swift";
 // The orchestrator settings + status tree (orchestratorStatus/start/stop/run-once + settings get/
 // update). github_project rides the GitHubProjectConfigWire (TYPE_RENAMES on the alias); the
@@ -3122,10 +3209,16 @@ const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardHeldDispatchSummary",
     "TaskBoardHeldDispatchItem",
 ];
+// This file's automation-snapshot tree relocated to `harness-protocol`
+// (issue #1145): pure data, moved in full, so `harness-task-board::automation::status`
+// now only re-exports it and this constant repoints there directly.
 const TASK_BOARD_AUTOMATION_STATUS_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/automation/status.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/automation_snapshot.rs");
+// This file's durable automation-settings tree relocated to `harness-protocol`
+// (issue #1145): pure data, moved in full, so `harness-task-board::automation::settings`
+// now only re-exports it and this constant repoints there directly.
 const TASK_BOARD_AUTOMATION_SETTINGS_SOURCE: &str =
-    include_str!("../crates/harness-task-board/src/automation/settings.rs");
+    include_str!("../crates/harness-protocol/src/daemon/task_board/automation_settings.rs");
 const TASK_BOARD_AUTOMATION_PROTOCOL_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/wire/task_board_automation.rs");
 const TASK_BOARD_AUTOMATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardAutomationWireTypes.generated.swift";
@@ -3245,9 +3338,12 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[
                 POLICY_IDS_SOURCE,
                 POLICY_SOURCE,
+                POLICY_DECISION_SOURCE,
+                TASK_BOARD_PROTOCOL_TYPES_SOURCE,
                 POLICY_GRAPH_SOURCE,
                 POLICY_MODELS_SOURCE,
                 POLICY_STORE_SOURCE,
+                POLICY_PIPELINE_SOURCE,
                 POLICY_SCENARIO_SOURCE,
                 POLICY_REPLAY_SOURCE,
             ],
@@ -3393,6 +3489,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[
                 TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_PROTOCOL_TYPES_SOURCE,
                 TASK_BOARD_ITEM_INTENT_SOURCE,
                 TASK_BOARD_WORKFLOW_SOURCE,
             ],
@@ -3403,6 +3500,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
             sources: &[
                 TASK_BOARD_SUMMARY_SOURCE,
+                TASK_BOARD_PROTOCOL_SUMMARY_SOURCE,
                 TASK_BOARD_PROJECT_SOURCE,
                 TASK_BOARD_PROJECT_COLOR_SOURCE,
                 TASK_BOARD_PROJECT_SHAPE_SOURCE,
@@ -3415,6 +3513,7 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[
                 TASK_BOARD_TYPES_SOURCE,
+                TASK_BOARD_PROTOCOL_TYPES_SOURCE,
                 TASK_BOARD_ITEM_INTENT_SOURCE,
                 TASK_BOARD_ITEM_FIELDS_SOURCE,
                 TASK_BOARD_LANE_SOURCE,
@@ -3466,7 +3565,7 @@ fn modules() -> Vec<GeneratedModule> {
             output: TASK_BOARD_EVALUATION_OUTPUT,
             description: "the Rust task-board evaluation summary, records and outcome",
             defaults: &[],
-            sources: &[TASK_BOARD_EVALUATION_SOURCE],
+            sources: &[TASK_BOARD_EVALUATION_SOURCE, TASK_BOARD_PROTOCOL_EVALUATION_SOURCE],
         },
         GeneratedModule {
             output: TASK_BOARD_DISPATCH_OUTPUT,
@@ -3474,7 +3573,9 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[
                 TASK_BOARD_DISPATCH_SOURCE,
+                TASK_BOARD_PROTOCOL_DISPATCH_SOURCE,
                 TASK_BOARD_PLANNING_SOURCE,
+                TASK_BOARD_PROTOCOL_PLANNING_SOURCE,
                 TASK_BOARD_STEPS_SOURCE,
             ],
         },
@@ -3594,15 +3695,23 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust task-board orchestrator settings and status tree",
             // The settings source is a defaults source too, not just a symbol
             // one: the repository config's `enabled` resolves `default_true`
-            // from there.
+            // from there. TASK_BOARD_PROTOCOL_ORCHESTRATOR_SOURCE joins it
+            // for the same reason: `TaskBoardOrchestratorSettings`'s own
+            // `Default` impl and its `default_enabled_workflows`/
+            // `default_dry_run_default`/`default_policy_version` fns moved
+            // there with the struct.
             defaults: &[
                 ORCHESTRATOR_TYPES_SOURCE,
+                TASK_BOARD_PROTOCOL_ORCHESTRATOR_SOURCE,
                 TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
             ],
             sources: &[
                 ORCHESTRATOR_TYPES_SOURCE,
+                TASK_BOARD_PROTOCOL_ORCHESTRATOR_SOURCE,
                 ORCHESTRATOR_STATUS_WIRE_SOURCE,
                 POLICY_SOURCE,
+                POLICY_DECISION_SOURCE,
+                GITHUB_CONFIG_SOURCE,
                 TASK_BOARD_AUTOMATION_SETTINGS_SOURCE,
             ],
         },

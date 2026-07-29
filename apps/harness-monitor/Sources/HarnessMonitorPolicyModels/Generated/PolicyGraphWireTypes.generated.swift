@@ -126,85 +126,6 @@ public enum PolicyAction: String, Codable, Equatable, Sendable, CaseIterable, Id
   public var id: String { rawValue }
 }
 
-public enum PolicyDecision: Codable, Equatable, Sendable {
-  case allow(reasonCode: PolicyReasonCode, policyVersion: String)
-  case deny(reasonCode: PolicyReasonCode, policyVersion: String)
-  case requireHuman(reasonCode: PolicyReasonCode, policyVersion: String)
-  case requireConsensus(reasonCode: PolicyReasonCode, policyVersion: String)
-  case dryRunOnly(reasonCode: PolicyReasonCode, policyVersion: String)
-
-  enum CodingKeys: String, CodingKey {
-    case decision
-    case reasonCode = "reason_code"
-    case policyVersion = "policy_version"
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let decision = try container.decode(String.self, forKey: .decision)
-    switch decision {
-    case "allow":
-      self = .allow(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
-    case "deny":
-      self = .deny(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
-    case "require_human":
-      self = .requireHuman(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
-    case "require_consensus":
-      self = .requireConsensus(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
-    case "dry_run_only":
-      self = .dryRunOnly(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
-    default:
-      throw DecodingError.dataCorruptedError(forKey: .decision, in: container, debugDescription: "unknown PolicyDecision decision \(decision)")
-    }
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    switch self {
-    case .allow(let reasonCode, let policyVersion):
-      try container.encode("allow", forKey: .decision)
-      try container.encode(reasonCode, forKey: .reasonCode)
-      try container.encode(policyVersion, forKey: .policyVersion)
-    case .deny(let reasonCode, let policyVersion):
-      try container.encode("deny", forKey: .decision)
-      try container.encode(reasonCode, forKey: .reasonCode)
-      try container.encode(policyVersion, forKey: .policyVersion)
-    case .requireHuman(let reasonCode, let policyVersion):
-      try container.encode("require_human", forKey: .decision)
-      try container.encode(reasonCode, forKey: .reasonCode)
-      try container.encode(policyVersion, forKey: .policyVersion)
-    case .requireConsensus(let reasonCode, let policyVersion):
-      try container.encode("require_consensus", forKey: .decision)
-      try container.encode(reasonCode, forKey: .reasonCode)
-      try container.encode(policyVersion, forKey: .policyVersion)
-    case .dryRunOnly(let reasonCode, let policyVersion):
-      try container.encode("dry_run_only", forKey: .decision)
-      try container.encode(reasonCode, forKey: .reasonCode)
-      try container.encode(policyVersion, forKey: .policyVersion)
-    }
-  }
-}
-
-public enum PolicyReasonCode: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case defaultAllow = "default_allow"
-  case autoMergeAllowed = "auto_merge_allowed"
-  case missingMergeEvidence = "missing_merge_evidence"
-  case checksNotGreen = "checks_not_green"
-  case branchProtectionBlocked = "branch_protection_blocked"
-  case reviewerNotApproved = "reviewer_not_approved"
-  case unresolvedRequestedChanges = "unresolved_requested_changes"
-  case protectedPathTouched = "protected_path_touched"
-  case riskAboveThreshold = "risk_above_threshold"
-  case humanRequired = "human_required"
-  case dryRunRequired = "dry_run_required"
-  case approvalRequired = "approval_required"
-  case approvalDenied = "approval_denied"
-  case spawnPolicyRequired = "spawn_policy_required"
-  case spawnKillSwitchEngaged = "spawn_kill_switch_engaged"
-
-  public var id: String { rawValue }
-}
-
 public enum PolicyApprovalState: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case pending = "pending"
   case approved = "approved"
@@ -432,6 +353,203 @@ public struct PolicyInput: Codable, Equatable, Sendable {
     case evaluatedAt = "evaluated_at"
     case approvals
   }
+}
+
+public enum PolicyDecision: Codable, Equatable, Sendable {
+  case allow(reasonCode: PolicyReasonCode, policyVersion: String)
+  case deny(reasonCode: PolicyReasonCode, policyVersion: String)
+  case requireHuman(reasonCode: PolicyReasonCode, policyVersion: String)
+  case requireConsensus(reasonCode: PolicyReasonCode, policyVersion: String)
+  case dryRunOnly(reasonCode: PolicyReasonCode, policyVersion: String)
+
+  enum CodingKeys: String, CodingKey {
+    case decision
+    case reasonCode = "reason_code"
+    case policyVersion = "policy_version"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let decision = try container.decode(String.self, forKey: .decision)
+    switch decision {
+    case "allow":
+      self = .allow(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
+    case "deny":
+      self = .deny(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
+    case "require_human":
+      self = .requireHuman(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
+    case "require_consensus":
+      self = .requireConsensus(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
+    case "dry_run_only":
+      self = .dryRunOnly(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode), policyVersion: try container.decode(String.self, forKey: .policyVersion))
+    default:
+      throw DecodingError.dataCorruptedError(forKey: .decision, in: container, debugDescription: "unknown PolicyDecision decision \(decision)")
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .allow(let reasonCode, let policyVersion):
+      try container.encode("allow", forKey: .decision)
+      try container.encode(reasonCode, forKey: .reasonCode)
+      try container.encode(policyVersion, forKey: .policyVersion)
+    case .deny(let reasonCode, let policyVersion):
+      try container.encode("deny", forKey: .decision)
+      try container.encode(reasonCode, forKey: .reasonCode)
+      try container.encode(policyVersion, forKey: .policyVersion)
+    case .requireHuman(let reasonCode, let policyVersion):
+      try container.encode("require_human", forKey: .decision)
+      try container.encode(reasonCode, forKey: .reasonCode)
+      try container.encode(policyVersion, forKey: .policyVersion)
+    case .requireConsensus(let reasonCode, let policyVersion):
+      try container.encode("require_consensus", forKey: .decision)
+      try container.encode(reasonCode, forKey: .reasonCode)
+      try container.encode(policyVersion, forKey: .policyVersion)
+    case .dryRunOnly(let reasonCode, let policyVersion):
+      try container.encode("dry_run_only", forKey: .decision)
+      try container.encode(reasonCode, forKey: .reasonCode)
+      try container.encode(policyVersion, forKey: .policyVersion)
+    }
+  }
+}
+
+public enum PolicyReasonCode: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case defaultAllow = "default_allow"
+  case autoMergeAllowed = "auto_merge_allowed"
+  case missingMergeEvidence = "missing_merge_evidence"
+  case checksNotGreen = "checks_not_green"
+  case branchProtectionBlocked = "branch_protection_blocked"
+  case reviewerNotApproved = "reviewer_not_approved"
+  case unresolvedRequestedChanges = "unresolved_requested_changes"
+  case protectedPathTouched = "protected_path_touched"
+  case riskAboveThreshold = "risk_above_threshold"
+  case humanRequired = "human_required"
+  case dryRunRequired = "dry_run_required"
+  case approvalRequired = "approval_required"
+  case approvalDenied = "approval_denied"
+  case spawnPolicyRequired = "spawn_policy_required"
+  case spawnKillSwitchEngaged = "spawn_kill_switch_engaged"
+
+  public var id: String { rawValue }
+}
+
+public enum TaskBoardWorkflowStatusWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case idle = "idle"
+  case admitting = "admitting"
+  case running = "running"
+  case paused = "paused"
+  case completed = "completed"
+  case failed = "failed"
+  case cancelled = "cancelled"
+
+  public var id: String { rawValue }
+}
+
+public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case inbox
+  case todo
+  case planning
+  case inProgress
+  case agenticReview
+  case testing
+  case inReview
+  case toReview
+  case humanRequired
+  case failed
+  case done
+  case new
+  case planReview
+  case needsYou
+  case blocked
+  case unknown(String)
+
+  public static let allCases: [Self] = [.inbox, .todo, .planning, .inProgress, .agenticReview, .testing, .inReview, .toReview, .humanRequired, .failed, .done, .new, .planReview, .needsYou, .blocked]
+
+  public var rawValue: String {
+    switch self {
+    case .inbox: "inbox"
+    case .todo: "todo"
+    case .planning: "planning"
+    case .inProgress: "in_progress"
+    case .agenticReview: "agentic_review"
+    case .testing: "testing"
+    case .inReview: "in_review"
+    case .toReview: "to_review"
+    case .humanRequired: "human_required"
+    case .failed: "failed"
+    case .done: "done"
+    case .new: "new"
+    case .planReview: "plan_review"
+    case .needsYou: "needs_you"
+    case .blocked: "blocked"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "inbox": self = .inbox
+    case "todo": self = .todo
+    case "planning": self = .planning
+    case "in_progress": self = .inProgress
+    case "agentic_review": self = .agenticReview
+    case "testing": self = .testing
+    case "in_review": self = .inReview
+    case "to_review": self = .toReview
+    case "human_required": self = .humanRequired
+    case "failed": self = .failed
+    case "done": self = .done
+    case "new": self = .new
+    case "plan_review": self = .planReview
+    case "needs_you": self = .needsYou
+    case "blocked": self = .blocked
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+
+public enum TaskBoardPriority: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case low = "low"
+  case medium = "medium"
+  case high = "high"
+  case critical = "critical"
+
+  public var id: String { rawValue }
+}
+
+public enum TaskBoardAgentMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case headless
+  case interactive
+  case planning
+  case evaluate
+  case unknown(String)
+
+  public static let allCases: [Self] = [.headless, .interactive, .planning, .evaluate]
+
+  public var rawValue: String {
+    switch self {
+    case .headless: "headless"
+    case .interactive: "interactive"
+    case .planning: "planning"
+    case .evaluate: "evaluate"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "headless": self = .headless
+    case "interactive": self = .interactive
+    case "planning": self = .planning
+    case "evaluate": self = .evaluate
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
 }
 
 public struct PolicyGraph: Codable, Equatable, Sendable {
@@ -1754,6 +1872,21 @@ public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
     case spawnRequiresLivePolicy = "spawn_requires_live_policy"
     case spawnKillSwitch = "spawn_kill_switch"
     case pendingApprovalGrantCount = "pending_approval_grant_count"
+  }
+}
+
+public struct PolicyPipelinePromoteResponse: Codable, Equatable, Sendable {
+  public var revision: UInt64
+  public var traceId: String
+
+  public init(revision: UInt64, traceId: String) {
+    self.revision = revision
+    self.traceId = traceId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case revision
+    case traceId = "trace_id"
   }
 }
 

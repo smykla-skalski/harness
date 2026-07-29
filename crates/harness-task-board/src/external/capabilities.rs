@@ -1,6 +1,11 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
+// `ExternalSyncField` relocated to
+// `harness_protocol::daemon::task_board::external` (#1145): pure data, needed
+// there because `ExternalSyncOperation` embeds it directly.
+pub use harness_protocol::daemon::task_board::external::ExternalSyncField;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -10,18 +15,6 @@ pub enum ExternalSyncConflictPolicy {
     Report,
     PreferLocal,
     PreferRemote,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
-#[value(rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum ExternalSyncField {
-    Title,
-    Body,
-    Status,
-    Project,
-    Url,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

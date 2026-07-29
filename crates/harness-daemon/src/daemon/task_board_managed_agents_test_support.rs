@@ -17,7 +17,7 @@ use crate::daemon::http::{
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
 use crate::daemon::websocket::ReplayBuffer;
-use crate::task_board::dispatch::DispatchLifecycle;
+use crate::task_board::dispatch::dispatch_lifecycle_planned;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
     TaskBoardWorkflowState,
@@ -114,7 +114,7 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
         board_item_id: item.id.clone(),
         session_id: "session-1".into(),
         work_item_id: "task-1".into(),
-        lifecycle: DispatchLifecycle::planned(
+        lifecycle: dispatch_lifecycle_planned(
             &crate::task_board::WorkerIntent { mode },
             &crate::task_board::ReviewerIntent {
                 phase: crate::task_board::FollowUpPhase::AfterWorkerReview,

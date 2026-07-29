@@ -1,117 +1,78 @@
-use serde::{Deserialize, Serialize};
+//! Dispatch lifecycle wire types.
+//!
+//! Relocated to `harness_protocol::daemon::task_board::dispatch_lifecycle`
+//! (#1145): pure data, needed there because `DispatchPlan` embeds
+//! `DispatchLifecycle` directly. `DispatchLifecycle::applied()` (a pure field
+//! mutation) moved with the type; `DispatchLifecycle::planned()` and its
+//! private `worker`/`reviewer`/`evaluator` step builders could not, since
+//! they read `harness_session::service::SPAWN_REVIEWER_COMMAND` and
+//! `harness-protocol` cannot depend on `harness-session`, which itself
+//! depends on `harness-protocol`. They became this free function instead;
+//! `dispatch.rs`'s own `build_dispatch_plan_with_decision` now calls it in
+//! place of `DispatchLifecycle::planned`, and so do `harness-daemon`'s two
+//! external callers.
+use harness_session::service::SPAWN_REVIEWER_COMMAND;
+
+pub use harness_protocol::daemon::task_board::dispatch_lifecycle::{
+    DispatchLifecycle, DispatchLifecyclePhase, DispatchLifecycleStatus, DispatchLifecycleStep,
+    DispatchNativeSignal,
+};
 
 use crate::types::AgentMode;
-use harness_session::service::SPAWN_REVIEWER_COMMAND;
 
 use super::{EvaluatorIntent, ReviewerIntent, WorkerIntent};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DispatchLifecycle {
-    pub worker: DispatchLifecycleStep,
-    pub reviewer: DispatchLifecycleStep,
-    pub evaluator: DispatchLifecycleStep,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DispatchLifecycleStep {
-    pub phase: DispatchLifecyclePhase,
-    pub status: DispatchLifecycleStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mode: Option<AgentMode>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suggested_persona: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub required_consensus: Option<u8>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub native_signal: Option<DispatchNativeSignal>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum DispatchLifecyclePhase {
-    Worker,
-    Reviewer,
-    Evaluator,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum DispatchLifecycleStatus {
-    Planned,
-    SessionTaskLinked,
-    WaitingForWorkerReview,
-    WaitingForReviewCompletion,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DispatchNativeSignal {
-    pub command: String,
-    pub trigger_step: String,
-}
-
-impl DispatchLifecycle {
-    #[must_use]
-    pub fn planned(
-        worker: &WorkerIntent,
-        reviewer: &ReviewerIntent,
-        evaluator: &EvaluatorIntent,
-    ) -> Self {
-        Self {
-            worker: DispatchLifecycleStep::worker(worker.mode, DispatchLifecycleStatus::Planned),
-            reviewer: DispatchLifecycleStep::reviewer(reviewer, DispatchLifecycleStatus::Planned),
-            evaluator: DispatchLifecycleStep::evaluator(
-                evaluator.mode,
-                DispatchLifecycleStatus::Planned,
-            ),
-        }
-    }
-
-    #[must_use]
-    pub fn applied(&self) -> Self {
-        let mut lifecycle = self.clone();
-        lifecycle.worker.status = DispatchLifecycleStatus::SessionTaskLinked;
-        lifecycle.reviewer.status = DispatchLifecycleStatus::WaitingForWorkerReview;
-        lifecycle.evaluator.status = DispatchLifecycleStatus::WaitingForReviewCompletion;
-        lifecycle
+#[must_use]
+pub fn dispatch_lifecycle_planned(
+    worker: &WorkerIntent,
+    reviewer: &ReviewerIntent,
+    evaluator: &EvaluatorIntent,
+) -> DispatchLifecycle {
+    DispatchLifecycle {
+        worker: lifecycle_worker_step(worker.mode, DispatchLifecycleStatus::Planned),
+        reviewer: lifecycle_reviewer_step(reviewer, DispatchLifecycleStatus::Planned),
+        evaluator: lifecycle_evaluator_step(evaluator.mode, DispatchLifecycleStatus::Planned),
     }
 }
 
-impl DispatchLifecycleStep {
-    fn worker(mode: AgentMode, status: DispatchLifecycleStatus) -> Self {
-        Self {
-            phase: DispatchLifecyclePhase::Worker,
-            status,
-            mode: Some(mode),
-            suggested_persona: None,
-            required_consensus: None,
-            native_signal: None,
-        }
+fn lifecycle_worker_step(mode: AgentMode, status: DispatchLifecycleStatus) -> DispatchLifecycleStep {
+    DispatchLifecycleStep {
+        phase: DispatchLifecyclePhase::Worker,
+        status,
+        mode: Some(mode),
+        suggested_persona: None,
+        required_consensus: None,
+        native_signal: None,
     }
+}
 
-    fn reviewer(intent: &ReviewerIntent, status: DispatchLifecycleStatus) -> Self {
-        Self {
-            phase: DispatchLifecyclePhase::Reviewer,
-            status,
-            mode: None,
-            suggested_persona: Some(intent.suggested_persona.clone()),
-            required_consensus: Some(intent.required_consensus),
-            native_signal: Some(DispatchNativeSignal {
-                command: SPAWN_REVIEWER_COMMAND.to_string(),
-                trigger_step: "submit_for_review".to_string(),
-            }),
-        }
+fn lifecycle_reviewer_step(
+    intent: &ReviewerIntent,
+    status: DispatchLifecycleStatus,
+) -> DispatchLifecycleStep {
+    DispatchLifecycleStep {
+        phase: DispatchLifecyclePhase::Reviewer,
+        status,
+        mode: None,
+        suggested_persona: Some(intent.suggested_persona.clone()),
+        required_consensus: Some(intent.required_consensus),
+        native_signal: Some(DispatchNativeSignal {
+            command: SPAWN_REVIEWER_COMMAND.to_string(),
+            trigger_step: "submit_for_review".to_string(),
+        }),
     }
+}
 
-    fn evaluator(mode: AgentMode, status: DispatchLifecycleStatus) -> Self {
-        Self {
-            phase: DispatchLifecyclePhase::Evaluator,
-            status,
-            mode: Some(mode),
-            suggested_persona: None,
-            required_consensus: None,
-            native_signal: None,
-        }
+fn lifecycle_evaluator_step(
+    mode: AgentMode,
+    status: DispatchLifecycleStatus,
+) -> DispatchLifecycleStep {
+    DispatchLifecycleStep {
+        phase: DispatchLifecyclePhase::Evaluator,
+        status,
+        mode: Some(mode),
+        suggested_persona: None,
+        required_consensus: None,
+        native_signal: None,
     }
 }

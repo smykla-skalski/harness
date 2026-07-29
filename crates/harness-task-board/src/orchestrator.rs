@@ -79,7 +79,7 @@ impl TaskBoardOrchestrator {
         &self,
         update: &TaskBoardOrchestratorSettingsUpdateRequest,
     ) -> Result<TaskBoardOrchestratorSettings, CliError> {
-        update.validate_admission_policy().map_err(|error| {
+        validate_orchestrator_settings_update_admission_policy(update).map_err(|error| {
             CliErrorKind::workflow_parse(format!("invalid task-board admission policy: {error}"))
         })?;
         let mut settings = self.settings()?;

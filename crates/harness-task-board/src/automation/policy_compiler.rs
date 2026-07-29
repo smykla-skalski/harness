@@ -11,82 +11,20 @@ use crate::{
 mod validation;
 use validation::validate_limit;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardPolicyScope {
-    Global,
-    Workflow(TaskBoardWorkflowKind),
-    Repository(String),
-}
-
-/// Quantitative policy limits compile into durable admission requirements.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardPolicyLimit {
-    Concurrency {
-        scope: TaskBoardPolicyScope,
-        limit: u64,
-        reservation: u64,
-    },
-    Rate {
-        scope: TaskBoardPolicyScope,
-        limit: u64,
-        window_seconds: u64,
-        reservation: u64,
-    },
-    TokenBudget {
-        scope: TaskBoardPolicyScope,
-        limit: u64,
-        window_seconds: u64,
-    },
-    MonetaryBudget {
-        scope: TaskBoardPolicyScope,
-        limit_microusd: u64,
-        window_seconds: u64,
-    },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardPolicyWeekday {
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday,
-    Sunday,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardOutsideWindowAction {
-    Defer,
-    Deny,
-}
-
-/// Recurring local-time window using 24-hour `HH:MM` and an IANA timezone.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardPolicyWindow {
-    pub scope: TaskBoardPolicyScope,
-    pub timezone: String,
-    pub weekdays: Vec<TaskBoardPolicyWeekday>,
-    pub start_time: String,
-    pub end_time: String,
-    pub outside_action: TaskBoardOutsideWindowAction,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardAutomationPolicy {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub limits: Vec<TaskBoardPolicyLimit>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub windows: Vec<TaskBoardPolicyWindow>,
-}
+// `TaskBoardPolicyScope`/`TaskBoardPolicyLimit`/`TaskBoardPolicyWeekday`/
+// `TaskBoardOutsideWindowAction`/`TaskBoardPolicyWindow`/`TaskBoardAutomationPolicy`
+// relocated to `harness_protocol::daemon::task_board::policy_scope` (#1145):
+// pure data with no inherent methods beyond `TaskBoardPolicyLimit::scope`
+// (moved too, since only the defining crate can add an inherent method to a
+// type), needed there because `TaskBoardOrchestratorSettings` embeds
+// `TaskBoardAutomationPolicy` directly. The compiler that turns them into
+// admission requirements (everything below) stays here: it reaches `chrono`,
+// `normalize_repository_slug`, and the admission-requirement types this move
+// has no need for.
+pub use harness_protocol::daemon::task_board::policy_scope::{
+    TaskBoardAutomationPolicy, TaskBoardOutsideWindowAction, TaskBoardPolicyLimit,
+    TaskBoardPolicyScope, TaskBoardPolicyWeekday, TaskBoardPolicyWindow,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardPolicyCompilationContext {
@@ -209,17 +147,6 @@ pub fn evaluate_task_board_policy(
     let compiled = compile_task_board_policy(policy, context)?;
     evaluate_admission_requirements(compiled.requirements, usage, &compiled.evaluated_at)
         .map_err(Into::into)
-}
-
-impl TaskBoardPolicyLimit {
-    const fn scope(&self) -> &TaskBoardPolicyScope {
-        match self {
-            Self::Concurrency { scope, .. }
-            | Self::Rate { scope, .. }
-            | Self::TokenBudget { scope, .. }
-            | Self::MonetaryBudget { scope, .. } => scope,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

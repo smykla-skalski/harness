@@ -2,16 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use super::super::dispatch::DispatchExecutionSummary;
 use super::super::evaluation::TaskBoardEvaluationSummary;
-use super::super::policy::POLICY_VERSION;
 use super::super::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
-use super::super::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
-use super::super::{
-    TaskBoardAutomationPolicy, TaskBoardAutomationRetrySettings,
-    TaskBoardAutomationSchedulingSettings, TaskBoardExecutionHostConfig,
-    TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorWorkflow,
-    TaskBoardPolicyCompilationError, TaskBoardRepositoryAutomationConfig,
-    TaskBoardReviewerSettings, validate_task_board_policy,
-};
+use super::super::types::TaskBoardStatus;
+use super::super::{TaskBoardPolicyCompilationError, validate_task_board_policy};
 
 /// Settings' `github_project` field, kept under its old name because that is
 /// what the stored JSON and the generated client still call it. The type behind
@@ -19,126 +12,33 @@ use super::super::{
 /// through `GitHubAutomationSettings::for_repository`.
 pub use crate::github::GitHubAutomationSettings as TaskBoardGitHubProjectConfig;
 
+// `TaskBoardOrchestratorSettings`/`TaskBoardOrchestratorSettingsUpdateRequest`/
+// `TaskBoardOrchestratorRunOnceRequest`/`TaskBoardGitHubInboxConfig`/
+// `TaskBoardHeldDispatchSummary`/`TaskBoardHeldDispatchItem`/
+// `TaskBoardOrchestratorTickInfo`/`TaskBoardOrchestratorTickPhase`/
+// `TaskBoardOrchestratorRunStatus`/`TaskBoardWorkflowExecutionCount` relocated
+// to `harness_protocol::daemon::task_board::orchestrator` (#1145): pure data,
+// needed there because `TaskBoardOrchestratorStatus` embeds
+// `TaskBoardOrchestratorSettings` directly. `TaskBoardOrchestratorStatusSnapshot`
+// (below) stays here: it embeds `DispatchExecutionSummary`/
+// `TaskBoardEvaluationSummary`, which in turn embed the full `TaskBoardItem`
+// domain entity. `TaskBoardOrchestratorSettingsUpdateRequest`'s
+// `validate_admission_policy` inherent method could not come along - a new
+// inherent method can only be added in the type's defining crate - so it
+// became the free function `validate_orchestrator_settings_update_admission_policy`
+// below.
+pub use harness_protocol::daemon::task_board::orchestrator::{
+    TaskBoardGitHubInboxConfig, TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
+    TaskBoardOrchestratorSettings, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase, TaskBoardWorkflowExecutionCount,
+};
+
 pub const CURRENT_ORCHESTRATOR_STATE_VERSION: u32 = 1;
 
 #[cfg(test)]
 #[path = "types_tests.rs"]
 mod tests;
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardGitHubInboxConfig {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub repositories: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub label_filter: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorSettings {
-    #[serde(default)]
-    pub step_mode: bool,
-    #[serde(default = "default_enabled_workflows")]
-    pub enabled_workflows: Vec<TaskBoardOrchestratorWorkflow>,
-    #[serde(default = "default_dry_run_default")]
-    pub dry_run_default: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dispatch_status_filter: Option<TaskBoardStatus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_dir: Option<String>,
-    #[serde(default)]
-    pub github_project: TaskBoardGitHubProjectConfig,
-    #[serde(default)]
-    pub github_inbox: TaskBoardGitHubInboxConfig,
-    #[serde(default)]
-    pub scheduling: TaskBoardAutomationSchedulingSettings,
-    #[serde(default)]
-    pub retry: TaskBoardAutomationRetrySettings,
-    #[serde(default)]
-    pub reviewers: TaskBoardReviewerSettings,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub repositories: Vec<TaskBoardRepositoryAutomationConfig>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub execution_hosts: Vec<TaskBoardExecutionHostConfig>,
-    #[serde(default)]
-    pub local_execution_host: TaskBoardLocalExecutionHostConfig,
-    #[serde(default)]
-    pub admission_policy: TaskBoardAutomationPolicy,
-    #[serde(default = "default_policy_version")]
-    pub policy_version: String,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorSettingsUpdateRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub step_mode: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enabled_workflows: Option<Vec<TaskBoardOrchestratorWorkflow>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dry_run_default: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dispatch_status_filter: Option<TaskBoardStatus>,
-    #[serde(default)]
-    pub clear_dispatch_status_filter: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_dir: Option<String>,
-    #[serde(default)]
-    pub clear_project_dir: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub github_project: Option<TaskBoardGitHubProjectConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub github_inbox: Option<TaskBoardGitHubInboxConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scheduling: Option<TaskBoardAutomationSchedulingSettings>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub retry: Option<TaskBoardAutomationRetrySettings>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reviewers: Option<TaskBoardReviewerSettings>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repositories: Option<Vec<TaskBoardRepositoryAutomationConfig>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution_hosts: Option<Vec<TaskBoardExecutionHostConfig>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub local_execution_host: Option<TaskBoardLocalExecutionHostConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub admission_policy: Option<TaskBoardAutomationPolicy>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub policy_version: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorRunOnceRequest {
-    #[serde(default, alias = "id", skip_serializing_if = "Option::is_none")]
-    pub item_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dry_run: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<TaskBoardStatus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_dir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub actor: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskBoardOrchestratorDispatchInput {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub item_id: Option<String>,
-    pub status: Option<TaskBoardStatus>,
-    pub dry_run: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_dir: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub actor: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardOrchestratorPreparedRun {
-    pub run_id: String,
-    pub started_at: String,
-    pub input: TaskBoardOrchestratorDispatchInput,
-    pub sync: TaskBoardSyncSummary,
-    pub audit: TaskBoardAuditSummary,
-}
 
 /// The orchestrator's full in-process status: what the daemon builds,
 /// mutates, and persists internally. Its embedded `last_run` carries the
@@ -163,21 +63,6 @@ pub struct TaskBoardOrchestratorStatusSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automation: Option<super::super::TaskBoardAutomationSnapshot>,
     pub settings: TaskBoardOrchestratorSettings,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardHeldDispatchSummary {
-    pub count: usize,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub items: Vec<TaskBoardHeldDispatchItem>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardHeldDispatchItem {
-    pub intent_id: String,
-    pub board_item_id: String,
-    pub session_id: String,
-    pub work_item_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,27 +107,6 @@ where
         .ok())
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorTickInfo {
-    pub run_id: String,
-    pub phase: TaskBoardOrchestratorTickPhase,
-    pub started_at: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub completed_at: Option<String>,
-    pub dry_run: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardOrchestratorTickPhase {
-    Starting,
-    Dispatch,
-    Evaluation,
-    Completed,
-    Failed,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardOrchestratorRunSummary {
     pub run_id: String,
@@ -262,52 +126,25 @@ pub struct TaskBoardOrchestratorRunSummary {
     pub policy_trace_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardOrchestratorRunStatus {
-    Completed,
-    Failed,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardOrchestratorDispatchInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_id: Option<String>,
+    pub status: Option<TaskBoardStatus>,
+    pub dry_run: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardWorkflowExecutionCount {
-    pub status: TaskBoardWorkflowStatus,
-    pub count: usize,
-}
-
-impl Default for TaskBoardOrchestratorSettings {
-    fn default() -> Self {
-        Self {
-            step_mode: false,
-            enabled_workflows: default_enabled_workflows(),
-            dry_run_default: default_dry_run_default(),
-            dispatch_status_filter: Some(TaskBoardStatus::Todo),
-            project_dir: None,
-            github_project: TaskBoardGitHubProjectConfig::default(),
-            github_inbox: TaskBoardGitHubInboxConfig::default(),
-            scheduling: TaskBoardAutomationSchedulingSettings::default(),
-            retry: TaskBoardAutomationRetrySettings::default(),
-            reviewers: TaskBoardReviewerSettings::default(),
-            repositories: Vec::new(),
-            execution_hosts: Vec::new(),
-            local_execution_host: TaskBoardLocalExecutionHostConfig::default(),
-            admission_policy: TaskBoardAutomationPolicy::default(),
-            policy_version: default_policy_version(),
-        }
-    }
-}
-
-impl TaskBoardOrchestratorSettingsUpdateRequest {
-    /// Validate the complete replacement admission policy, when supplied.
-    ///
-    /// # Errors
-    /// Returns the first deterministic whole-policy validation error.
-    pub fn validate_admission_policy(&self) -> Result<(), TaskBoardPolicyCompilationError> {
-        self.admission_policy
-            .as_ref()
-            .map_or(Ok(()), validate_task_board_policy)
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardOrchestratorPreparedRun {
+    pub run_id: String,
+    pub started_at: String,
+    pub input: TaskBoardOrchestratorDispatchInput,
+    pub sync: TaskBoardSyncSummary,
+    pub audit: TaskBoardAuditSummary,
 }
 
 impl Default for TaskBoardOrchestratorState {
@@ -320,23 +157,6 @@ impl Default for TaskBoardOrchestratorState {
             last_run: None,
         }
     }
-}
-
-fn default_enabled_workflows() -> Vec<TaskBoardOrchestratorWorkflow> {
-    vec![
-        TaskBoardOrchestratorWorkflow::DefaultTask,
-        TaskBoardOrchestratorWorkflow::PrFix,
-        TaskBoardOrchestratorWorkflow::PrReview,
-        TaskBoardOrchestratorWorkflow::Review,
-    ]
-}
-
-const fn default_dry_run_default() -> bool {
-    true
-}
-
-fn default_policy_version() -> String {
-    POLICY_VERSION.to_string()
 }
 
 const fn default_state_schema_version() -> u32 {
@@ -364,4 +184,23 @@ impl TaskBoardOrchestratorStatusSnapshot {
             synced + dispatched + evaluated
         })
     }
+}
+
+/// Validate the complete replacement admission policy, when supplied.
+///
+/// Free function because `TaskBoardOrchestratorSettingsUpdateRequest` moved to
+/// `harness-protocol` (#1145), and a new inherent method can only be added to
+/// a type in its defining crate; `validate_task_board_policy` itself stays
+/// here since it reaches `normalize_repository_slug` and admission-requirement
+/// state this move has no need for.
+///
+/// # Errors
+/// Returns the first deterministic whole-policy validation error.
+pub fn validate_orchestrator_settings_update_admission_policy(
+    request: &TaskBoardOrchestratorSettingsUpdateRequest,
+) -> Result<(), TaskBoardPolicyCompilationError> {
+    request
+        .admission_policy
+        .as_ref()
+        .map_or(Ok(()), validate_task_board_policy)
 }
