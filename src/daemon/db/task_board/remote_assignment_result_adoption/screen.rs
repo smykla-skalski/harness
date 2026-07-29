@@ -24,7 +24,7 @@ pub(super) enum TerminalAdoptionScreen {
     /// it, matching the dispositions the recorder reported before the split.
     Settled {
         context: &'static str,
-        outcome: TaskBoardRemoteResultAdoptionOutcome,
+        outcome: Box<TaskBoardRemoteResultAdoptionOutcome>,
     },
     /// Must stay boxed. It carries the assignment, the parent execution and the
     /// attempt together, and unboxed that measures 19056 bytes inside
@@ -58,13 +58,13 @@ pub(super) async fn screen_terminal_adoption_in_tx(
     if replayed_terminal_adoption_in_tx(transaction, &assignment, &parent, fencing_epoch).await? {
         return Ok(TerminalAdoptionScreen::Settled {
             context: "replayed",
-            outcome: TaskBoardRemoteResultAdoptionOutcome::Replayed(parent),
+            outcome: Box::new(TaskBoardRemoteResultAdoptionOutcome::Replayed(parent)),
         });
     }
     if assignment.fencing_epoch != fencing_epoch || cas_mismatch(expected, &parent).is_some() {
         return Ok(TerminalAdoptionScreen::Settled {
             context: "stale",
-            outcome: TaskBoardRemoteResultAdoptionOutcome::Stale(parent),
+            outcome: Box::new(TaskBoardRemoteResultAdoptionOutcome::Stale(parent)),
         });
     }
     let (attempt_index, current_attempt) = require_active_adoption_target(&assignment, &parent)?;

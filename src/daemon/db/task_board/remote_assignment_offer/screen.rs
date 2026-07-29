@@ -59,21 +59,29 @@ async fn screen_remote_offer_collision_in_tx<'c>(
     Ok(OfferCollisionScreen::Clear(transaction))
 }
 
+/// Everything `screen_remote_offer_admission_in_tx` needs beyond the
+/// transaction it takes ownership of and hands back on every path, grouped so
+/// the function keeps a two-argument signature instead of tripping
+/// `clippy::too_many_arguments`.
+pub(super) struct ScreenRemoteOfferAdmissionInput<'a> {
+    pub(super) expected_execution: &'a TaskBoardWorkflowExecutionCas,
+    pub(super) expected_attempt: &'a TaskBoardExecutionAttemptCas,
+    pub(super) request: &'a RemoteOfferRequest,
+    pub(super) authenticated_principal: &'a str,
+    pub(super) source_content: Option<&'a [u8]>,
+    pub(super) offered_at: &'a str,
+    pub(super) times: OfferTimes,
+}
+
 pub(super) async fn screen_remote_offer_admission_in_tx<'c>(
     transaction: Transaction<'c, Sqlite>,
-    expected_execution: &TaskBoardWorkflowExecutionCas,
-    expected_attempt: &TaskBoardExecutionAttemptCas,
-    request: &RemoteOfferRequest,
-    authenticated_principal: &str,
-    source_content: Option<&[u8]>,
-    offered_at: &str,
-    times: OfferTimes,
+    input: ScreenRemoteOfferAdmissionInput<'_>,
 ) -> Result<OfferPreparationScreen<'c>, CliError> {
     let mut transaction = match screen_remote_offer_collision_in_tx(
         transaction,
-        request,
-        authenticated_principal,
-        source_content,
+        input.request,
+        input.authenticated_principal,
+        input.source_content,
     )
     .await?
     {
@@ -84,11 +92,11 @@ pub(super) async fn screen_remote_offer_admission_in_tx<'c>(
     };
     match prepare_remote_offer_in_tx(
         &mut transaction,
-        expected_execution,
-        expected_attempt,
-        request,
-        offered_at,
-        times,
+        input.expected_execution,
+        input.expected_attempt,
+        input.request,
+        input.offered_at,
+        input.times,
     )
     .await?
     {

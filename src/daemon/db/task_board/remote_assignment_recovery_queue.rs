@@ -329,7 +329,7 @@ async fn append_wrapped_recovery_page(
     let Some(cursor) = cursor else {
         return Ok(());
     };
-    if due.len() >= RECOVERY_BATCH_LIMIT + 1 {
+    if due.len() > RECOVERY_BATCH_LIMIT {
         return Ok(());
     }
     let remaining = i64::try_from(RECOVERY_BATCH_LIMIT + 1 - due.len())

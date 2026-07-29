@@ -117,7 +117,7 @@ impl AsyncDaemonDb {
                 Err(commit_held_refusal(transaction, context, message).await)
             }
             HeldClaimPreparation::Ready(prepared) => {
-                Box::pin(deliver_held_claim(transaction, prepared)).await
+                Box::pin(deliver_held_claim(transaction, *prepared)).await
             }
         }
     }
@@ -131,7 +131,7 @@ enum HeldClaimPreparation {
         context: &'static str,
         message: String,
     },
-    Ready(PreparedHeldClaim),
+    Ready(Box<PreparedHeldClaim>),
 }
 
 /// The item and payload a held claim proved it may deliver, already advanced to
@@ -184,7 +184,7 @@ async fn prepare_held_claim_in_tx(
                 revision,
             } = state;
             advance_held_item(&mut item, decision_id, &now);
-            Ok(HeldClaimPreparation::Ready(PreparedHeldClaim {
+            Ok(HeldClaimPreparation::Ready(Box::new(PreparedHeldClaim {
                 intent_id,
                 applied,
                 item,
@@ -192,7 +192,7 @@ async fn prepare_held_claim_in_tx(
                 revision,
                 consumed_approval_grant_id,
                 now,
-            }))
+            })))
         }
     }
 }

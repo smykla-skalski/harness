@@ -32,7 +32,7 @@ pub(super) async fn prepare_pull_request_state(
         AutomationFlow::Done(workflow) => return AutomationFlow::Done(workflow),
     };
     if pull_request.merged {
-        return AutomationFlow::Done(waiting(&mut prepared.workflow, STEP_MERGED));
+        return AutomationFlow::Done(Box::new(waiting(&mut prepared.workflow, STEP_MERGED)));
     }
     if context.item.status == TaskBoardStatus::InReview {
         desired_labels.insert(context.config.labels.needs_human.clone());
@@ -70,11 +70,11 @@ async fn ensure_pull_request(
         None,
     );
     if !decision.is_allow() {
-        return AutomationFlow::Done(policy_blocked(
+        return AutomationFlow::Done(Box::new(policy_blocked(
             &mut prepared.workflow,
             PolicyAction::OpenPr,
             &decision,
-        ));
+        )));
     }
     match context
         .client
@@ -93,7 +93,11 @@ async fn ensure_pull_request(
                 .push(new_policy_trace_id());
             AutomationFlow::Continue(prepared.workflow.pr_number)
         }
-        Err(error) => AutomationFlow::Done(failure(&mut prepared.workflow, STEP_PR_FAILED, &error)),
+        Err(error) => AutomationFlow::Done(Box::new(failure(
+            &mut prepared.workflow,
+            STEP_PR_FAILED,
+            &error,
+        ))),
     }
 }
 
@@ -111,7 +115,11 @@ async fn load_pull_request(
             update_pull_request_metadata(&mut prepared.workflow, &pull_request);
             AutomationFlow::Continue(pull_request)
         }
-        Err(error) => AutomationFlow::Done(failure(&mut prepared.workflow, STEP_PR_FAILED, &error)),
+        Err(error) => AutomationFlow::Done(Box::new(failure(
+            &mut prepared.workflow,
+            STEP_PR_FAILED,
+            &error,
+        ))),
     }
 }
 
@@ -151,11 +159,11 @@ async fn ready_pull_request(
         None,
     );
     if !decision.is_allow() {
-        return AutomationFlow::Done(policy_blocked(
+        return AutomationFlow::Done(Box::new(policy_blocked(
             &mut prepared.workflow,
             PolicyAction::SubmitReview,
             &decision,
-        ));
+        )));
     }
     if let AutomationFlow::Done(workflow) = ready_draft_pull_request(
         context,
@@ -177,11 +185,11 @@ async fn ready_pull_request(
         {
             Ok(()) => {}
             Err(error) => {
-                return AutomationFlow::Done(failure(
+                return AutomationFlow::Done(Box::new(failure(
                     &mut prepared.workflow,
                     STEP_REVIEW_FAILED,
                     &error,
-                ));
+                )));
             }
         }
     }
@@ -219,9 +227,11 @@ async fn ready_draft_pull_request(
             update_pull_request_metadata(&mut prepared.workflow, pull_request);
             AutomationFlow::Continue(())
         }
-        Err(error) => {
-            AutomationFlow::Done(failure(&mut prepared.workflow, STEP_REVIEW_FAILED, &error))
-        }
+        Err(error) => AutomationFlow::Done(Box::new(failure(
+            &mut prepared.workflow,
+            STEP_REVIEW_FAILED,
+            &error,
+        ))),
     }
 }
 

@@ -117,7 +117,7 @@ impl AsyncDaemonDb {
         {
             SettlementResponseScreen::Replayed(receipt) => {
                 commit_replay(transaction, "settlement response").await?;
-                Ok(receipt)
+                Ok(*receipt)
             }
             SettlementResponseScreen::Settle(assignment) => {
                 Box::pin(commit_settled_response(
@@ -211,7 +211,7 @@ async fn claim_settlement_authority_row_in_tx(
 /// on its own puts that future past the 16384-byte `clippy::large_futures`
 /// threshold at the two controllers that await it.
 enum SettlementResponseScreen {
-    Replayed(TaskBoardRemoteSettlementReceipt),
+    Replayed(Box<TaskBoardRemoteSettlementReceipt>),
     Settle(Box<TaskBoardRemoteAssignmentRecord>),
 }
 
@@ -233,7 +233,7 @@ async fn screen_settlement_response_in_tx(
     .is_some()
     {
         let receipt = require_receipt(transaction, request).await?;
-        return Ok(SettlementResponseScreen::Replayed(receipt));
+        return Ok(SettlementResponseScreen::Replayed(Box::new(receipt)));
     }
     Ok(SettlementResponseScreen::Settle(Box::new(assignment)))
 }

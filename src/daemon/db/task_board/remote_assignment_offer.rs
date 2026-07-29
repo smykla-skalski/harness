@@ -44,7 +44,9 @@ mod screen;
 #[path = "remote_assignment_offer/types.rs"]
 mod types;
 use capacity::host_has_capacity;
-use screen::{OfferPreparationScreen, screen_remote_offer_admission_in_tx};
+use screen::{
+    OfferPreparationScreen, ScreenRemoteOfferAdmissionInput, screen_remote_offer_admission_in_tx,
+};
 pub(crate) use types::TaskBoardRemoteOfferWindow;
 use types::{OfferPreparation, OfferTimes};
 
@@ -89,13 +91,15 @@ impl AsyncDaemonDb {
             .await?;
         let (mut transaction, prepared) = match screen_remote_offer_admission_in_tx(
             transaction,
-            expected_execution,
-            expected_attempt,
-            request,
-            authenticated_principal,
-            source_content,
-            window.offered,
-            times,
+            ScreenRemoteOfferAdmissionInput {
+                expected_execution,
+                expected_attempt,
+                request,
+                authenticated_principal,
+                source_content,
+                offered_at: window.offered,
+                times,
+            },
         )
         .await?
         {

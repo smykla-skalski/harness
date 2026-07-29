@@ -36,7 +36,7 @@ pub(super) async fn automate_item_with_database_policy(
     };
     let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
         AutomationFlow::Continue(prepared) => prepared,
-        AutomationFlow::Done(workflow) => return workflow,
+        AutomationFlow::Done(workflow) => return *workflow,
     };
     continue_automation(&context, &mut prepared).await
 }
@@ -46,12 +46,12 @@ async fn continue_automation(
     prepared: &mut PreparedItem,
 ) -> TaskBoardWorkflowState {
     if let AutomationFlow::Done(workflow) = publish_branch(context, prepared).await {
-        return workflow;
+        return *workflow;
     }
     let pull_request_state = match prepare_pull_request_state(context, prepared).await {
         AutomationFlow::Continue(Some(pull_request_state)) => pull_request_state,
         AutomationFlow::Continue(None) => return prepared.workflow.clone(),
-        AutomationFlow::Done(workflow) => return workflow,
+        AutomationFlow::Done(workflow) => return *workflow,
     };
     if context.item.status != TaskBoardStatus::Done {
         return sync_labels_for_context(
@@ -116,7 +116,7 @@ struct PreparedItem {
 
 enum AutomationFlow<T> {
     Continue(T),
-    Done(TaskBoardWorkflowState),
+    Done(Box<TaskBoardWorkflowState>),
 }
 
 fn prepare_item(
@@ -133,11 +133,15 @@ fn prepare_item(
         context.item.status,
         TaskBoardStatus::InReview | TaskBoardStatus::Done
     ) {
-        return AutomationFlow::Done(workflow);
+        return AutomationFlow::Done(Box::new(workflow));
     }
     let Some(worktree) = resolve_worktree(context.item, &workflow, session_worktrees) else {
         let error = CliErrorKind::workflow_io("task-board github worktree missing").into();
-        return AutomationFlow::Done(failure(&mut workflow, STEP_MISSING_WORKTREE, &error));
+        return AutomationFlow::Done(Box::new(failure(
+            &mut workflow,
+            STEP_MISSING_WORKTREE,
+            &error,
+        )));
     };
     if workflow.worktree.as_deref() != Some(worktree.as_str()) {
         workflow.worktree = Some(worktree.clone());
@@ -147,20 +151,20 @@ fn prepare_item(
         .enabled_automations
         .enables(GitHubAutomation::CreateBranch)
     {
-        return AutomationFlow::Done(workflow);
+        return AutomationFlow::Done(Box::new(workflow));
     }
     let branch = managed_branch_name(context.config, &context.item.id, context.host_id);
     if workflow.branch.as_deref() != Some(branch.as_str()) {
         workflow.branch = Some(branch.clone());
     }
     if dry_run {
-        return AutomationFlow::Done(workflow);
+        return AutomationFlow::Done(Box::new(workflow));
     }
     if context.item.workflow.current_step_id.as_deref() == Some("review_changes_requested")
         && workflow.pr_number.is_none()
     {
         clear_error(&mut workflow);
-        return AutomationFlow::Done(workflow);
+        return AutomationFlow::Done(Box::new(workflow));
     }
     AutomationFlow::Continue(PreparedItem {
         workflow,
@@ -184,11 +188,18 @@ async fn publish_branch(
     {
         Ok(publication) => publication,
         Err(error) => {
-            return AutomationFlow::Done(failure(&mut prepared.workflow, STEP_PUSH_FAILED, &error));
+            return AutomationFlow::Done(Box::new(failure(
+                &mut prepared.workflow,
+                STEP_PUSH_FAILED,
+                &error,
+            )));
         }
     };
     if prepared.workflow.pr_number.is_none() && publication.waiting_for_commits {
-        return AutomationFlow::Done(waiting(&mut prepared.workflow, STEP_WAITING_FOR_COMMITS));
+        return AutomationFlow::Done(Box::new(waiting(
+            &mut prepared.workflow,
+            STEP_WAITING_FOR_COMMITS,
+        )));
     }
     if !publication.needs_push {
         return AutomationFlow::Continue(());
@@ -202,11 +213,11 @@ async fn publish_branch(
         None,
     );
     if !decision.is_allow() {
-        return AutomationFlow::Done(policy_blocked(
+        return AutomationFlow::Done(Box::new(policy_blocked(
             &mut prepared.workflow,
             PolicyAction::PushBranch,
             &decision,
-        ));
+        )));
     }
     if let Err(error) = push_branch_async(
         context.client,
@@ -217,7 +228,11 @@ async fn publish_branch(
     )
     .await
     {
-        return AutomationFlow::Done(failure(&mut prepared.workflow, STEP_PUSH_FAILED, &error));
+        return AutomationFlow::Done(Box::new(failure(
+            &mut prepared.workflow,
+            STEP_PUSH_FAILED,
+            &error,
+        )));
     }
     step(&mut prepared.workflow, STEP_BRANCH_PUSHED);
     prepared
