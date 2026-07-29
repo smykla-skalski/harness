@@ -64,4 +64,4 @@ jobs:
             harness-daemon-drift-${{ runner.os }}-
 
       - name: Check harness-daemon against its own Cargo.toml
-        run: ./scripts/cargo-local.sh clippy --all-targets -p harness-daemon
+        run: ./scripts/cargo-local.sh clippy --all-targets -p harness-daemon -- -D warnings
