@@ -38,7 +38,11 @@ static AUDIT_BROADCAST_SENDER: OnceLock<broadcast::Sender<StreamEvent>> = OnceLo
 /// seeds its own observe runtime with, so this module never has to reach
 /// back into `service` to find it.
 pub(crate) fn register_broadcast_sender(sender: broadcast::Sender<StreamEvent>) {
-    let _ = AUDIT_BROADCAST_SENDER.set(sender);
+    if AUDIT_BROADCAST_SENDER.set(sender).is_err() {
+        tracing::warn!(
+            "audit broadcast sender already registered; ignoring duplicate registration"
+        );
+    }
 }
 
 fn broadcast_sender() -> Option<broadcast::Sender<StreamEvent>> {
