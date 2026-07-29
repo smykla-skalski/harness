@@ -27,7 +27,7 @@ pub use router::sybra_routes;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SybraGatewayConfigError {
-    UpstreamUnparseable(String),
+    UpstreamUnparseable,
     UpstreamSchemeUnsupported(String),
     UpstreamMissingHost,
     UpstreamNotNumericLoopback(String),
@@ -35,6 +35,7 @@ pub enum SybraGatewayConfigError {
     UpstreamHasPathOrQuery,
     UpstreamMissingPort,
     UpstreamLoop(SocketAddr),
+    TokenCollision,
     TokenUnreadable(String),
     TokenNotRegularFile(String),
     TokenPermissionsTooOpen(String),
@@ -45,9 +46,7 @@ pub enum SybraGatewayConfigError {
 impl fmt::Display for SybraGatewayConfigError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UpstreamUnparseable(value) => {
-                write!(f, "Sybra upstream is not a valid URL: {value}")
-            }
+            Self::UpstreamUnparseable => write!(f, "Sybra upstream is not a valid URL"),
             Self::UpstreamSchemeUnsupported(scheme) => {
                 write!(f, "Sybra upstream must use HTTP, got {scheme}")
             }
@@ -71,8 +70,11 @@ impl fmt::Display for SybraGatewayConfigError {
             Self::UpstreamLoop(address) => {
                 write!(
                     f,
-                    "Sybra upstream loops back to the Harness listener at {address}"
+                    "Sybra upstream loops back to the gateway listener at {address}"
                 )
+            }
+            Self::TokenCollision => {
+                write!(f, "Sybra browser and upstream credentials must be distinct")
             }
             Self::TokenUnreadable(detail) => {
                 write!(f, "cannot read Sybra credential: {detail}")
@@ -168,16 +170,29 @@ impl SybraGatewayConfig {
         Ok(())
     }
 
+    /// Reject reuse of the private upstream credential at the browser edge.
+    ///
+    /// # Errors
+    /// Returns [`SybraGatewayConfigError::TokenCollision`] for equal credentials.
+    pub fn reject_matching_browser_token(
+        &self,
+        browser_token: &SybraBrowserToken,
+    ) -> Result<(), SybraGatewayConfigError> {
+        if constant_time_eq(
+            self.token.secret().as_bytes(),
+            browser_token.secret().as_bytes(),
+        ) {
+            return Err(SybraGatewayConfigError::TokenCollision);
+        }
+        Ok(())
+    }
+
     pub(crate) fn upstream_origin(&self) -> &str {
         &self.origin
     }
 
     pub(crate) fn authorization_header(&self) -> axum::http::HeaderValue {
         self.token.authorization_header()
-    }
-
-    pub(crate) fn upstream_token(&self) -> &str {
-        self.token.secret()
     }
 }
 
@@ -207,12 +222,20 @@ impl SybraBrowserToken {
         Ok(Self(token.secret))
     }
 
-    fn accepts(&self, value: Option<&HeaderValue>) -> bool {
+    fn accepts_header(&self, value: Option<&HeaderValue>) -> bool {
         value
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.strip_prefix("Bearer "))
             .map(str::trim)
             .is_some_and(|candidate| constant_time_eq(candidate.as_bytes(), self.0.as_bytes()))
+    }
+
+    fn accepts_secret(&self, candidate: &str) -> bool {
+        constant_time_eq(candidate.as_bytes(), self.0.as_bytes())
+    }
+
+    fn secret(&self) -> &str {
+        &self.0
     }
 }
 
@@ -276,10 +299,10 @@ impl SybraUpstreamToken {
 fn validate_upstream(upstream: &str) -> Result<String, SybraGatewayConfigError> {
     let uri = upstream
         .parse::<Uri>()
-        .map_err(|_| SybraGatewayConfigError::UpstreamUnparseable(upstream.to_owned()))?;
+        .map_err(|_| SybraGatewayConfigError::UpstreamUnparseable)?;
     let scheme = uri
         .scheme_str()
-        .ok_or_else(|| SybraGatewayConfigError::UpstreamUnparseable(upstream.to_owned()))?;
+        .ok_or(SybraGatewayConfigError::UpstreamUnparseable)?;
     if !scheme.eq_ignore_ascii_case("http") {
         return Err(SybraGatewayConfigError::UpstreamSchemeUnsupported(
             scheme.to_owned(),

@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex};
 
 use axum::body::{Body, Bytes};
 use axum::extract::{Request, State};
-use axum::http::{Method, StatusCode, header::AUTHORIZATION};
+use axum::http::{
+    Method, StatusCode,
+    header::{AUTHORIZATION, CONTENT_LENGTH},
+};
 use axum::response::Response;
 use http_body_util::BodyExt as _;
 use tokio::net::TcpListener;
@@ -12,13 +15,14 @@ use tokio::time::{Duration, sleep};
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt as _;
 
+use crate::ownership::UPLOAD_ATTACHMENT_BODY_BYTES;
 use crate::{
     SybraBrowserToken, SybraGateway, SybraGatewayConfig, SybraOperation, SybraOwner,
     SybraOwnershipRegistry, SybraUpstreamToken, sybra_routes,
 };
 
 const PRIVATE_TOKEN: &str = "sybra-private-upstream-token-0123456789";
-const BROWSER_TOKEN: &str = "browser-hop-token";
+const BROWSER_TOKEN: &str = "sybra-browser-edge-token-9876543210";
 type StreamSender = mpsc::Sender<Result<Bytes, Infallible>>;
 
 #[derive(Clone, Debug)]
@@ -42,6 +46,28 @@ struct TestEdge {
 
 impl TestEdge {
     async fn new(ownership: SybraOwnershipRegistry, ordinary: usize, streams: usize) -> Self {
+        let (config, upstream) = Self::upstream().await;
+        let gateway = SybraGateway::for_tests(
+            config,
+            ownership,
+            ordinary,
+            streams,
+            Duration::from_millis(50),
+            Duration::from_millis(100),
+        );
+        let router = sybra_routes(gateway, SybraBrowserToken::new(BROWSER_TOKEN.to_owned()));
+        Self { router, upstream }
+    }
+
+    async fn new_default() -> Self {
+        let (config, upstream) = Self::upstream().await;
+        let gateway =
+            SybraGateway::with_ownership(config, SybraOwnershipRegistry::default_upstream());
+        let router = sybra_routes(gateway, SybraBrowserToken::new(BROWSER_TOKEN.to_owned()));
+        Self { router, upstream }
+    }
+
+    async fn upstream() -> (SybraGatewayConfig, UpstreamState) {
         let upstream = UpstreamState::default();
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let address = listener.local_addr().expect("address");
@@ -54,16 +80,7 @@ impl TestEdge {
         let token = SybraUpstreamToken::parse(PRIVATE_TOKEN).expect("private token");
         let config =
             SybraGatewayConfig::new(&format!("http://{address}"), token).expect("gateway config");
-        let gateway = SybraGateway::for_tests(
-            config,
-            ownership,
-            ordinary,
-            streams,
-            Duration::from_millis(50),
-            Duration::from_millis(100),
-        );
-        let router = sybra_routes(gateway, SybraBrowserToken::new(BROWSER_TOKEN.to_owned()));
-        Self { router, upstream }
+        (config, upstream)
     }
 
     fn count(&self) -> usize {
@@ -162,7 +179,7 @@ async fn body_text(response: Response) -> String {
 }
 
 #[tokio::test]
-async fn public_routes_and_rpc_use_the_private_hop_credential() {
+async fn public_routes_strip_credentials_while_rpc_uses_the_private_credential() {
     let edge = TestEdge::new(SybraOwnershipRegistry::default_upstream(), 2, 1).await;
     let health = edge
         .router
@@ -184,11 +201,12 @@ async fn public_routes_and_rpc_use_the_private_hop_credential() {
     let asset = edge
         .router
         .clone()
-        .oneshot(request(Method::GET, "/app.js", false, Body::empty()))
+        .oneshot(request(Method::GET, "/app.js", true, Body::empty()))
         .await
         .expect("asset");
     assert_eq!(asset.status(), StatusCode::OK);
     assert_eq!(body_text(asset).await, "upstream");
+    assert_eq!(edge.last().authorization, None);
     let asset_head = edge
         .router
         .clone()
@@ -197,13 +215,14 @@ async fn public_routes_and_rpc_use_the_private_hop_credential() {
         .expect("asset head");
     assert_eq!(asset_head.status(), StatusCode::OK);
     assert_eq!(edge.last().method, Method::HEAD);
+    assert_eq!(edge.last().authorization, None);
 
     let rpc = edge
         .router
         .clone()
         .oneshot(request(
             Method::POST,
-            "/api/TaskService/Create?trace=ok",
+            &format!("/api/TaskService/Create?trace=ok&token={BROWSER_TOKEN}"),
             true,
             Body::from("payload"),
         ))
@@ -246,6 +265,19 @@ async fn private_methods_unknown_paths_and_terminal_owners_never_leak_upstream()
         ),
         (Method::GET, "/api/broken", true, StatusCode::NOT_FOUND),
         (Method::GET, "/v1/unknown", false, StatusCode::NOT_FOUND),
+        (Method::GET, "/metrics", false, StatusCode::NOT_FOUND),
+        (
+            Method::GET,
+            "/debug/pprof/profile",
+            false,
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            Method::POST,
+            "/webhook/github",
+            false,
+            StatusCode::NOT_FOUND,
+        ),
         (
             Method::POST,
             "/api/Native/Call",
@@ -266,7 +298,7 @@ async fn private_methods_unknown_paths_and_terminal_owners_never_leak_upstream()
 }
 
 #[tokio::test]
-async fn event_tokens_are_replaced_and_streams_have_dedicated_capacity() {
+async fn event_tokens_are_consumed_and_streams_have_dedicated_capacity() {
     let edge = TestEdge::new(SybraOwnershipRegistry::default_upstream(), 1, 1).await;
     let malformed = edge
         .router
@@ -282,22 +314,34 @@ async fn event_tokens_are_replaced_and_streams_have_dedicated_capacity() {
     assert_eq!(malformed.status(), StatusCode::BAD_REQUEST);
     assert_eq!(edge.count(), 0);
 
+    for uri in ["/events", "/events?token=wrong-browser-token-000000000"] {
+        let denied = edge
+            .router
+            .clone()
+            .oneshot(request(Method::GET, uri, false, Body::empty()))
+            .await
+            .expect("denied event source");
+        assert_eq!(denied.status(), StatusCode::UNAUTHORIZED, "{uri}");
+        assert_eq!(edge.count(), 0);
+    }
+
     let named = edge
         .router
         .clone()
         .oneshot(request(
             Method::GET,
-            "/api/events/task.created?token=browser-secret",
-            true,
+            &format!("/api/events/task.created?token={BROWSER_TOKEN}"),
+            false,
             Body::empty(),
         ))
         .await
         .expect("named event");
     assert_eq!(named.status(), StatusCode::OK);
     assert_eq!(body_text(named).await, "data: delayed\n\n");
+    assert_eq!(edge.last().path_and_query, "/api/events/task.created");
     assert_eq!(
-        edge.last().path_and_query,
-        format!("/api/events/task.created?token={PRIVATE_TOKEN}")
+        edge.last().authorization,
+        Some(format!("Bearer {PRIVATE_TOKEN}"))
     );
 
     let held = edge
@@ -305,19 +349,21 @@ async fn event_tokens_are_replaced_and_streams_have_dedicated_capacity() {
         .clone()
         .oneshot(request(
             Method::GET,
-            "/events?hold=1&token=browser-secret",
-            true,
+            &format!("/events?hold=1&token={BROWSER_TOKEN}"),
+            false,
             Body::empty(),
         ))
         .await
         .expect("held stream");
     assert_eq!(held.status(), StatusCode::OK);
     let captured = edge.last();
+    assert_eq!(captured.path_and_query, "/events?hold=1");
+    assert!(!captured.path_and_query.contains(BROWSER_TOKEN));
+    assert!(!captured.path_and_query.contains(PRIVATE_TOKEN));
     assert_eq!(
-        captured.path_and_query,
-        format!("/events?hold=1&token={PRIVATE_TOKEN}")
+        captured.authorization,
+        Some(format!("Bearer {PRIVATE_TOKEN}"))
     );
-    assert!(!captured.path_and_query.contains("browser-secret"));
 
     let capacity = edge
         .router
@@ -352,6 +398,29 @@ async fn event_tokens_are_replaced_and_streams_have_dedicated_capacity() {
 }
 
 #[tokio::test]
+async fn default_stream_capacity_accepts_five_long_lived_tabs() {
+    let edge = TestEdge::new_default().await;
+    let mut streams = Vec::new();
+    for index in 0..5 {
+        let response = edge
+            .router
+            .clone()
+            .oneshot(request(
+                Method::GET,
+                &format!("/events?hold=1&tab={index}&token={BROWSER_TOKEN}"),
+                false,
+                Body::empty(),
+            ))
+            .await
+            .expect("long-lived stream");
+        assert_eq!(response.status(), StatusCode::OK);
+        streams.push(response);
+    }
+    assert_eq!(streams.len(), 5);
+    assert_eq!(edge.count(), 5);
+}
+
+#[tokio::test]
 async fn ordinary_deadlines_and_body_bounds_do_not_apply_to_sse_bodies() {
     let edge = TestEdge::new(SybraOwnershipRegistry::default_upstream(), 1, 1).await;
     let timed_out = edge
@@ -374,6 +443,45 @@ async fn ordinary_deadlines_and_body_bounds_do_not_apply_to_sse_bodies() {
         .await
         .expect("oversized response");
     assert_eq!(oversized.status(), StatusCode::PAYLOAD_TOO_LARGE);
+
+    let large_body = vec![b'1'; 4 * 1024 * 1024 + 1];
+    let upload = edge
+        .router
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/api/TaskService/UploadAttachment",
+            true,
+            Body::from(large_body.clone()),
+        ))
+        .await
+        .expect("large upload");
+    assert_eq!(upload.status(), StatusCode::OK);
+    assert_eq!(body_text(upload).await, "upstream");
+    assert_eq!(edge.last().body.len(), large_body.len());
+
+    let mut beyond_limit = request(
+        Method::POST,
+        "/api/TaskService/UploadAttachment",
+        true,
+        Body::empty(),
+    );
+    beyond_limit.headers_mut().insert(
+        CONTENT_LENGTH,
+        (UPLOAD_ATTACHMENT_BODY_BYTES + 1)
+            .to_string()
+            .parse()
+            .expect("content length"),
+    );
+    let requests_before = edge.count();
+    let rejected_upload = edge
+        .router
+        .clone()
+        .oneshot(beyond_limit)
+        .await
+        .expect("rejected upload");
+    assert_eq!(rejected_upload.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(edge.count(), requests_before);
 
     let slow_body = edge
         .router

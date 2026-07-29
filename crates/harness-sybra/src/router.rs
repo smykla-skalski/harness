@@ -4,7 +4,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::extract::{Extension, Path, Request};
-use axum::http::{Method, StatusCode, header::AUTHORIZATION};
+use axum::http::{Method, StatusCode, Uri, header::AUTHORIZATION};
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use tokio::sync::Semaphore;
@@ -12,12 +12,14 @@ use tokio::time::Duration;
 
 use crate::client::SybraClients;
 use crate::forward;
+use crate::forward::ForwardPolicy;
+use crate::ownership::DEFAULT_REQUEST_BODY_BYTES;
 use crate::{
     SybraBrowserToken, SybraGatewayConfig, SybraOperation, SybraOwner, SybraOwnershipRegistry,
 };
 
 const MAX_ORDINARY_REQUESTS: usize = 8;
-const MAX_STREAMS: usize = 4;
+const MAX_STREAMS: usize = 32;
 
 #[derive(Clone)]
 pub struct SybraGateway {
@@ -115,6 +117,11 @@ where
         .route("/api/", any(private_not_found))
         .route("/v1", any(not_found))
         .route("/v1/{*unknown}", any(not_found))
+        .route("/metrics", any(not_found))
+        .route("/debug/pprof", any(not_found))
+        .route("/debug/pprof/{*unknown}", any(not_found))
+        .route("/webhook", any(not_found))
+        .route("/webhook/{*unknown}", any(not_found))
         .fallback(any(fallback))
         .layer(Extension(browser_token))
         .layer(Extension(gateway))
@@ -135,9 +142,18 @@ async fn api_operation(
     Extension(gateway): Extension<SybraGateway>,
     Extension(browser_token): Extension<SybraBrowserToken>,
     Path((service, method)): Path<(String, String)>,
-    request: Request,
+    mut request: Request,
 ) -> Response {
-    if !browser_authorized(&request, &browser_token) {
+    let query_tokens = match sanitize_token_query(&mut request) {
+        Ok(tokens) => tokens,
+        Err(MalformedQuery) => return malformed_query_response(),
+    };
+    let query_auth_allowed = service == "events";
+    if !browser_authorized(
+        &request,
+        &browser_token,
+        query_auth_allowed.then_some(query_tokens.as_slice()),
+    ) {
         return unauthorized_response();
     }
     if service == "events" {
@@ -169,10 +185,14 @@ async fn events(
 async fn private_stream(
     gateway: SybraGateway,
     browser_token: SybraBrowserToken,
-    request: Request,
+    mut request: Request,
     operation: SybraOperation,
 ) -> Response {
-    if !browser_authorized(&request, &browser_token) {
+    let query_tokens = match sanitize_token_query(&mut request) {
+        Ok(tokens) => tokens,
+        Err(MalformedQuery) => return malformed_query_response(),
+    };
+    if !browser_authorized(&request, &browser_token, Some(&query_tokens)) {
         return unauthorized_response();
     }
     if request.method() != Method::GET {
@@ -187,14 +207,21 @@ async fn execute(
     operation: SybraOperation,
     stream: bool,
 ) -> Response {
+    let body_limit = operation.request_body_limit();
     match gateway.inner.ownership.owner(&operation) {
-        SybraOwner::Upstream => forward_upstream(&gateway, request, stream).await,
+        SybraOwner::Upstream => forward_upstream(&gateway, request, stream, true, body_limit).await,
         SybraOwner::Native => terminal_owner_response("SYBRA_NATIVE_UNAVAILABLE"),
         SybraOwner::Unsupported => terminal_owner_response("SYBRA_UNSUPPORTED"),
     }
 }
 
-async fn forward_upstream(gateway: &SybraGateway, request: Request, stream: bool) -> Response {
+async fn forward_upstream(
+    gateway: &SybraGateway,
+    request: Request,
+    stream: bool,
+    inject_credential: bool,
+    body_limit: usize,
+) -> Response {
     let permits = if stream {
         &gateway.inner.streams
     } else {
@@ -208,16 +235,85 @@ async fn forward_upstream(gateway: &SybraGateway, request: Request, stream: bool
         &gateway.inner.config,
         client,
         request,
-        stream,
         permit,
-        gateway.inner.ordinary_deadline,
-        gateway.inner.stream_header_deadline,
+        ForwardPolicy {
+            stream,
+            inject_credential,
+            body_limit,
+            ordinary_deadline: gateway.inner.ordinary_deadline,
+            stream_header_deadline: gateway.inner.stream_header_deadline,
+        },
     )
     .await
 }
 
-fn browser_authorized(request: &Request, browser_token: &SybraBrowserToken) -> bool {
-    browser_token.accepts(request.headers().get(AUTHORIZATION))
+fn browser_authorized(
+    request: &Request,
+    browser_token: &SybraBrowserToken,
+    query_tokens: Option<&[String]>,
+) -> bool {
+    let header = browser_token.accepts_header(request.headers().get(AUTHORIZATION));
+    let query = query_tokens.is_some_and(|tokens| {
+        tokens.iter().fold(false, |accepted, candidate| {
+            accepted | browser_token.accepts_secret(candidate)
+        })
+    });
+    header | query
+}
+
+struct MalformedQuery;
+
+fn sanitize_token_query(request: &mut Request) -> Result<Vec<String>, MalformedQuery> {
+    let Some(query) = request.uri().query() else {
+        return Ok(Vec::new());
+    };
+    if !is_well_formed_percent_encoding(query) {
+        return Err(MalformedQuery);
+    }
+    let pairs =
+        serde_urlencoded::from_str::<Vec<(String, String)>>(query).map_err(|_| MalformedQuery)?;
+    let (tokens, kept): (Vec<_>, Vec<_>) = pairs.into_iter().partition(|(name, _)| name == "token");
+    let tokens = tokens.into_iter().map(|(_, value)| value).collect();
+    let query = serde_urlencoded::to_string(kept).map_err(|_| MalformedQuery)?;
+    let path_and_query = if query.is_empty() {
+        request.uri().path().to_owned()
+    } else {
+        format!("{}?{query}", request.uri().path())
+    };
+    *request.uri_mut() = path_and_query.parse::<Uri>().map_err(|_| MalformedQuery)?;
+    Ok(tokens)
+}
+
+fn is_well_formed_percent_encoding(query: &str) -> bool {
+    let bytes = query.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len()
+                || !bytes[index + 1].is_ascii_hexdigit()
+                || !bytes[index + 2].is_ascii_hexdigit()
+            {
+                return false;
+            }
+            index += 3;
+        } else {
+            index += 1;
+        }
+    }
+    true
+}
+
+fn malformed_query_response() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        axum::Json(serde_json::json!({
+            "error": {
+                "code": "SYBRA_BAD_QUERY",
+                "message": "Sybra event query is malformed",
+            }
+        })),
+    )
+        .into_response()
 }
 
 fn unauthorized_response() -> Response {
@@ -263,7 +359,7 @@ async fn private_not_found(
     Extension(browser_token): Extension<SybraBrowserToken>,
     request: Request,
 ) -> Response {
-    if browser_authorized(&request, &browser_token) {
+    if browser_authorized(&request, &browser_token, None) {
         StatusCode::NOT_FOUND.into_response()
     } else {
         unauthorized_response()
@@ -278,7 +374,7 @@ async fn asset(Extension(gateway): Extension<SybraGateway>, request: Request<Bod
     if !matches!(request.method(), &Method::GET | &Method::HEAD) {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
-    forward_upstream(&gateway, request, false).await
+    forward_upstream(&gateway, request, false, false, DEFAULT_REQUEST_BODY_BYTES).await
 }
 
 async fn fallback(

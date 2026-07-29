@@ -1,11 +1,27 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+pub(crate) const DEFAULT_REQUEST_BODY_BYTES: usize = 4 * 1024 * 1024;
+pub(crate) const UPLOAD_ATTACHMENT_BODY_BYTES: usize = 84 * 1024 * 1024;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SybraOperation {
     Rpc { service: String, method: String },
     Events,
     NamedEvent(String),
+}
+
+impl SybraOperation {
+    pub(crate) fn request_body_limit(&self) -> usize {
+        match self {
+            Self::Rpc { service, method }
+                if service == "TaskService" && method == "UploadAttachment" =>
+            {
+                UPLOAD_ATTACHMENT_BODY_BYTES
+            }
+            _ => DEFAULT_REQUEST_BODY_BYTES,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
