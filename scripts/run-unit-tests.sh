@@ -10,7 +10,7 @@ printf '==> test:unit 2/6: supporting workspace crates\n' >&2
 # harness-panel's build script otherwise shells out to npm to produce the
 # assets it embeds; the unit-test gate exercises the Rust side only, so it
 # gets the placeholder bundle instead of a frontend build on every run.
-HARNESS_PANEL_SKIP_FRONTEND_BUILD=1 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-daemon-root -p harness-daemon-state -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-telemetry -p harness-testkit -p harness-workspace "$@"
+HARNESS_PANEL_SKIP_FRONTEND_BUILD=1 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-daemon-root -p harness-daemon-state -p harness-db-schema -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-task-board-provider-sync -p harness-telemetry -p harness-testkit -p harness-workspace "$@"
 # Own invocation: `acp` only compiles with `bridge-runtime`, which the rest of
 # the supporting group above has no reason to build.
 printf '==> test:unit 3/6: harness-agents (bridge-runtime feature)\n' >&2
