@@ -114,9 +114,10 @@ fn dispatch_plan(endpoint: &str, token: &str, id: &str) -> Value {
     );
     assert_eq!(code, 200, "dispatch dry-run {id}: {body}");
     let plans = body["plans"].as_array().expect("dispatch plans array");
-    let matching: Vec<&Value> = plans
+    let matching: Vec<Value> = plans
         .iter()
         .filter(|plan| plan["board_item_id"] == json!(id))
+        .cloned()
         .collect();
     assert_eq!(
         matching.len(),
@@ -124,7 +125,7 @@ fn dispatch_plan(endpoint: &str, token: &str, id: &str) -> Value {
         "exactly one plan for {id}, got {}: {body}",
         matching.len()
     );
-    matching[0].clone()
+    matching.into_iter().next().expect("matched plan")
 }
 
 fn assert_not_blocked_on_approval(plan: &Value) {
