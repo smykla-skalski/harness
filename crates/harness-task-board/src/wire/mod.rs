@@ -2,12 +2,13 @@
 //!
 //! These describe task-board requests and responses, so they carry the
 //! domain's own types and belong beside it. The daemon re-exports them from
-//! `crate::daemon::protocol`; nothing here may reach back into the daemon.
-//! `task_board_steps`'s `ManagedAgentSnapshot`/`ManagedAgentSnapshotSchema`
-//! import comes from `harness_session::wire` directly rather than through a
-//! root-crate facade: this crate already depends on `harness-session` for
-//! `dispatch`/`evaluation`, and `harness-session` has no dependency back on
-//! this crate, so there is no cycle.
+//! its own `daemon::protocol` module; nothing here may reach back into the
+//! daemon. `task_board_steps`'s `ManagedAgentSnapshot`/
+//! `ManagedAgentSnapshotSchema` import comes from `harness_session::wire`
+//! directly rather than through a root-crate facade: this crate already
+//! depends on `harness-session` for `dispatch`/`evaluation`, and
+//! `harness-session` has no dependency back on this crate, so there is no
+//! cycle.
 
 mod policy_transfer;
 mod task_board;
