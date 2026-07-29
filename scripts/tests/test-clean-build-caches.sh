@@ -310,6 +310,70 @@ scenario_includes_scope_comment() {
   pass
 }
 
+scenario_sccache_is_gated_not_unconditional() {
+  start_test "sccache removal is gated, not unconditional remove_path"
+  # The old script ran `remove_path 'Mozilla.sccache'` directly under the
+  # global-caches section, wiping a warm cache on every clean:caches. The gate
+  # routes through clean_sccache_caches instead, and the unconditional lines
+  # must be gone or a size gate is meaningless.
+  assert_contains 'clean_sccache_caches' || return
+  assert_contains 'stop_repo_sccache_server' || return
+  assert_contains 'SCCACHE_REMOVE_THRESHOLD_KB' || return
+  assert_contains '100 * 1024 * 1024' || return
+  # The threshold compares total_kb against it; `>` not `>=`, so exactly 100G
+  # is kept and 100G + 1K is removed.
+  assert_contains 'total_kb > SCCACHE_REMOVE_THRESHOLD_KB' || return
+  if grep -Fq "remove_path 'Mozilla.sccache'" "$SCRIPT"; then
+    fail "unconditional remove_path 'Mozilla.sccache' still present; gate is bypassable"
+    return 1
+  fi
+  pass
+}
+
+scenario_sccache_covers_linux_cache_path() {
+  start_test "sccache cache list includes the Linux ~/.cache/sccache path"
+  # The macOS pair (Library/Caches/Mozilla.sccache, Library/Caches/sccache) was
+  # already listed; the Linux default ~/.cache/sccache was missing entirely, so
+  # clean:caches never reclaimed sccache on Linux.
+  assert_contains "\"\$HOME/.cache/sccache\"" || return
+  pass
+}
+
+scenario_force_help_mentions_sccache() {
+  start_test "--force help text documents that it also removes sccache"
+  assert_contains 'Also remove sccache and ms-playwright caches' || return
+  assert_contains 'sccache auto-removes over 100G' || return
+  pass
+}
+
+# Regression for the original bug: clean:caches deleted the sccache cache dir
+# out from under the running server, turning every later compile into a write
+# error. A healthy cache must survive a default dry-run and report as kept.
+scenario_dry_run_keeps_small_sccache_cache() {
+  start_test "dry-run keeps a small sccache cache (under 100G threshold)"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output=""
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp"
+  # A small warm cache under the isolated fake-home; size is well under 100G,
+  # so the gate must keep it rather than mark it for removal.
+  mkdir -p "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --dry-run)" || { fail "dry-run exited non-zero: $output"; return 1; }
+
+  assert_output_line_contains "$output" "Library/Caches/Mozilla.sccache" "(dry-run, kept" || return
+  # Kept, not slated for removal: the must-remove marker is absent from the line.
+  if grep -F "Library/Caches/Mozilla.sccache" <<<"$output" | grep -Fq 'would remove'; then
+    fail "small sccache cache marked for removal under the 100G threshold"
+    return 1
+  fi
+  pass
+}
+
 scenario_dry_run_keeps_leased_segment
 scenario_dry_run_sweeps_only_stale_test_temp_dirs
 scenario_missing_common_repo_root_lib_aborts_safely
@@ -318,6 +382,10 @@ scenario_includes_all_repo_rust_target_roots
 scenario_includes_all_project_xcode_roots
 scenario_includes_swiftpm_build_roots
 scenario_includes_scope_comment
+scenario_sccache_is_gated_not_unconditional
+scenario_sccache_covers_linux_cache_path
+scenario_force_help_mentions_sccache
+scenario_dry_run_keeps_small_sccache_cache
 
 log "clean-build-caches tests: $PASS_COUNT passed, $FAIL_COUNT failed"
 if (( FAIL_COUNT > 0 )); then

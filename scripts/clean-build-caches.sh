@@ -13,6 +13,12 @@
 #   - Tool caches:           JetBrains, Homebrew prune, swiftpm
 #                            (ms-playwright is reported but NOT removed; pass --force/-f to remove it)
 #
+# sccache is reported but NOT removed by default. A running sccache server
+# pins its cache directory at startup, so deleting it out from under the server
+# turns every later compile into a write error until the server restarts; the
+# server is stopped first when removal does run. The cache is removed only when
+# its total size exceeds SCCACHE_REMOVE_THRESHOLD (100G) or --force/-f is given.
+#
 # target/ is shared across every worktree via cargo-local.sh's
 # CARGO_TARGET_DIR: target/dev/local-v<format> for the main checkout, or
 # target/dev/wt-<worktree-name>-<hash>-v<format> per linked worktree, shared by
@@ -59,6 +65,11 @@ DRY_RUN=0
 AGGRESSIVE=0
 FORCE=0
 TOTAL_RECLAIMED_KB=0
+# sccache's cache is valuable to keep warm and expensive to rebuild, so it is
+# removed only when its total footprint crosses this threshold or --force is
+# given. 100 GiB is well above the 30G budget a healthy server settles at.
+SCCACHE_REMOVE_THRESHOLD_KB=$((100 * 1024 * 1024))
+readonly SCCACHE_REMOVE_THRESHOLD_KB
 # Rust's tempfile crate names temp dirs `.tmp` plus six random characters, and
 # nothing reclaims one whose owning process died mid-write. An ACP probe leak
 # left 27498 of them holding 177G because no cleanup path looked at $TMPDIR.
@@ -78,7 +89,8 @@ Usage: $(basename "$0") [--dry-run] [--aggressive] [-f|--force] [-h|--help]
 
   --dry-run     Print targets and sizes; do not delete.
   --aggressive  Also wipe Xcode UI HarnessMonitor-* DerivedData slots.
-  -f, --force   Also remove ms-playwright cache (reported-only by default).
+  -f, --force   Also remove sccache and ms-playwright caches (both are
+                reported-only by default; sccache auto-removes over 100G).
   -h, --help    Show this help.
 EOF
 }
@@ -145,6 +157,97 @@ run_cmd() {
 
 section() {
   printf '\n[%s]\n' "$1"
+}
+
+# sccache pins its cache directory at startup, so removing that directory while
+# the server keeps running turns every later compile into a write error until
+# the server restarts. Stopping it first lets the next build start a fresh
+# server against the recreated directory. The repo's server is resolved the
+# same way clean-sccache-servers.sh does: from cargo-local.sh's authoritative
+# --print-env. `--stop-server` works on both platforms, unlike the /proc-based
+# orphan reaper, because the target is the one server owning this checkout's
+# socket, not one orphan among many.
+stop_repo_sccache_server() {
+  local env uds bin
+  env="$("$ROOT/scripts/cargo-local.sh" --print-env 2>/dev/null || true)"
+  uds="$(awk -F= '/^SCCACHE_SERVER_UDS=/ {print $2; exit}' <<<"$env")"
+  bin="$(awk -F= '/^SCCACHE_BIN=/ {print $2; exit}' <<<"$env")"
+  [[ -n "$uds" && -n "$bin" ]] || return 0
+  [[ -S "$uds" && -x "$bin" ]] || return 0
+
+  if (( DRY_RUN )); then
+    printf '  · %-46s   (dry-run) %s\n' 'stop sccache server' "--stop-server"
+    return 0
+  fi
+  printf '  · %-46s   stopping\n' 'stop sccache server'
+  SCCACHE_SERVER_UDS="$uds" "$bin" --stop-server >/dev/null 2>&1 \
+    || printf '    (warning: sccache --stop-server exited non-zero; cache dirs may still be removed)\n'
+}
+
+# sccache is reported but kept by default: its cache is valuable to keep warm
+# and expensive to rebuild, and rebuilding it recompiles every dependency. It is
+# removed only when the total across its cache dirs exceeds the threshold, or
+# --force is given. Either way the server is stopped first so a running server
+# never outlives its cache directory. Mozilla.sccache and Library/Caches/sccache
+# are the macOS defaults; ~/.cache/sccache is the Linux one (and sccache's
+# documented default there), which the previous version never listed.
+clean_sccache_caches() {
+  stop_repo_sccache_server
+
+  local -a dirs=()
+  local dir total_kb=0 size_kb over_threshold remove reason
+  for dir in \
+    "$HOME/Library/Caches/Mozilla.sccache" \
+    "$HOME/Library/Caches/sccache" \
+    "$HOME/.cache/sccache"; do
+    [[ -e "$dir" ]] || continue
+    # The macOS pair can both resolve to the same path when Library/Caches is a
+    # symlink or the user relocated Caches; counting one twice doubles the size.
+    local existing
+    for existing in "${dirs[@]:-}"; do
+      [[ "$existing" == "$dir" ]] && continue 2
+    done
+    dirs+=("$dir")
+    size_kb="$(path_size_kb "$dir")"
+    total_kb=$((total_kb + size_kb))
+  done
+
+  if ((${#dirs[@]} == 0)); then
+    printf '  · %-46s %8s  (absent, skip)\n' 'sccache cache' '-'
+    return
+  fi
+
+  over_threshold=0
+  (( total_kb > SCCACHE_REMOVE_THRESHOLD_KB )) && over_threshold=1
+  # --force always removes; the size threshold removes without it. Kept by
+  # default means a healthy 30G cache survives a routine clean:caches.
+  if (( FORCE )); then
+    remove=1
+    reason='--force'
+  elif (( over_threshold )); then
+    remove=1
+    reason="over $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB") threshold"
+  else
+    remove=0
+    reason="kept: under $(bytes_to_human "$SCCACHE_REMOVE_THRESHOLD_KB"); pass -f/--force to remove"
+  fi
+
+  printf '  · %-46s %8s  total\n' 'sccache cache' "$(bytes_to_human "$total_kb")"
+  for dir in "${dirs[@]}"; do
+    size_kb="$(path_size_kb "$dir")"
+    local rel=${dir#"$HOME/"}
+    if (( DRY_RUN )); then
+      if (( remove )); then
+        printf '  · %-46s %8s  (dry-run, would remove: %s)\n' "$rel" "$(bytes_to_human "$size_kb")" "$reason"
+      else
+        printf '  · %-46s %8s  (dry-run, %s)\n' "$rel" "$(bytes_to_human "$size_kb")" "$reason"
+      fi
+    elif (( remove )); then
+      remove_path "$rel" "$dir"
+    else
+      printf '  · %-46s %8s  (%s)\n' "$rel" "$(bytes_to_human "$size_kb")" "$reason"
+    fi
+  done
 }
 
 # A versioned segment under target/dev is leased
@@ -302,8 +405,7 @@ clean_stale_test_temp_dirs
 
 section 'Global build caches'
 remove_path 'go-build cache'                        "$HOME/Library/Caches/go-build"
-remove_path 'Mozilla.sccache'                       "$HOME/Library/Caches/Mozilla.sccache"
-remove_path 'sccache'                               "$HOME/Library/Caches/sccache"
+clean_sccache_caches
 remove_path 'Yarn cache'                            "$HOME/Library/Caches/Yarn"
 remove_path 'swiftpm cache'                         "$HOME/Library/Caches/org.swift.swiftpm"
 remove_path 'gopls cache'                           "$HOME/Library/Caches/gopls"
