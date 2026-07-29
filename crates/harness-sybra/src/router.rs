@@ -373,9 +373,15 @@ async fn not_found() -> Response {
     StatusCode::NOT_FOUND.into_response()
 }
 
-async fn asset(Extension(gateway): Extension<SybraGateway>, request: Request<Body>) -> Response {
+async fn asset(
+    Extension(gateway): Extension<SybraGateway>,
+    mut request: Request<Body>,
+) -> Response {
     if !matches!(request.method(), &Method::GET | &Method::HEAD) {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
+    }
+    if sanitize_token_query(&mut request).is_err() {
+        return malformed_query_response();
     }
     forward_upstream(&gateway, request, false, false, DEFAULT_REQUEST_BODY_BYTES).await
 }

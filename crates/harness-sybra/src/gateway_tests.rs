@@ -199,15 +199,17 @@ async fn public_routes_strip_credentials_while_rpc_uses_the_private_credential()
     assert!(body_text(health_head).await.is_empty());
     assert_eq!(edge.count(), 0);
 
+    let asset_uri = format!("/app.js?cache=1&token={BROWSER_TOKEN}");
     let asset = edge
         .router
         .clone()
-        .oneshot(request(Method::GET, "/app.js", true, Body::empty()))
+        .oneshot(request(Method::GET, &asset_uri, true, Body::empty()))
         .await
         .expect("asset");
     assert_eq!(asset.status(), StatusCode::OK);
     assert_eq!(body_text(asset).await, "upstream");
     assert_eq!(edge.last().authorization, None);
+    assert_eq!(edge.last().path_and_query, "/app.js?cache=1");
     let asset_head = edge
         .router
         .clone()
