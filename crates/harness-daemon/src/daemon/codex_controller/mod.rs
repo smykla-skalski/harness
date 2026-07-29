@@ -1,6 +1,7 @@
 mod active_runs;
 mod approvals;
 mod completion_evidence;
+mod dependency_fixer;
 mod effort;
 mod events;
 mod handle;
@@ -26,5 +27,6 @@ mod worker_state;
 #[cfg(test)]
 mod tests;
 
+pub use dependency_fixer::CodexDependencyFixLauncher;
 pub use handle::CodexControllerHandle;
 pub use turn_lifecycle::CodexAgentTurnRuntime;
