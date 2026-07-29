@@ -62,6 +62,32 @@ struct PreviewHarnessClientTaskBoardLaneTransitionTests {
     #expect(movedSnapshot.itemsChangeSeq == firstBefore.itemsChangeSeq + 1)
   }
 
+  @Test("preview position updates preserve project identity metadata")
+  func previewPositionUpdatesPreserveProjectIdentityMetadata() async throws {
+    let client = PreviewHarnessClient(
+      fixtures: fixtures(
+        taskBoardItems: [
+          taskBoardItem(
+            id: "moving",
+            status: .todo,
+            lanePosition: 0,
+            sourceProjectId: "project-source",
+            executionRepository: "acme/widget"
+          ),
+          taskBoardItem(id: "anchor", status: .planning, lanePosition: 0),
+        ]
+      ),
+      isLaunchAgentInstalled: true
+    )
+
+    let before = try await client.taskBoardItem(id: "moving")
+    try await setPosition(client, item: before, status: .planning, position: 1, actor: "moving")
+    let after = try await client.taskBoardItem(id: "moving")
+
+    #expect(after.sourceProjectId == "project-source")
+    #expect(after.executionRepository == "acme/widget")
+  }
+
   @Test("generic deletion compacts only its source lane")
   func genericDeletionCompactsSourceLane() async throws {
     let client = PreviewHarnessClient(fixtures: .taskBoardBoardOnly, isLaunchAgentInstalled: true)
@@ -256,6 +282,8 @@ struct PreviewHarnessClientTaskBoardLaneTransitionTests {
     id: String,
     status: TaskBoardStatus,
     lanePosition: UInt32,
+    sourceProjectId: String? = nil,
+    executionRepository: String? = nil,
     deletedAt: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
@@ -267,6 +295,8 @@ struct PreviewHarnessClientTaskBoardLaneTransitionTests {
       priority: .medium,
       tags: [],
       projectId: nil,
+      sourceProjectId: sourceProjectId,
+      executionRepository: executionRepository,
       agentMode: .interactive,
       externalRefs: [],
       planning: TaskBoardPlanningState(),

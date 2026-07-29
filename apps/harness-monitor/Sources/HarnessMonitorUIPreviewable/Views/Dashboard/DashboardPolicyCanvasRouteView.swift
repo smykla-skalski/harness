@@ -8,7 +8,7 @@ struct DashboardPolicyCanvasRouteView: View {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let isRouteVisible: Bool
 
-  @StateObject private var policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore
+  @ObservedObject private var policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore
   @State private var selectedCanvasId: String?
   @State private var editingCanvasId: String?
   @State private var pendingNameRequest: DashboardPolicyCanvasNameRequest?
@@ -22,20 +22,13 @@ struct DashboardPolicyCanvasRouteView: View {
   init(
     store: HarnessMonitorStore,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore,
     isRouteVisible: Bool
   ) {
     self.store = store
     self.dashboardUI = dashboardUI
     self.isRouteVisible = isRouteVisible
-    _policyCanvasViewModelStore = StateObject(
-      wrappedValue: DashboardPolicyCanvasViewModelStore(
-        document: dashboardUI.policyPipeline,
-        simulation: dashboardUI.policySimulation,
-        audit: dashboardUI.policyAudit,
-        activeCanvasId: dashboardUI.policyCanvasWorkspace?.activeCanvasId,
-        workspace: dashboardUI.policyCanvasWorkspace
-      )
-    )
+    _policyCanvasViewModelStore = ObservedObject(wrappedValue: policyCanvasViewModelStore)
     _selectedCanvasId = State(
       initialValue: dashboardUI.policyCanvasWorkspace?.activeCanvasId)
   }

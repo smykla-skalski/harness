@@ -30,7 +30,7 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })
     #expect(item?.lanePosition == 1)
     #expect(item?.laneOrigin == .manual(actor: "Harness Monitor"))
-    #expect(store.currentSuccessFeedbackMessage == "Reordered task board item")
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
   @Test("A concurrent same-lane reorder recomputes the slot from the stable anchor")
@@ -234,7 +234,7 @@ struct HarnessMonitorStoreTaskBoardReorderTests {
     let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })
     #expect(item?.lanePosition == nil)
     #expect(item?.laneOrigin == nil)
-    #expect(store.currentSuccessFeedbackMessage == "Reset task board position")
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
   @Test("Reset retries a global conflict only while the item revision is unchanged")

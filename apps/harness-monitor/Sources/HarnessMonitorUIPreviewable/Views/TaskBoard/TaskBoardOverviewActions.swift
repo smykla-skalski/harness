@@ -229,17 +229,32 @@ public struct TaskBoardOverviewActions: Equatable {
     )
   }
 
-  func reorderTaskBoardItem(_ plan: TaskBoardCardReorderPlan) {
-    guard let store else { return }
+  @MainActor
+  @discardableResult
+  func reorderTaskBoardItem(_ plan: TaskBoardCardReorderPlan) -> Bool {
+    guard let store else { return false }
+    let optimisticMutation = store.beginOptimisticTaskBoardPosition(
+      id: plan.itemID,
+      sourceStatus: plan.sourceStatus,
+      destinationStatus: plan.destinationStatus,
+      placement: plan.placement
+    )
+    traceTaskBoardCardDrag(
+      "optimistic item=\(plan.itemID) applied=\(optimisticMutation != nil)"
+    )
+    guard let optimisticMutation else { return false }
     HarnessMonitorAsyncWorkQueue.shared.submit(
-      .init(title: "Reordering task board item") {
-        await store.reorderTaskBoardItem(
+      .init(title: "Positioning task board item") {
+        await store.positionTaskBoardItem(
           id: plan.itemID,
-          status: plan.status,
-          placement: plan.placement
+          sourceStatus: plan.sourceStatus,
+          destinationStatus: plan.destinationStatus,
+          placement: plan.placement,
+          optimisticMutation: optimisticMutation
         )
       }
     )
+    return true
   }
 
   func resetTaskBoardItemPosition(_ item: TaskBoardItem) {

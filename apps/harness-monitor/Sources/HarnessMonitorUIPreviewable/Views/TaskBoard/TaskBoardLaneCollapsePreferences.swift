@@ -111,4 +111,14 @@ enum TaskBoardLaneCollapsePreferences {
     )
     return Self.rawValue(for: overrides)
   }
+
+  @MainActor
+  static func expandedRawValue(
+    lane: TaskBoardInboxLane,
+    rawValue: String
+  ) -> String {
+    var overrides = overrides(from: rawValue)
+    overrides[lane] = false
+    return Self.rawValue(for: overrides)
+  }
 }

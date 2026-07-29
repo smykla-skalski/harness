@@ -562,6 +562,11 @@ run = '''
   apps/harness-monitor/Scripts/policy-canvas-lab-capture.sh
 '''
 
+[tasks."monitor:task-board-drag-lab"]
+description = "Build and launch the standalone native SwiftUI task-board drag lab"
+dir = "apps/harness-monitor/Tools/TaskBoardDragLab"
+run = "swift Scripts/RunLab.swift"
+
 [tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
 run = "apps/harness-monitor/Scripts/run-lint.sh"

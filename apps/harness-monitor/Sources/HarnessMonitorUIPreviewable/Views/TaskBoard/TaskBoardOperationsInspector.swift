@@ -58,7 +58,7 @@ public struct TaskBoardOperationsInspectorFocus: Equatable {
 struct TaskBoardOperationsInspector: View {
   let store: HarnessMonitorStore
   let taskBoardItems: [TaskBoardItem]
-  let isVisible: Bool
+  let triageRulesState: TaskBoardTriageRulesEditorState
   @AppStorage(TaskBoardOperationsInspectorWidth.storageKey)
   private var storedWidth = Double(TaskBoardOperationsInspectorWidth.defaultValue)
   @GestureState private var resizeTranslation: CGFloat = 0
@@ -77,20 +77,16 @@ struct TaskBoardOperationsInspector: View {
   var body: some View {
     TaskBoardOperationsInspectorContent(
       store: store,
-      taskBoardItems: isVisible ? taskBoardItems : [],
-      isActive: isVisible
+      taskBoardItems: taskBoardItems,
+      triageRulesState: triageRulesState,
+      isActive: true
     )
     .frame(width: displayedWidth)
     .clipped()
-    .harnessInspectorGlass(isActive: isVisible)
+    .harnessInspectorGlass(isActive: true)
     .overlay(alignment: .leading) {
-      if isVisible {
-        resizeHandle
-      }
+      resizeHandle
     }
-    .opacity(isVisible ? 1 : 0)
-    .allowsHitTesting(isVisible)
-    .accessibilityHidden(!isVisible)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.taskBoardOperationsInspector)
   }
@@ -144,13 +140,18 @@ struct TaskBoardOperationsInspector: View {
 private struct TaskBoardOperationsInspectorContent: View {
   let store: HarnessMonitorStore
   let taskBoardItems: [TaskBoardItem]
+  let triageRulesState: TaskBoardTriageRulesEditorState
   let isActive: Bool
 
   var body: some View {
     ScrollView(.vertical) {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
         TaskBoardAutomationInspector(store: store, isActive: isActive)
-        TaskBoardTriageRulesEditor(store: store, isActive: isActive)
+        TaskBoardTriageRulesEditor(
+          store: store,
+          isActive: isActive,
+          state: triageRulesState
+        )
         TaskBoardOperationsPanel(
           store: store,
           taskBoardItems: taskBoardItems,

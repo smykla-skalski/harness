@@ -165,6 +165,7 @@ extension HarnessMonitorStore {
   /// actions no longer visually disable the task board.
   public var isTaskBoardBusy: Bool {
     taskBoardRuntimeState.actionCount > 0
+      || !taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
   }
 
   /// Call before starting a task-board mutation, paired with

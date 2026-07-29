@@ -343,7 +343,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     )
     #expect(store.globalTaskBoardItems.first?.status == .inProgress)
     #expect(store.contentUI.dashboard.taskBoardItems.first?.status == .inProgress)
-    #expect(store.currentSuccessFeedbackMessage == "Moved task board item")
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
 }

@@ -6,24 +6,20 @@ struct DashboardRouteContent: View, Equatable {
   @Binding var selectedRoute: DashboardWindowRoute
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  let policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let operationsInspectorVisible: Bool
   let operationsInspectorDispatcher: TaskBoardOperationsInspectorFocusDispatcher
   @State private var reviewsSearchAutomationCommand = AppSearchAutomationCommand.idle
-  @State private var auditHasBeenMounted = false
-  @State private var diagnosticsHasBeenMounted = false
-  @State private var debuggingHasBeenMounted = false
-  @State private var policyCanvasHasBeenMounted = false
 
-  // Skip rebuilding the retained route subtree when only the window's column
-  // visibility animates: the route and the three @Observable inputs are
-  // unchanged, so the expensive hidden routes must not re-evaluate. Intra-slice
-  // data changes still re-run the affected route bodies through observation, and
-  // @State (mount flags, search command) self-invalidates regardless of this ==.
+  // Skip rebuilding the board and selected route when only the window's column
+  // visibility animates. Intra-slice data changes still re-run the affected
+  // route bodies through observation.
   nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.route == rhs.route
       && lhs.store === rhs.store
       && lhs.dashboardUI === rhs.dashboardUI
+      && lhs.policyCanvasViewModelStore === rhs.policyCanvasViewModelStore
       && lhs.sessionCatalog === rhs.sessionCatalog
       && lhs.operationsInspectorVisible == rhs.operationsInspectorVisible
       && lhs.operationsInspectorDispatcher === rhs.operationsInspectorDispatcher
@@ -57,64 +53,40 @@ struct DashboardRouteContent: View, Equatable {
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
 
-      if auditHasBeenMounted || isAuditVisible {
+      DashboardRetainedAuxiliaryRoute(isVisible: isAuditVisible) {
         DashboardAuditRouteView(
           store: store,
           dashboardUI: dashboardUI
         )
-        .layoutValue(key: DashboardRetainedRouteKey.self, value: .audit)
-        .opacity(isAuditVisible ? 1 : 0)
-        .allowsHitTesting(isAuditVisible)
-        .accessibilityHidden(!isAuditVisible)
-        .onAppear {
-          auditHasBeenMounted = true
-        }
       }
+      .layoutValue(key: DashboardRetainedRouteKey.self, value: .audit)
 
-      if policyCanvasHasBeenMounted || isPolicyCanvasVisible {
+      DashboardRetainedAuxiliaryRoute(isVisible: isPolicyCanvasVisible) {
         DashboardPolicyCanvasRouteView(
           store: store,
           dashboardUI: dashboardUI,
+          policyCanvasViewModelStore: policyCanvasViewModelStore,
           isRouteVisible: isPolicyCanvasVisible
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
-        .opacity(isPolicyCanvasVisible ? 1 : 0)
-        .allowsHitTesting(isPolicyCanvasVisible)
-        .accessibilityHidden(!isPolicyCanvasVisible)
-        .onAppear {
-          policyCanvasHasBeenMounted = true
-        }
       }
+      .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
 
-      if diagnosticsHasBeenMounted || isDiagnosticsVisible {
+      DashboardRetainedAuxiliaryRoute(isVisible: isDiagnosticsVisible) {
         DashboardDiagnosticsRouteView(
           store: store,
           selectedRoute: route
         )
-        .layoutValue(key: DashboardRetainedRouteKey.self, value: .diagnostics)
-        .opacity(isDiagnosticsVisible ? 1 : 0)
-        .allowsHitTesting(isDiagnosticsVisible)
-        .accessibilityHidden(!isDiagnosticsVisible)
-        .onAppear {
-          diagnosticsHasBeenMounted = true
-        }
       }
+      .layoutValue(key: DashboardRetainedRouteKey.self, value: .diagnostics)
 
-      if debuggingHasBeenMounted || isDebuggingVisible {
+      DashboardRetainedAuxiliaryRoute(isVisible: isDebuggingVisible) {
         DashboardDebuggingRouteView()
-          .layoutValue(key: DashboardRetainedRouteKey.self, value: .debugging)
-          .opacity(isDebuggingVisible ? 1 : 0)
-          .allowsHitTesting(isDebuggingVisible)
-          .accessibilityHidden(!isDebuggingVisible)
-          .onAppear {
-            debuggingHasBeenMounted = true
-          }
       }
+      .layoutValue(key: DashboardRetainedRouteKey.self, value: .debugging)
 
-      // Keep reviews unretained so its toolbar search and focused-scene command
-      // publishers disappear when the user leaves the route. The canvas route
-      // remains retained because it owns in-progress document state.
+      // Reviews intentionally leaves the tree when its route closes so its
+      // focused-scene command and search publishers cannot remain active.
       if isReviewsVisible {
         DashboardReviewsRouteView(
           store: store,
@@ -130,6 +102,32 @@ struct DashboardRouteContent: View, Equatable {
         searchAutomationCommand: $reviewsSearchAutomationCommand
       )
     )
+  }
+}
+
+private struct DashboardRetainedAuxiliaryRoute<Content: View>: View {
+  let isVisible: Bool
+  let content: Content
+  @State private var hasBeenMounted = false
+
+  init(
+    isVisible: Bool,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.isVisible = isVisible
+    self.content = content()
+  }
+
+  var body: some View {
+    if hasBeenMounted || isVisible {
+      content
+        .opacity(isVisible ? 1 : 0)
+        .allowsHitTesting(isVisible)
+        .accessibilityHidden(!isVisible)
+        .onAppear {
+          hasBeenMounted = true
+        }
+    }
   }
 }
 

@@ -28,12 +28,12 @@ extension TaskBoardOverviewBehaviorTests {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
 
     // The old aggregation reduced one PreferenceKey across every card in the
-    // LazyVStack; it updated several times per frame as lazy children measured
-    // in, which SwiftUI faults as "bound preference ... tried to update multiple
-    // times per frame". Target that specific pattern - the key and its frame-pair
-    // struct - not the whole PreferenceKey API, which unrelated future code in
-    // these files may legitimately use. The positive checks are the real guard:
-    // the card-frame modifier must keep reporting per card.
+    // lane; it updated several times per frame as children measured in, which
+    // SwiftUI faults as "bound preference ... tried to update multiple times per
+    // frame". Target that specific pattern - the key and its frame-pair struct -
+    // not the whole PreferenceKey API, which unrelated future code in these files
+    // may legitimately use. The positive checks are the real guard: the
+    // card-frame modifier must keep reporting per card.
     #expect(!support.contains("TaskBoardLaneCardFramePreferenceKey"))
     #expect(!support.contains("TaskBoardLaneCardFrame("))
     #expect(!laneColumn.contains("TaskBoardLaneCardFramePreferenceKey"))
@@ -41,12 +41,14 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(support.contains("tracking.setFrame(frame, for: id)"))
   }
 
-  @Test("Expanded lane scroll content owns its padding")
-  func expandedLaneScrollContentOwnsItsPadding() throws {
+  @Test("Expanded lane List owns custom insertion and card spacing")
+  func expandedLaneListOwnsCustomInsertionAndCardSpacing() throws {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let laneReveal = try taskBoardSourceFile(
+      named: "TaskBoardLaneUnifiedColumn+Reveal.swift"
+    )
+    let listTuner = try taskBoardSourceFile(named: "TaskBoardNativeListTuner.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
-    let laneScrollViewSource =
-      "ScrollView(.vertical, showsIndicators: true) {\n        laneScrollContent\n      }"
 
     #expect(
       laneColumn.contains(
@@ -56,30 +58,51 @@ extension TaskBoardOverviewBehaviorTests {
         """
       )
     )
-    #expect(laneColumn.contains("private var laneScrollContent: some View"))
-    #expect(laneColumn.components(separatedBy: laneScrollViewSource).count == 3)
+    #expect(laneColumn.contains("List {"))
+    #expect(laneColumn.contains("private var droppableListRowsContent: some DynamicViewContent"))
+    #expect(laneColumn.contains("ForEach(displayLaneListRows)"))
     #expect(
       laneColumn.contains(
-        """
-        laneRows
-              .padding(.horizontal, metrics.laneInnerPadding)
-              .padding(.top, metrics.laneHeaderBodyTopPadding)
-              .padding(.bottom, metrics.laneInnerPadding)
-              .frame(maxWidth: .infinity, alignment: .top)
-        """
+        ".dropDestination(for: TaskBoardCardDragPayload.self) { payloads, rowOffset in"
       )
     )
-    #expect(!laneColumn.contains(".contentMargins("))
+    #expect(laneReveal.contains("await nativeListCoordinator.reveal(row:"))
+    #expect(laneColumn.contains(".listRowInsets("))
+    #expect(laneColumn.contains("leading: metrics.listRowHorizontalInset"))
+    #expect(laneColumn.contains("trailing: metrics.listRowHorizontalInset"))
+    #expect(laneColumn.contains(".listRowSeparator(.hidden)"))
+    #expect(laneColumn.contains(".listRowBackground(Color.clear)"))
+    #expect(laneColumn.contains(".introspect(.list, on: .macOS(.v26))"))
+    #expect(listTuner.contains("draggingDestinationFeedbackStyle = .none"))
+    #expect(laneColumn.contains("private var cardGapState: TaskBoardLaneCardGapState"))
+    #expect(laneColumn.contains("cardGapState.displayIndex"))
+    #expect(laneColumn.contains("cardGapState.showsMarker"))
+    #expect(laneColumn.contains("StrokeStyle(lineWidth: 1.5, dash: [5])"))
+    #expect(laneColumn.contains("HarnessMonitorTheme.accent.opacity(0.12)"))
+    #expect(!laneColumn.contains("cardGapModel.target"))
+    #expect(listTuner.contains("setGapTarget(nil, reason: \"before-model-mutation\")"))
+    #expect(listTuner.contains("selectionHighlightStyle = .none"))
+    #expect(listTuner.contains("focusRingType = .none"))
+    #expect(listTuner.contains("tableView.scrollRowToVisible(row)"))
+    #expect(!listTuner.contains(".delegate ="))
+    #expect(!listTuner.contains(".dataSource ="))
+    #expect(
+      laneChrome.contains(
+        ".padding(.horizontal, metrics.laneInnerPadding)"
+      )
+    )
     #expect(
       laneColumn.contains(
         """
         TaskBoardEmptyLane(lane: lane)
-                    .padding(.horizontal, metrics.laneInnerPadding)
-                    .padding(.top, metrics.laneHeaderBodyTopPadding)
-                    .padding(.bottom, metrics.laneInnerPadding)
+              .padding(.horizontal, metrics.laneInnerPadding)
+              .padding(.top, metrics.laneHeaderBodyTopPadding)
+              .padding(.bottom, metrics.laneInnerPadding)
         """
       )
     )
+    #expect(!laneColumn.contains("LazyVStack"))
+    #expect(!laneColumn.contains("insertionMarker("))
     #expect(!laneChrome.contains(".padding(.top, metrics.laneHeaderBodyTopPadding)"))
   }
 
@@ -123,19 +146,83 @@ extension TaskBoardOverviewBehaviorTests {
   @Test("Lane drops derive from the precomputed drop-candidate set")
   func laneDropsUseModernSessionPlanForAcceptanceAndAction() throws {
     let board = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
+    let boardDrop = try taskBoardSourceFile(named: "TaskBoardOverviewView+BoardDrop.swift")
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let listTuner = try taskBoardSourceFile(named: "TaskBoardNativeListTuner.swift")
+    let fallback = try taskBoardSourceFile(
+      named: "TaskBoardLaneFallbackDropDestination.swift"
+    )
+    let interaction = try taskBoardSourceFile(
+      named: "TaskBoardOverviewView+CardInteraction.swift"
+    )
+    let dragRuntime = try taskBoardSourceFile(named: "TaskBoardCardDragRuntime.swift")
+
+    #expect(board.contains("dragRuntime: cardDragRuntimeValue"))
+    #expect(board.contains("dropHighlightState: cardDragRuntimeValue.highlightState(for: lane)"))
+    #expect(interaction.contains("cardDropPlan(cardIDs, to: $0) != nil"))
+    #expect(interaction.contains("cardDragRuntimeValue.begin("))
+    #expect(dragRuntime.contains("candidateLanes.contains(lane)"))
+    #expect(laneColumn.contains("private var listRowsContent: some DynamicViewContent"))
+    #expect(laneColumn.contains("private var droppableListRowsContent: some DynamicViewContent"))
+    #expect(laneColumn.contains("indexed-destination"))
+    #expect(laneColumn.contains(".introspect(.list, on: .macOS(.v26))"))
+    #expect(laneColumn.contains("nativeListCoordinator.register(tableView, lane: lane)"))
+    #expect(listTuner.contains("draggingDestinationFeedbackStyle = .none"))
+    #expect(listTuner.contains("setGapTarget(nil, reason: \"before-model-mutation\")"))
+    #expect(fallback.contains(".dropDestination(for: TaskBoardCardDragPayload.self)"))
+    #expect(fallback.contains("guard acceptsDrop()"))
+    #expect(fallback.contains("_ = action(payloads, insertionOffset)"))
+    #expect(boardDrop.contains("TaskBoardCardDropPlan.resolve(payloads, to: lane)"))
+    #expect(boardDrop.contains("TaskBoardCardReorderPlan.dropDecision("))
+    #expect(boardDrop.contains("currentPresentation.apiItems(in: lane)"))
+    #expect(!laneColumn.contains("TaskBoardCardReorderInsertionGap"))
+    #expect(!board.contains(".onDrop("))
+    #expect(!boardDrop.contains("DropDelegate"))
+    #expect(interaction.contains("TaskBoardCardDropPlan.resolve(cardDragPayloads(cardIDs)"))
+  }
+
+  @Test("Busy state keeps the active drag container stable")
+  func busyStateKeepsActiveDragContainerStable() throws {
+    let board = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
+    let boardDrop = try taskBoardSourceFile(named: "TaskBoardOverviewView+BoardDrop.swift")
+    let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let overview = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let interaction = try taskBoardSourceFile(
       named: "TaskBoardOverviewView+CardInteraction.swift"
     )
 
-    #expect(board.contains("dropCandidateLanesValue.contains(lane)"))
-    #expect(interaction.contains("cardDropPlan(cardIDs, to: $0) != nil"))
-    #expect(laneColumn.contains("isDropEnabled && isDropCandidate"))
-    #expect(laneColumn.contains("DropConfiguration(operation: operation)"))
-    #expect(laneColumn.contains("? .move : .forbidden"))
-    #expect(laneColumn.contains("TaskBoardCardDropPlan.resolve(payloads, to: lane)"))
-    #expect(!laneColumn.contains("_: CGPoint"))
-    #expect(interaction.contains("TaskBoardCardDropPlan.resolve(cardDragPayloads(cardIDs)"))
+    #expect(board.contains("cardDragPayloads(cardIDs)"))
+    #expect(!board.contains("isActionInFlight ? [] : cardDragPayloads(cardIDs)"))
+    #expect(board.contains(".dragContainerSelection(orderedSelectedCardIDs)"))
+    #expect(board.contains(".dragConfiguration(.init(allowMove: true))"))
+    #expect(board.contains("dragRuntime: cardDragRuntimeValue"))
+    #expect(board.contains("nativeListCoordinator: nativeListCoordinatorValue"))
+    #expect(!board.contains("ViewThatFits"))
+    #expect(
+      board.components(
+        separatedBy: "taskBoardLaneStrip(titleTypography: titleTypography)"
+      ).count == 2
+    )
+    #expect(!board.contains(".dropDestination("))
+    #expect(laneColumn.contains(".dropDestination("))
+    #expect(laneColumn.contains("droppableListRowsContent"))
+    #expect(!laneColumn.contains("isEnabled: isActionInFlight"))
+    #expect(boardDrop.contains("!isActionInFlight"))
+    #expect(boardDrop.contains("transaction.disablesAnimations = true"))
+    #expect(boardDrop.contains("withTransaction(transaction)"))
+    #expect(boardDrop.contains("defer { clearTransientCardDragState() }"))
+    #expect(boardDrop.contains("applyImmediateTaskBoardPositionProjection()"))
+    #expect(
+      overview.contains(
+        "currentPresentation.replacingTaskBoardItemsForImmediatePosition("
+      )
+    )
+    #expect(overview.contains("@Environment(\\.scenePhase)"))
+    #expect(overview.contains(".onChange(of: scenePhase)"))
+    #expect(overview.contains(".onChange(of: isCommandFocusActive)"))
+    #expect(overview.contains(".onKeyPress(.escape"))
+    #expect(overview.contains(".onDisappear"))
+    #expect(interaction.contains("clearTransientCardDragState()"))
   }
 
   @Test("Lifted cards highlight only lanes with valid drop plans")
@@ -146,15 +233,21 @@ extension TaskBoardOverviewBehaviorTests {
     )
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+    let dragRuntime = try taskBoardSourceFile(named: "TaskBoardCardDragRuntime.swift")
 
-    #expect(board.contains("dropCandidateLanesValue.contains(lane)"))
-    #expect(interaction.contains("case .initial, .active:"))
+    #expect(board.contains("dropHighlightState: cardDragRuntimeValue.highlightState(for: lane)"))
+    #expect(interaction.contains("case .initial:"))
+    #expect(interaction.contains("case .active:"))
+    #expect(interaction.contains("updateInitialCardDrag(session)"))
     #expect(interaction.contains("updateDraggedCardIDs(draggedIDs)"))
-    #expect(interaction.contains("case .ended, .dataTransferCompleted:"))
-    #expect(interaction.contains("dropCandidateLanesValue ="))
-    #expect(laneColumn.contains("isDropCandidate: isDropCandidate"))
-    #expect(laneChrome.contains("if isDropCandidate"))
-    #expect(laneChrome.contains("value: isDropCandidate"))
+    #expect(interaction.contains("case .ended(let operation):"))
+    #expect(interaction.contains("case .dataTransferCompleted:"))
+    #expect(interaction.contains("operation == .move || operation == .copy ? .ignore : .clear"))
+    #expect(interaction.contains("cardDragRuntimeValue.begin("))
+    #expect(dragRuntime.contains("final class TaskBoardLaneDropHighlightState"))
+    #expect(dragRuntime.contains("highlightState(for: lane).setTargeted(true)"))
+    #expect(laneColumn.contains("TaskBoardLaneDropHighlight("))
+    #expect(laneChrome.contains("state.isTargeted"))
   }
 
   @Test("Only the collapsed rail keeps the bounded toggle highlight")

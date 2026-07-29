@@ -15,6 +15,7 @@ extension HarnessMonitorPreviewStoreFactory {
       .agentTuiOverflow: agentTuiOverflowConfiguration,
       .taskDropCockpit: taskDropConfiguration,
       .taskBoardBoardOnly: taskBoardBoardOnlyConfiguration,
+      .taskBoardDragPerformance: taskBoardDragPerformanceConfiguration,
       .offlineCached: offlineCachedConfiguration,
       .sidebarOverflow: overflowConfiguration,
       .empty: emptyConfiguration,
@@ -68,6 +69,23 @@ extension HarnessMonitorPreviewStoreFactory {
       metrics: metrics,
       selection: PreviewSelectionState(
         bookmarkedSessionIDs: [PreviewFixtures.summary.sessionId],
+        sessionFilter: .all,
+        selectedSessionID: nil,
+        selectedDetail: nil,
+        timeline: []
+      )
+    )
+  }
+
+  static func taskBoardDragPerformanceConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.taskBoardDragPerformance
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
+    return liveConfiguration(
+      mode: .dashboardLanding,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [],
         sessionFilter: .all,
         selectedSessionID: nil,
         selectedDetail: nil,

@@ -32,6 +32,9 @@ public struct DashboardWindowView: View {
   @State private var navigationStateStorage = WindowNavigationState()
   @State private var operationsInspectorDispatcher =
     TaskBoardOperationsInspectorFocusDispatcher()
+  @State private var operationsInspectorTriageRulesState =
+    TaskBoardTriageRulesEditorState()
+  @StateObject private var policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore
 
   public init(
     store: HarnessMonitorStore,
@@ -48,6 +51,15 @@ public struct DashboardWindowView: View {
         store: store,
         initialDashboardRoute: DashboardRouteRestorationDefaults.initialRoute()
       )
+    _policyCanvasViewModelStore = StateObject(
+      wrappedValue: DashboardPolicyCanvasViewModelStore(
+        document: dashboardUI.policyPipeline,
+        simulation: dashboardUI.policySimulation,
+        audit: dashboardUI.policyAudit,
+        activeCanvasId: dashboardUI.policyCanvasWorkspace?.activeCanvasId,
+        workspace: dashboardUI.policyCanvasWorkspace
+      )
+    )
   }
 
   var selectedRoute: DashboardWindowRoute {
@@ -172,6 +184,7 @@ public struct DashboardWindowView: View {
               selectedRoute: selectedRouteBinding,
               store: store,
               dashboardUI: dashboardUI,
+              policyCanvasViewModelStore: policyCanvasViewModelStore,
               sessionCatalog: sessionCatalog,
               operationsInspectorVisible: operationsInspectorVisible,
               operationsInspectorDispatcher: operationsInspectorDispatcher
@@ -179,11 +192,13 @@ public struct DashboardWindowView: View {
             .equatable()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
           }
-          TaskBoardOperationsInspector(
-            store: store,
-            taskBoardItems: dashboardUI.taskBoardItems,
-            isVisible: operationsInspectorVisible && route == .taskBoard
-          )
+          if operationsInspectorVisible && route == .taskBoard {
+            TaskBoardOperationsInspector(
+              store: store,
+              taskBoardItems: dashboardUI.taskBoardItems,
+              triageRulesState: operationsInspectorTriageRulesState
+            )
+          }
         }
         .onAppear {
           operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector

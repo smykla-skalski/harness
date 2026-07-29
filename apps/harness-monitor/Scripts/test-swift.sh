@@ -23,7 +23,27 @@ XCODE_ONLY_TESTING="${XCODE_ONLY_TESTING:-}"
 BUILD_FOR_TESTING_SCRIPT="${BUILD_FOR_TESTING_SCRIPT:-$ROOT/Scripts/build-for-testing.sh}"
 TEST_RETRY_ITERATIONS="${HARNESS_MONITOR_TEST_RETRY_ITERATIONS:-0}"
 TEST_LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
-FOCUSED_UI_TEST_TIMEOUT_SECONDS="${HARNESS_MONITOR_FOCUSED_UI_TEST_TIMEOUT_SECONDS:-45}"
+DEFAULT_FOCUSED_UI_TEST_TIMEOUT_SECONDS=45
+TASK_BOARD_DRAG_TIMEOUT_SECONDS=180
+
+resolve_focused_ui_test_timeout_seconds() {
+  if [[ -n "${HARNESS_MONITOR_FOCUSED_UI_TEST_TIMEOUT_SECONDS:-}" ]]; then
+    printf '%s\n' "$HARNESS_MONITOR_FOCUSED_UI_TEST_TIMEOUT_SECONDS"
+    return
+  fi
+
+  case "$XCODE_ONLY_TESTING" in
+    *HarnessMonitorUITests/HarnessMonitorPerfTests/testTaskBoardDrag* | \
+      *HarnessMonitorUITests/HarnessMonitorPerfTests/testTaskBoardContextMenuEdgeMovesAndReveal*)
+      printf '%s\n' "$TASK_BOARD_DRAG_TIMEOUT_SECONDS"
+      ;;
+    *)
+      printf '%s\n' "$DEFAULT_FOCUSED_UI_TEST_TIMEOUT_SECONDS"
+      ;;
+  esac
+}
+
+FOCUSED_UI_TEST_TIMEOUT_SECONDS="$(resolve_focused_ui_test_timeout_seconds)"
 # A test that awaits something that never arrives otherwise blocks the whole run
 # for as long as anyone leaves it, and reports nothing at all: no failing name,
 # no output, just a process that never exits. Bound every test so the run ends
@@ -125,6 +145,9 @@ selector_requests_ui_tests() {
 }
 
 run_focused_ui_test_action_with_timeout() {
+  printf 'note: focused UI test action timeout=%ss selector=%s\n' \
+    "$FOCUSED_UI_TEST_TIMEOUT_SECONDS" \
+    "$XCODE_ONLY_TESTING"
   if (( FOCUSED_UI_TEST_TIMEOUT_SECONDS <= 0 )); then
     exec "$@"
   fi

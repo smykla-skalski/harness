@@ -66,9 +66,13 @@ extension HarnessMonitorStore {
 
   func applyTaskBoardDashboardSnapshot(
     _ snapshot: TaskBoardRefreshSnapshot,
-    fallbackStatus: TaskBoardOrchestratorStatus? = nil
+    fallbackStatus: TaskBoardOrchestratorStatus? = nil,
+    positionMutationGeneration: UInt64? = nil
   ) {
-    let resolvedItems = snapshot.items.value ?? globalTaskBoardItems
+    let resolvedItems = taskBoardItemsPreservingPositionMutation(
+      snapshot.items.value,
+      positionMutationGeneration: positionMutationGeneration
+    )
     let measuredAutomationSnapshot = snapshot.orchestratorStatus.measured?.value?.automation
     let snapshotStatus =
       if let measuredStatus = snapshot.orchestratorStatus.measured {
@@ -93,12 +97,36 @@ extension HarnessMonitorStore {
       globalTaskBoardProjects = snapshot.projects.value ?? globalTaskBoardProjects
       mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)
     }
-    if didChangeTaskBoardSnapshot {
+    if didChangeTaskBoardSnapshot
+      && taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+    {
       scheduleTaskBoardSnapshotCacheWrite(
         items: resolvedItems,
         orchestratorStatus: resolvedStatus
       )
     }
+  }
+
+  func taskBoardItemsPreservingPositionMutation(
+    _ loadedItems: [TaskBoardItem]?,
+    positionMutationGeneration: UInt64?
+  ) -> [TaskBoardItem] {
+    guard let loadedItems else { return globalTaskBoardItems }
+    guard let positionMutationGeneration else {
+      return taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+        ? loadedItems
+        : globalTaskBoardItems
+    }
+    guard canApplyTaskBoardItems(positionMutationGeneration: positionMutationGeneration) else {
+      return globalTaskBoardItems
+    }
+    return loadedItems
+  }
+
+  func canApplyTaskBoardItems(positionMutationGeneration: UInt64) -> Bool {
+    let mutationState = taskBoardRuntimeState.positionMutation
+    return mutationState.pendingTokens.isEmpty
+      && mutationState.generation == positionMutationGeneration
   }
 
   @discardableResult
@@ -182,5 +210,188 @@ extension HarnessMonitorStore {
       return
     }
     globalTaskBoardItems[index] = item
+  }
+}
+
+extension HarnessMonitorStore {
+  func rollbackOptimisticTaskBoardPosition(
+    _ mutation: TaskBoardOptimisticPositionMutation
+  ) {
+    guard isCurrentOptimisticTaskBoardPosition(mutation) else { return }
+    guard
+      let currentIndex = globalTaskBoardItems.firstIndex(where: {
+        $0.id == mutation.itemID
+      }),
+      let priorItem = mutation.priorItems.first(where: {
+        $0.id == mutation.itemID
+      })
+    else {
+      return
+    }
+    var restoredItems = globalTaskBoardItems
+    let currentItem = restoredItems.remove(at: currentIndex)
+    let restoredItem = currentItem.withTaskBoardPosition(
+      status: priorItem.status,
+      lanePosition: priorItem.lanePosition,
+      laneOrigin: priorItem.laneOrigin,
+      laneSetAt: priorItem.laneSetAt
+    )
+    let insertionIndex = Self.rollbackInsertionIndex(
+      in: restoredItems,
+      priorItems: mutation.priorItems,
+      itemID: mutation.itemID
+    )
+    restoredItems.insert(restoredItem, at: insertionIndex)
+    globalTaskBoardItems = restoredItems
+  }
+
+  func completeSuccessfulTaskBoardPosition(
+    _ item: TaskBoardItem,
+    mutation: TaskBoardOptimisticPositionMutation
+  ) {
+    guard isPendingTaskBoardPositionMutation(mutation) else { return }
+    let shouldMergeResponse = isCurrentOptimisticTaskBoardPosition(mutation)
+    finishTaskBoardPositionMutation(mutation)
+    if shouldMergeResponse {
+      mergeTaskBoardItem(item)
+    }
+    guard taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty else {
+      return
+    }
+    scheduleTaskBoardSnapshotCacheWrite(
+      items: globalTaskBoardItems,
+      orchestratorStatus: globalTaskBoardOrchestratorStatus
+    )
+  }
+
+  func beginTaskBoardPositionMutation() -> UInt64 {
+    cancelPendingTaskBoardSnapshotCacheWriteTask()
+    let wasIdle = taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+    taskBoardRuntimeState.positionMutation.generation &+= 1
+    let token = taskBoardRuntimeState.positionMutation.generation
+    taskBoardRuntimeState.positionMutation.pendingTokens.insert(token)
+    if wasIdle {
+      scheduleUISync([.contentDashboard])
+    }
+    return token
+  }
+
+  func isPendingTaskBoardPositionMutation(
+    _ mutation: TaskBoardOptimisticPositionMutation
+  ) -> Bool {
+    taskBoardRuntimeState.positionMutation.pendingTokens.contains(mutation.token)
+  }
+
+  private func isCurrentOptimisticTaskBoardPosition(
+    _ mutation: TaskBoardOptimisticPositionMutation
+  ) -> Bool {
+    guard
+      isPendingTaskBoardPositionMutation(mutation),
+      let currentItem = globalTaskBoardItems.first(where: {
+        $0.id == mutation.itemID
+      }),
+      let optimisticItem = mutation.optimisticItems.first(where: {
+        $0.id == mutation.itemID
+      })
+    else {
+      return false
+    }
+    return currentItem.hasSameTaskBoardPosition(as: optimisticItem)
+  }
+
+  func finishTaskBoardPositionMutation(
+    _ mutation: TaskBoardOptimisticPositionMutation
+  ) {
+    guard
+      taskBoardRuntimeState.positionMutation.pendingTokens.remove(mutation.token) != nil
+    else {
+      return
+    }
+    taskBoardRuntimeState.positionMutation.generation &+= 1
+    if taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty {
+      scheduleUISync([.contentDashboard])
+    }
+  }
+
+  private static func rollbackInsertionIndex(
+    in currentItems: [TaskBoardItem],
+    priorItems: [TaskBoardItem],
+    itemID: String
+  ) -> Int {
+    guard let priorIndex = priorItems.firstIndex(where: { $0.id == itemID }) else {
+      return currentItems.endIndex
+    }
+    for item in priorItems[..<priorIndex].reversed() {
+      if let index = currentItems.firstIndex(where: { $0.id == item.id }) {
+        return index + 1
+      }
+    }
+    let nextIndex = priorItems.index(after: priorIndex)
+    for item in priorItems[nextIndex...] {
+      if let index = currentItems.firstIndex(where: { $0.id == item.id }) {
+        return index
+      }
+    }
+    return currentItems.endIndex
+  }
+}
+
+extension TaskBoardItem {
+  func withOptimisticPosition(
+    status: TaskBoardStatus,
+    lanePosition: UInt32,
+    actor: String
+  ) -> TaskBoardItem {
+    withTaskBoardPosition(
+      status: status,
+      lanePosition: lanePosition,
+      laneOrigin: .manual(actor: actor),
+      laneSetAt: laneSetAt
+    )
+  }
+
+  fileprivate func hasSameTaskBoardPosition(as other: TaskBoardItem) -> Bool {
+    status == other.status
+      && lanePosition == other.lanePosition
+      && laneOrigin == other.laneOrigin
+      && laneSetAt == other.laneSetAt
+  }
+
+  fileprivate func withTaskBoardPosition(
+    status: TaskBoardStatus,
+    lanePosition: UInt32?,
+    laneOrigin: TaskBoardLaneOrigin?,
+    laneSetAt: String?
+  ) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: schemaVersion,
+      id: id,
+      title: title,
+      body: body,
+      status: status,
+      priority: priority,
+      tags: tags,
+      projectId: projectId,
+      sourceProjectId: sourceProjectId,
+      executionRepository: executionRepository,
+      targetProjectTypes: targetProjectTypes,
+      agentMode: agentMode,
+      kind: kind,
+      externalRefs: externalRefs,
+      importedFromProvider: importedFromProvider,
+      planning: planning,
+      workflow: workflow,
+      sessionId: sessionId,
+      workItemId: workItemId,
+      usage: usage,
+      parentItemId: parentItemId,
+      childOrder: childOrder,
+      lanePosition: lanePosition,
+      laneOrigin: laneOrigin,
+      laneSetAt: laneSetAt,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      deletedAt: deletedAt
+    )
   }
 }

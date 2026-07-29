@@ -44,7 +44,7 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
       store.selectedSession?.tasks.first(where: { $0.taskId == inboxTask.taskId })?.status
         == .awaitingReview
     )
-    #expect(store.currentSuccessFeedbackMessage == "Moved task board cards")
+    #expect(store.currentSuccessFeedbackMessage == nil)
     #expect(store.isTaskBoardBusy == false)
   }
 
@@ -79,7 +79,7 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
       Dictionary(uniqueKeysWithValues: store.globalTaskBoardItems.map { ($0.id, $0.status) })
         == ["board-1": .inProgress, "board-2": .inReview]
     )
-    #expect(store.currentSuccessFeedbackMessage == "Moved task board items")
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
   @Test("Moving session tasks applies one grouped mutation result")
@@ -122,7 +122,7 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
       ]
     )
     #expect(store.selectedSession?.tasks.allSatisfy { $0.status == .awaitingReview } == true)
-    #expect(store.currentSuccessFeedbackMessage == "Moved session tasks")
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
   @Test("Inbox move restores an overlapping session action owner")
@@ -291,7 +291,14 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
   @Test("Optimistic move shows the new status before the network call resolves")
   func optimisticMoveShowsNewStatusBeforeNetworkResolves() async {
     let client = RecordingHarnessClient()
-    client.configureTaskBoardItems([taskBoardItem(id: "board-1", status: .todo)])
+    client.configureTaskBoardItems([
+      taskBoardItem(
+        id: "board-1",
+        status: .todo,
+        sourceProjectId: "project-source",
+        executionRepository: "acme/widget"
+      )
+    ])
     client.configureMutationDelay(.milliseconds(200))
     let store = await makeBootstrappedStore(client: client)
 
@@ -301,19 +308,21 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
       ])
     }
 
-    var observedOptimisticStatus: TaskBoardStatus?
+    var observedOptimisticItem: TaskBoardItem?
     _ = await waitUntil {
-      guard let status = store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status,
-        status == .inProgress
+      guard let item = store.globalTaskBoardItems.first(where: { $0.id == "board-1" }),
+        item.status == .inProgress
       else {
         return false
       }
-      observedOptimisticStatus = status
+      observedOptimisticItem = item
       return true
     }
     _ = await mutation.value
 
-    #expect(observedOptimisticStatus == .inProgress)
+    #expect(observedOptimisticItem?.status == .inProgress)
+    #expect(observedOptimisticItem?.sourceProjectId == "project-source")
+    #expect(observedOptimisticItem?.executionRepository == "acme/widget")
     #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status == .inProgress)
   }
 

@@ -24,7 +24,13 @@ struct CacheWriteSyncState {
 struct TaskBoardRuntimeState {
   var connection = TaskBoardConnectionState()
   var stepModeMutation = TaskBoardStepModeMutationState()
+  var positionMutation = TaskBoardPositionMutationState()
   var actionCount = 0
+}
+
+struct TaskBoardPositionMutationState {
+  var generation: UInt64 = 0
+  var pendingTokens: Set<UInt64> = []
 }
 
 struct TaskBoardStepModeMutationState {

@@ -59,17 +59,17 @@ struct TaskBoardOperationsInspectorWidthTests {
   }
 }
 
-func expectPersistentResizableInspectorSource(_ source: String) {
+func expectVisibleResizableInspectorSource(_ source: String) {
   let clippedIndex = source.range(of: ".clipped()")?.lowerBound
   let glassIndex = source.range(
-    of: ".harnessInspectorGlass(isActive: isVisible)"
+    of: ".harnessInspectorGlass(isActive: true)"
   )?.lowerBound
 
   #expect(source.contains("static let defaultValue: CGFloat = 480"))
   #expect(source.contains("@AppStorage(TaskBoardOperationsInspectorWidth.storageKey)"))
   #expect(source.contains("ScrollView(.vertical)"))
   #expect(!source.contains("topContentInset"))
-  #expect(source.contains(".harnessInspectorGlass(isActive: isVisible)"))
+  #expect(source.contains(".harnessInspectorGlass(isActive: true)"))
   #expect(clippedIndex != nil)
   #expect(glassIndex != nil)
   if let clippedIndex, let glassIndex {
@@ -80,8 +80,8 @@ func expectPersistentResizableInspectorSource(_ source: String) {
   #expect(!source.contains("inspectorSurfaceFill"))
   #expect(!source.contains("Color(red:"))
   #expect(source.contains("TaskBoardOperationsPanel("))
-  #expect(source.contains("taskBoardItems: isVisible ? taskBoardItems : []"))
-  #expect(source.contains("isActive: isVisible"))
+  #expect(source.contains("taskBoardItems: taskBoardItems"))
+  #expect(source.contains("isActive: true"))
   #expect(source.contains("@GestureState private var resizeTranslation"))
   #expect(source.contains("DragGesture(minimumDistance: 0)"))
   #expect(source.contains(".updating($resizeTranslation)"))
@@ -98,6 +98,7 @@ func expectPersistentResizableInspectorSource(_ source: String) {
   #expect(!source.contains("Timer"))
   #expect(source.contains(".frame(width: displayedWidth)"))
   #expect(!source.contains("private static let width: CGFloat = 380"))
-  #expect(source.contains(".allowsHitTesting(isVisible)"))
-  #expect(source.contains(".accessibilityHidden(!isVisible)"))
+  #expect(!source.contains(".opacity(isVisible ? 1 : 0)"))
+  #expect(!source.contains(".allowsHitTesting(isVisible)"))
+  #expect(!source.contains(".accessibilityHidden(!isVisible)"))
 }

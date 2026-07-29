@@ -401,6 +401,45 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "explicit only-testing selector must not be overridden by default skips",
         )
 
+    def test_drag_performance_selector_gets_extended_focused_ui_timeout(self) -> None:
+        selector = (
+            "HarnessMonitorUITests/HarnessMonitorPerfTests/"
+            "testTaskBoardDragAndDropHitchRate"
+        )
+        completed, _ = self.run_script(only_testing=selector)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(
+            f"note: focused UI test action timeout=180s selector={selector}",
+            completed.stdout,
+        )
+
+    def test_drag_route_selector_gets_extended_focused_ui_timeout(self) -> None:
+        selector = (
+            "HarnessMonitorUITests/HarnessMonitorPerfTests/"
+            "testTaskBoardDragAfterRouteRoundTrip"
+        )
+        completed, _ = self.run_script(only_testing=selector)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(
+            f"note: focused UI test action timeout=180s selector={selector}",
+            completed.stdout,
+        )
+
+    def test_ordinary_focused_ui_selector_keeps_default_timeout(self) -> None:
+        selector = (
+            "HarnessMonitorUITests/HarnessMonitorUITests/"
+            "testToolbarOpensSettingsWindow"
+        )
+        completed, _ = self.run_script(only_testing=selector)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(
+            f"note: focused UI test action timeout=45s selector={selector}",
+            completed.stdout,
+        )
+
     def test_skips_ui_test_targets_by_default_to_avoid_tcc_prompts(self) -> None:
         completed, calls = self.run_script()
 

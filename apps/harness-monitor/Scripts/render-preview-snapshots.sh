@@ -9,13 +9,14 @@ Usage:
 
 Suites:
   dashboard-diff-lab
+  task-board-lane-alignment
   task-board-inspector
   task-board-filters
 EOF
 }
 
 if [[ "${1:-}" == "--list" ]]; then
-  printf '%s\n' dashboard-diff-lab task-board-inspector task-board-filters
+  printf '%s\n' dashboard-diff-lab task-board-lane-alignment task-board-inspector task-board-filters
   exit 0
 fi
 
@@ -26,7 +27,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-diff-lab|task-board-inspector|task-board-filters) ;;
+  dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-filters) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -75,6 +76,9 @@ trap cleanup EXIT
 case "$suite" in
   dashboard-diff-lab)
     HARNESS_DIFF_LAB_DUMP="$staging_directory" "$host"
+    ;;
+  task-board-lane-alignment)
+    HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   task-board-inspector)
     HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP="$staging_directory" "$host"

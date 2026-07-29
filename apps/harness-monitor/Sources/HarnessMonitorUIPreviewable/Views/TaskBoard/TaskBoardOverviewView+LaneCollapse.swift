@@ -17,6 +17,40 @@ extension TaskBoardOverviewView {
     )
   }
 
+  func requestLaneReveal(
+    cardID: TaskBoardCardID,
+    in lane: TaskBoardInboxLane,
+    anchor: TaskBoardLaneRevealAnchor
+  ) {
+    let apiItems = currentPresentation.apiItems(in: lane)
+    let inboxItems = currentPresentation.inboxItems(in: lane)
+    let priorDestinationCardIDs =
+      apiItems.map { TaskBoardCardID.api($0.id) }
+      + inboxItems.map {
+        TaskBoardCardID.inbox(
+          sessionID: $0.session.sessionId,
+          taskID: $0.task.taskId
+        )
+      }
+    let contentCount = laneContentCount(
+      apiItems: apiItems,
+      inboxItems: inboxItems,
+      decisions: decisions(in: lane)
+    )
+    if isLaneCollapsed(lane, contentCount: contentCount) {
+      laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.expandedRawValue(
+        lane: lane,
+        rawValue: laneCollapsePreferencesRawValue
+      )
+    }
+    laneRevealCoordinatorValue.request(
+      cardID: cardID,
+      in: lane,
+      anchor: anchor,
+      priorDestinationCardIDs: priorDestinationCardIDs
+    )
+  }
+
   /// Lanes currently collapsed on this board, used to flag an umbrella's
   /// children that are technically loaded but not visible in any lane today.
   var collapsedLanesValue: Set<TaskBoardInboxLane> {

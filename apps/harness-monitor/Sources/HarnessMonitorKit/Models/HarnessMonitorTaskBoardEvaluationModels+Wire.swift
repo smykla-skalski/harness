@@ -28,6 +28,7 @@ extension TaskBoardWorkflowStatus {
     self =
       switch wire {
       case .idle: .idle
+      case .admitting: .running
       case .running: .running
       case .paused: .paused
       case .completed: .completed

@@ -1,29 +1,21 @@
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
+import SwiftUIIntrospect
 
-/// Pure routing decision for a drop delivery, extracted so the reject-reason mapping stays
-/// testable without a live view. The guard legs here are reachable only through config/delivery
-/// races (a normal forbidden-lane drop never delivers because `dropConfiguration` returns
-/// `.forbidden`), so this cannot spam feedback in the common case.
-enum TaskBoardCardDropGate: Equatable {
-  case proceed(TaskBoardCardDropPlan)
-  case reject(String)
-}
-
-func taskBoardCardDropGate(
-  payloads: [TaskBoardCardDragPayload],
-  lane: TaskBoardInboxLane,
-  isDropEnabled: Bool,
-  isDropCandidate: Bool
-) -> TaskBoardCardDropGate {
-  guard isDropEnabled else {
-    return .reject("Cannot move task: an action is already in progress")
+func taskBoardLaneIsDropTargeted(
+  for phase: DropSession.Phase,
+  isCandidate: Bool
+) -> Bool {
+  guard isCandidate else { return false }
+  return switch phase {
+  case .entering, .active:
+    true
+  case .exiting, .ended, .dataTransferCompleted:
+    false
+  @unknown default:
+    false
   }
-  guard isDropCandidate, let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane) else {
-    return .reject("Cannot move task: it can no longer move to this lane")
-  }
-  return .proceed(plan)
 }
 
 struct TaskBoardLaneUnifiedColumn: View {
@@ -31,36 +23,36 @@ struct TaskBoardLaneUnifiedColumn: View {
   let apiItems: [TaskBoardItem]
   let inboxItems: [TaskBoardInboxItem]
   let decisions: [Decision]
-  /// This lane's own slice only (from `TaskBoardOverviewPresentation.apiCardPresentations(in:)`),
-  /// so a data change in one lane does not invalidate every column's diffed props.
+  /// This lane's own slice only, so a data change in one lane does not
+  /// invalidate every column's diffed properties.
   let apiCardPresentations: [String: TaskBoardCardPresentation]
   let inboxCardPresentations: [TaskBoardCardID: TaskBoardCardPresentation]
   let titleTypography: TaskBoardCardTitleTypography
   let isCollapsed: Bool
-  let isDropEnabled: Bool
-  let isDropCandidate: Bool
-  /// The single `.api` card being dragged when its source lane is this one;
-  /// `nil` disables every per-card reorder drop target in this column so
-  /// cross-lane drops keep landing on the column-wide `.dropDestination`.
-  let reorderDraggedItem: TaskBoardCardDragItem?
+  let dragRuntime: TaskBoardCardDragRuntime
+  let dropHighlightState: TaskBoardLaneDropHighlightState
+  let nativeListCoordinator: TaskBoardNativeListCoordinator
+  let cardGapModel: TaskBoardCardGapModel
   let selectionModel: TaskBoardCardSelectionModel
+  let revealCoordinator: TaskBoardLaneRevealCoordinator
   let actions: TaskBoardOverviewActions
-  let liveInboxItems: TaskBoardLiveInboxItems
-  /// Seeds the quick-add field for a static render. `var` (not `let`): a `let`
-  /// with a default drops out of the memberwise init entirely.
+  let onDrop: ([TaskBoardCardDragPayload], Int) -> Bool
+  /// A variable with a default remains in the memberwise initializer, which
+  /// lets static renders seed the quick-add field.
   var quickAddDraftTitle = ""
   @Binding var collapseOverridesRawValue: String
   @Environment(\.fontScale)
   private var fontScale
-  @State private var isDropTargeted = false
-  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardCardDropSignature>()
-  @State private var perfScrollPosition = ScrollPosition()
+  @Environment(\.isEnabled)
+  private var isLaneEnabled
   @State private var hoverTracking = TaskBoardLaneHoverTracking()
   @State private var hoveredCardID: TaskBoardLaneCardHoverID?
-  @State private var reorderInsertionHint: TaskBoardCardReorderInsertionHint?
   private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActiveAtLaunch
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var cardGapState: TaskBoardLaneCardGapState {
+    cardGapModel.state(for: lane)
+  }
   private var cardHoverCoordinateSpace: String {
     "task-board-lane-card-hover-\(lane.rawValue)"
   }
@@ -73,51 +65,78 @@ struct TaskBoardLaneUnifiedColumn: View {
     apiItems.isEmpty && inboxItems.isEmpty && decisions.isEmpty
   }
 
-  private var reorderDraggedItemID: String? {
-    guard
-      case .api(let itemID, _, _) = reorderDraggedItem,
-      reorderDraggedItem?.sourceLane == lane
-    else {
-      return nil
-    }
-    return itemID
+  private var orderedCardIDs: [TaskBoardCardID] {
+    apiItems.map { .api($0.id) }
+      + inboxItems.map {
+        .inbox(sessionID: $0.session.sessionId, taskID: $0.task.taskId)
+      }
   }
 
-  private func isReorderDropEnabled(for itemID: String) -> Bool {
-    lane != .umbrella
-      && isDropEnabled
-      && reorderDraggedItemID != nil
-      && reorderDraggedItemID != itemID
+  private var actionableRevealRequest: TaskBoardLaneRevealRequest? {
+    revealCoordinator.actionableRequest(
+      in: lane,
+      orderedCardIDs: orderedCardIDs
+    )
   }
 
   var body: some View {
     laneContent
       .taskBoardLaneColumnChrome(
         lane: lane,
-        isCollapsed: isCollapsed,
-        isDropCandidate: isDropCandidate,
-        isDropTargeted: isDropTargeted
+        isCollapsed: isCollapsed
       )
-      .dropDestination(
-        for: TaskBoardCardDragPayload.self,
-        isEnabled: isDropEnabled,
-        action: handleDrop
-      )
-      .dropConfiguration(dropConfiguration)
-      .onDropSessionUpdated(updateDropSession)
+      .overlay {
+        TaskBoardLaneDropHighlight(
+          lane: lane,
+          state: dropHighlightState
+        )
+      }
+      .coordinateSpace(.named(cardHoverCoordinateSpace))
+      .contentShape(.rect)
+      .onDropSessionUpdated(handleLaneDropSession)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
+      .overlay {
+        AccessibilityTextMarker(
+          identifier: "harness.task-board.column.\(lane.rawValue).order",
+          text: apiItems.map(\.id).joined(separator: ",")
+        )
+      }
+      .onChange(of: apiItems.map(\.id), initial: true) { _, ids in
+        traceTaskBoardCardDrag(
+          "rendered-order lane=\(lane.rawValue) ids=\(ids.joined(separator: ","))"
+        )
+      }
+      .onAppear {
+        traceTaskBoardCardDrag(
+          "lane-state lane=\(lane.rawValue) enabled=\(isLaneEnabled) "
+            + "collapsed=\(isCollapsed) api=\(apiItems.count)"
+        )
+      }
   }
 
   @ViewBuilder private var laneContent: some View {
     if isCollapsed {
-      TaskBoardCollapsedLane(
-        lane: lane,
-        count: totalCount,
-        collapseOverridesRawValue: $collapseOverridesRawValue
-      )
+      collapsedLane
     } else {
       expandedLaneContent
+    }
+  }
+
+  @ViewBuilder private var collapsedLane: some View {
+    let content = TaskBoardCollapsedLane(
+      lane: lane,
+      count: totalCount,
+      collapseOverridesRawValue: $collapseOverridesRawValue
+    )
+    if lane == .umbrella {
+      content
+    } else {
+      content.taskBoardLaneFallbackDropDestination(
+        acceptsDrop: { dragRuntime.accepts(lane) },
+        insertionOffset: apiItems.count,
+        action: onDrop
+      )
     }
   }
 
@@ -130,20 +149,17 @@ struct TaskBoardLaneUnifiedColumn: View {
       )
 
       Group {
-        if isEmpty {
-          TaskBoardEmptyLane(lane: lane)
-            .padding(.horizontal, metrics.laneInnerPadding)
-            .padding(.top, metrics.laneHeaderBodyTopPadding)
-            .padding(.bottom, metrics.laneInnerPadding)
+        // The source and every candidate need a mounted List during the drag.
+        // Lifting a lane's only card must not detach its hit-test anchor.
+        if isEmpty && !cardGapState.keepsListVisible {
+          emptyLane
         } else {
           laneScrollSurface
         }
       }
-      .taskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted)
+      .taskBoardLaneBodyChrome(lane: lane)
 
-      // Pinned under the cards rather than scrolling with them: in a lane deep
-      // enough to scroll, an affordance that scrolls away is one you go looking
-      // for.
+      // Keep quick add pinned below the cards instead of letting it scroll away.
       if showsQuickAdd {
         TaskBoardLaneQuickAddRow(
           lane: lane,
@@ -155,160 +171,316 @@ struct TaskBoardLaneUnifiedColumn: View {
     }
   }
 
+  @ViewBuilder private var emptyLane: some View {
+    let content = TaskBoardEmptyLane(lane: lane)
+      .padding(.horizontal, metrics.laneInnerPadding)
+      .padding(.top, metrics.laneHeaderBodyTopPadding)
+      .padding(.bottom, metrics.laneInnerPadding)
+    if lane == .umbrella {
+      content
+    } else {
+      content.taskBoardLaneFallbackDropDestination(
+        acceptsDrop: { dragRuntime.accepts(lane) },
+        insertionOffset: 0,
+        action: onDrop
+      )
+    }
+  }
+
   private var showsQuickAdd: Bool {
     actions.canCreateItem && lane.acceptsQuickAddedTask
   }
 
   @ViewBuilder private var laneScrollSurface: some View {
+    let surface =
+      laneListDropSurface
+      .task(id: actionableRevealRequest) {
+        guard let request = actionableRevealRequest else { return }
+        await revealCard(request)
+      }
     if perfScrollHookEnabled {
-      ScrollView(.vertical, showsIndicators: true) {
-        laneScrollContent
-      }
-      .scrollPosition($perfScrollPosition)
-      .scrollBounceBehavior(.basedOnSize)
-      .onReceive(
-        NotificationCenter.default.publisher(
-          for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToBottom
-        )
-      ) { note in
-        handlePerfLaneScroll(note: note, edge: "bottom")
-      }
-      .onReceive(
-        NotificationCenter.default.publisher(
-          for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToTop
-        )
-      ) { note in
-        handlePerfLaneScroll(note: note, edge: "top")
-      }
+      surface
+        .onReceive(
+          NotificationCenter.default.publisher(
+            for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToBottom
+          )
+        ) { note in
+          handlePerfLaneScroll(note: note, edge: "bottom")
+        }
+        .onReceive(
+          NotificationCenter.default.publisher(
+            for: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToTop
+          )
+        ) { note in
+          handlePerfLaneScroll(note: note, edge: "top")
+        }
     } else {
-      ScrollView(.vertical, showsIndicators: true) {
-        laneScrollContent
-      }
+      surface
+    }
+  }
+
+  @ViewBuilder private var laneListDropSurface: some View {
+    if lane != .umbrella {
+      // The row destination does not cover the empty space below the last card.
+      // The lane fallback uses the custom gap's exact offset there.
+      styledLaneList.taskBoardLaneFallbackDropDestination(
+        acceptsDrop: { dragRuntime.accepts(lane) },
+        insertionOffset: cardGapState.insertionOffset ?? apiItems.count,
+        action: onDrop
+      )
+    } else {
+      styledLaneList
+    }
+  }
+
+  @ViewBuilder private var styledLaneList: some View {
+    if lane == .umbrella {
+      styleLaneList(
+        List {
+          listRowsContent
+        }
+      )
+    } else {
+      styleLaneList(
+        List {
+          droppableListRowsContent
+        }
+      )
+    }
+  }
+
+  private func styleLaneList<Content: View>(_ content: Content) -> some View {
+    content
+      .listStyle(.plain)
+      .scrollContentBackground(.hidden)
+      .environment(\.defaultMinListRowHeight, 1)
+      .contentMargins(
+        .top,
+        max(0, metrics.laneHeaderBodyTopPadding - metrics.laneSpacing / 2),
+        for: .scrollContent
+      )
+      .contentMargins(
+        .bottom,
+        max(0, metrics.laneInnerPadding - metrics.laneSpacing / 2),
+        for: .scrollContent
+      )
       .scrollBounceBehavior(.basedOnSize)
-    }
+      .introspect(.list, on: .macOS(.v26)) { tableView in
+        nativeListCoordinator.register(tableView, lane: lane)
+      }
+      .dropConfiguration { _ in
+        // Always resolve an accepting lane as a move. A copy leaves the source
+        // in place and makes AppKit fly the preview home.
+        dragRuntime.accepts(lane)
+          ? DropConfiguration(operation: .move)
+          : DropConfiguration(operation: .forbidden)
+      }
+      .onContinuousHover(coordinateSpace: .named(cardHoverCoordinateSpace)) { phase in
+        guard !dragRuntime.isActive else { return }
+        updateHoveredCard(phase: phase)
+      }
   }
 
-  private var laneScrollContent: some View {
-    laneRows
-      .padding(.horizontal, metrics.laneInnerPadding)
-      .padding(.top, metrics.laneHeaderBodyTopPadding)
-      .padding(.bottom, metrics.laneInnerPadding)
-      .frame(maxWidth: .infinity, alignment: .top)
+  private func handleLaneDropSession(_ session: DropSession) {
+    // The pointer-polled custom gap owns insertion. SwiftUI's drop-session
+    // callback only drives the lane highlight.
+    TaskBoardCardDragDiagnostics.recordDropSession(session, lane: lane.rawValue)
+    let targeted = taskBoardLaneIsDropTargeted(
+      for: session.phase,
+      isCandidate: dragRuntime.accepts(lane)
+    )
+    dragRuntime.setTargeted(targeted, lane: lane)
   }
 
-  private func handlePerfLaneScroll(note: Notification, edge: String) {
+  var laneListRows: [TaskBoardLaneListRow] {
+    decisions.map(TaskBoardLaneListRow.decision)
+      + apiItems.map(TaskBoardLaneListRow.api)
+      + inboxItems.map(TaskBoardLaneListRow.inbox)
+  }
+
+  /// Live-reorders one stable card ID so List sees a move, never a
+  /// remove-plus-insert that can cancel the native drag session.
+  private var displayAPIItems: [TaskBoardItem] {
     guard
-      let raw = note.userInfo?[HarnessMonitorPerfTaskBoardLaneScrollBus.laneRawKey] as? String,
-      raw == lane.rawValue
-    else { return }
-    withAnimation(.easeOut(duration: 0.5)) {
-      perfScrollPosition = ScrollPosition(edge: edge == "top" ? .top : .bottom)
+      cardGapState.isActive,
+      case .api(let draggedItemID)? = cardGapState.draggedCardID
+    else {
+      return apiItems
     }
-    HarnessMonitorPerfTaskBoardLaneScrollBus.recordAccepted(laneRaw: raw, edge: edge)
+    var items = apiItems
+    items.removeAll { $0.id == draggedItemID }
+    if let index = cardGapState.displayIndex, let dragged = cardGapState.draggedItem {
+      items.insert(dragged, at: min(max(index, 0), items.count))
+    }
+    return items
   }
 
-  @ViewBuilder private var laneRows: some View {
-    LazyVStack(spacing: metrics.laneSpacing) {
-      if !decisions.isEmpty {
-        decisionRows
-      }
-      ForEach(apiItems) { item in
-        let cardID = TaskBoardCardID.api(item.id)
-        let hoverID = TaskBoardLaneCardHoverID.api(item.id)
-        TaskBoardItemRow(
-          item: item,
-          titleTypography: titleTypography,
-          isHovered: hoveredCardID == hoverID,
-          isSelected: selectionModel.selectedIDs.contains(cardID),
-          selectionModel: selectionModel,
-          actions: actions,
-          cardPresentation: apiCardPresentations[item.id]
-        )
-        .taskBoardCardFrame(
-          id: hoverID,
-          in: cardHoverCoordinateSpace,
-          tracking: hoverTracking,
-          isHovered: hoveredCardID == hoverID,
-          onChange: resolveHoveredCard
-        )
-        .taskBoardCardReorderDropTarget(
-          TaskBoardCardReorderDropContext(
-            draggedItemID: reorderDraggedItemID,
-            lane: lane,
-            apiItems: apiItems,
-            hoveredItemID: item.id
-          ),
-          isEnabled: isReorderDropEnabled(for: item.id),
-          actions: actions,
-          insertionHint: $reorderInsertionHint
-        )
-        .taskBoardCardReorderInsertionOverlay(
-          hint: reorderInsertionHint,
-          itemID: item.id
-        )
-        .contextMenu {
-          TaskBoardCardContextMenu(cardID: cardID)
-        }
-      }
-      ForEach(inboxItems) { item in
-        let cardID = TaskBoardCardID.inbox(
-          sessionID: item.session.sessionId,
-          taskID: item.task.taskId
-        )
-        let hoverID = TaskBoardLaneCardHoverID.inbox(
-          sessionID: item.session.sessionId,
-          taskID: item.task.taskId
-        )
-        TaskBoardInboxItemRow(
-          item: item,
-          titleTypography: titleTypography,
-          isHovered: hoveredCardID == hoverID,
-          isSelected: selectionModel.selectedIDs.contains(cardID),
-          selectionModel: selectionModel,
-          actions: actions,
-          cardPresentation: inboxCardPresentations[cardID]
-        )
-        .taskBoardCardFrame(
-          id: hoverID,
-          in: cardHoverCoordinateSpace,
-          tracking: hoverTracking,
-          isHovered: hoveredCardID == hoverID,
-          onChange: resolveHoveredCard
-        )
-        .contextMenu {
-          TaskBoardCardContextMenu(cardID: cardID)
-        }
-      }
-    }
-    .frame(maxWidth: .infinity)
-    .coordinateSpace(.named(cardHoverCoordinateSpace))
-    .onContinuousHover(coordinateSpace: .named(cardHoverCoordinateSpace)) { phase in
-      updateHoveredCard(phase: phase)
+  private var displayLaneListRows: [TaskBoardLaneListRow] {
+    decisions.map(TaskBoardLaneListRow.decision)
+      + displayAPIItems.map(TaskBoardLaneListRow.api)
+      + inboxItems.map(TaskBoardLaneListRow.inbox)
+  }
+
+  private var listRowsContent: some DynamicViewContent {
+    ForEach(displayLaneListRows) { row in
+      taskBoardListRow(row)
     }
   }
 
-  @ViewBuilder private var decisionRows: some View {
-    VStack(spacing: metrics.laneSpacing) {
-      ForEach(decisions, id: \.id) { decision in
-        let cardID = TaskBoardLaneCardHoverID.decision(decision.id)
-        TaskBoardDecisionRow(
-          decision: decision,
-          fontScale: fontScale,
-          isHovered: hoveredCardID == cardID,
-          actions: actions
+  private var droppableListRowsContent: some DynamicViewContent {
+    listRowsContent
+      .dropDestination(for: TaskBoardCardDragPayload.self) { payloads, rowOffset in
+        // A single-card exact move lands where the placeholder showed.
+        // Multi-card and status drags fall back to the List's native row.
+        let insertionOffset = cardGapState.insertionOffset
+          ?? laneListRows.prefix(rowOffset).count(where: \.isAPI)
+        traceTaskBoardCardDrag(
+          "indexed-destination lane=\(lane.rawValue) "
+            + "offset=\(insertionOffset) row-offset=\(rowOffset) "
+            + "payloads=\(payloads.count)"
         )
-        .taskBoardCardFrame(
-          id: cardID,
-          in: cardHoverCoordinateSpace,
-          tracking: hoverTracking,
-          isHovered: hoveredCardID == cardID,
-          onChange: resolveHoveredCard
-        )
+        _ = onDrop(payloads, insertionOffset)
       }
+  }
+
+  // Every row keeps one stable root. A builder that swaps row shapes reaches
+  // SwiftUI's HeterogeneousViewIDs path and crashes the List bridge with index -2.
+  private func taskBoardListRow(_ row: TaskBoardLaneListRow) -> some View {
+    styleListRow(
+      ZStack {
+        if cardGapState.isActive, let dragged = cardGapState.draggedCardID, row.cardID == dragged {
+          taskBoardGapPlaceholder(cardID: dragged, showsMarker: cardGapState.showsMarker)
+        } else {
+          taskBoardListRowContent(row)
+        }
+      }
+    )
+  }
+
+  // The placeholder keeps its draggable identity so the drag container never
+  // observes a remove-without-insert. Only the exact target draws the slot.
+  private func taskBoardGapPlaceholder(
+    cardID: TaskBoardCardID,
+    showsMarker: Bool
+  ) -> some View {
+    Color.clear
+      // `styleListRow` adds the measured row's vertical insets back.
+      .frame(height: max(1, cardGapState.gapHeight - metrics.laneSpacing))
+      .overlay {
+        if showsMarker {
+          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+            .fill(HarnessMonitorTheme.accent.opacity(0.12))
+            .overlay {
+              RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+                .strokeBorder(
+                  HarnessMonitorTheme.accent.opacity(0.45),
+                  style: StrokeStyle(lineWidth: 1.5, dash: [5])
+                )
+            }
+        }
+      }
+      .draggable(containerItemID: cardID)
+  }
+
+  @ViewBuilder
+  private func taskBoardListRowContent(_ row: TaskBoardLaneListRow) -> some View {
+    switch row {
+    case .decision(let decision):
+      taskBoardDecisionRow(decision)
+    case .api(let item):
+      taskBoardAPIRow(item)
+    case .inbox(let item):
+      taskBoardInboxRow(item)
     }
+  }
+
+  private func taskBoardAPIRow(_ item: TaskBoardItem) -> some View {
+    let cardID = TaskBoardCardID.api(item.id)
+    let hoverID = TaskBoardLaneCardHoverID.api(item.id)
+    return TaskBoardItemRow(
+      item: item,
+      titleTypography: titleTypography,
+      isHovered: hoveredCardID == hoverID,
+      isSelected: selectionModel.selectedIDs.contains(cardID),
+      selectionModel: selectionModel,
+      actions: actions,
+      cardPresentation: apiCardPresentations[item.id]
+    )
+    .taskBoardCardFrame(
+      id: hoverID,
+      in: cardHoverCoordinateSpace,
+      tracking: hoverTracking,
+      isHovered: hoveredCardID == hoverID,
+      onChange: resolveHoveredCard
+    )
+    .background {
+      TaskBoardCardContextMenu(cardID: cardID)
+    }
+  }
+
+  private func taskBoardInboxRow(_ item: TaskBoardInboxItem) -> some View {
+    let cardID = TaskBoardCardID.inbox(
+      sessionID: item.session.sessionId,
+      taskID: item.task.taskId
+    )
+    let hoverID = TaskBoardLaneCardHoverID.inbox(
+      sessionID: item.session.sessionId,
+      taskID: item.task.taskId
+    )
+    return TaskBoardInboxItemRow(
+      item: item,
+      titleTypography: titleTypography,
+      isHovered: hoveredCardID == hoverID,
+      isSelected: selectionModel.selectedIDs.contains(cardID),
+      selectionModel: selectionModel,
+      actions: actions,
+      cardPresentation: inboxCardPresentations[cardID]
+    )
+    .taskBoardCardFrame(
+      id: hoverID,
+      in: cardHoverCoordinateSpace,
+      tracking: hoverTracking,
+      isHovered: hoveredCardID == hoverID,
+      onChange: resolveHoveredCard
+    )
+    .background {
+      TaskBoardCardContextMenu(cardID: cardID)
+    }
+  }
+
+  private func taskBoardDecisionRow(_ decision: Decision) -> some View {
+    let hoverID = TaskBoardLaneCardHoverID.decision(decision.id)
+    return TaskBoardDecisionRow(
+      decision: decision,
+      fontScale: fontScale,
+      isHovered: hoveredCardID == hoverID,
+      actions: actions
+    )
+    .taskBoardCardFrame(
+      id: hoverID,
+      in: cardHoverCoordinateSpace,
+      tracking: hoverTracking,
+      isHovered: hoveredCardID == hoverID,
+      onChange: resolveHoveredCard
+    )
+  }
+
+  private func styleListRow<Content: View>(_ content: Content) -> some View {
+    content
+      .listRowInsets(
+        EdgeInsets(
+          top: metrics.laneSpacing / 2,
+          leading: metrics.listRowHorizontalInset,
+          bottom: metrics.laneSpacing / 2,
+          trailing: metrics.listRowHorizontalInset
+        )
+      )
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
   }
 
   private func updateHoveredCard(phase: HoverPhase) {
+    TaskBoardCardDragDiagnostics.recordHoverPhase(lane: lane.rawValue)
     switch phase {
     case .active(let location):
       hoverTracking.location = location
@@ -319,10 +491,11 @@ struct TaskBoardLaneUnifiedColumn: View {
     }
   }
 
-  /// Re-picks the hovered card from the last pointer location. Called on pointer
-  /// move and whenever a card's frame settles or leaves, so the highlight tracks
-  /// content that scrolls under a stationary pointer.
+  /// Re-picks from the last pointer location when scrolling moves content
+  /// underneath a stationary pointer.
   private func resolveHoveredCard() {
+    TaskBoardCardDragDiagnostics.recordHoverResolution(lane: lane.rawValue)
+    guard !dragRuntime.isActive else { return }
     guard let location = hoverTracking.location else {
       updateHoveredCard(id: nil)
       return
@@ -334,65 +507,7 @@ struct TaskBoardLaneUnifiedColumn: View {
     guard hoveredCardID != id else {
       return
     }
+    TaskBoardCardDragDiagnostics.recordHoverMutation(lane: lane.rawValue)
     hoveredCardID = id
-  }
-
-  private func handleDrop(_ payloads: [TaskBoardCardDragPayload], session: DropSession) {
-    defer { updateDropTargeted(false) }
-    switch taskBoardCardDropGate(
-      payloads: payloads,
-      lane: lane,
-      isDropEnabled: isDropEnabled,
-      isDropCandidate: isDropCandidate
-    ) {
-    case .reject(let reason):
-      actions.reportDropRejection(reason)
-    case .proceed(let plan):
-      _ = performDrop(
-        signature: TaskBoardCardDropSignature(
-          cardIDs: plan.items.map(\.id),
-          destination: lane
-        )
-      ) {
-        actions.moveCardsOrReportRejection(
-          plan.items,
-          to: lane,
-          liveInboxItems: liveInboxItems
-        )
-      }
-    }
-  }
-
-  private func dropConfiguration(for session: DropSession) -> DropConfiguration {
-    let operation: DropOperation = isDropEnabled && isDropCandidate ? .move : .forbidden
-    return DropConfiguration(operation: operation)
-  }
-
-  private func updateDropSession(_ session: DropSession) {
-    switch session.phase {
-    case .entering:
-      dropDeduper.reset()
-      updateDropTargeted(isDropEnabled && isDropCandidate)
-    case .active:
-      updateDropTargeted(isDropEnabled && isDropCandidate)
-    case .exiting, .ended, .dataTransferCompleted:
-      updateDropTargeted(false)
-    @unknown default:
-      updateDropTargeted(false)
-    }
-  }
-
-  private func updateDropTargeted(_ targeted: Bool) {
-    isDropTargeted = targeted
-  }
-
-  private func performDrop(
-    signature: TaskBoardCardDropSignature,
-    action: () -> Bool
-  ) -> Bool {
-    var deduper = dropDeduper
-    let handled = deduper.perform(signature, move: action)
-    dropDeduper = deduper
-    return handled
   }
 }

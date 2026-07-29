@@ -1,12 +1,12 @@
 [package]
 name = "harness-infra"
-version = "54.0.0"
+version = "55.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-kernel = { path = "../harness-kernel", version = "54.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
 chrono = { version = "0.4.44", features = ["serde"] }
 fs2 = "0.4.3"
 reqwest = { version = "0.13.2", features = ["json"] }

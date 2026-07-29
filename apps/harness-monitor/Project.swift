@@ -20,6 +20,7 @@ private let generatedAppEntitlements: SettingValue =
     "$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements"
 private let isolatedAppEntitlementsPath: Path = "HarnessMonitorIsolated.entitlements"
 private let isolatedAppBundleId: String = IsolatedAppIdentity.bundleId
+private let uiTestsBundleId = "\(isolatedAppBundleId).ui-tests"
 
 private func staticFrameworkSettings(
     bundleId: String,
@@ -595,6 +596,7 @@ private let uiPreviewableTarget: Target = {
         .target(name: "HarnessMonitorIntents"),
         .target(name: "HarnessMonitorPolicyCanvas"),
         .external(name: "ColorSelector"),
+        .external(name: "SwiftUIIntrospect"),
         .sdk(name: "SwiftData", type: .framework),
         .sdk(name: "Vision", type: .framework)
     ]
@@ -1160,7 +1162,7 @@ private let uiTestsTarget: Target = .target(
     name: "HarnessMonitorUITests",
     destinations: macOSDestinations,
     product: .uiTests,
-    bundleId: "io.harnessmonitor.ui-tests",
+    bundleId: uiTestsBundleId,
     deploymentTargets: macOSDeploymentTargets,
     sources: [
         "Tests/HarnessMonitorUITestSupport/**/*.swift",
@@ -1175,7 +1177,7 @@ private let uiTestsTarget: Target = .target(
         "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
         "CODE_SIGNING_ALLOWED": "YES",
         "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.ui-tests",
+        "PRODUCT_BUNDLE_IDENTIFIER": .string(uiTestsBundleId),
         "TEST_TARGET_NAME": "HarnessMonitorUITestHost"
     ]),
     metadata: .metadata(tags: ["tag:feature:ui-testing", "tag:layer:test"])

@@ -27,6 +27,150 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(presentation.apiItems(in: .todo).map(\.id) == ["session-item"])
   }
 
+  @Test("Immediate drop projection settles lanes without rebuilding card presentation")
+  func immediateDropProjectionSettlesLanesWithoutCardRebuild() async throws {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let firstTodo = taskBoardItem(id: "todo-first", status: .todo)
+    let movedTodo = taskBoardItem(
+      id: "todo-moved",
+      status: .todo,
+      sourceProjectId: "registered-project"
+    )
+    let planning = taskBoardItem(id: "planning-anchor", status: .planning)
+    let project = TaskBoardProjectSummary(
+      projectId: "registered-project",
+      source: .manual,
+      slug: "project-1",
+      color: .amber,
+      shape: .hexagon,
+      itemCount: 1,
+      readyCount: 1
+    )
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [firstTodo, movedTodo, planning],
+        decisionItems: [],
+        scopeSessionID: nil,
+        taskBoardProjects: [project]
+      )
+    )
+    let movedToPlanning = taskBoardItem(
+      id: movedTodo.id,
+      status: .planning,
+      sourceProjectId: "registered-project"
+    )
+    let cachedPresentation = try #require(
+      presentation.apiCardPresentations(in: .todo)[movedTodo.id]
+    )
+    #expect(
+      cachedPresentation.projectMark
+        == TaskBoardProjectMarkStyle(color: .amber, shape: .hexagon)
+    )
+
+    let projected = presentation.replacingTaskBoardItemsForImmediatePosition(
+      [firstTodo, planning, movedToPlanning],
+      scopeSessionID: nil
+    )
+
+    #expect(projected.apiItems(in: .todo).map(\.id) == [firstTodo.id])
+    #expect(
+      projected.apiItems(in: .planning).map(\.id)
+        == [planning.id, movedTodo.id]
+    )
+    #expect(
+      projected.apiCardPresentations(in: .planning)[movedTodo.id]
+        == cachedPresentation
+    )
+    #expect(
+      projected.apiCardPresentations(in: .planning)[movedTodo.id]?.projectMark
+        == cachedPresentation.projectMark
+    )
+    #expect(
+      projected.orderedCardIDs
+        == [.api(firstTodo.id), .api(planning.id), .api(movedTodo.id)]
+    )
+  }
+
+  @Test("Immediate drop projection preserves active facet and search membership")
+  func immediateDropProjectionPreservesFacetAndSearchMembership() async {
+    var filters = TaskBoardFilterState()
+    filters.toggleTag("visible")
+    let moved = taskBoardItem(
+      id: "moved",
+      status: .todo,
+      title: "Needle moving",
+      tags: ["visible"]
+    )
+    let hiddenByFacet = taskBoardItem(
+      id: "hidden-by-facet",
+      status: .todo,
+      title: "Needle hidden by facet",
+      tags: ["hidden"]
+    )
+    let hiddenBySearch = taskBoardItem(
+      id: "hidden-by-search",
+      status: .todo,
+      title: "Different title",
+      tags: ["visible"]
+    )
+    let presentation = await TaskBoardOverviewPresentationWorker().compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [moved, hiddenByFacet, hiddenBySearch],
+        decisionItems: [],
+        scopeSessionID: nil,
+        taskBoardProjects: [],
+        filters: filters,
+        searchText: "needle"
+      )
+    )
+    let movedToPlanning = taskBoardItem(
+      id: moved.id,
+      status: .planning,
+      title: moved.title,
+      tags: moved.tags
+    )
+
+    let projected = presentation.replacingTaskBoardItemsForImmediatePosition(
+      [hiddenByFacet, hiddenBySearch, movedToPlanning],
+      scopeSessionID: nil
+    )
+
+    #expect(projected.taskBoardItems.map(\.id) == [moved.id])
+    #expect(projected.apiItems(in: .todo).isEmpty)
+    #expect(projected.apiItems(in: .planning).map(\.id) == [moved.id])
+    #expect(projected.taskBoardItemsByID[hiddenByFacet.id] == nil)
+    #expect(projected.taskBoardItemsByID[hiddenBySearch.id] == nil)
+    #expect(projected.orderedCardIDs == [.api(moved.id)])
+  }
+
+  @Test("Immediate drop projection preserves same-lane order and session scope")
+  func immediateDropProjectionPreservesSameLaneOrderAndScope() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let first = taskBoardItem(id: "first", status: .todo, sessionId: "selected")
+    let moved = taskBoardItem(id: "moved", status: .todo, sessionId: "selected")
+    let otherSession = taskBoardItem(id: "other", status: .todo, sessionId: "other")
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: TaskBoardInboxSnapshot(),
+        taskBoardItems: [first, moved, otherSession],
+        decisionItems: [],
+        scopeSessionID: "selected",
+        taskBoardProjects: []
+      )
+    )
+
+    let projected = presentation.replacingTaskBoardItemsForImmediatePosition(
+      [moved, otherSession, first],
+      scopeSessionID: "selected"
+    )
+
+    #expect(projected.apiItems(in: .todo).map(\.id) == [moved.id, first.id])
+    #expect(projected.taskBoardItemsByID[otherSession.id] == nil)
+    #expect(projected.orderedCardIDs == [.api(moved.id), .api(first.id)])
+  }
+
   @Test("Umbrella items group under the umbrella lane regardless of status, even once done")
   func umbrellaItemsGroupUnderUmbrellaLaneRegardlessOfStatus() async {
     let worker = TaskBoardOverviewPresentationWorker()
@@ -356,6 +500,25 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(
       abs(
         large.headerBottomPadding + large.laneHeaderBodyTopPadding - large.laneInnerPadding
+      ) < 0.001
+    )
+  }
+
+  @Test("Lane List row inset accounts for the native macOS section margin")
+  func laneListRowInsetAlignsCardsWithHeader() {
+    let regular = TaskBoardLaneMetrics(fontScale: 1)
+    let large = TaskBoardLaneMetrics(fontScale: 1.8)
+
+    #expect(
+      abs(
+        regular.listRowHorizontalInset + HarnessMonitorTheme.spacingSM
+          - regular.laneInnerPadding
+      ) < 0.001
+    )
+    #expect(
+      abs(
+        large.listRowHorizontalInset + HarnessMonitorTheme.spacingSM
+          - large.laneInnerPadding
       ) < 0.001
     )
   }

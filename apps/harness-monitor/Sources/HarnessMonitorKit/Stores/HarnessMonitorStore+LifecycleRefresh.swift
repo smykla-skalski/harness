@@ -25,6 +25,7 @@ extension HarnessMonitorStore {
     let taskBoardOrchestratorStatus: TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>
     let taskBoardProjects: TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>
     let stepModeConfirmationRevision: UInt64
+    let positionMutationGeneration: UInt64
   }
 
   private enum RefreshSnapshotPiece: Sendable {
@@ -211,9 +212,12 @@ extension HarnessMonitorStore {
     let adoptsLocalManifest = !usesRemoteDaemon
     let stepModeConfirmationRevision =
       taskBoardRuntimeState.stepModeMutation.confirmationRevision
+    let positionMutationGeneration =
+      taskBoardRuntimeState.positionMutation.generation
     let refreshSnapshot = try await Self.loadRefreshSnapshot(
       using: client,
-      stepModeConfirmationRevision: stepModeConfirmationRevision
+      stepModeConfirmationRevision: stepModeConfirmationRevision,
+      positionMutationGeneration: positionMutationGeneration
     )
     await applyRefreshSnapshot(
       refreshSnapshot,
@@ -235,9 +239,12 @@ extension HarnessMonitorStore {
     let adoptsLocalManifest = !usesRemoteDaemon
     let stepModeConfirmationRevision =
       taskBoardRuntimeState.stepModeMutation.confirmationRevision
+    let positionMutationGeneration =
+      taskBoardRuntimeState.positionMutation.generation
     let refreshSnapshot = try await Self.loadRefreshSnapshot(
       using: client,
-      stepModeConfirmationRevision: stepModeConfirmationRevision
+      stepModeConfirmationRevision: stepModeConfirmationRevision,
+      positionMutationGeneration: positionMutationGeneration
     )
     await applyRefreshSnapshot(
       refreshSnapshot,
@@ -254,7 +261,8 @@ extension HarnessMonitorStore {
 
   nonisolated private static func loadRefreshSnapshot(
     using client: any HarnessMonitorClientProtocol,
-    stepModeConfirmationRevision: UInt64
+    stepModeConfirmationRevision: UInt64,
+    positionMutationGeneration: UInt64
   ) async throws -> RefreshSnapshot {
     try await withThrowingTaskGroup(
       of: RefreshSnapshotPiece.self,
@@ -351,7 +359,8 @@ extension HarnessMonitorStore {
         taskBoardItems: taskBoardItems,
         taskBoardOrchestratorStatus: taskBoardOrchestratorStatus,
         taskBoardProjects: taskBoardProjects,
-        stepModeConfirmationRevision: stepModeConfirmationRevision
+        stepModeConfirmationRevision: stepModeConfirmationRevision,
+        positionMutationGeneration: positionMutationGeneration
       )
     }
   }
@@ -400,6 +409,7 @@ struct TaskBoardConfirmationTick {
   var resolvedItems: [TaskBoardItem]
   var resolvedStatus: TaskBoardOrchestratorStatus?
   var automationSnapshot: TaskBoardAutomationSnapshot?
+  var positionMutationGeneration: UInt64
   var shouldApply: Bool
   var shouldKeepWaiting: Bool
 }

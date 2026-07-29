@@ -1,6 +1,35 @@
 import Foundation
 import HarnessMonitorKit
 
+struct TaskBoardCardContextMenuEdgeMoveContext {
+  let item: TaskBoardItem
+  let lane: TaskBoardInboxLane
+  let orderedItemIDs: [String]
+
+  static func resolve(
+    cardID: TaskBoardCardID,
+    canonicalItems: [TaskBoardItem]
+  ) -> Self? {
+    guard case .api(let itemID) = cardID else { return nil }
+    guard
+      let item = canonicalItems.first(where: { $0.id == itemID }),
+      item.kind != .umbrella,
+      let lane = TaskBoardInboxLane(taskBoardItem: item)
+    else {
+      return nil
+    }
+    return Self(
+      item: item,
+      lane: lane,
+      orderedItemIDs: canonicalItems.compactMap { candidate in
+        TaskBoardInboxLane(taskBoardItem: candidate) == lane
+          ? candidate.id
+          : nil
+      }
+    )
+  }
+}
+
 extension TaskBoardOverviewView {
   var taskBoardCardContextMenuActions: TaskBoardCardContextMenuActions {
     let deleteTargetsAction: (([TaskBoardDeletionTarget]) -> Void)? =
@@ -21,12 +50,77 @@ extension TaskBoardOverviewView {
       },
       canMove: canMoveCardContextMenuSelection,
       move: moveCardContextMenuSelection,
+      canMoveToEdge: canMoveCardContextMenuItemToEdge,
+      moveToEdge: moveCardContextMenuItemToEdge,
       canResetPosition: canResetCardPosition,
       resetPosition: resetCardPosition,
       deletionTargets: deletionTargets,
       canDelete: canDeleteTaskBoardCards,
       deleteTargets: deleteTargetsAction,
       primeSelection: primeCardSelectionForContextMenu
+    )
+  }
+
+  private func canMoveCardContextMenuItemToEdge(
+    _ cardID: TaskBoardCardID,
+    edge: TaskBoardCardContextMenuEdge
+  ) -> Bool {
+    guard
+      !isActionInFlight,
+      actions.canMoveTaskBoardItems,
+      let context = cardContextMenuEdgeMoveContext(cardID)
+    else {
+      return false
+    }
+    return !edge.isCurrentEdge(
+      itemID: context.item.id,
+      orderedItemIDs: context.orderedItemIDs
+    )
+  }
+
+  private func moveCardContextMenuItemToEdge(
+    _ cardID: TaskBoardCardID,
+    edge: TaskBoardCardContextMenuEdge
+  ) {
+    guard
+      canMoveCardContextMenuItemToEdge(cardID, edge: edge),
+      let context = cardContextMenuEdgeMoveContext(cardID)
+    else {
+      return
+    }
+    let placement: TaskBoardLanePlacement
+    let revealAnchor: TaskBoardLaneRevealAnchor
+    switch edge {
+    case .top:
+      placement = .first
+      revealAnchor = .top
+    case .bottom:
+      placement = .last
+      revealAnchor = .bottom
+    }
+    let moved = actions.reorderTaskBoardItem(
+      TaskBoardCardReorderPlan(
+        itemID: context.item.id,
+        sourceStatus: context.item.status,
+        destinationStatus: context.item.status,
+        placement: placement
+      )
+    )
+    guard moved else { return }
+    requestLaneReveal(
+      cardID: cardID,
+      in: context.lane,
+      anchor: revealAnchor
+    )
+    applyImmediateTaskBoardPositionProjection()
+  }
+
+  private func cardContextMenuEdgeMoveContext(
+    _ cardID: TaskBoardCardID
+  ) -> TaskBoardCardContextMenuEdgeMoveContext? {
+    TaskBoardCardContextMenuEdgeMoveContext.resolve(
+      cardID: cardID,
+      canonicalItems: allKnownTaskBoardItems
     )
   }
 
@@ -52,17 +146,21 @@ extension TaskBoardOverviewView {
   }
 
   private func moveCardContextMenuSelection(
+    _ primaryID: TaskBoardCardID,
     _ cardIDs: [TaskBoardCardID],
     to lane: TaskBoardInboxLane
   ) {
     guard let plan = cardContextMenuMovePlan(cardIDs, to: lane) else {
       return
     }
-    actions.moveCardsOrReportRejection(
+    let moved = actions.moveCardsOrReportRejection(
       plan.items,
       to: lane,
       liveInboxItems: liveInboxItemsValue
     )
+    if moved {
+      requestLaneReveal(cardID: primaryID, in: lane, anchor: .minimal)
+    }
   }
 
   private func canResetCardPosition(_ cardID: TaskBoardCardID) -> Bool {

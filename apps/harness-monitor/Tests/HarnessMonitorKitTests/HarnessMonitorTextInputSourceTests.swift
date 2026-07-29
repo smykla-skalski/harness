@@ -3,14 +3,18 @@ import Testing
 
 @Suite("Harness Monitor text input sources")
 struct HarnessMonitorTextInputSourceTests {
-  @Test("Previewable target does not depend on SwiftUI Introspect")
-  func previewableTargetDoesNotDependOnSwiftUIIntrospect() throws {
+  @Test("SwiftUI Introspect stays scoped to the task board List")
+  func swiftUIIntrospectStaysScopedToTaskBoardList() throws {
     let packageSource = try repoFile(at: "apps/harness-monitor/Tuist/Package.swift")
     let projectSource = try repoFile(at: "apps/harness-monitor/Project.swift")
+    let laneSource = try previewableSourceFile(
+      at: "Views/TaskBoard/TaskBoardLaneUnifiedColumn.swift")
 
-    #expect(!packageSource.contains("https://github.com/siteline/swiftui-introspect"))
-    #expect(!packageSource.contains("\"SwiftUIIntrospect\": .framework"))
-    #expect(!projectSource.contains(".external(name: \"SwiftUIIntrospect\")"))
+    #expect(packageSource.contains("https://github.com/siteline/swiftui-introspect"))
+    #expect(packageSource.contains("exact: \"26.0.1\""))
+    #expect(projectSource.contains(".external(name: \"SwiftUIIntrospect\")"))
+    #expect(laneSource.contains("import SwiftUIIntrospect"))
+    #expect(laneSource.contains(".introspect(.list, on: .macOS(.v26))"))
   }
 
   @Test("Shared text input helpers keep multiline ownership without Introspect")

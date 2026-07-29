@@ -63,10 +63,12 @@ extension RecordingHarnessClient {
         expectedItemRevision: request.expectedItemRevision,
         expectedItemsChangeSeq: request.expectedItemsChangeSeq
       )
-      let laneCount = taskBoardItemsStorage.count { item in
-        item.status.canonicalPersistedStatus == request.status && item.deletedAt == nil
+      let destinationCount = taskBoardItemsStorage.count { item in
+        item.id != id
+          && item.status.canonicalPersistedStatus == request.status
+          && item.deletedAt == nil
       }
-      guard Int(request.lanePosition) < laneCount else {
+      guard Int(request.lanePosition) <= destinationCount else {
         throw HarnessMonitorAPIError.semanticServer(
           code: 409,
           semanticCode: "TASK_BOARD_LANE_CAPACITY",
@@ -149,6 +151,10 @@ extension RecordingHarnessClient {
   }
 
   private func replaceInMaterializedLane(_ item: TaskBoardItem, at target: Int) {
+    guard let itemIndex = taskBoardItemsStorage.firstIndex(where: { $0.id == item.id }) else {
+      return
+    }
+    taskBoardItemsStorage[itemIndex] = item
     let liveLaneIndices = taskBoardItemsStorage.indices.filter { index in
       let entry = taskBoardItemsStorage[index]
       return entry.status.canonicalPersistedStatus == item.status && entry.deletedAt == nil
@@ -204,6 +210,8 @@ extension TaskBoardItem {
       priority: priority,
       tags: tags,
       projectId: projectId,
+      sourceProjectId: sourceProjectId,
+      executionRepository: executionRepository,
       targetProjectTypes: targetProjectTypes,
       agentMode: agentMode,
       kind: kind,

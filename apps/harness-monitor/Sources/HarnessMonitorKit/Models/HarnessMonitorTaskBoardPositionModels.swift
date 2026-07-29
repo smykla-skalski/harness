@@ -53,15 +53,34 @@ public struct TaskBoardRelativeLanePlacement: Equatable, Sendable {
   }
 
   public func resolvePosition(itemID: String, orderedItemIDs: [String]) -> UInt32? {
-    guard
-      let itemIndex = orderedItemIDs.firstIndex(of: itemID),
-      let anchorIndex = orderedItemIDs.firstIndex(of: anchorItemID)
-    else {
-      return nil
+    TaskBoardLanePlacement.relative(self).resolvePosition(
+      itemID: itemID,
+      orderedItemIDs: orderedItemIDs
+    )
+  }
+}
+
+public enum TaskBoardLanePlacement: Equatable, Sendable {
+  case first
+  case last
+  case relative(TaskBoardRelativeLanePlacement)
+
+  public func resolvePosition(itemID: String, orderedItemIDs: [String]) -> UInt32? {
+    let currentIndex = orderedItemIDs.firstIndex(of: itemID)
+    let remainingItemIDs = orderedItemIDs.filter { $0 != itemID }
+    let target: Int
+    switch self {
+    case .first:
+      target = 0
+    case .last:
+      target = remainingItemIDs.count
+    case .relative(let placement):
+      guard let anchorIndex = remainingItemIDs.firstIndex(of: placement.anchorItemID) else {
+        return nil
+      }
+      target = placement.edge == .after ? anchorIndex + 1 : anchorIndex
     }
-    let rawTarget = edge == .after ? anchorIndex + 1 : anchorIndex
-    let target = itemIndex < rawTarget ? rawTarget - 1 : rawTarget
-    guard target != itemIndex else {
+    guard currentIndex != target else {
       return nil
     }
     return UInt32(exactly: target)

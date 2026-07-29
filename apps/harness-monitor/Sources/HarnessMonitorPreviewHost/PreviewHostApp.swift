@@ -7,6 +7,12 @@ import SwiftUI
 struct PreviewHostApp: App {
   init() {
     if let dumpDirectory = ProcessInfo.processInfo.environment[
+      "HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP"
+    ] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      exit(TaskBoardLaneAlignmentPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
+    }
+    if let dumpDirectory = ProcessInfo.processInfo.environment[
       "HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP"
     ] {
       NSApplication.shared.setActivationPolicy(.prohibited)
