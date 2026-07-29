@@ -16,6 +16,13 @@ use super::{
 };
 use crate::acp::client::{ClientCallCancel, ClientError, ClientResult, REQUEST_CANCELLED};
 
+/// Bound on how long exit finalization waits for the PTY reader to observe
+/// EOF before reporting a terminal's exit status. A terminal descendant that
+/// keeps the PTY slave open past the direct child's exit would otherwise wedge
+/// this wait forever, so this is a safety net, not the expected latency: the
+/// reader normally closes as soon as the exiting process's fds do.
+const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(50);
+
 pub(super) fn spawn_exit_monitor(
     child: SharedTerminalChild,
     signal: Arc<TerminalWaitSignal>,
@@ -33,6 +40,11 @@ pub(super) fn spawn_exit_monitor(
 
             match wait_result {
                 Ok(Some(status)) => {
+                    // Drain before publishing the exit status: the reader runs on
+                    // its own thread, so without this a `terminal/wait_for_exit`
+                    // caller can race it and see truncated `terminal/output` even
+                    // though the process already reported its exit code.
+                    wait_for_output_drain(&signal, OUTPUT_DRAIN_TIMEOUT);
                     signal.finish_exit(terminal_exit_status(&status));
                     return;
                 }
@@ -205,7 +217,7 @@ fn block_on_child_exit(state: &TerminalState) {
 }
 
 fn finish_terminal(state: &mut TerminalState) {
-    wait_for_output_drain(&state.signal, Duration::from_millis(50));
+    wait_for_output_drain(&state.signal, OUTPUT_DRAIN_TIMEOUT);
     close_reader(state);
 }
 
