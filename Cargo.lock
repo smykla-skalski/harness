@@ -3719,6 +3719,7 @@ dependencies = [
  "harness-session",
  "harness-systemd-protocol",
  "harness-task-board",
+ "harness-task-board-codex-requests",
  "harness-task-board-provider-sync",
  "harness-telemetry",
  "harness-testkit",
@@ -4243,6 +4244,16 @@ dependencies = [
  "tracing",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "harness-task-board-codex-requests"
+version = "55.0.0"
+dependencies = [
+ "harness-kernel",
+ "harness-protocol",
+ "harness-task-board",
+ "serde_json",
 ]
 
 [[package]]

@@ -46,6 +46,7 @@ harness-reviews = { path = "../harness-reviews", version = "55.0.0" }
 harness-session = { path = "../harness-session", version = "55.0.0" }
 harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "55.0.0", optional = true }
 harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
+harness-task-board-codex-requests = { path = "../harness-task-board-codex-requests", version = "55.0.0" }
 harness-task-board-provider-sync = { path = "../harness-task-board-provider-sync", version = "55.0.0" }
 harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
 hex = "0.4.3"

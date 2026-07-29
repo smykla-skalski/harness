@@ -105,7 +105,7 @@ fn review_report(
     let Some(pull_request) = execution.transition.pull_request.as_ref() else {
         return Ok(None);
     };
-    let profile = crate::daemon::task_board_codex_requests::attempt_profile(execution, attempt)?;
+    let profile = harness_task_board_codex_requests::attempt_profile(execution, attempt)?;
     let requested_model = profile
         .model
         .clone()
