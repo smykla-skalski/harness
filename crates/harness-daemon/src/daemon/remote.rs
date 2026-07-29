@@ -287,6 +287,7 @@ const READ_WS_METHODS: &[&str] = &[
     ws_methods::TASK_BOARD_CAPABILITIES,
     ws_methods::TASK_BOARD_LIST,
     ws_methods::TASK_BOARD_GET,
+    ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
     ws_methods::TASK_BOARD_POSITION_GET,
     ws_methods::TASK_BOARD_TRIAGE_GET,
     ws_methods::TASK_BOARD_TRIAGE_HISTORY,

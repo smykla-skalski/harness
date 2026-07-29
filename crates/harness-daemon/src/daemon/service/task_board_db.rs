@@ -37,6 +37,7 @@ mod provider_sync_exclusion;
 mod provider_sync_execution;
 mod provider_sync_store;
 mod request_validation;
+mod review_report;
 mod reviews_sync;
 mod sync_audit;
 mod sync_run_context;
@@ -50,6 +51,7 @@ pub(crate) use positions::{
     set_task_board_item_position_db,
 };
 use request_validation::{validate_create_title, validate_estimate, validate_update_estimates};
+pub(crate) use review_report::get_task_board_ai_review_report_db;
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;

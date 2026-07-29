@@ -12,6 +12,7 @@ pub(super) mod policy_io;
 pub(super) mod policy_pipeline;
 pub(super) mod policy_spawn_gate;
 pub(super) mod positions;
+pub(super) mod review_report;
 pub(super) mod triage;
 pub(super) mod triage_escalation;
 pub(super) mod triage_rules;
@@ -58,6 +59,7 @@ fn task_board_item_routes() -> OpenApiRouter<DaemonHttpState> {
             items::put_task_board_item,
             items::delete_task_board_item
         ))
+        .routes(routes!(review_report::get_task_board_item_review_report))
 }
 
 fn task_board_position_routes() -> OpenApiRouter<DaemonHttpState> {

@@ -15,7 +15,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_list};
 use crate::daemon::service;
-use crate::task_board::TaskBoardItem;
+use crate::task_board::{TaskBoardAiReviewReportResponse, TaskBoardItem};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonHttpState, require_async_db};
@@ -68,6 +68,17 @@ pub(crate) async fn get_item(
     request: &TaskBoardGetItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     service::get_task_board_item_db(require_async_db(state, "task board get")?, request).await
+}
+
+pub(crate) async fn get_item_ai_review_report(
+    state: &DaemonHttpState,
+    request: &TaskBoardGetItemRequest,
+) -> Result<TaskBoardAiReviewReportResponse, CliError> {
+    service::get_task_board_ai_review_report_db(
+        require_async_db(state, "task board AI review report get")?,
+        request,
+    )
+    .await
 }
 
 pub(crate) async fn get_item_position_snapshot(

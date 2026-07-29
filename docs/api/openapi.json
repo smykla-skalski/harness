@@ -11521,6 +11521,67 @@
         "x-websocket-method": "task_board.position_reset"
       }
     },
+    "/v1/task-board/items/{item_id}/review-report": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "description": "Return the current AI review state for one task-board item. An active execution takes precedence over older terminal reports",
+        "operationId": "get_task_board_item_review_report",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "Task-board item identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Not-started, running, completed, failed, or cancelled AI review state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardAiReviewReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed or missing task-board item identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.review_report_get"
+      }
+    },
     "/v1/task-board/items/{item_id}/triage": {
       "get": {
         "tags": [
@@ -28571,6 +28632,213 @@
             ]
           }
         }
+      },
+      "TaskBoardAiReviewReportRecord": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "item_id",
+          "correlation_id",
+          "repository",
+          "pull_request_number",
+          "head_revision",
+          "runtime",
+          "requested_model",
+          "status",
+          "started_at",
+          "finished_at"
+        ],
+        "properties": {
+          "correlation_id": {
+            "type": "string"
+          },
+          "effective_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardReportOnlyReviewFinding"
+            }
+          },
+          "finished_at": {
+            "type": "string"
+          },
+          "head_revision": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "partial_output": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pull_request_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "report_id": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "requested_model": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskBoardAiReviewReportStatus"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "terminal_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardAiReviewReportResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "No review execution or retained terminal report exists for the item.",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_started"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The current review execution has not reached a terminal state.",
+            "required": [
+              "execution_id",
+              "runtime",
+              "started_at",
+              "status"
+            ],
+            "properties": {
+              "execution_id": {
+                "type": "string"
+              },
+              "head_revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "runtime": {
+                "type": "string"
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "running"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The latest review completed and the full immutable report is available.",
+            "required": [
+              "report",
+              "status"
+            ],
+            "properties": {
+              "report": {
+                "$ref": "#/components/schemas/TaskBoardAiReviewReportRecord"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The latest review failed after retaining all available output.",
+            "required": [
+              "report",
+              "status"
+            ],
+            "properties": {
+              "report": {
+                "$ref": "#/components/schemas/TaskBoardAiReviewReportRecord"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The latest review was cancelled after retaining all available output.",
+            "required": [
+              "report",
+              "status"
+            ],
+            "properties": {
+              "report": {
+                "$ref": "#/components/schemas/TaskBoardAiReviewReportRecord"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "cancelled"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "TaskBoardAiReviewReportStatus": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "failed",
+          "cancelled"
+        ]
       },
       "TaskBoardAttemptResultArtifact": {
         "oneOf": [

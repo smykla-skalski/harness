@@ -15,6 +15,9 @@ use super::remote_viewer_task_board_paging::{
     assert_viewer_pages_cover_the_selection_once, assert_viewer_pages_stay_projected,
     seed_paged_items,
 };
+use super::remote_viewer_task_board_review_report::{
+    assert_http_review_report, seed_review_report,
+};
 use super::remote_viewer_task_board_triage::{
     TRIAGE_ITEM_ID, assert_full_triage_current, assert_viewer_triage_current,
     assert_viewer_triage_history, assert_viewer_triage_override_mutations_are_denied,
@@ -43,6 +46,7 @@ async fn run_remote_viewer_projection_flow() {
     register_remote_client(&state, VIEWER_ID, RemoteRole::Viewer);
     register_remote_client(&state, OPERATOR_ID, RemoteRole::Operator);
     seed_sensitive_item(&state).await;
+    seed_review_report(&state, ITEM_ID).await;
     Box::pin(seed_triage_item(&state)).await;
     seed_paged_items(&state).await;
 
@@ -83,6 +87,7 @@ async fn assert_http_viewer_reads_and_write_denials(client: &reqwest::Client, ba
     )
     .await;
     assert_viewer_position_snapshot(&viewer_position);
+    assert_http_review_report(client, base_url, ITEM_ID, VIEWER_ID, true).await;
 
     let viewer_triage_current = get_http_json(
         client,
@@ -165,6 +170,7 @@ async fn assert_http_operator_reads(client: &reqwest::Client, base_url: &str) {
     let operator_list =
         get_http_json(client, base_url, http_paths::TASK_BOARD_ITEMS, OPERATOR_ID).await;
     assert_full_item(list_item_by_id(&operator_list, ITEM_ID));
+    assert_http_review_report(client, base_url, ITEM_ID, OPERATOR_ID, false).await;
 
     let operator_triage_current = get_http_json(
         client,

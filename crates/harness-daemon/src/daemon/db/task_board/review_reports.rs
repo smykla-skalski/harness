@@ -79,6 +79,31 @@ impl AsyncDaemonDb {
             .map(AiReviewReportRow::into_record)
             .collect()
     }
+
+    pub(crate) async fn task_board_latest_ai_review_report(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
+        query_as::<_, AiReviewReportRow>(
+            "SELECT report_id, item_id, correlation_id, repository, pull_request_number,
+                    head_revision, runtime, requested_model, effective_model, status, summary,
+                    findings_json, partial_output, terminal_reason, started_at, finished_at
+             FROM task_board_ai_review_reports
+             WHERE item_id = ?1
+             ORDER BY finished_at_unix_millis DESC, report_id DESC
+             LIMIT 1",
+        )
+        .bind(item_id)
+        .fetch_optional(self.pool())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "load latest AI review report for '{item_id}': {error}"
+            ))
+        })?
+        .map(AiReviewReportRow::into_record)
+        .transpose()
+    }
 }
 
 async fn load_by_id(
@@ -229,6 +254,13 @@ mod tests {
             .await
             .expect("append failed report");
 
+        assert_eq!(
+            reopened
+                .task_board_latest_ai_review_report("ticket-899")
+                .await
+                .expect("latest report"),
+            Some(failed.clone())
+        );
         assert_eq!(
             reopened
                 .task_board_ai_review_reports("ticket-899")
