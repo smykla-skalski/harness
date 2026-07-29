@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::future::Future;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -331,13 +330,11 @@ impl Listener for TlsListener {
     type Io = TlsStream<TcpStream>;
     type Addr = SocketAddr;
 
-    fn accept(&mut self) -> impl Future<Output = (Self::Io, Self::Addr)> + Send {
-        async move {
-            loop {
-                let (stream, address) = self.listener.accept().await.expect("accept executor TCP");
-                if let Ok(stream) = self.acceptor.accept(stream).await {
-                    return (stream, address);
-                }
+    async fn accept(&mut self) -> (Self::Io, Self::Addr) {
+        loop {
+            let (stream, address) = self.listener.accept().await.expect("accept executor TCP");
+            if let Ok(stream) = self.acceptor.accept(stream).await {
+                return (stream, address);
             }
         }
     }

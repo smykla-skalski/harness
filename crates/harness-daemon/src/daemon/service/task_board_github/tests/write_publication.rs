@@ -26,7 +26,7 @@ const HOST_ID: &str = "task-board-write-workflow";
 async fn pr_fix_policy_deny_prevents_real_git_push() {
     let fixture = PublicationFixture::new();
     let client = fixture.client(false);
-    let item = fixture.item("portfolio-project", fixture.repo.as_path());
+    let item = PublicationFixture::item("portfolio-project", fixture.repo.as_path());
     let policy = deny_push_policy();
     let error = publish_pr_fix_branch(PrFixBranchRequest {
         client: &client,
@@ -54,7 +54,7 @@ async fn pr_fix_requires_create_branch_immediately_before_push() {
     let mut fixture = PublicationFixture::new();
     fixture.config.enabled_automations.enabled = vec![GitHubAutomation::OpenPullRequest];
     let client = fixture.client(false);
-    let item = fixture.item("portfolio-project", fixture.repo.as_path());
+    let item = PublicationFixture::item("portfolio-project", fixture.repo.as_path());
 
     let error = publish_pr_fix_branch(PrFixBranchRequest {
         client: &client,
@@ -82,7 +82,7 @@ async fn parent_interleaving_with_the_same_tree_is_rejected() {
         .parent_interleaving
         .lock()
         .expect("parent interleaving") = Some(interloper);
-    let item = fixture.item("portfolio-project", fixture.repo.as_path());
+    let item = PublicationFixture::item("portfolio-project", fixture.repo.as_path());
 
     let error = publish_pr_fix_branch(PrFixBranchRequest {
         client: &client,
@@ -104,7 +104,7 @@ async fn parent_interleaving_with_the_same_tree_is_rejected() {
 #[tokio::test]
 async fn default_publication_rejects_same_tree_parent_drift_before_noop() {
     let fixture = PublicationFixture::new();
-    let stored = fixture.item("portfolio-project", fixture.repo.as_path());
+    let stored = PublicationFixture::item("portfolio-project", fixture.repo.as_path());
     let prepared = prepare_default_publication_item(stored, "owner/repo", &fixture.repo)
         .expect("canonical publication item");
     let branch = managed_branch_name(&fixture.config, &prepared.id, HOST_ID);
@@ -149,7 +149,7 @@ async fn default_publication_uses_canonical_repository_and_frozen_worktree() {
         &decoy,
         &["-c", "commit.gpgsign=false", "commit", "-m", "unreviewed"],
     );
-    let stored = fixture.item("portfolio-project", &decoy);
+    let stored = PublicationFixture::item("portfolio-project", &decoy);
     let prepared = prepare_default_publication_item(stored.clone(), "owner/repo", &fixture.repo)
         .expect("canonical publication item");
     let client = fixture.client(false);
@@ -191,7 +191,7 @@ async fn post_create_metadata_failure_keeps_authoritative_identity() {
     let fixture = PublicationFixture::new();
     let client = fixture.client(true);
     *client.ready_error.lock().expect("ready error") = Some("review metadata failed".into());
-    let stored = fixture.item("portfolio-project", fixture.repo.as_path());
+    let stored = PublicationFixture::item("portfolio-project", fixture.repo.as_path());
     let prepared = prepare_default_publication_item(stored, "owner/repo", &fixture.repo)
         .expect("canonical publication item");
 
@@ -268,7 +268,7 @@ impl PublicationFixture {
         }
     }
 
-    fn item(&self, project_id: &str, worktree: &Path) -> TaskBoardItem {
+    fn item(project_id: &str, worktree: &Path) -> TaskBoardItem {
         let mut item = TaskBoardItem::new(
             "write-publication".into(),
             "Write publication".into(),

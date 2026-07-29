@@ -275,9 +275,8 @@ fn v47_restart_rejects_a_partial_override_tuple() {
         .expect("install partial override tuple");
     drop(db);
 
-    let error = match DaemonDb::open(&path) {
-        Ok(_) => panic!("partial override must fail closed on restart"),
-        Err(error) => error,
+    let Err(error) = DaemonDb::open(&path) else {
+        panic!("partial override must fail closed on restart")
     };
     assert!(
         error.to_string().contains("override is not canonical"),
@@ -303,9 +302,8 @@ fn assert_restart_rejects_override(name: &str, actor: &str, reason: Option<&str>
         .unwrap_or_else(|error| panic!("SQL should accept {name}: {error}"));
     drop(db);
 
-    let error = match DaemonDb::open(&path) {
-        Ok(_) => panic!("{name} must fail closed on restart"),
-        Err(error) => error,
+    let Err(error) = DaemonDb::open(&path) else {
+        panic!("{name} must fail closed on restart")
     };
     assert!(
         error.to_string().contains("override is not canonical"),

@@ -1,3 +1,4 @@
+use sqlx::Row;
 use sqlx::query;
 use sqlx::query_scalar;
 
@@ -29,7 +30,6 @@ async fn item_snapshot(db: &AsyncDaemonDb, item_id: &str) -> ItemSnapshot {
     .fetch_one(db.pool())
     .await
     .expect("read item row");
-    use sqlx::Row;
     ItemSnapshot {
         revision: row.get("revision"),
         status: row.get("status"),

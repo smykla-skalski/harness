@@ -159,7 +159,6 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
         Ok(current) => match current.runtime_flavor() {
             RuntimeFlavor::MultiThread => {
                 let runtime = current;
-                let path = path;
                 block_in_place(move || {
                     runtime.block_on(async move {
                         Arc::new(

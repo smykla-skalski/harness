@@ -52,7 +52,7 @@ pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliErro
 pub(crate) fn all_migration_versions() -> Vec<i64> {
     DAEMON_DB_MIGRATOR
         .iter()
-        .map(|migration| i64::try_from(migration.version).unwrap_or(i64::MAX))
+        .map(|migration| migration.version)
         .collect()
 }
 

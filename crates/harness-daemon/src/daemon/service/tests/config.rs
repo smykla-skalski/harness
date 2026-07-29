@@ -99,7 +99,9 @@ fn serve_rejects_non_loopback_bind_host() {
         match result {
             Ok(Err(error)) => assert!(error.to_string().contains("loopback")),
             Ok(Ok(())) => panic!("serve should reject non-loopback hosts"),
-            Err(_) => panic!("serve should fail before starting"),
+            Err(elapsed) => {
+                panic!("serve should fail before starting, timed out instead: {elapsed}")
+            }
         }
     });
 }

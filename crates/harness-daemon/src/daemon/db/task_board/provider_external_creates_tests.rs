@@ -386,7 +386,9 @@ pub(super) async fn begin_in_scope(
         .expect("begin intent")
     {
         TaskBoardExternalCreateBegin::Started(intent) => intent,
-        other => panic!("expected started intent, got {other:?}"),
+        other @ TaskBoardExternalCreateBegin::Existing(_) => {
+            panic!("expected started intent, got {other:?}")
+        }
     }
 }
 
@@ -407,7 +409,9 @@ fn begin_intent(decision: TaskBoardExternalCreateBegin) -> (bool, TaskBoardExter
         TaskBoardExternalCreateBegin::Existing(TaskBoardExternalCreateExisting::Recover(
             intent,
         )) => (false, intent),
-        other => panic!("unexpected begin decision: {other:?}"),
+        other @ TaskBoardExternalCreateBegin::Existing(_) => {
+            panic!("unexpected begin decision: {other:?}")
+        }
     }
 }
 

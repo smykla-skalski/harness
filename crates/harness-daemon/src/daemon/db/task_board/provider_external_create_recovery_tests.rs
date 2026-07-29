@@ -415,7 +415,9 @@ async fn start(
         .expect("begin create intent")
     {
         TaskBoardExternalCreateBegin::Started(intent) => intent,
-        other => panic!("expected started intent, got {other:?}"),
+        other @ TaskBoardExternalCreateBegin::Existing(_) => {
+            panic!("expected started intent, got {other:?}")
+        }
     }
 }
 

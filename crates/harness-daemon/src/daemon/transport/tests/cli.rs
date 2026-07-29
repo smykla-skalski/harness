@@ -106,7 +106,9 @@ fn daemon_dev_execution_plan_includes_codex_ws_url() {
             super::super::super::codex_transport::CodexTransportKind::WebSocket { endpoint } => {
                 assert_eq!(endpoint, "ws://127.0.0.1:7777");
             }
-            other => panic!("expected websocket transport, got {other:?}"),
+            other @ super::super::super::codex_transport::CodexTransportKind::Stdio => {
+                panic!("expected websocket transport, got {other:?}")
+            }
         }
     });
 }
