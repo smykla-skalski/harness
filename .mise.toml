@@ -192,7 +192,7 @@ description = "Run live OpenRouter and Codex report turns through an isolated da
 run = "./scripts/live-agent-smoke.sh"
 
 [tasks."test:architecture"]
-description = "Run dependency-light Task Board architecture checks with native libtest (e.g. -- task_board_storage::task_board_orchestrator_has_one_runner -- --exact)"
+description = "Run dependency-light architecture checks (Task Board storage rules, daemon manifest drift) with native libtest (e.g. -- task_board_storage::task_board_orchestrator_has_one_runner -- --exact)"
 run = "./scripts/cargo-local.sh test -p harness-architecture-tests --lib"
 
 [tasks."test:integration"]
