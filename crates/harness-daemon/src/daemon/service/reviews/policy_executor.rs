@@ -76,6 +76,12 @@ impl DaemonReviewsPolicyExecutor {
         target: &ReviewTarget,
         method: GitHubMergeMethod,
     ) -> Result<(), CliError> {
+        // A blank head can never be admitted (`policy_merge` refuses it), so route
+        // straight there rather than record a ledger intent that would only ever
+        // resolve as an uncertain, un-reconcilable entry for an invalid action.
+        if target.head_sha.trim().is_empty() {
+            return self.client.policy_merge(target, method).await;
+        }
         let Some(store) = self.audit_db.clone() else {
             return self.client.policy_merge(target, method).await;
         };

@@ -117,9 +117,11 @@ impl GitHubAutomationClient for FakeGitHubClient {
             head_revision: self.pull_request.head_sha.clone(),
             author: None,
             lifecycle,
-            // The stored handle keeps its original draft state; the merge-evidence
-            // snapshot carries the current one, after the ready-for-review step.
-            is_draft: self.evidence.pull_request.draft,
+            // The pull request starts at its handle's draft state and becomes
+            // non-draft once ready_pull_request_for_review has run, so a fresh read
+            // after the ready step reports it ready rather than stale-draft.
+            is_draft: self.pull_request.draft
+                && *self.ready_calls.lock().expect("ready calls") == 0,
             gates: PullRequestMergeGates {
                 mergeability: Mergeability::Mergeable,
                 viewer_can_update: true,
