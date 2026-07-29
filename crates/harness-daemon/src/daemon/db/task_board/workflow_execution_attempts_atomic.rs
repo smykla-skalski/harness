@@ -6,9 +6,7 @@ use sqlx::{Sqlite, Transaction};
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
-use super::super::remote_assignment_stop_fence::{
-    RemoteTargetStopPlan, remote_target_stop_plan_in_tx,
-};
+use super::super::remote_assignment_fencing::{RemoteAssignmentFencing, RemoteTargetStopPlan};
 use super::super::workflow_executions::{
     cas_mismatch, load_execution_in_tx, update_execution_in_tx,
 };
@@ -16,7 +14,7 @@ use super::{
     attempt_cas_matches, reject_active_remote_target_mutation, update_attempt_in_tx,
     validate_atomic_execution_attempt_update,
 };
-use crate::daemon::db::{CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
@@ -106,7 +104,7 @@ pub(super) async fn decide_atomic_cas_in_tx(
         expectation.updated_attempt,
         &combined,
     )?;
-    match remote_target_stop_plan_in_tx(transaction, &current, &combined).await? {
+    match AsyncDaemonDb::remote_target_stop_plan_in_tx(transaction, &current, &combined).await? {
         RemoteTargetStopPlan::PersistCancelIntent(parent) => {
             Ok(AtomicCasSettlement::PersistCancelIntent(Box::new(parent)))
         }

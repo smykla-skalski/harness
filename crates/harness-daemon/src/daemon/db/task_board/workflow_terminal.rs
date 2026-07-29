@@ -9,7 +9,7 @@ use crate::task_board::TaskBoardItem;
 mod dispatch;
 #[path = "workflow_terminal_projection.rs"]
 mod projection;
-pub(super) use dispatch::settle_prepared_dispatch_in_tx;
+pub(super) use dispatch::{PreparedDispatchSettlement, settle_prepared_dispatch_in_tx};
 #[path = "workflow_terminal_in_tx.rs"]
 mod in_tx;
 pub(super) use in_tx::project_terminal_execution_in_tx;

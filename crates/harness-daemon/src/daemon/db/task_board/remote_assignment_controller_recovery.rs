@@ -11,9 +11,9 @@ use super::remote_assignment_model::{
 };
 use super::remote_assignment_rejection::apply_unclaimable_offer_in_tx;
 use super::workflow_execution_attempts::update_attempt_in_tx;
+use super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
-use super::workflow_terminal::project_terminal_execution_in_tx;
-use crate::daemon::db::{CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TASK_BOARD_EXECUTION_TARGET_RESOURCE;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE, TASK_BOARD_REMOTE_CLAIM_IO_AUTHORITY_RESOURCE,
@@ -257,7 +257,7 @@ pub(super) async fn recover_ambiguous_remote_start_in_tx(
         &unknown_attempt,
     )
     .await?;
-    project_terminal_execution_in_tx(transaction, &combined).await?;
+    AsyncDaemonDb::project_terminal_execution_in_tx(transaction, &combined).await?;
     Ok(true)
 }
 

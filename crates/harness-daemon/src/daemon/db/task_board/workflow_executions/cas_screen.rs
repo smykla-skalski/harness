@@ -4,11 +4,11 @@ use super::{
     cas_mismatch, ensure_terminal_transition_has_no_active_side_effect, load_execution_in_tx,
     validate_phase_change,
 };
-use crate::daemon::db::task_board::remote_assignment_stop_fence::{
-    RemoteTargetStopPlan, remote_target_stop_plan_in_tx,
+use crate::daemon::db::task_board::remote_assignment_fencing::{
+    RemoteAssignmentFencing, RemoteTargetStopPlan,
 };
 use crate::daemon::db::task_board::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
-use crate::daemon::db::{CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardWorkflowCasMismatch, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
@@ -76,7 +76,7 @@ async fn resolve_cas_write_in_tx(
             TaskBoardWorkflowExecutionCasOutcome::Unchanged(current),
         ));
     }
-    match remote_target_stop_plan_in_tx(transaction, &current, updated).await? {
+    match AsyncDaemonDb::remote_target_stop_plan_in_tx(transaction, &current, updated).await? {
         RemoteTargetStopPlan::ApplyRequested => {
             Ok(WorkflowExecutionCasScreen::Persist(updated.clone()))
         }

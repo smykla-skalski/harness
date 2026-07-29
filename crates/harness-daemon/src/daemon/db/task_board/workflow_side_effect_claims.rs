@@ -16,7 +16,7 @@ use crate::task_board::{
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_active_fence::active_remote_assignment_exists_in_tx;
+use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, attempt_identity_matches, update_attempt_in_tx, validate_attempt_phase,
 };
@@ -161,7 +161,12 @@ async fn reject_fenced_side_effect_claim_in_tx(
     parent: &TaskBoardWorkflowExecutionRecord,
     current: &TaskBoardExecutionAttemptRecord,
 ) -> Result<(), CliError> {
-    if active_remote_assignment_exists_in_tx(transaction, &claim.execution.execution_id).await? {
+    if AsyncDaemonDb::active_remote_assignment_exists_in_tx(
+        transaction,
+        &claim.execution.execution_id,
+    )
+    .await?
+    {
         return Err(CliErrorKind::concurrent_modification(
             "active remote assignment fenced the local side-effect claim",
         )

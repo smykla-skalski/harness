@@ -9,7 +9,7 @@ use super::dispatch_workflow_start::{
     insert_started_workflow_in_tx, load_claimed_applied, workflow_start_fence,
 };
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
-use super::remote_assignment_model::load_assignment_in_tx;
+use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_dispatch::workflow_owner;
 use super::workflow_executions::load_execution_in_tx;
 use super::workflow_start_admission::commit_frozen_start_admission_in_tx;
@@ -188,7 +188,7 @@ pub(super) async fn workflow_start_is_durable_in_tx(
         .strip_prefix("remote:")
         .filter(|assignment| !assignment.trim().is_empty())
         .ok_or_else(|| db_error("workflow execution target is invalid"))?;
-    let assignment = load_assignment_in_tx(transaction, assignment_id)
+    let assignment = AsyncDaemonDb::load_assignment_in_tx(transaction, assignment_id)
         .await?
         .ok_or_else(|| db_error("remote assignment disappeared before admission commit"))?;
     let exact = assignment.execution_id == execution.execution_id

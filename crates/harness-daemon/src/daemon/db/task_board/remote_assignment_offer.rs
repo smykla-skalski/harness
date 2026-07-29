@@ -14,14 +14,9 @@ use super::remote_lifecycle_trust::{
 use super::remote_outbound_sources::{
     persist_outbound_source_in_tx, require_outbound_source_in_tx,
 };
-use super::workflow_execution_attempts::{
-    attempt_cas_matches, update_attempt_in_tx, validate_attempt_phase,
-};
-use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
-use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
-use super::workflow_first_start_admission::{
-    TaskBoardFirstStartAdmission, revalidate_first_start_admission_in_tx,
-};
+use super::workflow_execution_attempts::update_attempt_in_tx;
+use super::workflow_execution_fencing::{TaskBoardFirstStartAdmission, WorkflowExecutionFencing};
+use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::task_board_codex_requests::remote_codex_attempt_request;
 use crate::task_board::TaskBoardExecutionPhase;
@@ -145,8 +140,8 @@ async fn prepare_remote_offer_in_tx(
     let Some((attempt_index, current_attempt)) = find_attempt(&parent, expected_attempt) else {
         return Ok(OfferPreparation::Stale("missing attempt"));
     };
-    if cas_mismatch(expected_execution, &parent).is_some()
-        || !attempt_cas_matches(expected_attempt, current_attempt)
+    if AsyncDaemonDb::cas_mismatch(expected_execution, &parent).is_some()
+        || !AsyncDaemonDb::attempt_cas_matches(expected_attempt, current_attempt)
     {
         return Ok(OfferPreparation::Stale("stale execution or attempt"));
     }
@@ -162,8 +157,13 @@ async fn prepare_remote_offer_in_tx(
     if !host_has_capacity(transaction, request, times.offered_at).await? {
         return Ok(OfferPreparation::Unavailable("unavailable host"));
     }
-    if revalidate_first_start_admission_in_tx(transaction, &parent, current_attempt, offered_at)
-        .await?
+    if AsyncDaemonDb::revalidate_first_start_admission_in_tx(
+        transaction,
+        &parent,
+        current_attempt,
+        offered_at,
+    )
+    .await?
         == TaskBoardFirstStartAdmission::Settled
     {
         return Ok(OfferPreparation::Unavailable("settled blocked admission"));
@@ -432,7 +432,7 @@ fn build_remote_claim(
     updated_attempt.completed_at = None;
     validate_task_board_attempt_update(current_attempt, &updated_attempt)
         .map_err(|error| db_error(format!("validate remote offer attempt: {error}")))?;
-    validate_attempt_phase(parent, &updated_attempt)?;
+    AsyncDaemonDb::validate_attempt_phase(parent, &updated_attempt)?;
     let mut updated_parent = parent.clone();
     updated_parent.transition.execution_state = TaskBoardExecutionState::Starting;
     updated_parent.ownership.host_id = Some(request.binding.host_id.clone());
@@ -480,7 +480,7 @@ async fn ensure_live_execution(
             ));
         }
     }
-    if live_execution_revision_mismatch_in_tx(transaction, parent)
+    if AsyncDaemonDb::live_execution_revision_mismatch_in_tx(transaction, parent)
         .await?
         .is_some()
     {
