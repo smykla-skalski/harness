@@ -171,18 +171,23 @@ section() {
 # orphan reaper, because the target is the one server owning this checkout's
 # socket, not one orphan among many.
 stop_repo_sccache_server() {
-  local env uds bin
+  local env uds bin probe_output
   env="$("$ROOT/scripts/cargo-local.sh" --print-env 2>/dev/null || true)"
   uds="$(awk -F= '/^SCCACHE_SERVER_UDS=/ {print $2; exit}' <<<"$env")"
   bin="$(awk -F= '/^SCCACHE_BIN=/ {print $2; exit}' <<<"$env")"
   SCCACHE_SELECTED_SOCKET="$uds"
   SCCACHE_SELECTED_PIDS=""
   if [[ -n "$uds" ]]; then
+    if ! probe_output="$(python3 "$ROOT/scripts/lib/sccache_processes.py" --socket "$uds" 2>/dev/null)"; then
+      printf '    (warning: configured sccache server ownership probe failed; cache kept)\n'
+      SCCACHE_STOP_OUTCOME="pid-probe-failed"
+      return 1
+    fi
     while IFS= read -r pid; do
       if [[ "$pid" =~ ^[0-9]+$ ]]; then
         SCCACHE_SELECTED_PIDS="${SCCACHE_SELECTED_PIDS}${pid}"$'\n'
       fi
-    done < <(python3 "$ROOT/scripts/lib/sccache_processes.py" --socket "$uds" 2>/dev/null || true)
+    done <<<"$probe_output"
   fi
   [[ -n "$uds" ]] || {
     SCCACHE_STOP_OUTCOME="server-unconfigured"

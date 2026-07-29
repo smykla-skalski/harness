@@ -580,6 +580,43 @@ PY
   pass
 }
 
+scenario_keeps_cache_when_server_ownership_probe_fails() {
+  start_test "sccache cache kept when configured server ownership probe fails"
+  reset_tmp_root
+  local repo="$TEST_TMP_ROOT/repo"
+  local output=""
+  local socket="$repo/fake-tmp/deleted.sock"
+
+  make_shared_target_fixture "$repo"
+  mkdir -p "$repo/fake-tmp" "$repo/fake-home/Library/Caches/Mozilla.sccache"
+  echo "cached object" > "$repo/fake-home/Library/Caches/Mozilla.sccache/blob"
+  cat > "$repo/scripts/cargo-local.sh" <<CARGO_LOCAL
+#!/usr/bin/env bash
+printf 'SCCACHE_BIN=%s\n' "$repo/fake-bin/sccache"
+printf 'SCCACHE_SERVER_UDS=%s\n' "$socket"
+CARGO_LOCAL
+  chmod +x "$repo/scripts/cargo-local.sh"
+  printf 'raise SystemExit(1)\n' > "$repo/scripts/lib/sccache_processes.py"
+
+  output="$(cd "$repo" && HOME="$repo/fake-home" TMPDIR="$repo/fake-tmp" \
+    ./scripts/clean-build-caches.sh --force 2>&1)" || true
+
+  [[ -e "$repo/fake-home/Library/Caches/Mozilla.sccache/blob" ]] || {
+    fail "cache removed after configured server ownership probe failed"
+    return 1
+  }
+  grep -Fq 'configured sccache server ownership probe failed' <<<"$output" || {
+    fail "missing ownership-probe warning: $output"
+    return 1
+  }
+  local audit="$repo/.cache/diagnostics/sccache-cleanup.jsonl"
+  grep -Fq '"stop_outcome":"pid-probe-failed"' "$audit" || {
+    fail "ownership-probe failure audit omitted its outcome: $(<"$audit")"
+    return 1
+  }
+  pass
+}
+
 scenario_authorized_removal_is_audited_before_cache_deletion() {
   start_test "authorized sccache removal leaves durable attribution"
   reset_tmp_root
@@ -667,6 +704,7 @@ scenario_normal_cleanup_keeps_small_sccache_cache_and_live_server
 scenario_destructive_dry_run_is_write_free
 scenario_keeps_cache_when_stop_fails_even_under_force
 scenario_keeps_cache_when_live_server_binary_is_unidentified
+scenario_keeps_cache_when_server_ownership_probe_fails
 scenario_authorized_removal_is_audited_before_cache_deletion
 scenario_dedupes_symlinked_sccache_cache_dirs
 
