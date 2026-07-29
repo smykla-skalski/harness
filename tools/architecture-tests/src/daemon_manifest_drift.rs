@@ -58,10 +58,8 @@ fn daemon_mirrored_source_stays_declared_in_both_manifests() {
 
         let relative = file
             .strip_prefix(root)
-            .expect("scanned file stays under the repository root")
-            .display()
-            .to_string();
-        if is_test_only_path(&relative) || is_declared_test_only(file, &cfg_test_only_child_modules)
+            .expect("scanned file stays under the repository root");
+        if is_test_only_path(relative) || is_declared_test_only(file, &cfg_test_only_child_modules)
         {
             continue;
         }
@@ -148,10 +146,13 @@ fn collect_rs_files(start: &Path, files: &mut Vec<PathBuf>) {
 /// production code once that feature is active. `is_declared_test_only`
 /// below covers the ones that really are test-only despite the singular
 /// name.
-fn is_test_only_path(relative: &str) -> bool {
-    relative
-        .split(['/', '_', '.'])
-        .any(|token| token == "tests")
+fn is_test_only_path(relative: &Path) -> bool {
+    relative.components().any(|component| {
+        component
+            .as_os_str()
+            .to_str()
+            .is_some_and(|component| component.split(['_', '.']).any(|token| token == "tests"))
+    })
 }
 
 /// A file that some *other* mirrored file declares as a bare `#[cfg(test)]
