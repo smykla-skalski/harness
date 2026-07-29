@@ -141,6 +141,121 @@ fn post_session_title_uses_async_db_when_sync_db_is_unavailable() {
     });
 }
 
+async fn async_lifecycle_drop_both_tasks(
+    state: &DaemonHttpState,
+    session_id: &str,
+    worker_id: &str,
+    primary_task: &str,
+    queued_task: &str,
+) {
+    let dropped = post_task_drop(
+        axum::extract::Path((session_id.to_owned(), primary_task.to_owned())),
+        auth_headers(),
+        State(state.clone()),
+        Json(TaskDropRequest {
+            actor: "spoofed".into(),
+            target: TaskDropTarget::Agent {
+                agent_id: worker_id.to_owned(),
+            },
+            queue_policy: TaskQueuePolicy::Locked,
+            reason: None,
+        }),
+    )
+    .await;
+    let (status, body) = response_json(dropped).await;
+    assert_eq!(status, StatusCode::OK);
+    let dropped_task = body["tasks"]
+        .as_array()
+        .expect("tasks array")
+        .iter()
+        .find(|task| task["task_id"].as_str() == Some(primary_task))
+        .expect("primary task");
+    assert_eq!(dropped_task["assigned_to"].as_str(), Some(worker_id));
+    assert_eq!(body["signals"].as_array().map(Vec::len), Some(1));
+
+    let queued = post_task_drop(
+        axum::extract::Path((session_id.to_owned(), queued_task.to_owned())),
+        auth_headers(),
+        State(state.clone()),
+        Json(TaskDropRequest {
+            actor: "spoofed".into(),
+            target: TaskDropTarget::Agent {
+                agent_id: worker_id.to_owned(),
+            },
+            queue_policy: TaskQueuePolicy::Locked,
+            reason: None,
+        }),
+    )
+    .await;
+    let (status, body) = response_json(queued).await;
+    assert_eq!(status, StatusCode::OK);
+    let queued_task_body = body["tasks"]
+        .as_array()
+        .expect("tasks array")
+        .iter()
+        .find(|task| task["task_id"].as_str() == Some(queued_task))
+        .expect("queued task");
+    assert!(queued_task_body["queue_policy"].is_null());
+}
+
+async fn async_lifecycle_requeue_and_complete(
+    state: &DaemonHttpState,
+    session_id: &str,
+    primary_task: &str,
+    queued_task: &str,
+) {
+    let updated_policy = post_task_queue_policy(
+        axum::extract::Path((session_id.to_owned(), queued_task.to_owned())),
+        auth_headers(),
+        State(state.clone()),
+        Json(TaskQueuePolicyRequest {
+            actor: "spoofed".into(),
+            queue_policy: TaskQueuePolicy::ReassignWhenFree,
+        }),
+    )
+    .await;
+    let (status, body) = response_json(updated_policy).await;
+    assert_eq!(status, StatusCode::OK);
+    let queued_task_body = body["tasks"]
+        .as_array()
+        .expect("tasks array")
+        .iter()
+        .find(|task| task["task_id"].as_str() == Some(queued_task))
+        .expect("queued task");
+    assert_eq!(
+        queued_task_body["queue_policy"].as_str(),
+        Some("reassign_when_free")
+    );
+
+    let completed = post_task_update(
+        axum::extract::Path((session_id.to_owned(), primary_task.to_owned())),
+        auth_headers(),
+        State(state.clone()),
+        Json(TaskUpdateRequest {
+            actor: "spoofed".into(),
+            status: TaskStatus::Done,
+            note: Some("completed".into()),
+        }),
+    )
+    .await;
+    let (status, body) = response_json(completed).await;
+    assert_eq!(status, StatusCode::OK);
+    let primary_task_body = body["tasks"]
+        .as_array()
+        .expect("tasks array")
+        .iter()
+        .find(|task| task["task_id"].as_str() == Some(primary_task))
+        .expect("primary task");
+    let queued_task_body = body["tasks"]
+        .as_array()
+        .expect("tasks array")
+        .iter()
+        .find(|task| task["task_id"].as_str() == Some(queued_task))
+        .expect("queued task");
+    assert_eq!(primary_task_body["status"].as_str(), Some("done"));
+    assert_eq!(queued_task_body["status"].as_str(), Some("open"));
+}
+
 #[test]
 fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_unavailable() {
     let sandbox = tempdir().expect("tempdir");
@@ -164,148 +279,37 @@ fn post_task_drop_queue_policy_update_and_status_use_async_db_when_sync_db_is_un
                 runtime.block_on(async {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
-                    let _ = start_async_http_session(
-                        state.clone(),
-                        &project_dir,
-                        "c768851c-68dd-5b32-aa14-328f195726f0",
-                    )
-                    .await;
+                    const SESSION_ID: &str = "c768851c-68dd-5b32-aa14-328f195726f0";
+                    let _ = start_async_http_session(state.clone(), &project_dir, SESSION_ID).await;
                     let worker_id = join_http_worker(
                         &state,
-                        "c768851c-68dd-5b32-aa14-328f195726f0",
+                        SESSION_ID,
                         &project_dir,
                         "Async Lifecycle Worker",
                     )
                     .await;
-                    let primary_task = create_http_task(
+                    let primary_task =
+                        create_http_task(&state, SESSION_ID, "primary task", TaskSeverity::High)
+                            .await;
+                    let queued_task =
+                        create_http_task(&state, SESSION_ID, "queued task", TaskSeverity::Medium)
+                            .await;
+
+                    async_lifecycle_drop_both_tasks(
                         &state,
-                        "c768851c-68dd-5b32-aa14-328f195726f0",
-                        "primary task",
-                        TaskSeverity::High,
+                        SESSION_ID,
+                        &worker_id,
+                        &primary_task,
+                        &queued_task,
                     )
                     .await;
-                    let queued_task = create_http_task(
+                    async_lifecycle_requeue_and_complete(
                         &state,
-                        "c768851c-68dd-5b32-aa14-328f195726f0",
-                        "queued task",
-                        TaskSeverity::Medium,
+                        SESSION_ID,
+                        &primary_task,
+                        &queued_task,
                     )
                     .await;
-
-                    let dropped = post_task_drop(
-                        axum::extract::Path((
-                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
-                            primary_task.clone(),
-                        )),
-                        auth_headers(),
-                        State(state.clone()),
-                        Json(TaskDropRequest {
-                            actor: "spoofed".into(),
-                            target: TaskDropTarget::Agent {
-                                agent_id: worker_id.clone(),
-                            },
-                            queue_policy: TaskQueuePolicy::Locked,
-                            reason: None,
-                        }),
-                    )
-                    .await;
-                    let (status, body) = response_json(dropped).await;
-                    assert_eq!(status, StatusCode::OK);
-                    let dropped_task = body["tasks"]
-                        .as_array()
-                        .expect("tasks array")
-                        .iter()
-                        .find(|task| task["task_id"].as_str() == Some(primary_task.as_str()))
-                        .expect("primary task");
-                    assert_eq!(
-                        dropped_task["assigned_to"].as_str(),
-                        Some(worker_id.as_str())
-                    );
-                    assert_eq!(body["signals"].as_array().map(Vec::len), Some(1));
-
-                    let queued = post_task_drop(
-                        axum::extract::Path((
-                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
-                            queued_task.clone(),
-                        )),
-                        auth_headers(),
-                        State(state.clone()),
-                        Json(TaskDropRequest {
-                            actor: "spoofed".into(),
-                            target: TaskDropTarget::Agent {
-                                agent_id: worker_id.clone(),
-                            },
-                            queue_policy: TaskQueuePolicy::Locked,
-                            reason: None,
-                        }),
-                    )
-                    .await;
-                    let (status, body) = response_json(queued).await;
-                    assert_eq!(status, StatusCode::OK);
-                    let queued_task_body = body["tasks"]
-                        .as_array()
-                        .expect("tasks array")
-                        .iter()
-                        .find(|task| task["task_id"].as_str() == Some(queued_task.as_str()))
-                        .expect("queued task");
-                    assert!(queued_task_body["queue_policy"].is_null());
-
-                    let updated_policy = post_task_queue_policy(
-                        axum::extract::Path((
-                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
-                            queued_task.clone(),
-                        )),
-                        auth_headers(),
-                        State(state.clone()),
-                        Json(TaskQueuePolicyRequest {
-                            actor: "spoofed".into(),
-                            queue_policy: TaskQueuePolicy::ReassignWhenFree,
-                        }),
-                    )
-                    .await;
-                    let (status, body) = response_json(updated_policy).await;
-                    assert_eq!(status, StatusCode::OK);
-                    let queued_task_body = body["tasks"]
-                        .as_array()
-                        .expect("tasks array")
-                        .iter()
-                        .find(|task| task["task_id"].as_str() == Some(queued_task.as_str()))
-                        .expect("queued task");
-                    assert_eq!(
-                        queued_task_body["queue_policy"].as_str(),
-                        Some("reassign_when_free")
-                    );
-
-                    let completed = post_task_update(
-                        axum::extract::Path((
-                            "c768851c-68dd-5b32-aa14-328f195726f0".to_owned(),
-                            primary_task.clone(),
-                        )),
-                        auth_headers(),
-                        State(state.clone()),
-                        Json(TaskUpdateRequest {
-                            actor: "spoofed".into(),
-                            status: TaskStatus::Done,
-                            note: Some("completed".into()),
-                        }),
-                    )
-                    .await;
-                    let (status, body) = response_json(completed).await;
-                    assert_eq!(status, StatusCode::OK);
-                    let primary_task_body = body["tasks"]
-                        .as_array()
-                        .expect("tasks array")
-                        .iter()
-                        .find(|task| task["task_id"].as_str() == Some(primary_task.as_str()))
-                        .expect("primary task");
-                    let queued_task_body = body["tasks"]
-                        .as_array()
-                        .expect("tasks array")
-                        .iter()
-                        .find(|task| task["task_id"].as_str() == Some(queued_task.as_str()))
-                        .expect("queued task");
-                    assert_eq!(primary_task_body["status"].as_str(), Some("done"));
-                    assert_eq!(queued_task_body["status"].as_str(), Some("open"));
                 });
             },
         );

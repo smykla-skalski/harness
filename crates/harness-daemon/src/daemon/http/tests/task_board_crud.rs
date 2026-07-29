@@ -25,9 +25,21 @@ async fn run_flow() {
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
+    crud_phase(&client, &base_url).await;
+    sync_and_audit_phase(&client, &base_url).await;
+    orchestrator_phase(&client, &base_url).await;
+
+    let deleted = delete_json(&client, &base_url, "/v1/task-board/items/board-http-crud").await;
+    assert!(deleted["deleted_at"].as_str().is_some());
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn crud_phase(client: &reqwest::Client, base_url: &str) {
     let created = post_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ITEMS,
         json!({
             "id": "board-http-crud",
@@ -39,37 +51,39 @@ async fn run_flow() {
     assert_eq!(created["id"].as_str(), Some("board-http-crud"));
 
     let updated = put_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         "/v1/task-board/items/board-http-crud",
         json!({ "status": "todo", "priority": "high" }),
     )
     .await;
     assert_eq!(updated["status"].as_str(), Some("todo"));
     assert_eq!(
-        get_json(&client, &base_url, "/v1/task-board/items/board-http-crud").await["priority"]
+        get_json(client, base_url, "/v1/task-board/items/board-http-crud").await["priority"]
             .as_str(),
         Some("high")
     );
     let listed = get_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &format!("{}?status=todo", http_paths::TASK_BOARD_ITEMS),
     )
     .await;
     assert_eq!(listed["items"].as_array().map(Vec::len), Some(1));
+}
 
+async fn sync_and_audit_phase(client: &reqwest::Client, base_url: &str) {
     let sync = post_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_SYNC,
         json!({ "status": "todo", "direction": "push", "dry_run": true }),
     )
     .await;
     assert_eq!(sync["total"].as_u64(), Some(1));
     let (sync_status, sync_error) = post_json_with_status(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_SYNC,
         json!({ "provider": "github", "direction": "pull", "dry_run": true }),
     )
@@ -80,29 +94,26 @@ async fn run_flow() {
             .as_str()
             .is_some_and(|message| message.contains("external sync token missing"))
     );
-    assert_task_board_sync_audit(&client, &base_url).await;
+    assert_task_board_sync_audit(client, base_url).await;
     let audit = get_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         &format!("{}?status=todo", http_paths::TASK_BOARD_AUDIT),
     )
     .await;
     assert_eq!(audit["total"].as_u64(), Some(1));
+}
 
+async fn orchestrator_phase(client: &reqwest::Client, base_url: &str) {
     assert_eq!(
-        get_json(
-            &client,
-            &base_url,
-            http_paths::TASK_BOARD_ORCHESTRATOR_STATUS
-        )
-        .await["running"]
+        get_json(client, base_url, http_paths::TASK_BOARD_ORCHESTRATOR_STATUS).await["running"]
             .as_bool(),
         Some(false)
     );
     assert_eq!(
         post_json(
-            &client,
-            &base_url,
+            client,
+            base_url,
             http_paths::TASK_BOARD_ORCHESTRATOR_START,
             json!({}),
         )
@@ -119,8 +130,8 @@ async fn run_flow() {
         }]
     });
     let settings = put_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         json!({
             "dry_run_default": false,
@@ -134,8 +145,8 @@ async fn run_flow() {
     assert_eq!(settings["step_mode"].as_bool(), Some(true));
     assert_eq!(settings["admission_policy"], admission_policy);
     let (invalid_status, invalid_error) = put_json_with_status(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         json!({
             "dry_run_default": true,
@@ -157,24 +168,34 @@ async fn run_flow() {
             .is_some_and(|message| message.contains("invalid task-board admission policy"))
     );
     let loaded_settings = get_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
     )
     .await;
     assert_eq!(loaded_settings["dry_run_default"].as_bool(), Some(false));
     assert_eq!(loaded_settings["step_mode"].as_bool(), Some(true));
     assert_eq!(loaded_settings["admission_policy"], admission_policy);
-    let status = get_json(
-        &client,
-        &base_url,
-        http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
-    )
-    .await;
+    let status = get_json(client, base_url, http_paths::TASK_BOARD_ORCHESTRATOR_STATUS).await;
     assert_eq!(status["step_mode"].as_bool(), Some(true));
+    orchestrator_runtime_config_phase(client, base_url).await;
+    assert_eq!(
+        post_json(
+            client,
+            base_url,
+            http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
+            json!({}),
+        )
+        .await["running"]
+            .as_bool(),
+        Some(false)
+    );
+}
+
+async fn orchestrator_runtime_config_phase(client: &reqwest::Client, base_url: &str) {
     let runtime_config = put_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         json!({
             "global": {
@@ -202,8 +223,8 @@ async fn run_flow() {
         Some("Harness Bot")
     );
     let loaded_runtime_config = get_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
     )
     .await;
@@ -212,8 +233,8 @@ async fn run_flow() {
         Some("owner/repo")
     );
     let tokens = put_json(
-        &client,
-        &base_url,
+        client,
+        base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
         json!({
             "global_token": "global-token",
@@ -228,23 +249,6 @@ async fn run_flow() {
     .await;
     assert_eq!(tokens["global_token_configured"].as_bool(), Some(true));
     assert_eq!(tokens["repository_token_count"].as_u64(), Some(1));
-    assert_eq!(
-        post_json(
-            &client,
-            &base_url,
-            http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
-            json!({}),
-        )
-        .await["running"]
-            .as_bool(),
-        Some(false)
-    );
-
-    let deleted = delete_json(&client, &base_url, "/v1/task-board/items/board-http-crud").await;
-    assert!(deleted["deleted_at"].as_str().is_some());
-
-    server.abort();
-    let _ = server.await;
 }
 
 #[test]
