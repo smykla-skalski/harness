@@ -53,6 +53,12 @@ class SccacheProcessTests(unittest.TestCase):
             {41: (f"{sandbox}/harness-sccache/owned.sock type=STREAM",)},
         )
 
+    def test_darwin_missing_lsof_fails_closed(self) -> None:
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            owners = sccache_processes._darwin_socket_owners(Path("/tmp/hst.fixture"))
+
+        self.assertEqual(owners, {})
+
 
 if __name__ == "__main__":
     unittest.main()

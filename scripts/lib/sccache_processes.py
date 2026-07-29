@@ -17,12 +17,15 @@ def _path_is_under(path: str, root: Path) -> bool:
 
 
 def _darwin_socket_owners(root: Path) -> dict[int, tuple[str, ...]]:
-    completed = subprocess.run(
-        ("/usr/sbin/lsof", "-nP", "-U", "-Fpn"),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        completed = subprocess.run(
+            ("/usr/sbin/lsof", "-nP", "-U", "-Fpn"),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return {}
     if completed.returncode != 0:
         return {}
     owners: dict[int, list[str]] = defaultdict(list)
