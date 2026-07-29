@@ -36,7 +36,6 @@ use std::sync::{Mutex, MutexGuard};
 use harness_task_board::TaskBoardTriageEscalationConfig;
 use harness_workspace::workspace::normalized_env_value;
 
-/// Env var that re-enables suite-lifecycle hooks in generated configs.
 /// Env var that enables ACP managed-agent runtime routes before the modal ships.
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 /// Env var that enables background Reviews policy runs.
