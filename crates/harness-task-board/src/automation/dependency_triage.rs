@@ -303,7 +303,7 @@ fn validate_disposition(
     let approvals_met = result.approvals.current >= result.approvals.required;
     let clean = result.conflicts.state == TaskBoardDependencyConflictState::Clean;
     let valid = match result.disposition {
-        TaskBoardDependencyTriageDisposition::WaitForChecks => pending && !failing,
+        TaskBoardDependencyTriageDisposition::WaitForChecks => pending && !failing && clean,
         TaskBoardDependencyTriageDisposition::ContinueSafe => {
             !result.checks.is_empty() && !pending && !failing && approvals_met && clean
         }
@@ -396,6 +396,10 @@ mod tests {
         let mut pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
         assert_eq!(validate(&pending), Ok(()));
+
+        let mut conflicted = pending.clone();
+        conflicted.conflicts.state = TaskBoardDependencyConflictState::Conflicted;
+        assert_contradiction(&conflicted);
 
         let mut failed_while_pending = result(TaskBoardDependencyTriageDisposition::WaitForChecks);
         failed_while_pending.checks[0].state = TaskBoardDependencyCheckState::Pending;
