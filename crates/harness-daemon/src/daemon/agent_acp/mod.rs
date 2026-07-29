@@ -64,6 +64,7 @@ mod protocol;
 mod sandbox_proxy;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod spawn_credential;
+mod turn_lifecycle;
 
 pub use harness_protocol::managed_agents::acp::{
     AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState,
@@ -82,3 +83,5 @@ pub use harness_protocol::managed_agents::runtime_failures::{
 pub use manager::AcpWakePrompt;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub use manager::{AcpAgentManagerHandle, AcpAgentReconcileResponse};
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
+pub use turn_lifecycle::OpenRouterAgentTurnRuntime;

@@ -119,6 +119,51 @@ pub struct AgentTurnResult {
     pub source_revision: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum AgentTurnSourceFreshness {
+    Current,
+    Stale {
+        reviewed_revision: String,
+        current_revision: String,
+    },
+}
+
+impl AgentTurnResult {
+    /// Compare the immutable revision reviewed by this turn with the current source revision.
+    ///
+    /// # Errors
+    /// Returns `CliError` when either revision is unavailable.
+    pub fn source_freshness(
+        &self,
+        current_revision: &str,
+    ) -> Result<AgentTurnSourceFreshness, CliError> {
+        let reviewed_revision = self
+            .source_revision
+            .as_deref()
+            .filter(|revision| !revision.trim().is_empty())
+            .ok_or_else(|| {
+                CliErrorKind::invalid_transition(
+                    "agent turn result has no immutable source revision",
+                )
+            })?;
+        let current_revision = current_revision.trim();
+        if current_revision.is_empty() {
+            return Err(
+                CliErrorKind::invalid_transition("current source revision is empty").into(),
+            );
+        }
+        if reviewed_revision == current_revision {
+            Ok(AgentTurnSourceFreshness::Current)
+        } else {
+            Ok(AgentTurnSourceFreshness::Stale {
+                reviewed_revision: reviewed_revision.to_string(),
+                current_revision: current_revision.to_string(),
+            })
+        }
+    }
+}
+
 #[async_trait]
 pub trait AgentTurnRuntime: Send + Sync {
     fn runtime(&self) -> &str;
