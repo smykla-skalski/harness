@@ -271,13 +271,20 @@ fn validate_next_steps(
         return Err(TaskBoardDependencyTriageError::InvalidNextSteps);
     }
     for (index, step) in steps.iter().enumerate() {
-        let expected = u32::try_from(index + 1).unwrap_or(u32::MAX);
+        let expected = expected_step_order(index)?;
         if step.order != expected || step.action.trim().is_empty() || step.reason.trim().is_empty()
         {
             return Err(TaskBoardDependencyTriageError::InvalidNextSteps);
         }
     }
     Ok(())
+}
+
+fn expected_step_order(index: usize) -> Result<u32, TaskBoardDependencyTriageError> {
+    index
+        .checked_add(1)
+        .and_then(|order| u32::try_from(order).ok())
+        .ok_or(TaskBoardDependencyTriageError::InvalidNextSteps)
 }
 
 fn validate_disposition(
@@ -384,6 +391,10 @@ mod tests {
         unordered.next_steps[0].order = 2;
         assert_eq!(
             validate(&unordered),
+            Err(TaskBoardDependencyTriageError::InvalidNextSteps)
+        );
+        assert_eq!(
+            expected_step_order(usize::MAX),
             Err(TaskBoardDependencyTriageError::InvalidNextSteps)
         );
     }
