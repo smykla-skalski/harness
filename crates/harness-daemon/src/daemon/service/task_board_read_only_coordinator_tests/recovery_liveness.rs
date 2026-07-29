@@ -1,22 +1,25 @@
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardWorkflowKind,
+    TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardWorkflowKind,
 };
 
-use super::fixture::{
-    AttemptSeed, NOW, RETRY_AT, seed_additional_execution, seed_execution, seed_publish_attempt,
-};
+use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_additional_execution, seed_execution};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 
 #[tokio::test]
 async fn recovery_cursor_advances_after_no_progress() {
-    let first = Box::pin(seed_publish_attempt(
-        "a-young-publish",
+    let first = Box::pin(seed_execution(
+        "a-young-report",
+        TaskBoardWorkflowKind::Review,
         TaskBoardExecutionState::Running,
-        TaskBoardAttemptState::Running,
+        Some(AttemptSeed {
+            state: TaskBoardAttemptState::Running,
+            failure_class: None,
+            available_at: Some(RETRY_AT),
+            error: None,
+            completed_at: None,
+        }),
     ))
     .await;
-    set_attempt_deadline(&first.test.db, &first.execution_id, RETRY_AT).await;
     let (_, second_execution_id) = Box::pin(seed_additional_execution(
         &first.test.db,
         "b-start-report",
@@ -103,26 +106,4 @@ const fn starting_attempt() -> AttemptSeed {
         error: None,
         completed_at: None,
     }
-}
-
-async fn set_attempt_deadline(
-    db: &crate::daemon::db::AsyncDaemonDb,
-    execution_id: &str,
-    available_at: &str,
-) {
-    let execution = db
-        .task_board_workflow_execution(execution_id)
-        .await
-        .expect("load publish execution")
-        .expect("publish execution");
-    let current = execution.attempts[0].clone();
-    let mut updated = current.clone();
-    updated.available_at = Some(available_at.into());
-    super::super::task_board_workflow_execution::record_workflow_execution_attempt(
-        db,
-        &TaskBoardExecutionAttemptCas::from(&current),
-        &updated,
-    )
-    .await
-    .expect("set publish verification deadline");
 }

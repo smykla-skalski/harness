@@ -1,7 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::{
-    TaskBoardExecutionPhase, TaskBoardStatus, TaskBoardWorkflowExecutionRecord,
-};
+use crate::task_board::{TaskBoardStatus, TaskBoardWorkflowExecutionRecord};
 
 use super::super::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows_with_runtime;
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
@@ -20,30 +18,6 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
     pub(super) async fn tick(&self, now: &str) {
         let db = self.restart(now).await;
         db.pool().close().await;
-    }
-
-    pub(super) async fn drive_to_phase(
-        &self,
-        phase: TaskBoardExecutionPhase,
-        now: &str,
-        max_ticks: usize,
-    ) {
-        for _ in 0..max_ticks {
-            let db = self.restart(now).await;
-            let reached_phase = self.execution(&db).await.transition.phase == Some(phase);
-            db.pool().close().await;
-            if reached_phase {
-                return;
-            }
-        }
-        let execution = self.persisted_execution().await;
-        panic!(
-            "workflow {} did not reach {phase:?}; stage={:?}; state={:?}; evidence={:?}",
-            execution.execution_id,
-            execution.transition.phase,
-            execution.transition.execution_state,
-            execution.artifacts.diagnostics
-        );
     }
 
     pub(super) async fn drive_to_terminal_projection(&self, now: &str, max_ticks: usize) {

@@ -13,7 +13,7 @@ use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 async fn second_reconciler_waits_for_claimed_report_without_orphaning_run() {
     let fixture = Box::pin(seed_execution(
         "report-exclusive",
-        TaskBoardWorkflowKind::Review,
+        TaskBoardWorkflowKind::PR_REVIEW,
         TaskBoardExecutionState::Running,
         Some(starting_attempt()),
     ))

@@ -4,7 +4,7 @@ use crate::task_board::{
     TaskBoardTerminalOutcomeKind, TaskBoardWorkflowKind,
 };
 
-use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_execution, seed_publish_attempt};
+use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_execution};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 use super::{load_execution, tick};
 
@@ -95,7 +95,7 @@ async fn unknown_and_cancelled_children_never_launch_attempt_n_plus_one() {
     ] {
         let fixture = Box::pin(seed_execution(
             label,
-            TaskBoardWorkflowKind::Review,
+            TaskBoardWorkflowKind::PR_REVIEW,
             parent,
             Some(seed),
         ))
@@ -157,48 +157,6 @@ async fn provider_head_resolution_error_schedules_durable_retry_wait() {
     assert_eq!(retry.failure_class, TaskBoardFailureClass::Transient);
     assert!(!retry.available_at.is_empty());
     assert_eq!(runtime.start_count(), 1);
-}
-
-#[tokio::test]
-async fn starting_publish_child_repairs_running_parent_before_side_effect() {
-    let fixture = Box::pin(seed_publish_attempt(
-        "publish-parent-repair",
-        TaskBoardExecutionState::Running,
-        TaskBoardAttemptState::Starting,
-    ))
-    .await;
-    let runtime = FakeReadOnlyRuntime::new([]);
-    runtime.block_publish();
-
-    let reconcile = super::super::task_board_read_only_coordinator::
-        reconcile_task_board_read_only_workflows_with_runtime(
-            &fixture.test.db,
-            &runtime,
-            NOW,
-            8,
-        );
-    let observe = async {
-        runtime.wait_for_publish().await;
-        let execution = load_execution(&fixture).await;
-        assert_eq!(
-            execution.transition.execution_state,
-            TaskBoardExecutionState::Starting
-        );
-        runtime.release_publish();
-    };
-    let (report, ()) = tokio::join!(reconcile, observe);
-    assert!(report.expect("reconcile publish").failures.is_empty());
-
-    let execution = load_execution(&fixture).await;
-    assert_eq!(
-        execution.transition.execution_state,
-        TaskBoardExecutionState::Running
-    );
-    assert_eq!(
-        execution.attempts[0].state,
-        TaskBoardAttemptState::Completed
-    );
-    assert_eq!(runtime.publish_count(), 1);
 }
 
 #[tokio::test]

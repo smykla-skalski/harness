@@ -5,9 +5,8 @@ use crate::{
     normalize_repository_slug,
 };
 
-const PR_REVIEW_PHASES: [TaskBoardExecutionPhase; 4] = [
+const PR_REVIEW_PHASES: [TaskBoardExecutionPhase; 3] = [
     TaskBoardExecutionPhase::Review,
-    TaskBoardExecutionPhase::Publish,
     TaskBoardExecutionPhase::Cleanup,
     TaskBoardExecutionPhase::Terminal,
 ];

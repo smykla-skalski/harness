@@ -147,10 +147,6 @@ impl FakeReadOnlyRuntime {
         self.publishes.load(Ordering::SeqCst)
     }
 
-    pub(super) fn verification_count(&self) -> usize {
-        self.verifications.load(Ordering::SeqCst)
-    }
-
     pub(super) fn last_request(&self) -> CodexRunRequest {
         self.requests
             .lock()
@@ -188,39 +184,6 @@ impl FakeReadOnlyRuntime {
 
     pub(super) fn fail_next_start_after_persist(&self) {
         self.fail_start_after_persist.store(true, Ordering::SeqCst);
-    }
-
-    pub(super) fn block_publish(&self) {
-        self.block_publish.store(true, Ordering::SeqCst);
-    }
-
-    pub(super) async fn wait_for_publish(&self) {
-        tokio::time::timeout(Duration::from_secs(5), self.publish_entered.acquire())
-            .await
-            .expect("timed out waiting for publish entry")
-            .expect("publish entry semaphore")
-            .forget();
-    }
-
-    pub(super) fn release_publish(&self) {
-        self.publish_release.add_permits(1);
-    }
-
-    pub(super) fn set_approved(&self, approved: bool) {
-        self.approved.store(approved, Ordering::SeqCst);
-    }
-
-    pub(super) fn set_publish_error(&self, detail: &str, approval_applied: bool) {
-        *self.publish_error.lock().expect("publish error lock") = Some(detail.into());
-        self.approve_on_publish_error
-            .store(approval_applied, Ordering::SeqCst);
-    }
-
-    pub(super) fn set_verification_error(&self, detail: &str) {
-        *self
-            .verification_error
-            .lock()
-            .expect("verification error lock") = Some(detail.into());
     }
 }
 

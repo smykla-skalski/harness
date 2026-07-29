@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionPhase, TaskBoardExecutionState,
     TaskBoardReviewRoundDecision, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
@@ -5,6 +7,44 @@ use crate::task_board::{
 
 use super::fixture::{NOW, seed_execution_with_reviewers};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
+
+#[tokio::test]
+async fn pull_request_review_runs_review_cleanup_and_terminal_without_publication() {
+    let fixture = Box::pin(seed_execution_with_reviewers(
+        "report-only-pull-request-review",
+        TaskBoardWorkflowKind::PR_REVIEW,
+        1,
+        1,
+    ))
+    .await;
+    let runtime = FakeReadOnlyRuntime::new([PlannedReport::passing_review()]);
+
+    super::drive_to_terminal_projection(&fixture, &runtime).await;
+
+    let completed = super::load_execution(&fixture).await;
+    assert_eq!(
+        completed.transition.phase,
+        Some(TaskBoardExecutionPhase::Terminal)
+    );
+    assert_eq!(
+        completed.transition.execution_state,
+        TaskBoardExecutionState::Completed
+    );
+    let actions = completed
+        .attempts
+        .iter()
+        .map(|attempt| attempt.action_key.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actions, ["cleanup", "review:reviewer-amber"].into());
+    assert_eq!(runtime.start_count(), 1);
+    assert_eq!(runtime.publish_count(), 0);
+    super::assert_terminal_projection(
+        &fixture,
+        TaskBoardStatus::Done,
+        TaskBoardWorkflowStatus::Completed,
+    )
+    .await;
+}
 
 #[tokio::test]
 async fn local_review_waits_for_two_reviewer_quorum_before_evaluation() {

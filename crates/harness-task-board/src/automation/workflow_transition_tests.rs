@@ -32,7 +32,6 @@ fn workflow_definitions_have_the_exact_phase_sequences() {
         task_board_workflow_phases(TaskBoardWorkflowKind::PR_REVIEW),
         [
             TaskBoardExecutionPhase::Review,
-            TaskBoardExecutionPhase::Publish,
             TaskBoardExecutionPhase::Cleanup,
             TaskBoardExecutionPhase::Terminal,
         ]
@@ -130,7 +129,7 @@ fn write_revision_cycle_retains_the_reviewed_head_as_next_base() {
 }
 
 #[test]
-fn pr_review_stays_on_exact_head_and_skips_evaluation() {
+fn pr_review_stays_on_exact_head_and_skips_evaluation_and_publish() {
     let identity = pull_request(23);
     let state = start_task_board_workflow(
         TaskBoardWorkflowKind::PR_REVIEW,
@@ -143,9 +142,25 @@ fn pr_review_stays_on_exact_head_and_skips_evaluation() {
         advance_task_board_workflow(&state, None, Some("head-violet")),
         Err(TaskBoardWorkflowTransitionError::HeadRevisionChanged)
     );
-    let publish = advance_task_board_workflow(&state, None, None).expect("advance to publish");
-    assert_eq!(publish.phase, Some(TaskBoardExecutionPhase::Publish));
-    assert_eq!(publish.exact_head_revision.as_deref(), Some("head-indigo"));
+    let cleanup = advance_task_board_workflow(&state, None, None).expect("advance to cleanup");
+    assert_eq!(cleanup.phase, Some(TaskBoardExecutionPhase::Cleanup));
+    assert_eq!(cleanup.exact_head_revision.as_deref(), Some("head-indigo"));
+    assert_eq!(
+        advance_task_board_workflow(&cleanup, None, None)
+            .expect("advance to terminal")
+            .phase,
+        Some(TaskBoardExecutionPhase::Terminal)
+    );
+
+    let mut forced_publish = state;
+    forced_publish.phase = Some(TaskBoardExecutionPhase::Publish);
+    assert_eq!(
+        validate_task_board_workflow_transition_state(&forced_publish),
+        Err(TaskBoardWorkflowTransitionError::InvalidPhase {
+            workflow_kind: TaskBoardWorkflowKind::PR_REVIEW,
+            phase: TaskBoardExecutionPhase::Publish,
+        })
+    );
 }
 
 #[test]
