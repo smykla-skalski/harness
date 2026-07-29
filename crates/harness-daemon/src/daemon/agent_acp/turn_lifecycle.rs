@@ -382,20 +382,20 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
                 "OpenRouter turn cancelled",
             )));
         }
-        let Some(failure) = self
-            .inspect_turn(id)?
-            .session_state
-            .and_then(|state| state.last_turn_failure)
-        else {
+        let Some(state) = self.inspect_turn(id)?.session_state else {
             return Ok(None);
         };
+        let Some(failure) = state.last_turn_failure else {
+            return Ok(None);
+        };
+        let actual_model = effective_model(&state.config_options);
         let (run_status, stop_reason, error) =
             if failure.category == AgentTurnFailureCategory::Cancelled {
                 (AgentTurnRunStatus::Cancelled, Some(failure.detail.clone()), None)
             } else {
                 (AgentTurnRunStatus::Failed, None, Some(failure.detail.clone()))
             };
-        self.persist_settlement(id, run_status, None, None, stop_reason, error)
+        self.persist_settlement(id, run_status, actual_model, None, stop_reason, error)
             .await?;
         Ok(Some(failure))
     }

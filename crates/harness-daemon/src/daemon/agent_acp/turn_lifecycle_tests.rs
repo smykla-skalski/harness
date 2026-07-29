@@ -46,6 +46,12 @@ impl FakeManager {
 
     fn fail(&self, detail: &str) {
         let mut state = self.state.lock().expect("state lock");
+        state.config_options = vec![AcpSessionConfigOptionState {
+            id: "model".into(),
+            name: "Model".into(),
+            category: Some("model".into()),
+            current_value: MODEL.into(),
+        }];
         state.last_turn_failure = Some(AgentTurnFailure::new(
             AgentTurnFailureCategory::ProviderRejected,
             AgentTurnFailureStage::Execution,
@@ -342,6 +348,7 @@ async fn failure_records_a_terminal_failure() {
         Some("provider rejected the request")
     );
     assert!(stored.stop_reason.is_none());
+    assert_eq!(stored.actual_model.as_deref(), Some(MODEL));
 }
 
 #[tokio::test]
