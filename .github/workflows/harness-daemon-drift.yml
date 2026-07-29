@@ -1,0 +1,67 @@
+# Harness Daemon Drift workflow
+#
+# `harness-daemon` re-includes root source modules via #[path] instead of
+# depending on the root `harness` package, but it declares its Cargo
+# dependencies and features separately in its own Cargo.toml. A root change
+# that adds a dependency or enables a feature used by that shared source
+# leaves harness-daemon's manifest behind, and nothing catches it until
+# someone builds harness-daemon specifically (see #551, #559, #581). This
+# workflow runs that build on every PR that could cause it.
+
+name: Harness Daemon Drift
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/harness-daemon-drift.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".cargo/**"
+      - "src/**"
+      - "crates/harness-daemon/**"
+      - "crates/harness-workspace/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/harness-daemon-drift.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".cargo/**"
+      - "src/**"
+      - "crates/harness-daemon/**"
+      - "crates/harness-workspace/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  daemon-drift:
+    name: harness-daemon dependency drift
+    runs-on: ${{ fromJSON(vars.RUNNER_LABEL || '["ubuntu-24.04"]') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # `.cargo/config.toml` pins the Linux linker to mold unconditionally, so
+      # every rustc invocation here needs it on PATH before cargo runs.
+      - name: Install mold linker
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Cache Cargo registry and harness-daemon build lane
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/dev
+          key: harness-daemon-drift-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/**') }}
+          restore-keys: |
+            harness-daemon-drift-${{ runner.os }}-
+
+      - name: Check harness-daemon against its own Cargo.toml
+        run: ./scripts/cargo-local.sh clippy --all-targets -p harness-daemon
