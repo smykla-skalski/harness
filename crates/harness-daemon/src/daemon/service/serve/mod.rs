@@ -37,9 +37,8 @@ pub(crate) use remote::serve_remote_https;
 
 use super::{
     AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, DaemonHttpState,
-    DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME, OnceLock, Path,
-    ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, bridge, broadcast, http, index, process_id,
-    state, tokio_watch, watch,
+    DaemonServeConfig, Duration, Mutex, OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL,
+    SessionStatus, bridge, broadcast, http, index, process_id, state, tokio_watch, watch,
 };
 use crate::daemon::acp_probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
@@ -75,13 +74,12 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
     let db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>> = Arc::new(OnceLock::new());
     let async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>> = Arc::new(OnceLock::new());
-    let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
-        sender: sender.clone(),
-        poll_interval: config.observe_interval,
-        running_sessions: Arc::default(),
-        db: db.clone(),
-        async_db: async_db.clone(),
-    });
+    super::install_observe_runtime(
+        sender.clone(),
+        config.observe_interval,
+        db.clone(),
+        async_db.clone(),
+    );
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
     let _shutdown_signal_guard =
         shutdown_signals::ShutdownSignalGuard::install(shutdown_tx.clone())?;

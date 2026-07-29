@@ -1,6 +1,7 @@
 use serde_json::Value;
 use sqlx::{QueryBuilder, Sqlite, Transaction, query};
 
+use crate::daemon::audit_events::AuditEventStore;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, HarnessMonitorAuditEventsResponse,
 };
@@ -111,6 +112,22 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("query audit events: {error}")))?;
         audit_response(rows, limit)
+    }
+}
+
+// The only place `AsyncDaemonDb` is named as the recorder's storage
+// contract - keeping it here, next to the concrete type, means the
+// recorder itself never has to import `db`.
+impl AuditEventStore for AsyncDaemonDb {
+    async fn upsert_audit_event(&self, event: &HarnessMonitorAuditEvent) -> Result<(), CliError> {
+        Self::upsert_audit_event(self, event).await
+    }
+
+    async fn insert_audit_event_if_absent(
+        &self,
+        event: &HarnessMonitorAuditEvent,
+    ) -> Result<bool, CliError> {
+        Self::insert_audit_event_if_absent(self, event).await
     }
 }
 
