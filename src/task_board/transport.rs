@@ -1,7 +1,6 @@
 use clap::{Args, Subcommand};
 use serde::Serialize;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
 };
@@ -9,6 +8,7 @@ use crate::task_board::types::{AgentMode, TaskBoardItemKind, TaskBoardPriority, 
 use crate::task_board::wire::{TASK_BOARD_STORAGE_DATABASE, TaskBoardCapabilitiesResponse};
 use harness_daemon_client::{ClientError, DaemonClient};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 mod catalog;
 mod dispatch;

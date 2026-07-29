@@ -6,7 +6,6 @@ use std::io::{self, Read};
 use clap::Args;
 use serde_json::Value;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::policy_graph::PolicyCanvasRecord;
 use crate::task_board::wire::{
     POLICY_TRANSFER_FORMAT, POLICY_TRANSFER_VERSION, PolicyCanvasWorkspaceResponse,
@@ -14,6 +13,7 @@ use crate::task_board::wire::{
     PolicyTransferWorkspaceMetadata,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 

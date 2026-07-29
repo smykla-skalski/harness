@@ -5,7 +5,6 @@ use clap::{ArgAction, Args, Subcommand, ValueEnum};
 use harness_daemon_client::DaemonClient;
 use serde_json::Value;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
     TaskBoardAutomationPolicy, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
@@ -17,6 +16,7 @@ use crate::task_board::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::orchestrator_tokens::TaskBoardOrchestratorGithubTokensArgs;
 use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};

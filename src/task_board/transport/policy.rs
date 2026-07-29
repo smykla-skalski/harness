@@ -1,7 +1,6 @@
 use clap::{ArgAction, Args, Subcommand};
 use serde::Serialize;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::wire::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
     PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
@@ -10,6 +9,7 @@ use crate::task_board::wire::{
 };
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
 use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};

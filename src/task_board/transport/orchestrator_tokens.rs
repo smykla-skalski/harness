@@ -2,12 +2,12 @@ use std::env;
 
 use clap::Args;
 
-use crate::app::command_context::{AppContext, Execute};
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, normalize_repository_slug,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::command_context::{AppContext, Execute};
 
 use super::{leaf_daemon_client, leaf_daemon_client_error, print_json};
 
@@ -97,7 +97,7 @@ fn repository_token_from_env(value: &str) -> Result<TaskBoardGitHubRepositoryTok
 
 #[cfg(test)]
 mod tests {
-    use crate::app::command_context::Execute;
+    use harness_workspace::command_context::Execute;
 
     use super::*;
 
