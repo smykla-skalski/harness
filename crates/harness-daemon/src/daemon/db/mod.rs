@@ -55,6 +55,7 @@ mod conversation;
 mod diagnostics;
 mod imports;
 mod policy;
+mod pull_request_actions;
 mod rebuild;
 mod remote_acme;
 mod remote_acme_cas;
@@ -127,6 +128,7 @@ mod schema_v53;
 mod schema_v54;
 mod schema_v55;
 mod schema_v56;
+mod schema_v57;
 #[allow(dead_code)]
 mod task_board;
 #[cfg(test)]
@@ -394,7 +396,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "56";
+pub(crate) const SCHEMA_VERSION: &str = "57";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

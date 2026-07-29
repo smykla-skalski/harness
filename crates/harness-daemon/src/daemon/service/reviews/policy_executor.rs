@@ -10,7 +10,11 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::reviews::token::{github_token, missing_token_error};
 use crate::reviews::policy::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
 use crate::reviews::{ReviewTarget, ReviewsGitHubClient};
-use crate::task_board::github::GitHubMergeMethod;
+use crate::task_board::github::{
+    ActionGateRequirement, GitHubMergeMethod, GitHubPullRequestEvidenceSource, MergeLedgerOutcome,
+    PullRequestAction, PullRequestActionKind, PullRequestIdentity, merge_with_ledger,
+};
+use harness_kernel::errors::CliErrorKind;
 use crate::task_board::policy_runtime::handoff::HandoffPolicyProvider;
 use crate::task_board::policy_runtime::notification::NotificationPolicyProvider;
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
@@ -43,7 +47,7 @@ impl ReviewsPolicyActionExecutor for DaemonReviewsPolicyExecutor {
         target: &ReviewTarget,
         method: GitHubMergeMethod,
     ) -> Result<(), CliError> {
-        let result = self.client.policy_merge(target, method).await;
+        let result = self.durable_merge(target, method).await;
         record_reviews_policy_action_audit_result(
             self.audit_db.as_ref(),
             "reviews.merge",
@@ -57,6 +61,63 @@ impl ReviewsPolicyActionExecutor for DaemonReviewsPolicyExecutor {
         )
         .await;
         result
+    }
+}
+
+impl DaemonReviewsPolicyExecutor {
+    /// Merge through the durable action ledger when a database is available, so a
+    /// restarted policy run never issues a second merge for the same head. The
+    /// ledger records the intent before GitHub sees it and reconciles an
+    /// uncertain prior attempt against fresh evidence before any retry. Without a
+    /// database the merge still runs, gated by the fresh recheck inside
+    /// `policy_merge`, just without cross-restart deduplication.
+    async fn durable_merge(
+        &self,
+        target: &ReviewTarget,
+        method: GitHubMergeMethod,
+    ) -> Result<(), CliError> {
+        // A blank head can never be admitted (`policy_merge` refuses it), so route
+        // straight there rather than record a ledger intent that would only ever
+        // resolve as an uncertain, un-reconcilable entry for an invalid action.
+        if target.head_sha.trim().is_empty() {
+            return self.client.policy_merge(target, method).await;
+        }
+        let Some(store) = self.audit_db.clone() else {
+            return self.client.policy_merge(target, method).await;
+        };
+        let source = GitHubPullRequestEvidenceSource::new(self.client.protected());
+        let action = PullRequestAction {
+            id: format!(
+                "reviews.merge:{}#{}@{}",
+                target.repository, target.number, target.head_sha
+            ),
+            kind: PullRequestActionKind::Merge,
+            identity: PullRequestIdentity::from_slug(target.repository.clone(), target.number)
+                .with_url(Some(target.url.clone())),
+            head_revision: target.head_sha.clone(),
+        };
+        let outcome = merge_with_ledger(
+            store.as_ref(),
+            &source,
+            action,
+            ActionGateRequirement::for_merge(),
+            || self.client.merge_verified(target, method),
+        )
+        .await?;
+        match outcome {
+            MergeLedgerOutcome::Merged | MergeLedgerOutcome::AlreadyApplied => Ok(()),
+            MergeLedgerOutcome::Blocked(blocks) => Err(CliErrorKind::workflow_io(format!(
+                "refused merge for {}#{}: {}",
+                target.repository,
+                target.number,
+                blocks
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ))
+            .into()),
+        }
     }
 }
 

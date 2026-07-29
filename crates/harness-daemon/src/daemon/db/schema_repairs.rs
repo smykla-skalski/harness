@@ -303,6 +303,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v54::run(&db.conn)?;
     super::schema_v55::run(&db.conn)?;
     super::schema_v56::run(&db.conn)?;
+    super::schema_v57::run(&db.conn)?;
     super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     super::schema_repairs_wake_events::require_complete_shape(&db.conn)?;
     super::schema_repairs_admission::require_complete_shape(&db.conn)?;

@@ -189,6 +189,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         // v56 renames the task-board inbox lane. The synchronous path also
         // canonicalizes nested JSON status fields before it seeds this row.
         55 => 56,
+        // v57 adds the durable pull_request_actions ledger.
+        56 => 57,
         _ => u64::MAX,
     }
 }

@@ -30,12 +30,12 @@ pub use pr_evidence::{
     ActionAdmission, ActionGateBlock, ActionGateDecision, ActionGateRequirement, ActionOutcome,
     ActionState, CheckGate, CheckState, CheckWait, CheckWaitControls, CheckWaitOutcome,
     CheckWaitProgress, GitHubPullRequestEvidenceSource, InMemoryPullRequestActionStore,
-    InMemoryPullRequestEvidenceSource, Mergeability, PullRequestAction,
+    InMemoryPullRequestEvidenceSource, Mergeability, MergeLedgerOutcome, PullRequestAction,
     PullRequestActionFailureClass, PullRequestActionKind, PullRequestActionStore,
     PullRequestEvidence, PullRequestEvidenceRead, PullRequestEvidenceSource, PullRequestIdentity,
     PullRequestLifecycle, PullRequestMergeGates, RecordedAction, ReviewDecision, ReviewGate,
-    action_effect_observed, begin_action, evaluate_action_gates, finish_action, poll_check_wait,
-    reconcile_action, verify_action_gates,
+    action_effect_observed, begin_action, evaluate_action_gates, finish_action, merge_with_ledger,
+    poll_check_wait, reconcile_action, verify_action_gates,
 };
 pub use publication::GitHubBranchState;
 pub use publication::{SigningVerifyOutcome, verify_signing_for_profile};
@@ -105,6 +105,22 @@ pub trait GitHubAutomationClient: Send + Sync {
         config: &GitHubProjectConfig,
         pull_request_number: u64,
     ) -> Result<GitHubMergeEvidence, CliError>;
+
+    /// Read fresh pull-request evidence - normalized identity, lifecycle, and
+    /// every merge gate - the fresh recheck an action gate is evaluated against
+    /// immediately before a mutation.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn read_pull_request_evidence(
+        &self,
+        _config: &GitHubProjectConfig,
+        _pull_request_number: u64,
+    ) -> Result<PullRequestEvidenceRead, CliError> {
+        Err(CliError::from(CliErrorKind::workflow_io(
+            "task-board github read_pull_request_evidence is unsupported",
+        )))
+    }
 
     /// Load current pull-request metadata.
     ///

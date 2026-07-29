@@ -1,14 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::task_board::github::{
-    GitHubAutomation, GitHubAutomationClient, GitHubMergeEvidence, GitHubProjectConfig,
-    GitHubPullRequestHandle, build_auto_merge_policy_input,
+    ActionGateBlock, ActionGateDecision, ActionGateRequirement, GitHubAutomation,
+    GitHubAutomationClient, GitHubMergeEvidence, GitHubProjectConfig, GitHubPullRequestHandle,
+    build_auto_merge_policy_input, evaluate_action_gates,
 };
 use crate::task_board::{
     PolicyAction, PolicyDecision, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
     TaskBoardWorkflowState,
 };
-use harness_kernel::errors::CliErrorKind;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DatabaseAutomationRequest;
 use super::support::{
@@ -303,30 +304,123 @@ async fn auto_merge_item(
     );
     match decision {
         PolicyDecision::Allow { .. } => {
-            if let Err(error) = context
-                .client
-                .merge_pull_request(
-                    context.config,
-                    pr_number,
-                    context.config.merge_method,
-                    Some(pull_request.head_sha.as_str()),
-                )
-                .await
-            {
-                return failure(&mut prepared.workflow, STEP_PR_FAILED, &error);
-            }
-            waiting(&mut prepared.workflow, STEP_MERGED);
-            prepared
-                .workflow
-                .policy_trace_ids
-                .push(new_policy_trace_id());
-            prepared.workflow.clone()
+            perform_auto_merge(context, prepared, pr_number, pull_request, desired_labels).await
         }
         decision => {
             apply_merge_block_decision(context, prepared, &mut desired_labels, &decision);
             sync_labels_for_context(context, prepared, pr_number, desired_labels).await
         }
     }
+}
+
+/// Re-read fresh evidence, refuse the merge if a gate regressed since the policy
+/// decision, and otherwise issue it. The policy decision above was made on the
+/// merge evidence fetched a moment earlier; this is the final boundary that
+/// binds the merge to the current head and gates immediately before the call.
+async fn perform_auto_merge(
+    context: &AutomationContext<'_>,
+    prepared: &mut PreparedItem,
+    pr_number: u64,
+    pull_request: &GitHubPullRequestHandle,
+    mut desired_labels: BTreeSet<String>,
+) -> TaskBoardWorkflowState {
+    match fresh_merge_gate(context, pr_number, &pull_request.head_sha).await {
+        Ok(MergeGate::Proceed) => {}
+        Ok(MergeGate::WaitForChecks) => {
+            waiting(&mut prepared.workflow, STEP_WAITING_FOR_CHECKS);
+            prepared
+                .workflow
+                .policy_trace_ids
+                .push(new_policy_trace_id());
+            return sync_labels_for_context(context, prepared, pr_number, desired_labels).await;
+        }
+        Ok(MergeGate::NeedsHuman) => {
+            // A terminal block (closed, draft, conflicting, or unauthorized) cannot
+            // clear on its own, so surface it for a human rather than re-waiting on
+            // checks every tick.
+            desired_labels.insert(context.config.labels.needs_human.clone());
+            waiting(&mut prepared.workflow, STEP_WAITING_FOR_HUMAN);
+            prepared
+                .workflow
+                .policy_trace_ids
+                .push(new_policy_trace_id());
+            return sync_labels_for_context(context, prepared, pr_number, desired_labels).await;
+        }
+        Err(error) => {
+            return failure(&mut prepared.workflow, STEP_EVIDENCE_FAILED, &error);
+        }
+    }
+    if let Err(error) = context
+        .client
+        .merge_pull_request(
+            context.config,
+            pr_number,
+            context.config.merge_method,
+            Some(pull_request.head_sha.as_str()),
+        )
+        .await
+    {
+        return failure(&mut prepared.workflow, STEP_PR_FAILED, &error);
+    }
+    waiting(&mut prepared.workflow, STEP_MERGED);
+    prepared
+        .workflow
+        .policy_trace_ids
+        .push(new_policy_trace_id());
+    prepared.workflow.clone()
+}
+
+/// What a fresh pre-merge evidence read means for a managed auto-merge.
+enum MergeGate {
+    /// Every mechanical gate clears on the verified head.
+    Proceed,
+    /// A transient block (checks pending, mergeability still computing, or a
+    /// moved head) that a later tick may clear.
+    WaitForChecks,
+    /// A terminal block that cannot clear without intervention.
+    NeedsHuman,
+}
+
+/// Read fresh evidence and classify whether the managed merge may proceed, should
+/// wait for a transient block to clear, or needs a human for a terminal block.
+async fn fresh_merge_gate(
+    context: &AutomationContext<'_>,
+    pr_number: u64,
+    verified_head: &str,
+) -> Result<MergeGate, CliError> {
+    let read = context
+        .client
+        .read_pull_request_evidence(context.config, pr_number)
+        .await?;
+    match evaluate_action_gates(&read, verified_head, ActionGateRequirement::for_managed_merge()) {
+        ActionGateDecision::Proceed(_) => Ok(MergeGate::Proceed),
+        ActionGateDecision::Blocked(blocks) => {
+            tracing::warn!(
+                pull_request = pr_number,
+                blocks = ?blocks,
+                "fresh evidence blocked task-board auto-merge"
+            );
+            if blocks.iter().any(block_needs_human) {
+                Ok(MergeGate::NeedsHuman)
+            } else {
+                Ok(MergeGate::WaitForChecks)
+            }
+        }
+    }
+}
+
+/// Whether a gate block is terminal - a state that cannot become mergeable
+/// without human intervention, as opposed to a transient one that a later tick
+/// may clear.
+fn block_needs_human(block: &ActionGateBlock) -> bool {
+    matches!(
+        block,
+        ActionGateBlock::PullRequestMissing
+            | ActionGateBlock::NotOpen(_)
+            | ActionGateBlock::Draft
+            | ActionGateBlock::Conflicts
+            | ActionGateBlock::WritePermissionMissing
+    )
 }
 
 fn apply_merge_block_decision(
