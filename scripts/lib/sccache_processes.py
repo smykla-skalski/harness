@@ -8,10 +8,14 @@ from pathlib import Path
 from typing import Iterable
 
 
+def _canonical_socket_path(path: str | Path) -> Path:
+    candidate = str(path).removesuffix(" type=STREAM").removesuffix(" (deleted)")
+    return Path(os.path.realpath(candidate))
+
+
 def _path_is_under(path: str, root: Path) -> bool:
-    candidate = path.removesuffix(" type=STREAM").removesuffix(" (deleted)")
     try:
-        resolved_candidate = Path(os.path.realpath(candidate))
+        resolved_candidate = _canonical_socket_path(path)
         resolved_root = Path(os.path.realpath(root))
         return resolved_candidate.is_relative_to(resolved_root)
     except (OSError, ValueError):
@@ -96,15 +100,12 @@ def socket_owners_under(root: Path) -> dict[int, tuple[str, ...]]:
 
 
 def pids_for_socket(path: Path) -> tuple[int, ...]:
-    target = str(path)
+    target = _canonical_socket_path(path)
     owners = socket_owners_under(path.parent)
     return tuple(
         pid
         for pid, paths in owners.items()
-        if any(
-            owned.removesuffix(" type=STREAM").removesuffix(" (deleted)") == target
-            for owned in paths
-        )
+        if any(_canonical_socket_path(owned) == target for owned in paths)
     )
 
 

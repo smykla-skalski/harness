@@ -14,6 +14,31 @@ from scripts.lib import sccache_processes
 
 
 class SccacheProcessTests(unittest.TestCase):
+    def test_pids_for_socket_canonicalizes_tmp_aliases(self) -> None:
+        target = Path("/tmp/hst.fixture/owned.sock")
+        owners = {41: ("/private/tmp/hst.fixture/owned.sock type=STREAM",)}
+        aliases = {
+            str(target): "/private/tmp/hst.fixture/owned.sock",
+            "/private/tmp/hst.fixture/owned.sock": (
+                "/private/tmp/hst.fixture/owned.sock"
+            ),
+        }
+        with (
+            patch.object(
+                sccache_processes,
+                "socket_owners_under",
+                return_value=owners,
+            ),
+            patch.object(
+                sccache_processes.os.path,
+                "realpath",
+                side_effect=lambda path: aliases[str(path)],
+            ),
+        ):
+            pids = sccache_processes.pids_for_socket(target)
+
+        self.assertEqual(pids, (41,))
+
     def test_path_ownership_canonicalizes_tmp_aliases(self) -> None:
         aliases = {
             "/tmp/hst.fixture": "/private/tmp/hst.fixture",

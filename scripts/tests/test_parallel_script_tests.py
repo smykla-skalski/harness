@@ -417,6 +417,26 @@ print(tmp)
             ["support-1", "release-1", "cargo-1", "support-2", "cargo-2"],
         )
 
+    def test_dedicated_and_combined_cargo_suites_enable_cache(self) -> None:
+        runner = load_runner()
+        dedicated = runner.build_tasks("cargo-local", host_os="Linux")
+        combined = tuple(
+            task
+            for task in runner.build_tasks("all", host_os="Linux")
+            if task.label.startswith("cargo-local:")
+        )
+
+        self.assertTrue(dedicated)
+        self.assertTrue(combined)
+        self.assertTrue(all(task.cache_enabled for task in dedicated))
+        self.assertTrue(all(task.cache_enabled for task in combined))
+        self.assertFalse(
+            any(
+                task.cache_enabled
+                for task in runner.build_tasks("support", host_os="Linux")
+            )
+        )
+
     def test_teardown_kills_only_processes_owned_by_the_sandbox(self) -> None:
         runner = load_runner()
         with tempfile.TemporaryDirectory(prefix="hst.", dir="/tmp") as directory:

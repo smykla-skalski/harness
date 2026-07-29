@@ -793,7 +793,8 @@ def build_tasks(suite: str, host_os: str | None = None) -> tuple[Task, ...]:
         )
     if suite == "cargo-local":
         return tuple(
-            _scenario_tasks(
+            replace(task, cache_enabled=True)
+            for task in _scenario_tasks(
                 "cargo-local",
                 cargo_script,
                 exclusive=frozenset(
