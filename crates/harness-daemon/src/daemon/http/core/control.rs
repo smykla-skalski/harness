@@ -6,13 +6,13 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
-use crate::daemon::acp_probe::probe_acp_agents_cached;
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::bridge::BridgeStatusReport;
 use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::protocol::{GitHubApiDiagnostics, WsConfigPayload, http_paths};
 use crate::daemon::service;
 use crate::daemon::websocket::build_config_payload;
+use harness_daemon_acp_probe::probe_acp_agents_cached;
 use harness_kernel::errors::CliError;
 use harness_protocol::daemon::summaries::{
     DaemonControlResponse, HostBridgeReconfigureRequest, LogLevelResponse, SetLogLevelRequest,

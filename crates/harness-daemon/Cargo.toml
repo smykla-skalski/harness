@@ -30,6 +30,7 @@ gix = { version = "0.86.0", features = ["progress-tree", "status", "worktree-mut
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["bridge-runtime"] }
 harness-command = { path = "../harness-command", version = "55.0.0" }
+harness-daemon-acp-probe = { path = "../harness-daemon-acp-probe", version = "55.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
 harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.0" }
 harness-db-schema = { path = "../harness-db-schema", version = "55.0.0" }

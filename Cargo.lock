@@ -3706,6 +3706,7 @@ dependencies = [
  "gray_matter",
  "harness-agents",
  "harness-command",
+ "harness-daemon-acp-probe",
  "harness-daemon-client",
  "harness-daemon-state",
  "harness-db-schema",
@@ -3781,6 +3782,15 @@ dependencies = [
  "vt100",
  "walkdir",
  "x509-parser",
+]
+
+[[package]]
+name = "harness-daemon-acp-probe"
+version = "55.0.0"
+dependencies = [
+ "harness-agents",
+ "harness-workspace",
+ "tracing",
 ]
 
 [[package]]

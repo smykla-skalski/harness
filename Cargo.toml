@@ -5,6 +5,7 @@ members = [
   "crates/harness-agents",
   "crates/harness-bridge",
   "crates/harness-command",
+  "crates/harness-daemon-acp-probe",
   "crates/harness-daemon-client",
   "crates/harness-daemon-root",
   "crates/harness-daemon-state",

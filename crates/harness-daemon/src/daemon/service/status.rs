@@ -3,11 +3,11 @@ use super::{
     DaemonManifest, DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL,
     SetLogLevelRequest, StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
-use crate::daemon::acp_probe::probe_acp_agents_cached;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::protocol::GitHubApiDiagnostics;
 use crate::github_api::GitHubProtectedClient;
+use harness_daemon_acp_probe::probe_acp_agents_cached;
 use harness_kernel::redact::secrets;
 use harness_protocol::daemon::summaries::{DaemonTelemetryRequest, DaemonTelemetryResponse};
 use tokio::task::{JoinError, spawn_blocking};

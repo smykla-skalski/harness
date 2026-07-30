@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
-use crate::daemon::acp_probe::probe_acp_agents_cached;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, acp_transcript_response,
     ensure_acp_agent, ensure_acp_enabled, managed_agent_list_response_async,
@@ -14,6 +13,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::remote_diagnostics::{project_audit_events, project_diagnostics_report};
 use crate::daemon::service;
+use harness_daemon_acp_probe::probe_acp_agents_cached;
 use harness_kernel::errors::CliError;
 use harness_protocol::timeline::TimelineWindowRequest;
 

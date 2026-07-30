@@ -10,11 +10,11 @@ use utoipa_axum::routes;
 
 use axum::extract::Query;
 
-use crate::daemon::acp_probe::cached_probe_snapshot;
 use crate::daemon::protocol::{RuntimeSessionResolutionResponse, http_paths};
 use crate::daemon::remote_diagnostics::project_diagnostics_report;
 use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::daemon::service;
+use harness_daemon_acp_probe::cached_probe_snapshot;
 use harness_kernel::errors::CliErrorKind;
 use harness_protocol::daemon::summaries::{
     DaemonTelemetryRequest, DaemonTelemetryResponse, HealthResponse, ReadinessResponse,
