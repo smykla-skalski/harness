@@ -1,88 +1,91 @@
-//! Async CRUD for the normalized policy tables on `AsyncDaemonDb`. Reads use
-//! five bulk SELECTs grouped in memory; writes and read-modify-write run under a
-//! single immediate transaction so concurrent canvas edits never lose updates.
+//! Async CRUD for the normalized policy tables. Reads use five bulk SELECTs
+//! grouped in memory; writes and read-modify-write run under a single
+//! immediate transaction so concurrent canvas edits never lose updates.
 
 use std::collections::HashMap;
 
 use sqlx::{Sqlite, Transaction, query, query_as};
 
-use super::super::{AsyncDaemonDb, CliError, db_error, utc_now};
-use super::mapper::{self, CanvasRowSet};
-use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
-use super::sql::{
+use crate::mapper::{self, CanvasRowSet};
+use crate::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
+use crate::sql::{
     SELECT_CANVASES, SELECT_EDGES, SELECT_GROUP_NODES, SELECT_GROUPS, SELECT_NODES,
     SELECT_WORKSPACE,
 };
-use crate::task_board::policy_graph::PolicyCanvasWorkspace;
+use crate::{PolicyGraphStore, db_error};
+use harness_kernel::errors::CliError;
+use harness_task_board::policy_graph::PolicyCanvasWorkspace;
+use harness_workspace::workspace::utc_now;
 
-impl AsyncDaemonDb {
-    /// Load the durable policy canvas workspace, or `None` when unseeded.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or deserialization failures.
-    pub(crate) async fn load_policy_workspace(
-        &self,
-    ) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("policy workspace load")
-            .await?;
-        let workspace = load_workspace_in_tx(&mut transaction).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit policy workspace load: {error}")))?;
-        Ok(workspace)
-    }
-
-    /// Replace the entire durable policy workspace with `workspace`.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or serialization failures.
-    pub(crate) async fn replace_policy_workspace(
-        &self,
-        workspace: &PolicyCanvasWorkspace,
-    ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("policy workspace replace")
-            .await?;
-        write_workspace_in_tx(&mut transaction, workspace).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit policy workspace replace: {error}")))?;
-        Ok(())
-    }
-
-    /// Atomically read-modify-write the policy workspace. `mutate` sees the
-    /// current workspace (seeded if absent) and may reject the change; on error
-    /// the transaction rolls back and on-disk state is unchanged.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] from `mutate` or on SQL failures.
-    pub(crate) async fn update_policy_workspace<F, R>(
-        &self,
-        mutate: F,
-    ) -> Result<(PolicyCanvasWorkspace, R), CliError>
-    where
-        F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<R, CliError>,
-    {
-        let mut transaction = self
-            .begin_immediate_transaction("policy workspace update")
-            .await?;
-        let mut workspace = load_workspace_in_tx(&mut transaction)
-            .await?
-            .unwrap_or_else(PolicyCanvasWorkspace::seeded);
-        let result = mutate(&mut workspace)?;
-        write_workspace_in_tx(&mut transaction, &workspace).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit policy workspace update: {error}")))?;
-        Ok((workspace, result))
-    }
+/// Load the durable policy canvas workspace, or `None` when unseeded.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL or deserialization failures.
+pub async fn load_policy_workspace<D: PolicyGraphStore>(
+    db: &D,
+) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("policy workspace load")
+        .await?;
+    let workspace = load_workspace_in_tx(&mut transaction).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit policy workspace load: {error}")))?;
+    Ok(workspace)
 }
 
-pub(crate) async fn load_workspace_in_tx(
+/// Replace the entire durable policy workspace with `workspace`.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL or serialization failures.
+pub async fn replace_policy_workspace<D: PolicyGraphStore>(
+    db: &D,
+    workspace: &PolicyCanvasWorkspace,
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("policy workspace replace")
+        .await?;
+    write_workspace_in_tx(&mut transaction, workspace).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit policy workspace replace: {error}")))?;
+    Ok(())
+}
+
+/// Atomically read-modify-write the policy workspace. `mutate` sees the
+/// current workspace (seeded if absent) and may reject the change; on error
+/// the transaction rolls back and on-disk state is unchanged.
+///
+/// # Errors
+/// Returns [`CliError`] from `mutate` or on SQL failures.
+pub async fn update_policy_workspace<D, F, R>(
+    db: &D,
+    mutate: F,
+) -> Result<(PolicyCanvasWorkspace, R), CliError>
+where
+    D: PolicyGraphStore,
+    F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<R, CliError>,
+{
+    let mut transaction = db
+        .begin_immediate_transaction("policy workspace update")
+        .await?;
+    let mut workspace = load_workspace_in_tx(&mut transaction)
+        .await?
+        .unwrap_or_else(PolicyCanvasWorkspace::seeded);
+    let result = mutate(&mut workspace)?;
+    write_workspace_in_tx(&mut transaction, &workspace).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit policy workspace update: {error}")))?;
+    Ok((workspace, result))
+}
+
+/// # Errors
+/// Returns [`CliError`] on SQL or deserialization failures.
+pub async fn load_workspace_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
     let Some(workspace_row) = query_as::<_, WorkspaceRow>(SELECT_WORKSPACE)
@@ -196,7 +199,7 @@ async fn clear_policy_rows(transaction: &mut Transaction<'_, Sqlite>) -> Result<
     Ok(())
 }
 
-pub(super) async fn insert_canvas_rowset(
+pub(crate) async fn insert_canvas_rowset(
     transaction: &mut Transaction<'_, Sqlite>,
     set: &CanvasRowSet,
 ) -> Result<(), CliError> {
@@ -395,7 +398,3 @@ const INSERT_GROUP: &str = "INSERT INTO policy_groups (canvas_id, group_id, posi
     frame_x, frame_y, frame_width, frame_height) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
 const INSERT_GROUP_NODE: &str = "INSERT INTO policy_group_nodes (canvas_id, group_id, node_id, position) \
     VALUES (?1, ?2, ?3, ?4)";
-
-#[cfg(test)]
-#[path = "store_async_tests.rs"]
-mod tests;

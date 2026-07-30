@@ -12,13 +12,16 @@ use serde_json::Value;
 use sqlx::{Executor, FromRow, Sqlite, query, query_as, query_scalar};
 use uuid::Uuid;
 
-use super::super::{AsyncDaemonDb, CliError, db_error, usize_from_i64};
-use crate::task_board::{PolicyAction, PolicyApprovalGrant, PolicyApprovalState, PolicyReasonCode};
-use crate::workspace::utc_now;
+use crate::{PolicyGraphStore, db_error, usize_from_i64};
+use harness_kernel::errors::CliError;
+use harness_task_board::{
+    PolicyAction, PolicyApprovalGrant, PolicyApprovalState, PolicyReasonCode,
+};
+use harness_workspace::workspace::utc_now;
 
 /// Fields needed to create a pending grant for an approval gate.
 #[derive(Debug, Clone)]
-pub(crate) struct NewApprovalGrant {
+pub struct NewApprovalGrant {
     pub board_item_id: String,
     pub action: PolicyAction,
     pub canvas_id: Option<String>,
@@ -103,220 +106,230 @@ WHERE id = ?1 AND state = 'approved' AND consumed_at IS NOT NULL
   AND (expiry_seconds IS NULL
        OR unixepoch(created_at) + expiry_seconds > unixepoch(?2))";
 
-impl AsyncDaemonDb {
-    /// Return the live grant for `grant`'s key, creating a pending one when none
-    /// exists.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on serialization or SQL failure.
-    pub(crate) async fn ensure_pending_approval_grant(
-        &self,
-        grant: &NewApprovalGrant,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        let now = utc_now();
-        self.retire_inactive_approval_grants(grant, &now).await?;
-        if let Some(existing) = self
-            .live_approval_grant_at(
-                &grant.board_item_id,
-                grant.action,
-                grant.canvas_revision,
-                &now,
-            )
-            .await?
-        {
-            return Ok(existing);
-        }
-        let id = format!("policy-grant-{}", Uuid::new_v4().simple());
-        insert_pending_grant_at(self.pool(), &id, grant, &now).await?;
-        self.approval_grant(&id)
-            .await?
-            .ok_or_else(|| db_error("created approval grant vanished".to_string()))
+/// Return the live grant for `grant`'s key, creating a pending one when none
+/// exists.
+///
+/// # Errors
+/// Returns [`CliError`] on serialization or SQL failure.
+pub async fn ensure_pending_approval_grant<D: PolicyGraphStore>(
+    db: &D,
+    grant: &NewApprovalGrant,
+) -> Result<PolicyApprovalGrant, CliError> {
+    let now = utc_now();
+    retire_inactive_approval_grants(db, grant, &now).await?;
+    if let Some(existing) = live_approval_grant_at(
+        db,
+        &grant.board_item_id,
+        grant.action,
+        grant.canvas_revision,
+        &now,
+    )
+    .await?
+    {
+        return Ok(existing);
     }
+    let id = format!("policy-grant-{}", Uuid::new_v4().simple());
+    insert_pending_grant_at(db.pool(), &id, grant, &now).await?;
+    approval_grant(db, &id)
+        .await?
+        .ok_or_else(|| db_error("created approval grant vanished".to_string()))
+}
 
-    /// The live (unconsumed) grant for a (board item, action, revision) key.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or decode failure.
-    pub(crate) async fn live_approval_grant(
-        &self,
-        board_item_id: &str,
-        action: PolicyAction,
-        canvas_revision: u64,
-    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
-        self.live_approval_grant_at(board_item_id, action, canvas_revision, &utc_now())
-            .await
-    }
+/// The live (unconsumed) grant for a (board item, action, revision) key.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL or decode failure.
+pub async fn live_approval_grant<D: PolicyGraphStore>(
+    db: &D,
+    board_item_id: &str,
+    action: PolicyAction,
+    canvas_revision: u64,
+) -> Result<Option<PolicyApprovalGrant>, CliError> {
+    live_approval_grant_at(db, board_item_id, action, canvas_revision, &utc_now()).await
+}
 
-    async fn live_approval_grant_at(
-        &self,
-        board_item_id: &str,
-        action: PolicyAction,
-        canvas_revision: u64,
-        now: &str,
-    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
-        let row: Option<ApprovalGrantRow> = query_as(SELECT_LIVE_GRANT_SQL)
-            .bind(board_item_id)
-            .bind(enum_to_snake(&action)?)
-            .bind(revision_to_i64(canvas_revision))
-            .bind(now)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| db_error(format!("read live approval grant: {error}")))?;
-        row.map(ApprovalGrantRow::into_grant).transpose()
-    }
+/// # Errors
+/// Returns [`CliError`] on SQL or decode failure.
+pub async fn live_approval_grant_at<D: PolicyGraphStore>(
+    db: &D,
+    board_item_id: &str,
+    action: PolicyAction,
+    canvas_revision: u64,
+    now: &str,
+) -> Result<Option<PolicyApprovalGrant>, CliError> {
+    let row: Option<ApprovalGrantRow> = query_as(SELECT_LIVE_GRANT_SQL)
+        .bind(board_item_id)
+        .bind(enum_to_snake(&action)?)
+        .bind(revision_to_i64(canvas_revision))
+        .bind(now)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| db_error(format!("read live approval grant: {error}")))?;
+    row.map(ApprovalGrantRow::into_grant).transpose()
+}
 
-    /// One grant by id.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or decode failure.
-    pub(crate) async fn approval_grant(
-        &self,
-        id: &str,
-    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
-        let row: Option<ApprovalGrantRow> = query_as(SELECT_GRANT_BY_ID_SQL)
-            .bind(id)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| db_error(format!("read approval grant: {error}")))?;
-        row.map(ApprovalGrantRow::into_grant).transpose()
-    }
+/// One grant by id.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL or decode failure.
+pub async fn approval_grant<D: PolicyGraphStore>(
+    db: &D,
+    id: &str,
+) -> Result<Option<PolicyApprovalGrant>, CliError> {
+    let row: Option<ApprovalGrantRow> = query_as(SELECT_GRANT_BY_ID_SQL)
+        .bind(id)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| db_error(format!("read approval grant: {error}")))?;
+    row.map(ApprovalGrantRow::into_grant).transpose()
+}
 
-    /// All pending, unconsumed grants awaiting a human decision.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or decode failure.
-    pub(crate) async fn list_pending_approval_grants(
-        &self,
-    ) -> Result<Vec<PolicyApprovalGrant>, CliError> {
-        self.list_pending_approval_grants_at(&utc_now()).await
-    }
+/// All pending, unconsumed grants awaiting a human decision.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL or decode failure.
+pub async fn list_pending_approval_grants<D: PolicyGraphStore>(
+    db: &D,
+) -> Result<Vec<PolicyApprovalGrant>, CliError> {
+    list_pending_approval_grants_at(db, &utc_now()).await
+}
 
-    async fn list_pending_approval_grants_at(
-        &self,
-        now: &str,
-    ) -> Result<Vec<PolicyApprovalGrant>, CliError> {
-        let rows: Vec<ApprovalGrantRow> = query_as(SELECT_PENDING_GRANTS_SQL)
-            .bind(now)
-            .fetch_all(self.pool())
-            .await
-            .map_err(|error| db_error(format!("list pending approval grants: {error}")))?;
-        rows.into_iter().map(ApprovalGrantRow::into_grant).collect()
-    }
+/// # Errors
+/// Returns [`CliError`] on SQL or decode failure.
+pub async fn list_pending_approval_grants_at<D: PolicyGraphStore>(
+    db: &D,
+    now: &str,
+) -> Result<Vec<PolicyApprovalGrant>, CliError> {
+    let rows: Vec<ApprovalGrantRow> = query_as(SELECT_PENDING_GRANTS_SQL)
+        .bind(now)
+        .fetch_all(db.pool())
+        .await
+        .map_err(|error| db_error(format!("list pending approval grants: {error}")))?;
+    rows.into_iter().map(ApprovalGrantRow::into_grant).collect()
+}
 
-    /// Count pending, unconsumed grants awaiting a human decision.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failure.
-    pub(crate) async fn count_pending_approval_grants(&self) -> Result<usize, CliError> {
-        self.count_pending_approval_grants_at(&utc_now()).await
-    }
+/// Count pending, unconsumed grants awaiting a human decision.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub async fn count_pending_approval_grants<D: PolicyGraphStore>(db: &D) -> Result<usize, CliError> {
+    count_pending_approval_grants_at(db, &utc_now()).await
+}
 
-    async fn count_pending_approval_grants_at(&self, now: &str) -> Result<usize, CliError> {
-        let count: i64 = query_scalar(COUNT_PENDING_GRANTS_SQL)
-            .bind(now)
-            .fetch_one(self.pool())
-            .await
-            .map_err(|error| db_error(format!("count pending approval grants: {error}")))?;
-        Ok(usize_from_i64(count))
-    }
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub async fn count_pending_approval_grants_at<D: PolicyGraphStore>(
+    db: &D,
+    now: &str,
+) -> Result<usize, CliError> {
+    let count: i64 = query_scalar(COUNT_PENDING_GRANTS_SQL)
+        .bind(now)
+        .fetch_one(db.pool())
+        .await
+        .map_err(|error| db_error(format!("count pending approval grants: {error}")))?;
+    Ok(usize_from_i64(count))
+}
 
-    /// Resolve a pending grant to approved or denied, recording the actor.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the grant is missing or already resolved.
-    pub(crate) async fn resolve_approval_grant(
-        &self,
-        id: &str,
-        approve: bool,
-        actor: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        self.resolve_approval_grant_at(id, approve, actor, &utc_now())
-            .await
-    }
+/// Resolve a pending grant to approved or denied, recording the actor.
+///
+/// # Errors
+/// Returns [`CliError`] when the grant is missing or already resolved.
+pub async fn resolve_approval_grant<D: PolicyGraphStore>(
+    db: &D,
+    id: &str,
+    approve: bool,
+    actor: &str,
+) -> Result<PolicyApprovalGrant, CliError> {
+    resolve_approval_grant_at(db, id, approve, actor, &utc_now()).await
+}
 
-    async fn resolve_approval_grant_at(
-        &self,
-        id: &str,
-        approve: bool,
-        actor: &str,
-        now: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        let state = if approve {
-            PolicyApprovalState::Approved
-        } else {
-            PolicyApprovalState::Denied
-        };
-        let affected = query(RESOLVE_GRANT_SQL)
-            .bind(id)
-            .bind(enum_to_snake(&state)?)
-            .bind(actor)
-            .bind(now)
-            .execute(self.pool())
-            .await
-            .map_err(|error| db_error(format!("resolve approval grant: {error}")))?
-            .rows_affected();
-        if affected == 0 {
-            return Err(db_error(format!(
-                "approval grant '{id}' is not pending or does not exist"
-            )));
-        }
-        self.approval_grant(id)
-            .await?
-            .ok_or_else(|| db_error("resolved approval grant vanished".to_string()))
+/// # Errors
+/// Returns [`CliError`] when the grant is missing or already resolved.
+pub async fn resolve_approval_grant_at<D: PolicyGraphStore>(
+    db: &D,
+    id: &str,
+    approve: bool,
+    actor: &str,
+    now: &str,
+) -> Result<PolicyApprovalGrant, CliError> {
+    let state = if approve {
+        PolicyApprovalState::Approved
+    } else {
+        PolicyApprovalState::Denied
+    };
+    let affected = query(RESOLVE_GRANT_SQL)
+        .bind(id)
+        .bind(enum_to_snake(&state)?)
+        .bind(actor)
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .map_err(|error| db_error(format!("resolve approval grant: {error}")))?
+        .rows_affected();
+    if affected == 0 {
+        return Err(db_error(format!(
+            "approval grant '{id}' is not pending or does not exist"
+        )));
     }
+    approval_grant(db, id)
+        .await?
+        .ok_or_else(|| db_error("resolved approval grant vanished".to_string()))
+}
 
-    /// Revoke a live pending or approved grant, recording the actor.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the grant is missing, terminal, consumed, or
-    /// expired.
-    pub(crate) async fn revoke_approval_grant(
-        &self,
-        id: &str,
-        actor: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        self.revoke_approval_grant_at(id, actor, &utc_now()).await
-    }
+/// Revoke a live pending or approved grant, recording the actor.
+///
+/// # Errors
+/// Returns [`CliError`] when the grant is missing, terminal, consumed, or
+/// expired.
+pub async fn revoke_approval_grant<D: PolicyGraphStore>(
+    db: &D,
+    id: &str,
+    actor: &str,
+) -> Result<PolicyApprovalGrant, CliError> {
+    revoke_approval_grant_at(db, id, actor, &utc_now()).await
+}
 
-    async fn revoke_approval_grant_at(
-        &self,
-        id: &str,
-        actor: &str,
-        now: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        let affected = query(REVOKE_GRANT_SQL)
-            .bind(id)
-            .bind(actor)
-            .bind(now)
-            .execute(self.pool())
-            .await
-            .map_err(|error| db_error(format!("revoke approval grant: {error}")))?
-            .rows_affected();
-        if affected == 0 {
-            return Err(db_error(format!(
-                "approval grant '{id}' is not live or does not exist"
-            )));
-        }
-        self.approval_grant(id)
-            .await?
-            .ok_or_else(|| db_error("revoked approval grant vanished".to_string()))
+/// # Errors
+/// Returns [`CliError`] when the grant is missing, terminal, consumed, or
+/// expired.
+pub async fn revoke_approval_grant_at<D: PolicyGraphStore>(
+    db: &D,
+    id: &str,
+    actor: &str,
+    now: &str,
+) -> Result<PolicyApprovalGrant, CliError> {
+    let affected = query(REVOKE_GRANT_SQL)
+        .bind(id)
+        .bind(actor)
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .map_err(|error| db_error(format!("revoke approval grant: {error}")))?
+        .rows_affected();
+    if affected == 0 {
+        return Err(db_error(format!(
+            "approval grant '{id}' is not live or does not exist"
+        )));
     }
+    approval_grant(db, id)
+        .await?
+        .ok_or_else(|| db_error("revoked approval grant vanished".to_string()))
+}
 
-    async fn retire_inactive_approval_grants(
-        &self,
-        grant: &NewApprovalGrant,
-        now: &str,
-    ) -> Result<(), CliError> {
-        query(RETIRE_INACTIVE_GRANTS_SQL)
-            .bind(&grant.board_item_id)
-            .bind(enum_to_snake(&grant.action)?)
-            .bind(revision_to_i64(grant.canvas_revision))
-            .bind(now)
-            .execute(self.pool())
-            .await
-            .map_err(|error| db_error(format!("retire inactive approval grants: {error}")))?;
-        Ok(())
-    }
+async fn retire_inactive_approval_grants<D: PolicyGraphStore>(
+    db: &D,
+    grant: &NewApprovalGrant,
+    now: &str,
+) -> Result<(), CliError> {
+    query(RETIRE_INACTIVE_GRANTS_SQL)
+        .bind(&grant.board_item_id)
+        .bind(enum_to_snake(&grant.action)?)
+        .bind(revision_to_i64(grant.canvas_revision))
+        .bind(now)
+        .execute(db.pool())
+        .await
+        .map_err(|error| db_error(format!("retire inactive approval grants: {error}")))?;
+    Ok(())
 }
 
 /// Consume an approved grant on an existing transaction so the one-shot
@@ -324,17 +337,16 @@ impl AsyncDaemonDb {
 ///
 /// # Errors
 /// Returns [`CliError`] on SQL failure.
-pub(crate) async fn consume_approval_grant_in_tx<'a, E>(
-    executor: E,
-    id: &str,
-) -> Result<bool, CliError>
+pub async fn consume_approval_grant_in_tx<'a, E>(executor: E, id: &str) -> Result<bool, CliError>
 where
     E: Executor<'a, Database = Sqlite>,
 {
     consume_approval_grant_in_tx_at(executor, id, &utc_now()).await
 }
 
-pub(crate) async fn consume_approval_grant_in_tx_at<'a, E>(
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub async fn consume_approval_grant_in_tx_at<'a, E>(
     executor: E,
     id: &str,
     now: &str,
@@ -352,7 +364,9 @@ where
     Ok(affected > 0)
 }
 
-pub(crate) async fn live_approval_grant_in_tx_at<'a, E>(
+/// # Errors
+/// Returns [`CliError`] on SQL or decode failure.
+pub async fn live_approval_grant_in_tx_at<'a, E>(
     executor: E,
     board_item_id: &str,
     action: PolicyAction,
@@ -373,7 +387,9 @@ where
     row.map(ApprovalGrantRow::into_grant).transpose()
 }
 
-pub(crate) async fn restore_consumed_approval_grant_in_tx_at<'a, E>(
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub async fn restore_consumed_approval_grant_in_tx_at<'a, E>(
     executor: E,
     id: &str,
     now: &str,
@@ -391,7 +407,16 @@ where
     Ok(affected > 0)
 }
 
-async fn insert_pending_grant_at<'a, E>(
+/// Insert a pending grant row directly, bypassing the live-key idempotency
+/// check `ensure_pending_approval_grant` applies. `pub` (not test-gated)
+/// because it is a legitimate low-level primitive, not a test-only escape
+/// hatch: fixture setups that need several grants for the same key -- to
+/// exercise expiry or revocation ordering -- go through this the same way
+/// `ensure_pending_approval_grant` itself does internally.
+///
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub async fn insert_pending_grant_at<'a, E>(
     executor: E,
     id: &str,
     grant: &NewApprovalGrant,
@@ -479,7 +504,3 @@ fn snake_to_enum<T: DeserializeOwned>(text: &str) -> Result<T, CliError> {
     serde_json::from_value(Value::String(text.to_owned()))
         .map_err(|error| db_error(format!("decode enum '{text}': {error}")))
 }
-
-#[cfg(test)]
-#[path = "approval_grants_tests.rs"]
-mod tests;

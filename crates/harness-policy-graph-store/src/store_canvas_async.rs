@@ -4,103 +4,102 @@ use std::time::Instant;
 
 use sqlx::{Sqlite, Transaction, query, query_as};
 
-use super::super::{AsyncDaemonDb, CliError, db_error};
-use super::mapper::{self, CanvasRowSet};
-#[cfg(test)]
-use super::rows::WorkspaceRow;
-use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow};
-#[cfg(test)]
-use super::sql::SELECT_WORKSPACE;
-use super::sql::{
+use crate::mapper::{self, CanvasRowSet};
+#[cfg(any(test, feature = "test-support"))]
+use crate::rows::WorkspaceRow;
+use crate::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow};
+#[cfg(any(test, feature = "test-support"))]
+use crate::sql::SELECT_WORKSPACE;
+use crate::sql::{
     SELECT_CANVAS_BY_ID, SELECT_EDGES_BY_CANVAS, SELECT_GROUP_NODES_BY_CANVAS,
     SELECT_GROUPS_BY_CANVAS, SELECT_NODES_BY_CANVAS,
 };
-use super::store_async::insert_canvas_rowset;
-use crate::task_board::policy_graph::{
+use crate::store_async::insert_canvas_rowset;
+use crate::{PolicyGraphStore, db_error};
+use harness_kernel::errors::CliError;
+use harness_task_board::policy_graph::{
     PolicyCanvasRecord, PolicyGraph, PolicyPipelineSaveResponse, apply_save_canvas_draft,
 };
 
-pub(crate) struct PolicyCanvasDraftSaveResult {
-    pub(crate) response: PolicyPipelineSaveResponse,
-    #[cfg(test)]
-    pub(crate) saved_canvas: PolicyCanvasRecord,
-    #[cfg(test)]
-    pub(crate) active_canvas_id: String,
-    #[cfg(test)]
-    pub(crate) global_policy_enforcement_enabled: bool,
+pub struct PolicyCanvasDraftSaveResult {
+    pub response: PolicyPipelineSaveResponse,
+    #[cfg(any(test, feature = "test-support"))]
+    pub saved_canvas: PolicyCanvasRecord,
+    #[cfg(any(test, feature = "test-support"))]
+    pub active_canvas_id: String,
+    #[cfg(any(test, feature = "test-support"))]
+    pub global_policy_enforcement_enabled: bool,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl PolicyCanvasDraftSaveResult {
     #[must_use]
-    pub(crate) fn saved_active_canvas(&self) -> bool {
+    pub fn saved_active_canvas(&self) -> bool {
         self.saved_canvas.id == self.active_canvas_id
     }
 
     #[must_use]
-    pub(crate) fn gate_document(&self) -> Option<PolicyGraph> {
+    pub fn gate_document(&self) -> Option<PolicyGraph> {
         (self.global_policy_enforcement_enabled && self.saved_active_canvas())
             .then(|| self.saved_canvas.live_document().cloned())
             .flatten()
     }
 }
 
-impl AsyncDaemonDb {
-    /// Save one policy-canvas draft without rewriting unrelated canvas rows.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on revision conflicts, unknown canvases, validation
-    /// serialization failures, or SQL failures.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "transactional canvas save measures load and write timing in one path"
-    )]
-    pub(crate) async fn save_policy_canvas_draft(
-        &self,
-        canvas_id: &str,
-        document: PolicyGraph,
-        if_revision: u64,
-    ) -> Result<PolicyCanvasDraftSaveResult, CliError> {
-        let total_started = Instant::now();
-        let mut transaction = self
-            .begin_immediate_transaction("policy canvas draft save")
-            .await?;
-        let load_started = Instant::now();
-        #[cfg(test)]
-        let workspace_row = load_workspace_row(&mut transaction).await?;
-        let (mut canvas, position) = load_canvas_rowset(&mut transaction, canvas_id).await?;
-        let load_elapsed = load_started.elapsed();
-        let response = apply_save_canvas_draft(&mut canvas, document, if_revision)?;
-        let write_started = Instant::now();
-        if response.persisted {
-            replace_canvas_rows(&mut transaction, &canvas, position).await?;
-        }
-        let write_elapsed = write_started.elapsed();
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit policy canvas draft save: {error}")))?;
-        tracing::debug!(
-            canvas_id,
-            persisted = response.persisted,
-            load_ms = load_elapsed.as_millis(),
-            write_ms = write_elapsed.as_millis(),
-            total_ms = total_started.elapsed().as_millis(),
-            "saved policy canvas draft"
-        );
-        Ok(PolicyCanvasDraftSaveResult {
-            response,
-            #[cfg(test)]
-            saved_canvas: canvas,
-            #[cfg(test)]
-            active_canvas_id: workspace_row.active_canvas_id,
-            #[cfg(test)]
-            global_policy_enforcement_enabled: workspace_row.global_policy_enforcement_enabled,
-        })
+/// Save one policy-canvas draft without rewriting unrelated canvas rows.
+///
+/// # Errors
+/// Returns [`CliError`] on revision conflicts, unknown canvases, validation
+/// serialization failures, or SQL failures.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "transactional canvas save measures load and write timing in one path"
+)]
+pub async fn save_policy_canvas_draft<D: PolicyGraphStore>(
+    db: &D,
+    canvas_id: &str,
+    document: PolicyGraph,
+    if_revision: u64,
+) -> Result<PolicyCanvasDraftSaveResult, CliError> {
+    let total_started = Instant::now();
+    let mut transaction = db
+        .begin_immediate_transaction("policy canvas draft save")
+        .await?;
+    let load_started = Instant::now();
+    #[cfg(any(test, feature = "test-support"))]
+    let workspace_row = load_workspace_row(&mut transaction).await?;
+    let (mut canvas, position) = load_canvas_rowset(&mut transaction, canvas_id).await?;
+    let load_elapsed = load_started.elapsed();
+    let response = apply_save_canvas_draft(&mut canvas, document, if_revision)?;
+    let write_started = Instant::now();
+    if response.persisted {
+        replace_canvas_rows(&mut transaction, &canvas, position).await?;
     }
+    let write_elapsed = write_started.elapsed();
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit policy canvas draft save: {error}")))?;
+    tracing::debug!(
+        canvas_id,
+        persisted = response.persisted,
+        load_ms = load_elapsed.as_millis(),
+        write_ms = write_elapsed.as_millis(),
+        total_ms = total_started.elapsed().as_millis(),
+        "saved policy canvas draft"
+    );
+    Ok(PolicyCanvasDraftSaveResult {
+        response,
+        #[cfg(any(test, feature = "test-support"))]
+        saved_canvas: canvas,
+        #[cfg(any(test, feature = "test-support"))]
+        active_canvas_id: workspace_row.active_canvas_id,
+        #[cfg(any(test, feature = "test-support"))]
+        global_policy_enforcement_enabled: workspace_row.global_policy_enforcement_enabled,
+    })
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 async fn load_workspace_row(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<WorkspaceRow, CliError> {
