@@ -1,5 +1,5 @@
 use super::*;
-use crate::github::{PullRequestAction, PullRequestActionKind, PullRequestIdentity};
+use crate::github::PullRequestIdentity;
 use crate::{
     TaskBoardEvaluationResult, TaskBoardExecutionOwnership, TaskBoardLifecycleOutcome,
     TaskBoardPhaseVerdict, TaskBoardResolvedReviewer, TaskBoardReviewResult,
@@ -92,30 +92,6 @@ fn check_recovery_reuses_one_exact_head_and_one_terminal_result() {
             .expect_err("stale result")
             .to_string()
             .contains("exact-head wait")
-    );
-}
-
-#[test]
-fn uncertain_github_actions_reconcile_before_any_retry() {
-    let mut action = action(ActionState::Uncertain);
-    let uncertain = classify_task_board_dependency_action_recovery(&action);
-    assert_eq!(uncertain.class, TaskBoardDependencyRecoveryClass::Uncertain);
-    assert!(uncertain.detail.contains("before retrying"));
-
-    action.state = ActionState::Succeeded;
-    assert_eq!(
-        classify_task_board_dependency_action_recovery(&action).class,
-        TaskBoardDependencyRecoveryClass::Completed
-    );
-    action.state = ActionState::Failed(PullRequestActionFailureClass::Transient);
-    assert_eq!(
-        classify_task_board_dependency_action_recovery(&action).class,
-        TaskBoardDependencyRecoveryClass::Resumable
-    );
-    action.state = ActionState::Failed(PullRequestActionFailureClass::Permanent);
-    assert_eq!(
-        classify_task_board_dependency_action_recovery(&action).class,
-        TaskBoardDependencyRecoveryClass::Failed
     );
 }
 
@@ -238,19 +214,6 @@ fn check_wait() -> TaskBoardDependencyCheckWait {
         identity: PullRequestIdentity::from_slug("acme/widgets", 17),
         exact_head_revision: HEAD.into(),
         required_checks: vec!["build".into()],
-    }
-}
-
-fn action(state: ActionState) -> RecordedAction {
-    RecordedAction {
-        action: PullRequestAction {
-            id: "route-1:dependency-merge:head".into(),
-            kind: PullRequestActionKind::Merge,
-            identity: PullRequestIdentity::from_slug("acme/widgets", 17),
-            head_revision: HEAD.into(),
-        },
-        state,
-        detail: None,
     }
 }
 

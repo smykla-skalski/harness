@@ -7,7 +7,6 @@ use super::{
     TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionRecord,
     valid_head_revision,
 };
-use crate::github::{ActionState, PullRequestActionFailureClass, RecordedAction};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -69,23 +68,22 @@ pub fn classify_task_board_dependency_workflow_recovery(
             "dependency workflow active attempt does not match its current step",
         ));
     }
-    let mut attempts = execution
-        .attempts
-        .iter()
-        .filter(|attempt| {
-            attempt_is_current(execution, attempt)
-                && completed_attempt_matches_exact_head(execution, attempt)
-        })
-        .collect::<Vec<_>>();
-    if attempts.iter().any(|attempt| {
-        attempt.state == TaskBoardAttemptState::Completed && attempt.artifact.is_none()
+    let mut attempt = None;
+    for candidate in execution.attempts.iter().filter(|candidate| {
+        attempt_is_current(execution, candidate)
+            && completed_attempt_matches_exact_head(execution, candidate)
     }) {
-        return Err(recovery_error(
-            "dependency workflow completed attempt has no result artifact",
-        ));
+        if candidate.state == TaskBoardAttemptState::Completed && candidate.artifact.is_none() {
+            return Err(recovery_error(
+                "dependency workflow completed attempt has no result artifact",
+            ));
+        }
+        if attempt.is_none_or(|current: &TaskBoardExecutionAttemptRecord| {
+            candidate.attempt > current.attempt
+        }) {
+            attempt = Some(candidate);
+        }
     }
-    attempts.sort_by_key(|attempt| attempt.attempt);
-    let attempt = attempts.last().copied();
     Ok(match attempt {
         Some(attempt) => classify_attempt(execution, attempt),
         None => resumable_without_attempt(execution),
@@ -100,7 +98,7 @@ pub fn classify_task_board_dependency_check_recovery(
     wait: &TaskBoardDependencyCheckWait,
     result: Option<&TaskBoardDependencyCheckResumeRecord>,
 ) -> Result<TaskBoardDependencyRecoveryDecision, CliError> {
-    validate_wait(wait)?;
+    validate_task_board_dependency_check_wait(wait)?;
     let Some(result) = result else {
         return Ok(decision(
             TaskBoardDependencyRecoveryClass::Resumable,
@@ -127,44 +125,6 @@ pub fn classify_task_board_dependency_check_recovery(
         Some(wait.exact_head_revision.clone()),
         "the retained check wait already has one terminal result",
     ))
-}
-
-#[must_use]
-pub fn classify_task_board_dependency_action_recovery(
-    action: &RecordedAction,
-) -> TaskBoardDependencyRecoveryDecision {
-    let step = TaskBoardDependencyRecoveryStep::GitHubAction;
-    let head = Some(action.action.head_revision.clone());
-    match action.state {
-        ActionState::Pending | ActionState::Uncertain => decision(
-            TaskBoardDependencyRecoveryClass::Uncertain,
-            step,
-            Some(action.action.id.clone()),
-            head,
-            "reconcile the GitHub action against fresh evidence before retrying",
-        ),
-        ActionState::Succeeded => decision(
-            TaskBoardDependencyRecoveryClass::Completed,
-            TaskBoardDependencyRecoveryStep::Advance,
-            Some(action.action.id.clone()),
-            head,
-            "the GitHub action already completed",
-        ),
-        ActionState::Failed(PullRequestActionFailureClass::Transient) => decision(
-            TaskBoardDependencyRecoveryClass::Resumable,
-            step,
-            Some(action.action.id.clone()),
-            head,
-            "retry the transient GitHub action through its durable ledger",
-        ),
-        ActionState::Failed(PullRequestActionFailureClass::Permanent) => decision(
-            TaskBoardDependencyRecoveryClass::Failed,
-            TaskBoardDependencyRecoveryStep::Stop,
-            Some(action.action.id.clone()),
-            head,
-            "the GitHub action failed permanently",
-        ),
-    }
 }
 
 fn terminal_decision(
@@ -342,7 +302,13 @@ fn completed_attempt_matches_exact_head(
     }
 }
 
-fn validate_wait(wait: &TaskBoardDependencyCheckWait) -> Result<(), CliError> {
+/// Validate the durable identity and exact-head binding for a dependency check wait.
+///
+/// # Errors
+/// Returns an invalid-transition error when required recovery state is incomplete.
+pub fn validate_task_board_dependency_check_wait(
+    wait: &TaskBoardDependencyCheckWait,
+) -> Result<(), CliError> {
     if wait.resume_id.trim().is_empty()
         || wait.route_id.trim().is_empty()
         || wait.identity.repository.trim().is_empty()
