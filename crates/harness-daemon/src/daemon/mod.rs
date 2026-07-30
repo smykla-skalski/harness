@@ -89,6 +89,8 @@ mod remote_acme_lease_guard;
 #[cfg(feature = "daemon-runtime")]
 mod remote_acme_live;
 #[cfg(feature = "daemon-runtime")]
+mod remote_acme_queries;
+#[cfg(feature = "daemon-runtime")]
 mod remote_acme_renewal;
 #[cfg(feature = "daemon-runtime")]
 pub mod remote_auth;
@@ -101,9 +103,13 @@ pub(crate) mod remote_diagnostics;
 #[cfg(feature = "daemon-runtime")]
 pub mod remote_identity;
 #[cfg(feature = "daemon-runtime")]
+mod remote_identity_queries;
+#[cfg(feature = "daemon-runtime")]
 pub mod remote_pairing;
 #[cfg(feature = "daemon-runtime")]
 mod remote_pairing_expiry_loop;
+#[cfg(feature = "daemon-runtime")]
+mod remote_pairing_queries;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) mod remote_redaction;
 #[cfg(feature = "daemon-runtime")]

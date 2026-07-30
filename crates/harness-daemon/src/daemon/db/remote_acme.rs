@@ -8,6 +8,7 @@ use crate::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeIssuanceState, RemoteAcmeRuntimeState,
     RemoteCertificateBundle, RemoteRenewalOutcome,
 };
+use crate::daemon::remote_acme_queries::{RemoteAcmeRenewalStatus, RemoteAcmeStoredState};
 
 const SELECT_REMOTE_ACME_STATE_SQL: &str = "
 SELECT
@@ -53,36 +54,6 @@ SELECT
     private_key_pem
 FROM remote_acme_state
 WHERE singleton = 1";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RemoteAcmeRenewalStatus {
-    Unknown,
-    Succeeded,
-    Failed,
-}
-
-impl RemoteAcmeRenewalStatus {
-    #[must_use]
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::Unknown => "unknown",
-            Self::Succeeded => "succeeded",
-            Self::Failed => "failed",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RemoteAcmeStoredState {
-    pub(crate) account_configured: bool,
-    pub(crate) account_id: Option<String>,
-    pub(crate) serve_config: Option<RemoteDaemonServeConfig>,
-    pub(crate) certificate_configured: bool,
-    pub(crate) certificate_fingerprint: Option<String>,
-    pub(crate) renewal_status: RemoteAcmeRenewalStatus,
-    pub(crate) renewal_error: Option<String>,
-    pub(crate) updated_at: String,
-}
 
 impl DaemonDb {
     /// Load token-safe remote ACME status from the singleton state row.

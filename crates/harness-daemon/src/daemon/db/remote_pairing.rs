@@ -6,9 +6,6 @@
     )
 )]
 
-use std::error::Error;
-use std::fmt;
-
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type};
 
@@ -26,6 +23,7 @@ use crate::daemon::remote_pairing::{
     RemotePairingError, RemotePairingRecord, RemoteStoredPairing, validate_pairing_audit_event_id,
     validate_pairing_domain,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingClaimCodeError;
 
 mod metadata;
 use metadata::{decode_remote_pairing_metadata, encode_remote_pairing_metadata};
@@ -53,12 +51,6 @@ const ROUTE_REMOTE_PAIR_REPLAY: &str = "remote.pair.replay";
 const ROUTE_REMOTE_PAIR_UNKNOWN: &str = "remote.pair.unknown";
 const ROUTE_REMOTE_PAIR_REVOKED: &str = "remote.pair.revoked";
 
-#[derive(Debug)]
-pub(crate) enum RemotePairingClaimCodeError {
-    Pairing(RemotePairingError),
-    Store(CliError),
-}
-
 impl RemotePairingClaimCodeError {
     fn pairing(error: RemotePairingError) -> Self {
         Self::Pairing(error)
@@ -66,24 +58,6 @@ impl RemotePairingClaimCodeError {
 
     fn store(error: CliError) -> Self {
         Self::Store(error)
-    }
-}
-
-impl fmt::Display for RemotePairingClaimCodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Pairing(error) => write!(f, "{error}"),
-            Self::Store(error) => write!(f, "{error}"),
-        }
-    }
-}
-
-impl Error for RemotePairingClaimCodeError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Pairing(error) => Some(error),
-            Self::Store(error) => Some(error),
-        }
     }
 }
 

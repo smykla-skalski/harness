@@ -10,6 +10,7 @@ use super::{
 use crate::daemon::remote_pairing::{
     RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation, RemotePairingState,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingOwner;
 use harness_kernel::errors::CliError;
 
 /// The columns and joins both reads share. One spelling, because
@@ -46,20 +47,6 @@ ORDER BY p.created_at DESC, p.pairing_id DESC"
 /// inventory to answer about a single row is what this exists to avoid.
 static SELECT_REMOTE_PAIRING_ENTRY_SQL: LazyLock<String> =
     LazyLock::new(|| format!("{INVENTORY_SELECT_SQL}WHERE p.pairing_id = ?1"));
-
-/// Who a pairing belongs to.
-///
-/// Three cases rather than a nested option, because "no such pairing" and
-/// "created on the host" are different answers and a caller that conflated
-/// them would treat an operator's link as one it may revoke.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RemotePairingOwner {
-    Unknown,
-    /// Created on the host, so no remote client owns it.
-    Host,
-    /// Minted by this client.
-    Client(String),
-}
 
 impl DaemonDb {
     /// Who minted one pairing.

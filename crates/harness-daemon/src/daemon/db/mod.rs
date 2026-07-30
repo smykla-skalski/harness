@@ -70,8 +70,8 @@ mod remote_acme_cas;
 mod remote_identity;
 mod remote_identity_async;
 mod remote_pairing_revoke;
-pub(crate) use remote_pairing::inventory::RemotePairingOwner;
-pub(crate) use remote_pairing_revoke::RemotePairingRevokeOutcome;
+pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingOwner;
+pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingRevokeOutcome;
 mod remote_pairing;
 mod remote_pairing_expiry;
 mod review_writes;
@@ -165,6 +165,8 @@ pub(crate) use async_bootstrap::all_migration_versions;
 // `pub`, not `pub(crate)`: `tests/integration_daemon.rs`'s task-board sync
 // scenarios link `harness` as an ordinary dependency and need this handle
 // directly, the same reason `daemon::state::test_support` is `pub` there.
+pub(crate) use crate::daemon::remote_acme_queries::RemoteAcmeStoredState;
+pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingClaimCodeError;
 pub use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]
 use conversation::{
@@ -174,8 +176,6 @@ use conversation::{
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
 pub(crate) use policy::NewApprovalGrant;
-pub(crate) use remote_acme::RemoteAcmeStoredState;
-pub(crate) use remote_pairing::RemotePairingClaimCodeError;
 pub(crate) use runtime::ensure_shared_db;
 #[cfg(test)]
 pub(crate) use schema::set_schema_init_hook;
