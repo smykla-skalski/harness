@@ -242,7 +242,7 @@ struct TaskBoardCardContextMenu: NSViewRepresentable {
         )
         if actions.canOpenAgent(scope.primaryID) {
           addItem(
-            title: "Open Agent",
+            title: "Open Spawned Task",
             symbol: "arrow.up.forward.app",
             action: #selector(openAgent)
           )

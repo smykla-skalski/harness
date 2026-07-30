@@ -53,16 +53,15 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(plan.items == [item])
   }
 
-  @Test("Board-only items select management surface instead of opening linked task")
+  @Test("Board-only items select their management surface")
   func boardOnlyItemsSelectManagementSurface() {
     let item = taskBoardItem(id: "board-only", status: .todo)
 
     #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .selectBoardItem)
-    #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .selectBoardItem)
   }
 
-  @Test("Linked board items open directly without inbox snapshot state")
-  func linkedBoardItemsOpenDirectlyWithoutInboxSnapshotState() {
+  @Test("Ordinary linked board items keep their direct task route")
+  func ordinaryLinkedBoardItemsOpenDirectly() {
     let item = taskBoardItem(
       id: "linked",
       status: .inProgress,
@@ -71,6 +70,19 @@ struct TaskBoardOverviewBehaviorTests {
     )
 
     #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .openLinkedTask)
+  }
+
+  @Test("Linked review items select their originating management surface")
+  func linkedReviewItemsSelectManagementSurface() {
+    let item = taskBoardItem(
+      id: "linked-review",
+      status: .inReview,
+      workflowKind: .prReview,
+      sessionId: PreviewFixtures.summary.sessionId,
+      workItemId: "task-linked"
+    )
+
+    #expect(TaskBoardOverviewItemBehavior.selectionAction(for: item) == .selectBoardItem)
   }
 
   @Test("Dispatch confirmation prefers the targeted board item title")

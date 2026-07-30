@@ -329,7 +329,7 @@ extension PreviewHarnessClient.Fixtures {
     detailsBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.detail],
     coreDetailsBySessionID: [:],
     timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline],
-    taskBoardItems: [boardOnlyTaskBoardItem]
+    taskBoardItems: [boardOnlyTaskBoardItem, linkedReviewTaskBoardItem]
   )
   public static let singleAgent = Self(
     health: standardHealth,

@@ -12,6 +12,9 @@ struct TaskBoardRouteContentSourceTests {
     let managementActionsSource = try taskBoardSourceFile(
       named: "TaskBoardItemLiveActionButtons.swift"
     )
+    let managementHierarchySource = try taskBoardSourceFile(
+      named: "TaskBoardItemManagementPanel+Hierarchy.swift"
+    )
     let managementComponentsSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementPanel+Components.swift"
     )
@@ -40,6 +43,8 @@ struct TaskBoardRouteContentSourceTests {
     #expect(actionsSource.contains("evaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
     #expect(selectionModelSource.contains("TaskBoardOverviewItemBehavior.selectionAction("))
+    #expect(selectionModelSource.contains("selectAPIItem(item)"))
+    #expect(managementHierarchySource.contains("selectionModel.selectAPIItem(item)"))
     #expect(overviewSource.contains("let inboxItems = currentPresentation.inboxItems(in: lane)"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
@@ -146,6 +151,10 @@ struct TaskBoardRouteContentSourceTests {
     #expect(laneSource.contains("Self.currentClickCount == 2"))
     #expect(!laneSource.contains("TapGesture(count: 2)"))
     #expect(laneSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))
+    #expect(laneSource.contains("Button(\"Open\")"))
+    #expect(laneSource.contains("Button(\"Open Spawned Task\")"))
+    #expect(laneSource.contains("selectionModel.openAPIItem(item, actions: actions)"))
+    #expect(laneSource.contains("actions.openSpawnedTask(item, openWindow: openWindow)"))
     #expect(supportSource.contains("SessionSidebarMultiSelect.resolve("))
   }
 
@@ -193,6 +202,7 @@ struct TaskBoardRouteContentSourceTests {
     #expect(contextMenuSource.contains("NSMenu.popUpContextMenu("))
     #expect(contextMenuSource.contains("TaskBoardCardContextMenuScope.resolve("))
     #expect(contextMenuSource.contains("actions.primeSelection(scope.cardIDs)"))
+    #expect(contextMenuSource.contains("\"Open Spawned Task\""))
     #expect(!contextMenuSource.contains("let _: Task"))
     #expect(contextMenuSource.contains("actions.githubURL(scope.primaryID) != nil"))
     #expect(

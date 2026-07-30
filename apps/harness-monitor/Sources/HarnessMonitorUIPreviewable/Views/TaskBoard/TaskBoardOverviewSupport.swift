@@ -341,10 +341,10 @@ enum TaskBoardOverviewItemSelectionAction: Equatable {
 
 enum TaskBoardOverviewItemBehavior {
   static func selectionAction(for item: TaskBoardItem) -> TaskBoardOverviewItemSelectionAction {
-    if shouldOpenLinkedTask(item) {
-      return .openLinkedTask
+    if item.showsReviewReport || !item.hasLinkedSessionTask {
+      return .selectBoardItem
     }
-    return .selectBoardItem
+    return .openLinkedTask
   }
 
   static func runOnceRequest(
@@ -356,10 +356,6 @@ enum TaskBoardOverviewItemBehavior {
 
   static func evaluationRequest(for item: TaskBoardItem) -> TaskBoardEvaluateRequest {
     TaskBoardEvaluateRequest(status: item.status, itemId: item.id)
-  }
-
-  private static func shouldOpenLinkedTask(_ item: TaskBoardItem) -> Bool {
-    item.hasLinkedSessionTask
   }
 }
 

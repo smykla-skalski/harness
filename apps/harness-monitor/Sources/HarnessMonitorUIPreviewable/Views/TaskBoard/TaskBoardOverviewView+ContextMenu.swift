@@ -189,7 +189,7 @@ extension TaskBoardOverviewView {
     TaskBoardCardDropPlan.resolve(cardDragPayloads(cardIDs), to: lane)
   }
 
-  private func canOpenCard(_ cardID: TaskBoardCardID) -> Bool {
+  func canOpenCard(_ cardID: TaskBoardCardID) -> Bool {
     switch cardID {
     case .api(let itemID):
       currentPresentation.taskBoardItem(id: itemID) != nil
@@ -198,7 +198,7 @@ extension TaskBoardOverviewView {
     }
   }
 
-  private func openCard(_ cardID: TaskBoardCardID) {
+  func openCard(_ cardID: TaskBoardCardID) {
     switch cardID {
     case .api(let itemID):
       if let item = currentPresentation.taskBoardItem(id: itemID) {
@@ -230,19 +230,31 @@ extension TaskBoardOverviewView {
   }
 
   func canOpenSpawnedAgent(_ cardID: TaskBoardCardID) -> Bool {
-    store != nil && spawnedSessionLink(for: cardID) != nil
+    switch cardID {
+    case .api(let itemID):
+      guard let item = currentPresentation.taskBoardItem(id: itemID) else {
+        return false
+      }
+      return actions.canOpenSpawnedTask(item)
+    case .inbox:
+      return store != nil && spawnedSessionLink(for: cardID) != nil
+    }
   }
 
   func openSpawnedAgent(_ cardID: TaskBoardCardID) {
-    guard let store, let link = spawnedSessionLink(for: cardID) else {
-      return
+    switch cardID {
+    case .api(let itemID):
+      guard let item = currentPresentation.taskBoardItem(id: itemID) else { return }
+      actions.openSpawnedTask(item, openWindow: openWindow)
+    case .inbox:
+      guard let store, let link = spawnedSessionLink(for: cardID) else { return }
+      TaskBoardSpawnedSessionNavigator.open(
+        store: store,
+        openWindow: openWindow,
+        sessionID: link.sessionID,
+        workItemID: link.workItemID
+      )
     }
-    TaskBoardSpawnedSessionNavigator.open(
-      store: store,
-      openWindow: openWindow,
-      sessionID: link.sessionID,
-      workItemID: link.workItemID
-    )
   }
 
   private func githubURL(for cardID: TaskBoardCardID) -> URL? {

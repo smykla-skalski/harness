@@ -23,6 +23,8 @@ struct TaskBoardItemRow: View {
   private var alwaysShowsFullRepositoryNames
   @Environment(\.taskBoardProjectLabelResolver)
   private var projectLabelResolver
+  @Environment(\.openWindow)
+  private var openWindow
 
   private var cardID: TaskBoardCardID { .api(item.id) }
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
@@ -89,12 +91,28 @@ struct TaskBoardItemRow: View {
     .contentShape(.rect)
     .draggable(containerItemID: cardID)
     .accessibilityValue(isSelected ? "Selected" : "Not selected")
-    .accessibilityHint("Click to select. Double-click to open.")
+    .accessibilityHint(accessibilityOpenHint)
     .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .accessibilityAction(named: Text("Open")) {
-      selectionModel.openAPIItem(item, actions: actions)
+    .accessibilityActions {
+      Button("Open") {
+        selectionModel.openAPIItem(item, actions: actions)
+      }
+      if actions.canOpenSpawnedTask(item) {
+        Button("Open Spawned Task") {
+          actions.openSpawnedTask(item, openWindow: openWindow)
+        }
+      }
     }
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
+  }
+
+  private var accessibilityOpenHint: String {
+    if actions.canOpenSpawnedTask(item) {
+      return
+        "Click to select. Double-click or press Return to open the ticket. "
+        + "Press Command-Return to open the spawned task."
+    }
+    return "Click to select. Double-click or press Return to open the ticket."
   }
 
   private var statusTint: Color { taskBoardStatusColor(for: item.status) }
