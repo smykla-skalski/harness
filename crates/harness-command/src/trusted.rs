@@ -202,11 +202,9 @@ mod tests {
     static UMASK_LOCK: Mutex<()> = Mutex::new(());
 
     /// Holds `UMASK_LOCK` and restores the process umask on drop, including
-    /// on test panic. Field order doesn't decide this: the guard, a struct
-    /// field, would otherwise release before the explicit `Drop` impl below
-    /// even runs, but that impl's own body always runs first regardless of
-    /// field order, so the umask is back to normal before another umask
-    /// test can start.
+    /// on test panic. A custom `Drop` impl's body always runs before its
+    /// struct's fields drop, so the umask is restored, by the impl below,
+    /// before `_guard` releases the lock - never the other way around.
     struct RestoreUmask<'a> {
         previous: Mode,
         _guard: MutexGuard<'a, ()>,
