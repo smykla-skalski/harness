@@ -187,20 +187,47 @@ mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt as _;
 
+    use std::sync::{Mutex, MutexGuard};
+
     use rustix::fs::Mode;
     use tempfile::tempdir;
 
     use super::*;
 
-    /// Restores the process umask on drop, including on test panic; `umask`
-    /// is process-wide state, and nextest gives each test its own process,
-    /// but restoring promptly still keeps a single test from leaking mode
-    /// bits into anything else that process goes on to do.
-    struct RestoreUmask(Mode);
+    /// Serializes umask mutation across tests in this module. `umask` is
+    /// process-wide state: nextest (this repo's canonical gate) runs each
+    /// test in its own process and never needs this, but `cargo test`'s
+    /// shared, multi-threaded process could let two umask-mutating tests
+    /// race and leak mode bits into each other without it.
+    static UMASK_LOCK: Mutex<()> = Mutex::new(());
 
-    impl Drop for RestoreUmask {
+    /// Holds `UMASK_LOCK` and restores the process umask on drop, including
+    /// on test panic. Field order doesn't decide this: the guard, a struct
+    /// field, would otherwise release before the explicit `Drop` impl below
+    /// even runs, but that impl's own body always runs first regardless of
+    /// field order, so the umask is back to normal before another umask
+    /// test can start.
+    struct RestoreUmask<'a> {
+        previous: Mode,
+        _guard: MutexGuard<'a, ()>,
+    }
+
+    impl RestoreUmask<'_> {
+        fn set(new_mask: Mode) -> Self {
+            let guard = UMASK_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let previous = rustix::process::umask(new_mask);
+            Self {
+                previous,
+                _guard: guard,
+            }
+        }
+    }
+
+    impl Drop for RestoreUmask<'_> {
         fn drop(&mut self) {
-            rustix::process::umask(self.0);
+            rustix::process::umask(self.previous);
         }
     }
 
@@ -276,8 +303,7 @@ mod tests {
             "expected /tmp to carry the sticky bit"
         );
 
-        let previous = rustix::process::umask(Mode::from_raw_mode(0o002));
-        let _restore = RestoreUmask(previous);
+        let _restore = RestoreUmask::set(Mode::from_raw_mode(0o002));
 
         let temporary = tempfile::Builder::new()
             .tempdir_in("/tmp")
@@ -309,8 +335,7 @@ mod tests {
         // umask. The group-write exception has to reach every such ancestor,
         // not just a sticky root's immediate child, or this exact shape of
         // worker-override path fails again under a permissive umask.
-        let previous = rustix::process::umask(Mode::from_raw_mode(0o002));
-        let _restore = RestoreUmask(previous);
+        let _restore = RestoreUmask::set(Mode::from_raw_mode(0o002));
 
         let temporary = tempfile::Builder::new()
             .tempdir_in("/tmp")
