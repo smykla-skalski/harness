@@ -250,7 +250,7 @@ fn classify_attempt(
             step_for(execution),
             key,
             head,
-            "reconnect to the deterministic agent run or resume its start",
+            "reconnect to the deterministic step or resume its start",
         ),
     }
 }
