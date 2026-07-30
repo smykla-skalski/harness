@@ -12,7 +12,12 @@ pub(crate) struct RepositoryReviewsSnapshot {
 pub(crate) async fn query_repository_reviews(
     request: &ReviewsQueryRequest,
 ) -> Result<RepositoryReviewsSnapshot, CliError> {
-    super::reviews::query_repository_reviews_snapshot(request).await
+    let (response, github_data_revision) =
+        super::reviews::query_repository_reviews_snapshot_parts(request).await?;
+    Ok(RepositoryReviewsSnapshot {
+        response,
+        github_data_revision,
+    })
 }
 
 pub(crate) async fn resolve_exact_pull_request(

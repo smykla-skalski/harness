@@ -155,14 +155,11 @@ async fn query_reviews_repositories_source(
     .map(|(source, _)| source)
 }
 
-pub(super) async fn query_repository_reviews_snapshot(
+pub(super) async fn query_repository_reviews_snapshot_parts(
     request: &ReviewsQueryRequest,
-) -> Result<super::reviews_source_port::RepositoryReviewsSnapshot, CliError> {
+) -> Result<(ReviewsQueryResponse, u64), CliError> {
     let source = query_reviews_repositories_source(request).await?;
-    Ok(super::reviews_source_port::RepositoryReviewsSnapshot {
-        response: source.response,
-        github_data_revision: source.github_data_revision,
-    })
+    Ok((source.response, source.github_data_revision))
 }
 
 async fn query_reviews_with_database(
