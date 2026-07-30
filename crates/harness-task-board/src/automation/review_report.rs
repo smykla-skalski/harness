@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::TaskBoardExecutionState;
 use super::report_only_review::{
     TaskBoardReportOnlyReviewError, TaskBoardReportOnlyReviewFinding, validate_finding_path,
     validate_head_revision, validate_nonempty,
@@ -50,7 +51,11 @@ pub struct TaskBoardAiReviewReportRecord {
     #[schema(minimum = 1)]
     pub pull_request_number: u64,
     pub head_revision: String,
+    /// Compatibility alias for `requested_runtime`.
     pub runtime: String,
+    pub requested_runtime: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_runtime: Option<String>,
     pub requested_model: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effective_model: Option<String>,
@@ -75,12 +80,32 @@ pub enum TaskBoardAiReviewReportResponse {
     /// The current review execution has not reached a terminal state.
     Running {
         execution_id: String,
+        /// Compatibility alias for `requested_runtime`.
         runtime: String,
+        requested_runtime: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        actual_runtime: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         requested_model: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         head_revision: Option<String>,
         started_at: String,
+    },
+    /// The execution settled before a full immutable report was retained.
+    Terminal {
+        execution_id: String,
+        execution_state: TaskBoardExecutionState,
+        /// Compatibility alias for `requested_runtime`.
+        runtime: String,
+        requested_runtime: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        actual_runtime: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        requested_model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        head_revision: Option<String>,
+        started_at: String,
+        finished_at: String,
     },
     /// The latest review completed and the full immutable report is available.
     Completed {
@@ -117,6 +142,8 @@ pub enum TaskBoardAiReviewReportError {
     InvalidStatus { value: String },
     #[error("AI review report timestamps must be RFC 3339 and finish no earlier than start")]
     InvalidTimestamps,
+    #[error("AI review report runtime alias must match requested_runtime")]
+    InvalidRuntimeProvenance,
     #[error("completed AI review reports require a summary and forbid a terminal reason")]
     InvalidCompletedState,
     #[error("failed or cancelled AI review reports require a terminal reason")]
@@ -136,12 +163,16 @@ pub fn validate_task_board_ai_review_report(
         ("correlation_id", report.correlation_id.as_str()),
         ("repository", report.repository.as_str()),
         ("runtime", report.runtime.as_str()),
+        ("requested_runtime", report.requested_runtime.as_str()),
         ("requested_model", report.requested_model.as_str()),
     ] {
         validate_nonempty(field, value)?;
     }
     if report.pull_request_number == 0 {
         return Err(TaskBoardAiReviewReportError::InvalidPullRequestNumber);
+    }
+    if report.runtime != report.requested_runtime {
+        return Err(TaskBoardAiReviewReportError::InvalidRuntimeProvenance);
     }
     validate_head_revision(&report.head_revision)?;
     validate_optional_output(report)?;
@@ -154,6 +185,9 @@ fn validate_optional_output(
 ) -> Result<(), TaskBoardAiReviewReportError> {
     if let Some(model) = report.effective_model.as_deref() {
         validate_nonempty("effective_model", model)?;
+    }
+    if let Some(runtime) = report.actual_runtime.as_deref() {
+        validate_nonempty("actual_runtime", runtime)?;
     }
     if let Some(summary) = report.summary.as_deref() {
         validate_nonempty("summary", summary)?;
@@ -290,6 +324,8 @@ mod tests {
             pull_request_number: 1122,
             head_revision: "0123456789abcdef0123456789abcdef01234567".into(),
             runtime: "openrouter".into(),
+            requested_runtime: "openrouter".into(),
+            actual_runtime: Some("openrouter".into()),
             requested_model: "deepseek/deepseek-v4-flash".into(),
             effective_model: Some("deepseek/deepseek-v4-flash".into()),
             status: TaskBoardAiReviewReportStatus::Completed,

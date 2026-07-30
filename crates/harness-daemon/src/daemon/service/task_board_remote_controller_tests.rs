@@ -54,6 +54,47 @@ async fn eligible_initial_attempt_selects_remote_before_any_local_run() {
 }
 
 #[tokio::test]
+async fn remote_offer_freezes_the_same_openrouter_runtime_as_the_local_attempt() {
+    let fixture = Box::pin(crate::daemon::db::remote_controller_fixture_with_runtime(
+        1,
+        "openrouter",
+    ))
+    .await;
+    refresh_fixture_observation(&fixture, 1, 0).await;
+    let phase = crate::task_board::TaskBoardExecutionPhase::Review;
+    let source = super::requests::prepare_source(&fixture.execution, phase, None)
+        .expect("prepare remote source")
+        .expect("remote source is ready");
+    let host = fixture
+        .db
+        .resolve_task_board_remote_host(
+            &fixture.execution,
+            source.source.repository(),
+            phase,
+            "openrouter",
+            &canonical_now(),
+        )
+        .await
+        .expect("resolve OpenRouter host")
+        .expect("OpenRouter host is eligible");
+    let prepared = super::requests::prepare_offer(
+        &fixture.execution,
+        &fixture.attempt,
+        &host,
+        source,
+        &canonical_now(),
+    )
+    .expect("prepare OpenRouter offer")
+    .expect("configuration remains current");
+
+    assert_eq!(prepared.request.launch.runtime, "openrouter");
+    assert_eq!(
+        prepared.request.launch.runtime,
+        fixture.execution.resolved_reviewers.profiles[0].runtime
+    );
+}
+
+#[tokio::test]
 async fn no_eligible_host_selects_one_local_target_before_claim() {
     let fixture = Box::pin(remote_controller_fixture(1)).await;
     // A valid host advertises at least one slot; a fully-occupied host is the "no eligible host" case.

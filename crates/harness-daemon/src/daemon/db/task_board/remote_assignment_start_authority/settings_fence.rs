@@ -54,7 +54,7 @@ pub(super) async fn revoke_unpermitted_start_in_tx(
            AND executor_start_authority_sha256 IS NULL
            AND executor_start_authority_at IS NULL
            AND executor_stop_pending_sha256 IS NULL
-           AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?5)
+           AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?5 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?5)
            AND NOT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?6)",
     )
     .bind(&record.assignment_id)
@@ -186,7 +186,7 @@ impl AsyncDaemonDb {
                AND executor_start_io_permit_sha256 IS NULL
                AND executor_start_io_permit_at IS NULL
                AND executor_stop_pending_sha256 IS NULL
-               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?7)
+               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?7 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?7)
                AND NOT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?8)",
         )
         .bind(&record.assignment_id)
@@ -250,7 +250,7 @@ impl AsyncDaemonDb {
                AND executor_stop_pending_sha256 IS NULL
                AND executor_start_io_permit_sha256 IS ?8
                AND executor_start_io_permit_at IS ?9
-               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?10)
+               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?10 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?10)
                AND NOT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?11)",
         )
         .bind(&record.assignment_id)
@@ -331,7 +331,7 @@ impl AsyncDaemonDb {
                AND executor_lifecycle_owner_sha256 IS NULL
                AND executor_stop_pending_sha256 IS NULL
                AND workspace_ref IS NULL AND started_at IS NULL
-               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?9)
+               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?9 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?9)
                AND NOT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?10)",
         )
         .bind(&record.assignment_id)
@@ -374,7 +374,7 @@ async fn require_empty_executor_identity(
     identity: &TaskBoardRemoteExecutorIdentity,
 ) -> Result<(), CliError> {
     let run_exists =
-        query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+        query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?1)")
             .bind(&identity.run_id)
             .fetch_one(transaction.as_mut())
             .await

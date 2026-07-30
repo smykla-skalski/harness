@@ -16,7 +16,7 @@ pub(super) use super::wire_artifacts::valid_artifact_path;
 pub use super::wire_artifacts::{RemoteArtifactEntry, RemoteArtifactManifest};
 
 pub use super::wire_host::RemoteHostAdvertisement;
-pub use super::wire_launch::RemoteCodexLaunchEnvelope;
+pub use super::wire_launch::RemoteRuntimeLaunchEnvelope;
 // `harness-daemon`'s own `db` and `service` tests build this crate as an
 // ordinary dependency, so a bare `cfg(test)` (scoped to this crate's own
 // test binary) would hide these from them; `test-support` is this crate's
@@ -213,7 +213,7 @@ pub struct RemoteOfferRequest {
     pub binding: RemoteAttemptBinding,
     pub lease_seconds: u32,
     pub deadline_at: String,
-    pub launch: RemoteCodexLaunchEnvelope,
+    pub launch: RemoteRuntimeLaunchEnvelope,
     pub source: RemoteSourceMaterial,
     pub artifacts: RemoteArtifactManifest,
     pub request_sha256: String,

@@ -7,8 +7,8 @@ use crate::daemon::db::{
 };
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactManifest,
-    RemoteAssignmentWireState, RemoteAttemptBinding, RemoteClaimRequest, RemoteCodexLaunchEnvelope,
-    RemoteLeaseRenewRequest, RemoteOfferRequest, RemoteSettledRequest, RemoteSourceMaterial,
+    RemoteAssignmentWireState, RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
+    RemoteOfferRequest, RemoteRuntimeLaunchEnvelope, RemoteSettledRequest, RemoteSourceMaterial,
     RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::remote_wire::wire_cleanup::RemoteCleanupObservationRequest;
@@ -18,6 +18,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board_codex_requests::attempt_profile;
 
 use crate::daemon::task_board_read_only_coordinator::requests::remote_codex_attempt_request;
 
@@ -64,13 +65,18 @@ pub(super) fn prepare_offer(
     let deadline_at = offered_at + Duration::seconds(REMOTE_ATTEMPT_DEADLINE_SECONDS);
     let binding = binding(execution, attempt, host, phase, source.repository())?;
     let launch = remote_codex_attempt_request(execution, attempt)?;
+    let runtime = if phase == TaskBoardExecutionPhase::Implementation {
+        "codex"
+    } else {
+        attempt_profile(execution, attempt)?.runtime.as_str()
+    };
     let request = RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding,
         lease_seconds: REMOTE_LEASE_SECONDS,
         deadline_at: canonical(deadline_at),
-        launch: RemoteCodexLaunchEnvelope::from_codex_request("codex", &launch)
-            .map_err(|error| invalid(format!("freeze remote Codex launch: {error}")))?,
+        launch: RemoteRuntimeLaunchEnvelope::from_run_request(runtime, &launch)
+            .map_err(|error| invalid(format!("freeze remote runtime launch: {error}")))?,
         source,
         artifacts,
         request_sha256: String::new(),

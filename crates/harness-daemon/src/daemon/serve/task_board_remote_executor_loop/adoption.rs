@@ -6,11 +6,11 @@ use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
     REMOTE_START_PREFLIGHT_FAILURE_CLASS, TaskBoardRemoteAssignmentRecord,
-    TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStopAuthority,
-    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome, executor_start_authority,
+    TaskBoardRemoteExecutorRun, TaskBoardRemoteExecutorStartIoPermit,
+    TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopReason,
+    TaskBoardRemoteMutationOutcome, executor_start_authority,
 };
 use crate::daemon::http::DaemonHttpState;
-use crate::daemon::protocol::CodexRunSnapshot;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteOfferRequest,
     RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -101,7 +101,7 @@ async fn reconcile_claimed_adoption(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
     workspace: &Path,
 ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
     let permit = permit
@@ -128,7 +128,7 @@ async fn stop_pre_permit_remote_run(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
     let authority = executor_start_authority(record)?.ok_or_else(|| {
         concurrent("remote executor run has no durable pre-permit start authority")
@@ -184,7 +184,12 @@ async fn reconcile_fresh_start_failure(
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     error: CliError,
 ) -> Result<(), CliError> {
-    if db.codex_run(&identity.run_id).await?.is_some() {
+    let offer = record.require_offer()?;
+    if db
+        .task_board_remote_executor_run(offer, &identity.run_id)
+        .await?
+        .is_some()
+    {
         // A durable run exists, so the Start may have launched: ambiguous. Retain
         // permit/authority/capacity and defer; only a proven no-run seals a failure.
         return Err(error);
@@ -264,7 +269,7 @@ async fn stop_invalid_remote_run_if_fenced(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
     if let Some((stop_authority, reason)) = invalid_run_stop_source(record, permit)? {
         claim_and_settle_invalid_remote_run(state, db, &stop_authority, snapshot, reason).await?;
@@ -311,7 +316,7 @@ async fn adopt_remote_start(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
     workspace: &Path,
 ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
     let outcome = db
@@ -364,7 +369,7 @@ async fn settle_failed_adoption(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
     reason: TaskBoardRemoteExecutorStopReason,
 ) -> Result<(), CliError> {
     claim_and_settle_invalid_remote_run(
@@ -380,7 +385,7 @@ async fn settle_failed_adoption(
 async fn mark_running_if_active(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
     if snapshot.status.is_active() {
         let owner = record

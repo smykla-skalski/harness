@@ -23008,92 +23008,6 @@
           }
         }
       },
-      "RemoteCodexLaunchEnvelope": {
-        "type": "object",
-        "description": "Private, path-free Codex launch contract sealed into one remote offer.",
-        "required": [
-          "schema_version",
-          "runtime",
-          "actor",
-          "prompt",
-          "mode",
-          "role",
-          "fallback_role",
-          "capabilities",
-          "display_name",
-          "board_item_id",
-          "workflow_execution_id",
-          "allow_custom_model"
-        ],
-        "properties": {
-          "actor": {
-            "type": "string"
-          },
-          "allow_custom_model": {
-            "type": "boolean"
-          },
-          "board_item_id": {
-            "type": "string"
-          },
-          "capabilities": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "display_name": {
-            "type": "string"
-          },
-          "effort": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "fallback_role": {
-            "$ref": "#/components/schemas/SessionRole"
-          },
-          "mode": {
-            "$ref": "#/components/schemas/CodexRunMode"
-          },
-          "model": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "persona": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "prompt": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/SessionRole"
-          },
-          "runtime": {
-            "type": "string"
-          },
-          "schema_version": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "task_id": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "workflow_execution_id": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
       "RemoteHostAdvertisement": {
         "type": "object",
         "required": [
@@ -23270,7 +23184,7 @@
             "type": "string"
           },
           "launch": {
-            "$ref": "#/components/schemas/RemoteCodexLaunchEnvelope"
+            "$ref": "#/components/schemas/RemoteRuntimeLaunchEnvelope"
           },
           "lease_seconds": {
             "type": "integer",
@@ -23749,6 +23663,92 @@
             }
           }
         ]
+      },
+      "RemoteRuntimeLaunchEnvelope": {
+        "type": "object",
+        "description": "Private, path-free runtime launch contract sealed into one remote offer.",
+        "required": [
+          "schema_version",
+          "runtime",
+          "actor",
+          "prompt",
+          "mode",
+          "role",
+          "fallback_role",
+          "capabilities",
+          "display_name",
+          "board_item_id",
+          "workflow_execution_id",
+          "allow_custom_model"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "allow_custom_model": {
+            "type": "boolean"
+          },
+          "board_item_id": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fallback_role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CodexRunMode"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "persona": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SessionRole"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workflow_execution_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "RemoteSettledRequest": {
         "type": "object",
@@ -28643,12 +28643,19 @@
           "pull_request_number",
           "head_revision",
           "runtime",
+          "requested_runtime",
           "requested_model",
           "status",
           "started_at",
           "finished_at"
         ],
         "properties": {
+          "actual_runtime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "correlation_id": {
             "type": "string"
           },
@@ -28693,8 +28700,12 @@
           "requested_model": {
             "type": "string"
           },
-          "runtime": {
+          "requested_runtime": {
             "type": "string"
+          },
+          "runtime": {
+            "type": "string",
+            "description": "Compatibility alias for `requested_runtime`."
           },
           "started_at": {
             "type": "string"
@@ -28740,10 +28751,17 @@
             "required": [
               "execution_id",
               "runtime",
+              "requested_runtime",
               "started_at",
               "status"
             ],
             "properties": {
+              "actual_runtime": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "execution_id": {
                 "type": "string"
               },
@@ -28759,8 +28777,12 @@
                   "null"
                 ]
               },
-              "runtime": {
+              "requested_runtime": {
                 "type": "string"
+              },
+              "runtime": {
+                "type": "string",
+                "description": "Compatibility alias for `requested_runtime`."
               },
               "started_at": {
                 "type": "string"
@@ -28769,6 +28791,64 @@
                 "type": "string",
                 "enum": [
                   "running"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The execution settled before a full immutable report was retained.",
+            "required": [
+              "execution_id",
+              "execution_state",
+              "runtime",
+              "requested_runtime",
+              "started_at",
+              "finished_at",
+              "status"
+            ],
+            "properties": {
+              "actual_runtime": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "execution_id": {
+                "type": "string"
+              },
+              "execution_state": {
+                "$ref": "#/components/schemas/TaskBoardExecutionState"
+              },
+              "finished_at": {
+                "type": "string"
+              },
+              "head_revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_runtime": {
+                "type": "string"
+              },
+              "runtime": {
+                "type": "string",
+                "description": "Compatibility alias for `requested_runtime`."
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "terminal"
                 ]
               }
             }
@@ -30495,6 +30575,23 @@
           "publish",
           "cleanup",
           "terminal"
+        ]
+      },
+      "TaskBoardExecutionState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "preparing",
+          "starting",
+          "running",
+          "retry_wait",
+          "awaiting_approval",
+          "blocked",
+          "human_required",
+          "draining",
+          "completed",
+          "failed",
+          "cancelled"
         ]
       },
       "TaskBoardFailureClass": {

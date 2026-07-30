@@ -17,17 +17,106 @@ struct TaskBoardReviewProvenance {
   var executionID: String?
   var repository: String?
   var pullRequestNumber: UInt64?
-  var runtime: String
+  var requestedRuntime: String
+  var actualRuntime: String?
   var model: String?
   var headRevision: String?
   var startedAt: String
   var finishedAt: String?
 }
 
-struct TaskBoardReviewMetadataCard: View {
-  let provenance: TaskBoardReviewProvenance
+private struct TaskBoardReviewMetadataRow: Identifiable {
+  let label: String
+  let value: String
+  var monospaced = false
+  var destination: URL?
+
+  var id: String { label }
+}
+
+private struct TaskBoardReviewBadgeChrome: ViewModifier {
+  let tint: Color
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var fillOpacity: Double {
+    if reduceTransparency {
+      return colorSchemeContrast == .increased ? 0.34 : 0.26
+    }
+    return colorSchemeContrast == .increased ? 0.24 : 0.16
+  }
+
+  func body(content: Content) -> some View {
+    content.background {
+      Capsule()
+        .fill(tint.opacity(fillOpacity))
+    }
+  }
+}
+
+extension View {
+  fileprivate func taskBoardReviewBadgePadding() -> some View {
+    padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
+      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+  }
+
+  fileprivate func taskBoardReviewBadgeChrome(tint: Color) -> some View {
+    modifier(TaskBoardReviewBadgeChrome(tint: tint))
+  }
+}
+
+struct TaskBoardReviewSectionHeader<Accessory: View>: View {
+  let title: String
+  let systemImage: String
+  let accessory: Accessory
   @Environment(\.fontScale)
   private var fontScale
+
+  init(
+    title: String,
+    systemImage: String,
+    @ViewBuilder accessory: () -> Accessory
+  ) {
+    self.title = title
+    self.systemImage = systemImage
+    self.accessory = accessory()
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
+      Label(title, systemImage: systemImage)
+        .font(HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale))
+        .fixedSize()
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      accessory
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+extension TaskBoardReviewSectionHeader where Accessory == EmptyView {
+  init(title: String, systemImage: String) {
+    self.init(title: title, systemImage: systemImage) {
+      EmptyView()
+    }
+  }
+}
+
+struct TaskBoardReviewMetadataCard: View {
+  let provenance: TaskBoardReviewProvenance
+  @State private var showsDetails: Bool
+  @Environment(\.fontScale)
+  private var fontScale
+
+  init(
+    provenance: TaskBoardReviewProvenance,
+    initiallyShowsDetails: Bool = false
+  ) {
+    self.provenance = provenance
+    _showsDetails = State(initialValue: initiallyShowsDetails)
+  }
 
   private var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
@@ -38,28 +127,34 @@ struct TaskBoardReviewMetadataCard: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      if let repository = provenance.repository,
-        let pullRequestNumber = provenance.pullRequestNumber
-      {
-        metadataRow("Pull request", "\(repository) #\(pullRequestNumber)")
+    VStack(spacing: 0) {
+      ForEach(visibleRows) { row in
+        TaskBoardOperationsFormRow(
+          row.label,
+          showsSeparator: false,
+          verticalPadding: HarnessMonitorTheme.spacingSM,
+          contentMaxWidth: nil,
+          minHeight: nil
+        ) {
+          metadataValue(row)
+        }
+        if row.id != visibleRows.last?.id {
+          Divider()
+        }
       }
-      metadataRow("Runtime", provenance.runtime)
-      if let model = provenance.model {
-        metadataRow("Model", model)
-      }
-      if let headRevision = provenance.headRevision {
-        metadataRow("Revision", headRevision, monospaced: true)
-      }
-      if let executionID = provenance.executionID {
-        metadataRow("Execution", executionID, monospaced: true)
-      }
-      metadataRow("Started", provenance.startedAt.taskBoardReviewDisplayTimestamp)
-      if let finishedAt = provenance.finishedAt {
-        metadataRow("Finished", finishedAt.taskBoardReviewDisplayTimestamp)
-      }
+      Divider()
+      TaskBoardReviewDisclosureButton(
+        collapsedTitle: "Show details",
+        expandedTitle: "Hide details",
+        isExpanded: $showsDetails
+      )
     }
-    .padding(HarnessMonitorTheme.spacingSM)
+    .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+    .environment(\.taskBoardOperationsRowLabelFont, captionFont)
+    .environment(
+      \.taskBoardOperationsRowLabelWidth,
+      124 * min(fontScale, 1.3)
+    )
     .background(HarnessMonitorTheme.ink.opacity(0.04), in: .rect(cornerRadius: 8))
     .overlay {
       RoundedRectangle(cornerRadius: 8)
@@ -67,205 +162,98 @@ struct TaskBoardReviewMetadataCard: View {
     }
   }
 
-  private func metadataRow(
-    _ label: String,
-    _ value: String,
-    monospaced: Bool = false
-  ) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-        Text(label)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        metadataValue(value, monospaced: monospaced)
-      }
-      VStack(alignment: .leading, spacing: 2) {
-        Text(label)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        metadataValue(value, monospaced: monospaced)
-      }
+  private var visibleRows: [TaskBoardReviewMetadataRow] {
+    primaryRows + (showsDetails ? detailRows : [])
+  }
+
+  private var primaryRows: [TaskBoardReviewMetadataRow] {
+    var result: [TaskBoardReviewMetadataRow] = []
+    if let repository = provenance.repository,
+      let pullRequestNumber = provenance.pullRequestNumber
+    {
+      result.append(
+        .init(
+          label: "Pull request",
+          value: "\(repository)#\(pullRequestNumber)",
+          destination: TaskBoardReviewGitHubLinks.pullRequest(
+            repository: repository,
+            number: pullRequestNumber
+          )
+        )
+      )
     }
-    .font(captionFont)
+    result.append(
+      .init(
+        label: "Runtime",
+        value: provenance.actualRuntime ?? provenance.requestedRuntime
+      )
+    )
+    if let model = provenance.model {
+      result.append(.init(label: "Model", value: model))
+    }
+    if let headRevision = provenance.headRevision {
+      result.append(
+        .init(
+          label: "Revision",
+          value: headRevision,
+          monospaced: true,
+          destination: TaskBoardReviewGitHubLinks.revision(
+            repository: provenance.repository,
+            revision: headRevision
+          )
+        )
+      )
+    }
+    return result
+  }
+
+  private var detailRows: [TaskBoardReviewMetadataRow] {
+    var result = [
+      TaskBoardReviewMetadataRow(
+        label: "Requested runtime",
+        value: provenance.requestedRuntime
+      )
+    ]
+    if let actualRuntime = provenance.actualRuntime {
+      result.append(.init(label: "Actual runtime", value: actualRuntime))
+    }
+    if let executionID = provenance.executionID {
+      result.append(.init(label: "Execution", value: executionID, monospaced: true))
+    }
+    result.append(
+      .init(label: "Started", value: provenance.startedAt.taskBoardReviewDisplayTimestamp)
+    )
+    if let finishedAt = provenance.finishedAt {
+      result.append(.init(label: "Finished", value: finishedAt.taskBoardReviewDisplayTimestamp))
+    }
+    return result
   }
 
   @ViewBuilder
-  private func metadataValue(_ value: String, monospaced: Bool) -> some View {
-    if monospaced {
-      Text(value)
-        .font(captionFont.monospaced())
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .textSelection(.enabled)
-        .help(value)
+  private func metadataValue(_ row: TaskBoardReviewMetadataRow) -> some View {
+    if let destination = row.destination {
+      Link(destination: destination) {
+        metadataText(row)
+      }
+      .foregroundStyle(HarnessMonitorTheme.accent)
+      .help("Open \(row.label.lowercased()) on GitHub")
     } else {
-      Text(value)
-        .font(captionSemibold)
-        .multilineTextAlignment(.trailing)
+      metadataText(row)
         .textSelection(.enabled)
     }
   }
-}
 
-struct TaskBoardReviewStaleHeadCard: View {
-  let reportHead: String
-  let currentHead: String?
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-
-  private var captionSemibold: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Label("Report is for an older revision", systemImage: "exclamationmark.triangle.fill")
-        .font(captionSemibold)
-      if let currentHead {
-        Text(
-          "Reviewed \(reportHead.taskBoardShortRevision) · "
-            + "Current \(currentHead.taskBoardShortRevision)"
-        )
-        .font(captionFont.monospaced())
-        .textSelection(.enabled)
-      }
-    }
-    .foregroundStyle(HarnessMonitorTheme.caution)
-    .padding(HarnessMonitorTheme.spacingSM)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(HarnessMonitorTheme.caution.opacity(0.12), in: .rect(cornerRadius: 8))
-    .overlay {
-      RoundedRectangle(cornerRadius: 8)
-        .strokeBorder(HarnessMonitorTheme.caution.opacity(0.3))
-    }
-    .accessibilityLabel("Report is for an older pull request revision")
-  }
-}
-
-struct TaskBoardReviewFindingsSection: View {
-  let findings: [TaskBoardReportOnlyReviewFinding]
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-
-  private var captionSemibold: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Label("Findings", systemImage: "list.bullet.rectangle")
-          .font(captionSemibold)
-        Text("\(findings.count)")
-          .font(captionSemibold.monospacedDigit())
-          .harnessPillPadding()
-          .harnessContentPill(
-            tint: findings.isEmpty ? HarnessMonitorTheme.success : Color.secondary
-          )
-      }
-      if findings.isEmpty {
-        Text("No actionable findings")
-          .font(captionFont)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      } else {
-        ForEach(Array(findings.enumerated()), id: \.offset) { _, finding in
-          findingCard(finding)
-        }
-      }
-    }
-    .fixedSize(horizontal: false, vertical: true)
-  }
-
-  private func findingCard(_ finding: TaskBoardReportOnlyReviewFinding) -> some View {
-    let line = finding.location.line.map { ":\($0)" } ?? ""
-    let tint = finding.severity.taskBoardTint
-    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      ViewThatFits(in: .horizontal) {
-        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-          severityPill(finding.severity)
-          locationText(finding.location.path, line: line, singleLine: true)
-        }
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          severityPill(finding.severity)
-          locationText(finding.location.path, line: line, singleLine: false)
-        }
-      }
-      Text(finding.evidence)
-        .font(captionFont)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .padding(HarnessMonitorTheme.spacingSM)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(HarnessMonitorTheme.ink.opacity(0.04), in: .rect(cornerRadius: 8))
-    .overlay(alignment: .leading) {
-      Rectangle()
-        .fill(tint)
-        .frame(width: 3)
-    }
-    .clipShape(.rect(cornerRadius: 8))
-  }
-
-  private func severityPill(_ severity: TaskBoardReviewFindingSeverity) -> some View {
-    Label(severity.taskBoardTitle, systemImage: severity.taskBoardSystemImage)
-      .font(captionSemibold)
-      .foregroundStyle(severity.taskBoardTint)
-      .harnessPillPadding()
-      .harnessContentPill(tint: severity.taskBoardTint)
-  }
-
-  private func locationText(_ path: String, line: String, singleLine: Bool) -> some View {
-    Text("\(path)\(line)")
-      .font(captionSemibold.monospaced())
-      .lineLimit(singleLine ? 1 : nil)
+  private func metadataText(_ row: TaskBoardReviewMetadataRow) -> some View {
+    Text(row.value)
+      .font(row.monospaced ? captionFont.monospaced() : captionSemibold)
+      .lineLimit(row.monospaced ? 1 : nil)
       .truncationMode(.middle)
-      .textSelection(.enabled)
+      .multilineTextAlignment(.trailing)
+      .help(row.value)
   }
 }
 
-struct TaskBoardReviewTextCard: View {
-  let title: String
-  let systemImage: String
-  let content: String
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-
-  private var captionSemibold: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Label(title, systemImage: systemImage)
-        .font(captionSemibold)
-      Text(content)
-        .font(captionFont)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .padding(HarnessMonitorTheme.spacingSM)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(HarnessMonitorTheme.ink.opacity(0.04), in: .rect(cornerRadius: 8))
-    .overlay {
-      RoundedRectangle(cornerRadius: 8)
-        .strokeBorder(HarnessMonitorTheme.ink.opacity(0.1))
-    }
-  }
-}
-
-struct TaskBoardReviewStatusPill: View {
+struct TaskBoardReviewPill: View {
   let title: String
   let systemImage: String
   let tint: Color
@@ -276,8 +264,11 @@ struct TaskBoardReviewStatusPill: View {
     Label(title, systemImage: systemImage)
       .font(HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale))
       .foregroundStyle(tint)
-      .harnessPillPadding()
-      .harnessContentPill(tint: tint)
+      .fixedSize()
+      .taskBoardReviewBadgePadding()
+      .taskBoardReviewBadgeChrome(tint: tint)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(title)
   }
 }
 
@@ -324,15 +315,15 @@ struct TaskBoardReviewMessageCard<Accessory: View>: View {
           .font(captionSemibold)
         Text(detail)
           .font(captionFont)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
       }
       Spacer(minLength: 0)
       accessory
     }
+    .foregroundStyle(HarnessMonitorTheme.ink)
     .padding(HarnessMonitorTheme.spacingSM)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(HarnessMonitorTheme.ink.opacity(0.04), in: .rect(cornerRadius: 8))
+    .background(tint.opacity(0.08), in: .rect(cornerRadius: 8))
     .overlay {
       RoundedRectangle(cornerRadius: 8)
         .strokeBorder(tint.opacity(0.22))
@@ -357,37 +348,4 @@ extension String {
     return date.formatted(date: .abbreviated, time: .shortened)
   }
 
-  fileprivate var taskBoardShortRevision: String {
-    String(prefix(8))
-  }
-}
-
-extension TaskBoardReviewFindingSeverity {
-  fileprivate var taskBoardSystemImage: String {
-    switch self {
-    case .critical:
-      "exclamationmark.octagon.fill"
-    case .high:
-      "exclamationmark.triangle.fill"
-    case .medium:
-      "exclamationmark.circle.fill"
-    case .low:
-      "info.circle.fill"
-    }
-  }
-
-  fileprivate var taskBoardTint: Color {
-    switch self {
-    case .critical, .high:
-      HarnessMonitorTheme.danger
-    case .medium:
-      HarnessMonitorTheme.caution
-    case .low:
-      HarnessMonitorTheme.accent
-    }
-  }
-
-  fileprivate var taskBoardTitle: String {
-    rawValue.capitalized
-  }
 }

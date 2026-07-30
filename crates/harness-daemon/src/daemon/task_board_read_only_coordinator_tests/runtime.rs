@@ -223,7 +223,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
         Ok(self.runs.lock().expect("runs lock").get(run_id).cloned())
     }
 
-    async fn start_codex_report_run(
+    async fn start_report_run(
         &self,
         session_id: &str,
         request: &CodexRunRequest,
@@ -316,6 +316,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             board_item_id: Some(start.board_item_id.into()),
             workflow_execution_id: Some(start.workflow_execution_id.into()),
             project_dir: start.project_dir.clone(),
+            runtime_run_id: None,
             requested_runtime: start.runtime.into(),
             actual_runtime: Some(start.runtime.into()),
             runtime_turn_id: Some(format!("turn-{}", start.run_id)),

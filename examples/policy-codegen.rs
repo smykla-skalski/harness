@@ -2765,6 +2765,8 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_REVIEW_REPORT_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/automation/review_report.rs");
+const TASK_BOARD_REVIEW_REPORT_WORKFLOW_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/workflow.rs");
 const TASK_BOARD_REPORT_ONLY_REVIEW_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/automation/report_only_review.rs");
 const TASK_BOARD_REVIEW_REPORT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardReviewReportWireTypes.generated.swift";
@@ -2775,6 +2777,7 @@ const TASK_BOARD_REVIEW_REPORT_EMIT_ONLY: &[&str] = &[
     "TaskBoardAiReviewReportStatus",
     "TaskBoardAiReviewReportRecord",
     "TaskBoardAiReviewReportResponse",
+    "TaskBoardExecutionState",
 ];
 const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../crates/harness-task-board/src/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
@@ -3541,6 +3544,7 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[
                 TASK_BOARD_REPORT_ONLY_REVIEW_SOURCE,
                 TASK_BOARD_REVIEW_REPORT_SOURCE,
+                TASK_BOARD_REVIEW_REPORT_WORKFLOW_SOURCE,
             ],
         },
         GeneratedModule {

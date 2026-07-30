@@ -1,5 +1,5 @@
 use chrono::Duration;
-use harness_task_board_codex_requests::remote_codex_attempt_request;
+use harness_task_board_codex_requests::{attempt_profile, remote_codex_attempt_request};
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
@@ -21,7 +21,7 @@ use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardExecutionPhase;
-use crate::task_board::remote_wire::wire::{RemoteCodexLaunchEnvelope, RemoteOfferRequest};
+use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteRuntimeLaunchEnvelope};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
@@ -238,8 +238,7 @@ async fn persist_remote_offer_in_tx(
         .ok_or_else(|| db_error("inserted remote assignment disappeared"))
 }
 
-/// Writes the frozen claim onto the execution and its attempt, which is the
-/// part of persistence that a fresh assignment row does not itself carry.
+/// Writes the frozen claim that a fresh assignment row does not itself carry.
 async fn apply_remote_claim_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     input: &PersistRemoteOfferInput<'_>,
@@ -334,13 +333,14 @@ async fn validate_binding(
     expected: &TaskBoardWorkflowExecutionCas,
 ) -> Result<(), CliError> {
     let binding = &request.binding;
-    // This re-renders the prompt to compare launch envelopes, which is safe
-    // only because both renders happen inside one controller pass against a
-    // catalog installed once at startup: a customization takes effect on
-    // restart, never between these two. A replayed or reassigned offer never
-    // reaches here, so no frozen envelope is ever compared against a fresh one.
+    // Re-rendering is safe because the runtime catalog is immutable until restart.
     let expected_request = remote_codex_attempt_request(parent, attempt)?;
-    let expected_launch = RemoteCodexLaunchEnvelope::from_codex_request("codex", &expected_request)
+    let runtime = if binding.phase == TaskBoardExecutionPhase::Implementation {
+        "codex"
+    } else {
+        attempt_profile(parent, attempt)?.runtime.as_str()
+    };
+    let expected_launch = RemoteRuntimeLaunchEnvelope::from_run_request(runtime, &expected_request)
         .map_err(|error| db_error(format!("build frozen remote launch contract: {error}")))?;
     let expected_epoch = parent
         .ownership

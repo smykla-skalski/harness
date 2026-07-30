@@ -93,7 +93,7 @@ async fn save_executor_codex_run(
     started_at: &str,
 ) {
     let offer = assignment.require_offer().expect("strict executor offer");
-    let request = offer.launch.codex_request();
+    let request = offer.launch.run_request();
     fixture
         .db
         .save_codex_run(&CodexRunSnapshot {

@@ -33,7 +33,7 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         run_id: &str,
     ) -> Result<Option<CodexRunSnapshot>, CliError>;
 
-    async fn start_codex_report_run(
+    async fn start_report_run(
         &self,
         session_id: &str,
         request: &CodexRunRequest,
@@ -149,7 +149,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         .map(Some)
     }
 
-    async fn start_codex_report_run(
+    async fn start_report_run(
         &self,
         session_id: &str,
         request: &CodexRunRequest,

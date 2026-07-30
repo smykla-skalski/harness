@@ -6,8 +6,8 @@ use super::workflow_dispatch::workflow_owner;
 use super::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::remote_wire::wire::{
-    RemoteArtifactManifest, RemoteAttemptBinding, RemoteClaimRequest, RemoteCodexLaunchEnvelope,
-    RemoteOfferRequest, RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteArtifactManifest, RemoteAttemptBinding, RemoteClaimRequest, RemoteOfferRequest,
+    RemoteRuntimeLaunchEnvelope, RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
     test_codex_launch,
 };
 use crate::task_board::{
@@ -56,19 +56,39 @@ pub(crate) struct ControllerFixture {
 }
 
 pub(crate) async fn controller_fixture(capacity: u32) -> ControllerFixture {
-    Box::pin(controller_fixture_with_retry_attempts(capacity, None)).await
+    Box::pin(controller_fixture_for_runtime(capacity, None, "codex")).await
+}
+
+pub(crate) async fn controller_fixture_with_runtime(
+    capacity: u32,
+    runtime: &str,
+) -> ControllerFixture {
+    Box::pin(controller_fixture_for_runtime(capacity, None, runtime)).await
 }
 
 pub(super) async fn controller_fixture_with_retry_attempts(
     capacity: u32,
     max_attempts: Option<u32>,
 ) -> ControllerFixture {
+    Box::pin(controller_fixture_for_runtime(
+        capacity,
+        max_attempts,
+        "codex",
+    ))
+    .await
+}
+
+async fn controller_fixture_for_runtime(
+    capacity: u32,
+    max_attempts: Option<u32>,
+    runtime: &str,
+) -> ControllerFixture {
     let temp = tempfile::tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&temp.path().join("controller.db"))
         .await
         .expect("open controller db");
     configure_controller(&db, max_attempts).await;
-    let execution = Box::pin(review_execution(&db)).await;
+    let execution = Box::pin(review_execution(&db, runtime)).await;
     let attempt = review_attempt(&execution.execution_id, 1, NOW);
     db.create_task_board_execution_attempt(&attempt)
         .await
@@ -84,7 +104,7 @@ pub(super) async fn controller_fixture_with_retry_attempts(
             host_instance_id: INSTANCE.into(),
             protocol_version: TASK_BOARD_REMOTE_PROTOCOL_VERSION,
             repositories: vec![REPOSITORY.into()],
-            runtimes: vec!["codex".into()],
+            runtimes: vec![runtime.into()],
             capabilities: vec![TaskBoardPhaseCapabilityProfile::ReviewReadOnly],
             capacity,
             active_assignments: 0,
@@ -262,8 +282,8 @@ async fn configure_controller(db: &AsyncDaemonDb, max_attempts: Option<u32>) {
         .expect("configure controller");
 }
 
-async fn review_execution(db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecord {
-    Box::pin(seeded_review_execution(db, "remote", None)).await
+async fn review_execution(db: &AsyncDaemonDb, runtime: &str) -> TaskBoardWorkflowExecutionRecord {
+    Box::pin(seeded_review_execution(db, "remote", None, runtime)).await
 }
 
 /// Seed a second remote-eligible review candidate beside the fixture's own.
@@ -276,7 +296,7 @@ pub(crate) async fn add_review_candidate(
     label: &str,
     pull_request: Option<TaskBoardPullRequestIdentity>,
 ) -> TaskBoardWorkflowExecutionRecord {
-    let execution = Box::pin(seeded_review_execution(db, label, pull_request)).await;
+    let execution = Box::pin(seeded_review_execution(db, label, pull_request, "codex")).await;
     let mut attempt = review_attempt(&execution.execution_id, 1, NOW);
     // The fixture's own attempt already holds the unlabelled key.
     attempt.idempotency_key = format!("review-attempt-{label}-1");
@@ -293,6 +313,7 @@ async fn seeded_review_execution(
     db: &AsyncDaemonDb,
     label: &str,
     pull_request: Option<TaskBoardPullRequestIdentity>,
+    runtime: &str,
 ) -> TaskBoardWorkflowExecutionRecord {
     let item_id = format!("item-{label}");
     let execution_id = format!("execution-{label}");
@@ -309,7 +330,7 @@ async fn seeded_review_execution(
         .task_board_orchestrator_settings_snapshot()
         .await
         .expect("settings snapshot");
-    let reviewer = reviewers();
+    let reviewer = reviewers(runtime);
     let record = TaskBoardWorkflowExecutionRecord {
         execution_id: execution_id.clone(),
         item_id: item_id.clone(),
@@ -358,14 +379,14 @@ async fn seeded_review_execution(
         .execution
 }
 
-fn reviewers() -> TaskBoardResolvedReviewer {
+fn reviewers(runtime: &str) -> TaskBoardResolvedReviewer {
     TaskBoardResolvedReviewer {
         reviewer_count: 1,
         required_approvals: 1,
         max_revision_cycles: 1,
         profiles: vec![TaskBoardReviewerProfile {
             id: "reviewer".into(),
-            runtime: "codex".into(),
+            runtime: runtime.into(),
             persona: "security-reviewer".into(),
             agent_mode: AgentMode::Evaluate,
             model: Some("gpt-5.4".into()),
@@ -423,8 +444,11 @@ pub(super) fn offer_request(
         },
         lease_seconds: 60,
         deadline_at: DEADLINE.into(),
-        launch: RemoteCodexLaunchEnvelope::from_codex_request("codex", &launch)
-            .expect("freeze canonical remote Codex launch"),
+        launch: RemoteRuntimeLaunchEnvelope::from_run_request(
+            &execution.resolved_reviewers.profiles[0].runtime,
+            &launch,
+        )
+        .expect("freeze canonical remote runtime launch"),
         source: RemoteSourceMaterial::repository_revision(REPOSITORY, SOURCE_REVISION),
         artifacts: RemoteArtifactManifest::default(),
         request_sha256: String::new(),

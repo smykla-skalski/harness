@@ -1,7 +1,7 @@
 use super::*;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteAttemptBinding,
-    RemoteCodexLaunchEnvelope, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
+    RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse, RemoteRuntimeLaunchEnvelope,
     RemoteSourceMaterial, RemoteStatusRequest, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -265,7 +265,7 @@ pub(super) fn remote_offer(
         },
         lease_seconds: 60,
         deadline_at: "2026-07-19T10:10:00Z".into(),
-        launch: RemoteCodexLaunchEnvelope::from_codex_request("codex", &request)
+        launch: RemoteRuntimeLaunchEnvelope::from_run_request("codex", &request)
             .expect("freeze canonical remote Codex launch"),
         source: RemoteSourceMaterial::repository_revision(
             "example/harness",

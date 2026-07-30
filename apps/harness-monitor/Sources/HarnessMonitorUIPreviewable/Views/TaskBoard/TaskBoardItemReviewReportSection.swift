@@ -1,10 +1,18 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private struct TaskBoardReviewHeaderStatus {
+  let title: String
+  let systemImage: String
+  let tint: Color
+}
+
 struct TaskBoardItemReviewReportSection: View {
   let item: TaskBoardItem
   let actions: TaskBoardOverviewActions
   let state: TaskBoardReviewReportState
+  var initiallyShowsDetails = false
+  var initiallyShowsFullSummary = false
   @Environment(\.fontScale)
   private var fontScale
 
@@ -28,14 +36,57 @@ struct TaskBoardItemReviewReportSection: View {
   }
 
   private var header: some View {
-    VStack(alignment: .leading, spacing: 2) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
       Label("AI Review", systemImage: "sparkles.rectangle.stack")
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.ink)
         .accessibilityAddTraits(.isHeader)
-      Text("\(item.reviewIntentTitle) · Workflow \(item.workflow?.status.title ?? "Idle")")
+      Text("·")
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
+      Text(item.reviewIntentSubtitle)
+        .font(captionFont)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      if let headerStatus {
+        TaskBoardReviewPill(
+          title: headerStatus.title,
+          systemImage: headerStatus.systemImage,
+          tint: headerStatus.tint
+        )
+      }
+    }
+  }
+
+  private var headerStatus: TaskBoardReviewHeaderStatus? {
+    guard let response = state.response else { return nil }
+    switch response {
+    case .notStarted:
+      return nil
+    case .running:
+      return .init(title: "Running", systemImage: "bolt.fill", tint: HarnessMonitorTheme.accent)
+    case .terminal(_, let executionState, _, _, _, _, _, _, _):
+      return executionState.taskBoardReviewHeaderStatus
+    case .completed:
+      return .init(
+        title: "Completed",
+        systemImage: "checkmark.circle.fill",
+        tint: HarnessMonitorTheme.success
+      )
+    case .failed:
+      return .init(
+        title: "Failed",
+        systemImage: "xmark.octagon.fill",
+        tint: HarnessMonitorTheme.danger
+      )
+    case .cancelled:
+      return .init(
+        title: "Cancelled",
+        systemImage: "slash.circle.fill",
+        tint: HarnessMonitorTheme.caution
+      )
     }
   }
 
@@ -46,59 +97,66 @@ struct TaskBoardItemReviewReportSection: View {
         TaskBoardReviewMessageCard(
           icon: "clock",
           title: "Waiting to start",
-          detail: "No review execution has been recorded for this item.",
+          detail: "No review execution has been recorded for this item",
           tint: HarnessMonitorTheme.secondaryInk
         )
       case .running(
         let executionID,
-        let runtime,
+        _,
+        let requestedRuntime,
+        let actualRuntime,
         let requestedModel,
         let headRevision,
         let startedAt
       ):
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          HStack(spacing: HarnessMonitorTheme.spacingSM) {
-            ProgressView()
-              .controlSize(.small)
-              .accessibilityLabel("Review in progress")
-            TaskBoardReviewStatusPill(
-              title: "Running",
-              systemImage: "bolt.fill",
-              tint: HarnessMonitorTheme.accent
-            )
-          }
-          TaskBoardReviewMetadataCard(
-            provenance: TaskBoardReviewProvenance(
-              executionID: executionID,
-              repository: item.executionRepository,
-              pullRequestNumber: item.workflow?.prNumber,
-              runtime: runtime,
-              model: requestedModel,
-              headRevision: headRevision,
-              startedAt: startedAt,
-              finishedAt: nil
-            )
+        TaskBoardReviewMetadataCard(
+          provenance: TaskBoardReviewProvenance(
+            executionID: executionID,
+            repository: item.executionRepository,
+            pullRequestNumber: item.workflow?.prNumber,
+            requestedRuntime: requestedRuntime,
+            actualRuntime: actualRuntime,
+            model: requestedModel,
+            headRevision: headRevision,
+            startedAt: startedAt,
+            finishedAt: nil
           )
-        }
+        )
+      case .terminal(
+        _,
+        let executionState,
+        _,
+        let requestedRuntime,
+        let actualRuntime,
+        let requestedModel,
+        let headRevision,
+        let startedAt,
+        let finishedAt
+      ):
+        TaskBoardTerminalExecutionReport(
+          item: item,
+          executionState: executionState,
+          terminalReason: item.workflow?.lastError,
+          requestedRuntime: requestedRuntime,
+          actualRuntime: actualRuntime,
+          requestedModel: requestedModel,
+          headRevision: headRevision,
+          startedAt: startedAt,
+          finishedAt: finishedAt
+        )
       case .completed(let report):
         terminalReport(
           report,
-          title: "Completed",
-          systemImage: "checkmark.circle.fill",
           tint: HarnessMonitorTheme.success
         )
       case .failed(let report):
         terminalReport(
           report,
-          title: "Failed",
-          systemImage: "xmark.octagon.fill",
           tint: HarnessMonitorTheme.danger
         )
       case .cancelled(let report):
         terminalReport(
           report,
-          title: "Cancelled",
-          systemImage: "slash.circle.fill",
           tint: HarnessMonitorTheme.caution
         )
       }
@@ -108,7 +166,7 @@ struct TaskBoardItemReviewReportSection: View {
       TaskBoardReviewMessageCard(
         icon: "exclamationmark.triangle.fill",
         title: "Review report unavailable",
-        detail: "The daemon could not load the latest report.",
+        detail: "The daemon could not load the latest report",
         tint: HarnessMonitorTheme.caution
       ) {
         Button("Retry") {
@@ -122,14 +180,12 @@ struct TaskBoardItemReviewReportSection: View {
 
   private func terminalReport(
     _ report: TaskBoardAiReviewReportRecord,
-    title: String,
-    systemImage: String,
     tint: Color
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      TaskBoardReviewStatusPill(title: title, systemImage: systemImage, tint: tint)
       if report.isStale(comparedWith: item.workflow?.prHeadRevision) {
         TaskBoardReviewStaleHeadCard(
+          repository: report.repository,
           reportHead: report.headRevision,
           currentHead: item.workflow?.prHeadRevision
         )
@@ -139,18 +195,22 @@ struct TaskBoardItemReviewReportSection: View {
           executionID: nil,
           repository: report.repository,
           pullRequestNumber: report.pullRequestNumber,
-          runtime: report.runtime,
+          requestedRuntime: report.requestedRuntime,
+          actualRuntime: report.actualRuntime,
           model: report.effectiveModel ?? report.requestedModel,
           headRevision: report.headRevision,
           startedAt: report.startedAt,
           finishedAt: report.finishedAt
-        )
+        ),
+        initiallyShowsDetails: initiallyShowsDetails
       )
       if let summary = report.summary, !summary.isEmpty {
-        TaskBoardReviewTextCard(
+        TaskBoardReviewTextSection(
           title: "Summary",
           systemImage: "text.alignleft",
-          content: summary
+          content: summary,
+          collapsedLineLimit: 4,
+          initiallyExpanded: initiallyShowsFullSummary
         )
       }
       if let reason = report.terminalReason, !reason.isEmpty {
@@ -162,13 +222,17 @@ struct TaskBoardItemReviewReportSection: View {
         )
       }
       if let partialOutput = report.partialOutput, !partialOutput.isEmpty {
-        TaskBoardReviewTextCard(
+        TaskBoardReviewTextSection(
           title: "Partial output",
           systemImage: "doc.text",
           content: partialOutput
         )
       }
-      TaskBoardReviewFindingsSection(findings: report.findings)
+      TaskBoardReviewFindingsSection(
+        findings: report.findings,
+        repository: report.repository,
+        revision: report.headRevision
+      )
     }
     .fixedSize(horizontal: false, vertical: true)
   }
@@ -183,19 +247,108 @@ struct TaskBoardItemReviewReportSection: View {
   }
 }
 
+private struct TaskBoardTerminalExecutionReport: View {
+  let item: TaskBoardItem
+  let executionState: TaskBoardExecutionState
+  let terminalReason: String?
+  let requestedRuntime: String
+  let actualRuntime: String?
+  let requestedModel: String?
+  let headRevision: String?
+  let startedAt: String
+  let finishedAt: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      TaskBoardReviewMessageCard(
+        icon: executionState.taskBoardReviewSystemImage,
+        title: "Report unavailable",
+        detail: reportUnavailableDetail,
+        tint: executionState.taskBoardReviewTint
+      )
+      TaskBoardReviewMetadataCard(
+        provenance: TaskBoardReviewProvenance(
+          executionID: nil,
+          repository: item.executionRepository,
+          pullRequestNumber: item.workflow?.prNumber,
+          requestedRuntime: requestedRuntime,
+          actualRuntime: actualRuntime,
+          model: requestedModel,
+          headRevision: headRevision,
+          startedAt: startedAt,
+          finishedAt: finishedAt
+        )
+      )
+    }
+  }
+
+  private var reportUnavailableDetail: String {
+    if let terminalReason,
+      !terminalReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      return terminalReason
+    }
+    switch executionState {
+    case .completed:
+      return "The review finished before Harness retained a report"
+    case .cancelled:
+      return "The review was cancelled before Harness retained a report"
+    default:
+      return "The review stopped before Harness retained a report"
+    }
+  }
+}
+
+extension TaskBoardExecutionState {
+  fileprivate var taskBoardReviewHeaderStatus: TaskBoardReviewHeaderStatus {
+    .init(
+      title: taskBoardReviewTitle,
+      systemImage: taskBoardReviewSystemImage,
+      tint: taskBoardReviewTint
+    )
+  }
+
+  fileprivate var taskBoardReviewTitle: String {
+    switch self {
+    case .completed: "Completed"
+    case .failed: "Failed"
+    case .cancelled: "Cancelled"
+    default: "Finished"
+    }
+  }
+
+  fileprivate var taskBoardReviewSystemImage: String {
+    switch self {
+    case .completed: "checkmark.circle.fill"
+    case .failed: "xmark.octagon.fill"
+    case .cancelled: "slash.circle.fill"
+    default: "checkmark.seal.fill"
+    }
+  }
+
+  fileprivate var taskBoardReviewTint: Color {
+    switch self {
+    case .completed: HarnessMonitorTheme.success
+    case .failed: HarnessMonitorTheme.danger
+    case .cancelled: HarnessMonitorTheme.caution
+    default: HarnessMonitorTheme.secondaryInk
+    }
+  }
+}
+
 extension TaskBoardItem {
   var showsReviewReport: Bool {
     matchesReviewWorkflow
   }
 
-  fileprivate var reviewIntentTitle: String {
+  fileprivate var reviewIntentSubtitle: String {
     switch workflowKind {
     case .some(.prReview):
-      "Pull request review"
+      "Pull request"
     case .some(.review):
-      "Completed work review"
+      "Completed work"
     default:
-      "AI review"
+      "General"
     }
   }
 

@@ -10,12 +10,13 @@ use crate::agents::turn::{
 use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpSessionConfigOptionState,
 };
-use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use harness_workspace::workspace::utc_now;
 
 use super::AcpAgentManagerHandle;
+
+mod persistence;
 
 const OPENROUTER_RUNTIME: &str = "openrouter";
 
@@ -363,7 +364,6 @@ impl OpenRouterAgentTurnRuntime {
                 .into()
             })
     }
-
     async fn persist_start(
         &self,
         id: &AgentTurnId,
@@ -596,3 +596,11 @@ fn effective_model(options: &[AcpSessionConfigOptionState]) -> Option<String> {
 #[cfg(test)]
 #[path = "turn_lifecycle_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "turn_lifecycle/reconciliation_tests.rs"]
+mod reconciliation_tests;
+
+#[cfg(test)]
+#[path = "turn_lifecycle/persistence_tests.rs"]
+mod persistence_tests;

@@ -62,6 +62,8 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
   public var pullRequestNumber: UInt64
   public var headRevision: String
   public var runtime: String
+  public var requestedRuntime: String
+  public var actualRuntime: String?
   public var requestedModel: String
   public var effectiveModel: String?
   public var status: TaskBoardAiReviewReportStatus
@@ -72,7 +74,7 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
   public var startedAt: String
   public var finishedAt: String
 
-  public init(reportId: String, itemId: String, correlationId: String, repository: String, pullRequestNumber: UInt64, headRevision: String, runtime: String, requestedModel: String, effectiveModel: String? = nil, status: TaskBoardAiReviewReportStatus, summary: String? = nil, findings: [TaskBoardReportOnlyReviewFinding] = [], partialOutput: String? = nil, terminalReason: String? = nil, startedAt: String, finishedAt: String) {
+  public init(reportId: String, itemId: String, correlationId: String, repository: String, pullRequestNumber: UInt64, headRevision: String, runtime: String, requestedRuntime: String, actualRuntime: String? = nil, requestedModel: String, effectiveModel: String? = nil, status: TaskBoardAiReviewReportStatus, summary: String? = nil, findings: [TaskBoardReportOnlyReviewFinding] = [], partialOutput: String? = nil, terminalReason: String? = nil, startedAt: String, finishedAt: String) {
     self.reportId = reportId
     self.itemId = itemId
     self.correlationId = correlationId
@@ -80,6 +82,8 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
     self.pullRequestNumber = pullRequestNumber
     self.headRevision = headRevision
     self.runtime = runtime
+    self.requestedRuntime = requestedRuntime
+    self.actualRuntime = actualRuntime
     self.requestedModel = requestedModel
     self.effectiveModel = effectiveModel
     self.status = status
@@ -100,6 +104,8 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
     pullRequestNumber = try container.decode(UInt64.self, forKey: .pullRequestNumber)
     headRevision = try container.decode(String.self, forKey: .headRevision)
     runtime = try container.decode(String.self, forKey: .runtime)
+    requestedRuntime = try container.decode(String.self, forKey: .requestedRuntime)
+    actualRuntime = try container.decodeIfPresent(String.self, forKey: .actualRuntime)
     requestedModel = try container.decode(String.self, forKey: .requestedModel)
     effectiveModel = try container.decodeIfPresent(String.self, forKey: .effectiveModel)
     status = try container.decode(TaskBoardAiReviewReportStatus.self, forKey: .status)
@@ -119,6 +125,8 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
     case pullRequestNumber = "pull_request_number"
     case headRevision = "head_revision"
     case runtime
+    case requestedRuntime = "requested_runtime"
+    case actualRuntime = "actual_runtime"
     case requestedModel = "requested_model"
     case effectiveModel = "effective_model"
     case status
@@ -133,7 +141,8 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
 
 public enum TaskBoardAiReviewReportResponse: Codable, Equatable, Sendable {
   case notStarted
-  case running(executionId: String, runtime: String, requestedModel: String?, headRevision: String?, startedAt: String)
+  case running(executionId: String, runtime: String, requestedRuntime: String, actualRuntime: String?, requestedModel: String?, headRevision: String?, startedAt: String)
+  case terminal(executionId: String, executionState: TaskBoardExecutionState, runtime: String, requestedRuntime: String, actualRuntime: String?, requestedModel: String?, headRevision: String?, startedAt: String, finishedAt: String)
   case completed(report: TaskBoardAiReviewReportRecord)
   case failed(report: TaskBoardAiReviewReportRecord)
   case cancelled(report: TaskBoardAiReviewReportRecord)
@@ -142,9 +151,13 @@ public enum TaskBoardAiReviewReportResponse: Codable, Equatable, Sendable {
     case status
     case executionId = "execution_id"
     case runtime
+    case requestedRuntime = "requested_runtime"
+    case actualRuntime = "actual_runtime"
     case requestedModel = "requested_model"
     case headRevision = "head_revision"
     case startedAt = "started_at"
+    case executionState = "execution_state"
+    case finishedAt = "finished_at"
     case report
   }
 
@@ -155,7 +168,9 @@ public enum TaskBoardAiReviewReportResponse: Codable, Equatable, Sendable {
     case "not_started":
       self = .notStarted
     case "running":
-      self = .running(executionId: try container.decode(String.self, forKey: .executionId), runtime: try container.decode(String.self, forKey: .runtime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt))
+      self = .running(executionId: try container.decode(String.self, forKey: .executionId), runtime: try container.decode(String.self, forKey: .runtime), requestedRuntime: try container.decode(String.self, forKey: .requestedRuntime), actualRuntime: try container.decodeIfPresent(String.self, forKey: .actualRuntime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt))
+    case "terminal":
+      self = .terminal(executionId: try container.decode(String.self, forKey: .executionId), executionState: try container.decode(TaskBoardExecutionState.self, forKey: .executionState), runtime: try container.decode(String.self, forKey: .runtime), requestedRuntime: try container.decode(String.self, forKey: .requestedRuntime), actualRuntime: try container.decodeIfPresent(String.self, forKey: .actualRuntime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt), finishedAt: try container.decode(String.self, forKey: .finishedAt))
     case "completed":
       self = .completed(report: try container.decode(TaskBoardAiReviewReportRecord.self, forKey: .report))
     case "failed":
@@ -172,13 +187,26 @@ public enum TaskBoardAiReviewReportResponse: Codable, Equatable, Sendable {
     switch self {
     case .notStarted:
       try container.encode("not_started", forKey: .status)
-    case .running(let executionId, let runtime, let requestedModel, let headRevision, let startedAt):
+    case .running(let executionId, let runtime, let requestedRuntime, let actualRuntime, let requestedModel, let headRevision, let startedAt):
       try container.encode("running", forKey: .status)
       try container.encode(executionId, forKey: .executionId)
       try container.encode(runtime, forKey: .runtime)
+      try container.encode(requestedRuntime, forKey: .requestedRuntime)
+      try container.encode(actualRuntime, forKey: .actualRuntime)
       try container.encode(requestedModel, forKey: .requestedModel)
       try container.encode(headRevision, forKey: .headRevision)
       try container.encode(startedAt, forKey: .startedAt)
+    case .terminal(let executionId, let executionState, let runtime, let requestedRuntime, let actualRuntime, let requestedModel, let headRevision, let startedAt, let finishedAt):
+      try container.encode("terminal", forKey: .status)
+      try container.encode(executionId, forKey: .executionId)
+      try container.encode(executionState, forKey: .executionState)
+      try container.encode(runtime, forKey: .runtime)
+      try container.encode(requestedRuntime, forKey: .requestedRuntime)
+      try container.encode(actualRuntime, forKey: .actualRuntime)
+      try container.encode(requestedModel, forKey: .requestedModel)
+      try container.encode(headRevision, forKey: .headRevision)
+      try container.encode(startedAt, forKey: .startedAt)
+      try container.encode(finishedAt, forKey: .finishedAt)
     case .completed(let report):
       try container.encode("completed", forKey: .status)
       try container.encode(report, forKey: .report)
@@ -190,4 +218,21 @@ public enum TaskBoardAiReviewReportResponse: Codable, Equatable, Sendable {
       try container.encode(report, forKey: .report)
     }
   }
+}
+
+public enum TaskBoardExecutionState: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case pending = "pending"
+  case preparing = "preparing"
+  case starting = "starting"
+  case running = "running"
+  case retryWait = "retry_wait"
+  case awaitingApproval = "awaiting_approval"
+  case blocked = "blocked"
+  case humanRequired = "human_required"
+  case draining = "draining"
+  case completed = "completed"
+  case failed = "failed"
+  case cancelled = "cancelled"
+
+  public var id: String { rawValue }
 }

@@ -6,10 +6,9 @@ use tokio::task::spawn_blocking;
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
     REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
-    TaskBoardRemoteTerminalArtifact,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun, TaskBoardRemoteMutationOutcome,
+    TaskBoardRemoteRunStatus, TaskBoardRemoteTerminalArtifact,
 };
-use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::git::bundle_export::GitBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease,
@@ -34,14 +33,18 @@ enum TerminalEvidence {
     },
 }
 
-pub(super) async fn persist_terminal_snapshot(
+pub(super) async fn persist_terminal_snapshot<S>(
     db: &AsyncDaemonDb,
     owner_instance_id: &str,
     record: &TaskBoardRemoteAssignmentRecord,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &S,
     workspace: &Path,
-) -> Result<(), CliError> {
-    let evidence = terminal_evidence(record, snapshot, workspace).await?;
+) -> Result<(), CliError>
+where
+    S: Clone + Into<TaskBoardRemoteExecutorRun>,
+{
+    let snapshot = snapshot.clone().into();
+    let evidence = terminal_evidence(record, &snapshot, workspace).await?;
     let owner_at = utc_now();
     let Some(claim) = db
         .claim_task_board_remote_executor_lifecycle_owner_with_settings(
@@ -91,45 +94,51 @@ pub(super) async fn persist_terminal_snapshot(
 )]
 async fn terminal_evidence(
     record: &TaskBoardRemoteAssignmentRecord,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
     workspace: &Path,
 ) -> Result<TerminalEvidence, CliError> {
     match snapshot.status {
-        CodexRunStatus::Completed => match completed_evidence(record, snapshot, workspace).await {
-            Ok(evidence) => Ok(evidence),
-            Err(error) if error.code() == "KSRCLI084" => {
-                tracing::warn!(%error, assignment_id = %record.assignment_id, "remote executor produced invalid terminal evidence");
-                Ok(TerminalEvidence::Failed {
-                    error_code: "executor_output_invalid",
-                    failure_class: TaskBoardFailureClass::Permanent,
-                })
+        TaskBoardRemoteRunStatus::Completed => {
+            match completed_evidence(record, snapshot, workspace).await {
+                Ok(evidence) => Ok(evidence),
+                Err(error) if error.code() == "KSRCLI084" => {
+                    tracing::warn!(%error, assignment_id = %record.assignment_id, "remote executor produced invalid terminal evidence");
+                    Ok(TerminalEvidence::Failed {
+                        error_code: "executor_output_invalid",
+                        failure_class: TaskBoardFailureClass::Permanent,
+                    })
+                }
+                Err(error) => Err(error),
             }
-            Err(error) => Err(error),
-        },
-        CodexRunStatus::Failed => Ok(TerminalEvidence::Failed {
+        }
+        TaskBoardRemoteRunStatus::Failed => Ok(TerminalEvidence::Failed {
             error_code: "executor_runtime_failed",
             failure_class: TaskBoardFailureClass::Transient,
         }),
-        CodexRunStatus::Cancelled => Ok(TerminalEvidence::Failed {
+        TaskBoardRemoteRunStatus::Cancelled => Ok(TerminalEvidence::Failed {
             error_code: "executor_runtime_cancelled",
             failure_class: TaskBoardFailureClass::Permanent,
         }),
         _ => Err(invalid_transition(
-            "remote terminal persistence requires a terminal Codex snapshot",
+            "remote terminal persistence requires a terminal runtime snapshot",
         )),
     }
 }
 
-async fn completed_evidence(
+async fn completed_evidence<S>(
     record: &TaskBoardRemoteAssignmentRecord,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &S,
     workspace: &Path,
-) -> Result<TerminalEvidence, CliError> {
+) -> Result<TerminalEvidence, CliError>
+where
+    S: Clone + Into<TaskBoardRemoteExecutorRun>,
+{
+    let snapshot = snapshot.clone().into();
     let offer = record.require_offer()?;
     let message = snapshot
         .final_message
         .as_deref()
-        .ok_or_else(|| invalid_transition("completed remote Codex run has no final message"))?;
+        .ok_or_else(|| invalid_transition("completed remote runtime run has no final message"))?;
     let result = serde_json::from_str::<TaskBoardLocalAttemptResult>(message.trim())
         .map_err(|error| invalid_transition(format!("parse remote attempt result: {error}")))?;
     let typed = RemoteTypedResult::seal(result, offer.request_sha256.clone())

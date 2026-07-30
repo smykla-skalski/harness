@@ -259,7 +259,7 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
         Ok(self.load_run(run_id))
     }
 
-    async fn start_codex_report_run(
+    async fn start_report_run(
         &self,
         session_id: &str,
         request: &CodexRunRequest,

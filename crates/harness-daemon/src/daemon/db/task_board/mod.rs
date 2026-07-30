@@ -103,6 +103,7 @@ mod remote_assignment_status_settlement_tests;
 mod remote_assignment_stop_fence;
 mod remote_assignment_terminal;
 mod remote_assignment_terminal_handoff;
+mod remote_executor_run;
 mod review_reports;
 mod triage_apply;
 mod triage_apply_agent;
@@ -322,6 +323,9 @@ pub(crate) use remote_assignment_start_authority::{
 };
 #[allow(unused_imports)]
 pub(crate) use remote_evidence_retention::TaskBoardRemoteEvidencePruneResult;
+pub(crate) use remote_executor_run::{
+    TaskBoardRemoteExecutorRun, TaskBoardRemoteRunStatus, TaskBoardRemoteRuntimeProvenance,
+};
 pub(crate) use remote_hosts::TaskBoardRemoteHostSelection;
 // `pub`, not `pub(crate)`: `db/mod.rs` re-exports these two further, all the
 // way out to `harness-db-schema`'s own v43 controller-operation migration

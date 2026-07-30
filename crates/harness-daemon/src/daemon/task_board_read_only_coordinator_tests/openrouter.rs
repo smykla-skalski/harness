@@ -9,7 +9,10 @@
 //! provider, recording the run exactly as the production adapter does.
 
 use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
-use crate::task_board::{TaskBoardAttemptState, TaskBoardExecutionState};
+use crate::daemon::protocol::TaskBoardGetItemRequest;
+use crate::task_board::{
+    TaskBoardAiReviewReportResponse, TaskBoardAttemptState, TaskBoardExecutionState,
+};
 
 use super::fixture::{Fixture, NOW, RETRY_AT, seed_execution_with_reviewer_runtime};
 use super::runtime::FakeReadOnlyRuntime;
@@ -81,6 +84,28 @@ async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {
             .expect("codex run lookup")
             .is_none()
     );
+    let reopened = AsyncDaemonDb::connect(&fixture.test.path)
+        .await
+        .expect("reopen database for ticket report");
+    let report = crate::daemon::service::get_task_board_ai_review_report_db(
+        &reopened,
+        &TaskBoardGetItemRequest {
+            id: fixture.item_id.clone(),
+        },
+    )
+    .await
+    .expect("load originating ticket report after reopen");
+    assert!(matches!(
+        report,
+        TaskBoardAiReviewReportResponse::Running {
+            runtime,
+            requested_runtime,
+            actual_runtime: Some(actual_runtime),
+            ..
+        } if runtime == "openrouter"
+            && requested_runtime == "openrouter"
+            && actual_runtime == "openrouter"
+    ));
 
     // Re-reconciling the running attempt is idempotent: no second turn starts.
     reconcile(&db, &runtime, NOW).await;

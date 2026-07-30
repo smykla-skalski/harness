@@ -61,7 +61,7 @@ impl AsyncDaemonDb {
         let receipt = start_failure_receipt(&record, permit, response)?;
         let (receipt_json, receipt_sha256) = start_failure_receipt_values(&receipt)?;
         let run_exists =
-            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?1)")
                 .bind(&permit.identity.run_id)
                 .fetch_one(transaction.as_mut())
                 .await
@@ -90,7 +90,7 @@ impl AsyncDaemonDb {
                AND executor_stop_pending_sha256 IS NULL
                AND result_json IS NULL AND status_sha256 IS NULL
                AND result_sha256 IS NULL
-               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?11)",
+               AND NOT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?11 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?11)",
         )
         .bind(&record.assignment_id)
         .bind(&response.observed_at)

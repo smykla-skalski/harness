@@ -118,6 +118,8 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         46 => Some(("task_board_items", "source_project_id")),
         48 => Some(("task_board_projects", "color")),
         50 => Some(("task_board_projects", "shape")),
+        60 => Some(("task_board_ai_review_reports", "requested_runtime")),
+        61 => Some(("task_board_ai_review_reports", "actual_runtime")),
         _ => None,
     }
 }
@@ -195,8 +197,9 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         57 => 58,
         // v59 adds the durable agent_turn_runs table for provider-backed report runs.
         58 => 59,
-        // v60 retains the provider-owned turn identity for report harvesting.
-        59 => 60,
+        // v60 splits provider turn identity and report runtime provenance so
+        // every ALTER remains recoverable across a crash.
+        59..=62 => 60,
         _ => u64::MAX,
     }
 }

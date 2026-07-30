@@ -97,8 +97,9 @@ pub(crate) use task_board::remote_assignment_test_support::{
     accept_executor as accept_remote_executor, add_review_candidate as add_remote_review_candidate,
     authorize_and_start_executor as authorize_and_start_remote_executor,
     claim_request as remote_executor_claim_request,
-    controller_fixture as remote_controller_fixture, executor_fixture as remote_executor_fixture,
-    seed_cancelable_controller_targets,
+    controller_fixture as remote_controller_fixture,
+    controller_fixture_with_runtime as remote_controller_fixture_with_runtime,
+    executor_fixture as remote_executor_fixture, seed_cancelable_controller_targets,
 };
 pub(crate) use task_board::workflow_owner;
 #[cfg(test)]
@@ -122,7 +123,7 @@ pub(crate) use task_board::{
     TaskBoardPreparationClaim, TaskBoardPreparationRelease, TaskBoardPreparationUnavailable,
     TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteControllerOperationToken, TaskBoardRemoteControllerScanItem,
-    TaskBoardRemoteControllerScanStep, TaskBoardRemoteExecutorIdentity,
+    TaskBoardRemoteControllerScanStep, TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorRun,
     TaskBoardRemoteExecutorScan, TaskBoardRemoteExecutorStartAuthority,
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
     TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopPending,
@@ -132,13 +133,13 @@ pub(crate) use task_board::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     TaskBoardRemotePriorPhaseBundle, TaskBoardRemoteRecoveryBatch, TaskBoardRemoteRecoveryFailure,
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRecord,
-    TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState,
-    TaskBoardRemoteSettlementReceipt, TaskBoardRemoteSourceBundle,
-    TaskBoardRemoteSourceOfferReassignment, TaskBoardRemoteTerminalArtifact,
-    TaskBoardRunAcquireRequest, TaskBoardTriageCurrentRead, TaskBoardTriageOverrideClearInput,
-    TaskBoardTriageOverrideMutationResult, TaskBoardTriageOverrideSetInput,
-    executor_start_authority, executor_start_io_permit, remote_executor_identity,
-    remote_executor_identity_from_parts, stop_pending_snapshot_matches,
+    TaskBoardRemoteResultImportRequest, TaskBoardRemoteResultImportState, TaskBoardRemoteRunStatus,
+    TaskBoardRemoteRuntimeProvenance, TaskBoardRemoteSettlementReceipt,
+    TaskBoardRemoteSourceBundle, TaskBoardRemoteSourceOfferReassignment,
+    TaskBoardRemoteTerminalArtifact, TaskBoardRunAcquireRequest, TaskBoardTriageCurrentRead,
+    TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideMutationResult,
+    TaskBoardTriageOverrideSetInput, executor_start_authority, executor_start_io_permit,
+    remote_executor_identity, remote_executor_identity_from_parts, stop_pending_snapshot_matches,
 };
 pub(crate) use task_board::{
     ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,

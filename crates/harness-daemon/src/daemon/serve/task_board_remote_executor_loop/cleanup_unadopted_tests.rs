@@ -405,7 +405,7 @@ fn run_snapshot(
         .require_offer()
         .expect("strict offer")
         .launch
-        .codex_request();
+        .run_request();
     CodexRunSnapshot {
         run_id: authority.identity.run_id.clone(),
         session_id: authority.identity.session_id.clone(),

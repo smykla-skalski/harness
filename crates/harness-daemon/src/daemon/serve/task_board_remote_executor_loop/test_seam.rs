@@ -16,7 +16,9 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use super::RemoteWorkerIdentity;
 use super::runtime::PreparedRemoteWorkerAction;
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{
+    AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, TaskBoardRemoteExecutorRun,
+};
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::workspace::utc_now;
@@ -58,7 +60,7 @@ pub(crate) struct RuntimeSeamScope {
     _serial: OwnedMutexGuard<()>,
 }
 
-/// Records one fresh external Codex Start attempt (`start_codex_run`).
+/// Records one fresh external runtime Start attempt.
 pub(super) fn record_start() {
     START_CALLS.fetch_add(1, Ordering::SeqCst);
 }
@@ -106,7 +108,7 @@ pub(super) async fn execute_runtime_seam(
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
     workspace: &Path,
-) -> Result<Option<CodexRunSnapshot>, CliError> {
+) -> Result<Option<TaskBoardRemoteExecutorRun>, CliError> {
     let seam = runtime_seam_slot()
         .lock()
         .expect("lock deterministic runtime seam slot")
@@ -116,7 +118,6 @@ pub(super) async fn execute_runtime_seam(
     };
     let outcome = record_runtime_call(&seam, offer, identity, action, workspace).await?;
     let snapshot = runtime_snapshot(db, offer, identity, workspace, &outcome).await?;
-    db.save_codex_run(&snapshot).await?;
     if let Some(final_message) = outcome.armed_final_message() {
         disarm_completed_probe(&seam, identity, final_message).await;
     }
@@ -131,6 +132,10 @@ pub(super) fn runtime_seam_installed() -> bool {
 }
 
 impl RuntimeSeamScope {
+    pub(crate) async fn start_count(&self) -> usize {
+        self.seam.lock().await.started_runs.len()
+    }
+
     pub(super) async fn calls(&self) -> Vec<RuntimeSeamCall> {
         self.seam.lock().await.calls.clone()
     }
@@ -225,9 +230,20 @@ async fn runtime_snapshot(
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
     outcome: &RuntimeSeamOutcome,
-) -> Result<CodexRunSnapshot, CliError> {
+) -> Result<TaskBoardRemoteExecutorRun, CliError> {
+    if offer.launch.runtime == "openrouter" {
+        persist_agent_turn_snapshot(db, offer, identity, workspace, outcome).await?;
+        return db
+            .task_board_remote_executor_run(offer, &identity.run_id)
+            .await?
+            .ok_or_else(|| invalid_transition("deterministic runtime seam lost agent turn run"));
+    }
     match outcome {
-        RuntimeSeamOutcome::Start => Ok(deterministic_start_snapshot(offer, identity, workspace)),
+        RuntimeSeamOutcome::Start => {
+            let snapshot = deterministic_start_snapshot(offer, identity, workspace);
+            db.save_codex_run(&snapshot).await?;
+            Ok(TaskBoardRemoteExecutorRun::from(snapshot))
+        }
         RuntimeSeamOutcome::Probe { final_message } => {
             let mut snapshot = db
                 .codex_run(&identity.run_id)
@@ -239,9 +255,52 @@ async fn runtime_snapshot(
                 snapshot.error = None;
                 snapshot.updated_at = utc_now();
             }
-            Ok(snapshot)
+            db.save_codex_run(&snapshot).await?;
+            Ok(TaskBoardRemoteExecutorRun::from(snapshot))
         }
     }
+}
+
+async fn persist_agent_turn_snapshot(
+    db: &AsyncDaemonDb,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    workspace: &Path,
+    outcome: &RuntimeSeamOutcome,
+) -> Result<(), CliError> {
+    let now = utc_now();
+    let mut snapshot = db
+        .agent_turn_run(&identity.run_id)
+        .await?
+        .unwrap_or_else(|| AgentTurnRunSnapshot {
+            run_id: identity.run_id.clone(),
+            session_id: Some(identity.session_id.clone()),
+            task_id: offer.launch.task_id.clone(),
+            board_item_id: Some(offer.launch.board_item_id.clone()),
+            workflow_execution_id: Some(offer.launch.workflow_execution_id.clone()),
+            project_dir: Some(workspace.to_string_lossy().into_owned()),
+            runtime_run_id: Some(format!("acp:{}", identity.run_id)),
+            requested_runtime: "openrouter".into(),
+            actual_runtime: Some("openrouter".into()),
+            requested_model: offer.launch.model.clone(),
+            actual_model: None,
+            status: AgentTurnRunStatus::Running,
+            source_revision: None,
+            report: None,
+            stop_reason: None,
+            error: None,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        });
+    if let RuntimeSeamOutcome::Probe {
+        final_message: Some(message),
+    } = outcome
+    {
+        snapshot.status = AgentTurnRunStatus::Completed;
+        snapshot.report = Some(message.clone());
+        snapshot.updated_at = now;
+    }
+    db.save_agent_turn_run(&snapshot).await
 }
 
 impl RuntimeSeamOutcome {
@@ -263,7 +322,7 @@ fn deterministic_start_snapshot(
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
 ) -> CodexRunSnapshot {
-    let request = offer.launch.codex_request();
+    let request = offer.launch.run_request();
     let observed_at = utc_now();
     CodexRunSnapshot {
         run_id: identity.run_id.clone(),

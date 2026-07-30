@@ -123,6 +123,8 @@ fn review_report(
         pull_request_number: pull_request.number,
         head_revision,
         runtime: profile.runtime.clone(),
+        requested_runtime: profile.runtime.clone(),
+        actual_runtime: Some("codex".into()),
         requested_model,
         effective_model: run.model.clone(),
         status,

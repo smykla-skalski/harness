@@ -4,8 +4,7 @@ use sqlx::{Sqlite, Transaction, query_as};
 use super::{TaskBoardRemoteExecutorStopPending, stop_pending_digest};
 use crate::daemon::db::task_board::remote_assignment_model::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::db::task_board::remote_assignment_start_authority::remote_executor_identity;
-use crate::daemon::db::{CliError, db_error};
-use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot};
+use crate::daemon::db::{CliError, TaskBoardRemoteExecutorRun, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 const OBSERVED_LAUNCH_DOMAIN: &str = "harness.task-board.remote-executor-observed-launch.v1";
@@ -28,14 +27,20 @@ type StoredLaunchEvidence = (
 pub(super) async fn durable_run_matches_snapshot(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &TaskBoardRemoteAssignmentRecord,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<bool, CliError> {
     let identity = remote_executor_identity(record)?;
     if snapshot.run_id != identity.run_id || snapshot.session_id != identity.session_id {
         return Ok(false);
     }
-    let Some(stored) =
-        stored_launch_evidence(transaction, &snapshot.run_id, &snapshot.session_id, false).await?
+    let Some(stored) = stored_launch_evidence(
+        transaction,
+        record,
+        &snapshot.run_id,
+        &snapshot.session_id,
+        false,
+    )
+    .await?
     else {
         return Ok(false);
     };
@@ -44,18 +49,24 @@ pub(super) async fn durable_run_matches_snapshot(
 
 pub(super) async fn durable_stopped_run_matches(
     transaction: &mut Transaction<'_, Sqlite>,
-    _record: &TaskBoardRemoteAssignmentRecord,
+    record: &TaskBoardRemoteAssignmentRecord,
     pending: &TaskBoardRemoteExecutorStopPending,
 ) -> Result<bool, CliError> {
-    let Some(stored) =
-        stored_launch_evidence(transaction, &pending.run_id, &pending.session_id, true).await?
+    let Some(stored) = stored_launch_evidence(
+        transaction,
+        record,
+        &pending.run_id,
+        &pending.session_id,
+        true,
+    )
+    .await?
     else {
         return Ok(false);
     };
     Ok(stored_launch_digest(&stored) == pending.observed_launch_sha256)
 }
 
-pub(super) fn observed_launch_digest(snapshot: &CodexRunSnapshot) -> String {
+pub(super) fn observed_launch_digest(snapshot: &TaskBoardRemoteExecutorRun) -> String {
     launch_digest(&[
         Some(snapshot.run_id.as_str()),
         Some(snapshot.session_id.as_str()),
@@ -108,10 +119,35 @@ pub(super) fn settled_stop_replays(
 
 async fn stored_launch_evidence(
     transaction: &mut Transaction<'_, Sqlite>,
+    record: &TaskBoardRemoteAssignmentRecord,
     run_id: &str,
     session_id: &str,
     require_terminal: bool,
 ) -> Result<Option<StoredLaunchEvidence>, CliError> {
+    let offer = record.require_offer()?;
+    if offer.launch.runtime == "openrouter" {
+        return query_as::<_, StoredLaunchEvidence>(
+            "SELECT runs.run_id, COALESCE(runs.session_id, ''), runs.task_id,
+                    runs.board_item_id, runs.workflow_execution_id, ?4,
+                    COALESCE(runs.project_dir, ''), ?5, ?6, runs.created_at,
+                    runs.requested_model, ?7
+             FROM agent_turn_runs AS runs
+             WHERE runs.run_id = ?1 AND runs.session_id = ?2
+               AND runs.requested_runtime = 'openrouter'
+               AND runs.actual_runtime = 'openrouter'
+               AND (?3 = 0 OR runs.status IN ('completed', 'failed', 'cancelled'))",
+        )
+        .bind(run_id)
+        .bind(session_id)
+        .bind(require_terminal)
+        .bind(&offer.launch.display_name)
+        .bind(mode_label(offer.launch.mode))
+        .bind(&offer.launch.prompt)
+        .bind(&offer.launch.effort)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("verify remote executor stop run: {error}")));
+    }
     query_as::<_, StoredLaunchEvidence>(
         "SELECT runs.run_id, runs.session_id, runs.task_id, runs.board_item_id,
                 runs.workflow_execution_id, runs.display_name, runs.project_dir,
@@ -169,10 +205,10 @@ fn update_required(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-const fn mode_label(mode: CodexRunMode) -> &'static str {
+const fn mode_label(mode: crate::daemon::protocol::CodexRunMode) -> &'static str {
     match mode {
-        CodexRunMode::Report => "report",
-        CodexRunMode::WorkspaceWrite => "workspace_write",
-        CodexRunMode::Approval => "approval",
+        crate::daemon::protocol::CodexRunMode::Report => "report",
+        crate::daemon::protocol::CodexRunMode::WorkspaceWrite => "workspace_write",
+        crate::daemon::protocol::CodexRunMode::Approval => "approval",
     }
 }

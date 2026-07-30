@@ -22,6 +22,8 @@ extension PreviewHarnessClientState {
           pullRequestNumber: item.workflow?.prNumber ?? 901,
           headRevision: String(repeating: "a", count: 40),
           runtime: "openrouter",
+          requestedRuntime: "openrouter",
+          actualRuntime: "openrouter",
           requestedModel: "deepseek/deepseek-v4-flash",
           effectiveModel: "deepseek/deepseek-v4-flash",
           status: .completed,

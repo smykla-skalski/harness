@@ -101,6 +101,8 @@ let sampleTaskBoardReviewReportText =
       "pull_request_number": 42,
       "head_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "runtime": "openrouter",
+      "requested_runtime": "openrouter",
+      "actual_runtime": "openrouter",
       "requested_model": "deepseek/deepseek-v4-flash",
       "effective_model": "deepseek/deepseek-v4-flash",
       "status": "completed",
