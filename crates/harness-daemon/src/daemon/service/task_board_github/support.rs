@@ -20,7 +20,7 @@ use harness_kernel::errors::CliError;
 /// The live canvas a decision is evaluated against, when one is published.
 pub(super) type AutomationPolicy<'a> = Option<(&'a str, &'a PolicyGraph)>;
 
-use super::super::task_board_runtime::external_sync_config_for_repository;
+use super::super::repository_sync_support::external_sync_config_for_repository;
 
 #[path = "git_ops.rs"]
 mod git_ops;

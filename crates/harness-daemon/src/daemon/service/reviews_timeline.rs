@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
+use crate::daemon::service::repository_sync_support::external_sync_config_for_repository;
 use crate::reviews::ReviewsCacheClearResponse;
 use crate::reviews::timeline::{
     self, ReviewsTimelineRequest, ReviewsTimelineResponse, TimelineError, TimelineGitHubClient,

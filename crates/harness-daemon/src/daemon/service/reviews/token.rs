@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
+use crate::daemon::service::repository_sync_support::external_sync_config_for_repository;
 use crate::reviews::{ReviewTarget, ReviewsPullRequestReference, ReviewsQueryRequest};
 use crate::task_board::ExternalProvider;
 use harness_kernel::errors::{CliError, CliErrorKind};

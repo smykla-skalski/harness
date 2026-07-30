@@ -5,7 +5,7 @@ use crate::task_board::runtime_config::normalize_repository_slug;
 use crate::task_board::working_copy::{WorkingCopyKey, WorkingCopyListEntry};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::task_board_runtime::external_sync_config_for_repository;
+use super::super::repository_sync_support::external_sync_config_for_repository;
 use super::{progress_sink, store, working_copy_runtime};
 
 /// Obtain a working copy for `repository`. When `allow_clone` is false a

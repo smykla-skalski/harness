@@ -12,7 +12,7 @@ use crate::task_board::{
 };
 
 use super::super::{
-    cached_query_response, query_reviews_repositories_source, query_reviews_with_database,
+    cached_query_response, query_reviews_with_database,
     refresh::reconcile_targeted_missing_task_board_reviews, store_cached_query_response,
 };
 use super::parsed;
@@ -163,7 +163,7 @@ async fn repository_source_aggregate_reuses_canonical_per_repository_buckets() {
         );
     }
 
-    let source = query_reviews_repositories_source(&request)
+    let source = crate::daemon::service::reviews_source_port::query_repository_reviews(&request)
         .await
         .expect("aggregate cached repository sources");
 

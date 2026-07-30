@@ -379,7 +379,7 @@ pub(crate) async fn active_external_sync_config_db(
 ) -> Result<ExternalSyncConfig, CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
     Ok(
-        super::task_board_runtime::external_sync_config_for_repository(
+        super::repository_sync_support::external_sync_config_for_repository(
             None,
             &settings.github_inbox.repositories,
         )

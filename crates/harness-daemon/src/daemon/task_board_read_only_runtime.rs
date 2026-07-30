@@ -264,10 +264,12 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         if review.viewer_has_active_approval == Some(true) {
             return Ok(lifecycle_outcome(execution, &review, false));
         }
-        let response = crate::daemon::service::reviews::approve_reviews(&ReviewsApproveRequest {
-            targets: vec![review.target()],
-            source: ReviewsApproveRequestSource::Direct,
-        })
+        let response = crate::daemon::service::reviews_source_port::approve_pull_requests(
+            &ReviewsApproveRequest {
+                targets: vec![review.target()],
+                source: ReviewsApproveRequestSource::Direct,
+            },
+        )
         .await?;
         require_applied_approval(&response, &review)?;
         Ok(lifecycle_outcome(execution, &review, true))
@@ -327,7 +329,7 @@ async fn resolve_pr_review(
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<ReviewItem, CliError> {
     let identity = pr_review_identity(execution)?;
-    let review = crate::daemon::service::reviews::resolve_exact_pull_request(
+    let review = crate::daemon::service::reviews_source_port::resolve_exact_pull_request(
         &identity.repository,
         identity.number,
     )

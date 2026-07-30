@@ -157,9 +157,11 @@ pub(crate) async fn validate_read_only_workflow_launch(
 pub(crate) async fn resolve_pr_review_head(
     identity: &TaskBoardPullRequestIdentity,
 ) -> Result<String, CliError> {
-    let review =
-        super::super::reviews::resolve_exact_pull_request(&identity.repository, identity.number)
-            .await?;
+    let review = super::super::reviews_source_port::resolve_exact_pull_request(
+        &identity.repository,
+        identity.number,
+    )
+    .await?;
     if review.state != ReviewPullRequestState::Open {
         return Err(invalid_transition(format!(
             "pull request '{}#{}' is not open",
