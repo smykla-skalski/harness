@@ -329,7 +329,7 @@ fn schedule_dependency_fix_deadline(
             .unwrap_or_default();
         tokio::time::sleep(remaining).await;
         if let Err(error) =
-            enforce_dependency_fix_deadline(controller, request, run, deadline).await
+            enforce_dependency_fix_deadline(controller, request, run).await
         {
             tracing::error!(%error, "failed to enforce dependency fixer deadline");
         }
@@ -340,7 +340,6 @@ async fn enforce_dependency_fix_deadline(
     controller: CodexControllerHandle,
     request: TaskBoardDependencyFixRequest,
     run: TaskBoardDependencyFixRun,
-    deadline: DateTime<Utc>,
 ) -> Result<(), CliError> {
     if !controller.run(&run.run_id)?.status.is_active() {
         return Ok(());
@@ -355,7 +354,8 @@ async fn enforce_dependency_fix_deadline(
     if stopped.status != CodexRunStatus::Cancelled {
         return Ok(());
     }
-    let audit = task_board_dependency_fix_timeout_audit(&request, &run, &deadline.to_rfc3339())?;
+    let completed_at = Utc::now().to_rfc3339();
+    let audit = task_board_dependency_fix_timeout_audit(&request, &run, &completed_at)?;
     let sink = controller.dependency_fix_audit_sink()?;
     TaskBoardDependencyFixAuditSink::record(sink.as_ref(), &audit).await
 }
