@@ -54,7 +54,38 @@ struct TaskBoardSelectionFocusTests {
       dispatcher: dispatcher
     ).performDeleteSelection()
 
-    #expect(dispatcher.deleteRequestGeneration == 1)
+    #expect(dispatcher.requestGeneration == 1)
+    #expect(dispatcher.latestRequest == .delete)
+  }
+
+  @Test("Ticket and spawned-task opens forward through distinct requests")
+  func openActionsForwardOnlyWhileEnabled() {
+    let dispatcher = TaskBoardSelectionDispatcher()
+
+    TaskBoardSelectionFocus(
+      selectionCount: 1,
+      canDelete: false,
+      canOpen: false,
+      canOpenSpawnedTask: false,
+      dispatcher: dispatcher
+    ).performOpenSelection()
+    TaskBoardSelectionFocus(
+      selectionCount: 1,
+      canDelete: false,
+      canOpen: true,
+      canOpenSpawnedTask: false,
+      dispatcher: dispatcher
+    ).performOpenSelection()
+    TaskBoardSelectionFocus(
+      selectionCount: 1,
+      canDelete: false,
+      canOpen: true,
+      canOpenSpawnedTask: true,
+      dispatcher: dispatcher
+    ).performOpenSpawnedTask()
+
+    #expect(dispatcher.requestGeneration == 2)
+    #expect(dispatcher.latestRequest == .openSpawnedTask)
   }
 
   @Test("Inspector toggle forwards through a stable dispatcher")
@@ -114,7 +145,7 @@ struct TaskBoardSelectionFocusTests {
     #expect(!commandsSource.contains(".keyboardShortcut(.deleteForward"))
     #expect(focusSource.contains(".keyboardShortcut(.deleteForward, modifiers: [])"))
     #expect(focusSource.contains("@Observable"))
-    #expect(focusSource.contains("deleteRequestGeneration &+= 1"))
+    #expect(focusSource.contains("requestGeneration &+= 1"))
     #expect(!focusSource.contains("deleteSelection: (() -> Void)?"))
     #expect(focusSource.contains(".opacity(0)"))
     #expect(focusSource.contains(".accessibilityHidden(true)"))
@@ -136,17 +167,30 @@ struct TaskBoardSelectionFocusTests {
     )
     #expect(
       overviewSource.contains(
-        ".taskBoardSelectionForwardDeleteShortcut(taskBoardCommandFocus?.selection)"
+        ".taskBoardSelectionShortcuts(taskBoardCommandFocus?.selection)"
       )
     )
     #expect(overviewFocusSource.contains("guard isCommandFocusActive else { return nil }"))
     #expect(overviewFocusSource.contains("operationsInspector: operationsInspectorFocus"))
+    #expect(!overviewSource.contains("bindTaskBoardSelectionDispatcher"))
+  }
+
+  @Test("Task board keyboard opens use distinct primary and spawned-task requests")
+  func taskBoardKeyboardOpenShortcutsAreDistinct() throws {
+    let focusSource = try sourceFile(
+      at: "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardSelectionFocus.swift"
+    )
+    let overviewSource = try sourceFile(
+      at: "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOverviewView.swift"
+    )
+
+    #expect(focusSource.contains(".keyboardShortcut(.return, modifiers: [])"))
+    #expect(focusSource.contains(".keyboardShortcut(.return, modifiers: .command)"))
     #expect(
       overviewSource.contains(
-        ".onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration)"
+        ".onChange(of: taskBoardSelectionDispatcher.requestGeneration)"
       )
     )
-    #expect(!overviewSource.contains("bindTaskBoardSelectionDispatcher"))
   }
 
   private func sourceFile(at relativePath: String) throws -> String {

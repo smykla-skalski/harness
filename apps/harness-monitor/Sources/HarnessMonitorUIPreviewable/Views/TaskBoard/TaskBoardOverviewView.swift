@@ -191,7 +191,7 @@ public struct TaskBoardOverviewView: View {
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
     )
     .harnessFocusedSceneValue(\.harnessTaskBoardCommandFocus, taskBoardCommandFocus)
-    .taskBoardSelectionForwardDeleteShortcut(taskBoardCommandFocus?.selection)
+    .taskBoardSelectionShortcuts(taskBoardCommandFocus?.selection)
     .taskBoardCardPreferences(projectLabelResolver: cachedPresentation.projectLabelResolver)
     .environment(relativeTimeClock)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
@@ -233,8 +233,8 @@ public struct TaskBoardOverviewView: View {
     .task(id: searchText) {
       await applySearchTextWhenSettled()
     }
-    .onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration) {
-      requestDeleteSelectedTaskBoardCards()
+    .onChange(of: taskBoardSelectionDispatcher.requestGeneration) {
+      handleTaskBoardSelectionRequest(taskBoardSelectionDispatcher.latestRequest)
     }
     .confirmationDialog(
       pendingLiveOperationValue?.title ?? "Run live task-board operation?",

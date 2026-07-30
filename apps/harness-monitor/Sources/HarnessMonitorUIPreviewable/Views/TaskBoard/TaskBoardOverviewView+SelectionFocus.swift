@@ -8,6 +8,8 @@ extension TaskBoardOverviewView {
       selection: TaskBoardSelectionFocus(
         selectionCount: selectedIDs.count,
         canDelete: canDeleteTaskBoardCards(selectedIDs),
+        canOpen: canOpenTaskBoardCard(selectedIDs),
+        canOpenSpawnedTask: canOpenSpawnedTaskBoardCard(selectedIDs),
         dispatcher: taskBoardSelectionDispatcherValue
       ),
       operationsInspector: operationsInspectorFocus
@@ -33,5 +35,56 @@ extension TaskBoardOverviewView {
       return
     }
     actions.deleteTaskBoardTargets(deletionTargets(for: selectedIDs))
+  }
+
+  func canOpenTaskBoardCard(_ selectedIDs: [TaskBoardCardID]) -> Bool {
+    guard
+      selectedIDs.count == 1,
+      selectionModelValue.selectedItemID == nil,
+      selectionModelValue.acceptsBoardShortcuts,
+      let cardID = selectedIDs.first
+    else {
+      return false
+    }
+    return canOpenCard(cardID)
+  }
+
+  func canOpenSpawnedTaskBoardCard(_ selectedIDs: [TaskBoardCardID]) -> Bool {
+    guard
+      canOpenTaskBoardCard(selectedIDs),
+      let cardID = selectedIDs.first
+    else {
+      return false
+    }
+    return canOpenSpawnedAgent(cardID)
+  }
+
+  func requestOpenSelectedTaskBoardCard() {
+    let selectedIDs = selectionModelValue.orderedSelectedIDs
+    guard canOpenTaskBoardCard(selectedIDs), let cardID = selectedIDs.first else {
+      return
+    }
+    openCard(cardID)
+  }
+
+  func requestOpenSelectedSpawnedTask() {
+    let selectedIDs = selectionModelValue.orderedSelectedIDs
+    guard canOpenSpawnedTaskBoardCard(selectedIDs), let cardID = selectedIDs.first else {
+      return
+    }
+    openSpawnedAgent(cardID)
+  }
+
+  func handleTaskBoardSelectionRequest(_ request: TaskBoardSelectionRequest?) {
+    switch request {
+    case .delete:
+      requestDeleteSelectedTaskBoardCards()
+    case .open:
+      requestOpenSelectedTaskBoardCard()
+    case .openSpawnedTask:
+      requestOpenSelectedSpawnedTask()
+    case nil:
+      break
+    }
   }
 }

@@ -65,15 +65,18 @@ final class TaskBoardCardSelectionModel {
   }
 
   func openAPIItem(_ item: TaskBoardItem, actions: TaskBoardOverviewActions) {
-    switch TaskBoardOverviewItemBehavior.selectionAction(for: item) {
-    case .openLinkedTask:
+    guard TaskBoardOverviewItemBehavior.selectionAction(for: item) == .selectBoardItem else {
       isCreatingItem = false
       selectedItemID = nil
       actions.openTaskBoardItem(item)
-    case .selectBoardItem:
-      isCreatingItem = false
-      selectedItemID = item.id
+      return
     }
+    selectAPIItem(item)
+  }
+
+  func selectAPIItem(_ item: TaskBoardItem) {
+    isCreatingItem = false
+    selectedItemID = item.id
   }
 
   func beginCreatingItem() {

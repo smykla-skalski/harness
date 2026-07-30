@@ -2,15 +2,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Backlink + children rows for the management panel. Held together with the
-/// panel's own `selectionModel`/`actions` (not a closure) so navigating away
-/// re-targets the same sheet through the board's existing selection
-/// machinery, matching how every other card open/select already works.
+/// panel's own `selectionModel` (not a closure) so navigating away re-targets
+/// the same sheet through the board's existing selection machinery.
 struct TaskBoardManagementHierarchySection: View {
   let backlink: TaskBoardParentBacklink
   let childrenSummary: TaskBoardUmbrellaChildrenSummary?
   let metrics: TaskBoardOverviewMetrics
   let selectionModel: TaskBoardCardSelectionModel
-  let actions: TaskBoardOverviewActions
   @Environment(\.fontScale)
   private var fontScale
 
@@ -117,6 +115,6 @@ struct TaskBoardManagementHierarchySection: View {
   }
 
   private func open(_ item: TaskBoardItem) {
-    selectionModel.openAPIItem(item, actions: actions)
+    selectionModel.selectAPIItem(item)
   }
 }

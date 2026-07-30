@@ -12,6 +12,8 @@ struct TaskBoardItemLiveActionButtons: View {
   let evaluatePreviewState: TaskBoardEvaluatePreviewState
 
   @State private var pendingAction: LiveAction?
+  @Environment(\.openWindow)
+  private var openWindow
 
   private var canRunOnce: Bool { actions.canRunOrchestratorOnce }
   private var canEvaluate: Bool { actions.canEvaluateItem || actions.canEvaluateBoard }
@@ -21,6 +23,7 @@ struct TaskBoardItemLiveActionButtons: View {
       spacing: HarnessMonitorTheme.spacingSM,
       lineSpacing: HarnessMonitorTheme.spacingSM
     ) {
+      openSpawnedTaskButton
       runOnceButton
       evaluateButton
     }
@@ -40,6 +43,21 @@ struct TaskBoardItemLiveActionButtons: View {
       Button("Cancel", role: .cancel) {}
     } message: { action in
       Text(action.message(for: item.title))
+    }
+  }
+
+  @ViewBuilder private var openSpawnedTaskButton: some View {
+    if actions.canOpenSpawnedTask(item) {
+      Button {
+        actions.openSpawnedTask(item, openWindow: openWindow)
+      } label: {
+        Label("Open Spawned Task", systemImage: "arrow.up.forward.app")
+          .font(captionFont)
+      }
+      .frame(minHeight: metrics.controlMinHeight)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .accessibilityIdentifier("harness.task-board.manage-item.open-spawned-task")
     }
   }
 

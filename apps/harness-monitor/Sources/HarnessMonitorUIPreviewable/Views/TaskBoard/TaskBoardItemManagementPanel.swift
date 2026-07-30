@@ -88,8 +88,7 @@ struct TaskBoardItemManagementPanel: View {
         backlink: backlink,
         childrenSummary: childrenSummary,
         metrics: metrics,
-        selectionModel: selectionModel,
-        actions: actions
+        selectionModel: selectionModel
       )
       editorFields
       routesToEditor

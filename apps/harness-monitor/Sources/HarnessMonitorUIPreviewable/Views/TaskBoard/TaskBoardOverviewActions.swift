@@ -285,3 +285,30 @@ public struct TaskBoardOverviewActions: Equatable {
   }
 
 }
+
+extension TaskBoardOverviewActions {
+  func canOpenSpawnedTask(_ item: TaskBoardItem) -> Bool {
+    store != nil
+      && item.sessionId?.isEmpty == false
+      && item.workItemId?.isEmpty == false
+  }
+
+  @MainActor
+  func openSpawnedTask(_ item: TaskBoardItem, openWindow: OpenWindowAction) {
+    guard
+      let store,
+      let sessionID = item.sessionId,
+      !sessionID.isEmpty,
+      let workItemID = item.workItemId,
+      !workItemID.isEmpty
+    else {
+      return
+    }
+    TaskBoardSpawnedSessionNavigator.open(
+      store: store,
+      openWindow: openWindow,
+      sessionID: sessionID,
+      workItemID: workItemID
+    )
+  }
+}

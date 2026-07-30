@@ -107,8 +107,8 @@ struct TaskBoardCardSelectionModelTests {
     #expect(!model.isCreatingItem)
   }
 
-  @Test("Opening a session-linked item does not select it locally")
-  func openingLinkedItemDoesNotSelectLocally() {
+  @Test("Opening an ordinary session-linked item keeps its direct task route")
+  func openingOrdinaryLinkedItemDoesNotSelectBoardItem() {
     let model = TaskBoardCardSelectionModel()
     model.selectedItemID = "stale"
     let item = Self.makeItem(id: "linked", sessionId: "session-a", workItemId: "task-a")
@@ -116,6 +116,45 @@ struct TaskBoardCardSelectionModelTests {
     model.openAPIItem(item, actions: TaskBoardOverviewActions(store: nil, scope: .dashboard))
 
     #expect(model.selectedItemID == nil)
+  }
+
+  @Test("Opening a linked review item preserves the originating board item")
+  func openingLinkedReviewItemSelectsOriginatingBoardItem() {
+    let model = TaskBoardCardSelectionModel()
+    let item = Self.makeItem(
+      id: "linked-review",
+      sessionId: "session-a",
+      workItemId: "task-a",
+      workflowKind: .prReview
+    )
+
+    model.openAPIItem(item, actions: TaskBoardOverviewActions(store: nil, scope: .dashboard))
+
+    #expect(model.selectedItemID == "linked-review")
+    #expect(!model.isCreatingItem)
+  }
+
+  @Test("Spawned-task navigation is available only with a store and linked session")
+  func spawnedTaskNavigationCapabilityRequiresStoreAndSession() {
+    let linked = Self.makeItem(id: "linked", sessionId: "session-a", workItemId: "task-a")
+    let boardOnly = Self.makeItem(id: "board-only", sessionId: nil, workItemId: nil)
+    let sessionOnly = Self.makeItem(id: "session-only", sessionId: "session-a", workItemId: nil)
+    let taskOnly = Self.makeItem(id: "task-only", sessionId: nil, workItemId: "task-a")
+    let emptySession = Self.makeItem(id: "empty-session", sessionId: "", workItemId: "task-a")
+    let emptyTask = Self.makeItem(id: "empty-task", sessionId: "session-a", workItemId: "")
+    let noStoreActions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
+    let storeActions = TaskBoardOverviewActions(
+      store: HarnessMonitorPreviewStoreFactory.makeStore(for: .empty),
+      scope: .dashboard
+    )
+
+    #expect(!noStoreActions.canOpenSpawnedTask(linked))
+    #expect(!storeActions.canOpenSpawnedTask(boardOnly))
+    #expect(!storeActions.canOpenSpawnedTask(sessionOnly))
+    #expect(!storeActions.canOpenSpawnedTask(taskOnly))
+    #expect(!storeActions.canOpenSpawnedTask(emptySession))
+    #expect(!storeActions.canOpenSpawnedTask(emptyTask))
+    #expect(storeActions.canOpenSpawnedTask(linked))
   }
 
   @Test("Begin-creating and clear-selection reset sheet routing state")
@@ -136,7 +175,8 @@ struct TaskBoardCardSelectionModelTests {
   private static func makeItem(
     id: String,
     sessionId: String?,
-    workItemId: String?
+    workItemId: String?,
+    workflowKind: TaskBoardWorkflowKind? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -148,6 +188,7 @@ struct TaskBoardCardSelectionModelTests {
       tags: [],
       projectId: nil,
       agentMode: .interactive,
+      workflowKind: workflowKind,
       externalRefs: [],
       planning: TaskBoardPlanningState(summary: nil),
       workflow: nil,
