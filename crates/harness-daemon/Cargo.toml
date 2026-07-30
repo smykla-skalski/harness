@@ -28,6 +28,8 @@ harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["
 harness-command = { path = "../harness-command", version = "55.0.0" }
 harness-daemon-acp-probe = { path = "../harness-daemon-acp-probe", version = "55.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
+harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "55.0.0" }
+harness-daemon-launchd = { path = "../harness-daemon-launchd", version = "55.0.0" }
 harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.0" }
 harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "55.0.0" }
 harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.0" }

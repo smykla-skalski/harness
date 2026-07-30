@@ -12,11 +12,11 @@
 //! and the bridge would never be picked up.
 //!
 //! [`adopt_running_daemon_root`] scans the plausible daemon roots, picks
-//! the one whose [`crate::daemon::state::DAEMON_LOCK_FILE`] is currently
+//! the one whose [`harness_daemon_root::DAEMON_LOCK_FILE`] is currently
 //! held (flock is immune to PID reuse and stale manifests), and installs a
 //! process-local override via
-//! [`crate::daemon::state::set_daemon_root_override`]. Every subsequent
-//! [`crate::daemon::state::daemon_root`] call in this process resolves to
+//! [`harness_daemon_root::set_daemon_root_override`]. Every subsequent
+//! [`harness_daemon_root::daemon_root`] call in this process resolves to
 //! that path, so existing plumbing (`bridge_state_path`, `bridge_socket_path`,
 //! etc.) automatically targets the running daemon without env mutation or
 //! new argument plumbing.
@@ -26,12 +26,24 @@
 //! probed first; only if it has no live daemon do we fall back to the
 //! other plausible roots. This keeps the "I know what I am doing" escape
 //! hatch working.
+//!
+//! `harness-daemon` and `harness-bridge` both depend on this crate, not the
+//! other way around: `harness-bridge`'s own control commands need to adopt
+//! whichever daemon is currently running before dispatching, and until this
+//! extraction it duplicated this module's entire source through a
+//! `#[path]` include rather than a normal dependency.
 
 use std::path::{Path, PathBuf};
 
-use crate::daemon::HARNESS_MONITOR_APP_GROUP_ID;
-use crate::daemon::state;
-use crate::workspace::{harness_data_root, host_home_dir};
+use harness_daemon_root as state;
+use harness_workspace::workspace::{harness_data_root, host_home_dir};
+
+/// Mirrors `harness-daemon`'s and `harness-bridge`'s own copy of the
+/// Harness Monitor app group id. Kept as a small local literal rather than a
+/// shared constant so this crate stays independent of either binary crate;
+/// `harness-daemon-client`'s locator carries the same literal for the same
+/// reason.
+const HARNESS_MONITOR_APP_GROUP_ID: &str = "Q498EB36N4.io.harnessmonitor";
 
 /// Marker directory the runtime-profile shell helpers use under the macOS
 /// app group container to namespace per-profile state. Kept as an

@@ -32,6 +32,7 @@ harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["
 # `harness-daemon` dependency.
 harness-daemon = { path = "../harness-daemon", version = "55.0.0", optional = true }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
+harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "55.0.0" }
 harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.0" }
 # Optional: only the `daemon-runtime` build mode needs the task-board runtime
 # config surface (e.g. `agent_acp`'s OpenRouter token lookup); the default
