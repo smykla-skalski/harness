@@ -8,6 +8,7 @@ members = [
   "crates/harness-command",
   "crates/harness-daemon-acp-probe",
   "crates/harness-daemon-client",
+  "crates/harness-daemon-provider-credentials",
   "crates/harness-daemon-root",
   "crates/harness-daemon-state",
   "crates/harness-daemon",

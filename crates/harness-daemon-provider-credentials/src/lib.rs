@@ -1,19 +1,25 @@
+//! Loads GitHub and `OpenRouter` provider credentials from the macOS Keychain
+//! at daemon startup and persists them through `harness-daemon-state`,
+//! converting into `harness-task-board`'s own credential-snapshot and
+//! sync-request types.
+//!
+//! `db`'s `AsyncDaemonDb` type still lives inside `harness-daemon` itself, so
+//! depending on it here would recreate the daemon-crate dependency this
+//! extraction exists to remove. The daemon's own startup sequence resolves
+//! the task-board instance id and passes it in as a plain string instead.
+
+#[cfg(all(target_os = "macos", not(test)))]
+use harness_daemon_state::{replace_task_board_github_tokens, replace_task_board_openrouter_token};
+#[cfg(all(target_os = "macos", not(test)))]
+use harness_task_board::{
+    TaskBoardGitHubCredentialSnapshot, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardOpenRouterCredentialSnapshot, TaskBoardOpenRouterTokenSyncRequest,
+};
 #[cfg(all(target_os = "macos", not(test)))]
 use security_framework::base::Error as SecError;
 #[cfg(all(target_os = "macos", not(test)))]
 use security_framework::passwords::get_generic_password;
 use sha1::{Digest, Sha1};
-
-#[cfg(all(target_os = "macos", not(test)))]
-use crate::task_board::{
-    TaskBoardGitHubCredentialSnapshot, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardOpenRouterCredentialSnapshot, TaskBoardOpenRouterTokenSyncRequest,
-};
-use harness_kernel::errors::CliError;
-
-use super::db::AsyncDaemonDb;
-#[cfg(all(target_os = "macos", not(test)))]
-use super::state;
 
 #[cfg(all(target_os = "macos", not(test)))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";
@@ -53,12 +59,12 @@ impl Default for ProviderCredentialLoadReport {
     }
 }
 
-pub(crate) async fn load_provider_credentials(db: &AsyncDaemonDb) -> Result<(), CliError> {
-    let instance_id = db.task_board_instance_id().await?;
-    let report = load_for_instance(&instance_id);
+/// Loads GitHub and `OpenRouter` provider credentials for `instance_id` from
+/// the macOS Keychain and persists them through `harness-daemon-state`.
+pub fn load_provider_credentials(instance_id: &str) {
+    let report = load_for_instance(instance_id);
     log_load_issue("GitHub", &report.github);
     log_load_issue("OpenRouter", &report.openrouter);
-    Ok(())
 }
 
 // Only `load_for_instance` (macOS, non-test) calls this in production; the
@@ -110,13 +116,13 @@ fn load_for_instance(instance_id: &str) -> ProviderCredentialLoadReport {
         TaskBoardOpenRouterCredentialSnapshot::is_configured,
     );
     if let Some(snapshot) = github {
-        let _ = state::replace_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
+        let _ = replace_task_board_github_tokens(&TaskBoardGitHubTokensSyncRequest {
             global_token: snapshot.global_token,
             repository_tokens: snapshot.repository_tokens,
         });
     }
     if let Some(snapshot) = openrouter {
-        let _ = state::replace_task_board_openrouter_token(&TaskBoardOpenRouterTokenSyncRequest {
+        let _ = replace_task_board_openrouter_token(&TaskBoardOpenRouterTokenSyncRequest {
             token: snapshot.token,
         });
     }

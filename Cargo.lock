@@ -3730,6 +3730,7 @@ dependencies = [
  "harness-command",
  "harness-daemon-acp-probe",
  "harness-daemon-client",
+ "harness-daemon-provider-credentials",
  "harness-daemon-state",
  "harness-db-schema",
  "harness-feature-flags",
@@ -3829,6 +3830,19 @@ dependencies = [
  "tracing",
  "user_dirs",
  "uzers",
+]
+
+[[package]]
+name = "harness-daemon-provider-credentials"
+version = "55.0.0"
+dependencies = [
+ "harness-daemon-state",
+ "harness-task-board",
+ "hex",
+ "security-framework",
+ "serde_json",
+ "sha1 0.11.0",
+ "tracing",
 ]
 
 [[package]]

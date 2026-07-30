@@ -59,6 +59,7 @@ use background_tasks::{
     recover_remote_assignments_at_startup_with_controller, spawn_background_tasks,
 };
 use harness_daemon_acp_probe::schedule_probe_cache_refresh;
+use harness_daemon_provider_credentials::load_provider_credentials;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use local_listener::{bind_local_listener_and_build_manifest, prepare_local_daemon_environment};
 use manifest::persist_manifest;
@@ -233,7 +234,8 @@ pub(crate) async fn initialize_startup_state(
             task_board_migration::migrate_task_board(async_db).await?;
             reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
-            super::provider_credentials::load_provider_credentials(async_db).await?;
+            let task_board_instance_id = async_db.task_board_instance_id().await?;
+            load_provider_credentials(&task_board_instance_id);
         }
         spawn_startup_background_tasks(
             Arc::clone(&db),
