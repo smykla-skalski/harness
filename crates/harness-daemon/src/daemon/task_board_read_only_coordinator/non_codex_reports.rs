@@ -140,6 +140,7 @@ where
         project_dir: Some(context.worktree.clone()),
         prompt: request.prompt,
         requested_model: request.model,
+        pull_request: None,
         run_id: &claimed.idempotency_key,
         board_item_id: &execution.item_id,
         workflow_execution_id: &execution.execution_id,

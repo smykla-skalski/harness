@@ -22,6 +22,7 @@ fn snapshot(run_id: &str, status: AgentTurnRunStatus) -> AgentTurnRunSnapshot {
         project_dir: Some("/tmp/project".into()),
         requested_runtime: "openrouter".into(),
         actual_runtime: Some("openrouter".into()),
+        runtime_turn_id: Some(format!("turn-{run_id}")),
         requested_model: Some("auto".into()),
         actual_model: None,
         status,

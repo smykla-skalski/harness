@@ -27,6 +27,7 @@ macro_rules! bind_run {
             .bind(&$snapshot.project_dir)
             .bind(&$snapshot.requested_runtime)
             .bind(&$snapshot.actual_runtime)
+            .bind(&$snapshot.runtime_turn_id)
             .bind(&$snapshot.requested_model)
             .bind(&$snapshot.actual_model)
             .bind($snapshot.status.as_str())
@@ -91,6 +92,7 @@ pub(crate) struct AgentTurnRunSnapshot {
     pub project_dir: Option<String>,
     pub requested_runtime: String,
     pub actual_runtime: Option<String>,
+    pub runtime_turn_id: Option<String>,
     pub requested_model: Option<String>,
     pub actual_model: Option<String>,
     pub status: AgentTurnRunStatus,
@@ -106,13 +108,13 @@ pub(crate) struct AgentTurnRunSnapshot {
 /// progressed, so start-by-id inserts only when absent.
 const RECORD_STARTED_SQL: &str = "INSERT OR IGNORE INTO agent_turn_runs (run_id, session_id, \
      task_id, board_item_id, workflow_execution_id, project_dir, requested_runtime, \
-     actual_runtime, requested_model, actual_model, status, source_revision, report, stop_reason, \
-     error, created_at, updated_at) \
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)";
+     actual_runtime, runtime_turn_id, requested_model, actual_model, status, source_revision, \
+     report, stop_reason, error, created_at, updated_at) \
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)";
 
 const SELECT_BY_ID_SQL: &str = "SELECT run_id, session_id, task_id, board_item_id, \
-     workflow_execution_id, project_dir, requested_runtime, actual_runtime, requested_model, \
-     actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at \
+     workflow_execution_id, project_dir, requested_runtime, actual_runtime, runtime_turn_id, \
+     requested_model, actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at \
      FROM agent_turn_runs WHERE run_id = ?1";
 
 // A later save carries only the columns it learned. `requested_runtime` is
@@ -124,9 +126,9 @@ const SELECT_BY_ID_SQL: &str = "SELECT run_id, session_id, task_id, board_item_i
 // column become immutable, so exactly one terminal outcome survives every later
 // write and every restart even under a racing caller.
 const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_id, board_item_id, \
-     workflow_execution_id, project_dir, requested_runtime, actual_runtime, requested_model, \
-     actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at) \
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17) \
+     workflow_execution_id, project_dir, requested_runtime, actual_runtime, runtime_turn_id, \
+     requested_model, actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at) \
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18) \
      ON CONFLICT(run_id) DO UPDATE SET \
         session_id = COALESCE(excluded.session_id, agent_turn_runs.session_id), \
         task_id = COALESCE(excluded.task_id, agent_turn_runs.task_id), \
@@ -134,6 +136,7 @@ const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_
         workflow_execution_id = COALESCE(excluded.workflow_execution_id, agent_turn_runs.workflow_execution_id), \
         project_dir = COALESCE(excluded.project_dir, agent_turn_runs.project_dir), \
         actual_runtime = COALESCE(excluded.actual_runtime, agent_turn_runs.actual_runtime), \
+        runtime_turn_id = COALESCE(excluded.runtime_turn_id, agent_turn_runs.runtime_turn_id), \
         requested_model = COALESCE(excluded.requested_model, agent_turn_runs.requested_model), \
         actual_model = COALESCE(excluded.actual_model, agent_turn_runs.actual_model), \
         status = excluded.status, \
@@ -267,6 +270,7 @@ struct AgentTurnRunRow {
     project_dir: Option<String>,
     requested_runtime: String,
     actual_runtime: Option<String>,
+    runtime_turn_id: Option<String>,
     requested_model: Option<String>,
     actual_model: Option<String>,
     status: String,
@@ -289,6 +293,7 @@ impl AgentTurnRunRow {
             project_dir: self.project_dir,
             requested_runtime: self.requested_runtime,
             actual_runtime: self.actual_runtime,
+            runtime_turn_id: self.runtime_turn_id,
             requested_model: self.requested_model,
             actual_model: self.actual_model,
             status: AgentTurnRunStatus::parse(&self.status)?,

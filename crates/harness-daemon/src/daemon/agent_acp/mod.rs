@@ -50,6 +50,8 @@ mod active;
 mod dependency_reverification;
 #[cfg(feature = "daemon-runtime")]
 mod dependency_triage;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use dependency_triage::dependency_triage_prompt;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod event_frame;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]

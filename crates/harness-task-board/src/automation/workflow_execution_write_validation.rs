@@ -3,8 +3,8 @@ use std::fmt::Display;
 use crate::{
     TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, normalize_repository_slug, validate_plan_approval,
-    validate_planning_result, validate_task_board_read_only_run_context,
+    TaskBoardWorkflowKind, compile_task_board_dependency_route, normalize_repository_slug,
+    validate_plan_approval, validate_planning_result, validate_task_board_read_only_run_context,
 };
 
 use super::TaskBoardWorkflowExecutionValidationError;
@@ -90,6 +90,42 @@ pub(super) fn validate_write_attempt_artifact(
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<bool, TaskBoardWorkflowExecutionValidationError> {
     match attempt.artifact.as_ref() {
+        Some(TaskBoardAttemptResultArtifact::DependencyTriage(route)) => {
+            if !record.snapshot.workflow_kind.has_dependency_update_intent()
+                || attempt.action_key != "dependency_triage"
+            {
+                return invalid(
+                    "attempt.artifact.dependency_triage",
+                    "artifact does not belong to dependency triage",
+                );
+            }
+            let pull_request = record.transition.pull_request.as_ref().ok_or_else(|| {
+                field_error(
+                    "attempt.artifact.dependency_triage",
+                    "dependency workflow has no pull request",
+                )
+            })?;
+            let head = frozen_pr_fix_head(record).ok_or_else(|| {
+                    field_error(
+                        "attempt.artifact.dependency_triage",
+                        "dependency workflow has no frozen pull request head",
+                    )
+                })?;
+            let compiled = compile_task_board_dependency_route(
+                &route.source_result,
+                &pull_request.repository,
+                pull_request.number,
+                head,
+            )
+            .map_err(|error| field_error("attempt.artifact.dependency_triage", error))?;
+            if compiled != **route {
+                return invalid(
+                    "attempt.artifact.dependency_triage",
+                    "stored route contradicts its source result",
+                );
+            }
+            Ok(true)
+        }
         Some(TaskBoardAttemptResultArtifact::Planning(result)) => {
             require_write(record, "attempt.artifact.planning")?;
             validate_planning_result(result, &record.snapshot, &record.execution_id)
@@ -208,6 +244,7 @@ fn validate_read_only_has_no_write_evidence(
     if artifacts.planning_result.is_some()
         || artifacts.plan_approval.is_some()
         || !artifacts.approval_invalidations.is_empty()
+        || artifacts.dependency_triage.is_some()
         || artifacts.provisional_publication.is_some()
     {
         return invalid("artifacts", "read-only workflow carries write evidence");

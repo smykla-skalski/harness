@@ -13,12 +13,13 @@ use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
 use harness_protocol::session::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use harness_task_board::prompt_catalog::{PromptId, render_prompt};
 use harness_task_board::{
+    TASK_BOARD_DEPENDENCY_FIXER_EFFORT, TASK_BOARD_DEPENDENCY_FIXER_MODEL,
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
-    TaskBoardEvaluationResult, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
-    TaskBoardImplementationResult, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
-    TaskBoardReadOnlyRunContext, TaskBoardReportOnlyReviewFinding, TaskBoardReviewFindingLocation,
-    TaskBoardReviewFindingSeverity, TaskBoardReviewResult, TaskBoardReviewerOutcome,
-    TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord,
+    TaskBoardDependencyRouteStatus, TaskBoardEvaluationResult, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionPhase, TaskBoardImplementationResult, TaskBoardLocalAttemptResult,
+    TaskBoardPhaseVerdict, TaskBoardReadOnlyRunContext, TaskBoardReportOnlyReviewFinding,
+    TaskBoardReviewFindingLocation, TaskBoardReviewFindingSeverity, TaskBoardReviewResult,
+    TaskBoardReviewerOutcome, TaskBoardReviewerProfile, TaskBoardWorkflowExecutionRecord,
     validate_task_board_read_only_run_context,
 };
 
@@ -153,6 +154,11 @@ fn write_implementation_request(
 ) -> Result<CodexRunRequest, CliError> {
     let context = run_context(execution)?;
     let task_id = write_task_id(execution)?;
+    let dependency_fix = execution
+        .artifacts
+        .dependency_triage
+        .as_ref()
+        .is_some_and(|route| route.status == TaskBoardDependencyRouteStatus::FixRequested);
     Ok(CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
         prompt: implementation_prompt(execution, context, attempt, target)?,
@@ -170,8 +176,8 @@ fn write_implementation_request(
         task_id: Some(task_id.to_string()),
         board_item_id: Some(execution.item_id.clone()),
         workflow_execution_id: Some(execution.execution_id.clone()),
-        model: None,
-        effort: None,
+        model: dependency_fix.then(|| TASK_BOARD_DEPENDENCY_FIXER_MODEL.into()),
+        effort: dependency_fix.then(|| TASK_BOARD_DEPENDENCY_FIXER_EFFORT.into()),
         allow_custom_model: false,
     })
 }
@@ -225,12 +231,13 @@ fn implementation_prompt(
         .map(|criterion| format!("- {criterion}"))
         .collect::<Vec<_>>()
         .join("\n");
+    let plan_markdown = dependency_plan_markdown(execution, &planning.plan_markdown)?;
     let mut variables = BTreeMap::from([
         ("board_item_id", execution.item_id.clone()),
         ("title", context.title.clone()),
         ("workspace_directive", workspace_directive(context, target)),
         ("base_head_revision", base_head.to_string()),
-        ("plan_markdown", planning.plan_markdown.clone()),
+        ("plan_markdown", plan_markdown),
         ("acceptance_criteria", criteria),
         ("execution_id", execution.execution_id.clone()),
         ("managed_run_id", attempt.idempotency_key.clone()),
@@ -243,6 +250,23 @@ fn implementation_prompt(
     ]);
     push_worktree(&mut variables, context, target);
     render_prompt(PromptId::WriteImplementation, &variables)
+}
+
+fn dependency_plan_markdown(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    approved_plan: &str,
+) -> Result<String, CliError> {
+    let Some(route) = execution.artifacts.dependency_triage.as_ref() else {
+        return Ok(approved_plan.to_string());
+    };
+    if route.status != TaskBoardDependencyRouteStatus::FixRequested {
+        return Ok(approved_plan.to_string());
+    }
+    let triage = serde_json::to_string_pretty(&route.source_result)
+        .map_err(|error| invalid_transition(format!("serialize dependency triage: {error}")))?;
+    Ok(format!(
+        "{approved_plan}\n\nDependency triage for the frozen pull request head:\n```json\n{triage}\n```"
+    ))
 }
 
 /// The raw worktree only exists for a local run; a remote executor checkout is

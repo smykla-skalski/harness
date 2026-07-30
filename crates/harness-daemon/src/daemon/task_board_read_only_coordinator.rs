@@ -14,6 +14,7 @@ use super::task_board_read_only_runtime::{
 
 mod attempt_recovery;
 mod attempts;
+mod dependency_triage;
 mod in_progress;
 mod ingestion;
 mod lifecycle;

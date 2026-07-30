@@ -5,16 +5,17 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use async_trait::async_trait;
 
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
-    TaskBoardEvaluationResult, TaskBoardImplementationResult, TaskBoardLifecycleOutcome,
-    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,
-    TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionRecord,
+    TaskBoardDependencyTriageResult, TaskBoardEvaluationResult, TaskBoardImplementationResult,
+    TaskBoardLifecycleOutcome, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
+    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::super::task_board_read_only_runtime::{
-    TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
+    NonCodexReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
 };
 use super::{BASE_HEAD, NOW};
 
@@ -80,9 +81,12 @@ impl PlannedRun {
 pub(super) struct FakeWriteRuntime {
     plans: Mutex<VecDeque<PlannedRun>>,
     runs: Mutex<BTreeMap<String, CodexRunSnapshot>>,
+    triage_runs: Mutex<BTreeMap<String, AgentTurnRunSnapshot>>,
+    planned_triage: Mutex<VecDeque<TaskBoardDependencyTriageResult>>,
     head: Mutex<String>,
     valid_implementation_ancestry: AtomicBool,
     starts: AtomicUsize,
+    triage_starts: AtomicUsize,
     publishes: AtomicUsize,
     published: AtomicBool,
     ambiguous_publish_errors: Mutex<VecDeque<String>>,
@@ -101,9 +105,12 @@ impl FakeWriteRuntime {
         Self {
             plans: Mutex::new(plans.into_iter().collect()),
             runs: Mutex::new(BTreeMap::new()),
+            triage_runs: Mutex::new(BTreeMap::new()),
+            planned_triage: Mutex::new(VecDeque::new()),
             head: Mutex::new(BASE_HEAD.into()),
             valid_implementation_ancestry: AtomicBool::new(true),
             starts: AtomicUsize::new(0),
+            triage_starts: AtomicUsize::new(0),
             publishes: AtomicUsize::new(0),
             published: AtomicBool::new(false),
             ambiguous_publish_errors: Mutex::new(VecDeque::new()),
@@ -115,6 +122,17 @@ impl FakeWriteRuntime {
 
     pub(super) fn start_count(&self) -> usize {
         self.starts.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn plan_triage(&self, result: TaskBoardDependencyTriageResult) {
+        self.planned_triage
+            .lock()
+            .expect("planned triage lock")
+            .push_back(result);
+    }
+
+    pub(super) fn triage_start_count(&self) -> usize {
+        self.triage_starts.load(Ordering::SeqCst)
     }
 
     pub(super) fn publish_count(&self) -> usize {
@@ -264,6 +282,62 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
         self.start_run(session_id, request, run_id)
+    }
+
+    async fn load_non_codex_report_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
+        Ok(self
+            .triage_runs
+            .lock()
+            .expect("triage runs lock")
+            .get(run_id)
+            .cloned())
+    }
+
+    async fn start_non_codex_report_run(
+        &self,
+        start: NonCodexReportStart<'_>,
+    ) -> Result<(), CliError> {
+        self.triage_starts.fetch_add(1, Ordering::SeqCst);
+        let result = self
+            .planned_triage
+            .lock()
+            .expect("planned triage lock")
+            .pop_front()
+            .ok_or_else(|| CliErrorKind::invalid_transition("no planned dependency triage"))?;
+        let pull_request = start
+            .pull_request
+            .as_ref()
+            .ok_or_else(|| CliErrorKind::invalid_transition("triage has no pull request"))?;
+        let run = AgentTurnRunSnapshot {
+            run_id: start.run_id.into(),
+            session_id: Some(start.session_id.into()),
+            task_id: None,
+            board_item_id: Some(start.board_item_id.into()),
+            workflow_execution_id: Some(start.workflow_execution_id.into()),
+            project_dir: start.project_dir,
+            requested_runtime: start.runtime.into(),
+            actual_runtime: Some(start.runtime.into()),
+            runtime_turn_id: Some(format!("turn-{}", start.run_id)),
+            requested_model: start.requested_model.clone(),
+            actual_model: start.requested_model,
+            status: AgentTurnRunStatus::Completed,
+            source_revision: Some(pull_request.pull_request.head_revision.clone()),
+            report: Some(serde_json::to_string(&result).map_err(|error| {
+                CliErrorKind::invalid_transition(format!("serialize triage: {error}"))
+            })?),
+            stop_reason: Some("end_turn".into()),
+            error: None,
+            created_at: NOW.into(),
+            updated_at: NOW.into(),
+        };
+        self.triage_runs
+            .lock()
+            .expect("triage runs lock")
+            .insert(start.run_id.into(), run);
+        Ok(())
     }
 
     async fn resolve_exact_head(

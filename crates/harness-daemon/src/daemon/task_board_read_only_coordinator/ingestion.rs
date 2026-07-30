@@ -1,9 +1,10 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionPhase, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowRevisionGuard, normalize_repository_slug,
+    TaskBoardDependencyRouteRecord, TaskBoardDependencyRouteStatus, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
+    TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard, normalize_repository_slug,
     restart_task_board_workflow_revision,
 };
 use harness_kernel::errors::CliError;
@@ -35,6 +36,9 @@ where
         return Ok(());
     }
     match attempt.artifact.as_ref() {
+        Some(TaskBoardAttemptResultArtifact::DependencyTriage(route)) => {
+            apply_dependency_triage(db, execution, route, revisions, now).await?;
+        }
         Some(TaskBoardAttemptResultArtifact::Implementation(result)) => {
             advance_with_head(db, execution, revisions, &result.head_revision, now).await?;
         }
@@ -76,6 +80,86 @@ where
             ));
         }
     }
+    Ok(())
+}
+
+async fn apply_dependency_triage(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    route: &TaskBoardDependencyRouteRecord,
+    revisions: &TaskBoardWorkflowRevisionGuard,
+    now: &str,
+) -> Result<(), CliError> {
+    let mut updated = execution.clone();
+    updated.artifacts.dependency_triage = Some(route.clone());
+    updated.transition.execution_state = TaskBoardExecutionState::Pending;
+    updated.updated_at = now.to_string();
+    db.compare_and_set_task_board_workflow_execution(
+        &TaskBoardWorkflowExecutionCas::from(execution),
+        &updated,
+    )
+    .await?;
+    let current = db
+        .task_board_workflow_execution(&execution.execution_id)
+        .await?
+        .ok_or_else(|| invalid_transition("dependency workflow disappeared after triage"))?;
+    match &route.status {
+        TaskBoardDependencyRouteStatus::FixRequested => Ok(()),
+        TaskBoardDependencyRouteStatus::ReadyToContinue => {
+            advance(db, &current, revisions, now).await
+        }
+        TaskBoardDependencyRouteStatus::ReportCompleted => {
+            complete_report_only(db, &current, route, now).await
+        }
+        TaskBoardDependencyRouteStatus::HumanRequired { unmet_requirement } => {
+            require_human(
+                db,
+                &current.execution_id,
+                "dependency_human_required",
+                unmet_requirement,
+                TaskBoardTerminalOutcomeKind::HumanRequired,
+                now,
+            )
+            .await
+        }
+        TaskBoardDependencyRouteStatus::WaitingForChecks { pending_checks } => {
+            require_human(
+                db,
+                &current.execution_id,
+                "dependency_checks_pending",
+                &format!(
+                    "required checks are pending: {}",
+                    pending_checks.join(", ")
+                ),
+                TaskBoardTerminalOutcomeKind::HumanRequired,
+                now,
+            )
+            .await
+        }
+    }
+}
+
+async fn complete_report_only(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    route: &TaskBoardDependencyRouteRecord,
+    now: &str,
+) -> Result<(), CliError> {
+    let mut updated = execution.clone();
+    updated.transition.phase = Some(TaskBoardExecutionPhase::Terminal);
+    updated.transition.execution_state = TaskBoardExecutionState::Completed;
+    updated.completed_at = Some(now.to_string());
+    updated.updated_at = now.to_string();
+    updated.artifacts.terminal_outcome = Some(TaskBoardTerminalOutcome {
+        kind: TaskBoardTerminalOutcomeKind::Succeeded,
+        summary: route.reason.clone(),
+        recorded_at: now.to_string(),
+    });
+    db.compare_and_set_task_board_workflow_execution(
+        &TaskBoardWorkflowExecutionCas::from(execution),
+        &updated,
+    )
+    .await?;
     Ok(())
 }
 
@@ -329,6 +413,13 @@ fn attempt_matches_unapplied_phase(
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> bool {
     match (execution.transition.phase, attempt.artifact.as_ref()) {
+        (
+            Some(TaskBoardExecutionPhase::Implementation),
+            Some(TaskBoardAttemptResultArtifact::DependencyTriage(_)),
+        ) => {
+            attempt.action_key == "dependency_triage"
+                && execution.artifacts.dependency_triage.is_none()
+        }
         (
             Some(TaskBoardExecutionPhase::Implementation),
             Some(TaskBoardAttemptResultArtifact::Implementation(result)),

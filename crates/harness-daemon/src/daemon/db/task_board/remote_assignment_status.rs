@@ -83,11 +83,13 @@ impl AsyncDaemonDb {
         response: &RemoteStatusResponse,
         authenticated_principal: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::record_task_board_remote_assignment_status(
-            self,
-            request,
-            response,
-            authenticated_principal,
+        Box::pin(
+            <Self as RemoteExecutionQueries>::record_task_board_remote_assignment_status(
+                self,
+                request,
+                response,
+                authenticated_principal,
+            ),
         )
         .await
     }

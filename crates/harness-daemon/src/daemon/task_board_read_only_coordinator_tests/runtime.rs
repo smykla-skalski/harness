@@ -318,6 +318,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             project_dir: start.project_dir.clone(),
             requested_runtime: start.runtime.into(),
             actual_runtime: Some(start.runtime.into()),
+            runtime_turn_id: Some(format!("turn-{}", start.run_id)),
             requested_model: start.requested_model.clone(),
             actual_model: None,
             status: AgentTurnRunStatus::Running,
