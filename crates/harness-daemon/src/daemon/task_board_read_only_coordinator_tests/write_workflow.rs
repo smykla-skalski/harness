@@ -368,13 +368,14 @@ async fn invalid_recovery_state_requires_human_instead_of_retrying_forever() {
     ];
 
     assert!(
-        crate::daemon::task_board_read_only_coordinator::refuse_invalid_recovery(
+        crate::daemon::task_board_read_only_coordinator::recovery_decision_or_refuse(
             &fixture.test.db,
             &corrupted,
             NOW,
         )
         .await
         .expect("refuse invalid recovery")
+        .is_none()
     );
 
     let execution = load_execution(&fixture).await;

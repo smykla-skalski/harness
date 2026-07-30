@@ -2,7 +2,11 @@ use async_trait::async_trait;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 
-use super::{TaskBoardDependencyRouteRecord, TaskBoardDependencyRouteStatus};
+use super::{
+    TaskBoardDependencyRecoveryClass, TaskBoardDependencyRecoveryStep,
+    TaskBoardDependencyRouteRecord, TaskBoardDependencyRouteStatus,
+    classify_task_board_dependency_check_recovery,
+};
 use crate::github::{
     CheckState, CheckWait, CheckWaitControls, CheckWaitOutcome, PullRequestEvidence,
     PullRequestEvidenceSource, PullRequestIdentity, poll_check_wait,
@@ -166,6 +170,15 @@ pub async fn observe_task_board_dependency_check_wait(
         exact_head_revision: wait.exact_head_revision.clone(),
         status: resume_status(outcome, &wait.required_checks)?,
     };
+    let recovery = classify_task_board_dependency_check_recovery(wait, Some(&record))?;
+    if recovery.class != TaskBoardDependencyRecoveryClass::Completed
+        || recovery.step != TaskBoardDependencyRecoveryStep::Advance
+    {
+        return Err(CliErrorKind::invalid_transition(
+            "dependency check completion did not produce an advance recovery decision",
+        )
+        .into());
+    }
     match sink.resume_once(record.clone()).await? {
         TaskBoardDependencyCheckResumeAdmission::Resumed => {
             Ok(TaskBoardDependencyCheckResumeOutcome {

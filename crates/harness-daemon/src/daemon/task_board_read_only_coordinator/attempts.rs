@@ -1,9 +1,10 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard,
+    TaskBoardAttemptState, TaskBoardDependencyRecoveryClass, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome,
+    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowRevisionGuard,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use sha2::{Digest, Sha256};
@@ -32,9 +33,9 @@ where
     if refusal::refuse_unusable_execution(db, &execution, now).await? {
         return Ok(());
     }
-    if refusal::refuse_invalid_recovery(db, &execution, now).await? {
+    let Some(recovery) = refusal::recovery_decision_or_refuse(db, &execution, now).await? else {
         return Ok(());
-    }
+    };
     if execution.transition.execution_state == TaskBoardExecutionState::RetryWait {
         crate::daemon::service::task_board_workflow_execution::resume_workflow_retry(
             db,
@@ -65,14 +66,37 @@ where
         ))
         .await;
     }
-    if attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await? {
-        return Ok(());
-    }
-    if let Some(attempt) = ingestion::unapplied_completed_attempt(&execution) {
-        return ingestion::ingest_completed_attempt(
-            db, runtime, &execution, attempt, &revisions, now,
-        )
-        .await;
+    match recovery.class {
+        TaskBoardDependencyRecoveryClass::Completed => {
+            let attempt = ingestion::unapplied_completed_attempt(&execution).ok_or_else(|| {
+                invalid_transition("completed recovery has no unapplied durable attempt")
+            })?;
+            return ingestion::ingest_completed_attempt(
+                db, runtime, &execution, attempt, &revisions, now,
+            )
+            .await;
+        }
+        TaskBoardDependencyRecoveryClass::Failed | TaskBoardDependencyRecoveryClass::Uncertain => {
+            if attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await? {
+                return Ok(());
+            }
+            return Err(invalid_transition(
+                "terminal recovery decision has no recoverable durable attempt",
+            ));
+        }
+        TaskBoardDependencyRecoveryClass::Resumable => {
+            let retry_wait = recovery.action_key.as_deref().is_some_and(|action_key| {
+                execution.attempts.iter().any(|attempt| {
+                    attempt.action_key == action_key
+                        && attempt.state == TaskBoardAttemptState::RetryWait
+                })
+            });
+            if retry_wait
+                && attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await?
+            {
+                return Ok(());
+            }
+        }
     }
     if execution.transition.phase == Some(TaskBoardExecutionPhase::Publish)
         && !lifecycle::preflight_publish(db, runtime, &execution, now).await?

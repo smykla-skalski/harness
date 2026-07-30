@@ -1,7 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
-    classify_task_board_dependency_workflow_recovery,
+    TaskBoardDependencyRecoveryDecision, TaskBoardTerminalOutcomeKind,
+    TaskBoardWorkflowExecutionRecord, classify_task_board_dependency_workflow_recovery,
 };
 use harness_kernel::errors::CliError;
 
@@ -44,13 +44,14 @@ pub(super) async fn refuse_unusable_execution(
     Ok(false)
 }
 
-pub(crate) async fn refuse_invalid_recovery(
+pub(crate) async fn recovery_decision_or_refuse(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
-) -> Result<bool, CliError> {
-    let Err(error) = classify_task_board_dependency_workflow_recovery(execution) else {
-        return Ok(false);
+) -> Result<Option<TaskBoardDependencyRecoveryDecision>, CliError> {
+    let error = match classify_task_board_dependency_workflow_recovery(execution) {
+        Ok(decision) => return Ok(Some(decision)),
+        Err(error) => error,
     };
     require_human(
         db,
@@ -61,5 +62,5 @@ pub(crate) async fn refuse_invalid_recovery(
         now,
     )
     .await?;
-    Ok(true)
+    Ok(None)
 }

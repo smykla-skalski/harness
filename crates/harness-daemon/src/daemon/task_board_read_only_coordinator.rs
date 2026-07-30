@@ -27,7 +27,7 @@ mod review_report_retention;
 mod revision_validation;
 
 #[cfg(test)]
-pub(crate) use refusal::refuse_invalid_recovery;
+pub(crate) use refusal::recovery_decision_or_refuse;
 
 const MAX_RECONCILIATIONS_PER_CLASS_PER_TICK: usize = 16;
 
