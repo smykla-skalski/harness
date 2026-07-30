@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.95"
 
 [dependencies]
+libc = "0.2"
 rustix = { version = "=1.1.4", default-features = false, features = ["fs", "process", "std"] }
 uzers = { version = "0.12.2", default-features = false }
 
