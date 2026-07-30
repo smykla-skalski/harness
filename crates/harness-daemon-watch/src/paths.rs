@@ -1,7 +1,7 @@
 use std::path::{Component, Path, PathBuf};
 
-use crate::daemon::index;
 use harness_kernel::errors::CliError;
+use harness_session::index;
 
 use super::state::{RuntimeSessionResolveCache, RuntimeSessionResolveKind, RuntimeSessionTarget};
 

@@ -16,39 +16,45 @@ use super::refresh::{emit_watch_changes, refresh_watch_snapshot};
 use super::service_port::WatchServicePort;
 use super::state::{
     PendingWatchPaths, RefreshScope, RuntimeSessionResolveCache, WatchChanges, WatchSnapshot,
-};
-use crate::daemon::db::{
-    AsyncDaemonDb, DaemonDb, prepare_runtime_transcript_resync, prepare_session_resync,
     session_id_from_change_scope,
 };
-use crate::daemon::index;
-use crate::daemon::protocol::StreamEvent;
+use super::storage::{AsyncWatchStorage, WatchStorage};
 use harness_kernel::errors::CliError;
+use harness_protocol::daemon::StreamEvent;
+use harness_session::index;
 
 /// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
 /// is available, uses `change_tracking` versions instead of full filesystem
 /// discovery. Falls back to the legacy JSON-diff approach otherwise.
 #[must_use]
-pub(crate) fn spawn_watch_loop(
+pub fn spawn_watch_loop<Db, AsyncDb>(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
-    db: Option<Arc<Mutex<DaemonDb>>>,
-    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
-    port: Arc<dyn WatchServicePort>,
-) -> JoinHandle<()> {
+    db: Option<Arc<Mutex<Db>>>,
+    async_db: Arc<OnceLock<Arc<AsyncDb>>>,
+    port: Arc<dyn WatchServicePort<Db, AsyncDb>>,
+) -> JoinHandle<()>
+where
+    Db: WatchStorage + 'static,
+    AsyncDb: AsyncWatchStorage + 'static,
+{
     match db {
         Some(db) => spawn_db_watch_loop(sender, interval, db, async_db, port),
         None => spawn_legacy_watch_loop(sender, interval, port),
     }
 }
 
-fn spawn_db_watch_loop(
+fn spawn_db_watch_loop<Db, AsyncDb>(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
-    db: Arc<Mutex<DaemonDb>>,
-    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
-    port: Arc<dyn WatchServicePort>,
-) -> JoinHandle<()> {
+    db: Arc<Mutex<Db>>,
+    async_db: Arc<OnceLock<Arc<AsyncDb>>>,
+    port: Arc<dyn WatchServicePort<Db, AsyncDb>>,
+) -> JoinHandle<()>
+where
+    Db: WatchStorage + 'static,
+    AsyncDb: AsyncWatchStorage + 'static,
+{
     spawn(async move {
         let root = index::projects_root();
         let _ = fs_err::create_dir_all(&root);
@@ -114,7 +120,8 @@ fn spawn_db_watch_loop(
 /// whenever the change-tracking poll surfaced session activity, and otherwise
 /// at most once per `SESSION_LIVENESS_REFRESH_TTL` so idle dead-process
 /// detection stays bounded without re-scanning sessions every tick.
-pub(super) fn liveness_reconcile_due(
+#[must_use]
+pub fn liveness_reconcile_due(
     changes: &WatchChanges,
     last_reconcile_at: Option<Instant>,
     now: Instant,
@@ -129,10 +136,10 @@ pub(super) fn liveness_reconcile_due(
     }
 }
 
-async fn reconcile_session_liveness_for_watch(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
-    db: &Arc<Mutex<DaemonDb>>,
-    port: &dyn WatchServicePort,
+async fn reconcile_session_liveness_for_watch<Db, AsyncDb>(
+    async_db: Option<&Arc<AsyncDb>>,
+    db: &Arc<Mutex<Db>>,
+    port: &dyn WatchServicePort<Db, AsyncDb>,
 ) {
     let Err(error) = reconcile_session_liveness_result(async_db, db, port).await else {
         return;
@@ -141,10 +148,10 @@ async fn reconcile_session_liveness_for_watch(
     log_session_liveness_refresh_error(&error);
 }
 
-async fn reconcile_session_liveness_result(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
-    db: &Arc<Mutex<DaemonDb>>,
-    port: &dyn WatchServicePort,
+async fn reconcile_session_liveness_result<Db, AsyncDb>(
+    async_db: Option<&Arc<AsyncDb>>,
+    db: &Arc<Mutex<Db>>,
+    port: &dyn WatchServicePort<Db, AsyncDb>,
 ) -> Result<(), CliError> {
     if let Some(async_db) = async_db {
         return port.reconcile_liveness_async(Some(async_db.as_ref())).await;
@@ -165,7 +172,7 @@ fn log_session_liveness_refresh_error(error: &CliError) {
     tracing::warn!(%error, "failed to refresh session liveness before watch poll");
 }
 
-fn current_change_sequence(db: &Arc<Mutex<DaemonDb>>) -> i64 {
+fn current_change_sequence<Db: WatchStorage>(db: &Arc<Mutex<Db>>) -> i64 {
     let Ok(db_guard) = db.lock() else {
         return 0;
     };
@@ -173,11 +180,15 @@ fn current_change_sequence(db: &Arc<Mutex<DaemonDb>>) -> i64 {
     db_guard.current_change_sequence().unwrap_or(0)
 }
 
-fn spawn_legacy_watch_loop(
+fn spawn_legacy_watch_loop<Db, AsyncDb>(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
-    port: Arc<dyn WatchServicePort>,
-) -> JoinHandle<()> {
+    port: Arc<dyn WatchServicePort<Db, AsyncDb>>,
+) -> JoinHandle<()>
+where
+    Db: Send + 'static,
+    AsyncDb: AsyncWatchStorage + 'static,
+{
     spawn(async move {
         let root = index::projects_root();
         let _ = fs_err::create_dir_all(&root);
@@ -235,7 +246,7 @@ fn spawn_legacy_watch_loop(
     })
 }
 
-pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> WatchChanges {
+pub fn poll_change_tracking<Db: WatchStorage>(db: &Db, last_change_seq: &mut i64) -> WatchChanges {
     let mut changes = WatchChanges::default();
 
     let Ok(rows) = db.load_change_tracking_since(*last_change_seq) else {
@@ -257,22 +268,26 @@ pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> 
     changes
 }
 
-async fn poll_change_tracking_prefer_async(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
-    db: &Arc<Mutex<DaemonDb>>,
+async fn poll_change_tracking_prefer_async<Db, AsyncDb>(
+    async_db: Option<&Arc<AsyncDb>>,
+    db: &Arc<Mutex<Db>>,
     last_change_seq: &mut i64,
-) -> WatchChanges {
+) -> WatchChanges
+where
+    Db: WatchStorage,
+    AsyncDb: AsyncWatchStorage,
+{
     if let Some(async_db) = async_db {
         return poll_change_tracking_async(async_db.as_ref(), last_change_seq).await;
     }
     let Ok(db_guard) = db.lock() else {
         return WatchChanges::default();
     };
-    poll_change_tracking(&db_guard, last_change_seq)
+    poll_change_tracking(&*db_guard, last_change_seq)
 }
 
-pub(super) async fn poll_change_tracking_async(
-    async_db: &AsyncDaemonDb,
+pub async fn poll_change_tracking_async<AsyncDb: AsyncWatchStorage>(
+    async_db: &AsyncDb,
     last_change_seq: &mut i64,
 ) -> WatchChanges {
     let Ok(rows) = async_db.load_change_tracking_since(*last_change_seq).await else {
@@ -297,8 +312,8 @@ pub(super) async fn poll_change_tracking_async(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn reindex_sessions_from_paths_async(
-    db: Arc<Mutex<DaemonDb>>,
+async fn reindex_sessions_from_paths_async<Db: WatchStorage + 'static>(
+    db: Arc<Mutex<Db>>,
     paths: Vec<PathBuf>,
     resolve_cache: &mut RuntimeSessionResolveCache,
 ) {
@@ -316,7 +331,7 @@ async fn reindex_sessions_from_paths_async(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
+fn reindex_extracted_work<Db: WatchStorage>(db: &Arc<Mutex<Db>>, work: ReindexWork) {
     if work.is_empty() {
         return;
     }
@@ -332,7 +347,7 @@ fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
     let mut fallback_session_ids = work.full_session_ids;
 
     for target in &work.transcript_targets {
-        match prepare_runtime_transcript_resync(
+        match Db::prepare_runtime_transcript_resync(
             &target.session_id,
             &target.runtime_name,
             &target.runtime_session_id,
@@ -355,7 +370,7 @@ fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
     }
 
     for session_id in &fallback_session_ids {
-        match prepare_session_resync(session_id) {
+        match Db::prepare_session_resync(session_id) {
             Ok(import) => prepared_sessions.push(import),
             Err(error) => tracing::warn!(
                 %error,

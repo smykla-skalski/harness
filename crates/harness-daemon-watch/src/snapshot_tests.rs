@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
-use crate::agents::runtime;
-use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
-use crate::session::service as session_service;
-use crate::session::types::{SessionRole, TaskSeverity};
+use harness_agents::runtime;
+use harness_agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
+use harness_session::service as session_service;
+use harness_session::types::{SessionRole, TaskSeverity};
 
 use super::refresh::refresh_watch_snapshot;
 use super::state::{RefreshScope, WatchSnapshot};

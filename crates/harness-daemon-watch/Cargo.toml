@@ -1,0 +1,35 @@
+[package]
+name = "harness-daemon-watch"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+async-trait = "0.1.83"
+fs-err = "3.3.0"
+harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "55.0.0" }
+harness-feature-flags = { path = "../harness-feature-flags", version = "55.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.0" }
+harness-session = { path = "../harness-session", version = "55.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
+harness-timeline = { path = "../harness-timeline", version = "55.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+notify = "8.2.0"
+serde = "1.0.228"
+serde_json = "1.0.149"
+tokio = { version = "1.50.0", features = ["rt", "time", "sync"] }
+tracing = "0.1.44"
+
+[dev-dependencies]
+harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["test-support"] }
+harness-testkit = { path = "../../testkit" }
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "=3.27.0"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

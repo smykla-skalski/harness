@@ -4,8 +4,8 @@ use fs_err as fs;
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
-use crate::session::service as session_service;
-use crate::session::types::{SessionRole, SessionState};
+use harness_session::service as session_service;
+use harness_session::types::{SessionRole, SessionState};
 
 pub(super) fn with_temp_project<F: FnOnce(&Path)>(test_fn: F) {
     let tmp = tempdir().expect("tempdir");
@@ -42,7 +42,7 @@ pub(super) fn start_active_session(
 }
 
 pub(super) fn append_project_ledger_entry(project_dir: &Path) {
-    let ledger_path = crate::workspace::project_context_dir(project_dir)
+    let ledger_path = harness_workspace::workspace::project_context_dir(project_dir)
         .join("agents")
         .join("ledger")
         .join("events.jsonl");

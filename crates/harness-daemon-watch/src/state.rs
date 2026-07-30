@@ -7,6 +7,15 @@ use harness_kernel::errors::CliError;
 
 use super::paths::orchestration_context_root;
 
+pub(super) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
+    if scope == "global" || scope.starts_with("task_board:") {
+        None
+    } else {
+        Some(scope.strip_prefix("session:").unwrap_or(scope))
+            .filter(|session_id| !session_id.is_empty())
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct SessionDigest {
     pub(super) detail_json: String,
@@ -20,11 +29,11 @@ pub(super) struct WatchSnapshot {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(super) struct WatchChanges {
-    pub(super) sessions_updated: bool,
-    pub(super) session_ids: BTreeSet<String>,
-    pub(super) task_board_revision: Option<i64>,
-    pub(super) task_board_scopes: BTreeSet<String>,
+pub struct WatchChanges {
+    pub sessions_updated: bool,
+    pub session_ids: BTreeSet<String>,
+    pub task_board_revision: Option<i64>,
+    pub task_board_scopes: BTreeSet<String>,
 }
 
 impl WatchChanges {

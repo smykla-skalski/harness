@@ -3737,6 +3737,7 @@ dependencies = [
  "harness-daemon-provider-credentials",
  "harness-daemon-snapshot",
  "harness-daemon-state",
+ "harness-daemon-watch",
  "harness-db-schema",
  "harness-feature-flags",
  "harness-github-api",
@@ -3993,6 +3994,31 @@ dependencies = [
  "temp-env",
  "tempfile",
  "uuid",
+]
+
+[[package]]
+name = "harness-daemon-watch"
+version = "55.0.0"
+dependencies = [
+ "async-trait",
+ "fs-err",
+ "harness-agents",
+ "harness-daemon-snapshot",
+ "harness-feature-flags",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-session",
+ "harness-task-board",
+ "harness-testkit",
+ "harness-timeline",
+ "harness-workspace",
+ "notify",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

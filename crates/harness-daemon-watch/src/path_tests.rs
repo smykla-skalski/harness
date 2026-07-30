@@ -1,9 +1,9 @@
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
-use crate::session::service as session_service;
-use crate::session::types::SessionRole;
 use harness_kernel::errors::CliError;
+use harness_session::service as session_service;
+use harness_session::types::SessionRole;
 
 use super::paths::{
     WatchPathTarget, session_id_from_path, session_id_from_path_with, watch_target_from_path,
@@ -42,7 +42,7 @@ fn session_id_from_path_extracts_known_layouts() {
             .values()
             .find(|agent| agent.agent_id.starts_with("codex-"))
             .expect("worker");
-        let context_root = crate::workspace::project_context_dir(project);
+        let context_root = harness_workspace::workspace::project_context_dir(project);
 
         assert_eq!(
             session_id_from_path(
@@ -203,7 +203,7 @@ fn watch_target_from_path_marks_runtime_transcripts_as_targeted_refreshes() {
                 .expect("join worker")
             },
         );
-        let context_root = crate::workspace::project_context_dir(project);
+        let context_root = harness_workspace::workspace::project_context_dir(project);
 
         assert_eq!(
             watch_target_from_path(

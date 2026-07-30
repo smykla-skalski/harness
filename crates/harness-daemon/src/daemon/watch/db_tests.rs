@@ -16,10 +16,10 @@ use crate::session::types::SessionStatus;
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
-use super::loops::{liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async};
-use super::refresh::{emit_watch_changes, emit_watch_changes_with};
-use super::service_port::WatchServicePort;
-use super::state::WatchChanges;
+use super::{
+    WatchChanges, WatchServicePort, emit_watch_changes, emit_watch_changes_with,
+    liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async,
+};
 
 /// Mirrors `service::SESSION_LIVENESS_REFRESH_TTL` for tests that exercise the
 /// loop's own due-or-not arithmetic; `watch` takes the real value as a
@@ -34,7 +34,7 @@ const TEST_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 struct RecordingWatchServicePort;
 
 #[async_trait]
-impl WatchServicePort for RecordingWatchServicePort {
+impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
     fn liveness_refresh_ttl(&self) -> Duration {
         TEST_LIVENESS_REFRESH_TTL
     }
