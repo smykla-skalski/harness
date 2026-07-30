@@ -19,7 +19,7 @@ struct TaskBoardWorkflowStepDetailSheet: View {
 
   var body: some View {
     TaskBoardWorkflowDetailSheetFrame(
-      title: step.action.displayTitle,
+      title: step.action.taskBoardDisplayTitle,
       subtitle: "Next step \(step.order)",
       systemImage: "\(max(1, min(step.order, 50))).circle"
     ) {
@@ -39,7 +39,7 @@ struct TaskBoardWorkflowAttemptDetailSheet: View {
 
   var body: some View {
     TaskBoardWorkflowDetailSheetFrame(
-      title: attempt.actionKey.displayTitle,
+      title: attempt.actionKey.taskBoardDisplayTitle,
       subtitle: "Attempt \(attempt.attempt) for this step",
       systemImage: attempt.state.systemImage,
       tint: attempt.state.tint

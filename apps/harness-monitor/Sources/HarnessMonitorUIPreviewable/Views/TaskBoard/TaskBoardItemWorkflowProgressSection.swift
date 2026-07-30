@@ -225,7 +225,7 @@ extension TaskBoardItem {
 }
 
 extension String {
-  var displayTitle: String {
+  var taskBoardDisplayTitle: String {
     replacingOccurrences(of: "_", with: " ")
       .split(separator: " ")
       .map { $0.capitalized }
@@ -234,11 +234,11 @@ extension String {
 }
 
 extension TaskBoardExecutionPhase {
-  var displayTitle: String { rawValue.displayTitle }
+  var displayTitle: String { rawValue.taskBoardDisplayTitle }
 }
 
 extension TaskBoardExecutionState {
-  var displayTitle: String { rawValue.displayTitle }
+  var displayTitle: String { rawValue.taskBoardDisplayTitle }
   var systemImage: String {
     switch self {
     case .completed: "checkmark.circle.fill"
@@ -261,7 +261,7 @@ extension TaskBoardExecutionState {
 }
 
 extension TaskBoardAttemptState {
-  var displayTitle: String { rawValue.displayTitle }
+  var displayTitle: String { rawValue.taskBoardDisplayTitle }
   var systemImage: String {
     switch self {
     case .completed: "checkmark.circle.fill"
@@ -282,11 +282,11 @@ extension TaskBoardAttemptState {
 }
 
 extension TaskBoardTerminalOutcomeKind {
-  var displayTitle: String { rawValue.displayTitle }
+  var displayTitle: String { rawValue.taskBoardDisplayTitle }
 }
 
 extension TaskBoardDependencyTriageDisposition {
-  var displayTitle: String { rawValue.displayTitle }
+  var displayTitle: String { rawValue.taskBoardDisplayTitle }
   var systemImage: String {
     switch self {
     case .continueSafe, .reportOnly: "checkmark.shield.fill"
@@ -305,7 +305,7 @@ extension TaskBoardDependencyTriageDisposition {
 }
 
 extension TaskBoardDependencyCheckState {
-  var displayTitle: String { rawValue.displayTitle }
+  var displayTitle: String { rawValue.taskBoardDisplayTitle }
   var systemImage: String {
     switch self {
     case .passed: "checkmark.circle.fill"
