@@ -129,14 +129,12 @@ mod tests {
         let codex = dependency_fix_codex_request(&request).expect("Codex request");
 
         assert_eq!(codex.mode, CodexRunMode::WorkspaceWrite);
-        assert_eq!(
-            TASK_BOARD_DEPENDENCY_FIXER_MODEL,
-            "gpt-5.3-codex-spark"
-        );
+        assert_eq!(TASK_BOARD_DEPENDENCY_FIXER_MODEL, "gpt-5.3-codex-spark");
         assert_eq!(
             codex.model.as_deref(),
             Some(TASK_BOARD_DEPENDENCY_FIXER_MODEL)
         );
+        assert_eq!(TASK_BOARD_DEPENDENCY_FIXER_EFFORT, "low");
         assert_eq!(
             codex.effort.as_deref(),
             Some(TASK_BOARD_DEPENDENCY_FIXER_EFFORT)
