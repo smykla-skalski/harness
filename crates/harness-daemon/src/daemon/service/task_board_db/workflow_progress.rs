@@ -30,18 +30,20 @@ pub(crate) async fn get_task_board_workflow_progress_db(
     let mut evidence = BTreeMap::new();
     for attempt in &execution.attempts {
         if let Some(run) = db.codex_run(&attempt.idempotency_key).await? {
-            validate_run_binding(
+            if matching_run_binding(
                 run.workflow_execution_id.as_deref(),
                 execution_id,
                 &attempt.idempotency_key,
-            )?;
-            evidence.insert(attempt.idempotency_key.clone(), codex_evidence(&run));
-        } else if let Some(run) = db.agent_turn_run(&attempt.idempotency_key).await? {
-            validate_run_binding(
+            )? {
+                evidence.insert(attempt.idempotency_key.clone(), codex_evidence(&run));
+            }
+        } else if let Some(run) = db.agent_turn_run(&attempt.idempotency_key).await?
+            && matching_run_binding(
                 run.workflow_execution_id.as_deref(),
                 execution_id,
                 &attempt.idempotency_key,
-            )?;
+            )?
+        {
             evidence.insert(attempt.idempotency_key.clone(), agent_turn_evidence(&run));
         }
     }
@@ -50,18 +52,19 @@ pub(crate) async fn get_task_board_workflow_progress_db(
     })
 }
 
-fn validate_run_binding(
+fn matching_run_binding(
     bound_execution_id: Option<&str>,
     expected_execution_id: &str,
     run_id: &str,
-) -> Result<(), CliError> {
-    if bound_execution_id == Some(expected_execution_id) {
-        return Ok(());
+) -> Result<bool, CliError> {
+    match bound_execution_id {
+        Some(bound_execution_id) if bound_execution_id == expected_execution_id => Ok(true),
+        None => Ok(false),
+        Some(_) => Err(CliErrorKind::workflow_io(format!(
+            "workflow attempt run '{run_id}' is not bound to execution '{expected_execution_id}'"
+        ))
+        .into()),
     }
-    Err(CliErrorKind::workflow_io(format!(
-        "workflow attempt run '{run_id}' is not bound to execution '{expected_execution_id}'"
-    ))
-    .into())
 }
 
 fn codex_evidence(run: &CodexRunSnapshot) -> TaskBoardWorkflowAttemptRuntimeEvidence {
@@ -85,5 +88,25 @@ fn agent_turn_evidence(run: &AgentTurnRunSnapshot) -> TaskBoardWorkflowAttemptRu
             .or_else(|| run.requested_model.clone()),
         report: run.report.clone(),
         terminal_reason: run.error.clone().or_else(|| run.stop_reason.clone()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::matching_run_binding;
+
+    #[test]
+    fn exact_run_binding_includes_runtime_evidence() {
+        assert!(matching_run_binding(Some("execution-1"), "execution-1", "run-1").unwrap());
+    }
+
+    #[test]
+    fn missing_run_binding_omits_legacy_runtime_evidence() {
+        assert!(!matching_run_binding(None, "execution-1", "run-1").unwrap());
+    }
+
+    #[test]
+    fn different_run_binding_rejects_runtime_evidence() {
+        assert!(matching_run_binding(Some("execution-2"), "execution-1", "run-1").is_err());
     }
 }
