@@ -12,9 +12,14 @@
 use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
+    TaskBoardFailureClass, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::CliError;
+
+/// Non-Codex reviewer runtimes the coordinator can drive. Codex is handled by
+/// its own path; anything outside this set is refused by name before any side
+/// effect, so a stray or hand-edited profile never silently runs as Codex.
+const SUPPORTED_NON_CODEX_RUNTIMES: [&str; 1] = ["openrouter"];
 
 use super::super::task_board_read_only_runtime::{NonCodexReportStart, TaskBoardReadOnlyRuntime};
 use super::attempts::{require_human, set_execution_state, settlement_is_current};
@@ -39,6 +44,10 @@ pub(super) async fn reconcile_non_codex_report_attempt<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
+    if !SUPPORTED_NON_CODEX_RUNTIMES.contains(&runtime_name) {
+        refuse_unsupported_runtime(db, execution, attempt, runtime_name, now).await?;
+        return Ok(true);
+    }
     match db.agent_turn_run(&attempt.idempotency_key).await? {
         Some(run) if run.status.is_active() => {
             mark_running(db, execution, attempt, now).await?;
@@ -64,6 +73,38 @@ where
             Ok(true)
         }
     }
+}
+
+/// An unsupported reviewer runtime is a configuration mistake, not a transient
+/// fault, and nothing has been started. Fail the attempt permanently, naming the
+/// runtime, so it is refused visibly instead of retried or run as Codex.
+async fn refuse_unsupported_runtime(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    runtime_name: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    let detail = format!("reviewer runtime '{runtime_name}' is not a supported reviewer runtime");
+    transition_attempt(
+        db,
+        attempt,
+        TaskBoardAttemptState::Failed,
+        now,
+        Some(TaskBoardFailureClass::Permanent),
+        Some(&detail),
+        None,
+    )
+    .await?;
+    require_human(
+        db,
+        &execution.execution_id,
+        "reviewer_runtime_unsupported",
+        &detail,
+        TaskBoardTerminalOutcomeKind::HumanRequired,
+        now,
+    )
+    .await
 }
 
 /// Claim the attempt's side effect, then start the runtime turn. `Ok(true)`

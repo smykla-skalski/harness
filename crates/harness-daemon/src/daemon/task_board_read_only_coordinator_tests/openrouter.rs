@@ -81,6 +81,56 @@ async fn openrouter_reviewer_starts_and_durably_tracks_a_non_codex_turn() {
 }
 
 #[tokio::test]
+async fn an_unknown_reviewer_runtime_is_refused_by_name_not_run_as_codex() {
+    let fixture = Box::pin(seed_execution_with_reviewer_runtime("or-unknown", "gemini")).await;
+    let db = AsyncDaemonDb::connect(&fixture.test.path)
+        .await
+        .expect("open coordinator database");
+    let store = AsyncDaemonDb::connect(&fixture.test.path)
+        .await
+        .expect("open runtime store");
+    let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
+
+    // Schedule the attempt, then reconcile it: an unsupported runtime is refused.
+    reconcile(&db, &runtime, NOW).await;
+    reconcile(&db, &runtime, NOW).await;
+
+    let execution = load(&fixture, &db).await;
+    assert_eq!(
+        execution.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(execution.attempts.len(), 1);
+    assert_eq!(execution.attempts[0].state, TaskBoardAttemptState::Failed);
+    assert!(
+        execution.attempts[0]
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("gemini")),
+        "{execution:?}"
+    );
+    assert_eq!(
+        execution.blocked_reason.as_deref(),
+        Some("reviewer_runtime_unsupported")
+    );
+    // Nothing was started: no turn, no Codex run, no durable non-Codex run.
+    assert_eq!(runtime.start_count(), 0);
+    let attempt_key = execution.attempts[0].idempotency_key.clone();
+    assert!(
+        db.codex_run(&attempt_key)
+            .await
+            .expect("codex run lookup")
+            .is_none()
+    );
+    assert!(
+        db.agent_turn_run(&attempt_key)
+            .await
+            .expect("agent turn run lookup")
+            .is_none()
+    );
+}
+
+#[tokio::test]
 async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
     let fixture = Box::pin(seed_execution_with_reviewer_runtime("or-restart", "openrouter")).await;
     let db = AsyncDaemonDb::connect(&fixture.test.path)
