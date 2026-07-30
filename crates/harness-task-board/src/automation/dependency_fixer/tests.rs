@@ -242,7 +242,7 @@ fn prompt_binds_the_head_repair_triage_and_result_contract() {
         "acme/widgets#17",
         HEAD,
         "build requires a code fix",
-        "\"checks\"",
+        "Triage report for current repair head",
         "\"changed_paths\"",
         "\"validation\"",
         "\"remaining_blockers\"",
