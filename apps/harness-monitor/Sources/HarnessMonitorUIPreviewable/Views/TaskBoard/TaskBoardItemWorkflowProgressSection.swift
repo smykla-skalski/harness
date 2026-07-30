@@ -83,7 +83,7 @@ struct TaskBoardItemWorkflowProgressSection: View {
           executionID: progress.executionId,
           repository: progress.triage?.repository ?? item.executionRepository,
           pullRequestNumber: progress.triage?.pullRequestNumber ?? item.workflow?.prNumber,
-          requestedRuntime: progress.currentRuntime ?? "Not started",
+          requestedRuntime: progress.currentRuntime ?? "Unavailable",
           actualRuntime: nil,
           model: progress.currentModel,
           headRevision: progress.exactHeadRevision,

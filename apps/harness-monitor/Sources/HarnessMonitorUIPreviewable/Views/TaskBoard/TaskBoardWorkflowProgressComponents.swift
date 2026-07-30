@@ -330,12 +330,14 @@ struct TaskBoardWorkflowAttemptsCard: View {
               .font(captionSemibold)
               .lineLimit(1)
             Spacer(minLength: HarnessMonitorTheme.spacingSM)
-            Text(attempt.runtimeSummary)
-              .font(captionFont)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(1)
-              .truncationMode(.middle)
-              .multilineTextAlignment(.trailing)
+            if let runtimeSummary = attempt.runtimeSummary {
+              Text(runtimeSummary)
+                .font(captionFont)
+                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .multilineTextAlignment(.trailing)
+            }
             Text(attempt.state.displayTitle)
               .font(captionFont)
               .foregroundStyle(attempt.state.tint)
@@ -449,7 +451,8 @@ extension String {
 }
 
 extension TaskBoardWorkflowAttemptProgress {
-  fileprivate var runtimeSummary: String {
-    [runtime, model].compactMap(\.self).joined(separator: " · ")
+  fileprivate var runtimeSummary: String? {
+    let summary = [runtime, model].compactMap(\.self).joined(separator: " · ")
+    return summary.isEmpty ? nil : summary
   }
 }
