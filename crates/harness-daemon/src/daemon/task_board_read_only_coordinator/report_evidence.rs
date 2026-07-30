@@ -22,13 +22,18 @@ pub(super) async fn accept_completed_run(
     let result = match parse_attempt_result(run, execution, attempt) {
         Ok(result) => result,
         Err(error) => {
+            let detail = error.to_string();
+            super::review_report_retention::retain_invalid_review_run(
+                db, execution, attempt, run, &detail,
+            )
+            .await?;
             transition_attempt(
                 db,
                 attempt,
                 TaskBoardAttemptState::Failed,
                 now,
                 Some(TaskBoardFailureClass::Permanent),
-                Some(&error.to_string()),
+                Some(&detail),
                 None,
             )
             .await?;
@@ -123,6 +128,14 @@ pub(super) fn parse_attempt_result(
         .final_message
         .as_deref()
         .ok_or_else(|| invalid_transition("completed Codex run has no final message"))?;
+    parse_attempt_result_message(message, execution, attempt)
+}
+
+pub(super) fn parse_attempt_result_message(
+    message: &str,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> Result<TaskBoardLocalAttemptResult, CliError> {
     let result = serde_json::from_str::<TaskBoardLocalAttemptResult>(message.trim())
         .map_err(|error| invalid_transition(format!("parse workflow attempt result: {error}")))?;
     let expected =

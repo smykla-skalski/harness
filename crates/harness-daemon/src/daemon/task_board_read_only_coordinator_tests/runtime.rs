@@ -9,11 +9,8 @@ use tokio::sync::Semaphore;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::{
-    TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
-    TaskBoardEvaluationResult, TaskBoardImplementationResult, TaskBoardLifecycleOutcome,
-    TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReportOnlyReviewFinding,
-    TaskBoardReviewFindingLocation, TaskBoardReviewFindingSeverity, TaskBoardReviewResult,
-    TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionRecord,
+    TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardImplementationResult,
+    TaskBoardLifecycleOutcome, TaskBoardLocalAttemptResult, TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -22,76 +19,10 @@ use super::super::task_board_read_only_runtime::{
 };
 use super::fixture::{FROZEN_HEAD, NOW};
 
-pub(super) struct PlannedReport {
-    action_key: String,
-    attempt: u32,
-    artifact: TaskBoardAttemptResultArtifact,
-    status: CodexRunStatus,
-}
+#[path = "runtime/planned_report.rs"]
+mod planned_report;
 
-impl PlannedReport {
-    pub(super) fn passing_review() -> Self {
-        Self::passing_review_for("reviewer-amber")
-    }
-
-    pub(super) fn passing_review_for(profile_id: &str) -> Self {
-        Self {
-            action_key: format!("review:{profile_id}"),
-            attempt: 1,
-            artifact: TaskBoardAttemptResultArtifact::Review(TaskBoardReviewerOutcome {
-                profile_id: profile_id.into(),
-                result: TaskBoardReviewResult {
-                    verdict: TaskBoardPhaseVerdict::Pass,
-                    head_revision: FROZEN_HEAD.into(),
-                    summary: "exact-head review passed".into(),
-                    findings: Vec::new(),
-                    structured_findings: vec![TaskBoardReportOnlyReviewFinding {
-                        severity: TaskBoardReviewFindingSeverity::High,
-                        location: TaskBoardReviewFindingLocation {
-                            path: "src/review.rs".into(),
-                            line: Some(41),
-                        },
-                        evidence: "review finding retained".into(),
-                    }],
-                },
-            }),
-            status: CodexRunStatus::Completed,
-        }
-    }
-
-    pub(super) fn running_review() -> Self {
-        let mut report = Self::passing_review();
-        report.status = CodexRunStatus::Running;
-        report
-    }
-
-    pub(super) fn failed_review() -> Self {
-        let mut report = Self::passing_review();
-        report.status = CodexRunStatus::Failed;
-        report
-    }
-
-    pub(super) fn cancelled_review() -> Self {
-        let mut report = Self::passing_review();
-        report.status = CodexRunStatus::Cancelled;
-        report
-    }
-
-    pub(super) fn passing_evaluation() -> Self {
-        Self {
-            action_key: "evaluate".into(),
-            attempt: 1,
-            artifact: TaskBoardAttemptResultArtifact::Evaluation(TaskBoardEvaluationResult {
-                verdict: TaskBoardPhaseVerdict::Pass,
-                summary: "durable review evidence passed evaluation".into(),
-                evidence: vec!["review was bound to the frozen head".into()],
-                head_revision: None,
-                revision_cycle: None,
-            }),
-            status: CodexRunStatus::Completed,
-        }
-    }
-}
+pub(super) use planned_report::PlannedReport;
 
 enum HeadBehavior {
     Exact(String),
@@ -103,6 +34,8 @@ pub(super) struct FakeReadOnlyRuntime {
     reports: Mutex<VecDeque<PlannedReport>>,
     runs: Mutex<BTreeMap<String, CodexRunSnapshot>>,
     head: Mutex<HeadBehavior>,
+    immutable_content: Mutex<Result<String, String>>,
+    immutable_content_loads: AtomicUsize,
     starts: Mutex<Vec<String>>,
     requests: Mutex<Vec<CodexRunRequest>>,
     load_error: Mutex<Option<String>>,
@@ -129,6 +62,10 @@ impl FakeReadOnlyRuntime {
             reports: Mutex::new(reports.into_iter().collect()),
             runs: Mutex::new(BTreeMap::new()),
             head: Mutex::new(HeadBehavior::Exact(FROZEN_HEAD.into())),
+            immutable_content: Mutex::new(Ok(
+                r#"{"pull_request":{"title":"Frozen test pull request"},"patches":[]}"#.into(),
+            )),
+            immutable_content_loads: AtomicUsize::new(0),
             starts: Mutex::new(Vec::new()),
             requests: Mutex::new(Vec::new()),
             load_error: Mutex::new(None),
@@ -152,6 +89,17 @@ impl FakeReadOnlyRuntime {
     pub(super) fn with_durable_db(mut self, db: AsyncDaemonDb) -> Self {
         self.durable_db = Some(db);
         self
+    }
+
+    pub(super) fn fail_immutable_content(&self, detail: &str) {
+        *self
+            .immutable_content
+            .lock()
+            .expect("immutable content lock") = Err(detail.into());
+    }
+
+    pub(super) fn immutable_content_load_count(&self) -> usize {
+        self.immutable_content_loads.load(Ordering::SeqCst)
     }
 
     pub(super) fn set_head(&self, head: &str) {
@@ -210,8 +158,7 @@ impl FakeReadOnlyRuntime {
     }
 
     pub(super) fn evict_agent_turn_on_next_load(&self) {
-        self.evict_agent_turn_on_load
-            .store(true, Ordering::SeqCst);
+        self.evict_agent_turn_on_load.store(true, Ordering::SeqCst);
     }
 }
 
@@ -329,7 +276,10 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             requested_model: start.requested_model.clone(),
             actual_model: None,
             status: AgentTurnRunStatus::Running,
-            source_revision: None,
+            source_revision: start
+                .pull_request
+                .as_ref()
+                .map(|pull_request| pull_request.pull_request.head_revision.clone()),
             report: None,
             stop_reason: None,
             error: None,
@@ -365,6 +315,20 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             return db.agent_turn_run(run_id).await;
         }
         Ok(Some(run))
+    }
+
+    async fn immutable_pull_request_content(
+        &self,
+        _repository: &str,
+        _number: u64,
+        _expected_head: &str,
+    ) -> Result<String, CliError> {
+        self.immutable_content_loads.fetch_add(1, Ordering::SeqCst);
+        self.immutable_content
+            .lock()
+            .expect("immutable content lock")
+            .clone()
+            .map_err(|detail| CliErrorKind::workflow_io(detail).into())
     }
 
     async fn resolve_exact_head(

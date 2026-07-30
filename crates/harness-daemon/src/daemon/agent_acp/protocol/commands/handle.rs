@@ -121,6 +121,7 @@ impl AcpProtocolHandle {
             target: RouteTarget {
                 acp_id: acp_id.to_string(),
                 session_id: session_id.to_string(),
+                report_only_review: false,
             },
             response_tx,
         })?;

@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardAttemptState,
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardReviewRoundDecision,
@@ -108,6 +109,59 @@ async fn cancelled_pull_request_review_retains_available_output_before_settlemen
         Some("Codex Report run was cancelled")
     );
     assert!(report.partial_output.is_some());
+}
+
+#[tokio::test]
+async fn malformed_codex_completion_retains_output_and_rejection_reason() {
+    let fixture = Box::pin(seed_execution_with_reviewers(
+        "malformed-pull-request-review",
+        TaskBoardWorkflowKind::PrReview,
+        1,
+        1,
+    ))
+    .await;
+    let runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()])
+        .with_durable_db(fixture.test.db.clone());
+
+    super::tick(&fixture, &runtime, NOW).await;
+    super::tick(&fixture, &runtime, NOW).await;
+    let execution = super::load_execution(&fixture).await;
+    let run_id = execution.attempts[0].idempotency_key.clone();
+    let mut run = fixture
+        .test
+        .db
+        .codex_run(&run_id)
+        .await
+        .expect("load Codex run")
+        .expect("Codex run exists");
+    run.status = CodexRunStatus::Completed;
+    run.final_message = Some("not valid workflow evidence".into());
+    fixture
+        .test
+        .db
+        .save_codex_run(&run)
+        .await
+        .expect("save malformed completion");
+
+    let report = drive_until_report(&fixture, &runtime).await;
+
+    assert_eq!(report.status, TaskBoardAiReviewReportStatus::Failed);
+    assert_eq!(
+        report.partial_output.as_deref(),
+        Some("not valid workflow evidence")
+    );
+    assert!(
+        report
+            .terminal_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("parse workflow attempt result"))
+    );
+    let execution = super::load_execution(&fixture).await;
+    assert_eq!(
+        execution.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(execution.attempts[0].state, TaskBoardAttemptState::Failed);
 }
 
 async fn drive_until_report(

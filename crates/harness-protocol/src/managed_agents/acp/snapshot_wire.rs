@@ -376,6 +376,7 @@ mod tests {
                 AgentTurnFailureStage::Execution,
                 "agent refused the prompt",
             )),
+            last_turn_partial_output: Some("partial report".into()),
         });
         let value = serde_json::to_value(&snapshot).expect("serialize inspect snapshot");
         assert_eq!(value["handshake"]["protocol_version"], 1);

@@ -36,6 +36,7 @@ fn route_target(session_id: &str) -> RouteTarget {
     RouteTarget {
         acp_id: format!("agent-{session_id}"),
         session_id: session_id.to_owned(),
+        report_only_review: false,
     }
 }
 
@@ -121,19 +122,31 @@ async fn beginning_a_turn_clears_the_prior_terminal_result() {
             .and_then(|state| state.last_turn_result)
             .is_some()
     );
+    supervisor.mutate_session_state(|state| {
+        state
+            .config_options
+            .push(crate::daemon::agent_acp::AcpSessionConfigOptionState {
+                id: "harness_provider_effective_model".into(),
+                name: "Provider effective model".into(),
+                category: None,
+                current_value: "stale/model".into(),
+            });
+    });
 
     session_state::begin_turn(&supervisor);
+    let state = supervisor.session_state().expect("session state");
+    assert!(state.last_turn_result.is_none());
     assert!(
-        supervisor
-            .session_state()
-            .and_then(|state| state.last_turn_result)
-            .is_none()
+        state
+            .config_options
+            .iter()
+            .all(|option| option.id != "harness_provider_effective_model")
     );
 }
 
 #[tokio::test]
 #[cfg(unix)]
-async fn prompt_error_records_structured_failure_without_partial_report() {
+async fn prompt_error_records_structured_failure_with_partial_output() {
     let child = ChildGuard(
         Command::new("sleep")
             .arg("60")
@@ -161,6 +174,7 @@ async fn prompt_error_records_structured_failure_without_partial_report() {
     assert!(failure.automatic_retry_safe);
     assert!(!failure.detail.contains("super-secret"));
     assert!(state.last_turn_result.is_none());
+    assert_eq!(state.last_turn_partial_output.as_deref(), Some("partial"));
 }
 
 #[tokio::test]
@@ -175,6 +189,7 @@ async fn refusal_uses_provider_rejection_failure() {
     let supervisor = AcpSessionSupervisor::new(&child.0, SupervisionConfig::default());
 
     session_state::begin_turn(&supervisor);
+    session_state::apply_live_turn_update(&supervisor, &text_update("partial refusal"));
     session_state::record_stop_reason(&supervisor, &PromptResponse::new(StopReason::Refusal));
 
     let state = supervisor.session_state().expect("session state");
@@ -182,6 +197,10 @@ async fn refusal_uses_provider_rejection_failure() {
     assert_eq!(failure.category, AgentTurnFailureCategory::ProviderRejected);
     assert!(!failure.automatic_retry_safe);
     assert!(state.last_turn_result.is_none());
+    assert_eq!(
+        state.last_turn_partial_output.as_deref(),
+        Some("partial refusal")
+    );
 }
 
 #[tokio::test]
@@ -196,6 +215,7 @@ async fn cancelled_stop_reason_uses_shared_cancellation_failure() {
     let supervisor = AcpSessionSupervisor::new(&child.0, SupervisionConfig::default());
 
     session_state::begin_turn(&supervisor);
+    session_state::apply_live_turn_update(&supervisor, &text_update("partial cancellation"));
     session_state::record_stop_reason(&supervisor, &PromptResponse::new(StopReason::Cancelled));
 
     let state = supervisor.session_state().expect("session state");
@@ -204,6 +224,10 @@ async fn cancelled_stop_reason_uses_shared_cancellation_failure() {
     assert_eq!(failure.stage, AgentTurnFailureStage::Cancellation);
     assert!(!failure.automatic_retry_safe);
     assert!(state.last_turn_result.is_none());
+    assert_eq!(
+        state.last_turn_partial_output.as_deref(),
+        Some("partial cancellation")
+    );
 }
 
 #[tokio::test]

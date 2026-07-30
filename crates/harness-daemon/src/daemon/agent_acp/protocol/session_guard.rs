@@ -26,6 +26,7 @@ struct RouteState {
 pub(super) struct RouteTarget {
     pub acp_id: String,
     pub session_id: String,
+    pub report_only_review: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,10 +105,10 @@ impl SessionRouteGuard {
 
     pub(super) fn stop_target(&self, target: &RouteTarget) -> Option<SessionId> {
         let mut state = self.state.lock().expect("session route guard lock");
-        let session_id = state
-            .routes
-            .iter()
-            .find_map(|(session_id, route)| (route == target).then(|| session_id.clone()))?;
+        let session_id = state.routes.iter().find_map(|(session_id, route)| {
+            (route.acp_id == target.acp_id && route.session_id == target.session_id)
+                .then(|| session_id.clone())
+        })?;
         state.routes.remove(&session_id);
         state.remember_ended(session_id.clone());
         Some(SessionId::new(session_id))
@@ -152,6 +153,11 @@ impl SessionRouteGuard {
                 "stale_session_id: ACP session routing not initialized yet",
             ),
         })
+    }
+
+    pub(super) fn is_report_only(&self, incoming: &SessionId) -> Result<bool, RouteError> {
+        self.ensure_known(incoming)
+            .map(|target| target.report_only_review)
     }
 }
 

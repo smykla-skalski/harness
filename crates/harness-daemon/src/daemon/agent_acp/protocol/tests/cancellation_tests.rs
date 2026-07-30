@@ -64,6 +64,7 @@ fn handler_harness() -> HandlerHarness {
         RouteTarget {
             acp_id: "agent-acp-1".to_string(),
             session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
+            report_only_review: false,
         },
     );
     let (notifications, _routed) = mpsc::channel(8);

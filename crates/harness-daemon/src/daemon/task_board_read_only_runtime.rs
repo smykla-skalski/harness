@@ -13,10 +13,10 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-#[path = "task_board_read_only_runtime/git_evidence.rs"]
-mod git_evidence;
 #[path = "task_board_read_only_runtime/agent_turn_report.rs"]
 pub(crate) mod agent_turn_report;
+#[path = "task_board_read_only_runtime/git_evidence.rs"]
+mod git_evidence;
 
 pub(crate) use agent_turn_report::AgentTurnReportStart;
 
@@ -75,6 +75,17 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
     ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
         Err(invalid_transition(
             "runtime does not support agent-turn report run loading",
+        ))
+    }
+
+    async fn immutable_pull_request_content(
+        &self,
+        _repository: &str,
+        _number: u64,
+        _expected_head: &str,
+    ) -> Result<String, CliError> {
+        Err(invalid_transition(
+            "runtime does not support immutable pull request content",
         ))
     }
 
@@ -212,6 +223,20 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         run_id: &str,
     ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
         agent_turn_report::load_agent_turn_report_run(self.state, self.db, run_id).await
+    }
+
+    async fn immutable_pull_request_content(
+        &self,
+        repository: &str,
+        number: u64,
+        expected_head: &str,
+    ) -> Result<String, CliError> {
+        crate::daemon::service::reviews_source_port::immutable_pull_request_content(
+            repository,
+            number,
+            expected_head,
+        )
+        .await
     }
 
     async fn resolve_exact_head(

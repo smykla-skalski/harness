@@ -63,18 +63,19 @@ impl ActiveAcpSession {
         self.process.event_emitter()
     }
 
-    pub(in crate::daemon::agent_acp) fn attach_protocol_session(
+    pub(in crate::daemon::agent_acp) fn attach_protocol_session_with_config(
         &self,
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
         resume_session_id: Option<String>,
     ) -> Result<String, String> {
         self.process.attach_protocol_session(
             acp_id,
             session_id,
             project_dir,
-            self.session_config.clone(),
+            session_config,
             resume_session_id,
         )
     }
@@ -87,11 +88,30 @@ impl ActiveAcpSession {
         resume_session_id: Option<String>,
         prompt: String,
     ) -> Result<String, String> {
-        self.process.prompt_protocol_session(
+        self.prompt_protocol_session_with_config(
             acp_id,
             session_id,
             project_dir,
             self.session_config.clone(),
+            resume_session_id,
+            prompt,
+        )
+    }
+
+    pub(in crate::daemon::agent_acp) fn prompt_protocol_session_with_config(
+        &self,
+        acp_id: &str,
+        session_id: &str,
+        project_dir: PathBuf,
+        session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
+        prompt: String,
+    ) -> Result<String, String> {
+        self.process.prompt_protocol_session(
+            acp_id,
+            session_id,
+            project_dir,
+            session_config,
             resume_session_id,
             prompt,
         )

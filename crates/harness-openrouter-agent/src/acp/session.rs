@@ -26,6 +26,7 @@ pub struct SessionState {
     pub project_dir: PathBuf,
     pub model: String,
     pub reasoning_effort: Option<String>,
+    pub report_only_review: bool,
     pub history: Vec<ChatMessage>,
     /// Set to `true` by `session/cancel`. The prompt loop polls this between
     /// SSE chunks and tool calls and returns `StopReason::Cancelled`.
@@ -38,6 +39,7 @@ impl SessionState {
             project_dir,
             model,
             reasoning_effort: None,
+            report_only_review: false,
             history: Vec::new(),
             cancel_flag: Arc::new(AtomicBool::new(false)),
         }
@@ -90,6 +92,7 @@ impl SessionStore {
                 project_dir: state.project_dir.clone(),
                 model: state.model.clone(),
                 reasoning_effort: state.reasoning_effort.clone(),
+                report_only_review: state.report_only_review,
                 history: state.history.clone(),
                 cancel_flag: state.cancel_flag.clone(),
             })
@@ -107,6 +110,15 @@ impl SessionStore {
     pub async fn set_model(&self, session_id: &SessionId, model: &str) -> bool {
         if let Some(state) = self.inner.lock().await.sessions.get_mut(session_id) {
             state.model = model.to_owned();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub async fn set_report_only_review(&self, session_id: &SessionId, enabled: bool) -> bool {
+        if let Some(state) = self.inner.lock().await.sessions.get_mut(session_id) {
+            state.report_only_review = enabled;
             true
         } else {
             false
@@ -140,6 +152,7 @@ pub struct SessionSnapshot {
     pub project_dir: PathBuf,
     pub model: String,
     pub reasoning_effort: Option<String>,
+    pub report_only_review: bool,
     pub history: Vec<ChatMessage>,
     pub cancel_flag: Arc<AtomicBool>,
 }

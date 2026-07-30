@@ -149,6 +149,7 @@ async fn detaching_a_session_closes_it_on_the_agent() {
                 target: RouteTarget {
                     acp_id: "agent-acp-1".to_string(),
                     session_id: "c6e24bcb-cb15-555b-99fb-9dbb7ccc986e".to_string(),
+                    report_only_review: false,
                 },
                 response_tx,
             })

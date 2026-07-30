@@ -97,3 +97,7 @@ pub use manager::{AcpAgentManagerHandle, AcpAgentReconcileResponse};
 pub use turn_lifecycle::OpenRouterAgentTurnRuntime;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) use turn_lifecycle::OpenRouterRunCorrelation;
+
+const REPORT_ONLY_REVIEW_CAPABILITY: &str = "harness.report_only_review";
+pub(crate) const PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID: &str =
+    "harness_provider_effective_model";

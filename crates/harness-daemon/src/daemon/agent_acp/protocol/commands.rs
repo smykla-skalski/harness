@@ -24,11 +24,7 @@ use crate::daemon::agent_acp::prompt_gate::PromptLease;
 
 pub(super) type ProtocolCommandResult<T> = Result<T, String>;
 
-/// How long a detach waits for the agent to confirm the session is closed.
-///
-/// Short because someone is stopping one agent and waiting on the reply, and
-/// the process-lifecycle lock is held for the whole call. The lifecycle budget
-/// would bound it too, but at a latency nobody wants on an interactive stop.
+/// Keep interactive detach well below the general lifecycle budget.
 const DETACH_CLOSE_BUDGET: Duration = Duration::from_secs(2);
 
 mod handle;
@@ -148,7 +144,6 @@ async fn handle_protocol_command(
     }
 }
 
-/// Commands that act on this connection's routed sessions.
 async fn handle_routed_command(
     supervisor: Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
@@ -226,7 +221,6 @@ async fn handle_routed_command(
     }
 }
 
-/// Commands that act on the agent connection's own session inventory.
 async fn handle_lifecycle_command(
     supervisor: Arc<AcpSessionSupervisor>,
     connection: &ConnectionTo<Agent>,
@@ -324,7 +318,14 @@ async fn attach_protocol_session(
         .await?
     };
     let protocol_session_id = response.session_id.clone();
-    session_guard.start_session(&protocol_session_id, RouteTarget { acp_id, session_id });
+    session_guard.start_session(
+        &protocol_session_id,
+        RouteTarget {
+            acp_id,
+            session_id,
+            report_only_review: session_config.report_only_review(),
+        },
+    );
     if let Err(error) = apply_requested_session_configuration(
         supervisor,
         connection,
@@ -435,14 +436,8 @@ async fn detach_protocol_session(
 
 /// Tell the agent the session is finished once the route is gone.
 ///
-/// Best effort on purpose: the route is already detached and the caller has
-/// moved on, so a refusing or unreachable agent must not fail the detach. It
-/// matters because a closed session is one the agent may persist and hand back
-/// later, while a killed one is not.
-///
-/// Bounded well under the lifecycle budget because a detach comes from someone
-/// stopping one agent and waiting on the answer, with the process-lifecycle
-/// lock held for the whole call.
+/// Best effort because the route is already detached; bounded because the
+/// process-lifecycle lock remains held while the caller waits.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"

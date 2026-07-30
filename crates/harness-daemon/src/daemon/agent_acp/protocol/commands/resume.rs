@@ -44,7 +44,14 @@ pub(super) async fn resume_protocol_session(
     .await
     .map_err(|error| error.to_string())?;
     let protocol_session_id = SessionId::new(resume_session_id.to_string());
-    session_guard.start_session(&protocol_session_id, RouteTarget { acp_id, session_id });
+    session_guard.start_session(
+        &protocol_session_id,
+        RouteTarget {
+            acp_id,
+            session_id,
+            report_only_review: session_config.report_only_review(),
+        },
+    );
     if let Err(error) = apply_requested_session_configuration(
         supervisor,
         connection,

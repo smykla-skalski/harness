@@ -56,6 +56,38 @@ fn session_route_guard_accepts_expected_session_id() {
 }
 
 #[test]
+fn session_route_guard_tracks_report_only_sessions() {
+    let guard = SessionRouteGuard::default();
+    let session = SessionId::new("acp-session-report-only");
+    let mut target = route_target("report-only-agent");
+    target.report_only_review = true;
+    guard.start_session(&session, target);
+    assert!(guard.is_report_only(&session).expect("known session"));
+    guard.stop_session(&session);
+    assert!(guard.is_report_only(&session).is_err());
+}
+
+#[test]
+fn session_route_guard_reuse_replaces_the_capability_atomically() {
+    let guard = SessionRouteGuard::default();
+    let session = SessionId::new("acp-session-reused");
+    guard.start_session(&session, route_target("standard-agent"));
+    assert!(!guard.is_report_only(&session).expect("standard session"));
+
+    let mut report_only = route_target("report-only-agent");
+    report_only.report_only_review = true;
+    guard.start_session(&session, report_only);
+    assert!(guard.is_report_only(&session).expect("report-only session"));
+
+    guard.start_session(&session, route_target("next-standard-agent"));
+    assert!(
+        !guard
+            .is_report_only(&session)
+            .expect("restored standard session")
+    );
+}
+
+#[test]
 fn session_route_guard_rejects_after_session_end() {
     let guard = SessionRouteGuard::default();
     let session_id = SessionId::new("acp-session-1");
@@ -460,5 +492,6 @@ fn route_target(session_id: &str) -> RouteTarget {
     RouteTarget {
         acp_id: format!("agent-{session_id}"),
         session_id: session_id.to_string(),
+        report_only_review: false,
     }
 }

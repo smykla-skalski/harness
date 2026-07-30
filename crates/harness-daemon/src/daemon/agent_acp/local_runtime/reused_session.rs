@@ -19,7 +19,9 @@ impl AcpAgentManagerHandle {
         let Some(existing) = self.reusable_session_for_process_key(input.process_key)? else {
             return Ok(None);
         };
-        let runtime_session_id = Self::attach_reused_protocol_session(&existing, input)?;
+        let session_config = AcpSessionRequestConfig::from_request(input.request, input.descriptor);
+        let runtime_session_id =
+            Self::attach_reused_protocol_session(&existing, input, session_config.clone())?;
         let display_name = input
             .request
             .name
@@ -52,7 +54,7 @@ impl AcpAgentManagerHandle {
                 self.sender(),
             ),
             existing.process(),
-            AcpSessionRequestConfig::from_request(input.request, input.descriptor),
+            session_config,
         ));
         if let Err(error) = self
             .sessions_guard()
@@ -75,20 +77,23 @@ impl AcpAgentManagerHandle {
     fn attach_reused_protocol_session(
         existing: &Arc<ActiveAcpSession>,
         input: DescriptorStartInput<'_>,
+        session_config: AcpSessionRequestConfig,
     ) -> Result<String, CliError> {
         (if let Some(prompt) = prompt_text(input.request.prompt.as_deref()) {
-            existing.prompt_protocol_session(
+            existing.prompt_protocol_session_with_config(
                 input.acp_id,
                 input.session_id,
                 input.project_dir.to_path_buf(),
+                session_config,
                 input.request.resume_session_id.clone(),
                 prompt,
             )
         } else {
-            existing.attach_protocol_session(
+            existing.attach_protocol_session_with_config(
                 input.acp_id,
                 input.session_id,
                 input.project_dir.to_path_buf(),
+                session_config,
                 input.request.resume_session_id.clone(),
             )
         })

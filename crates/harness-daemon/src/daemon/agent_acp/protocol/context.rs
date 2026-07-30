@@ -33,12 +33,28 @@ impl ProtocolContext {
         }
     }
 
+    fn ensure_tool_access(
+        &self,
+        session_id: &agent_client_protocol::schema::v1::SessionId,
+        operation: &str,
+    ) -> ClientResult<()> {
+        if self.session_guard.is_report_only(session_id)? {
+            return Err(ClientError::new(
+                -32603,
+                format!(
+                    "report_only_review: '{operation}' is unavailable for immutable review input"
+                ),
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) async fn read_text_file(
         self,
         request: ReadTextFileRequest,
     ) -> ClientResult<<ReadTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "read_text_file")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,
@@ -55,7 +71,7 @@ impl ProtocolContext {
         cancel: ClientCallCancel,
     ) -> ClientResult<<WriteTextFileRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "write_text_file")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,
@@ -72,7 +88,7 @@ impl ProtocolContext {
         cancel: ClientCallCancel,
     ) -> ClientResult<<CreateTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "create_terminal")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,
@@ -88,7 +104,7 @@ impl ProtocolContext {
         request: &TerminalOutputRequest,
     ) -> ClientResult<<TerminalOutputRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "terminal_output")?;
         with_client_call(&self.supervisor, "client/terminal_output", || {
             self.client.handle_terminal_output(request)
         })
@@ -99,7 +115,7 @@ impl ProtocolContext {
         request: ReleaseTerminalRequest,
     ) -> ClientResult<<ReleaseTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "release_terminal")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,
@@ -116,7 +132,7 @@ impl ProtocolContext {
         cancel: ClientCallCancel,
     ) -> ClientResult<<WaitForTerminalExitRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "wait_for_terminal_exit")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,
@@ -132,7 +148,7 @@ impl ProtocolContext {
         request: KillTerminalRequest,
     ) -> ClientResult<<KillTerminalRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "kill_terminal")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,
@@ -149,7 +165,7 @@ impl ProtocolContext {
         cancel: ClientCallCancel,
     ) -> ClientResult<<RequestPermissionRequest as agent_client_protocol::JsonRpcRequest>::Response>
     {
-        let _target = self.session_guard.ensure_known(&request.session_id)?;
+        self.ensure_tool_access(&request.session_id, "request_permission")?;
         spawn_blocking_client_call(
             self.supervisor,
             self.client,

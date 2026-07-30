@@ -25,8 +25,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use agent_client_protocol::schema::v1::{
-    ContentBlock, ContentChunk, SessionId, SessionNotification, SessionUpdate, StopReason,
-    TextContent,
+    ConfigOptionUpdate, ContentBlock, ContentChunk, SessionConfigOption, SessionConfigSelectOption,
+    SessionId, SessionNotification, SessionUpdate, StopReason, TextContent,
 };
 use agent_client_protocol::{Client, ConnectionTo};
 use futures_util::StreamExt;
@@ -84,7 +84,36 @@ pub async fn drive_turn(
             Err(TurnFailure::Provider(error)) => {
                 return error_outcome(connection, session_id, &error);
             }
+            Err(TurnFailure::InvalidResponse(detail)) => {
+                return Err(agent_client_protocol::Error::new(
+                    OPENROUTER_TURN_FAILED,
+                    detail,
+                ));
+            }
         };
+        if let Some(effective_model) = turn.effective_model.as_deref() {
+            send_effective_model_update(connection, session_id, effective_model);
+        }
+        if snapshot.report_only_review
+            && turn.effective_model.as_deref() != Some(snapshot.model.as_str())
+        {
+            return Err(agent_client_protocol::Error::new(
+                OPENROUTER_TURN_FAILED,
+                format!(
+                    "report-only review requested model '{}' but provider reported '{}'",
+                    snapshot.model,
+                    turn.effective_model.as_deref().unwrap_or("<missing>")
+                ),
+            ));
+        }
+        if snapshot.report_only_review
+            && (turn.finished_with_tool_calls || !turn.tool_calls.is_empty())
+        {
+            return Err(agent_client_protocol::Error::new(
+                OPENROUTER_TURN_FAILED,
+                "report-only review refused a provider tool call",
+            ));
+        }
         if !turn.finished_with_tool_calls || turn.tool_calls.is_empty() {
             store
                 .extend_history(session_id, vec![assistant_text_message(&turn.text)])
@@ -112,12 +141,14 @@ struct TurnResult {
     text: String,
     tool_calls: Vec<AssistantToolCall>,
     finished_with_tool_calls: bool,
+    effective_model: Option<String>,
 }
 
 #[derive(Debug)]
 enum TurnFailure {
     Cancelled,
     Provider(OpenRouterError),
+    InvalidResponse(String),
 }
 
 async fn drain_stream(
@@ -134,6 +165,7 @@ async fn drain_stream(
     let mut text = String::new();
     let mut accumulator: BTreeMap<u32, PartialToolCall> = BTreeMap::new();
     let mut finished_with_tool_calls = false;
+    let mut effective_model = None;
     while let Some(chunk_result) = stream.next().await {
         if cancel_flag.load(Ordering::SeqCst) {
             return Err(TurnFailure::Cancelled);
@@ -142,6 +174,18 @@ async fn drain_stream(
             Ok(chunk) => chunk,
             Err(error) => return Err(TurnFailure::Provider(error)),
         };
+        let chunk_model = chunk.model.trim();
+        if !chunk_model.is_empty() {
+            if effective_model
+                .as_deref()
+                .is_some_and(|model| model != chunk_model)
+            {
+                return Err(TurnFailure::InvalidResponse(
+                    "provider changed models within one streamed response".into(),
+                ));
+            }
+            effective_model = Some(chunk_model.to_string());
+        }
         for choice in chunk.choices {
             absorb_choice_delta(
                 connection,
@@ -159,7 +203,30 @@ async fn drain_stream(
         text,
         tool_calls: finalize_tool_calls(accumulator),
         finished_with_tool_calls,
+        effective_model,
     })
+}
+
+fn send_effective_model_update(
+    connection: &ConnectionTo<Client>,
+    session_id: &SessionId,
+    effective_model: &str,
+) {
+    let option = SessionConfigOption::select(
+        "harness_provider_effective_model",
+        "Provider effective model",
+        effective_model.to_string(),
+        vec![SessionConfigSelectOption::new(
+            effective_model.to_string(),
+            effective_model.to_string(),
+        )],
+    );
+    if let Err(error) = connection.send_notification(SessionNotification::new(
+        session_id.clone(),
+        SessionUpdate::ConfigOptionUpdate(ConfigOptionUpdate::new(vec![option])),
+    )) {
+        tracing::warn!(%error, "failed to report provider effective model");
+    }
 }
 
 fn absorb_choice_delta(
@@ -292,12 +359,17 @@ fn content_block_text(block: &ContentBlock) -> String {
 }
 
 fn build_request(snapshot: &SessionSnapshot) -> ChatRequest {
+    let (tools, tool_choice) = if snapshot.report_only_review {
+        (Vec::new(), None)
+    } else {
+        (tool_catalog(), Some(ToolChoice::Mode(ToolChoiceMode::Auto)))
+    };
     ChatRequest {
         model: snapshot.model.clone(),
         messages: snapshot.history.clone(),
         stream: true,
-        tools: tool_catalog(),
-        tool_choice: Some(ToolChoice::Mode(ToolChoiceMode::Auto)),
+        tools,
+        tool_choice,
         parallel_tool_calls: None,
         reasoning: snapshot
             .reasoning_effort
@@ -376,6 +448,7 @@ mod tests {
             project_dir: std::path::PathBuf::from("/tmp"),
             model: "anthropic/claude-haiku-4-5".to_owned(),
             reasoning_effort: Some("high".to_owned()),
+            report_only_review: false,
             history: vec![ChatMessage {
                 role: ChatRole::User,
                 content: Some("hello".to_owned()),
@@ -396,6 +469,21 @@ mod tests {
                 ..
             }) if effort == "high"
         ));
+    }
+
+    #[test]
+    fn report_only_request_exposes_no_tools() {
+        let snapshot = SessionSnapshot {
+            project_dir: std::path::PathBuf::from("/tmp"),
+            model: "deepseek/deepseek-v4-flash".to_owned(),
+            reasoning_effort: None,
+            report_only_review: true,
+            history: Vec::new(),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+        };
+        let request = build_request(&snapshot);
+        assert!(request.tools.is_empty());
+        assert!(request.tool_choice.is_none());
     }
 
     #[test]
