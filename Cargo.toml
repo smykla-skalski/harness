@@ -42,6 +42,7 @@ members = [
   "crates/harness-task-board-codex-requests",
   "crates/harness-task-board-git-runtime",
   "crates/harness-task-board-provider-sync",
+  "crates/harness-task-board-workflow-execution",
   "crates/harness-task-board-remote-viewer",
   "crates/harness-telemetry",
   "crates/harness-timeline",

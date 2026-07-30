@@ -235,6 +235,7 @@ pub(crate) mod task_board_remote_controller;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
+#[path = "task_board_workflow_execution_adapter.rs"]
 pub(crate) mod task_board_workflow_execution;
 #[cfg(test)]
 mod task_board_workflow_execution_tests;

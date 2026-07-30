@@ -3757,6 +3757,7 @@ dependencies = [
  "harness-task-board-git-runtime",
  "harness-task-board-provider-sync",
  "harness-task-board-remote-viewer",
+ "harness-task-board-workflow-execution",
  "harness-telemetry",
  "harness-testkit",
  "harness-timeline",
@@ -4509,6 +4510,15 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "harness-task-board-workflow-execution"
+version = "55.0.0"
+dependencies = [
+ "chrono",
+ "harness-kernel",
+ "harness-task-board",
 ]
 
 [[package]]
