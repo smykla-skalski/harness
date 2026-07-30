@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 
 use async_trait::async_trait;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -39,6 +40,8 @@ pub struct TaskBoardDependencyFixRequest {
     pub workflow_execution_id: String,
     #[serde(default = "default_dependency_fix_attempt")]
     pub attempt: u32,
+    #[serde(default)]
+    pub attempt_policy: super::TaskBoardDependencyFixAttemptPolicy,
     pub repository: String,
     pub pull_request_number: u64,
     pub exact_head_revision: String,
@@ -46,6 +49,8 @@ pub struct TaskBoardDependencyFixRequest {
     pub triage_result: TaskBoardDependencyTriageResult,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_evidence: Option<TaskBoardDependencyFixRetryEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit: Option<super::TaskBoardDependencyFixAuditTrail>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +60,7 @@ pub struct TaskBoardDependencyFixRun {
     pub requested_model: String,
     pub requested_effort: String,
     pub attempt: u32,
+    pub started_at: String,
     pub failure_evidence_id: Option<String>,
 }
 
@@ -170,12 +176,14 @@ pub fn task_board_dependency_fix_request(
         board_item_id: binding.board_item_id.clone(),
         workflow_execution_id: binding.workflow_execution_id.clone(),
         attempt: 1,
+        attempt_policy: super::TaskBoardDependencyFixAttemptPolicy::default(),
         repository: route.repository.clone(),
         pull_request_number: route.pull_request_number,
         exact_head_revision: route.exact_head_revision.clone(),
         requested_repair: route.reason.clone(),
         triage_result: route.source_result.clone(),
         retry_evidence: None,
+        audit: None,
     })
 }
 
@@ -315,7 +323,7 @@ pub fn render_task_board_dependency_fix_prompt(
             "dependency fixer result template could not be encoded: {error}"
         ))
     })?;
-    let retry = render_retry_evidence(request)?;
+    let retry = render_retry_context(request)?;
     let triage_label = if request.triage_result.exact_head_revision == request.exact_head_revision {
         "Triage report for current repair head".into()
     } else {
@@ -340,18 +348,28 @@ pub fn render_task_board_dependency_fix_prompt(
     ))
 }
 
-fn render_retry_evidence(request: &TaskBoardDependencyFixRequest) -> Result<String, CliError> {
-    let Some(evidence) = &request.retry_evidence else {
-        return Ok(String::new());
-    };
-    let evidence = serde_json::to_string_pretty(evidence).map_err(|error| {
-        CliErrorKind::workflow_parse(format!(
-            "dependency fixer retry evidence could not be encoded: {error}"
-        ))
-    })?;
-    Ok(format!(
-        "\nRetry failure evidence received by this run:\n{evidence}\n"
-    ))
+fn render_retry_context(request: &TaskBoardDependencyFixRequest) -> Result<String, CliError> {
+    let mut rendered = String::new();
+    if let Some(evidence) = &request.retry_evidence {
+        let evidence = serde_json::to_string_pretty(evidence).map_err(|error| {
+            CliErrorKind::workflow_parse(format!(
+                "dependency fixer retry evidence could not be encoded: {error}"
+            ))
+        })?;
+        let _ = writeln!(
+            rendered,
+            "\nRetry failure evidence received by this run:\n{evidence}"
+        );
+    }
+    if let Some(audit) = &request.audit {
+        let audit = serde_json::to_string_pretty(audit).map_err(|error| {
+            CliErrorKind::workflow_parse(format!(
+                "dependency fixer audit trail could not be encoded: {error}"
+            ))
+        })?;
+        let _ = writeln!(rendered, "\nDependency fix audit trail:\n{audit}");
+    }
+    Ok(rendered)
 }
 
 /// Decode and validate the result produced by one exact-head fixer run.
@@ -418,7 +436,7 @@ fn validate_unique_text(values: &[String], label: &str) -> Result<(), CliError> 
     Ok(())
 }
 
-fn validate_prior_run(
+pub(super) fn validate_prior_run(
     request: &TaskBoardDependencyFixRequest,
     run: &TaskBoardDependencyFixRun,
 ) -> Result<(), CliError> {

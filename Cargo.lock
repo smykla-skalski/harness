@@ -3874,19 +3874,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "harness-daemon-provider-credentials"
-version = "55.0.0"
-dependencies = [
- "harness-daemon-state",
- "harness-task-board",
- "hex",
- "security-framework",
- "serde_json",
- "sha1 0.11.0",
- "tracing",
-]
-
-[[package]]
 name = "harness-daemon-discovery"
 version = "55.0.0"
 dependencies = [
@@ -3911,6 +3898,19 @@ dependencies = [
  "tracing",
  "utoipa",
  "uzers",
+]
+
+[[package]]
+name = "harness-daemon-provider-credentials"
+version = "55.0.0"
+dependencies = [
+ "harness-daemon-state",
+ "harness-task-board",
+ "hex",
+ "security-framework",
+ "serde_json",
+ "sha1 0.11.0",
+ "tracing",
 ]
 
 [[package]]
