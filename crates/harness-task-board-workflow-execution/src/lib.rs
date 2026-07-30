@@ -390,6 +390,7 @@ fn require_human_for_unknown_outcome(
     });
 }
 
+/// Moves an execution into the human-required state for the given reason.
 pub fn require_human(
     record: &mut TaskBoardWorkflowExecutionRecord,
     reason: &str,
