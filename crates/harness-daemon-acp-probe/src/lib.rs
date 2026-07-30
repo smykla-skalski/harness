@@ -10,6 +10,8 @@
 //! `install_bridge_probe_refresh` lets the daemon plug that one call in
 //! instead, keeping this crate agnostic of how the bridge works.
 
+#![deny(unsafe_code)]
+
 use std::sync::OnceLock;
 
 use harness_agents::acp::probe::{
