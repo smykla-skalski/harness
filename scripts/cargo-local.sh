@@ -197,11 +197,50 @@ configure_sccache_socket() {
 
   # Every server enforces its own size limit over the same on-disk cache, so
   # keying the socket per checkout put several of them in an eviction fight.
-  # One server per repository keeps a single owner of that cache.
-  socket_id="$(short_hash "$COMMON_REPO_ROOT")"
+  # The repository, compiler-cache version, and basedir inventory give every
+  # current worktree one server while letting an old configuration drain after
+  # the binary version or registered worktrees change.
+  socket_id="$(short_hash "$COMMON_REPO_ROOT:${SCCACHE_VERSION:-}:${SCCACHE_BASEDIRS:-}")"
   export SCCACHE_SERVER_UDS="$socket_root/$socket_id.sock"
   export SCCACHE_IDLE_TIMEOUT="${SCCACHE_IDLE_TIMEOUT:-1800}"
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
+}
+
+default_sccache_basedirs() {
+  local checkout inventory segment worktrees
+
+  worktrees="$(
+    git -C "$ROOT" worktree list --porcelain 2>/dev/null \
+      | awk '/^worktree / { sub(/^worktree /, ""); print }' \
+      || true
+  )"
+  if [[ -z "$worktrees" ]]; then
+    printf '%s' "$ROOT"
+    if (( target_dir_is_default )); then
+      printf ':%s' "$target_dir"
+    fi
+    printf '\n'
+    return 0
+  fi
+
+  inventory="$(
+    while IFS= read -r checkout; do
+      [[ -n "$checkout" ]] || continue
+      printf '%s\n' "$checkout"
+      if [[ "$checkout" == "$COMMON_REPO_ROOT" ]]; then
+        segment="$(cargo_lane_main_segment)"
+      else
+        segment="$(cargo_lane_segment_for_path "$checkout")"
+      fi
+      printf '%s/target/dev/%s\n' "$COMMON_REPO_ROOT" "$segment"
+    done <<<"$worktrees" \
+      | awk 'substr($0, 1, 1) == "/"' \
+      | LC_ALL=C sort -u
+  )"
+  {
+    awk -v root="$COMMON_REPO_ROOT" '$0 == root { print; exit }' <<<"$inventory"
+    awk -v root="$COMMON_REPO_ROOT" '$0 != root' <<<"$inventory"
+  } | paste -sd: -
 }
 
 # An unknown - a timeout under load, a permission error - reads as reachable on
@@ -759,11 +798,10 @@ configure_tmpdir
 
 resolve_sccache_bin || true
 if [[ -n "${SCCACHE_BIN:-}" ]]; then
-  # sccache reads this only in the process that starts the server. Keep the
-  # setting repo-wide for compiler families that honour it, but do not mistake
-  # it for a Rust cross-worktree cache: sccache's Rust key still hashes rustc's
-  # checkout-specific working directory and source arguments.
-  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$COMMON_REPO_ROOT}"
+  # The server fixes this list at startup. Include every registered checkout
+  # and its isolated target lane so identical source, --out-dir, and --extern
+  # paths normalize to the same cache key across worktrees.
+  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$(default_sccache_basedirs)}"
   # Swallowing a socket failure would leave sccache enabled on whatever default
   # endpoint it picks, which can be a localhost TCP port any local user can
   # reach. Losing the cache is the safer trade.

@@ -1358,7 +1358,7 @@ scenario_supported_sccache_is_resolved_once() {
   output="$(print_cargo_env "$fake_bin" "$fake_bin/sccache" "$tmpdir")"
   if assert_line "SCCACHE_BIN=$fake_bin/sccache" "$output" \
     && assert_line "SCCACHE_VERSION=0.16.0" "$output" \
-    && assert_line "SCCACHE_BASEDIRS=$COMMON_REPO_ROOT" "$output" \
+    && assert_contains "SCCACHE_BASEDIRS=$COMMON_REPO_ROOT:" "$output" \
     && assert_contains "SCCACHE_SERVER_UDS=$tmpdir/harness-sccache/" "$output" \
     && assert_line "CACHE_MODE=sccache" "$output"; then
     pass "supported sccache is resolved once"
@@ -1497,12 +1497,38 @@ scenario_young_socket_survives_the_sweep() {
 scenario_sccache_socket_is_shared_across_checkouts() {
   local base="$ROOT/tmp/cargo-local-checkouts-$$"
   local fake_bin="$SANDBOX/checkout-bin"
+  local common_root="$base/main"
+  local explicit_target="$base/explicit-target"
+  local socket_tmpdir="$SOCKET_TMPDIR/checkouts"
   local co out a_sock="" b_sock="" a_target="" b_target=""
-  mkdir -p "$fake_bin"
+  local a_bases="" b_bases="" explicit_bases="" expected_bases="" failure_bases=""
+  local version_socket=""
+  mkdir -p "$fake_bin" "$common_root/.git" "$socket_tmpdir"
   write_fake_sccache "$fake_bin/sccache" "0.16.0"
+  cat >"$fake_bin/git" <<EOF
+#!/usr/bin/env bash
+if [[ "\$*" == *"--git-common-dir"* ]]; then
+  printf '%s\n' "$common_root/.git"
+elif [[ "\$*" == *"worktree list --porcelain"* ]]; then
+  if [[ "\${HARNESS_TEST_WORKTREE_FAILURE:-}" == "1" ]]; then
+    exit 92
+  elif [[ "\${HARNESS_TEST_EMPTY_WORKTREES:-}" == "1" ]]; then
+    exit 0
+  elif [[ "\$*" == *"$base/alpha"* ]]; then
+    printf 'worktree %s\n\nworktree %s\n\nworktree %s\n\n' "$base/beta" "$common_root" "$base/alpha"
+  else
+    printf 'worktree %s\n\nworktree %s\n\nworktree %s\n\n' "$common_root" "$base/alpha" "$base/beta"
+  fi
+else
+  exit 91
+fi
+EOF
+  chmod +x "$fake_bin/git"
 
   # Two checkout roots under one git common root. The socket follows the
-  # repository, so it must match while the build caches stay distinct.
+  # repository, so it must match while the build caches stay distinct. The
+  # server also needs every source and target root up front: it reads basedirs
+  # only when starting, and either checkout may be the one that starts it.
   for co in alpha beta; do
     mkdir -p "$base/$co/scripts/lib"
     cp "$ROOT/scripts/cargo-local.sh" "$base/$co/scripts/cargo-local.sh"
@@ -1516,8 +1542,11 @@ scenario_sccache_socket_is_shared_across_checkouts() {
       unset CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
       unset CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
       unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
-      SCCACHE_BIN="$fake_bin/sccache" \
+      PATH="$fake_bin:$PATH" \
+        SCCACHE_BIN="$fake_bin/sccache" \
         RUSTC_WRAPPER='' \
+        TMPDIR="$socket_tmpdir/" \
+        USER="$TEST_USER" \
         CODEX_SESSION_ID="cargo-local-checkout-$$" \
         HARNESS_CARGO_SKIP_LEASE=1 \
         HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
@@ -1526,18 +1555,87 @@ scenario_sccache_socket_is_shared_across_checkouts() {
     if [[ "$co" == alpha ]]; then
       a_sock="$(awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
       a_target="$(awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
+      a_bases="$(awk -F= '$1 == "SCCACHE_BASEDIRS" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
     else
       b_sock="$(awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
       b_target="$(awk -F= '$1 == "CARGO_TARGET_DIR" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
+      b_bases="$(awk -F= '$1 == "SCCACHE_BASEDIRS" { print substr($0, index($0, "=") + 1) }' <<<"$out")"
     fi
   done
 
+  expected_bases="$common_root:$base/alpha:$base/beta:$common_root/target/dev/$(cargo_lane_main_segment):$a_target:$b_target"
   if [[ -n "$a_sock" ]] \
     && [[ "$a_target" != "$b_target" ]] \
-    && [[ "$a_sock" == "$b_sock" ]]; then
-    pass "one sccache socket per repository across separate checkouts"
+    && [[ "$a_sock" == "$b_sock" ]] \
+    && [[ "$a_bases" == "$expected_bases" ]] \
+    && [[ "$b_bases" == "$expected_bases" ]]; then
+    pass "one sccache server normalizes every checkout and target lane"
   else
-    fail "socket did not follow the repository: a=$a_sock b=$b_sock targets=$a_target,$b_target"
+    fail "sccache sharing drifted: sockets=$a_sock,$b_sock targets=$a_target,$b_target basedirs=$a_bases,$b_bases"
+  fi
+
+  write_fake_sccache "$fake_bin/sccache" "0.17.0"
+  version_socket="$(
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      TMPDIR="$socket_tmpdir/" \
+      USER="$TEST_USER" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$base/alpha/scripts/cargo-local.sh" --print-env \
+      | awk -F= '$1 == "SCCACHE_SERVER_UDS" { print substr($0, index($0, "=") + 1) }'
+  )"
+  if [[ -n "$version_socket" ]] && [[ "$version_socket" != "$a_sock" ]]; then
+    pass "an sccache version change rotates the shared server socket"
+  else
+    fail "sccache version change kept the old server socket: $a_sock"
+  fi
+
+  failure_bases="$(
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR CARGO_TARGET_DIR HARNESS_CARGO_TARGET_DIR
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      TMPDIR="$socket_tmpdir/" \
+      USER="$TEST_USER" \
+      HARNESS_TEST_WORKTREE_FAILURE=1 \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$base/alpha/scripts/cargo-local.sh" --print-env \
+      | awk -F= '$1 == "SCCACHE_BASEDIRS" { print substr($0, index($0, "=") + 1) }'
+  )"
+  if [[ "$failure_bases" == "$base/alpha:$a_target" ]]; then
+    pass "a failed worktree query uses the single-checkout basedir fallback"
+  else
+    fail "failed worktree query did not use fallback basedirs: $failure_bases"
+  fi
+
+  explicit_bases="$(
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR HARNESS_CARGO_TARGET_DIR
+    PATH="$fake_bin:$PATH" \
+      SCCACHE_BIN="$fake_bin/sccache" \
+      RUSTC_WRAPPER='' \
+      TMPDIR="$socket_tmpdir/" \
+      USER="$TEST_USER" \
+      CARGO_TARGET_DIR="$explicit_target" \
+      HARNESS_TEST_EMPTY_WORKTREES=1 \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$base/alpha/scripts/cargo-local.sh" --print-env \
+      | awk -F= '$1 == "SCCACHE_BASEDIRS" { print substr($0, index($0, "=") + 1) }'
+  )"
+  if [[ "$explicit_bases" == "$base/alpha" ]]; then
+    pass "an explicit target stays out of the fallback sccache basedir inventory"
+  else
+    fail "explicit target leaked into fallback sccache basedirs: $explicit_bases"
   fi
 
   rm -rf "$base"
