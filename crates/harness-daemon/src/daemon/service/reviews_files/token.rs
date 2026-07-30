@@ -3,7 +3,7 @@
 use crate::task_board::ExternalProvider;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::task_board_runtime::external_sync_config_for_repository;
+use super::super::repository_sync_support::external_sync_config_for_repository;
 
 pub(super) fn github_token(repository: Option<&str>) -> Option<String> {
     external_sync_config_for_repository(repository, &[])

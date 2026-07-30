@@ -41,9 +41,9 @@ use super::protocol::{
 };
 // The session snapshot layer lives in its own crate now; see `daemon::db`'s
 // own `daemon_snapshot` alias for why.
-use harness_daemon_snapshot as snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
+use harness_daemon_snapshot as snapshot;
 use harness_protocol::daemon::DAEMON_WIRE_VERSION;
 use harness_protocol::daemon::summaries::{
     DaemonControlResponse, HealthResponse, LogLevelResponse, ReadyEventPayload, SetLogLevelRequest,
@@ -192,6 +192,7 @@ mod observe_stream;
 mod openrouter_models;
 mod openrouter_readiness;
 mod read_reconciliation;
+mod repository_sync_support;
 mod resolved_events;
 mod review_mutations;
 mod review_mutations_async;
@@ -199,6 +200,7 @@ mod review_submit_txn;
 pub(crate) mod reviews;
 mod reviews_files;
 mod reviews_github_policy;
+pub(crate) mod reviews_source_port;
 mod reviews_thread_resolve;
 mod reviews_timeline;
 mod session_setup;

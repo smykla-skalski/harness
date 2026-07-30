@@ -73,7 +73,7 @@ impl ExternalSyncClient for SharedReviewRequestClient {
             .as_ref()
             .expect("shared Reviews client has tasks or a query");
         let source =
-            super::super::reviews::query_reviews_repositories_source(&query.request).await?;
+            super::super::reviews_source_port::query_repository_reviews(&query.request).await?;
         self.hold_github_revision(source.github_data_revision)
             .await?;
         let tasks = review_external_tasks(

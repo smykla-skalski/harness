@@ -45,7 +45,7 @@ pub(crate) use self::sync::{
     log_sync_request, sync_options,
 };
 #[cfg(test)]
-use super::task_board_runtime::external_sync_config_for_repository;
+use super::repository_sync_support::external_sync_config_for_repository;
 
 mod dispatch;
 mod dispatch_preparation;

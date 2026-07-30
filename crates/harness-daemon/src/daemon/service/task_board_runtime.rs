@@ -10,12 +10,11 @@ use crate::daemon::protocol::{
 use crate::daemon::state;
 use crate::task_board::github::{SigningVerifyOutcome, verify_signing_for_profile};
 use crate::task_board::{
-    ExternalProvider, ExternalSyncConfig, TaskBoardGitHubRepositoryToken,
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
-    TaskBoardGitIdentityDefaults, TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeProfile, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOpenRouterTokenSyncResponse, discover_git_identity_defaults,
-    normalize_repository_slug,
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitIdentityDefaults,
+    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
+    discover_git_identity_defaults, normalize_repository_slug,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -235,32 +234,6 @@ pub fn sync_task_board_openrouter_token(
     request: &TaskBoardOpenRouterTokenSyncRequest,
 ) -> Result<TaskBoardOpenRouterTokenSyncResponse, CliError> {
     Ok(state::replace_task_board_openrouter_token(request))
-}
-
-pub(crate) fn external_sync_config_for_repository(
-    repository: Option<&str>,
-    inbox_repositories: &[String],
-) -> ExternalSyncConfig {
-    let repository = normalize_repository_slug(repository);
-    let mut config = ExternalSyncConfig::from_env();
-    if let Some(token) = repository
-        .as_deref()
-        .and_then(state::task_board_github_repository_token)
-        .or_else(|| {
-            config
-                .token_for(ExternalProvider::GitHub)
-                .is_none()
-                .then(|| state::task_board_github_token(None))
-                .flatten()
-        })
-    {
-        config = config.with_github_token_override(Some(token.as_str()));
-    }
-    if let Some(repository) = repository.as_deref() {
-        config = config.with_github_repository_override(Some(repository));
-    }
-    config = config.with_github_inbox_repositories_override(inbox_repositories);
-    config
 }
 
 #[cfg(test)]

@@ -70,7 +70,7 @@ pub use refresh::refresh_reviews;
 pub use resolve::resolve_review_pull_requests;
 use token::{github_token, missing_token_error, token_bound_requests};
 
-pub(crate) async fn resolve_exact_pull_request(
+pub(super) async fn resolve_exact_pull_request(
     repository: &str,
     number: u64,
 ) -> Result<ReviewItem, CliError> {
@@ -111,13 +111,13 @@ pub async fn query_reviews(
 }
 
 #[derive(Clone)]
-pub(crate) struct ReviewsQuerySource {
-    pub(crate) response: ReviewsQueryResponse,
-    pub(crate) github_data_revision: u64,
+struct ReviewsQuerySource {
+    response: ReviewsQueryResponse,
+    github_data_revision: u64,
     authoritative_viewer_keys: HashSet<String>,
 }
 
-pub(crate) async fn query_reviews_repositories_source(
+async fn query_reviews_repositories_source(
     request: &ReviewsQueryRequest,
 ) -> Result<ReviewsQuerySource, CliError> {
     request.validate()?;
@@ -153,6 +153,13 @@ pub(crate) async fn query_reviews_repositories_source(
     })
     .await
     .map(|(source, _)| source)
+}
+
+pub(super) async fn query_repository_reviews_snapshot_parts(
+    request: &ReviewsQueryRequest,
+) -> Result<(ReviewsQueryResponse, u64), CliError> {
+    let source = query_reviews_repositories_source(request).await?;
+    Ok((source.response, source.github_data_revision))
 }
 
 async fn query_reviews_with_database(
