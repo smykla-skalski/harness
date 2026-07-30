@@ -36,6 +36,7 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check --all-targets -p harness-session
 "$cargo_local" check --all-targets -p harness-systemd-protocol
 "$cargo_local" check --all-targets -p harness-task-board
+"$cargo_local" check --all-targets -p harness-task-board-git-runtime
 "$cargo_local" check --all-targets -p harness-telemetry
 "$cargo_local" check --all-targets -p harness-workspace
 "$cargo_local" check -p harness --bin harness

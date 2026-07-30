@@ -51,6 +51,7 @@ harness-session = { path = "../harness-session", version = "55.0.0" }
 harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "55.0.0", optional = true }
 harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
 harness-task-board-codex-requests = { path = "../harness-task-board-codex-requests", version = "55.0.0" }
+harness-task-board-git-runtime = { path = "../harness-task-board-git-runtime", version = "55.0.0" }
 harness-task-board-provider-sync = { path = "../harness-task-board-provider-sync", version = "55.0.0" }
 harness-task-board-remote-viewer = { path = "../harness-task-board-remote-viewer", version = "55.0.0" }
 harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
@@ -123,6 +124,7 @@ harness-policy-graph-store = { path = "../harness-policy-graph-store", version =
 harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.0", features = ["test-support"] }
 harness-reviews = { path = "../harness-reviews", version = "55.0.0", features = ["test-support"] }
 harness-task-board = { path = "../harness-task-board", version = "55.0.0", features = ["test-support"] }
+harness-task-board-git-runtime = { path = "../harness-task-board-git-runtime", version = "55.0.0", features = ["test-support"] }
 harness-testkit = { path = "../../testkit" }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
 opentelemetry_sdk = { version = "=0.32.1", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }
@@ -133,7 +135,7 @@ tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 [features]
 default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]
 bridge-runtime = []
-daemon-runtime = ["bridge-runtime", "dep:harness-acme-dns", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http", "dep:harness-timeline", "dep:harness-voice", "harness-daemon-state/daemon-runtime", "harness-reviews/daemon-runtime", "harness-session/daemon-runtime", "harness-task-board/daemon-runtime", "harness-task-board-provider-sync/daemon-runtime"]
+daemon-runtime = ["bridge-runtime", "dep:harness-acme-dns", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http", "dep:harness-timeline", "dep:harness-voice", "harness-daemon-state/daemon-runtime", "harness-reviews/daemon-runtime", "harness-session/daemon-runtime", "harness-task-board/daemon-runtime", "harness-task-board-git-runtime/daemon-runtime", "harness-task-board-provider-sync/daemon-runtime"]
 standalone-daemon = ["harness-observe/standalone-daemon"]
 standalone-worker = []
 # Exposes items normally `cfg(test)`-only (`DaemonDb::open_in_memory`, the
