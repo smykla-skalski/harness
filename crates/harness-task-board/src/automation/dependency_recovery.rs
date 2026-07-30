@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardDependencyCheckResumeRecord,
     TaskBoardDependencyCheckWait, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionRecord,
-    valid_head_revision,
+    TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord, valid_head_revision,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -167,17 +166,6 @@ fn classify_attempt(
             head,
             "the interrupted step outcome must be reconciled before retrying",
         ),
-        TaskBoardAttemptState::Failed
-            if attempt.failure_class == Some(TaskBoardFailureClass::Transient) =>
-        {
-            decision(
-                TaskBoardDependencyRecoveryClass::Resumable,
-                step_for(execution),
-                key,
-                head,
-                "resume the transient failure through its bounded retry policy",
-            )
-        }
         TaskBoardAttemptState::Failed | TaskBoardAttemptState::Cancelled => decision(
             TaskBoardDependencyRecoveryClass::Failed,
             TaskBoardDependencyRecoveryStep::Stop,

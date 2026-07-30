@@ -1,10 +1,10 @@
 use super::*;
 use crate::github::PullRequestIdentity;
 use crate::{
-    TaskBoardEvaluationResult, TaskBoardExecutionOwnership, TaskBoardLifecycleOutcome,
-    TaskBoardPhaseVerdict, TaskBoardResolvedReviewer, TaskBoardReviewResult,
-    TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowKind,
-    TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
+    TaskBoardEvaluationResult, TaskBoardExecutionOwnership, TaskBoardFailureClass,
+    TaskBoardLifecycleOutcome, TaskBoardPhaseVerdict, TaskBoardResolvedReviewer,
+    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionArtifacts,
+    TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
 };
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -45,7 +45,7 @@ fn agent_publish_and_terminal_attempts_have_distinct_recovery_classes() {
 }
 
 #[test]
-fn retry_wait_and_transient_failure_resume_the_same_agent_step() {
+fn retry_wait_resumes_but_failed_attempt_stops() {
     let mut execution = execution(TaskBoardExecutionPhase::Evaluate);
     execution
         .attempts
@@ -60,10 +60,10 @@ fn retry_wait_and_transient_failure_resume_the_same_agent_step() {
 
     execution.attempts[0].state = TaskBoardAttemptState::Failed;
     execution.attempts[0].failure_class = Some(TaskBoardFailureClass::Transient);
-    let transient =
-        classify_task_board_dependency_workflow_recovery(&execution).expect("transient failure");
-    assert_eq!(transient.class, TaskBoardDependencyRecoveryClass::Resumable);
-    assert_eq!(transient.step, TaskBoardDependencyRecoveryStep::AgentRun);
+    let failed =
+        classify_task_board_dependency_workflow_recovery(&execution).expect("failed attempt");
+    assert_eq!(failed.class, TaskBoardDependencyRecoveryClass::Failed);
+    assert_eq!(failed.step, TaskBoardDependencyRecoveryStep::Stop);
 }
 
 #[test]
