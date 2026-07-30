@@ -27,7 +27,7 @@ struct ParsedDaemonCommands {
 }
 
 #[test]
-fn daemon_transport_round_trip_smoke_covers_public_surface() {
+fn daemon_cli_round_trip_smoke_covers_public_surface() {
     let parsed = parse_daemon_test_commands();
     assert_serve_and_dev_commands(parsed.serve, parsed.dev);
     assert_remaining_commands(
