@@ -1,11 +1,7 @@
 use sqlx::query_as;
 
+use super::change_tracking::LOAD_CHANGE_TRACKING_SQL;
 use super::{AsyncDaemonDb, CliError, db_error};
-
-const LOAD_CHANGE_TRACKING_SQL: &str = "SELECT scope, change_seq
-     FROM change_tracking
-     WHERE change_seq > ?1
-     ORDER BY change_seq";
 
 const CURRENT_CHANGE_SEQ_SQL: &str =
     "SELECT last_seq FROM change_tracking_state WHERE singleton = 1";

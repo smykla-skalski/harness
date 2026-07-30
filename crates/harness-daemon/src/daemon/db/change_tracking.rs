@@ -3,6 +3,10 @@
 //! `DaemonDb::connection()` instead of through a named method; giving it one
 //! here is what lets `watch::storage::ChangeTrackingSyncQueries` reach it
 //! through a trait instead of raw SQL in the caller.
+//!
+//! `LOAD_CHANGE_TRACKING_SQL` lives here rather than duplicated in both
+//! modules; `async_change_tracking.rs` imports it so the sync and async
+//! backends can never drift onto two different query texts.
 
 use super::{CliError, DaemonDb, db_error};
 
