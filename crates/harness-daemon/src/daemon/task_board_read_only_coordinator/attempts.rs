@@ -4,14 +4,13 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard,
-    classify_task_board_dependency_workflow_recovery,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use sha2::{Digest, Sha256};
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::{
-    attempt_recovery, in_progress, ingestion, lifecycle, reports, requests, revision_validation,
+    attempt_recovery, in_progress, ingestion, lifecycle, refusal, reports, revision_validation,
 };
 
 #[expect(
@@ -30,10 +29,12 @@ where
     if is_stopped(&execution) {
         return Ok(());
     }
-    if refuse_unusable_execution(db, &execution, now).await? {
+    if refusal::refuse_unusable_execution(db, &execution, now).await? {
         return Ok(());
     }
-    classify_task_board_dependency_workflow_recovery(&execution)?;
+    if refusal::refuse_invalid_recovery(db, &execution, now).await? {
+        return Ok(());
+    }
     if execution.transition.execution_state == TaskBoardExecutionState::RetryWait {
         crate::daemon::service::task_board_workflow_execution::resume_workflow_retry(
             db,
@@ -79,44 +80,6 @@ where
         return Ok(());
     }
     schedule_next_attempt(db, &execution, now).await
-}
-
-/// Refuses an execution whose immutable inputs cannot be used at all. These are
-/// configuration mistakes rather than transient faults, so each one ends the
-/// execution with a human-required outcome instead of being retried.
-/// `Ok(true)` means the execution was refused and needs no further reconciling.
-async fn refuse_unusable_execution(
-    db: &AsyncDaemonDb,
-    execution: &TaskBoardWorkflowExecutionRecord,
-    now: &str,
-) -> Result<bool, CliError> {
-    if let Err(error) = requests::run_context(execution) {
-        require_human(
-            db,
-            &execution.execution_id,
-            "read_only_run_context_missing",
-            &error.to_string(),
-            TaskBoardTerminalOutcomeKind::HumanRequired,
-            now,
-        )
-        .await?;
-        return Ok(true);
-    }
-    if execution.snapshot.workflow_kind.is_write()
-        && let Err(error) = requests::write_task_id(execution)
-    {
-        require_human(
-            db,
-            &execution.execution_id,
-            "write_task_id_missing",
-            &error.to_string(),
-            TaskBoardTerminalOutcomeKind::HumanRequired,
-            now,
-        )
-        .await?;
-        return Ok(true);
-    }
-    Ok(false)
 }
 
 async fn current_revisions_or_invalidate(

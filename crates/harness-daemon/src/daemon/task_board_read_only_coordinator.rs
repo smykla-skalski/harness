@@ -18,12 +18,16 @@ mod in_progress;
 mod ingestion;
 mod lifecycle;
 mod non_codex_reports;
+mod refusal;
 mod report_evidence;
 mod report_starts;
 mod reports;
 pub(crate) mod requests;
 mod review_report_retention;
 mod revision_validation;
+
+#[cfg(test)]
+pub(crate) use refusal::refuse_invalid_recovery;
 
 const MAX_RECONCILIATIONS_PER_CLASS_PER_TICK: usize = 16;
 

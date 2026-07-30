@@ -1,7 +1,8 @@
 use crate::task_board::{
-    TaskBoardAttemptResultArtifact, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardPhaseVerdict, TaskBoardPlanApprovalInvalidation, TaskBoardStatus,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardPhaseVerdict,
+    TaskBoardPlanApprovalInvalidation, TaskBoardStatus, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind, TaskBoardWorkflowStatus,
 };
 
 use self::fixture as write_fixture;
@@ -351,6 +352,60 @@ async fn legacy_write_execution_without_task_identity_fails_closed() {
         Some("write_task_id_missing")
     );
     assert_eq!(runtime.start_count(), 0);
+}
+
+#[tokio::test]
+async fn invalid_recovery_state_requires_human_instead_of_retrying_forever() {
+    let fixture = Box::pin(write_fixture::seed_write_execution(
+        "write-invalid-recovery",
+    ))
+    .await;
+    let mut corrupted = load_execution(&fixture).await;
+    corrupted.attempts = vec![active_attempt(1), active_attempt(2)];
+
+    assert!(
+        crate::daemon::task_board_read_only_coordinator::refuse_invalid_recovery(
+            &fixture.test.db,
+            &corrupted,
+            NOW,
+        )
+        .await
+        .expect("refuse invalid recovery")
+    );
+
+    let execution = load_execution(&fixture).await;
+    assert_eq!(
+        execution.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(
+        execution.blocked_reason.as_deref(),
+        Some("dependency_recovery_invalid")
+    );
+    assert!(
+        execution
+            .artifacts
+            .terminal_outcome
+            .as_ref()
+            .is_some_and(|outcome| outcome.summary.contains("multiple active attempts"))
+    );
+}
+
+fn active_attempt(attempt: u32) -> TaskBoardExecutionAttemptRecord {
+    TaskBoardExecutionAttemptRecord {
+        execution_id: "execution-write-invalid-recovery".into(),
+        action_key: "implementation:1".into(),
+        attempt,
+        idempotency_key: format!("execution-write-invalid-recovery:implementation:1:{attempt}"),
+        state: TaskBoardAttemptState::Running,
+        failure_class: None,
+        available_at: None,
+        error: None,
+        artifact: None,
+        started_at: NOW.into(),
+        updated_at: NOW.into(),
+        completed_at: None,
+    }
 }
 
 async fn drive_to_terminal(fixture: &Fixture, runtime: &FakeWriteRuntime) {
