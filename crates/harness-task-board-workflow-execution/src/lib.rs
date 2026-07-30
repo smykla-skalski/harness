@@ -1,8 +1,9 @@
-#[cfg(test)]
-use std::collections::BTreeMap;
+//! Durable task-board workflow-execution transitions over a narrow storage port.
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::{
+use std::future::Future;
+
+use harness_kernel::errors::CliError;
+use harness_task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptCas,
     TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptCreateOutcome,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase,
@@ -12,79 +13,50 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowRevisionGuard, advance_task_board_workflow,
 };
-// `TaskBoardWorkflowKind` is only read by the `#[cfg(test)]` items below.
-#[cfg(test)]
-use crate::task_board::{
-    TaskBoardExecutionOwnership, TaskBoardWorkflowExecutionArtifacts,
-    TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
-    start_task_board_workflow,
-};
-use harness_kernel::errors::CliError;
 
-#[path = "task_board_workflow_execution/support.rs"]
+mod attempt_validation;
 mod support;
 
-pub(super) use support::canonical_time;
-#[cfg(test)]
-use support::required;
+use attempt_validation::attempt_replay_matches;
+pub use attempt_validation::validate_attempt_phase;
+pub use support::canonical_time;
 use support::{invalid_transition, parse_time, workflow_error};
 
-#[cfg(test)]
-pub(crate) struct TaskBoardWorkflowExecutionCreateRequest {
-    pub execution_id: String,
-    pub item_id: String,
-    pub snapshot: TaskBoardWorkflowSnapshot,
-    pub pull_request: Option<TaskBoardPullRequestIdentity>,
-    pub exact_head_revision: Option<String>,
-    pub created_at: String,
+/// Persistence operations required by workflow-execution transitions.
+pub trait WorkflowExecutionStore: Send + Sync {
+    /// Loads one execution by its durable identity.
+    fn workflow_execution(
+        &self,
+        execution_id: &str,
+    ) -> impl Future<Output = Result<Option<TaskBoardWorkflowExecutionRecord>, CliError>> + Send;
+
+    /// Persists an execution when its compare-and-set fence still matches.
+    fn compare_and_set_workflow_execution(
+        &self,
+        expected: &TaskBoardWorkflowExecutionCas,
+        updated: &TaskBoardWorkflowExecutionRecord,
+    ) -> impl Future<Output = Result<TaskBoardWorkflowExecutionCasOutcome, CliError>> + Send;
+
+    /// Creates an attempt under an existing execution.
+    fn create_execution_attempt(
+        &self,
+        proposed: &TaskBoardExecutionAttemptRecord,
+    ) -> impl Future<Output = Result<TaskBoardExecutionAttemptCreateOutcome, CliError>> + Send;
+
+    /// Persists an attempt when its compare-and-set fence still matches.
+    fn compare_and_set_execution_attempt(
+        &self,
+        expected: &TaskBoardExecutionAttemptCas,
+        updated: &TaskBoardExecutionAttemptRecord,
+    ) -> impl Future<Output = Result<TaskBoardExecutionAttemptCasOutcome, CliError>> + Send;
 }
 
-#[cfg(test)]
-pub(crate) async fn create_or_load_workflow_execution(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardWorkflowExecutionCreateRequest,
-) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
-    let created_at = canonical_time(&request.created_at)?;
-    if !(matches!(
-        request.snapshot.workflow_kind,
-        TaskBoardWorkflowKind::Review
-    ) || request.snapshot.workflow_kind.is_read_only_review())
-    {
-        return Err(invalid_transition(
-            "read-only workflow execution requires Review or PrReview",
-        ));
-    }
-    let transition = start_task_board_workflow(
-        request.snapshot.workflow_kind,
-        request.pull_request.as_ref(),
-        request.exact_head_revision.as_deref(),
-    )
-    .map_err(workflow_error)?;
-    let record = TaskBoardWorkflowExecutionRecord {
-        execution_id: required(&request.execution_id, "execution id")?,
-        item_id: required(&request.item_id, "item id")?,
-        snapshot: request.snapshot.clone(),
-        resolved_reviewers: request.snapshot.reviewer.clone(),
-        transition,
-        artifacts: TaskBoardWorkflowExecutionArtifacts::default(),
-        ownership: TaskBoardExecutionOwnership {
-            host_id: None,
-            fencing_epoch: 0,
-            resources: BTreeMap::default(),
-        },
-        available_at: None,
-        blocked_reason: None,
-        created_at: created_at.clone(),
-        updated_at: created_at,
-        completed_at: None,
-        attempts: Vec::new(),
-    };
-    db.create_or_load_task_board_workflow_execution(&record)
-        .await
-}
-
-pub(crate) async fn advance_workflow_execution(
-    db: &AsyncDaemonDb,
+/// Advances an execution after checking its frozen revisions and phase evidence.
+///
+/// # Errors
+/// Returns [`CliError`] when timestamps, transitions, or persistence are invalid.
+pub async fn advance_workflow_execution(
+    db: &impl WorkflowExecutionStore,
     expected: &TaskBoardWorkflowExecutionCas,
     current_revisions: &TaskBoardWorkflowRevisionGuard,
     observed_pull_request: Option<&TaskBoardPullRequestIdentity>,
@@ -101,7 +73,7 @@ pub(crate) async fn advance_workflow_execution(
     if current_revisions != &TaskBoardWorkflowRevisionGuard::from(&record.snapshot) {
         invalidate_for_revision_change(&mut record, current_revisions, &updated_at);
         return db
-            .compare_and_set_task_board_workflow_execution(expected, &record)
+            .compare_and_set_workflow_execution(expected, &record)
             .await;
     }
     if record
@@ -111,12 +83,12 @@ pub(crate) async fn advance_workflow_execution(
     {
         require_human_for_unknown_outcome(&mut record, &updated_at);
         return db
-            .compare_and_set_task_board_workflow_execution(expected, &record)
+            .compare_and_set_workflow_execution(expected, &record)
             .await;
     }
     if !phase_evidence_allows_advance(&mut record, &updated_at) {
         return db
-            .compare_and_set_task_board_workflow_execution(expected, &record)
+            .compare_and_set_workflow_execution(expected, &record)
             .await;
     }
     record.transition = advance_task_board_workflow(
@@ -137,12 +109,16 @@ pub(crate) async fn advance_workflow_execution(
             recorded_at: updated_at,
         });
     }
-    db.compare_and_set_task_board_workflow_execution(expected, &record)
+    db.compare_and_set_workflow_execution(expected, &record)
         .await
 }
 
-pub(crate) async fn schedule_workflow_retry(
-    db: &AsyncDaemonDb,
+/// Moves an execution into retry wait with durable diagnostic evidence.
+///
+/// # Errors
+/// Returns [`CliError`] when timestamps are invalid or persistence fails.
+pub async fn schedule_workflow_retry(
+    db: &impl WorkflowExecutionStore,
     expected: &TaskBoardWorkflowExecutionCas,
     retry: TaskBoardRetrySchedule,
     diagnostic: TaskBoardExecutionDiagnostic,
@@ -158,7 +134,7 @@ pub(crate) async fn schedule_workflow_retry(
         && record.artifacts.diagnostics.last() == Some(&diagnostic)
     {
         return db
-            .compare_and_set_task_board_workflow_execution(expected, &record)
+            .compare_and_set_workflow_execution(expected, &record)
             .await;
     }
     record.transition.execution_state = TaskBoardExecutionState::RetryWait;
@@ -166,12 +142,16 @@ pub(crate) async fn schedule_workflow_retry(
     record.artifacts.retry = Some(retry);
     record.artifacts.diagnostics.push(diagnostic);
     record.updated_at = canonical_time(updated_at)?;
-    db.compare_and_set_task_board_workflow_execution(expected, &record)
+    db.compare_and_set_workflow_execution(expected, &record)
         .await
 }
 
-pub(crate) async fn resume_workflow_retry(
-    db: &AsyncDaemonDb,
+/// Resumes a retry-wait execution once its availability time has arrived.
+///
+/// # Errors
+/// Returns [`CliError`] when timestamps are invalid or persistence fails.
+pub async fn resume_workflow_retry(
+    db: &impl WorkflowExecutionStore,
     expected: &TaskBoardWorkflowExecutionCas,
     resumed_at: &str,
 ) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
@@ -193,29 +173,37 @@ pub(crate) async fn resume_workflow_retry(
     record.available_at = None;
     record.artifacts.retry = None;
     record.updated_at = resumed_at;
-    db.compare_and_set_task_board_workflow_execution(expected, &record)
+    db.compare_and_set_workflow_execution(expected, &record)
         .await
 }
 
-pub(crate) async fn create_workflow_execution_attempt(
-    db: &AsyncDaemonDb,
+/// Validates and creates one execution attempt.
+///
+/// # Errors
+/// Returns [`CliError`] when the parent is absent, the phase is invalid, or persistence fails.
+pub async fn create_workflow_execution_attempt(
+    db: &impl WorkflowExecutionStore,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardExecutionAttemptCreateOutcome, CliError> {
     let execution = db
-        .task_board_workflow_execution(&attempt.execution_id)
+        .workflow_execution(&attempt.execution_id)
         .await?
         .ok_or_else(|| invalid_transition("workflow execution does not exist"))?;
     validate_attempt_phase(&execution, attempt)?;
-    db.create_task_board_execution_attempt(attempt).await
+    db.create_execution_attempt(attempt).await
 }
 
-pub(crate) async fn record_workflow_execution_attempt(
-    db: &AsyncDaemonDb,
+/// Validates and compare-and-sets one execution attempt.
+///
+/// # Errors
+/// Returns [`CliError`] when the parent is absent, the phase is invalid, or persistence fails.
+pub async fn record_workflow_execution_attempt(
+    db: &impl WorkflowExecutionStore,
     expected: &TaskBoardExecutionAttemptCas,
     updated: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardExecutionAttemptCasOutcome, CliError> {
     let execution = db
-        .task_board_workflow_execution(&expected.execution_id)
+        .workflow_execution(&expected.execution_id)
         .await?
         .ok_or_else(|| invalid_transition("workflow execution does not exist"))?;
     if execution
@@ -224,130 +212,42 @@ pub(crate) async fn record_workflow_execution_attempt(
         .any(|current| attempt_replay_matches(expected, current, updated))
     {
         return db
-            .compare_and_set_task_board_execution_attempt(expected, updated)
+            .compare_and_set_execution_attempt(expected, updated)
             .await;
     }
     validate_attempt_phase(&execution, updated)?;
-    db.compare_and_set_task_board_execution_attempt(expected, updated)
+    db.compare_and_set_execution_attempt(expected, updated)
         .await
 }
 
-fn attempt_replay_matches(
-    expected: &TaskBoardExecutionAttemptCas,
-    current: &TaskBoardExecutionAttemptRecord,
-    updated: &TaskBoardExecutionAttemptRecord,
-) -> bool {
-    current == updated
-        && expected.execution_id == current.execution_id
-        && expected.action_key == current.action_key
-        && expected.attempt == current.attempt
-        && expected.idempotency_key == current.idempotency_key
-}
-
-pub(super) fn validate_attempt_phase(
-    execution: &TaskBoardWorkflowExecutionRecord,
-    attempt: &TaskBoardExecutionAttemptRecord,
-) -> Result<(), CliError> {
-    if attempt.execution_id != execution.execution_id {
-        return Err(invalid_transition(
-            "workflow attempt does not belong to its execution",
-        ));
-    }
-    let phase = execution
-        .transition
-        .phase
-        .ok_or_else(|| invalid_transition("workflow execution has no active phase"))?;
-    let valid_action = match phase {
-        TaskBoardExecutionPhase::Implementation => {
-            (execution
-                .snapshot
-                .workflow_kind
-                .has_dependency_update_intent()
-                && execution.artifacts.dependency_triage.is_none()
-                && attempt.action_key == "dependency_triage")
-                || attempt.action_key
-                    == format!(
-                        "implementation:{}",
-                        execution.artifacts.current_revision_cycle
-                    )
-        }
-        TaskBoardExecutionPhase::Review => attempt.action_key.starts_with("review:"),
-        TaskBoardExecutionPhase::Evaluate => {
-            attempt.action_key == "evaluate"
-                || attempt.action_key
-                    == format!("evaluate:{}", execution.artifacts.current_revision_cycle)
-        }
-        TaskBoardExecutionPhase::Publish => attempt.action_key == "publish",
-        TaskBoardExecutionPhase::Cleanup => attempt.action_key == "cleanup",
-        TaskBoardExecutionPhase::Planning
-        | TaskBoardExecutionPhase::AwaitingApproval
-        | TaskBoardExecutionPhase::Terminal => false,
-    };
-    if !valid_action {
-        return Err(invalid_transition(format!(
-            "workflow attempt action '{}' does not belong to phase {phase:?} at revision cycle {}",
-            attempt.action_key, execution.artifacts.current_revision_cycle
-        )));
-    }
-    if attempt.state != TaskBoardAttemptState::Completed {
-        return Ok(());
-    }
-    let valid_artifact = match (phase, attempt.artifact.as_ref()) {
-        (
-            TaskBoardExecutionPhase::Implementation,
-            Some(TaskBoardAttemptResultArtifact::DependencyTriage(_)),
-        ) => attempt.action_key == "dependency_triage",
-        (
-            TaskBoardExecutionPhase::Implementation,
-            Some(TaskBoardAttemptResultArtifact::Implementation(_)),
-        ) => attempt.action_key.starts_with("implementation:"),
-        (
-            TaskBoardExecutionPhase::Evaluate,
-            Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
-        )
-        | (
-            TaskBoardExecutionPhase::Publish | TaskBoardExecutionPhase::Cleanup,
-            Some(TaskBoardAttemptResultArtifact::Lifecycle(_)),
-        ) => true,
-        (
-            TaskBoardExecutionPhase::Review,
-            Some(TaskBoardAttemptResultArtifact::Review(outcome)),
-        ) => attempt.action_key == format!("review:{}", outcome.profile_id),
-        _ => false,
-    };
-    if valid_artifact {
-        Ok(())
-    } else {
-        Err(invalid_transition(
-            "workflow attempt result artifact contradicts its frozen phase",
-        ))
-    }
-}
-
-pub(super) async fn guarded_execution(
-    db: &AsyncDaemonDb,
+/// Loads an execution only when its compare-and-set fence still matches.
+///
+/// # Errors
+/// Returns [`CliError`] when persistence cannot load the execution.
+pub async fn guarded_execution(
+    db: &impl WorkflowExecutionStore,
     expected: &TaskBoardWorkflowExecutionCas,
 ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
-    let current = db
-        .task_board_workflow_execution(&expected.execution_id)
-        .await?;
+    let current = db.workflow_execution(&expected.execution_id).await?;
     Ok(current.filter(|record| cas_matches(expected, record)))
 }
 
-pub(super) async fn stale_outcome(
-    db: &AsyncDaemonDb,
+/// Produces the durable stale outcome for a failed compare-and-set fence.
+///
+/// # Errors
+/// Returns [`CliError`] when persistence cannot load or screen the execution.
+pub async fn stale_outcome(
+    db: &impl WorkflowExecutionStore,
     expected: &TaskBoardWorkflowExecutionCas,
 ) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
-    let current = db
-        .task_board_workflow_execution(&expected.execution_id)
-        .await?;
+    let current = db.workflow_execution(&expected.execution_id).await?;
     let Some(current) = current else {
         return Ok(TaskBoardWorkflowExecutionCasOutcome::Stale {
             mismatch: TaskBoardWorkflowCasMismatch::ExecutionId,
             current: None,
         });
     };
-    db.compare_and_set_task_board_workflow_execution(expected, &current)
+    db.compare_and_set_workflow_execution(expected, &current)
         .await
 }
 
@@ -388,7 +288,7 @@ fn phase_evidence_allows_advance(
                     .as_ref()
                     .is_some_and(|route| {
                         route.status
-                            == crate::task_board::TaskBoardDependencyRouteStatus::ReadyToContinue
+                            == harness_task_board::TaskBoardDependencyRouteStatus::ReadyToContinue
                     });
             let present = triage_continues
                 || completed_attempt(record, &action, ArtifactKind::Implementation);
@@ -490,7 +390,7 @@ fn require_human_for_unknown_outcome(
     });
 }
 
-pub(crate) fn require_human(
+pub fn require_human(
     record: &mut TaskBoardWorkflowExecutionRecord,
     reason: &str,
     updated_at: &str,
