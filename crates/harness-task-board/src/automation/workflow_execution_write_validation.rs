@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
 use crate::{
-    TaskBoardAttemptResultArtifact, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardImplementationResult, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowKind, compile_task_board_dependency_route, normalize_repository_slug,
-    validate_plan_approval, validate_planning_result, validate_task_board_read_only_run_context,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardImplementationResult,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, compile_task_board_dependency_route,
+    normalize_repository_slug, validate_plan_approval, validate_planning_result,
+    validate_task_board_read_only_run_context,
 };
 
 use super::TaskBoardWorkflowExecutionValidationError;
@@ -105,21 +106,20 @@ pub(super) fn validate_write_attempt_artifact(
                     "dependency workflow has no pull request",
                 )
             })?;
-            let head = record
-                .transition
-                .exact_head_revision
-                .as_deref()
-                .ok_or_else(|| {
-                    field_error(
-                        "attempt.artifact.dependency_triage",
-                        "dependency workflow has no frozen exact head revision",
-                    )
-                })?;
+            if route.repository != pull_request.repository
+                || route.pull_request_number != pull_request.number
+                || !dependency_triage_head_belongs_to_execution(record, &route.exact_head_revision)
+            {
+                return invalid(
+                    "attempt.artifact.dependency_triage",
+                    "stored route does not belong to the workflow pull request revision",
+                );
+            }
             let compiled = compile_task_board_dependency_route(
                 &route.source_result,
                 &pull_request.repository,
                 pull_request.number,
-                head,
+                &route.exact_head_revision,
             )
             .map_err(|error| field_error("attempt.artifact.dependency_triage", error))?;
             if compiled != **route {
@@ -168,6 +168,23 @@ pub(super) fn validate_write_attempt_artifact(
         }
         _ => Ok(false),
     }
+}
+
+fn dependency_triage_head_belongs_to_execution(
+    record: &TaskBoardWorkflowExecutionRecord,
+    triage_head: &str,
+) -> bool {
+    record.transition.exact_head_revision.as_deref() == Some(triage_head)
+        || record.attempts.iter().any(|attempt| {
+            attempt.state == TaskBoardAttemptState::Completed
+                && attempt.action_key == "implementation:1"
+                && matches!(
+                    attempt.artifact.as_ref(),
+                    Some(TaskBoardAttemptResultArtifact::Implementation(result))
+                        if result.revision_cycle == 1
+                            && result.base_head_revision == triage_head
+                )
+        })
 }
 
 fn validate_phase_evidence(

@@ -222,7 +222,7 @@ fn next_action_key(execution: &TaskBoardWorkflowExecutionRecord) -> Result<Strin
             if execution.snapshot.workflow_kind.has_dependency_update_intent()
                 && execution.artifacts.dependency_triage.is_none() =>
         {
-            Ok("dependency_triage".into())
+            Ok(dependency_triage::DEPENDENCY_TRIAGE_ACTION.into())
         }
         Some(TaskBoardExecutionPhase::Implementation) => Ok(format!(
             "implementation:{}",

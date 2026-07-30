@@ -28,7 +28,8 @@ where
                 TaskBoardAttemptState::Starting | TaskBoardAttemptState::Running
             )
     }) {
-        dependency_triage::reconcile(db, runtime, execution, attempt, false, now).await?;
+        let allow_start = attempt.state == TaskBoardAttemptState::Starting;
+        dependency_triage::reconcile(db, runtime, execution, attempt, allow_start, now).await?;
         return Ok(true);
     }
     if let Some(attempt) = active_attempt.filter(|attempt| {

@@ -8,6 +8,7 @@ use crate::{AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOn
 
 const NOW: &str = "2026-07-18T10:00:00Z";
 const DEPENDENCY_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+const UPDATED_DEPENDENCY_HEAD: &str = "1111111111111111111111111111111111111111";
 
 #[test]
 fn implementation_phase_requires_revision_bound_plan_approval() {
@@ -160,6 +161,45 @@ fn dependency_triage_uses_exact_head_when_pull_request_head_is_absent() {
     assert!(
         validate_write_attempt_artifact(&record, &attempt)
             .expect("exact head is the canonical triage binding")
+    );
+}
+
+#[test]
+fn dependency_triage_retains_its_initial_head_after_implementation() {
+    let mut record = write_execution();
+    record.snapshot.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    record.transition.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    record.transition.exact_head_revision = Some(UPDATED_DEPENDENCY_HEAD.into());
+    record.transition.pull_request = Some(TaskBoardPullRequestIdentity {
+        repository: "acme/widgets".into(),
+        number: 17,
+        head: Some(TaskBoardPullRequestHeadIdentity {
+            repository: "acme/widgets".into(),
+            branch: "dependencies".into(),
+            revision: DEPENDENCY_HEAD.into(),
+        }),
+    });
+    let result = dependency_triage_result();
+    let route =
+        compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
+            .expect("compile dependency route");
+    let triage = completed_attempt(
+        "dependency_triage",
+        TaskBoardAttemptResultArtifact::DependencyTriage(Box::new(route)),
+    );
+    let mut implementation = implementation_attempt(1);
+    let Some(TaskBoardAttemptResultArtifact::Implementation(result)) =
+        implementation.artifact.as_mut()
+    else {
+        panic!("implementation artifact")
+    };
+    result.base_head_revision = DEPENDENCY_HEAD.into();
+    result.head_revision = UPDATED_DEPENDENCY_HEAD.into();
+    record.attempts.push(implementation);
+
+    assert!(
+        validate_write_attempt_artifact(&record, &triage)
+            .expect("triage remains bound to the pre-implementation head")
     );
 }
 

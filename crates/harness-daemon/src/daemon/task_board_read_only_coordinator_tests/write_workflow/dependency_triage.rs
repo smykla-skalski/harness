@@ -4,6 +4,7 @@ use crate::task_board::{
     TaskBoardDependencyConflictState, TaskBoardDependencyIdentity, TaskBoardDependencyRouteStatus,
     TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageResult,
     TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
+    TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas,
 };
 
 use super::*;
@@ -23,6 +24,42 @@ async fn dependency_update_schedules_triage_before_workspace_write() {
     assert_eq!(execution.attempts.len(), 1);
     assert_eq!(execution.attempts[0].action_key, "dependency_triage");
     assert_eq!(runtime.start_count(), 0);
+}
+
+#[tokio::test]
+async fn starting_dependency_triage_resumes_after_restart() {
+    let fixture = Box::pin(write_fixture::seed_write_execution_kind(
+        "dependency-triage-start-recovery",
+        TaskBoardWorkflowKind::PrFixReview,
+    ))
+    .await;
+    let runtime = FakeWriteRuntime::new([]);
+    runtime.plan_triage(safe_triage_result());
+    tick(&fixture, &runtime).await;
+    let prepared = load_execution(&fixture).await;
+    let attempt = prepared.attempts.first().expect("prepared triage attempt");
+    assert!(
+        fixture
+            .test
+            .db
+            .select_task_board_local_execution_target(
+                &TaskBoardWorkflowExecutionCas::from(&prepared),
+                &TaskBoardExecutionAttemptCas::from(attempt),
+                NOW,
+            )
+            .await
+            .expect("select local triage target"),
+        "fixture must stop after target selection",
+    );
+
+    tick(&fixture, &runtime).await;
+
+    let resumed = load_execution(&fixture).await;
+    assert_eq!(runtime.triage_start_count(), 1);
+    assert_ne!(
+        resumed.attempts[0].state,
+        TaskBoardAttemptState::Starting
+    );
 }
 
 #[tokio::test]
