@@ -134,6 +134,21 @@ async fn blocked_fixer_requires_human_without_remote_reads_or_writes() {
     assert!(client.recorded.lock().expect("recorded").is_none());
 }
 
+#[tokio::test]
+async fn recording_failure_never_reports_delivery() {
+    let mut client = Client::successful();
+    client.record_failure = Some(TaskBoardDependencyFixDeliveryFailure::new(
+        TaskBoardDependencyFixDeliveryBlockReason::ResultRecordingFailed,
+        "durable store unavailable",
+    ));
+
+    assert_human_required(
+        &client,
+        TaskBoardDependencyFixDeliveryBlockReason::ResultRecordingFailed,
+    )
+    .await;
+}
+
 async fn assert_human_required(
     client: &Client,
     expected: TaskBoardDependencyFixDeliveryBlockReason,
@@ -152,6 +167,7 @@ struct Client {
     before: TaskBoardDependencyFixRemoteHeadEvidence,
     after: TaskBoardDependencyFixRemoteHeadEvidence,
     publish_failure: Option<TaskBoardDependencyFixDeliveryFailure>,
+    record_failure: Option<TaskBoardDependencyFixDeliveryFailure>,
     published: Mutex<Option<(String, String, String, String)>>,
     recorded: Mutex<Option<String>>,
 }
@@ -167,6 +183,7 @@ impl Client {
             before: remote_head(BASE, TREE),
             after: remote_head(REMOTE, TREE),
             publish_failure: None,
+            record_failure: None,
             published: Mutex::new(None),
             recorded: Mutex::new(None),
         }
@@ -225,6 +242,9 @@ impl TaskBoardDependencyFixDeliveryClient for Client {
         _request: &TaskBoardDependencyFixDeliveryRequest,
         remote_head_revision: &str,
     ) -> Result<(), TaskBoardDependencyFixDeliveryFailure> {
+        if let Some(failure) = &self.record_failure {
+            return Err(failure.clone());
+        }
         *self.recorded.lock().expect("recorded") = Some(remote_head_revision.into());
         Ok(())
     }
