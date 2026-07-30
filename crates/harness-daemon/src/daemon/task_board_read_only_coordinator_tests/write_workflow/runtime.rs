@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
-use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
+use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardDependencyTriageResult, TaskBoardEvaluationResult, TaskBoardImplementationResult,

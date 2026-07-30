@@ -7,7 +7,9 @@ use self::write::{
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::dispatch_intents::helpers::has_active_dispatch_reservation_in_tx;
 use super::item_tx_ext::TaskBoardItemTxExt;
-use super::items::{ParentAssignmentValidation, TaskBoardMutation, TriageOutcome, bump_change_in_tx};
+use super::items::{
+    ParentAssignmentValidation, TaskBoardMutation, TriageOutcome, bump_change_in_tx,
+};
 use super::lane_order::LaneTransitionKind;
 use super::provider_queries::ProviderQueries;
 use super::triage_apply::reapply_active_override_outcome_in_tx;

@@ -2,9 +2,9 @@ use std::{error::Error, fmt};
 
 use http::{HeaderMap, StatusCode, header::AUTHORIZATION};
 
-use harness_protocol::daemon::api_contract::HttpApiRouteContract;
 use super::remote::{RemoteAccessScope, remote_http_scopes, remote_ws_scopes};
 use super::remote_identity::RemoteStoredClient;
+use harness_protocol::daemon::api_contract::HttpApiRouteContract;
 
 #[cfg(test)]
 #[path = "remote_auth_tests.rs"]

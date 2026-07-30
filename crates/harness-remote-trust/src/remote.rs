@@ -1,6 +1,4 @@
-use harness_protocol::daemon::api_contract::{
-    HttpApiRouteContract, http_paths, ws_methods,
-};
+use harness_protocol::daemon::api_contract::{HttpApiRouteContract, http_paths, ws_methods};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RemoteRole {

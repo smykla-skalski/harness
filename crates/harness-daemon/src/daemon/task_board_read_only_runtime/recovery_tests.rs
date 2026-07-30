@@ -9,9 +9,7 @@ use super::{ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::{
-    AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb,
-};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
     default_remote_pairing_limiter, default_remote_pairing_status_limiter,
@@ -71,7 +69,10 @@ async fn production_load_settles_evicted_agent_turn_and_releases_admission() {
     db.save_agent_turn_run(&run)
         .await
         .expect("save active agent-turn run");
-    assert_eq!(admission_state(db.as_ref(), "ledger-evicted").await, "committed");
+    assert_eq!(
+        admission_state(db.as_ref(), "ledger-evicted").await,
+        "committed"
+    );
     let state = restarted_state(&db_path, db.clone());
     let runtime = ProductionTaskBoardReadOnlyRuntime::new(&state, db.as_ref());
 
@@ -86,14 +87,13 @@ async fn production_load_settles_evicted_agent_turn_and_releases_admission() {
         reconciled.error.as_deref(),
         Some("provider turn is no longer attached to this daemon")
     );
-    assert_eq!(admission_state(db.as_ref(), "ledger-evicted").await, "released");
+    assert_eq!(
+        admission_state(db.as_ref(), "ledger-evicted").await,
+        "released"
+    );
 }
 
-async fn insert_committed_admission(
-    db: &AsyncDaemonDb,
-    ledger_id: &str,
-    managed_worker_id: &str,
-) {
+async fn insert_committed_admission(db: &AsyncDaemonDb, ledger_id: &str, managed_worker_id: &str) {
     let mut conn = db.pool().acquire().await.expect("acquire connection");
     sqlx::query("PRAGMA foreign_keys = OFF")
         .execute(&mut *conn)
@@ -119,11 +119,13 @@ async fn insert_committed_admission(
 }
 
 async fn admission_state(db: &AsyncDaemonDb, ledger_id: &str) -> String {
-    sqlx::query_scalar("SELECT state FROM task_board_dispatch_admission_ledger WHERE ledger_id = ?1")
-        .bind(ledger_id)
-        .fetch_one(db.pool())
-        .await
-        .expect("read admission state")
+    sqlx::query_scalar(
+        "SELECT state FROM task_board_dispatch_admission_ledger WHERE ledger_id = ?1",
+    )
+    .bind(ledger_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("read admission state")
 }
 
 async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {

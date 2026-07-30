@@ -44,7 +44,8 @@ pub use lifecycle::{
 // `TaskBoardItem` domain entity or state reachable only from it.
 pub use harness_protocol::daemon::task_board::dispatch::{
     DispatchBlockReason, DispatchFailure, DispatchFailureKind, DispatchPlan, DispatchReadiness,
-    EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
+    EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent, TaskCreationIntent,
+    WorkerIntent,
 };
 
 const REVIEWER_PERSONA: &str = "code-reviewer";

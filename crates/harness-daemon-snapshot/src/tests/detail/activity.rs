@@ -123,7 +123,10 @@ fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
                 "XDG_DATA_HOME",
                 Some(tmp.path().to_str().expect("utf8 path")),
             ),
-            ("CLAUDE_SESSION_ID", Some("snapshot-copilot-ledger-fallback")),
+            (
+                "CLAUDE_SESSION_ID",
+                Some("snapshot-copilot-ledger-fallback"),
+            ),
         ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");

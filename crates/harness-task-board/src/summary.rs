@@ -28,8 +28,7 @@ use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatu
 // `TaskBoardProjectSummary`/`TaskBoardMachineSummary` (below) stay here:
 // nothing in that closure embeds them.
 pub use harness_protocol::daemon::task_board::summary::{
-    TaskBoardAuditSummary, TaskBoardProviderSyncSummary, TaskBoardStatusCount,
-    TaskBoardSyncSummary,
+    TaskBoardAuditSummary, TaskBoardProviderSyncSummary, TaskBoardStatusCount, TaskBoardSyncSummary,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

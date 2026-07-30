@@ -192,7 +192,9 @@ pub(crate) trait DispatchAdmissionQueries: Send + Sync {
         reason: &str,
     ) -> Result<TaskBoardPreparationRelease, CliError>;
 
-    async fn held_task_board_dispatch_summary(&self) -> Result<TaskBoardHeldDispatchSummary, CliError>;
+    async fn held_task_board_dispatch_summary(
+        &self,
+    ) -> Result<TaskBoardHeldDispatchSummary, CliError>;
 
     async fn held_task_board_dispatch(
         &self,
@@ -422,28 +424,35 @@ impl DispatchAdmissionQueries for AsyncDaemonDb {
         &self,
         intent_id: &str,
     ) -> Result<TaskBoardPreparationClaim, CliError> {
-        super::dispatch_preparations::queries::attempt_task_board_dispatch_preparation_claim(self, intent_id)
-            .await
+        super::dispatch_preparations::queries::attempt_task_board_dispatch_preparation_claim(
+            self, intent_id,
+        )
+        .await
     }
 
     async fn claim_task_board_dispatch_preparation(
         &self,
         intent_id: &str,
     ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
-        super::dispatch_preparations::queries::claim_task_board_dispatch_preparation(self, intent_id).await
+        super::dispatch_preparations::queries::claim_task_board_dispatch_preparation(
+            self, intent_id,
+        )
+        .await
     }
 
     async fn claim_next_task_board_dispatch_preparation(
         &self,
     ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
-        super::dispatch_preparations::queries::claim_next_task_board_dispatch_preparation(self).await
+        super::dispatch_preparations::queries::claim_next_task_board_dispatch_preparation(self)
+            .await
     }
 
     async fn renew_task_board_dispatch_preparation(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
     ) -> Result<(), CliError> {
-        super::dispatch_preparations::queries::renew_task_board_dispatch_preparation(self, claim).await
+        super::dispatch_preparations::queries::renew_task_board_dispatch_preparation(self, claim)
+            .await
     }
 
     async fn complete_task_board_dispatch_preparation(
@@ -482,8 +491,10 @@ impl DispatchAdmissionQueries for AsyncDaemonDb {
         claim: &ClaimedTaskBoardDispatchPreparation,
         reason: &str,
     ) -> Result<TaskBoardPreparationRelease, CliError> {
-        super::dispatch_preparations::queries::release_task_board_dispatch_preparation(self, claim, reason)
-            .await
+        super::dispatch_preparations::queries::release_task_board_dispatch_preparation(
+            self, claim, reason,
+        )
+        .await
     }
 
     async fn held_task_board_dispatch_summary(

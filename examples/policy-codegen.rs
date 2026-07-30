@@ -3044,8 +3044,7 @@ const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // type of nearly every managed-agent endpoint.
 const MANAGED_AGENTS_EMIT_ONLY: &[&str] = &["ManagedAgentSnapshot", "ManagedAgentListResponse"];
 const DAEMON_STATE_SOURCE: &str = include_str!("../crates/harness-daemon-root/src/lib.rs");
-const DAEMON_LAUNCHD_SOURCE: &str =
-    include_str!("../crates/harness-daemon-launchd/src/lib.rs");
+const DAEMON_LAUNCHD_SOURCE: &str = include_str!("../crates/harness-daemon-launchd/src/lib.rs");
 const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/DaemonStateWireTypes.generated.swift";
 // The /v1/diagnostics report (DaemonDiagnosticsReport from summaries.rs) and the daemon-state
 // cluster it nests: the manifest tree (DaemonManifest -> HostBridgeManifest ->
@@ -3587,7 +3586,10 @@ fn modules() -> Vec<GeneratedModule> {
             output: TASK_BOARD_EVALUATION_OUTPUT,
             description: "the Rust task-board evaluation summary, records and outcome",
             defaults: &[],
-            sources: &[TASK_BOARD_EVALUATION_SOURCE, TASK_BOARD_PROTOCOL_EVALUATION_SOURCE],
+            sources: &[
+                TASK_BOARD_EVALUATION_SOURCE,
+                TASK_BOARD_PROTOCOL_EVALUATION_SOURCE,
+            ],
         },
         GeneratedModule {
             output: TASK_BOARD_DISPATCH_OUTPUT,

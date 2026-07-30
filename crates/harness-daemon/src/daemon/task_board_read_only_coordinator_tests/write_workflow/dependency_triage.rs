@@ -3,8 +3,8 @@ use crate::task_board::{
     TaskBoardDependencyCheck, TaskBoardDependencyCheckState, TaskBoardDependencyConflictEvidence,
     TaskBoardDependencyConflictState, TaskBoardDependencyIdentity, TaskBoardDependencyRouteStatus,
     TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageResult,
-    TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
-    TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas,
+    TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass, TaskBoardExecutionAttemptCas,
+    TaskBoardWorkflowExecutionCas,
 };
 
 use super::*;
@@ -56,10 +56,7 @@ async fn starting_dependency_triage_resumes_after_restart() {
 
     let resumed = load_execution(&fixture).await;
     assert_eq!(runtime.triage_start_count(), 1);
-    assert_ne!(
-        resumed.attempts[0].state,
-        TaskBoardAttemptState::Starting
-    );
+    assert_ne!(resumed.attempts[0].state, TaskBoardAttemptState::Starting);
 }
 
 #[tokio::test]
@@ -133,12 +130,11 @@ async fn dependency_fixer_starts_only_after_explicit_triage_route() {
         .iter()
         .find(|attempt| attempt.action_key == "implementation:1")
         .expect("routed implementation attempt");
-    let request =
-        crate::daemon::task_board_read_only_coordinator::requests::codex_attempt_request(
-            &routed,
-            implementation,
-        )
-        .expect("dependency fixer request");
+    let request = crate::daemon::task_board_read_only_coordinator::requests::codex_attempt_request(
+        &routed,
+        implementation,
+    )
+    .expect("dependency fixer request");
     assert_eq!(request.model.as_deref(), Some("gpt-5.3-codex-spark"));
     assert_eq!(request.effort.as_deref(), Some("low"));
     assert!(request.prompt.contains("\"disposition\": \"fix_required\""));
@@ -202,7 +198,10 @@ async fn invalid_dependency_triage_fails_closed_without_workspace_write() {
         execution.transition.execution_state,
         TaskBoardExecutionState::HumanRequired
     );
-    assert_eq!(execution.blocked_reason.as_deref(), Some("attempt_outcome_unknown"));
+    assert_eq!(
+        execution.blocked_reason.as_deref(),
+        Some("attempt_outcome_unknown")
+    );
     assert_eq!(runtime.start_count(), 0);
 }
 

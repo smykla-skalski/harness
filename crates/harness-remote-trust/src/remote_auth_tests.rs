@@ -4,12 +4,12 @@ use super::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteAuthTarget, RemoteBearerCredentials,
     authorize_remote_execution_operation, authorize_remote_http_route, authorize_remote_ws_method,
 };
+use crate::remote::{RemoteAccessScope, RemoteRole};
+use crate::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 use harness_protocol::daemon::api_contract::{
     HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind,
     http_paths, ws_methods,
 };
-use crate::remote::{RemoteAccessScope, RemoteRole};
-use crate::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 
 #[test]
 fn remote_bearer_credentials_require_client_id_and_bearer_token() {

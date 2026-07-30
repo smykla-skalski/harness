@@ -150,9 +150,8 @@ fn dependency_triage_uses_exact_head_when_pull_request_head_is_absent() {
         head: None,
     });
     let result = dependency_triage_result();
-    let route =
-        compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
-            .expect("compile dependency route");
+    let route = compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
+        .expect("compile dependency route");
     let attempt = completed_attempt(
         "dependency_triage",
         TaskBoardAttemptResultArtifact::DependencyTriage(Box::new(route)),
@@ -180,9 +179,8 @@ fn dependency_triage_retains_its_initial_head_after_implementation() {
         }),
     });
     let result = dependency_triage_result();
-    let route =
-        compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
-            .expect("compile dependency route");
+    let route = compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
+        .expect("compile dependency route");
     let triage = completed_attempt(
         "dependency_triage",
         TaskBoardAttemptResultArtifact::DependencyTriage(Box::new(route)),

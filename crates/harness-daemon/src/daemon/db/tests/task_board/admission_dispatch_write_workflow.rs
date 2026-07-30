@@ -89,13 +89,9 @@ async fn dependency_dispatch_starts_triage_before_implementation() {
         .expect("claim dependency dispatch")
         .expect("pending dependency dispatch");
 
-    db.complete_task_board_dispatch(
-        &intent,
-        &claim.claim_token,
-        &workflow_owner(&execution_id),
-    )
-    .await
-    .expect("complete dependency dispatch");
+    db.complete_task_board_dispatch(&intent, &claim.claim_token, &workflow_owner(&execution_id))
+        .await
+        .expect("complete dependency dispatch");
 
     let execution = db
         .task_board_workflow_execution(&execution_id)
@@ -227,8 +223,12 @@ async fn reserved_dependency_write(
     ClaimedTaskBoardDispatchPreparation,
     TaskBoardWriteWorkflowLaunch,
 ) {
-    let (db, item_id) =
-        Box::pin(prepare_reserved_write_item(label, Some("example/compass"), false)).await;
+    let (db, item_id) = Box::pin(prepare_reserved_write_item(
+        label,
+        Some("example/compass"),
+        false,
+    ))
+    .await;
     db.update_task_board_item(&item_id, |item| {
         item.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
         item.workflow.pr_number = Some(17);

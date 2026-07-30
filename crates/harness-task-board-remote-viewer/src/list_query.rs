@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board::wire::{TaskBoardListItemsResponse, TaskBoardListItemsSelection};
 use harness_task_board::{
-    TaskBoardItem, TaskBoardProgressRollup, TaskBoardQueryFields, TaskBoardQueryTarget,
-    select_page,
+    TaskBoardItem, TaskBoardProgressRollup, TaskBoardQueryFields, TaskBoardQueryTarget, select_page,
 };
 
 use crate::{

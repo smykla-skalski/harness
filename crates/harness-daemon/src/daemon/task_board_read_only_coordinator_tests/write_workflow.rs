@@ -10,9 +10,9 @@ use super::driver::HeadlessWorkflowDriver;
 use super::fixture::{Fixture, NOW};
 use runtime::{FakeWriteRuntime, PlannedRun};
 
+mod dependency_triage;
 mod fixture;
 mod runtime;
-mod dependency_triage;
 mod verification_exhaustion;
 
 const BASE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";

@@ -328,9 +328,7 @@ fn schedule_dependency_fix_deadline(
             .to_std()
             .unwrap_or_default();
         tokio::time::sleep(remaining).await;
-        if let Err(error) =
-            enforce_dependency_fix_deadline(controller, request, run).await
-        {
+        if let Err(error) = enforce_dependency_fix_deadline(controller, request, run).await {
             tracing::error!(%error, "failed to enforce dependency fixer deadline");
         }
     });

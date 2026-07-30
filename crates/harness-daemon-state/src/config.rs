@@ -6,13 +6,14 @@ use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::read_json_typed;
-use harness_task_board::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOpenRouterTokenSyncResponse, normalize_repository_slug,
-};
 #[cfg(any(test, feature = "daemon-runtime", feature = "test-support"))]
 use harness_task_board::TaskBoardGitRuntimeProfile;
+use harness_task_board::{
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
+    normalize_repository_slug,
+};
 
 use super::{append_event_best_effort, config_path, ensure_daemon_dirs};
 

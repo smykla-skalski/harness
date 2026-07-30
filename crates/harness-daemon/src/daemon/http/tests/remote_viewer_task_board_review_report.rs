@@ -2,9 +2,8 @@ use serde_json::Value;
 
 use crate::daemon::protocol::http_paths;
 use crate::task_board::{
-    TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus,
-    TaskBoardReportOnlyReviewFinding, TaskBoardReviewFindingLocation,
-    TaskBoardReviewFindingSeverity,
+    TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardReportOnlyReviewFinding,
+    TaskBoardReviewFindingLocation, TaskBoardReviewFindingSeverity,
 };
 
 use super::remote_viewer_support::get_http_json;
@@ -47,7 +46,10 @@ fn assert_review_report(response: &Value, redacted: bool) {
     };
     assert_eq!(response["status"], "completed");
     assert_eq!(response["report"]["summary"], expected);
-    assert_eq!(response["report"]["findings"][0]["location"]["path"], expected);
+    assert_eq!(
+        response["report"]["findings"][0]["location"]["path"],
+        expected
+    );
     assert_eq!(response["report"]["findings"][0]["evidence"], expected);
     assert_eq!(response["report"]["partial_output"], expected);
 }
