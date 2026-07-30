@@ -75,6 +75,11 @@ impl TaskBoardDependencyFixLauncher for CodexDependencyFixLauncher {
             requested_effort: snapshot
                 .effort
                 .unwrap_or_else(|| TASK_BOARD_DEPENDENCY_FIXER_EFFORT.into()),
+            attempt: request.attempt,
+            failure_evidence_id: request
+                .retry_evidence
+                .as_ref()
+                .map(|evidence| evidence.evidence_id.clone()),
         })
     }
 }
@@ -152,10 +157,12 @@ mod tests {
             session_id: "session-1".into(),
             board_item_id: "item-1".into(),
             workflow_execution_id: "execution-1".into(),
+            attempt: 1,
             repository: "acme/widgets".into(),
             pull_request_number: 17,
             exact_head_revision: HEAD.into(),
             requested_repair: "repair the failing build".into(),
+            retry_evidence: None,
             triage_result: TaskBoardDependencyTriageResult {
                 schema_version: 1,
                 repository: "acme/widgets".into(),

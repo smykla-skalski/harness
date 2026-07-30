@@ -5,8 +5,9 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    TaskBoardDependencyRouteOutcome, TaskBoardDependencyRouteRecord,
-    TaskBoardDependencyRouteStatus, TaskBoardDependencyRouteStore,
+    TaskBoardDependencyCheckConclusion, TaskBoardDependencyCheckResumeRecord,
+    TaskBoardDependencyCheckResumeStatus, TaskBoardDependencyRouteOutcome,
+    TaskBoardDependencyRouteRecord, TaskBoardDependencyRouteStatus, TaskBoardDependencyRouteStore,
     TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageResult,
     route_task_board_dependency_triage_result, valid_head_revision,
     validate_task_board_dependency_triage_result,
@@ -15,6 +16,7 @@ use super::{
 pub const TASK_BOARD_DEPENDENCY_FIX_RESULT_SCHEMA_VERSION: u32 = 1;
 pub const TASK_BOARD_DEPENDENCY_FIXER_MODEL: &str = "gpt-5.3-codex-spark";
 pub const TASK_BOARD_DEPENDENCY_FIXER_EFFORT: &str = "low";
+pub const TASK_BOARD_DEPENDENCY_FIX_RETRY_EVIDENCE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskBoardDependencyFixBinding {
@@ -31,11 +33,14 @@ pub struct TaskBoardDependencyFixRequest {
     pub session_id: String,
     pub board_item_id: String,
     pub workflow_execution_id: String,
+    pub attempt: u32,
     pub repository: String,
     pub pull_request_number: u64,
     pub exact_head_revision: String,
     pub requested_repair: String,
     pub triage_result: TaskBoardDependencyTriageResult,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_evidence: Option<TaskBoardDependencyFixRetryEvidence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +49,42 @@ pub struct TaskBoardDependencyFixRun {
     pub runtime: String,
     pub requested_model: String,
     pub requested_effort: String,
+    pub attempt: u32,
+    pub failure_evidence_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "availability", rename_all = "snake_case")]
+pub enum TaskBoardDependencyFixDiagnosticEvidence {
+    Available { url: String },
+    Unavailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardDependencyFixFailedCheckEvidence {
+    pub name: String,
+    pub conclusion: TaskBoardDependencyCheckConclusion,
+    pub diagnostics: TaskBoardDependencyFixDiagnosticEvidence,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardDependencyFixPriorAttemptEvidence {
+    pub attempt: u32,
+    pub run_id: String,
+    pub summary: String,
+    pub validation: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardDependencyFixRetryEvidence {
+    pub schema_version: u32,
+    pub evidence_id: String,
+    pub exact_head_revision: String,
+    pub checks: Vec<TaskBoardDependencyFixFailedCheckEvidence>,
+    pub prior_attempt: TaskBoardDependencyFixPriorAttemptEvidence,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -123,11 +164,69 @@ pub fn task_board_dependency_fix_request(
         session_id: binding.session_id.clone(),
         board_item_id: binding.board_item_id.clone(),
         workflow_execution_id: binding.workflow_execution_id.clone(),
+        attempt: 1,
         repository: route.repository.clone(),
         pull_request_number: route.pull_request_number,
         exact_head_revision: route.exact_head_revision.clone(),
         requested_repair: route.reason.clone(),
         triage_result: route.source_result.clone(),
+        retry_evidence: None,
+    })
+}
+
+/// Bind one settled failed-check result to the next deterministic fixer attempt.
+///
+/// # Errors
+///
+/// Rejects mismatched prior results, non-failing check outcomes, stale route evidence, and
+/// malformed diagnostics.
+pub fn task_board_dependency_fix_retry_request(
+    previous_request: &TaskBoardDependencyFixRequest,
+    previous_run: &TaskBoardDependencyFixRun,
+    previous_result: &TaskBoardDependencyFixResult,
+    checks: &TaskBoardDependencyCheckResumeRecord,
+) -> Result<TaskBoardDependencyFixRequest, CliError> {
+    validate_task_board_dependency_fix_result(previous_result, previous_request)?;
+    validate_prior_run(previous_request, previous_run)?;
+    if checks.route_id != previous_request.route_id
+        || !valid_head_revision(&checks.exact_head_revision)
+    {
+        return Err(parse_error(
+            "dependency fixer retry check evidence does not match its prior attempt",
+        ));
+    }
+    let TaskBoardDependencyCheckResumeStatus::ChecksFailed { checks: settled } = &checks.status
+    else {
+        return Err(parse_error(
+            "dependency fixer retry requires settled failed checks",
+        ));
+    };
+    let normalized_checks = retry_check_evidence(settled)?;
+    let attempt = previous_request
+        .attempt
+        .checked_add(1)
+        .ok_or_else(|| parse_error("dependency fixer retry attempt overflow"))?;
+    let evidence_id = format!(
+        "{}:retry:{attempt}:{}",
+        previous_request.route_id, checks.exact_head_revision
+    );
+    Ok(TaskBoardDependencyFixRequest {
+        dispatch_id: format!("{}:fix:{attempt}", previous_request.route_id),
+        exact_head_revision: checks.exact_head_revision.clone(),
+        attempt,
+        retry_evidence: Some(TaskBoardDependencyFixRetryEvidence {
+            schema_version: TASK_BOARD_DEPENDENCY_FIX_RETRY_EVIDENCE_SCHEMA_VERSION,
+            evidence_id,
+            exact_head_revision: checks.exact_head_revision.clone(),
+            checks: normalized_checks,
+            prior_attempt: TaskBoardDependencyFixPriorAttemptEvidence {
+                attempt: previous_request.attempt,
+                run_id: previous_run.run_id.clone(),
+                summary: previous_result.summary.clone(),
+                validation: previous_result.validation.clone(),
+            },
+        }),
+        ..previous_request.clone()
     })
 }
 
@@ -209,17 +308,34 @@ pub fn render_task_board_dependency_fix_prompt(
             "dependency fixer result template could not be encoded: {error}"
         ))
     })?;
+    let retry = render_retry_evidence(request)?;
     Ok(format!(
         "Repair dependency update pull request {repository}#{number} at exact head {head}.\n\
          Do not work from or publish against another revision.\n\
-         Requested repair: {repair}\n\n\
+         Fixer attempt: {attempt}\n\
+         Requested repair: {repair}\n{retry}\n\
          Triage report and check evidence:\n{triage}\n\n\
          Make only the changes required by this repair. Run the smallest relevant validation.\n\
          Return exactly one JSON object matching this contract:\n{response}",
         repository = request.repository,
         number = request.pull_request_number,
         head = request.exact_head_revision,
+        attempt = request.attempt,
         repair = request.requested_repair,
+    ))
+}
+
+fn render_retry_evidence(request: &TaskBoardDependencyFixRequest) -> Result<String, CliError> {
+    let Some(evidence) = &request.retry_evidence else {
+        return Ok(String::new());
+    };
+    let evidence = serde_json::to_string_pretty(evidence).map_err(|error| {
+        CliErrorKind::workflow_parse(format!(
+            "dependency fixer retry evidence could not be encoded: {error}"
+        ))
+    })?;
+    Ok(format!(
+        "\nRetry failure evidence received by this run:\n{evidence}\n"
     ))
 }
 
@@ -285,6 +401,66 @@ fn validate_unique_text(values: &[String], label: &str) -> Result<(), CliError> 
         )));
     }
     Ok(())
+}
+
+fn validate_prior_run(
+    request: &TaskBoardDependencyFixRequest,
+    run: &TaskBoardDependencyFixRun,
+) -> Result<(), CliError> {
+    if run.run_id.trim().is_empty()
+        || run.attempt != request.attempt
+        || run.failure_evidence_id
+            != request
+                .retry_evidence
+                .as_ref()
+                .map(|evidence| evidence.evidence_id.clone())
+    {
+        return Err(parse_error(
+            "dependency fixer retry run does not match its prior request",
+        ));
+    }
+    Ok(())
+}
+
+fn retry_check_evidence(
+    checks: &[super::TaskBoardDependencySettledCheck],
+) -> Result<Vec<TaskBoardDependencyFixFailedCheckEvidence>, CliError> {
+    let mut names = BTreeSet::new();
+    let mut failed = false;
+    let mut normalized = Vec::with_capacity(checks.len());
+    for check in checks {
+        if check.name.trim().is_empty()
+            || check.name.trim() != check.name
+            || !names.insert(check.name.as_str())
+        {
+            return Err(parse_error(
+                "dependency fixer retry has invalid check names",
+            ));
+        }
+        failed |= check.conclusion == TaskBoardDependencyCheckConclusion::Failure;
+        let diagnostics = match check.details_url.as_deref() {
+            Some(url) if !url.trim().is_empty() && url.trim() == url => {
+                TaskBoardDependencyFixDiagnosticEvidence::Available { url: url.into() }
+            }
+            Some(_) => {
+                return Err(parse_error(
+                    "dependency fixer retry has invalid diagnostic link",
+                ));
+            }
+            None => TaskBoardDependencyFixDiagnosticEvidence::Unavailable,
+        };
+        normalized.push(TaskBoardDependencyFixFailedCheckEvidence {
+            name: check.name.clone(),
+            conclusion: check.conclusion.clone(),
+            diagnostics,
+        });
+    }
+    if normalized.is_empty() || !failed {
+        return Err(parse_error(
+            "dependency fixer retry evidence has no failed check",
+        ));
+    }
+    Ok(normalized)
 }
 
 fn parse_error(detail: impl Into<String>) -> CliError {
