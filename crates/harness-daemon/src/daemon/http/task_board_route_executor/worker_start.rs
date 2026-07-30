@@ -3,10 +3,12 @@ use tracing::warn;
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::task_board_managed_agents::{
-    maintain_task_board_dispatch_claim, managed_worker_id, resume_worker_compensation,
+    maintain_task_board_dispatch_claim, resume_worker_compensation,
     settle_claimed_task_board_worker,
 };
-use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
+use crate::task_board::{
+    DispatchAppliedTask, DispatchFailure, DispatchFailureKind, managed_worker_id,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DaemonHttpState;

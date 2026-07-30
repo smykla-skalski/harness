@@ -310,4 +310,7 @@ pub use types::{
     TaskBoardTombstoneCause, TaskBoardWorkflowKind, TaskBoardWorkflowState,
     TaskBoardWorkflowStatus,
 };
-pub use worker_prompt::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};
+pub use worker_prompt::{
+    WorkerPromptContext, codex_worker_id, managed_worker_id, plan_worker_prompt,
+    render_worker_prompt, rendered_worker_prompt, terminal_worker_id, worker_prompt,
+};
