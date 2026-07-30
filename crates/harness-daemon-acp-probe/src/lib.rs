@@ -64,9 +64,12 @@ fn spawn_routed_probe_cache_refresh(refresh: ProbeCacheRefresh) {
             return;
         }
         // The real daemon always installs a refresh before serving its first
-        // request; reaching here means it did not, so falling back to a
-        // local probe beats leaving the refresh permanently unpaid.
+        // request; reaching here means it did not. Probing locally would try
+        // to execute agent binaries a sandboxed process can't run, so warn
+        // and drop `refresh` instead: its `Drop` impl clears the in-flight
+        // flag, leaving the next call free to try again.
         warn!("sandboxed daemon has no bridge probe refresh installed");
+        return;
     }
     spawn_local_probe_cache_refresh(refresh);
 }
