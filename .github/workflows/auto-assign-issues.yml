@@ -5,13 +5,15 @@ on:
   issues:
     types: [opened]
 
-permissions:
-  issues: write
+permissions: {}
 
 jobs:
   assign:
     name: Assign new issue
+    permissions:
+      issues: write
     runs-on: ubuntu-24.04
+    timeout-minutes: 2
     steps:
       - name: Assign issue
         env:
