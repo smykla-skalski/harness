@@ -66,7 +66,7 @@ impl RemotePairingEvent {
 #[cfg(test)]
 mod tests {
     use super::{RemotePairingChange, RemotePairingEvent};
-    use crate::daemon::remote_pairing::{RemotePairingInventoryEntry, RemotePairingState};
+    use crate::remote_pairing::{RemotePairingInventoryEntry, RemotePairingState};
 
     fn event(minted_by: Option<&str>) -> RemotePairingEvent {
         RemotePairingEvent {

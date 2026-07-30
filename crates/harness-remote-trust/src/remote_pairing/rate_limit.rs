@@ -44,19 +44,19 @@ impl RemotePairingRateLimiter {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn new_for_tests(max_attempts: u32) -> Self {
         Self::new(max_attempts)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn new_bounded_for_tests(max_attempts: u32, max_entries: usize) -> Self {
         Self::new_bounded(max_attempts, max_entries)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn tracked_attempts_for_tests(&self) -> (usize, usize) {
         (self.ip_attempts.len(), self.code_attempts.len())

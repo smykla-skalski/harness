@@ -82,13 +82,13 @@ impl RemotePairingStatusRateLimiter {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn new_for_tests(max_attempts: u32) -> Self {
         Self::new(max_attempts)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn new_windowed_for_tests(max_attempts: u32, max_entries: usize, window: Duration) -> Self {
         Self::new_windowed(max_attempts, max_entries, window)
@@ -103,7 +103,7 @@ impl RemotePairingStatusRateLimiter {
         self.record_attempt_at(remote_addr, pairing_fingerprint, Instant::now())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn record_attempt_at_for_tests(
         &mut self,

@@ -3,7 +3,7 @@ use super::{
     RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration,
     RemoteTokenHash, expand_client_scopes,
 };
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::remote::{RemoteAccessScope, RemoteRole};
 
 #[test]
 fn remote_token_hash_does_not_store_raw_token_and_verifies_constant_width_digest() {

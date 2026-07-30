@@ -5,8 +5,9 @@ use super::{
     RemotePairingRecord, RemotePairingStatusRateLimitDecision, RemotePairingStatusRateLimiter,
     validate_pairing_domain,
 };
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
-use crate::reviews::ReviewsQueryRequest;
+use harness_protocol::daemon::reviews::types::ReviewsQueryRequest;
+
+use crate::remote::{RemoteAccessScope, RemoteRole};
 
 #[test]
 fn remote_pairing_code_hashes_secret_and_redacts_debug() {

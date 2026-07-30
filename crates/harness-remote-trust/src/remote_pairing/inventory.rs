@@ -37,7 +37,7 @@ impl RemotePairingState {
     /// before it was claimed must not read as pending and invite someone to
     /// wait for a claim that can no longer happen.
     #[must_use]
-    pub(crate) fn derive(observed: &RemotePairingObservation<'_>) -> Self {
+    pub fn derive(observed: &RemotePairingObservation<'_>) -> Self {
         if observed.revoked_at.is_some() {
             return Self::Revoked;
         }
@@ -61,14 +61,14 @@ impl RemotePairingState {
 /// The stored facts a state is derived from, named so the derivation reads as
 /// the rule it is rather than as four positional booleans.
 ///
-/// Crate-private: it is the argument to a derivation the daemon runs on its own
-/// rows, not something a caller of this module ever builds.
+/// Persistence adapters build this from their own rows and pass it into the
+/// trust-domain derivation.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RemotePairingObservation<'a> {
-    pub(crate) claimed_at: Option<&'a str>,
-    pub(crate) revoked_at: Option<&'a str>,
-    pub(crate) last_seen_at: Option<&'a str>,
-    pub(crate) expired: bool,
+pub struct RemotePairingObservation<'a> {
+    pub claimed_at: Option<&'a str>,
+    pub revoked_at: Option<&'a str>,
+    pub last_seen_at: Option<&'a str>,
+    pub expired: bool,
 }
 
 /// The device a claimed link became.

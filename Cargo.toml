@@ -29,6 +29,7 @@ members = [
   "crates/harness-panel",
   "crates/harness-policy-graph-store",
   "crates/harness-protocol",
+  "crates/harness-remote-trust",
   "crates/harness-reviews",
   "crates/harness-run",
   "crates/harness-session",
