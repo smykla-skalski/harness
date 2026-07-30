@@ -1,6 +1,7 @@
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
 use crate::daemon::db::{DaemonDb, RemoteAcmeStoredState};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
@@ -9,7 +10,6 @@ use crate::daemon::remote_identity::{
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
-use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote::open_remote_daemon_db;
 
 pub(super) fn execute_remote_doctor() -> Result<i32, CliError> {

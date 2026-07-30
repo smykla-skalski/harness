@@ -139,8 +139,8 @@ start_leaf() {
         ;;
       daemon)
         exec "$cargo_driver" \
-          build --release --locked -p harness-daemon --bin harness-daemon \
-          --features tokio-console
+          build --release --locked -p harness-daemon-bin --bin harness-daemon \
+          --features harness-daemon/tokio-console
         ;;
       systemd)
         exec "$cargo_driver" \

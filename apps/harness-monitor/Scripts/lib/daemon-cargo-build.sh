@@ -467,7 +467,7 @@ build_daemon_binary() {
   features="$(daemon_build_features)"
   local cargo_args=(
     rustc
-    --package harness-daemon
+    --package harness-daemon-bin
     --bin harness-daemon
     --features "$features"
   )

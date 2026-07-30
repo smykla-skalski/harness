@@ -3521,6 +3521,7 @@ dependencies = [
  "harness-agents",
  "harness-command",
  "harness-daemon",
+ "harness-daemon-cli",
  "harness-daemon-client",
  "harness-feature-flags",
  "harness-github-api",
@@ -3815,6 +3816,40 @@ version = "55.0.0"
 dependencies = [
  "harness-agents",
  "harness-workspace",
+ "tracing",
+]
+
+[[package]]
+name = "harness-daemon-bin"
+version = "55.0.0"
+dependencies = [
+ "assert_cmd",
+ "clap",
+ "fs-err",
+ "harness-command",
+ "harness-daemon",
+ "harness-daemon-cli",
+ "harness-github-api",
+ "harness-kernel",
+ "harness-telemetry",
+ "temp-env",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "harness-daemon-cli"
+version = "55.0.0"
+dependencies = [
+ "clap",
+ "harness-daemon",
+ "harness-kernel",
+ "harness-protocol",
+ "reqwest",
+ "serde_json",
+ "temp-env",
+ "tokio",
  "tracing",
 ]
 

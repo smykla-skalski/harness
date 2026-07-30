@@ -17,7 +17,7 @@ class TestAgentsE2EScriptTests(unittest.TestCase):
         self.assertIn(
             '"$CHECKOUT_ROOT/scripts/cargo-local.sh" build \\\n'
             "  --package harness \\\n"
-            "  --package harness-daemon \\\n"
+            "  --package harness-daemon-bin \\\n"
             "  --package harness-bridge \\\n"
             "  --bins",
             script,
