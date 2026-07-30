@@ -9,11 +9,11 @@ use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
-use crate::daemon::db::policy::restore_consumed_approval_grant_in_tx_at;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     DispatchAppliedTask, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
+use harness_policy_graph_store::restore_consumed_approval_grant_in_tx_at;
 
 pub(in crate::daemon::db::task_board) async fn refuse_pending_admission_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,

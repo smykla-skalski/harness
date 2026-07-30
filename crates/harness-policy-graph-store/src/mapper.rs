@@ -9,14 +9,14 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use super::super::db_error;
-use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
-use crate::task_board::policy_graph::{
+use crate::db_error;
+use crate::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
+use harness_kernel::errors::CliError;
+use harness_task_board::policy_graph::{
     PolicyCanvasPoint, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace, PolicyGraph,
     PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode,
     PolicyGraphNodeLayout, PolicyGraphNodeLayoutSource,
 };
-use harness_kernel::errors::CliError;
 
 /// All rows that make up a single persisted canvas.
 pub(crate) struct CanvasRowSet {
@@ -422,8 +422,7 @@ mod tests {
     fn canvas_round_trips_through_rows() {
         let mut document = PolicyGraph::seeded_v2();
         document.layout.zoom = 1.25;
-        document.layout.offset =
-            crate::task_board::policy_graph::PolicyCanvasPoint { x: 320, y: 181 };
+        document.layout.offset = PolicyCanvasPoint { x: 320, y: 181 };
         if let Some(layout) = document.layout.nodes.first_mut() {
             layout.source = Some(PolicyGraphNodeLayoutSource::Manual);
         }

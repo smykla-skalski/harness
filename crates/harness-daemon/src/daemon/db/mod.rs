@@ -62,7 +62,7 @@ mod imports;
 pub(crate) use imports::{
     prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
 };
-mod policy;
+mod policy_graph_connection;
 mod pull_request_actions;
 mod rebuild;
 mod remote_acme;
@@ -175,7 +175,7 @@ use conversation::{
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
-pub(crate) use policy::NewApprovalGrant;
+pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
 #[cfg(test)]
 pub(crate) use schema::set_schema_init_hook;

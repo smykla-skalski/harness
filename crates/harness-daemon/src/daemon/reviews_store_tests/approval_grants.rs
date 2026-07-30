@@ -2,14 +2,16 @@ use std::collections::HashMap;
 
 use tempfile::{TempDir, tempdir};
 
-use super::*;
-use crate::daemon::db::ReservedTaskBoardDispatch;
-use crate::daemon::db::task_board::write_workflow_fixture::{
-    approved_write_item, complete_write_preparation,
+use crate::daemon::db::{
+    AsyncDaemonDb, ReservedTaskBoardDispatch, approved_write_item, complete_write_preparation,
 };
 use crate::task_board::{
     PolicyAction, PolicyApprovalState, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
     build_dispatch_plans_with_policy,
+};
+use harness_policy_graph_store::{
+    NewApprovalGrant, consume_approval_grant_in_tx, consume_approval_grant_in_tx_at,
+    insert_pending_grant_at,
 };
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {

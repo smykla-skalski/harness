@@ -3,7 +3,6 @@ use std::ops::Deref;
 
 use tempfile::{TempDir, tempdir};
 
-use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
@@ -13,6 +12,7 @@ use crate::task_board::{
     TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardStatus, build_dispatch_plans_with_policy,
 };
 use harness_kernel::errors::CliError;
+use harness_policy_graph_store::consume_approval_grant_in_tx;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum IntentPhase {

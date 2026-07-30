@@ -7,13 +7,13 @@ use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_preparation_claim::TaskBoardPreparationClaim;
 use super::dispatch_workflow_launch::rebind_write_launch;
 use super::item_tx_ext::TaskBoardItemTxExt;
-use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
 use crate::task_board::{
     DispatchAppliedTask, DispatchPlan, SessionIntent, TaskBoardItem,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
 };
+use harness_policy_graph_store::consume_approval_grant_in_tx;
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
 
@@ -265,11 +265,17 @@ pub(super) async fn reserve_task_board_dispatch(
         evaluate_dispatch_admission_in_tx(&mut transaction, &item, item_revision, None).await?;
     if admission.as_ref().is_some_and(|value| !value.is_allowed()) {
         let mut admission = admission.take().expect("checked task board admission");
-        persist_admission_snapshot_in_tx(&mut transaction, &plan.board_item_id, None, &mut admission)
-            .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit refused task board admission: {error}"))
-        })?;
+        persist_admission_snapshot_in_tx(
+            &mut transaction,
+            &plan.board_item_id,
+            None,
+            &mut admission,
+        )
+        .await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit refused task board admission: {error}")))?;
         return Ok(ReservedTaskBoardDispatch::Blocked(Box::new(admission)));
     }
     let intent_id = format!("dispatch-intent-{}", Uuid::new_v4().simple());
@@ -285,8 +291,13 @@ pub(super) async fn reserve_task_board_dispatch(
     // visible no-op rather than a second competing run. The ticket stays in
     // Todo and at the same revision; only its workflow content moves to
     // Admitting, so the claim guard and launch bindings are unaffected.
-    stamp_admitting_execution_in_tx(&mut transaction, item, item_revision, &workflow_execution_id)
-        .await?;
+    stamp_admitting_execution_in_tx(
+        &mut transaction,
+        item,
+        item_revision,
+        &workflow_execution_id,
+    )
+    .await?;
     let preparation = TaskBoardDispatchPreparation {
         board_item_id: plan.board_item_id.clone(),
         session_id,
@@ -318,7 +329,6 @@ pub(super) async fn reserve_task_board_dispatch(
         preparation: Box::new(preparation),
     })
 }
-
 
 // The remaining `DispatchAdmissionQueries` real implementations live in
 // `queries` (split into its own file to keep this one under the repo's line
