@@ -63,8 +63,6 @@ pub mod ordering;
 mod policy_runtime_store;
 pub mod protocol;
 #[cfg(feature = "daemon-runtime")]
-mod provider_credentials;
-#[cfg(feature = "daemon-runtime")]
 mod pull_request_action_store;
 #[cfg(feature = "daemon-runtime")]
 pub mod remote;
