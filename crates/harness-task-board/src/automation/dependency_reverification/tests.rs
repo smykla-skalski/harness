@@ -3,8 +3,9 @@ use crate::github::{CheckGate, Mergeability, PullRequestIdentity, ReviewDecision
 use crate::{
     TaskBoardDependencyApprovalEvidence, TaskBoardDependencyCheck, TaskBoardDependencyCheckState,
     TaskBoardDependencyConflictEvidence, TaskBoardDependencyConflictState,
-    TaskBoardDependencyIdentity, TaskBoardDependencyTriageDisposition,
-    TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
+    TaskBoardDependencyFixAttemptPolicy, TaskBoardDependencyIdentity,
+    TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageStep,
+    TaskBoardDependencyUpdateClass,
 };
 
 const ORIGINAL_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -16,6 +17,11 @@ const LATER_HEAD: &str = "3456789abcdef0123456789abcdef0123456789a";
 fn request_binds_original_context_fix_ci_diff_and_current_gates() {
     let request = request().expect("valid reverification request");
 
+    assert_request_context(&request);
+    assert_request_prompt(&request);
+}
+
+fn assert_request_context(request: &TaskBoardDependencyReverificationRequest) {
     assert_eq!(request.original_turn_id, "deepseek-turn-1");
     assert_eq!(request.original_triage.exact_head_revision, ORIGINAL_HEAD);
     assert_eq!(request.fixer_result.head_revision, FIXER_HEAD);
@@ -25,8 +31,11 @@ fn request_binds_original_context_fix_ci_diff_and_current_gates() {
         request.verification_id,
         format!("route-1:verify:{REMOTE_HEAD}")
     );
+}
+
+fn assert_request_prompt(request: &TaskBoardDependencyReverificationRequest) {
     let prompt =
-        render_task_board_dependency_reverification_prompt(&request).expect("rendered prompt");
+        render_task_board_dependency_reverification_prompt(request).expect("rendered prompt");
     assert_prompt_mentions_resumed_context(&prompt);
 }
 
@@ -94,7 +103,7 @@ fn request_rejects_failed_ci_stale_identity_and_inconsistent_gates() {
 }
 
 #[test]
-fn validate_rejects_duplicate_checks_required_names_and_diff_mismatches() {
+fn validation_rejects_duplicate_evidence() {
     let mut duplicate_ci = request().expect("valid request");
     let TaskBoardDependencyCheckResumeStatus::ChecksPassed { checks } =
         &mut duplicate_ci.latest_ci.status
@@ -110,7 +119,10 @@ fn validate_rejects_duplicate_checks_required_names_and_diff_mismatches() {
         .required_check_names
         .push("build".into());
     assert!(validate_task_board_dependency_reverification_request(&duplicate_required).is_err());
+}
 
+#[test]
+fn validation_rejects_incomplete_diff_evidence() {
     let mut invalid_diff = request().expect("valid request");
     invalid_diff.diff = "Cargo.lock changed".into();
     assert!(validate_task_board_dependency_reverification_request(&invalid_diff).is_err());
@@ -239,12 +251,14 @@ fn fixer_request() -> TaskBoardDependencyFixRequest {
         board_item_id: "item-1".into(),
         workflow_execution_id: "execution-1".into(),
         attempt: 1,
+        attempt_policy: TaskBoardDependencyFixAttemptPolicy::default(),
         repository: "acme/widgets".into(),
         pull_request_number: 17,
         exact_head_revision: ORIGINAL_HEAD.into(),
         requested_repair: "repair the failing build".into(),
         triage_result: triage(),
         retry_evidence: None,
+        audit: None,
     }
 }
 

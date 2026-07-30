@@ -109,8 +109,8 @@ mod tests {
         TaskBoardDependencyCheck, TaskBoardDependencyCheckConclusion,
         TaskBoardDependencyCheckResumeRecord, TaskBoardDependencyCheckResumeStatus,
         TaskBoardDependencyCheckState, TaskBoardDependencyConflictEvidence,
-        TaskBoardDependencyConflictState, TaskBoardDependencyFixRequest,
-        TaskBoardDependencyFixResult, TaskBoardDependencyIdentity,
+        TaskBoardDependencyConflictState, TaskBoardDependencyFixAttemptPolicy,
+        TaskBoardDependencyFixRequest, TaskBoardDependencyFixResult, TaskBoardDependencyIdentity,
         TaskBoardDependencyReverificationDecision, TaskBoardDependencySettledCheck,
         TaskBoardDependencyTriageDisposition, TaskBoardDependencyTriageResult,
         TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
@@ -226,12 +226,14 @@ mod tests {
             board_item_id: "item-1".into(),
             workflow_execution_id: "execution-1".into(),
             attempt: 1,
+            attempt_policy: TaskBoardDependencyFixAttemptPolicy::default(),
             repository: "acme/widgets".into(),
             pull_request_number: 17,
             exact_head_revision: ORIGINAL.into(),
             requested_repair: "repair".into(),
             triage_result: triage(),
             retry_evidence: None,
+            audit: None,
         }
     }
 
