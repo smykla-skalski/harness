@@ -280,10 +280,10 @@ fn task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static
 mod more;
 
 /// The full expected `(method, path, ws_method, swift_client_exposed)` table
-/// for `task_board_routes_have_complete_ws_parity`, split into its own file
-/// (and `more`, a further split of the same table) purely to keep
-/// `task_board.rs` under the repo's line cap -- this is pure literal data,
-/// not logic.
+/// for `task_board_routes_have_complete_ws_parity`. This file was already
+/// split out of `task_board.rs` to keep that file under the repo's line
+/// cap; `more` is a further split of this same table, keeping this file
+/// itself under the cap. Both splits carry pure literal data, not logic.
 pub(super) fn expected_task_board_ws_parity()
 -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
     let mut expected = Vec::new();
