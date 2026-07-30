@@ -195,19 +195,26 @@ fn local_head(worktree: &Path) -> Result<String, CliError> {
         .map_err(|error| invalid_transition(format!("resolve review HEAD: {error}")))
 }
 
+/// Reviewer runtimes a local read-only workflow can dispatch. Codex runs the
+/// long-standing durable path; `openrouter` runs the shared non-Codex turn
+/// through the `agent_turn_runs` store. A profile naming anything else is a
+/// configuration mistake refused before any side effect.
+pub(super) const SUPPORTED_READ_ONLY_RUNTIMES: [&str; 2] = ["codex", "openrouter"];
+
 pub(super) fn ensure_supported_runtimes(
     reviewers: &TaskBoardResolvedReviewer,
 ) -> Result<(), CliError> {
-    if reviewers
+    if let Some(profile) = reviewers
         .profiles
         .iter()
-        .all(|profile| profile.runtime == "codex")
+        .find(|profile| !SUPPORTED_READ_ONLY_RUNTIMES.contains(&profile.runtime.as_str()))
     {
-        Ok(())
+        Err(invalid_transition(format!(
+            "local read-only workflows do not support reviewer runtime '{}'",
+            profile.runtime
+        )))
     } else {
-        Err(invalid_transition(
-            "local read-only workflows currently require Codex reviewer runtimes",
-        ))
+        Ok(())
     }
 }
 
@@ -231,4 +238,45 @@ const fn is_read_only_workflow(kind: TaskBoardWorkflowKind) -> bool {
 
 fn invalid_transition(detail: impl Into<String>) -> CliError {
     CliErrorKind::invalid_transition(detail.into()).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_board::TaskBoardReviewerProfile;
+
+    fn reviewer(runtime: &str) -> TaskBoardReviewerProfile {
+        TaskBoardReviewerProfile {
+            id: format!("reviewer-{runtime}"),
+            runtime: runtime.into(),
+            persona: "code-reviewer".into(),
+            agent_mode: crate::task_board::AgentMode::Evaluate,
+            model: None,
+            effort: None,
+        }
+    }
+
+    fn resolved(runtimes: &[&str]) -> TaskBoardResolvedReviewer {
+        TaskBoardResolvedReviewer {
+            reviewer_count: 1,
+            required_approvals: 1,
+            max_revision_cycles: 3,
+            profiles: runtimes.iter().map(|runtime| reviewer(runtime)).collect(),
+        }
+    }
+
+    #[test]
+    fn supported_runtimes_accept_codex_and_openrouter() {
+        ensure_supported_runtimes(&resolved(&["codex"])).expect("codex accepted");
+        ensure_supported_runtimes(&resolved(&["openrouter"])).expect("openrouter accepted");
+        ensure_supported_runtimes(&resolved(&["codex", "openrouter"]))
+            .expect("a mixed supported set is accepted");
+    }
+
+    #[test]
+    fn an_unsupported_runtime_is_refused_by_name() {
+        let error =
+            ensure_supported_runtimes(&resolved(&["gemini"])).expect_err("unsupported runtime");
+        assert!(error.to_string().contains("gemini"), "{error}");
+    }
 }

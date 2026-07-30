@@ -35,6 +35,18 @@ where
     // it are structural, so they must not render: an attempt that has already
     // finished has to be harvestable no matter what the prompt file says now.
     let identity = attempt_run_identity(execution, attempt)?;
+    if identity.runtime == "openrouter" {
+        return super::non_codex_reports::reconcile_non_codex_report_attempt(
+            db,
+            runtime,
+            execution,
+            attempt,
+            &identity.runtime,
+            allow_start,
+            now,
+        )
+        .await;
+    }
     let run = load_codex_run(runtime, identity.mode, &attempt.idempotency_key).await?;
     let run = match run {
         Some(run) => run,
@@ -85,7 +97,7 @@ where
     }
 }
 
-fn report_claim_verification_due(
+pub(super) fn report_claim_verification_due(
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
 ) -> Result<bool, CliError> {
@@ -255,7 +267,7 @@ pub(super) async fn record_retry_or_human(
     }
 }
 
-async fn mark_unknown(
+pub(super) async fn mark_unknown(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -365,7 +377,7 @@ async fn retry_wait_available_at(
     }
 }
 
-async fn current_attempt(
+pub(super) async fn current_attempt(
     db: &AsyncDaemonDb,
     expected: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardExecutionAttemptRecord, CliError> {

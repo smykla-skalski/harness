@@ -15,6 +15,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[path = "task_board_read_only_runtime/git_evidence.rs"]
 mod git_evidence;
+#[path = "task_board_read_only_runtime/non_codex.rs"]
+pub(crate) mod non_codex;
+
+pub(crate) use non_codex::NonCodexReportStart;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardPublishVerification {
@@ -53,6 +57,15 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
     ) -> Result<CodexRunSnapshot, CliError> {
         Err(invalid_transition(
             "write workflow runtime does not support WorkspaceWrite starts",
+        ))
+    }
+
+    async fn start_non_codex_report_run(
+        &self,
+        _start: NonCodexReportStart<'_>,
+    ) -> Result<(), CliError> {
+        Err(invalid_transition(
+            "runtime does not support non-Codex report runs",
         ))
     }
 
@@ -176,6 +189,13 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
             move |handle| handle.start_run_with_id(&session_id, &request, run_id),
         )
         .await
+    }
+
+    async fn start_non_codex_report_run(
+        &self,
+        start: NonCodexReportStart<'_>,
+    ) -> Result<(), CliError> {
+        non_codex::start_non_codex_report_run(self.state, start).await
     }
 
     async fn resolve_exact_head(
