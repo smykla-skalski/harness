@@ -4,10 +4,10 @@ use std::fmt;
 /// Which third-party DNS registrar drives the DNS-01 challenge.
 ///
 /// Originally defined in `daemon::remote` alongside its other small ACME
-/// config enums; moved here because the runner and provider selector below
-/// match on it directly, and `daemon::remote` now re-exports it under the
-/// same path so its other callers (`db`, `transport`) keep compiling
-/// unchanged.
+/// config enums; moved here because the runner (`remote_acme_dns_runner.rs`)
+/// and provider selector (`remote_acme_dns_provider.rs`) in this crate match
+/// on it directly, and `daemon::remote` now re-exports it under the same
+/// path so its other callers (`db`, `transport`) keep compiling unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteDnsProvider {
     Aftermarket,
