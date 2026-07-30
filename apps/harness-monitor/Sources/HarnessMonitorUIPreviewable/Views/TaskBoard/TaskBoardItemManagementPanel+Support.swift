@@ -24,7 +24,7 @@ struct TaskBoardReviewReportLoadKey: Hashable {
 
 struct TaskBoardWorkflowProgressLoadKey: Hashable {
   let itemID: String
-  let executionID: String
+  let executionID: String?
   let updatedAt: String
 }
 

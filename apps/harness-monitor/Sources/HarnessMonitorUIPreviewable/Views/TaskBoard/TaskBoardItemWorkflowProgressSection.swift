@@ -213,6 +213,17 @@ struct TaskBoardItemWorkflowProgressSection: View {
   }
 }
 
+extension TaskBoardItem {
+  var showsWorkflowProgress: Bool {
+    switch workflowKind {
+    case .prFix, .prFixReview:
+      true
+    default:
+      false
+    }
+  }
+}
+
 extension String {
   var displayTitle: String {
     replacingOccurrences(of: "_", with: " ")

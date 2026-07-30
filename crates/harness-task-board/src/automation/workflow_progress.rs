@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -98,7 +99,9 @@ pub fn build_task_board_workflow_progress(
             }
         })
         .collect::<Vec<_>>();
-    let current = attempts.last();
+    let current = attempts
+        .iter()
+        .max_by_key(|attempt| DateTime::parse_from_rfc3339(&attempt.updated_at).ok());
 
     TaskBoardWorkflowProgress {
         execution_id: execution.execution_id.clone(),
@@ -159,6 +162,45 @@ mod tests {
         assert_eq!(
             progress.attempts[0].terminal_reason.as_deref(),
             Some("required check failed")
+        );
+    }
+
+    #[test]
+    fn current_runtime_uses_most_recent_attempt() {
+        let mut execution = execution();
+        let mut older_attempt = execution.attempts[0].clone();
+        older_attempt.action_key = "z_cleanup".into();
+        older_attempt.idempotency_key = "run-older".into();
+        older_attempt.updated_at = "2026-07-30T08:00:00Z".into();
+        older_attempt.completed_at = Some("2026-07-30T08:00:00Z".into());
+        execution.attempts.push(older_attempt);
+        let evidence = BTreeMap::from([
+            (
+                "run-1".into(),
+                TaskBoardWorkflowAttemptRuntimeEvidence {
+                    runtime: "codex".into(),
+                    model: Some("gpt-5.3-codex-spark".into()),
+                    report: None,
+                    terminal_reason: None,
+                },
+            ),
+            (
+                "run-older".into(),
+                TaskBoardWorkflowAttemptRuntimeEvidence {
+                    runtime: "openrouter".into(),
+                    model: Some("deepseek/deepseek-v4-flash".into()),
+                    report: None,
+                    terminal_reason: None,
+                },
+            ),
+        ]);
+
+        let progress = build_task_board_workflow_progress(&execution, &evidence);
+
+        assert_eq!(progress.current_runtime.as_deref(), Some("codex"));
+        assert_eq!(
+            progress.current_model.as_deref(),
+            Some("gpt-5.3-codex-spark")
         );
     }
 

@@ -41,12 +41,10 @@ struct TaskBoardItemManagementPanel: View {
   }
 
   private var workflowProgressLoadKey: TaskBoardWorkflowProgressLoadKey? {
-    guard let item, let executionID = item.workflow?.executionId, !executionID.isEmpty else {
-      return nil
-    }
+    guard let item, item.showsWorkflowProgress else { return nil }
     return TaskBoardWorkflowProgressLoadKey(
       itemID: item.id,
-      executionID: executionID,
+      executionID: item.workflow?.executionId,
       updatedAt: item.updatedAt
     )
   }
