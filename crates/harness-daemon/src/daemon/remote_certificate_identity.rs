@@ -31,7 +31,7 @@ impl fmt::Debug for RemotePrivateKeyPem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RemoteCertificateIdentityError {
+pub enum RemoteCertificateIdentityError {
     MissingCertificatePem,
     InvalidCertificatePem(String),
     InvalidCertificateDer(String),

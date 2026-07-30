@@ -9,7 +9,7 @@ use tokio::sync::{Notify, oneshot};
 use harness_kernel::remote_redaction::redact_secret_detail;
 
 #[derive(Clone, Default)]
-pub(crate) struct RemoteAcmeCleanupTracker {
+pub struct RemoteAcmeCleanupTracker {
     state: Arc<RemoteAcmeCleanupState>,
 }
 
@@ -20,12 +20,13 @@ struct RemoteAcmeCleanupState {
 }
 
 impl RemoteAcmeCleanupTracker {
-    #[cfg(test)]
-    pub(crate) fn same_operation(&self, other: &Self) -> bool {
+    #[cfg(any(test, feature = "test-support"))]
+    #[must_use]
+    pub fn same_operation(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.state, &other.state)
     }
 
-    pub(crate) fn spawn_cleanup<F>(&self, cleanup: F) -> oneshot::Receiver<Result<(), String>>
+    pub fn spawn_cleanup<F>(&self, cleanup: F) -> oneshot::Receiver<Result<(), String>>
     where
         F: Future<Output = Result<(), String>> + Send + 'static,
     {
@@ -49,7 +50,7 @@ impl RemoteAcmeCleanupTracker {
         result_rx
     }
 
-    pub(crate) async fn wait_for_cleanup(&self) {
+    pub async fn wait_for_cleanup(&self) {
         loop {
             let completed = self.state.completed.notified();
             if self.state.active.load(Ordering::Acquire) == 0 {

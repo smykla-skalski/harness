@@ -8,7 +8,7 @@ use std::{num::NonZeroU64, str::FromStr};
 
 use clap::ValueEnum;
 
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use harness_remote_trust::remote::{RemoteAccessScope, RemoteRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum DaemonRemoteRole {

@@ -3848,6 +3848,7 @@ version = "55.0.0"
 dependencies = [
  "clap",
  "harness-daemon",
+ "harness-daemon-remote-cli",
  "harness-daemon-snapshot",
  "harness-kernel",
  "harness-protocol",
@@ -3912,6 +3913,29 @@ dependencies = [
  "serde_json",
  "sha1 0.11.0",
  "tracing",
+]
+
+[[package]]
+name = "harness-daemon-remote-cli"
+version = "55.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.23.0",
+ "clap",
+ "harness-daemon",
+ "harness-kernel",
+ "harness-remote-trust",
+ "harness-reviews",
+ "harness-testkit",
+ "libc",
+ "rcgen",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

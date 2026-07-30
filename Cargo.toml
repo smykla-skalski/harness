@@ -13,6 +13,7 @@ members = [
   "crates/harness-daemon-discovery",
   "crates/harness-daemon-launchd",
   "crates/harness-daemon-provider-credentials",
+  "crates/harness-daemon-remote-cli",
   "crates/harness-daemon-root",
   "crates/harness-daemon-state",
   "crates/harness-daemon",
@@ -81,8 +82,8 @@ harness-command = { path = "crates/harness-command", version = "55.0.0" }
 # `harness-daemon` binary itself always builds with.
 harness-daemon = { path = "crates/harness-daemon", version = "55.0.0", optional = true }
 # Same reasoning and gate as `harness-daemon` above: `DaemonCommand` and its
-# local Args types moved out of `crate::daemon::transport` into their own
-# crate (#1230), and `tests/integration/**` needs them for the same
+# local Args types moved into dedicated local and remote CLI crates
+# (#1230, #1140), and `tests/integration/**` needs them for the same
 # in-process command-execution checks it always ran.
 harness-daemon-cli = { path = "crates/harness-daemon-cli", version = "55.0.0", optional = true }
 harness-daemon-client = { path = "crates/harness-daemon-client", version = "55.0.0" }

@@ -4,12 +4,12 @@ use clap::Parser;
 use harness_testkit::with_isolated_harness_env;
 use rcgen::{CertificateParams, KeyPair};
 
-use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
-use crate::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
-use crate::daemon::remote_pairing::RemotePairingCode;
-use crate::daemon::state;
+use harness_daemon::app::{AppContext, Execute};
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
+use harness_daemon::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
+use harness_daemon::daemon::state;
+use harness_remote_trust::remote_pairing::RemotePairingCode;
 
 use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand, DaemonRemoteServeArgs};
 
@@ -68,7 +68,7 @@ fn daemon_remote_serve_args_select_remote_http_auth_mode() {
     assert_eq!(serve_config.port, 443);
     assert_eq!(
         serve_config.auth_mode,
-        crate::daemon::http::DaemonHttpAuthMode::Remote
+        harness_daemon::daemon::http::DaemonHttpAuthMode::Remote
     );
     assert_eq!(
         serve_config.remote_domain.as_deref(),

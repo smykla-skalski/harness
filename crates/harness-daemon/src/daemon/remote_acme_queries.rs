@@ -2,7 +2,7 @@
 //!
 //! `db/remote_acme.rs` and `db/remote_acme_cas.rs` persist this area's
 //! account, certificate, and renewal state, but the trait lives here, next to
-//! the domain code that calls it (`daemon::transport::remote_acme`,
+//! the domain code that calls it (`harness-daemon-remote-cli`,
 //! `daemon::remote_acme_renewal`) rather than inside `db`. `db` doesn't own
 //! `DaemonDb`'s callers, and an inherent `impl DaemonDb` block for this area
 //! could never move into a crate `db` doesn't share with them; a trait this
@@ -24,7 +24,7 @@ use super::remote_acme::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RemoteAcmeRenewalStatus {
+pub enum RemoteAcmeRenewalStatus {
     Unknown,
     Succeeded,
     Failed,
@@ -32,7 +32,7 @@ pub(crate) enum RemoteAcmeRenewalStatus {
 
 impl RemoteAcmeRenewalStatus {
     #[must_use]
-    pub(crate) const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
             Self::Succeeded => "succeeded",
@@ -42,15 +42,15 @@ impl RemoteAcmeRenewalStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RemoteAcmeStoredState {
-    pub(crate) account_configured: bool,
-    pub(crate) account_id: Option<String>,
-    pub(crate) serve_config: Option<RemoteDaemonServeConfig>,
-    pub(crate) certificate_configured: bool,
-    pub(crate) certificate_fingerprint: Option<String>,
-    pub(crate) renewal_status: RemoteAcmeRenewalStatus,
-    pub(crate) renewal_error: Option<String>,
-    pub(crate) updated_at: String,
+pub struct RemoteAcmeStoredState {
+    pub account_configured: bool,
+    pub account_id: Option<String>,
+    pub serve_config: Option<RemoteDaemonServeConfig>,
+    pub certificate_configured: bool,
+    pub certificate_fingerprint: Option<String>,
+    pub renewal_status: RemoteAcmeRenewalStatus,
+    pub renewal_error: Option<String>,
+    pub updated_at: String,
 }
 
 /// `db`'s remote-ACME persistence, scoped to the account, certificate, and
@@ -64,7 +64,7 @@ pub(crate) struct RemoteAcmeStoredState {
     reason = "the crate-boundary seam this module exists for; every caller \
               still goes through the inherent method each one forwards to"
 )]
-pub(crate) trait RemoteAcmeQueries {
+pub trait RemoteAcmeQueries {
     /// # Errors
     /// Returns [`CliError`] on SQL or status parsing failures.
     fn load_remote_acme_state(&self) -> Result<RemoteAcmeStoredState, CliError>;

@@ -1,16 +1,16 @@
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::RemoteAccessScope;
-use crate::daemon::remote_identity::{
+use harness_daemon::app::{AppContext, Execute};
+use harness_daemon::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
+use harness_daemon::daemon::db::{DaemonDb, RemoteIdentitySyncQueries};
+use harness_daemon::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_remote_trust::remote::RemoteAccessScope;
+use harness_remote_trust::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken,
     RemoteStoredClient, remote_token_hint,
 };
-use crate::workspace::utc_now;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::remote::{DaemonRemoteClientIdArgs, DaemonRemoteClientsCommand, open_remote_daemon_db};
 

@@ -1,6 +1,6 @@
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
-use crate::daemon::remote_identity::RemoteClientRegistration;
+use harness_daemon::daemon::db::{DaemonDb, RemoteIdentitySyncQueries};
+use harness_remote_trust::remote::{RemoteAccessScope, RemoteRole};
+use harness_remote_trust::remote_identity::RemoteClientRegistration;
 
 use super::super::remote::{DaemonRemoteClientIdArgs, DaemonRemoteClientsCommand};
 

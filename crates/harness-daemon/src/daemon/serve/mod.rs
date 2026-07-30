@@ -21,7 +21,7 @@ mod task_board_migration;
 pub(crate) mod test_support;
 mod watch_port;
 
-pub(crate) use shutdown_signals::ShutdownSignalGuard;
+pub use shutdown_signals::ShutdownSignalGuard;
 
 pub(crate) use config::{http_auth_mode, validate_serve_config};
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
@@ -34,7 +34,7 @@ pub(crate) use reconciliation::{
     prepared_session_import_required, run_background_reconciliation, session_import_required,
     sync_background_projects_and_collect_candidates,
 };
-pub(crate) use remote::serve_remote_https;
+pub use remote::serve_remote_https;
 
 pub use config::DaemonServeConfig;
 use std::path::Path;

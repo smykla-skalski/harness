@@ -22,7 +22,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 /// # Errors
 /// Returns [`CliError`] when `created_at` is not RFC 3339 or the TTL pushes the
 /// expiry past what a timestamp can hold.
-pub(crate) fn pairing_expires_at(created_at: &str, ttl_seconds: u64) -> Result<String, CliError> {
+pub fn pairing_expires_at(created_at: &str, ttl_seconds: u64) -> Result<String, CliError> {
     let created_at = DateTime::parse_from_rfc3339(created_at)
         .map_err(|error| CliErrorKind::workflow_parse(format!("parse pairing time: {error}")))?
         .with_timezone(&Utc);
@@ -34,7 +34,7 @@ pub(crate) fn pairing_expires_at(created_at: &str, ttl_seconds: u64) -> Result<S
     Ok(expires_at.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
-pub(crate) struct RemotePairingCreateParams<'a> {
+pub struct RemotePairingCreateParams<'a> {
     pub pairing_id: &'a str,
     pub audit_event_id: &'a str,
     pub code: &'a RemotePairingCode,
@@ -54,7 +54,7 @@ pub(crate) struct RemotePairingCreateParams<'a> {
     pub extra_audit: Option<&'a RemoteAuditEvent>,
 }
 
-pub(crate) struct RemotePairingCreated {
+pub struct RemotePairingCreated {
     pub pairing_id: String,
     pub role: String,
     pub scopes: Vec<String>,
@@ -76,7 +76,7 @@ pub(crate) struct RemotePairingCreated {
 /// # Errors
 /// Returns [`CliError`] when scope expansion, subject validation, invitation
 /// assembly, or persistence fails.
-pub(crate) fn create_remote_pairing(
+pub fn create_remote_pairing(
     db: &DaemonDb,
     params: &RemotePairingCreateParams<'_>,
 ) -> Result<RemotePairingCreated, CliError> {

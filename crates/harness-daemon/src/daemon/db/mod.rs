@@ -169,7 +169,10 @@ pub(crate) use async_bootstrap::all_migration_versions;
 // `pub`, not `pub(crate)`: `tests/integration_daemon.rs`'s task-board sync
 // scenarios link `harness` as an ordinary dependency and need this handle
 // directly, the same reason `daemon::state::test_support` is `pub` there.
-pub(crate) use crate::daemon::remote_acme_queries::RemoteAcmeStoredState;
+pub use crate::daemon::remote_acme_queries::{
+    RemoteAcmeQueries, RemoteAcmeRenewalStatus, RemoteAcmeStoredState,
+};
+pub use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingClaimCodeError;
 pub use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]

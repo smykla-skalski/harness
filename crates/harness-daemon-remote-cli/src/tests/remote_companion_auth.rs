@@ -1,9 +1,9 @@
 use clap::{CommandFactory, Parser};
 use harness_testkit::with_isolated_harness_env;
 
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::RemoteDaemonServeConfig;
-use crate::daemon::remote_acme::{
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries};
+use harness_daemon::daemon::remote::RemoteDaemonServeConfig;
+use harness_daemon::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
     RemoteCertificateBundle,
 };

@@ -1,7 +1,7 @@
 //! Small CLI-output and root-adoption helpers shared by `harness-daemon`'s own
 //! command dispatch (`harness-daemon-cli`, an ordinary downstream dependency
 //! of this crate) and the remote-daemon subcommand tree
-//! (`daemon::transport`, still inside this crate). Neither caller depends on
+//! (`harness-daemon-remote-cli`). Neither caller depends on
 //! the other, so these live here instead of in either one - the same reason
 //! `remote_redaction.rs` moved to `harness-kernel` rather than into either
 //! side of the remote-trust split.
