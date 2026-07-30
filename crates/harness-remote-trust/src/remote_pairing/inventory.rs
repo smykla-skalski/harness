@@ -14,7 +14,8 @@ use super::RemotePairingSubject;
 /// Ordered by how far the link has travelled, so a reader can see that
 /// `Revoked` overrides everything else: a device whose credential was cut off
 /// is revoked whether or not its link had also expired.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum RemotePairingState {
     /// Minted, still claimable, nobody has used it.
@@ -72,7 +73,8 @@ pub struct RemotePairingObservation<'a> {
 }
 
 /// The device a claimed link became.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RemotePairingDevice {
     pub client_id: String,
     pub display_name: String,
@@ -85,7 +87,8 @@ pub struct RemotePairingDevice {
 }
 
 /// One link and what became of it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RemotePairingInventoryEntry {
     pub pairing_id: String,
     /// The enum rather than its label, so the schema enumerates what a reader

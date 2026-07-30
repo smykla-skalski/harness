@@ -7,11 +7,11 @@ unalias -a 2>/dev/null || true
 # unifies features across every selected package for the length of an
 # invocation, so a crate that only builds because a sibling switched one of its
 # optional dependencies on still passes. That is the whole point of the split,
-# and it is why these stay thirty separate invocations.
+# and it is why these stay separate invocations.
 #
-# The caller wraps this in `cargo-local.sh --with-group-lease` so the thirty
-# share one build lease instead of thirty, which is what stops them from
-# sizing each other down to a fraction of the machine.
+# The caller wraps this in `cargo-local.sh --with-group-lease` so they share one
+# build lease, which stops them from sizing each other down to a fraction of
+# the machine.
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)"
 cargo_local="$ROOT/scripts/cargo-local.sh"
 
