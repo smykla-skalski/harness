@@ -24,6 +24,9 @@ use crate::task_board::{
     bind_plan_approval, build_planning_result, resolve_task_board_reviewers,
 };
 
+#[path = "offers/openrouter.rs"]
+mod openrouter;
+
 #[derive(Clone, Copy)]
 enum RepositorySource {
     Snapshot,

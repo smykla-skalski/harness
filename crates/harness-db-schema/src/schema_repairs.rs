@@ -64,6 +64,8 @@ const CURRENT_SCHEMA_RUN_COLUMNS: &[(&str, &str)] = &[
     ("codex_runs", "board_item_id"),
     ("codex_runs", "workflow_execution_id"),
     ("agent_turn_runs", "runtime_turn_id"),
+    ("task_board_ai_review_reports", "requested_runtime"),
+    ("task_board_ai_review_reports", "actual_runtime"),
 ];
 
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
@@ -340,6 +342,7 @@ pub fn repair_current_schema_shape(
     super::schema_v58::run(conn)?;
     super::schema_v59::run(conn)?;
     super::schema_v60::run(conn)?;
+    super::schema_v61::run(conn)?;
     super::schema_repairs_external_creates::require_complete_shape(conn)?;
     super::schema_repairs_wake_events::require_complete_shape(conn)?;
     super::schema_repairs_admission::require_complete_shape(conn)?;

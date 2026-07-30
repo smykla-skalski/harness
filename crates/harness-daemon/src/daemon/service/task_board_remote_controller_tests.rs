@@ -54,6 +54,27 @@ async fn eligible_initial_attempt_selects_remote_before_any_local_run() {
 }
 
 #[tokio::test]
+async fn remote_offer_freezes_the_same_openrouter_runtime_as_the_local_attempt() {
+    let fixture = Box::pin(crate::daemon::db::remote_controller_fixture_with_runtime(
+        1,
+        "openrouter",
+    ))
+    .await;
+    refresh_fixture_observation(&fixture, 1, 0).await;
+    let mut report = TaskBoardRemoteControllerReport::default();
+
+    offer_remote_candidates(&fixture.db, &mut report)
+        .await
+        .expect("select the OpenRouter-capable host");
+
+    assert_eq!(report.offered_attempts, 1);
+    assert_eq!(
+        offered_runtime(&fixture).await,
+        fixture.execution.resolved_reviewers.profiles[0].runtime,
+    );
+}
+
+#[tokio::test]
 async fn no_eligible_host_selects_one_local_target_before_claim() {
     let fixture = Box::pin(remote_controller_fixture(1)).await;
     // A valid host advertises at least one slot; a fully-occupied host is the "no eligible host" case.
@@ -295,4 +316,15 @@ async fn codex_run_count(fixture: &crate::daemon::db::RemoteControllerFixture) -
         .fetch_one(fixture.db.pool())
         .await
         .expect("count local Codex runs")
+}
+
+async fn offered_runtime(fixture: &crate::daemon::db::RemoteControllerFixture) -> String {
+    query_scalar(
+        "SELECT json_extract(request_json, '$.launch.runtime') \
+         FROM task_board_remote_assignments WHERE execution_id = ?1",
+    )
+    .bind(&fixture.execution.execution_id)
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load offered runtime")
 }

@@ -22,21 +22,24 @@ use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assig
 use super::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, to_i64,
 };
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::daemon::protocol::CodexRunSnapshot;
+use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, db_error};
 
 impl AsyncDaemonDb {
     #[expect(
         clippy::cognitive_complexity,
         reason = "fenced transaction guard chain; each guard settles the transaction before returning"
     )]
-    pub(crate) async fn claim_task_board_remote_executor_stop_pending(
+    pub(crate) async fn claim_task_board_remote_executor_stop_pending<S>(
         &self,
         authority: &TaskBoardRemoteExecutorStopAuthority,
-        snapshot: &CodexRunSnapshot,
+        snapshot: &S,
         reason: TaskBoardRemoteExecutorStopReason,
         acquired_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorStopPending>, CliError> {
+    ) -> Result<Option<TaskBoardRemoteExecutorStopPending>, CliError>
+    where
+        S: Clone + Into<TaskBoardRemoteExecutorRun>,
+    {
+        let snapshot = snapshot.clone().into();
         canonical_time(acquired_at, "remote executor stop authority time")?;
         let assignment_id = authority_assignment_id(authority);
         let mut transaction = self
@@ -44,7 +47,7 @@ impl AsyncDaemonDb {
             .await?;
         let record = require_assignment(&mut transaction, assignment_id).await?;
         if let Some(current) = record.executor_stop_pending.as_ref() {
-            if stop_request_replays(current, authority, snapshot, reason) {
+            if stop_request_replays(current, authority, &snapshot, reason) {
                 let replay = current.clone();
                 commit_noop(transaction, "replayed remote executor stop authority").await?;
                 return Ok(Some(replay));
@@ -54,12 +57,12 @@ impl AsyncDaemonDb {
             ));
         }
         if !source_matches(&record, authority, reason)
-            || !durable_run_matches_snapshot(&mut transaction, &record, snapshot).await?
+            || !durable_run_matches_snapshot(&mut transaction, &record, &snapshot).await?
         {
             commit_noop(transaction, "stale remote executor stop authority").await?;
             return Ok(None);
         }
-        let pending = stop_pending(&record, authority, snapshot, reason, acquired_at)?;
+        let pending = stop_pending(&record, authority, &snapshot, reason, acquired_at)?;
         let (json, sha256) = stop_pending_values(&pending)?;
         let rows = query(
             "UPDATE task_board_remote_assignments

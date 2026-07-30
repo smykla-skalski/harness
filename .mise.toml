@@ -351,7 +351,6 @@ depends = [
   "harness:check:binary-contracts",
   "harness:check:source-size",
   "harness:check:rust",
-  "sybra:check",
   "panel:frontend:lint",
 ]
 
@@ -430,6 +429,7 @@ run = "./scripts/cargo-local.sh --with-group-lease ./scripts/check-feature-isola
 
 [tasks."harness:check:rust"]
 hide = true
+depends = ["sybra:check"]
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
   # harness-observe stays its own invocation: harness-daemon forwards its

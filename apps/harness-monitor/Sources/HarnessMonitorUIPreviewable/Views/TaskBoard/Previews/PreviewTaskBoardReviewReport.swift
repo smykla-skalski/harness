@@ -14,17 +14,39 @@ import SwiftUI
     )
 }
 
+#Preview("Task Board Review Terminal Execution") {
+  TaskBoardReviewReportPreviewSurface(
+    item: TaskBoardReviewReportPreviewFixture.terminalItem,
+    response: TaskBoardReviewReportPreviewFixture.terminalResponse
+  )
+  .harnessPreviewSceneAppearance()
+}
+
 @MainActor
 private struct TaskBoardReviewReportPreviewSurface: View {
-  @State private var state = TaskBoardReviewReportState(
-    response: .completed(report: TaskBoardReviewReportPreviewFixture.report)
-  )
+  @State private var state: TaskBoardReviewReportState
+  private let item: TaskBoardItem
+  private let initiallyExpanded: Bool
+
+  init(
+    item: TaskBoardItem = TaskBoardReviewReportPreviewFixture.item,
+    response: TaskBoardAiReviewReportResponse = .completed(
+      report: TaskBoardReviewReportPreviewFixture.report
+    ),
+    initiallyExpanded: Bool = false
+  ) {
+    self.item = item
+    self.initiallyExpanded = initiallyExpanded
+    _state = State(initialValue: TaskBoardReviewReportState(response: response))
+  }
 
   var body: some View {
     TaskBoardItemReviewReportSection(
-      item: TaskBoardReviewReportPreviewFixture.item,
+      item: item,
       actions: TaskBoardOverviewActions(store: nil, scope: .dashboard),
-      state: state
+      state: state,
+      initiallyShowsDetails: initiallyExpanded,
+      initiallyShowsFullSummary: initiallyExpanded
     )
     .padding(24)
     .frame(width: 560, alignment: .topLeading)
@@ -33,36 +55,11 @@ private struct TaskBoardReviewReportPreviewSurface: View {
 }
 
 private enum TaskBoardReviewReportPreviewFixture {
-  static let currentHead = String(repeating: "b", count: 40)
-  static let reportHead = String(repeating: "a", count: 40)
+  static let currentHead = "dc78a2698cb7b5e197825a81bd92bb12c8109b81"
+  static let reportHead = "b08dca3c08f699e66ee97162f425539667936848"
 
-  static let item = TaskBoardItem(
-    schemaVersion: 1,
-    id: "review-report-preview",
-    title: "Review pull request #901",
-    body: "Inspect the selected immutable revision.",
-    status: .inReview,
-    priority: .high,
-    tags: ["review"],
-    projectId: "harness",
-    executionRepository: "smykla-skalski/harness",
-    agentMode: .evaluate,
-    workflowKind: .prReview,
-    externalRefs: [],
-    planning: TaskBoardPlanningState(),
-    workflow: TaskBoardWorkflowState(
-      status: .completed,
-      prNumber: 901,
-      prUrl: "https://github.com/smykla-skalski/harness/pull/901",
-      prHeadRevision: currentHead
-    ),
-    sessionId: nil,
-    workItemId: nil,
-    usage: TaskBoardUsage(),
-    createdAt: "2026-07-29T19:35:00Z",
-    updatedAt: "2026-07-29T19:42:00Z",
-    deletedAt: nil
-  )
+  static let item = makeItem(workflowStatus: .completed)
+  static let terminalItem = makeItem(workflowStatus: .failed)
 
   static let report = TaskBoardAiReviewReportRecord(
     reportId: "report-preview-901",
@@ -72,32 +69,171 @@ private enum TaskBoardReviewReportPreviewFixture {
     pullRequestNumber: 901,
     headRevision: reportHead,
     runtime: "openrouter",
+    requestedRuntime: "openrouter",
+    actualRuntime: "openrouter",
     requestedModel: "deepseek/deepseek-v4-flash",
     effectiveModel: "deepseek/deepseek-v4-flash",
     status: .completed,
-    summary: "The review completed with one actionable finding.",
+    summary: """
+      The review validates the new multi-runtime execution path across local and remote task-board \
+      workflows. Runtime selection is now frozen from the reviewer profile before an offer is \
+      created, and the remote executor routes OpenRouter work through the durable agent turn store \
+      while leaving the existing Codex path intact. Requested and actual runtime provenance is \
+      retained with the originating ticket so operators can distinguish configuration intent from \
+      the adapter that performed the work
+
+      Four findings remain. The two blocking findings concern stale executor fencing and restart \
+      reconciliation, where concurrent ownership changes could publish an obsolete result or start \
+      the same OpenRouter turn twice. The medium finding identifies a report path that reads current \
+      configuration instead of durable execution provenance. The low finding asks for explicit \
+      regression coverage proving that remote Codex runs continue to use codex_runs and never enter \
+      agent_turn_runs. Address the blocking findings before merging and retain the lower-severity \
+      cases as acceptance coverage for the final delivery
+      """,
     findings: [
       TaskBoardReportOnlyReviewFinding(
+        severity: .critical,
+        location: TaskBoardReviewFindingLocation(
+          path: "src/service/serve/task_board_remote_executor_loop/openrouter.rs",
+          line: 184
+        ),
+        evidence: """
+          A resumed OpenRouter run can publish after its lease is fenced, allowing a stale \
+          executor to overwrite the authoritative result
+          """
+      ),
+      TaskBoardReportOnlyReviewFinding(
+        severity: .high,
+        location: TaskBoardReviewFindingLocation(
+          path: "src/service/serve/task_board_remote_executor_loop/reconcile.rs",
+          line: 92
+        ),
+        evidence: """
+          Restart reconciliation can start a second agent turn before the interrupted durable \
+          run is adopted
+          """
+      ),
+      TaskBoardReportOnlyReviewFinding(
         severity: .medium,
-        location: TaskBoardReviewFindingLocation(path: "src/review.rs", line: 42),
-        evidence: "The retry path does not preserve the original correlation id."
-      )
+        location: TaskBoardReviewFindingLocation(
+          path: "src/service/serve/task_board_review_report.rs",
+          line: 147
+        ),
+        evidence: """
+          The ticket report reads the configured runtime instead of the actual runtime retained \
+          by the durable run
+          """
+      ),
+      TaskBoardReportOnlyReviewFinding(
+        severity: .low,
+        location: TaskBoardReviewFindingLocation(
+          path: "tests/integration/daemon_control/restart_boundaries/task_board_admission.rs",
+          line: 311
+        ),
+        evidence: """
+          The restart fixture does not assert that Codex runs remain isolated from \
+          agent_turn_runs
+          """
+      ),
     ],
     startedAt: "2026-07-29T19:40:00Z",
     finishedAt: "2026-07-29T19:41:12Z"
   )
+
+  static let terminalResponse = TaskBoardAiReviewReportResponse.notStarted(
+    terminal: TaskBoardAiReviewUnavailableExecution(
+      executionId: "execution-preview-901",
+      executionState: .failed,
+      runtime: "openrouter",
+      requestedRuntime: "openrouter",
+      actualRuntime: "openrouter",
+      requestedModel: "deepseek/deepseek-v4-flash",
+      headRevision: currentHead,
+      startedAt: "2026-07-29T19:40:00Z",
+      finishedAt: "2026-07-29T19:41:12Z"
+    )
+  )
+
+  private static func makeItem(workflowStatus: TaskBoardWorkflowStatus) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: "review-report-preview",
+      title: "Review pull request #901",
+      body: "Inspect the selected immutable revision",
+      status: .inReview,
+      priority: .high,
+      tags: ["review"],
+      projectId: "harness",
+      executionRepository: "smykla-skalski/harness",
+      agentMode: .evaluate,
+      workflowKind: .prReview,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(),
+      workflow: TaskBoardWorkflowState(
+        status: workflowStatus,
+        prNumber: 901,
+        prUrl: "https://github.com/smykla-skalski/harness/pull/901",
+        prHeadRevision: currentHead,
+        lastError: workflowStatus == .failed
+          ? "The OpenRouter review stopped before producing a report"
+          : nil
+      ),
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-07-29T19:35:00Z",
+      updatedAt: "2026-07-29T19:42:00Z",
+      deletedAt: nil
+    )
+  }
 }
 
-extension TaskBoardInspectorPreviewRenderer {
-  static func dumpReviewReport(toDirectory directory: String) -> Bool {
-    renderReviewReport(
+@MainActor
+public enum TaskBoardReviewReportPreviewRenderer {
+  public static func dump(toDirectory directory: String) -> Bool {
+    do {
+      try FileManager.default.createDirectory(
+        atPath: directory,
+        withIntermediateDirectories: true
+      )
+    } catch {
+      return false
+    }
+
+    return renderReviewReport(
       name: "review-report-default",
       textSizeIndex: HarnessMonitorTextSize.defaultIndex,
       directory: directory
     )
       && renderReviewReport(
+        name: "review-report-expanded-default",
+        textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        initiallyExpanded: true,
+        directory: directory
+      )
+      && renderReviewReport(
         name: "review-report-largest-text",
         textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
+        directory: directory
+      )
+      && renderReviewReport(
+        name: "review-report-expanded-largest-text",
+        textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
+        initiallyExpanded: true,
+        directory: directory
+      )
+      && renderReviewReport(
+        name: "review-report-terminal-default",
+        textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        item: TaskBoardReviewReportPreviewFixture.terminalItem,
+        response: TaskBoardReviewReportPreviewFixture.terminalResponse,
+        directory: directory
+      )
+      && renderReviewReport(
+        name: "review-report-terminal-largest-text",
+        textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
+        item: TaskBoardReviewReportPreviewFixture.terminalItem,
+        response: TaskBoardReviewReportPreviewFixture.terminalResponse,
         directory: directory
       )
   }
@@ -105,15 +241,48 @@ extension TaskBoardInspectorPreviewRenderer {
   private static func renderReviewReport(
     name: String,
     textSizeIndex: Int,
+    item: TaskBoardItem = TaskBoardReviewReportPreviewFixture.item,
+    response: TaskBoardAiReviewReportResponse = .completed(
+      report: TaskBoardReviewReportPreviewFixture.report
+    ),
+    initiallyExpanded: Bool = false,
     directory: String
   ) -> Bool {
     let content =
-      TaskBoardReviewReportPreviewSurface()
+      TaskBoardReviewReportPreviewSurface(
+        item: item,
+        response: response,
+        initiallyExpanded: initiallyExpanded
+      )
       .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
     let view = NSHostingView(rootView: content)
-    let height: CGFloat =
-      textSizeIndex == HarnessMonitorTextSize.scales.count - 1 ? 760 : 560
-    view.setFrameSize(NSSize(width: 560, height: height))
+    view.setFrameSize(NSSize(width: 560, height: 1))
+    view.layoutSubtreeIfNeeded()
+    let fittingSize = view.fittingSize
+    view.setFrameSize(
+      NSSize(
+        width: 560,
+        height: fittingSize.height
+      )
+    )
+    let window = NSWindow(
+      contentRect: view.bounds,
+      styleMask: .borderless,
+      backing: .buffered,
+      defer: false,
+      screen: NSScreen.main
+    )
+    window.contentView = view
+    view.layoutSubtreeIfNeeded()
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+    let settledSize = view.fittingSize
+    view.setFrameSize(
+      NSSize(
+        width: 560,
+        height: settledSize.height
+      )
+    )
+    window.setContentSize(view.frame.size)
     view.layoutSubtreeIfNeeded()
 
     guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {

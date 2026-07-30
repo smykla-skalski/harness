@@ -42,7 +42,7 @@ pub(crate) fn reviewers(reviewer_count: u32, required_approvals: u32) -> TaskBoa
     .take(usize::try_from(reviewer_count).expect("reviewer count"))
     .map(|(id, persona)| TaskBoardReviewerProfile {
         id: id.into(),
-        runtime: "runtime-shared".into(),
+        runtime: "codex".into(),
         persona: persona.into(),
         agent_mode: AgentMode::Evaluate,
         model: Some(format!("model-{id}")),

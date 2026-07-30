@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use super::RemoteWorkerIdentity;
-use super::runtime::{stop_codex_run, validate_run_snapshot};
+use super::runtime::{stop_remote_run, validate_run_snapshot};
 use super::source_bundle::cleanup_prior_phase_import_ref;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
-    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
+    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun,
+    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopReason,
+    TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::http::DaemonHttpState;
-use crate::daemon::protocol::CodexRunSnapshot;
 use crate::session::storage as session_storage;
 use crate::session::types::SessionState;
 use crate::task_board::TaskBoardRemoteAssignmentState;
@@ -64,7 +64,7 @@ pub(super) async fn reconcile_settled_executor_cleanup(
 }
 
 /// Releases the local state an executor built for a settled assignment.
-/// `Ok(true)` means an active Codex run was asked to stop and nothing else was
+/// `Ok(true)` means an active runtime run was asked to stop and nothing else was
 /// released yet, so the caller must leave the cleanup fence open this pass.
 #[expect(
     clippy::cognitive_complexity,
@@ -76,10 +76,14 @@ async fn release_executor_local_state(
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<bool, CliError> {
-    if let Some(run) = db.codex_run(&identity.run_id).await? {
+    let offer = record.require_offer()?;
+    if let Some(run) = db
+        .task_board_remote_executor_run(offer, &identity.run_id)
+        .await?
+    {
         validate_cleanup_run(db, record, identity, &run).await?;
         if run.status.is_active() {
-            stop_codex_run(state, &identity.run_id).await?;
+            stop_remote_run(state, db, &run).await?;
             return Ok(true);
         }
     }
@@ -105,7 +109,12 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
     if !exact_unstarted_provisioning(&record, authority) {
         return Ok(false);
     }
-    if db.codex_run(&authority.identity.run_id).await?.is_some() {
+    let offer = record.require_offer()?;
+    if db
+        .task_board_remote_executor_run(offer, &authority.identity.run_id)
+        .await?
+        .is_some()
+    {
         return Err(concurrent(
             "remote executor provisioning cleanup found a durable run",
         ));
@@ -197,7 +206,11 @@ async fn preclaim_superseded_cleanup_is_empty(
             "preclaim superseded cleanup contains executor work evidence",
         ));
     }
-    if db.codex_run(&identity.run_id).await?.is_some()
+    let offer = record.require_offer()?;
+    if db
+        .task_board_remote_executor_run(offer, &identity.run_id)
+        .await?
+        .is_some()
         || db.resolve_session(&identity.session_id).await?.is_some()
     {
         return Err(concurrent(
@@ -255,7 +268,7 @@ async fn validate_cleanup_run(
     db: &AsyncDaemonDb,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
-    run: &CodexRunSnapshot,
+    run: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
     if let Some(start) = record.start_receipt.as_ref() {
         return validate_run_snapshot(
@@ -389,7 +402,12 @@ async fn cleanup_orphan_executor_session(
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<(), CliError> {
-    if db.codex_run(&identity.run_id).await?.is_some() {
+    let offer = record.require_offer()?;
+    if db
+        .task_board_remote_executor_run(offer, &identity.run_id)
+        .await?
+        .is_some()
+    {
         return Err(concurrent(
             "unstarted remote cleanup found an unowned deterministic session",
         ));

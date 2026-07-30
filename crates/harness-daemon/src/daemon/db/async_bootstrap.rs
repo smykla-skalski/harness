@@ -118,6 +118,8 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         46 => Some(("task_board_items", "source_project_id")),
         48 => Some(("task_board_projects", "color")),
         50 => Some(("task_board_projects", "shape")),
+        60 => Some(("task_board_ai_review_reports", "requested_runtime")),
+        61 => Some(("task_board_ai_review_reports", "actual_runtime")),
         _ => None,
     }
 }
@@ -197,6 +199,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         58 => 59,
         // v60 retains the provider-owned turn identity for report harvesting.
         59 => 60,
+        // v61 splits report runtime provenance across replayable ALTERs.
+        60..=62 => 61,
         _ => u64::MAX,
     }
 }

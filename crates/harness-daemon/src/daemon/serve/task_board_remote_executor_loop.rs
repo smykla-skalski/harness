@@ -1,5 +1,5 @@
 //! Host-local executor loop for durable remote Task Board attempts.
-//! It owns checkout/Codex work; the controller owns progression and local paths never cross hosts.
+//! It owns checkout/runtime work; the controller owns progression and local paths never cross hosts.
 
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorIdentity,
@@ -45,9 +45,9 @@ use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executo
 use fences::{concurrent, invalid_transition, require_executor_identity, shutdown_observed};
 use recovery::{abandon_predecessor_claim, prepare_recovery};
 #[cfg(test)]
-use runtime::remote_codex_request;
+use runtime::remote_run_request;
 use runtime::{
-    PreparedRemoteWorkerAction, RemoteWorkerAction, start_window_is_open, stop_codex_run,
+    PreparedRemoteWorkerAction, RemoteWorkerAction, start_window_is_open, stop_remote_run,
     validate_run_identity, worker_action,
 };
 use scan::executor_assignment_ids;
@@ -233,12 +233,9 @@ async fn reconcile_active_remote_worker(
 ) -> Result<(), CliError> {
     require_executor_identity(&record)?;
     let offer = record.require_offer()?.clone();
-    if offer.launch.runtime != "codex" {
-        return Err(invalid_transition(
-            "remote executor supports only the Codex runtime",
-        ));
-    }
-    let existing = db.codex_run(&identity.run_id).await?;
+    let existing = db
+        .task_board_remote_executor_run(&offer, &identity.run_id)
+        .await?;
     let action = worker_action(record.state, existing.as_ref().map(|run| run.status));
     if action == RemoteWorkerAction::Hold {
         return Ok(());
@@ -451,17 +448,19 @@ async fn stop_terminal_remote_worker(
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<(), CliError> {
-    let Some(snapshot) = db.codex_run(&identity.run_id).await? else {
+    let offer = record.require_offer()?;
+    let Some(snapshot) = db
+        .task_board_remote_executor_run(offer, &identity.run_id)
+        .await?
+    else {
         return Ok(());
     };
     require_executor_identity(record)?;
-    let offer = record.require_offer()?;
     validate_run_identity(&snapshot, offer, identity)?;
     if !snapshot.status.is_active() {
         return Ok(());
     }
-    let run_id = identity.run_id.clone();
-    stop_codex_run(state, &run_id).await
+    stop_remote_run(state, db, &snapshot).await
 }
 
 #[cfg(test)]

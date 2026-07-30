@@ -77,7 +77,7 @@ impl AcceptanceFixture {
                     .into_owned(),
                 })
                 .collect(),
-            runtimes: vec!["codex".into()],
+            runtimes: vec!["codex".into(), "openrouter".into()],
             capabilities: vec![
                 TaskBoardPhaseCapabilityProfile::ImplementationWrite,
                 TaskBoardPhaseCapabilityProfile::ReviewReadOnly,

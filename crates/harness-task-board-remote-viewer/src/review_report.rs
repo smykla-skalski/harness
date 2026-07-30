@@ -99,6 +99,8 @@ mod tests {
                 pull_request_number: 17,
                 head_revision: "0123456789abcdef0123456789abcdef01234567".into(),
                 runtime: "openrouter".into(),
+                requested_runtime: "openrouter".into(),
+                actual_runtime: Some("openrouter".into()),
                 requested_model: "deepseek/deepseek-v4-flash".into(),
                 effective_model: None,
                 status: TaskBoardAiReviewReportStatus::Completed,

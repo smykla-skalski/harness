@@ -315,7 +315,7 @@ async fn persist_run(
         .require_offer()
         .expect("strict offer")
         .launch
-        .codex_request();
+        .run_request();
     fixture
         .db
         .save_codex_run(&CodexRunSnapshot {

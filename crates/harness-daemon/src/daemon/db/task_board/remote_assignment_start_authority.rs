@@ -239,7 +239,7 @@ impl AsyncDaemonDb {
             return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
         }
         let run_exists =
-            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?1)")
                 .bind(&authority.identity.run_id)
                 .fetch_one(transaction.as_mut())
                 .await

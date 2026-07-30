@@ -3,7 +3,7 @@ import Foundation
 extension PreviewHarnessClientState {
   func taskBoardItemReviewReport(id: String) throws -> TaskBoardAiReviewReportResponse {
     _ = try currentTaskBoardItem(id: id)
-    return taskBoardReviewReportsByItemID[id] ?? .notStarted
+    return taskBoardReviewReportsByItemID[id] ?? .notStarted(terminal: nil)
   }
 
   static func seededTaskBoardReviewReports(
@@ -22,6 +22,8 @@ extension PreviewHarnessClientState {
           pullRequestNumber: item.workflow?.prNumber ?? 901,
           headRevision: String(repeating: "a", count: 40),
           runtime: "openrouter",
+          requestedRuntime: "openrouter",
+          actualRuntime: "openrouter",
           requestedModel: "deepseek/deepseek-v4-flash",
           effectiveModel: "deepseek/deepseek-v4-flash",
           status: .completed,

@@ -209,6 +209,19 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
+    pub(crate) async fn cancel_agent_turn_run(&self, run_id: &str) -> Result<(), CliError> {
+        let Some(mut run) = self.agent_turn_run(run_id).await? else {
+            return Err(db_error("cancelled agent turn run does not exist"));
+        };
+        if !run.status.is_active() {
+            return Ok(());
+        }
+        run.status = AgentTurnRunStatus::Cancelled;
+        run.stop_reason = Some("cancelled by remote executor".into());
+        run.updated_at = utc_now();
+        self.save_agent_turn_run(&run).await
+    }
+
     /// Settle legacy agent turn runs that lack a provider turn identity after a
     /// daemon restart. Correlated runs stay active so runtime reconciliation can
     /// harvest their terminal result. Idempotent: a second sweep finds nothing

@@ -311,6 +311,8 @@ fn completed_report(item_id: &str) -> TaskBoardAiReviewReportRecord {
         pull_request_number: 1147,
         head_revision: "0123456789abcdef0123456789abcdef01234567".into(),
         runtime: "openrouter".into(),
+        requested_runtime: "openrouter".into(),
+        actual_runtime: Some("openrouter".into()),
         requested_model: "deepseek/deepseek-v4-flash".into(),
         effective_model: Some("deepseek/deepseek-v4-flash".into()),
         status: TaskBoardAiReviewReportStatus::Completed,

@@ -1,10 +1,10 @@
 use std::process::Command;
 
 use super::{
-    RemoteWorkerAction, remote_codex_request, start_window_is_open, validate_run_identity,
+    RemoteWorkerAction, remote_run_request, start_window_is_open, validate_run_identity,
     worker_action,
 };
-use crate::daemon::db::remote_executor_identity_from_parts;
+use crate::daemon::db::{TaskBoardRemoteRunStatus, remote_executor_identity_from_parts};
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAttemptBinding, RemoteOfferRequest,
@@ -39,14 +39,14 @@ fn start_action_adopts_the_exact_run_before_persisting_start_evidence() {
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Claimed,
-            Some(CodexRunStatus::Running)
+            Some(TaskBoardRemoteRunStatus::Running)
         ),
         RemoteWorkerAction::Probe
     );
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Claimed,
-            Some(CodexRunStatus::Completed)
+            Some(TaskBoardRemoteRunStatus::Completed)
         ),
         RemoteWorkerAction::Probe
     );
@@ -61,14 +61,14 @@ fn start_action_adopts_the_exact_run_before_persisting_start_evidence() {
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Started,
-            Some(CodexRunStatus::Completed)
+            Some(TaskBoardRemoteRunStatus::Completed)
         ),
         RemoteWorkerAction::Probe
     );
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Running,
-            Some(CodexRunStatus::Failed)
+            Some(TaskBoardRemoteRunStatus::Failed)
         ),
         RemoteWorkerAction::Probe
     );
@@ -84,7 +84,7 @@ fn runtime_thread_is_mutable_after_the_sealed_launch() {
         offer.binding.fencing_epoch,
         &offer.request_sha256,
     );
-    let request = remote_codex_request(&offer);
+    let request = remote_run_request(&offer);
     assert!(request.resume_thread_id.is_none());
     let mut snapshot = CodexRunSnapshot {
         run_id: identity.run_id.clone(),
@@ -124,28 +124,28 @@ fn durable_cancel_stops_only_an_active_exact_worker() {
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Cancelled,
-            Some(CodexRunStatus::WaitingApproval)
+            Some(TaskBoardRemoteRunStatus::WaitingApproval)
         ),
         RemoteWorkerAction::Cancel
     );
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Cancelled,
-            Some(CodexRunStatus::Completed)
+            Some(TaskBoardRemoteRunStatus::Completed)
         ),
         RemoteWorkerAction::Hold
     );
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Unknown,
-            Some(CodexRunStatus::Running)
+            Some(TaskBoardRemoteRunStatus::Running)
         ),
         RemoteWorkerAction::Cancel
     );
     assert_eq!(
         worker_action(
             TaskBoardRemoteAssignmentState::Unknown,
-            Some(CodexRunStatus::Completed)
+            Some(TaskBoardRemoteRunStatus::Completed)
         ),
         RemoteWorkerAction::Hold
     );
@@ -221,7 +221,7 @@ fn probe_accepts_a_legitimate_implementation_head_advance() {
 #[test]
 fn phase_selects_the_narrow_codex_mode() {
     let implementation =
-        remote_codex_request(&repository_offer(TaskBoardExecutionPhase::Implementation));
+        remote_run_request(&repository_offer(TaskBoardExecutionPhase::Implementation));
     assert_eq!(implementation.mode, CodexRunMode::WorkspaceWrite);
 
     let mut review = repository_offer(TaskBoardExecutionPhase::Review);
@@ -248,7 +248,7 @@ fn phase_selects_the_narrow_codex_mode() {
     review.launch.model = Some("gpt-5.4".into());
     review.launch.effort = Some("high".into());
     let review = review.seal().expect("seal review offer");
-    let request = remote_codex_request(&review);
+    let request = remote_run_request(&review);
     assert_eq!(request.mode, CodexRunMode::Report);
     assert_eq!(request.capabilities, review.launch.capabilities);
     assert_eq!(

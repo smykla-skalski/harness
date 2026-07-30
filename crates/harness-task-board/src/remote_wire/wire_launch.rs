@@ -5,16 +5,18 @@ use crate::TaskBoardExecutionPhase;
 use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
 use harness_protocol::session::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 
-pub const REMOTE_CODEX_LAUNCH_SCHEMA_VERSION: u32 = 1;
-pub const MAX_REMOTE_CODEX_PROMPT_BYTES: usize = 2 * 1024 * 1024;
+pub const REMOTE_RUNTIME_LAUNCH_SCHEMA_VERSION: u32 = 1;
+pub const MAX_REMOTE_RUNTIME_PROMPT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_CAPABILITIES: usize = 256;
 const MAX_LAUNCH_TEXT_BYTES: usize = 1_024;
 
-/// Private, path-free Codex launch contract sealed into one remote offer.
+pub const SUPPORTED_REMOTE_LAUNCH_RUNTIMES: [&str; 2] = ["codex", "openrouter"];
+
+/// Private, path-free runtime launch contract sealed into one remote offer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[derive(utoipa::ToSchema)]
-pub struct RemoteCodexLaunchEnvelope {
+pub struct RemoteRuntimeLaunchEnvelope {
     pub schema_version: u32,
     pub runtime: String,
     pub actor: String,
@@ -37,17 +39,17 @@ pub struct RemoteCodexLaunchEnvelope {
     pub allow_custom_model: bool,
 }
 
-impl RemoteCodexLaunchEnvelope {
+impl RemoteRuntimeLaunchEnvelope {
     /// # Errors
     /// Returns [`RemoteWireError::MissingField`] if `request` lacks a field
     /// the sealed envelope requires, or [`RemoteWireError`] if the
     /// assembled envelope fails its own wire contract.
-    pub fn from_codex_request(
+    pub fn from_run_request(
         runtime: &str,
         request: &CodexRunRequest,
     ) -> Result<Self, RemoteWireError> {
         let launch = Self {
-            schema_version: REMOTE_CODEX_LAUNCH_SCHEMA_VERSION,
+            schema_version: REMOTE_RUNTIME_LAUNCH_SCHEMA_VERSION,
             runtime: runtime.to_owned(),
             actor: request
                 .actor
@@ -96,7 +98,7 @@ impl RemoteCodexLaunchEnvelope {
     }
 
     #[must_use]
-    pub fn codex_request(&self) -> CodexRunRequest {
+    pub fn run_request(&self) -> CodexRunRequest {
         CodexRunRequest {
             actor: Some(self.actor.clone()),
             prompt: self.prompt.clone(),
@@ -117,7 +119,7 @@ impl RemoteCodexLaunchEnvelope {
     }
 
     fn validate_common(&self) -> Result<(), RemoteWireError> {
-        if self.schema_version != REMOTE_CODEX_LAUNCH_SCHEMA_VERSION {
+        if self.schema_version != REMOTE_RUNTIME_LAUNCH_SCHEMA_VERSION {
             return Err(RemoteWireError::UnsupportedVersion);
         }
         for (name, value) in [
@@ -130,12 +132,12 @@ impl RemoteCodexLaunchEnvelope {
         ] {
             require_text(name, value)?;
         }
-        if self.runtime != "codex"
+        if !SUPPORTED_REMOTE_LAUNCH_RUNTIMES.contains(&self.runtime.as_str())
             || self.actor != CONTROL_PLANE_ACTOR_ID
             || self.role != SessionRole::Leader
             || self.fallback_role != SessionRole::Worker
             || self.allow_custom_model
-            || self.prompt.len() > MAX_REMOTE_CODEX_PROMPT_BYTES
+            || self.prompt.len() > MAX_REMOTE_RUNTIME_PROMPT_BYTES
             || self.capabilities.len() > MAX_CAPABILITIES
             || !bounded_text(&self.display_name)
             || !bounded_text(&self.board_item_id)
@@ -154,11 +156,12 @@ impl RemoteCodexLaunchEnvelope {
 
 fn phase_launch_matches(
     phase: TaskBoardExecutionPhase,
-    launch: &RemoteCodexLaunchEnvelope,
+    launch: &RemoteRuntimeLaunchEnvelope,
 ) -> bool {
     match phase {
         TaskBoardExecutionPhase::Implementation => {
-            launch.mode == CodexRunMode::WorkspaceWrite
+            launch.runtime == "codex"
+                && launch.mode == CodexRunMode::WorkspaceWrite
                 && launch.task_id.is_some()
                 && launch.persona.is_none()
                 && launch.model.is_none()
@@ -188,10 +191,10 @@ pub fn test_codex_launch(
     execution_id: &str,
     action_key: &str,
     prompt: &str,
-) -> RemoteCodexLaunchEnvelope {
+) -> RemoteRuntimeLaunchEnvelope {
     let implementation = phase == TaskBoardExecutionPhase::Implementation;
-    RemoteCodexLaunchEnvelope {
-        schema_version: REMOTE_CODEX_LAUNCH_SCHEMA_VERSION,
+    RemoteRuntimeLaunchEnvelope {
+        schema_version: REMOTE_RUNTIME_LAUNCH_SCHEMA_VERSION,
         runtime: "codex".into(),
         actor: CONTROL_PLANE_ACTOR_ID.into(),
         prompt: prompt.into(),

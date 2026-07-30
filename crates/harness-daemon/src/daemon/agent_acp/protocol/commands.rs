@@ -6,9 +6,7 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use agent_client_protocol::schema::v1::{
-    CancelNotification, ListSessionsRequest, LogoutRequest, SessionId,
-};
+use agent_client_protocol::schema::v1::{ListSessionsRequest, LogoutRequest, SessionId};
 use agent_client_protocol::{Agent, ConnectionTo, Result as AcpResult};
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::timeout;
@@ -34,11 +32,13 @@ pub(super) type ProtocolCommandResult<T> = Result<T, String>;
 const DETACH_CLOSE_BUDGET: Duration = Duration::from_secs(2);
 
 mod handle;
+mod notification;
 mod prompt;
 mod resume;
 
 pub(in crate::daemon::agent_acp) use handle::AcpProtocolHandle;
 pub(super) use handle::response_timeout_for;
+use notification::send_cancel_notification;
 use prompt::send_prompt;
 use resume::resume_protocol_session;
 
@@ -510,13 +510,6 @@ async fn close_routed_sessions(
         }
     }
     Ok(closed)
-}
-
-fn send_cancel_notification(
-    connection: &ConnectionTo<Agent>,
-    session_id: SessionId,
-) -> AcpResult<()> {
-    connection.send_notification(CancelNotification::new(session_id))
 }
 
 #[cfg(test)]

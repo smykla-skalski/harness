@@ -1,4 +1,4 @@
-use super::wire::{RemoteAttemptBinding, RemoteCodexLaunchEnvelope, RemoteWireError};
+use super::wire::{RemoteAttemptBinding, RemoteRuntimeLaunchEnvelope, RemoteWireError};
 use crate::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 use harness_protocol::managed_agents::codex::{CodexRunMode, CodexRunRequest};
 use harness_protocol::session::{CONTROL_PLANE_ACTOR_ID, SessionRole};
@@ -10,19 +10,43 @@ fn review_and_evaluate_launches_preserve_nondefault_profile_contract() {
         (TaskBoardExecutionPhase::Evaluate, "evaluate:1"),
     ] {
         let request = report_request(action);
-        let launch = RemoteCodexLaunchEnvelope::from_codex_request("codex", &request)
+        let launch = RemoteRuntimeLaunchEnvelope::from_run_request("codex", &request)
             .expect("freeze nondefault report launch");
         launch
             .validate(&binding(phase, action))
             .expect("validate exact report launch");
-        assert_request(&launch.codex_request(), &request);
+        assert_request(&launch.run_request(), &request);
     }
+}
+
+#[test]
+fn supported_runtimes_preserve_the_same_serialized_launch_shape() {
+    let request = report_request("review:security");
+    let codex = RemoteRuntimeLaunchEnvelope::from_run_request("codex", &request)
+        .expect("freeze Codex launch");
+    let openrouter = RemoteRuntimeLaunchEnvelope::from_run_request("openrouter", &request)
+        .expect("freeze OpenRouter launch");
+    let mut codex_json = serde_json::to_value(codex).expect("serialize Codex launch");
+    let openrouter_json = serde_json::to_value(openrouter).expect("serialize OpenRouter launch");
+    codex_json["runtime"] = serde_json::Value::String("openrouter".into());
+    assert_eq!(codex_json, openrouter_json);
+}
+
+#[test]
+fn unsupported_runtime_is_rejected_without_changing_the_launch_contract() {
+    assert!(matches!(
+        RemoteRuntimeLaunchEnvelope::from_run_request(
+            "unknown",
+            &report_request("review:security")
+        ),
+        Err(RemoteWireError::MissingField("canonical_codex_launch"))
+    ));
 }
 
 #[test]
 fn implementation_launch_preserves_task_item_and_write_capabilities() {
     let request = implementation_request();
-    let launch = RemoteCodexLaunchEnvelope::from_codex_request("codex", &request)
+    let launch = RemoteRuntimeLaunchEnvelope::from_run_request("codex", &request)
         .expect("freeze implementation launch");
     launch
         .validate(&binding(
@@ -30,7 +54,7 @@ fn implementation_launch_preserves_task_item_and_write_capabilities() {
             "implementation:1",
         ))
         .expect("validate exact implementation launch");
-    let reconstructed = launch.codex_request();
+    let reconstructed = launch.run_request();
     assert_request(&reconstructed, &request);
     assert_eq!(reconstructed.task_id.as_deref(), Some("task-17"));
     assert_eq!(reconstructed.board_item_id.as_deref(), Some("item-17"));
@@ -44,7 +68,7 @@ fn implementation_launch_preserves_task_item_and_write_capabilities() {
 #[test]
 fn phase_and_custom_model_tampering_fail_closed() {
     let mut launch =
-        RemoteCodexLaunchEnvelope::from_codex_request("codex", &report_request("review:security"))
+        RemoteRuntimeLaunchEnvelope::from_run_request("codex", &report_request("review:security"))
             .expect("freeze report launch");
     launch.allow_custom_model = true;
     assert_eq!(
@@ -53,7 +77,7 @@ fn phase_and_custom_model_tampering_fail_closed() {
     );
 
     let mut implementation =
-        RemoteCodexLaunchEnvelope::from_codex_request("codex", &implementation_request())
+        RemoteRuntimeLaunchEnvelope::from_run_request("codex", &implementation_request())
             .expect("freeze implementation launch");
     implementation.task_id = None;
     assert_eq!(

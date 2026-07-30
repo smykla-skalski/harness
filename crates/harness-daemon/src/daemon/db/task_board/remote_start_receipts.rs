@@ -183,6 +183,29 @@ pub(super) async fn durable_start_receipt_run_matches(
     receipt: &TaskBoardRemoteExecutorStartReceipt,
 ) -> Result<bool, CliError> {
     let offer = record.require_offer()?;
+    if offer.launch.runtime == "openrouter" {
+        return query_scalar::<_, bool>(
+            "SELECT EXISTS(
+               SELECT 1 FROM agent_turn_runs AS runs
+               WHERE runs.run_id = ?1 AND runs.session_id = ?2
+                 AND runs.workflow_execution_id = ?3 AND runs.project_dir = ?4
+                 AND runs.created_at = ?5 AND runs.task_id IS ?6
+                 AND runs.board_item_id = ?7 AND runs.requested_runtime = 'openrouter'
+                 AND runs.actual_runtime = 'openrouter' AND runs.requested_model IS ?8
+             )",
+        )
+        .bind(&receipt.run_id)
+        .bind(&receipt.session_id)
+        .bind(&record.execution_id)
+        .bind(&receipt.project_dir)
+        .bind(&receipt.started_at)
+        .bind(&offer.launch.task_id)
+        .bind(&offer.launch.board_item_id)
+        .bind(&offer.launch.model)
+        .fetch_one(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("verify remote executor start receipt run: {error}")));
+    }
     let mode = match offer.binding.phase {
         TaskBoardExecutionPhase::Implementation => "workspace_write",
         TaskBoardExecutionPhase::Review | TaskBoardExecutionPhase::Evaluate => "report",

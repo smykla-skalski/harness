@@ -9,7 +9,10 @@
 //! provider, recording the run exactly as the production adapter does.
 
 use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
-use crate::task_board::{TaskBoardAttemptState, TaskBoardExecutionState};
+use crate::daemon::protocol::TaskBoardGetItemRequest;
+use crate::task_board::{
+    TaskBoardAiReviewReportResponse, TaskBoardAttemptState, TaskBoardExecutionState,
+};
 
 use super::fixture::{Fixture, NOW, RETRY_AT, seed_execution_with_reviewer_runtime};
 use super::runtime::FakeReadOnlyRuntime;
@@ -81,6 +84,28 @@ async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {
             .expect("codex run lookup")
             .is_none()
     );
+    let reopened = AsyncDaemonDb::connect(&fixture.test.path)
+        .await
+        .expect("reopen database for ticket report");
+    let report = crate::daemon::service::get_task_board_ai_review_report_db(
+        &reopened,
+        &TaskBoardGetItemRequest {
+            id: fixture.item_id.clone(),
+        },
+    )
+    .await
+    .expect("load originating ticket report after reopen");
+    assert!(matches!(
+        report,
+        TaskBoardAiReviewReportResponse::Running {
+            runtime,
+            requested_runtime,
+            actual_runtime: Some(actual_runtime),
+            ..
+        } if runtime == "openrouter"
+            && requested_runtime == "openrouter"
+            && actual_runtime == "openrouter"
+    ));
 
     // Re-reconciling the running attempt is idempotent: no second turn starts.
     reconcile(&db, &runtime, NOW).await;
@@ -159,20 +184,10 @@ async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
         .clone();
     assert_eq!(runtime.start_count(), 1);
 
-    // A restart settles the interrupted run to exactly one Failed outcome; a
-    // second sweep is a no-op.
-    assert_eq!(
-        db.reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("settle interrupted runs"),
-        1
-    );
-    assert_eq!(
-        db.reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("second sweep settles nothing"),
-        0
-    );
+    // A fresh runtime cannot observe the old provider turn and settles it once
+    // when the coordinator reloads the durable run.
+    runtime.evict_agent_turn_on_next_load();
+    reconcile(&db, &runtime, NOW).await;
     assert_eq!(
         db.agent_turn_run(&first_key)
             .await
@@ -184,7 +199,6 @@ async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
 
     // Seeing the failed run, the coordinator retries the review rather than
     // restarting the dead turn: no new turn starts for the same attempt.
-    reconcile(&db, &runtime, NOW).await;
     assert_eq!(runtime.start_count(), 1);
     assert_eq!(
         load(&fixture, &db).await.transition.execution_state,

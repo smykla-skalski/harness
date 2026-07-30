@@ -59,7 +59,7 @@ where
     match request.mode {
         CodexRunMode::Report => {
             runtime
-                .start_codex_report_run(session_id, request, run_id)
+                .start_report_run(session_id, request, run_id)
                 .await
         }
         CodexRunMode::WorkspaceWrite => {

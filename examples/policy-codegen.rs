@@ -2047,6 +2047,16 @@ fn is_json_passthrough_field(struct_name: &str, field_name: &str) -> bool {
         .any(|(owner, field)| *owner == struct_name && *field == field_name)
 }
 
+fn compatibility_decode_default(fields: &FieldsNamed, field_name: &str) -> Option<String> {
+    let has_runtime_alias = fields
+        .named
+        .iter()
+        .filter_map(|field| field.ident.as_ref())
+        .any(|ident| ident == "runtime");
+    (field_name == "requested_runtime" && has_runtime_alias)
+        .then(|| "container.decode(String.self, forKey: .runtime)".to_string())
+}
+
 fn build_fields(
     struct_name: &str,
     fields: &FieldsNamed,
@@ -2122,14 +2132,21 @@ fn build_fields(
         );
         let force_optional = skip_default_optional || hand_model_default_optional;
         let optional = swift_type.optional || force_optional;
+        let compatibility_decode_default = compatibility_decode_default(fields, &name);
         let decode_default = if force_optional {
             None
         } else {
-            natural_decode_default
+            compatibility_decode_default
+                .clone()
+                .or_else(|| natural_decode_default.clone())
         };
+        let init_decode_default = compatibility_decode_default
+            .is_none()
+            .then_some(decode_default.as_deref())
+            .flatten();
         let init_default = field_init_default(
             optional,
-            decode_default.as_deref(),
+            init_decode_default,
             &swift_type.name,
             rust_ident.as_deref(),
             derives_default,
@@ -2765,6 +2782,8 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
 ];
 const TASK_BOARD_REVIEW_REPORT_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/automation/review_report.rs");
+const TASK_BOARD_REVIEW_REPORT_WORKFLOW_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/workflow.rs");
 const TASK_BOARD_REPORT_ONLY_REVIEW_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/automation/report_only_review.rs");
 const TASK_BOARD_REVIEW_REPORT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardReviewReportWireTypes.generated.swift";
@@ -2774,7 +2793,9 @@ const TASK_BOARD_REVIEW_REPORT_EMIT_ONLY: &[&str] = &[
     "TaskBoardReportOnlyReviewFinding",
     "TaskBoardAiReviewReportStatus",
     "TaskBoardAiReviewReportRecord",
+    "TaskBoardAiReviewUnavailableExecution",
     "TaskBoardAiReviewReportResponse",
+    "TaskBoardExecutionState",
 ];
 const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../crates/harness-task-board/src/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
@@ -3541,6 +3562,7 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[
                 TASK_BOARD_REPORT_ONLY_REVIEW_SOURCE,
                 TASK_BOARD_REVIEW_REPORT_SOURCE,
+                TASK_BOARD_REVIEW_REPORT_WORKFLOW_SOURCE,
             ],
         },
         GeneratedModule {

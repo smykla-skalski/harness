@@ -47,7 +47,7 @@ async fn pull_request_review_runs_review_cleanup_and_terminal_without_publicatio
         .expect("load retained review report");
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].head_revision, super::fixture::FROZEN_HEAD);
-    assert_eq!(reports[0].runtime, "runtime-shared");
+    assert_eq!(reports[0].runtime, "codex");
     assert_eq!(reports[0].requested_model, "model-reviewer-amber");
     assert_eq!(
         reports[0].effective_model.as_deref(),

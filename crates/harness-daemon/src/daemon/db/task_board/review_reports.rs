@@ -16,6 +16,8 @@ struct AiReviewReportRow {
     pull_request_number: i64,
     head_revision: String,
     runtime: String,
+    requested_runtime: Option<String>,
+    actual_runtime: Option<String>,
     requested_model: String,
     effective_model: Option<String>,
     status: String,
@@ -65,7 +67,8 @@ impl AsyncDaemonDb {
     ) -> Result<Vec<TaskBoardAiReviewReportRecord>, CliError> {
         let rows = query_as::<_, AiReviewReportRow>(
             "SELECT report_id, item_id, correlation_id, repository, pull_request_number,
-                    head_revision, runtime, requested_model, effective_model, status, summary,
+                    head_revision, runtime, requested_runtime, actual_runtime, requested_model,
+                    effective_model, status, summary,
                     findings_json, partial_output, terminal_reason, started_at, finished_at
              FROM task_board_ai_review_reports
              WHERE item_id = ?1
@@ -86,7 +89,8 @@ impl AsyncDaemonDb {
     ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
         query_as::<_, AiReviewReportRow>(
             "SELECT report_id, item_id, correlation_id, repository, pull_request_number,
-                    head_revision, runtime, requested_model, effective_model, status, summary,
+                    head_revision, runtime, requested_runtime, actual_runtime, requested_model,
+                    effective_model, status, summary,
                     findings_json, partial_output, terminal_reason, started_at, finished_at
              FROM task_board_ai_review_reports
              WHERE item_id = ?1
@@ -112,7 +116,8 @@ async fn load_by_id(
 ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
     query_as::<_, AiReviewReportRow>(
         "SELECT report_id, item_id, correlation_id, repository, pull_request_number,
-                head_revision, runtime, requested_model, effective_model, status, summary,
+                head_revision, runtime, requested_runtime, actual_runtime, requested_model,
+                effective_model, status, summary,
                 findings_json, partial_output, terminal_reason, started_at, finished_at
          FROM task_board_ai_review_reports
          WHERE report_id = ?1",
@@ -139,10 +144,12 @@ async fn insert_report(
     query(
         "INSERT INTO task_board_ai_review_reports (
             report_id, item_id, correlation_id, repository, pull_request_number, head_revision,
-            runtime, requested_model, effective_model, status, summary, findings_json,
+            runtime, requested_runtime, actual_runtime, requested_model, effective_model, status,
+            summary, findings_json,
             partial_output, terminal_reason, started_at, finished_at, finished_at_unix_millis
          ) VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
+            ?18, ?19
          )",
     )
     .bind(&report.report_id)
@@ -152,6 +159,8 @@ async fn insert_report(
     .bind(pull_request_number)
     .bind(&report.head_revision)
     .bind(&report.runtime)
+    .bind(&report.requested_runtime)
+    .bind(&report.actual_runtime)
     .bind(&report.requested_model)
     .bind(&report.effective_model)
     .bind(report.status.as_str())
@@ -192,6 +201,10 @@ impl AiReviewReportRow {
             repository: self.repository,
             pull_request_number,
             head_revision: self.head_revision,
+            requested_runtime: self
+                .requested_runtime
+                .unwrap_or_else(|| self.runtime.clone()),
+            actual_runtime: self.actual_runtime,
             runtime: self.runtime,
             requested_model: self.requested_model,
             effective_model: self.effective_model,
@@ -307,6 +320,8 @@ mod tests {
             pull_request_number: 1122,
             head_revision: "0123456789abcdef0123456789abcdef01234567".into(),
             runtime: "openrouter".into(),
+            requested_runtime: "openrouter".into(),
+            actual_runtime: Some("openrouter".into()),
             requested_model: "deepseek/deepseek-v4-flash".into(),
             effective_model: Some("deepseek/deepseek-v4-flash".into()),
             status: TaskBoardAiReviewReportStatus::Completed,

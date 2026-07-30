@@ -44,7 +44,7 @@ fn production_adapter_satisfies_runtime_contract() {
     assert_runtime::<ProductionTaskBoardReadOnlyRuntime<'static>>();
     let constructor = ProductionTaskBoardReadOnlyRuntime::new;
     let load = ProductionTaskBoardReadOnlyRuntime::load_codex_report_run;
-    let start = ProductionTaskBoardReadOnlyRuntime::start_codex_report_run;
+    let start = ProductionTaskBoardReadOnlyRuntime::start_report_run;
     let resolve = ProductionTaskBoardReadOnlyRuntime::resolve_exact_head;
     let publish = ProductionTaskBoardReadOnlyRuntime::publish_pr_review;
     let verify = ProductionTaskBoardReadOnlyRuntime::verify_pr_review_approval;

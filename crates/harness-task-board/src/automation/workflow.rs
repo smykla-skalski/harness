@@ -28,7 +28,7 @@ pub enum TaskBoardExecutionPhase {
     Terminal,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskBoardExecutionState {
     #[default]

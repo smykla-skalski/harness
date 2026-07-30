@@ -16,9 +16,25 @@ struct TaskBoardReviewReportTests {
         "status":"running",
         "execution_id":"execution-1",
         "runtime":"openrouter",
+        "actual_runtime":"openrouter",
         "requested_model":"deepseek/deepseek-v4-flash",
         "head_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "started_at":"2026-07-29T19:40:00Z"
+      }
+      """#,
+      #"""
+      {
+        "status":"not_started",
+        "terminal":{
+          "execution_id":"execution-1",
+          "execution_state":"failed",
+          "runtime":"openrouter",
+          "actual_runtime":"openrouter",
+          "requested_model":"deepseek/deepseek-v4-flash",
+          "head_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "started_at":"2026-07-29T19:40:00Z",
+          "finished_at":"2026-07-29T19:41:00Z"
+        }
       }
       """#,
       sampleTaskBoardReviewReportText,
@@ -42,28 +58,36 @@ struct TaskBoardReviewReportTests {
       try decoder.decode(TaskBoardAiReviewReportResponse.self, from: Data($0.utf8))
     }
 
-    #expect(responses.count == 5)
-    guard case .notStarted = responses[0] else {
+    #expect(responses.count == 6)
+    guard case .notStarted(terminal: nil) = responses[0] else {
       Issue.record("Expected not-started response")
       return
     }
-    guard case .running(_, let runtime, let model, _, _) = responses[1] else {
+    guard case .running(_, let runtime, _, let actualRuntime, let model, _, _) = responses[1] else {
       Issue.record("Expected running response")
       return
     }
     #expect(runtime == "openrouter")
+    #expect(actualRuntime == "openrouter")
     #expect(model == "deepseek/deepseek-v4-flash")
-    guard case .completed(let completed) = responses[2] else {
+    guard case .notStarted(let terminal) = responses[2], let terminal else {
+      Issue.record("Expected terminal execution response")
+      return
+    }
+    #expect(terminal.executionState == .failed)
+    #expect(terminal.requestedRuntime == "openrouter")
+    #expect(terminal.actualRuntime == "openrouter")
+    guard case .completed(let completed) = responses[3] else {
       Issue.record("Expected completed response")
       return
     }
     #expect(completed.findings.first?.location.path == "src/review.rs")
-    guard case .failed(let failed) = responses[3] else {
+    guard case .failed(let failed) = responses[4] else {
       Issue.record("Expected failed response")
       return
     }
     #expect(failed.terminalReason == "runtime exited")
-    guard case .cancelled(let cancelled) = responses[4] else {
+    guard case .cancelled(let cancelled) = responses[5] else {
       Issue.record("Expected cancelled response")
       return
     }
@@ -80,6 +104,8 @@ struct TaskBoardReviewReportTests {
       pullRequestNumber: 42,
       headRevision: String(repeating: "a", count: 40),
       runtime: "openrouter",
+      requestedRuntime: "openrouter",
+      actualRuntime: "openrouter",
       requestedModel: "deepseek/deepseek-v4-flash",
       status: .completed,
       summary: "Done",

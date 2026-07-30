@@ -10,8 +10,7 @@ use crate::daemon::db::task_board::remote_assignment_model::{
 use crate::daemon::db::task_board::remote_assignment_start_authority::{
     executor_start_authority, executor_start_io_permit, remote_executor_identity,
 };
-use crate::daemon::db::{CliError, db_error};
-use crate::daemon::protocol::CodexRunSnapshot;
+use crate::daemon::db::{CliError, TaskBoardRemoteExecutorRun, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteSourceMaterial, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -71,10 +70,14 @@ pub(in super::super) fn decode_executor_stop_pending(
     Ok(Some(pending))
 }
 
-pub(crate) fn stop_pending_snapshot_matches(
+pub(crate) fn stop_pending_snapshot_matches<S>(
     pending: &TaskBoardRemoteExecutorStopPending,
-    snapshot: &CodexRunSnapshot,
-) -> bool {
+    snapshot: &S,
+) -> bool
+where
+    S: Clone + Into<TaskBoardRemoteExecutorRun>,
+{
+    let snapshot = snapshot.clone().into();
     snapshot.run_id == pending.run_id
         && snapshot.session_id == pending.session_id
         && snapshot.project_dir == pending.project_dir
@@ -84,7 +87,7 @@ pub(crate) fn stop_pending_snapshot_matches(
 pub(super) fn stop_pending(
     record: &TaskBoardRemoteAssignmentRecord,
     authority: &TaskBoardRemoteExecutorStopAuthority,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
     reason: TaskBoardRemoteExecutorStopReason,
     acquired_at: &str,
 ) -> Result<TaskBoardRemoteExecutorStopPending, CliError> {
@@ -256,7 +259,7 @@ fn stop_source_from_record(
 pub(super) fn stop_request_replays(
     pending: &TaskBoardRemoteExecutorStopPending,
     authority: &TaskBoardRemoteExecutorStopAuthority,
-    snapshot: &CodexRunSnapshot,
+    snapshot: &TaskBoardRemoteExecutorRun,
     reason: TaskBoardRemoteExecutorStopReason,
 ) -> bool {
     pending.fencing_epoch == authority_fencing_epoch(authority)

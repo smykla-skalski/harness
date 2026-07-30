@@ -112,6 +112,58 @@ async fn production_tick_uses_the_runtime_seam_for_start_then_active_probe_body(
 }
 
 #[test]
+fn openrouter_start_is_durable_and_restart_settles_once_without_codex_run() {
+    run_deep_async(openrouter_start_is_durable_and_restart_settles_once_body);
+}
+
+async fn openrouter_start_is_durable_and_restart_settles_once_body() {
+    let (fixture, before) = Box::pin(live_claimed_executor_for("openrouter")).await;
+    let identity = remote_executor_identity(&before).expect("deterministic executor identity");
+    let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
+    let scope: RuntimeSeamScope = install_deterministic_runtime_seam().await;
+
+    reconcile_task_board_remote_executor_tick(&state)
+        .await
+        .expect("start OpenRouter through the remote runtime seam");
+    let run = fixture
+        .db
+        .agent_turn_run(&identity.run_id)
+        .await
+        .expect("load OpenRouter run")
+        .expect("durable OpenRouter run");
+    assert_eq!(run.requested_runtime, "openrouter");
+    assert_eq!(run.actual_runtime.as_deref(), Some("openrouter"));
+    assert!(
+        fixture
+            .db
+            .codex_run(&identity.run_id)
+            .await
+            .expect("check Codex store")
+            .is_none()
+    );
+    assert_eq!(scope.calls().await.len(), 1);
+
+    assert_eq!(
+        fixture
+            .db
+            .reconcile_interrupted_agent_turn_runs()
+            .await
+            .expect("preserve correlated OpenRouter run"),
+        0
+    );
+    drop(scope);
+    reconcile_task_board_remote_executor_tick(&state)
+        .await
+        .expect("settle the turn evicted from the restarted runtime");
+    assert_eq!(
+        load_assignment(&fixture.db, &before.assignment_id)
+            .await
+            .state,
+        TaskBoardRemoteAssignmentState::Failed
+    );
+}
+
+#[test]
 fn runtime_seam_scope_clears_on_early_return_and_panic() {
     run_deep_async(runtime_seam_scope_clears_on_early_return_and_panic_body);
 }
@@ -198,6 +250,12 @@ where
 }
 
 async fn live_claimed_executor() -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
+    live_claimed_executor_for("codex").await
+}
+
+async fn live_claimed_executor_for(
+    runtime: &str,
+) -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
     let fixture = remote_executor_fixture(1).await;
     let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
@@ -205,6 +263,7 @@ async fn live_claimed_executor() -> (RemoteExecutorFixture, TaskBoardRemoteAssig
     let offered_at = (now - Duration::seconds(2)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let claimed_at = (now - Duration::seconds(1)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let mut request = request_for_revision(&fixture.request, &revision);
+    request.launch.runtime = runtime.into();
     request.deadline_at =
         (now + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     request.request_sha256.clear();

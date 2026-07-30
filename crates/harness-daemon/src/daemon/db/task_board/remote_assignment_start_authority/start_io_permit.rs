@@ -390,7 +390,7 @@ async fn deterministic_run_exists(
     transaction: &mut Transaction<'_, Sqlite>,
     identity: &TaskBoardRemoteExecutorIdentity,
 ) -> Result<bool, CliError> {
-    query_scalar("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1)")
+    query_scalar("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?1)")
         .bind(&identity.run_id)
         .fetch_one(transaction.as_mut())
         .await

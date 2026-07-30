@@ -252,6 +252,17 @@ pub(super) async fn configure_checkout(db: &AsyncDaemonDb, origin: &Path) {
         .expect("load executor settings");
     settings.local_execution_host.repositories[0].checkout_path =
         origin.to_string_lossy().into_owned();
+    if !settings
+        .local_execution_host
+        .runtimes
+        .iter()
+        .any(|runtime| runtime == "openrouter")
+    {
+        settings
+            .local_execution_host
+            .runtimes
+            .push("openrouter".into());
+    }
     db.replace_task_board_orchestrator_settings(&settings)
         .await
         .expect("configure exact executor checkout");
@@ -276,7 +287,7 @@ pub(super) async fn persist_exact_run(
     workspace: &Path,
 ) {
     let offer = assignment.require_offer().expect("sealed executor offer");
-    let request = super::runtime::remote_codex_request(offer);
+    let request = super::runtime::remote_run_request(offer);
     db.save_codex_run(&CodexRunSnapshot {
         run_id: authority.identity.run_id.clone(),
         session_id: authority.identity.session_id.clone(),
