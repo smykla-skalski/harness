@@ -1,9 +1,10 @@
 use super::*;
 use crate::github::{PullRequestAction, PullRequestActionKind, PullRequestIdentity};
 use crate::{
-    TaskBoardExecutionOwnership, TaskBoardPhaseVerdict, TaskBoardResolvedReviewer,
-    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionArtifacts,
-    TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
+    TaskBoardExecutionOwnership, TaskBoardLifecycleOutcome, TaskBoardPhaseVerdict,
+    TaskBoardResolvedReviewer, TaskBoardReviewResult, TaskBoardReviewerOutcome,
+    TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
+    TaskBoardWorkflowTransitionState,
 };
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -29,6 +30,14 @@ fn agent_publish_and_terminal_attempts_have_distinct_recovery_classes() {
     assert_eq!(publish.step, TaskBoardDependencyRecoveryStep::GitHubAction);
 
     execution.attempts[0].state = TaskBoardAttemptState::Completed;
+    execution.attempts[0].artifact = Some(TaskBoardAttemptResultArtifact::Lifecycle(
+        TaskBoardLifecycleOutcome {
+            mutated: true,
+            terminal: false,
+            provider_revision: None,
+            external_url: None,
+        },
+    ));
     let completed =
         classify_task_board_dependency_workflow_recovery(&execution).expect("completed recovery");
     assert_eq!(completed.class, TaskBoardDependencyRecoveryClass::Completed);
@@ -139,6 +148,37 @@ fn active_attempt_must_belong_to_the_current_step() {
             .expect_err("stale active attempt")
             .to_string()
             .contains("does not match its current step")
+    );
+}
+
+#[test]
+fn review_attempt_requires_a_non_empty_profile_id() {
+    let mut execution = execution(TaskBoardExecutionPhase::Review);
+    execution
+        .attempts
+        .push(attempt("review:", TaskBoardAttemptState::Running));
+
+    assert!(
+        classify_task_board_dependency_workflow_recovery(&execution)
+            .expect_err("empty reviewer profile")
+            .to_string()
+            .contains("does not match its current step")
+    );
+}
+
+#[test]
+fn completed_current_attempt_requires_a_result_artifact() {
+    let mut execution = execution(TaskBoardExecutionPhase::Review);
+    execution.attempts.push(attempt(
+        "review:reviewer-amber",
+        TaskBoardAttemptState::Completed,
+    ));
+
+    assert!(
+        classify_task_board_dependency_workflow_recovery(&execution)
+            .expect_err("missing completed result")
+            .to_string()
+            .contains("has no result artifact")
     );
 }
 

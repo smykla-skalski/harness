@@ -77,6 +77,13 @@ pub fn classify_task_board_dependency_workflow_recovery(
                 && completed_attempt_matches_exact_head(execution, attempt)
         })
         .collect::<Vec<_>>();
+    if attempts.iter().any(|attempt| {
+        attempt.state == TaskBoardAttemptState::Completed && attempt.artifact.is_none()
+    }) {
+        return Err(recovery_error(
+            "dependency workflow completed attempt has no result artifact",
+        ));
+    }
     attempts.sort_by_key(|attempt| attempt.attempt);
     let attempt = attempts.last().copied();
     Ok(match attempt {
@@ -286,13 +293,14 @@ fn attempt_is_current(
             .action_key
             .strip_prefix("review:")
             .is_some_and(|profile_id| {
-                !execution.artifacts.review_cycles.iter().any(|cycle| {
-                    cycle.revision_cycle == execution.artifacts.current_revision_cycle
-                        && cycle
-                            .outcomes
-                            .iter()
-                            .any(|outcome| outcome.profile_id == profile_id)
-                })
+                !profile_id.is_empty()
+                    && !execution.artifacts.review_cycles.iter().any(|cycle| {
+                        cycle.revision_cycle == execution.artifacts.current_revision_cycle
+                            && cycle
+                                .outcomes
+                                .iter()
+                                .any(|outcome| outcome.profile_id == profile_id)
+                    })
             }),
         Some(TaskBoardExecutionPhase::Evaluate) => {
             attempt.action_key == "evaluate"
