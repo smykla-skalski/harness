@@ -49,21 +49,23 @@ pub fn classify_task_board_dependency_workflow_recovery(
     if let Some(decision) = terminal_decision(execution) {
         return Ok(decision);
     }
-    let active_attempts = execution
-        .attempts
-        .iter()
-        .filter(|attempt| {
-            matches!(
-                attempt.state,
-                TaskBoardAttemptState::Preparing
-                    | TaskBoardAttemptState::Starting
-                    | TaskBoardAttemptState::Running
-            )
-        })
-        .count();
-    if active_attempts > 1 {
+    let mut active_attempts = execution.attempts.iter().filter(|attempt| {
+        matches!(
+            attempt.state,
+            TaskBoardAttemptState::Preparing
+                | TaskBoardAttemptState::Starting
+                | TaskBoardAttemptState::Running
+        )
+    });
+    let active_attempt = active_attempts.next();
+    if active_attempts.next().is_some() {
         return Err(recovery_error(
             "dependency workflow has multiple active attempts",
+        ));
+    }
+    if active_attempt.is_some_and(|attempt| !attempt_is_current(execution, attempt)) {
+        return Err(recovery_error(
+            "dependency workflow active attempt does not match its current step",
         ));
     }
     let mut attempts = execution

@@ -125,6 +125,22 @@ fn multiple_active_attempts_are_rejected_before_recovery() {
     );
 }
 
+#[test]
+fn active_attempt_must_belong_to_the_current_step() {
+    let mut execution = execution(TaskBoardExecutionPhase::Implementation);
+    execution.attempts.push(attempt(
+        "review:reviewer-amber",
+        TaskBoardAttemptState::Running,
+    ));
+
+    assert!(
+        classify_task_board_dependency_workflow_recovery(&execution)
+            .expect_err("stale active attempt")
+            .to_string()
+            .contains("does not match its current step")
+    );
+}
+
 fn check_wait() -> TaskBoardDependencyCheckWait {
     TaskBoardDependencyCheckWait {
         resume_id: "route-1:checks".into(),
