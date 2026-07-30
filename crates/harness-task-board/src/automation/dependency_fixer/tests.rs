@@ -16,11 +16,9 @@ const FAILED_HEAD: &str = "123456789abcdef0123456789abcdef012345678";
 async fn dispatches_only_an_explicit_fix_route_with_all_evidence() {
     let launcher = Launcher::default();
     let fix = route(TaskBoardDependencyTriageDisposition::FixRequired);
-
     let run = dispatch_task_board_dependency_fix(&fix, &binding(), &launcher)
         .await
         .expect("fix route dispatches");
-
     assert_eq!(run.run_id, format!("{}:fix", fix.route_id));
     assert_eq!(run.requested_model, TASK_BOARD_DEPENDENCY_FIXER_MODEL);
     assert_eq!(run.requested_effort, TASK_BOARD_DEPENDENCY_FIXER_EFFORT);
@@ -30,7 +28,11 @@ async fn dispatches_only_an_explicit_fix_route_with_all_evidence() {
     assert_eq!(request.exact_head_revision, HEAD);
     assert_eq!(request.requested_repair, "build requires a code fix");
     assert_eq!(request.triage_result.checks[0].name, "test");
-
+    let mut legacy = serde_json::to_value(&request).expect("serialized request");
+    legacy.as_object_mut().expect("request object").remove("attempt");
+    let decoded: TaskBoardDependencyFixRequest =
+        serde_json::from_value(legacy).expect("legacy request");
+    assert_eq!(decoded.attempt, 1);
     for disposition in [
         TaskBoardDependencyTriageDisposition::ReportOnly,
         TaskBoardDependencyTriageDisposition::HumanRequired,

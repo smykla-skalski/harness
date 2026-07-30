@@ -18,6 +18,10 @@ pub const TASK_BOARD_DEPENDENCY_FIXER_MODEL: &str = "gpt-5.3-codex-spark";
 pub const TASK_BOARD_DEPENDENCY_FIXER_EFFORT: &str = "low";
 pub const TASK_BOARD_DEPENDENCY_FIX_RETRY_EVIDENCE_SCHEMA_VERSION: u32 = 1;
 
+const fn default_dependency_fix_attempt() -> u32 {
+    1
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskBoardDependencyFixBinding {
     pub session_id: String,
@@ -33,6 +37,7 @@ pub struct TaskBoardDependencyFixRequest {
     pub session_id: String,
     pub board_item_id: String,
     pub workflow_execution_id: String,
+    #[serde(default = "default_dependency_fix_attempt")]
     pub attempt: u32,
     pub repository: String,
     pub pull_request_number: u64,
