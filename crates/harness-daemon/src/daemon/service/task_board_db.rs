@@ -45,7 +45,7 @@ mod triage_reads;
 mod triage_rules_reads;
 mod update_request;
 
-pub(crate) use list_items::{TaskBoardListSource, read_task_board_items_db};
+pub(crate) use list_items::read_task_board_items_db;
 pub(crate) use positions::{
     get_task_board_item_position_snapshot_db, reset_task_board_item_position_db,
     set_task_board_item_position_db,

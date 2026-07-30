@@ -347,7 +347,7 @@ pub(crate) use task_board_automation_runtime::{
     TaskBoardAutomationRunSession, TaskBoardAutomationRunStart, task_board_automation_snapshot,
 };
 pub(crate) use task_board_db::{
-    TaskBoardListSource, activate_task_board_triage_rules_db, approve_task_board_plan_db,
+    activate_task_board_triage_rules_db, approve_task_board_plan_db,
     audit_task_board_db, begin_task_board_planning_db, clear_task_board_triage_override_db,
     create_task_board_item_db, delete_task_board_item_db, get_task_board_ai_review_report_db,
     get_task_board_item_db, get_task_board_item_position_snapshot_db,

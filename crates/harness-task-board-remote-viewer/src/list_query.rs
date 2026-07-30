@@ -1,15 +1,39 @@
 use std::collections::HashMap;
 
-use crate::daemon::db::TaskBoardItemSnapshot;
-use crate::daemon::protocol::{TaskBoardListItemsResponse, TaskBoardListItemsSelection};
-use crate::daemon::service::TaskBoardListSource;
-use crate::task_board::{TaskBoardItem, TaskBoardQueryFields, TaskBoardQueryTarget, select_page};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board::wire::{TaskBoardListItemsResponse, TaskBoardListItemsSelection};
+use harness_task_board::{
+    TaskBoardItem, TaskBoardProgressRollup, TaskBoardQueryFields, TaskBoardQueryTarget,
+    select_page,
+};
 
-use super::{
+use crate::{
     RemoteViewerTaskBoardItem, RemoteViewerTaskBoardListResponse, TaskBoardReadListResponse,
     drop_cached_provider_text,
 };
+
+/// One task-board item paired with the row revision observed alongside it.
+///
+/// Mirrors the shape of `harness-daemon`'s own `db::TaskBoardItemSnapshot`
+/// rather than naming it: this crate never depends on `harness-daemon`, so
+/// the daemon's list-read call site converts its snapshot into this on the
+/// way in.
+pub struct RevisionedTaskBoardItem {
+    pub item: TaskBoardItem,
+    pub item_revision: i64,
+}
+
+/// The whole live board one list read selects from, plus the change sequence
+/// and roll-ups observed alongside it.
+///
+/// Mirrors the shape of `harness-daemon`'s own `service::TaskBoardListSource`
+/// rather than naming it, for the same one-way-dependency reason as
+/// [`RevisionedTaskBoardItem`].
+pub struct TaskBoardListProjectionSource {
+    pub items: Vec<RevisionedTaskBoardItem>,
+    pub items_change_seq: i64,
+    pub progress_rollups: HashMap<String, TaskBoardProgressRollup>,
+}
 
 impl TaskBoardQueryTarget for RemoteViewerTaskBoardItem {
     fn query_fields(&self) -> TaskBoardQueryFields<'_> {
@@ -26,7 +50,7 @@ impl TaskBoardQueryTarget for RemoteViewerTaskBoardItem {
     }
 }
 
-impl TaskBoardQueryTarget for TaskBoardItemSnapshot {
+impl TaskBoardQueryTarget for RevisionedTaskBoardItem {
     fn query_fields(&self) -> TaskBoardQueryFields<'_> {
         self.item.query_fields()
     }
@@ -48,12 +72,16 @@ impl<T: TaskBoardQueryTarget> TaskBoardQueryTarget for RevisionedItem<T> {
 /// A remote viewer's selection runs against that viewer's redacted projection
 /// rather than the stored items, so a facet or text search can only ever
 /// distinguish items by text the same viewer could have read back anyway.
-pub(crate) fn project_task_board_list(
-    source: TaskBoardListSource,
+///
+/// # Errors
+/// Returns [`CliError`] when `selection`'s cursor no longer matches the
+/// board's current change sequence.
+pub fn project_task_board_list(
+    source: TaskBoardListProjectionSource,
     selection: &TaskBoardListItemsSelection,
     viewer: bool,
 ) -> Result<TaskBoardReadListResponse, CliError> {
-    let TaskBoardListSource {
+    let TaskBoardListProjectionSource {
         items,
         items_change_seq,
         progress_rollups,
@@ -169,7 +197,7 @@ fn page_items<T>(items: Vec<T>, window: &[usize]) -> Vec<T> {
 }
 
 fn split_snapshot_page(
-    snapshots: Vec<TaskBoardItemSnapshot>,
+    snapshots: Vec<RevisionedTaskBoardItem>,
 ) -> (Vec<TaskBoardItem>, HashMap<String, i64>) {
     split_revisioned_page(snapshots.into_iter().map(|snapshot| RevisionedItem {
         item: snapshot.item,

@@ -48,6 +48,7 @@ harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "55
 harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
 harness-task-board-codex-requests = { path = "../harness-task-board-codex-requests", version = "55.0.0" }
 harness-task-board-provider-sync = { path = "../harness-task-board-provider-sync", version = "55.0.0" }
+harness-task-board-remote-viewer = { path = "../harness-task-board-remote-viewer", version = "55.0.0" }
 harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
 hex = "0.4.3"
 hickory-resolver = "0.26.1"

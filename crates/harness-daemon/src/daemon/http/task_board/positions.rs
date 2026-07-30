@@ -6,7 +6,7 @@ use axum::response::Response;
 use crate::daemon::protocol::{
     TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest, http_paths,
 };
-use crate::daemon::remote_task_board::project_task_board_position_snapshot;
+use harness_task_board_remote_viewer::project_task_board_position_snapshot;
 
 use super::super::DaemonHttpState;
 use super::super::openapi::DaemonErrorBody;

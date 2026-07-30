@@ -4,8 +4,8 @@ use axum::response::Response;
 
 use crate::daemon::http::openapi::DaemonErrorBody;
 use crate::daemon::protocol::{TaskBoardGetItemRequest, http_paths};
-use crate::daemon::remote_task_board::project_task_board_ai_review_report;
 use crate::task_board::TaskBoardAiReviewReportResponse;
+use harness_task_board_remote_viewer::project_task_board_ai_review_report;
 
 use super::super::DaemonHttpState;
 use super::super::response::timed_json;

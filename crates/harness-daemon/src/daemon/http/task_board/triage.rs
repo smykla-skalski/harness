@@ -9,10 +9,10 @@ use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardClearTriageOverrideRequest,
     TaskBoardSetTriageOverrideRequest, TaskBoardTriageHistoryRequest, http_paths,
 };
-use crate::daemon::remote_task_board::{
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board_remote_viewer::{
     project_task_board_triage_current, project_task_board_triage_history,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::super::openapi::DaemonErrorBody;

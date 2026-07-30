@@ -109,8 +109,6 @@ pub(crate) mod remote_redaction;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_request_audit;
 #[cfg(feature = "daemon-runtime")]
-pub(crate) mod remote_task_board;
-#[cfg(feature = "daemon-runtime")]
 pub mod remote_tls;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_viewer;

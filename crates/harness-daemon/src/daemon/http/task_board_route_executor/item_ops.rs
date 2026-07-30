@@ -13,10 +13,10 @@ use crate::daemon::protocol::{
     TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
     TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
 };
-use crate::daemon::remote_task_board::{TaskBoardReadListResponse, project_task_board_list};
 use crate::daemon::service;
 use crate::task_board::{TaskBoardAiReviewReportResponse, TaskBoardItem};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board_remote_viewer::{TaskBoardReadListResponse, project_task_board_list};
 
 use super::super::{DaemonHttpState, require_async_db};
 
@@ -60,7 +60,7 @@ pub(crate) async fn list_items(
         .ok_or_else(|| CliError::from(CliErrorKind::workflow_io(TASK_BOARD_LIST_INVALID_PARAMS)))?;
     let source =
         service::read_task_board_items_db(require_async_db(state, "task board list")?).await?;
-    project_task_board_list(source, &selection, viewer)
+    project_task_board_list(source.into(), &selection, viewer)
 }
 
 pub(crate) async fn get_item(

@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use super::{TaskBoardReadListResponse, project_task_board_list};
-use crate::daemon::db::TaskBoardItemSnapshot;
-use crate::daemon::protocol::TaskBoardListItemsRequest;
-use crate::daemon::service::TaskBoardListSource;
-use crate::task_board::{
-    ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
-};
+use harness_task_board::wire::TaskBoardListItemsRequest;
+use harness_task_board::{ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardStatus};
+
+use super::{RevisionedTaskBoardItem, TaskBoardListProjectionSource, TaskBoardReadListResponse};
+use crate::list_query::project_task_board_list;
+use harness_task_board::TaskBoardItem;
 
 const CACHED_PROVIDER_BODY: &str = "a very long cached issue body that no client decodes";
 
@@ -34,9 +33,9 @@ fn item_with_synced_ref() -> TaskBoardItem {
     item
 }
 
-fn list_source() -> TaskBoardListSource {
-    TaskBoardListSource {
-        items: vec![TaskBoardItemSnapshot {
+fn list_source() -> TaskBoardListProjectionSource {
+    TaskBoardListProjectionSource {
+        items: vec![RevisionedTaskBoardItem {
             item: item_with_synced_ref(),
             item_revision: 1,
         }],
@@ -113,13 +112,13 @@ fn the_viewer_projection_is_untouched() {
 fn the_list_materializes_revisions_for_the_returned_page_only() {
     let mut second = item_with_synced_ref();
     second.id = "item-2".to_owned();
-    let source = TaskBoardListSource {
+    let source = TaskBoardListProjectionSource {
         items: vec![
-            TaskBoardItemSnapshot {
+            RevisionedTaskBoardItem {
                 item: item_with_synced_ref(),
                 item_revision: 11,
             },
-            TaskBoardItemSnapshot {
+            RevisionedTaskBoardItem {
                 item: second,
                 item_revision: 22,
             },

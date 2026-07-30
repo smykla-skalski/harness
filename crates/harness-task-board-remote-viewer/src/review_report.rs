@@ -1,9 +1,9 @@
-use crate::task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportResponse};
+use harness_task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportResponse};
 
-use super::super::remote_redaction::REDACTION_PLACEHOLDER;
+use crate::remote_redaction::REDACTION_PLACEHOLDER;
 
 #[must_use]
-pub(crate) fn project_task_board_ai_review_report(
+pub fn project_task_board_ai_review_report(
     response: TaskBoardAiReviewReportResponse,
     viewer: bool,
 ) -> TaskBoardAiReviewReportResponse {
@@ -49,7 +49,7 @@ fn redact_report(mut report: TaskBoardAiReviewReportRecord) -> TaskBoardAiReview
 
 #[cfg(test)]
 mod tests {
-    use crate::task_board::{
+    use harness_task_board::{
         TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportResponse,
         TaskBoardAiReviewReportStatus, TaskBoardReportOnlyReviewFinding,
         TaskBoardReviewFindingLocation, TaskBoardReviewFindingSeverity,
