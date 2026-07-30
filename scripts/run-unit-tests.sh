@@ -11,8 +11,10 @@ printf '==> test:unit 2/6: supporting workspace crates\n' >&2
 # assets it embeds; the unit-test gate exercises the Rust side only, so it
 # gets the placeholder bundle instead of a frontend build on every run.
 HARNESS_PANEL_SKIP_FRONTEND_BUILD=1 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-acp-probe -p harness-daemon-client -p harness-daemon-root -p harness-daemon-state -p harness-db-schema -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-protocol -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-task-board-codex-requests -p harness-task-board-provider-sync -p harness-task-board-remote-viewer -p harness-telemetry -p harness-testkit -p harness-timeline -p harness-voice -p harness-workspace "$@"
-# Own invocation: `acp` only compiles with `bridge-runtime`, which the rest of
-# the supporting group above has no reason to build.
+# Own invocation: nextest only runs tests for `-p`-selected packages, so
+# `acp`'s own suite still needs this explicit `bridge-runtime` selection even
+# though harness-daemon-acp-probe, in the group above, already builds
+# harness-agents with that feature as a dependency.
 printf '==> test:unit 3/6: harness-agents (bridge-runtime feature)\n' >&2
 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime "$@"
 # Extra invocation, on top of harness-task-board's own default-feature run
