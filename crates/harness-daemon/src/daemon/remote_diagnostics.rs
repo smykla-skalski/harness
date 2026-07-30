@@ -3,9 +3,9 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::state::DaemonAuditEvent;
 
-use harness_kernel::remote_redaction::redact_known_secrets;
+use harness_kernel::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
 
-const REDACTED: &str = "[redacted]";
+const REDACTED: &str = REDACTION_PLACEHOLDER;
 
 #[must_use]
 pub(crate) fn project_diagnostics_report(
