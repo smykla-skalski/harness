@@ -205,6 +205,8 @@ mod tests {
             identity: PullRequestIdentity::from_slug("owner/repo", 42),
             head_revision: "head-sha".to_owned(),
             author: None,
+            viewer_login: None,
+            viewer_has_approved: false,
             lifecycle,
             is_draft: false,
             gates: PullRequestMergeGates {

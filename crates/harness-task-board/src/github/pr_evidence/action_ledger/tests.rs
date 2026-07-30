@@ -346,6 +346,8 @@ fn evidence(lifecycle: PullRequestLifecycle) -> PullRequestEvidence {
         identity: PullRequestIdentity::new("octo", "harness", 7),
         head_revision: "aaa".to_string(),
         author: None,
+        viewer_login: None,
+        viewer_has_approved: false,
         lifecycle,
         is_draft: false,
         gates: PullRequestMergeGates {

@@ -46,6 +46,8 @@ fn evidence(lifecycle: PullRequestLifecycle, is_draft: bool) -> PullRequestEvide
         identity: identity(),
         head_revision: "deadbeef".to_string(),
         author: Some("octocat".to_string()),
+        viewer_login: None,
+        viewer_has_approved: false,
         lifecycle,
         is_draft,
         gates: default_gates(),
@@ -148,6 +150,35 @@ fn the_projection_reads_a_found_pull_request() {
     assert_eq!(found.author.as_deref(), Some("octocat"));
     assert_eq!(found.lifecycle, PullRequestLifecycle::Open);
     assert!(found.is_open());
+}
+
+#[test]
+fn projection_identifies_the_viewers_active_approval() {
+    let read = project(json!({
+        "viewer": { "login": "harness-bot" },
+        "repository": {
+            "pullRequest": {
+                "number": 7,
+                "headRefOid": "cafef00d",
+                "isDraft": false,
+                "state": "OPEN",
+                "author": { "login": "renovate" },
+                "reviews": {
+                    "nodes": [
+                        {
+                            "state": "APPROVED",
+                            "submittedAt": "2026-07-29T00:00:00Z",
+                            "author": { "login": "harness-bot" }
+                        }
+                    ]
+                }
+            }
+        }
+    }));
+    let found = read.evidence().expect("found");
+    assert_eq!(found.viewer_login.as_deref(), Some("harness-bot"));
+    assert!(found.viewer_has_approved);
+    assert_eq!(found.gates.review.current_approvals, 1);
 }
 
 #[test]

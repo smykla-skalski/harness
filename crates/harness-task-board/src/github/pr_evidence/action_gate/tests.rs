@@ -21,6 +21,8 @@ fn mergeable_evidence() -> PullRequestEvidence {
         identity: identity(),
         head_revision: HEAD.to_string(),
         author: Some("octocat".to_string()),
+        viewer_login: None,
+        viewer_has_approved: false,
         lifecycle: PullRequestLifecycle::Open,
         is_draft: false,
         gates: PullRequestMergeGates {

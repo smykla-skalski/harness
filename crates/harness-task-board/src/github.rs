@@ -206,6 +206,24 @@ pub trait GitHubAutomationClient: Send + Sync {
         )))
     }
 
+    /// Submit an approval review for one exact pull request head.
+    ///
+    /// Callers must run a fresh exact-head and account-policy gate immediately before this
+    /// mutation. Implementations must bind the review to `head_revision`.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn approve_pull_request(
+        &self,
+        _config: &GitHubProjectConfig,
+        _pull_request_number: u64,
+        _head_revision: &str,
+    ) -> Result<(), CliError> {
+        Err(CliError::from(CliErrorKind::workflow_io(
+            "task-board github approve_pull_request is unsupported",
+        )))
+    }
+
     /// Merge one pull request using the configured merge method.
     ///
     /// # Errors

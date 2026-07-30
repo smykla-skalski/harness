@@ -116,6 +116,8 @@ impl GitHubAutomationClient for FakeGitHubClient {
                 .with_url(self.pull_request.html_url.clone()),
             head_revision: self.pull_request.head_sha.clone(),
             author: None,
+            viewer_login: None,
+            viewer_has_approved: false,
             lifecycle,
             // The pull request starts at its handle's draft state and becomes
             // non-draft once ready_pull_request_for_review has run, so a fresh read

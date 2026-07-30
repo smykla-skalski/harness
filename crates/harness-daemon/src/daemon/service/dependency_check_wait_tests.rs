@@ -102,6 +102,8 @@ impl PullRequestEvidenceSource for Source {
             identity: identity.clone(),
             head_revision: HEAD.into(),
             author: Some("renovate".into()),
+            viewer_login: None,
+            viewer_has_approved: false,
             lifecycle: PullRequestLifecycle::Open,
             is_draft: false,
             gates: PullRequestMergeGates {
