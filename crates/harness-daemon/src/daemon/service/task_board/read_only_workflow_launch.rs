@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 
 use tokio::task::spawn_blocking;
 
+use crate::agents::runtime::models;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::service::{
+    assess_provider_readiness, provider_prerequisite_reasons, runtime_requires_provider_credential,
+};
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
 use crate::sandbox;
@@ -58,6 +62,7 @@ pub(super) async fn prepare_read_only_workflow_launch(
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
     ensure_supported_read_only_runtimes(&resolved_reviewers)?;
+    ensure_reviewer_runtimes_available(&resolved_reviewers).await?;
     let (pull_request, exact_head_revision) = resolve_exact_head(&item, worktree).await?;
     Ok(Some(TaskBoardReadOnlyWorkflowLaunch {
         workflow_kind: item.workflow_kind,
@@ -108,6 +113,11 @@ pub(crate) async fn validate_read_only_workflow_launch(
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
     ensure_supported_read_only_runtimes(&reviewers)?;
+    // Re-check provider prerequisites at the durable start, not only at prepare:
+    // a daemon restart between the two, or a credential revoked after prepare,
+    // must still stop the review before any turn begins rather than start a
+    // worker that fails at runtime. Stays retryable with the named prerequisite.
+    ensure_reviewer_runtimes_available(&reviewers).await?;
     if item.workflow_kind != launch.workflow_kind
         || item.agent_mode != AgentMode::Evaluate
         || execution_repository != launch.execution_repository
@@ -230,6 +240,48 @@ pub(super) fn ensure_supported_read_only_runtimes(
     ensure_runtimes_supported(reviewers, &SUPPORTED_READ_ONLY_RUNTIMES, "read-only")
 }
 
+/// Fail the launch before any agent work when a selected reviewer runtime is
+/// configured but cannot currently run - a missing, rejected, or unverifiable
+/// provider credential, or a model the live provider does not offer. This is
+/// distinct from the unsupported-runtime refusal above: the runtime is
+/// supported, so the block names the specific unmet prerequisite (reusing the
+/// headless-readiness vocabulary) and stays retryable, because releasing the
+/// preparation lets a later dispatch proceed once the prerequisite is met.
+///
+/// A runtime that needs no provider credential (Codex) carries no prerequisite
+/// this gate can evaluate; its readiness is settled on its own durable path, so
+/// it is skipped up front before any model resolution or provider probe.
+async fn ensure_reviewer_runtimes_available(
+    reviewers: &TaskBoardResolvedReviewer,
+) -> Result<(), CliError> {
+    for profile in &reviewers.profiles {
+        let runtime = profile.runtime.as_str();
+        if !runtime_requires_provider_credential(runtime) {
+            continue;
+        }
+        // A credential-backed runtime must resolve to a concrete model. An
+        // unresolvable model is itself an unmet prerequisite, named rather than
+        // defaulted to an empty string that the readiness check would then
+        // silently treat as a model.
+        let Some(model) = models::effective_model(runtime, profile.model.as_deref()) else {
+            return Err(invalid_transition(format!(
+                "reviewer runtime '{runtime}' cannot run: no model is configured or catalogued for it"
+            )));
+        };
+        let (credential, model_available) = assess_provider_readiness(runtime, &model).await;
+        if let Some(reason) =
+            provider_prerequisite_reasons(runtime, &model, &credential, model_available)
+                .into_iter()
+                .next()
+        {
+            return Err(invalid_transition(format!(
+                "reviewer runtime '{runtime}' cannot run: {reason}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn normalized_execution_repository(item: &TaskBoardItem) -> Result<Option<String>, CliError> {
     task_board_read_only_execution_repository(item)
         .map_err(|error| invalid_transition(error.to_string()))
@@ -292,6 +344,32 @@ mod tests {
             .expect_err("unsupported runtime");
         assert!(error.to_string().contains("gemini"), "{error}");
         assert!(error.to_string().contains("read-only"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn availability_gate_skips_a_credential_free_runtime() {
+        // Codex needs no provider credential, so the availability gate has no
+        // prerequisite to evaluate and must not block it.
+        ensure_reviewer_runtimes_available(&resolved(&["codex"]))
+            .await
+            .expect("codex has no provider prerequisite to gate");
+    }
+
+    #[tokio::test]
+    async fn availability_gate_blocks_openrouter_without_a_credential() {
+        // No token is configured in this isolated test process, so the supported
+        // openrouter runtime cannot run. The block must name the runtime and the
+        // specific unmet prerequisite rather than refusing the runtime by name.
+        let error = ensure_reviewer_runtimes_available(&resolved(&["openrouter"]))
+            .await
+            .expect_err("openrouter without a credential cannot run");
+        let message = error.to_string();
+        assert!(message.contains("openrouter"), "{message}");
+        assert!(message.contains("cannot run"), "{message}");
+        assert!(
+            message.contains("credential is not configured"),
+            "{message}"
+        );
     }
 
     #[test]

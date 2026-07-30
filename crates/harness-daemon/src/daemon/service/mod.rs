@@ -343,15 +343,14 @@ pub(crate) use task_board_automation_runtime::{
     TaskBoardAutomationRunSession, TaskBoardAutomationRunStart, task_board_automation_snapshot,
 };
 pub(crate) use task_board_db::{
-    activate_task_board_triage_rules_db, approve_task_board_plan_db,
-    audit_task_board_db, begin_task_board_planning_db, clear_task_board_triage_override_db,
-    create_task_board_item_db, delete_task_board_item_db, get_task_board_ai_review_report_db,
-    get_task_board_item_db, get_task_board_item_position_snapshot_db,
-    get_task_board_item_triage_current_db, get_task_board_item_triage_history_db,
-    get_task_board_triage_rules_audit_db, get_task_board_triage_rules_draft_db,
-    get_task_board_triage_rules_revisions_db, list_task_board_machines_db,
-    list_task_board_projects_db, preview_task_board_triage_rules_db, read_task_board_items_db,
-    reset_task_board_item_position_db, revoke_task_board_plan_db,
+    activate_task_board_triage_rules_db, approve_task_board_plan_db, audit_task_board_db,
+    begin_task_board_planning_db, clear_task_board_triage_override_db, create_task_board_item_db,
+    delete_task_board_item_db, get_task_board_ai_review_report_db, get_task_board_item_db,
+    get_task_board_item_position_snapshot_db, get_task_board_item_triage_current_db,
+    get_task_board_item_triage_history_db, get_task_board_triage_rules_audit_db,
+    get_task_board_triage_rules_draft_db, get_task_board_triage_rules_revisions_db,
+    list_task_board_machines_db, list_task_board_projects_db, preview_task_board_triage_rules_db,
+    read_task_board_items_db, reset_task_board_item_position_db, revoke_task_board_plan_db,
     save_task_board_triage_rules_draft_db, set_task_board_item_position_db,
     set_task_board_triage_override_db, submit_task_board_plan_db, sync_task_board_db,
     task_board_host_list_db, task_board_host_local_db, task_board_host_set_project_types_db,
@@ -397,7 +396,9 @@ pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 
 pub(crate) use headless_readiness::{
-    CredentialAssessment, HeadlessReadinessInputs, RuntimeProbe, build_headless_readiness_report,
+    HeadlessReadinessInputs, RuntimeProbe, assess_provider_readiness,
+    build_headless_readiness_report, provider_prerequisite_reasons,
+    runtime_requires_provider_credential,
 };
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;

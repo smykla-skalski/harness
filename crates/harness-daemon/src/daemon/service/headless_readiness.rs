@@ -3,6 +3,9 @@ use crate::agents::runtime::models;
 use crate::daemon::bridge::{
     BRIDGE_CAPABILITY_ACP, BRIDGE_CAPABILITY_AGENT_TUI, BRIDGE_CAPABILITY_CODEX, BridgeStatusReport,
 };
+use crate::daemon::state::task_board_openrouter_token;
+
+use super::{OpenRouterCredential, probe_openrouter_readiness};
 use harness_protocol::daemon::{
     DAEMON_WIRE_VERSION, HeadlessReadinessCredential, HeadlessReadinessLane,
     HeadlessReadinessModel, HeadlessReadinessPeer, HeadlessReadinessReport,
@@ -167,13 +170,11 @@ fn collect_unmet_requirements(
     );
     push_credential_failure(&mut reasons, &inputs.credential, credential);
     push_runtime_failure(&mut reasons, inputs, evaluation);
-    push_failure(
+    push_model_failure(
         &mut reasons,
+        &inputs.request.model,
+        &inputs.request.runtime,
         evaluation.model_available,
-        format!(
-            "model '{}' is unavailable for runtime '{}'",
-            inputs.request.model, inputs.request.runtime
-        ),
     );
     push_failure(
         &mut reasons,
@@ -208,6 +209,58 @@ fn push_credential_failure(
             ));
         }
     }
+}
+
+fn push_model_failure(reasons: &mut Vec<String>, model: &str, runtime: &str, available: bool) {
+    push_failure(
+        reasons,
+        available,
+        format!("model '{model}' is unavailable for runtime '{runtime}'"),
+    );
+}
+
+/// Resolve the credential and model prerequisites for `runtime`/`model` against
+/// the live provider, using the same logic the headless readiness HTTP path
+/// reports. A runtime that needs no provider credential falls back to the static
+/// catalog, the only signal available for it. No returned detail ever contains
+/// the token: only HTTP status codes and transport reasons propagate.
+pub(crate) async fn assess_provider_readiness(
+    runtime: &str,
+    model: &str,
+) -> (CredentialAssessment, bool) {
+    let static_model_ok = models::validate_model(runtime, model).is_ok();
+    if runtime != "openrouter" {
+        return (CredentialAssessment::NotRequired, static_model_ok);
+    }
+    let Some(token) = task_board_openrouter_token() else {
+        return (CredentialAssessment::Missing, static_model_ok);
+    };
+    let readiness = probe_openrouter_readiness(&token, model).await;
+    let credential = match readiness.credential {
+        OpenRouterCredential::Accepted => CredentialAssessment::Accepted,
+        OpenRouterCredential::Rejected(detail) => CredentialAssessment::Rejected(detail),
+        OpenRouterCredential::Unverified(detail) => CredentialAssessment::Unverified(detail),
+    };
+    let model_available = readiness.model_available.unwrap_or(static_model_ok);
+    (credential, model_available)
+}
+
+/// Named, secret-free prerequisite failures for `runtime`/`model`, ordered so a
+/// credential failure precedes a model failure. An empty vector means the
+/// provider prerequisites are all met. This shares the exact wording and
+/// redaction the headless readiness report uses, so an operator sees one
+/// vocabulary whether the block surfaces on the readiness probe or at dispatch.
+pub(crate) fn provider_prerequisite_reasons(
+    runtime: &str,
+    model: &str,
+    credential: &CredentialAssessment,
+    model_available: bool,
+) -> Vec<String> {
+    let mut reasons = Vec::new();
+    let report = credential_report(credential, runtime);
+    push_credential_failure(&mut reasons, credential, &report);
+    push_model_failure(&mut reasons, model, runtime, model_available);
+    reasons
 }
 
 fn push_runtime_failure(
@@ -326,6 +379,14 @@ fn credential_report(
 
 fn credential_provider(runtime: &str) -> Option<&'static str> {
     (runtime == "openrouter").then_some("openrouter")
+}
+
+/// Whether `runtime` runs through a provider that requires a validated
+/// credential. Only such runtimes carry the credential/model prerequisites this
+/// module can evaluate; the rest settle readiness on their own path. Shares
+/// `credential_provider` so the set stays in one place.
+pub(crate) fn runtime_requires_provider_credential(runtime: &str) -> bool {
+    credential_provider(runtime).is_some()
 }
 
 fn push_failure(reasons: &mut Vec<String>, passed: bool, reason: String) {
