@@ -294,6 +294,28 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         Ok(())
     }
 
+    async fn approve_pull_request(
+        &self,
+        config: &GitHubProjectConfig,
+        pull_request_number: u64,
+        head_revision: &str,
+    ) -> Result<(), CliError> {
+        self.client
+            .rest_empty(
+                Method::POST,
+                format!(
+                    "/repos/{}/{}/pulls/{pull_request_number}/reviews",
+                    config.owner, config.repo
+                ),
+                Some(json!({
+                    "commit_id": head_revision,
+                    "event": "APPROVE"
+                })),
+                rest_write_descriptor("task_board.github.approve_pull_request"),
+            )
+            .await
+    }
+
     async fn merge_pull_request(
         &self,
         config: &GitHubProjectConfig,

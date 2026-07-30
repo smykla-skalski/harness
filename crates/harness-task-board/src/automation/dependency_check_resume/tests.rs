@@ -355,6 +355,8 @@ fn evidence(state: CheckState, details_url: Option<&str>) -> PullRequestEvidence
         identity: PullRequestIdentity::from_slug("acme/widgets", 17),
         head_revision: HEAD.into(),
         author: Some("renovate".into()),
+        viewer_login: None,
+        viewer_has_approved: false,
         lifecycle: PullRequestLifecycle::Open,
         is_draft: false,
         gates: PullRequestMergeGates {

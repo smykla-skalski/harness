@@ -130,6 +130,10 @@ pub struct PullRequestEvidence {
     pub head_revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_login: Option<String>,
+    #[serde(default)]
+    pub viewer_has_approved: bool,
     pub lifecycle: PullRequestLifecycle,
     pub is_draft: bool,
     /// Every merge gate read off this same snapshot.

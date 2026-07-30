@@ -57,6 +57,7 @@ pub enum ReviewDecision {
     Approved,
     ChangesRequested,
     ReviewRequired,
+    NotRequired,
     Unknown,
 }
 
@@ -75,8 +76,9 @@ impl ReviewGate {
     /// all fail.
     #[must_use]
     pub fn is_satisfied(&self) -> bool {
-        self.decision == ReviewDecision::Approved
-            && self.current_approvals >= self.required_approvals
+        self.current_approvals >= self.required_approvals
+            && (self.decision == ReviewDecision::Approved
+                || self.required_approvals == 0 && self.decision == ReviewDecision::NotRequired)
     }
 
     #[must_use]

@@ -19,6 +19,8 @@ fn evidence(head: &str, checks: &[(&str, CheckState)], required: &[&str]) -> Pul
         identity: identity(),
         head_revision: head.to_string(),
         author: Some("octocat".to_string()),
+        viewer_login: None,
+        viewer_has_approved: false,
         lifecycle: PullRequestLifecycle::Open,
         is_draft: false,
         gates: PullRequestMergeGates {

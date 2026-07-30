@@ -20,6 +20,7 @@ use super::{
 
 const PULL_REQUEST_EVIDENCE_QUERY: &str = r"
 query($owner: String!, $repo: String!, $number: Int!) {
+  viewer { login }
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       number
@@ -120,6 +121,7 @@ pub(crate) fn pull_request_evidence_from_response(
     response: PullRequestEvidenceResponse,
     observed_at: String,
 ) -> Result<PullRequestEvidenceRead, CliError> {
+    let viewer_login = response.viewer.map(|viewer| viewer.login);
     let Some(node) = response
         .repository
         .and_then(|repository| repository.pull_request)
@@ -137,6 +139,9 @@ pub(crate) fn pull_request_evidence_from_response(
         .into());
     }
     let lifecycle = lifecycle_from_state(&node.state)?;
+    let viewer_has_approved = viewer_login
+        .as_deref()
+        .is_some_and(|viewer| reviewer_is_approved(&node.reviews.nodes, viewer));
     let gates = gates_from_node(&node);
     let identity = PullRequestIdentity {
         repository: identity.repository.clone(),
@@ -147,6 +152,8 @@ pub(crate) fn pull_request_evidence_from_response(
         identity,
         head_revision: node.head_ref_oid,
         author: node.author.map(|author| author.login),
+        viewer_login,
+        viewer_has_approved,
         lifecycle,
         is_draft: node.is_draft,
         gates,
@@ -185,7 +192,8 @@ fn review_decision_from_state(state: Option<&str>) -> ReviewDecision {
         Some("APPROVED") => ReviewDecision::Approved,
         Some("CHANGES_REQUESTED") => ReviewDecision::ChangesRequested,
         Some("REVIEW_REQUIRED") => ReviewDecision::ReviewRequired,
-        _ => ReviewDecision::Unknown,
+        None => ReviewDecision::NotRequired,
+        Some(_) => ReviewDecision::Unknown,
     }
 }
 
@@ -209,6 +217,22 @@ fn head_check_gates(node: &PullRequestNode) -> Vec<CheckGate> {
 /// "changes requested" or "dismissed" from the same author drops the approval;
 /// `COMMENTED` reviews are not decisive and never change the standing.
 fn current_approvals(reviews: &[ReviewNode]) -> u32 {
+    u32::try_from(
+        latest_decisive_reviews(reviews)
+            .values()
+            .filter(|state| **state == "APPROVED")
+            .count(),
+    )
+    .unwrap_or(0)
+}
+
+fn reviewer_is_approved(reviews: &[ReviewNode], reviewer: &str) -> bool {
+    latest_decisive_reviews(reviews)
+        .get(reviewer)
+        .is_some_and(|state| *state == "APPROVED")
+}
+
+fn latest_decisive_reviews(reviews: &[ReviewNode]) -> BTreeMap<String, &str> {
     let mut ordered = reviews.iter().collect::<Vec<_>>();
     ordered.sort_by(|left, right| left.submitted_at.cmp(&right.submitted_at));
     let mut latest: BTreeMap<String, &str> = BTreeMap::new();
@@ -223,15 +247,7 @@ fn current_approvals(reviews: &[ReviewNode]) -> u32 {
             _ => {}
         }
     }
-    // The count is bounded by `reviews(first: 100)`, so it always fits; a
-    // fail-closed 0 covers the unreachable overflow rather than a surprising max.
-    u32::try_from(
-        latest
-            .values()
-            .filter(|state| **state == "APPROVED")
-            .count(),
-    )
-    .unwrap_or(0)
+    latest
 }
 
 fn required_check_names(rule: &BranchProtectionRule) -> Vec<String> {
@@ -265,6 +281,8 @@ fn evidence_descriptor() -> GitHubRequestDescriptor {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct PullRequestEvidenceResponse {
+    #[serde(default)]
+    viewer: Option<ActorNode>,
     #[serde(default)]
     repository: Option<RepositoryNode>,
 }

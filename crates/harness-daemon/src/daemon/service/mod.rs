@@ -175,6 +175,7 @@ use crate::daemon::db;
 use crate::daemon::protocol;
 
 mod adopt;
+mod dependency_approval_merge;
 mod dependency_check_wait;
 #[cfg(test)]
 mod dependency_check_wait_tests;

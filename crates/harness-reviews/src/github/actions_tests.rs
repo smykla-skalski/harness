@@ -156,6 +156,8 @@ fn evidence(
         identity: PullRequestIdentity::from_slug("example/widgets", 42),
         head_revision: head.to_owned(),
         author: None,
+        viewer_login: None,
+        viewer_has_approved: false,
         lifecycle,
         is_draft,
         gates,

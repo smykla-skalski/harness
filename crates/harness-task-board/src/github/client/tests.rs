@@ -51,6 +51,36 @@ async fn request_pull_request_reviewers_posts_expected_payload() {
     );
 }
 
+#[tokio::test]
+async fn approve_pull_request_posts_expected_payload() {
+    let _budget_guard = harness_github_api::acquire_global_budget_test_lock().await;
+    let (endpoint, captured, handle) = spawn_json_mock(json!({
+        "id": 1,
+        "node_id": "PRR_1",
+        "html_url": "https://github.invalid/owner/repo/pull/42#pullrequestreview-1",
+        "state": "APPROVED",
+        "user": null
+    }));
+    let client = automation_client_with_base_uri(&endpoint);
+    let config = GitHubProjectConfig::new("owner", "repo");
+
+    client
+        .approve_pull_request(&config, 42, "verified-head")
+        .await
+        .expect("approve pull request");
+
+    handle.join().expect("mock server");
+    let captured = captured.lock().expect("captured request");
+    assert_eq!(captured.path, "/repos/owner/repo/pulls/42/reviews");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&captured.body).expect("json body"),
+        json!({
+            "commit_id": "verified-head",
+            "event": "APPROVE"
+        })
+    );
+}
+
 #[test]
 fn rest_pull_request_handle_maps_response_entries() {
     let pull_request: RestPullRequestResponse = serde_json::from_value(json!({
