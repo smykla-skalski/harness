@@ -57,7 +57,7 @@ pub(super) async fn prepare_read_only_workflow_launch(
         execution_repository.as_deref(),
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
-    ensure_supported_runtimes(&resolved_reviewers)?;
+    ensure_supported_read_only_runtimes(&resolved_reviewers)?;
     let (pull_request, exact_head_revision) = resolve_exact_head(&item, worktree).await?;
     Ok(Some(TaskBoardReadOnlyWorkflowLaunch {
         workflow_kind: item.workflow_kind,
@@ -107,7 +107,7 @@ pub(crate) async fn validate_read_only_workflow_launch(
         execution_repository.as_deref(),
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
-    ensure_supported_runtimes(&reviewers)?;
+    ensure_supported_read_only_runtimes(&reviewers)?;
     if item.workflow_kind != launch.workflow_kind
         || item.agent_mode != AgentMode::Evaluate
         || execution_repository != launch.execution_repository
@@ -197,25 +197,37 @@ fn local_head(worktree: &Path) -> Result<String, CliError> {
 
 /// Reviewer runtimes a local read-only workflow can dispatch. Codex runs the
 /// long-standing durable path; `openrouter` runs the shared non-Codex turn
-/// through the `agent_turn_runs` store. A profile naming anything else is a
-/// configuration mistake refused before any side effect.
+/// through the `agent_turn_runs` store. The write launch path is stricter -
+/// there is no non-Codex write execution yet - so it keeps its own set rather
+/// than sharing this one.
 pub(super) const SUPPORTED_READ_ONLY_RUNTIMES: [&str; 2] = ["codex", "openrouter"];
 
-pub(super) fn ensure_supported_runtimes(
+/// Refuse a reviewer profile whose runtime is not in `allowed`, before any side
+/// effect. `workflow` names the launch path so the operator-facing error is
+/// accurate for whichever gate rejected it.
+pub(super) fn ensure_runtimes_supported(
     reviewers: &TaskBoardResolvedReviewer,
+    allowed: &[&str],
+    workflow: &str,
 ) -> Result<(), CliError> {
     if let Some(profile) = reviewers
         .profiles
         .iter()
-        .find(|profile| !SUPPORTED_READ_ONLY_RUNTIMES.contains(&profile.runtime.as_str()))
+        .find(|profile| !allowed.contains(&profile.runtime.as_str()))
     {
         Err(invalid_transition(format!(
-            "local read-only workflows do not support reviewer runtime '{}'",
+            "local {workflow} workflows do not support reviewer runtime '{}'",
             profile.runtime
         )))
     } else {
         Ok(())
     }
+}
+
+pub(super) fn ensure_supported_read_only_runtimes(
+    reviewers: &TaskBoardResolvedReviewer,
+) -> Result<(), CliError> {
+    ensure_runtimes_supported(reviewers, &SUPPORTED_READ_ONLY_RUNTIMES, "read-only")
 }
 
 fn normalized_execution_repository(item: &TaskBoardItem) -> Result<Option<String>, CliError> {
@@ -266,17 +278,31 @@ mod tests {
     }
 
     #[test]
-    fn supported_runtimes_accept_codex_and_openrouter() {
-        ensure_supported_runtimes(&resolved(&["codex"])).expect("codex accepted");
-        ensure_supported_runtimes(&resolved(&["openrouter"])).expect("openrouter accepted");
-        ensure_supported_runtimes(&resolved(&["codex", "openrouter"]))
+    fn read_only_gate_accepts_codex_and_openrouter() {
+        ensure_supported_read_only_runtimes(&resolved(&["codex"])).expect("codex accepted");
+        ensure_supported_read_only_runtimes(&resolved(&["openrouter"]))
+            .expect("openrouter accepted");
+        ensure_supported_read_only_runtimes(&resolved(&["codex", "openrouter"]))
             .expect("a mixed supported set is accepted");
     }
 
     #[test]
-    fn an_unsupported_runtime_is_refused_by_name() {
-        let error =
-            ensure_supported_runtimes(&resolved(&["gemini"])).expect_err("unsupported runtime");
+    fn read_only_gate_refuses_an_unsupported_runtime_by_name() {
+        let error = ensure_supported_read_only_runtimes(&resolved(&["gemini"]))
+            .expect_err("unsupported runtime");
         assert!(error.to_string().contains("gemini"), "{error}");
+        assert!(error.to_string().contains("read-only"), "{error}");
+    }
+
+    #[test]
+    fn a_stricter_gate_refuses_openrouter_with_its_own_wording() {
+        // The write launch path passes a Codex-only set: openrouter is refused
+        // there, and the error names that path rather than "read-only".
+        ensure_runtimes_supported(&resolved(&["codex"]), &["codex"], "write")
+            .expect("codex accepted on the write path");
+        let error = ensure_runtimes_supported(&resolved(&["openrouter"]), &["codex"], "write")
+            .expect_err("openrouter refused on the write path");
+        assert!(error.to_string().contains("openrouter"), "{error}");
+        assert!(error.to_string().contains("write"), "{error}");
     }
 }

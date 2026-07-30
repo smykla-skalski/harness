@@ -10,6 +10,12 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+/// Reviewer runtimes a local write workflow can dispatch. Only Codex has a
+/// durable write execution path; the non-Codex runtimes the read-only gate
+/// accepts have no write execution yet (#908), so admitting one here would
+/// stamp a workflow that cannot run.
+const SUPPORTED_WRITE_RUNTIMES: [&str; 1] = ["codex"];
+
 pub(super) async fn prepare_write_workflow_launch(
     db: &AsyncDaemonDb,
     item_id: &str,
@@ -48,7 +54,11 @@ pub(super) async fn prepare_write_workflow_launch(
         execution_repository.as_deref(),
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
-    super::read_only_workflow_launch::ensure_supported_runtimes(&resolved_reviewers)?;
+    super::read_only_workflow_launch::ensure_runtimes_supported(
+        &resolved_reviewers,
+        &SUPPORTED_WRITE_RUNTIMES,
+        "write",
+    )?;
     let requested_pull_request = requested_pull_request(&item)?;
     let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
         db,
@@ -131,7 +141,11 @@ pub(crate) async fn validate_write_workflow_launch(
         execution_repository.as_deref(),
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
-    super::read_only_workflow_launch::ensure_supported_runtimes(&reviewers)?;
+    super::read_only_workflow_launch::ensure_runtimes_supported(
+        &reviewers,
+        &SUPPORTED_WRITE_RUNTIMES,
+        "write",
+    )?;
     let requested_pull_request = requested_pull_request(&item)?;
     let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
         db,
