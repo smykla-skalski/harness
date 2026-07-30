@@ -105,10 +105,14 @@ pub(super) fn validate_write_attempt_artifact(
                     "dependency workflow has no pull request",
                 )
             })?;
-            let head = frozen_pr_fix_head(record).ok_or_else(|| {
+            let head = record
+                .transition
+                .exact_head_revision
+                .as_deref()
+                .ok_or_else(|| {
                     field_error(
                         "attempt.artifact.dependency_triage",
-                        "dependency workflow has no frozen pull request head",
+                        "dependency workflow has no frozen exact head revision",
                     )
                 })?;
             let compiled = compile_task_board_dependency_route(
