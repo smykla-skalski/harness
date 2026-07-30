@@ -174,6 +174,19 @@ fn retry_rejects_non_failure_and_mismatched_prior_run_evidence() {
         .is_err()
     );
 
+    checks = failed_checks(&previous_request.route_id);
+    checks.identity =
+        crate::github::PullRequestIdentity::from_slug("acme/other-widgets", 17);
+    assert!(
+        task_board_dependency_fix_retry_request(
+            &previous_request,
+            &previous_run,
+            &previous_result,
+            &checks,
+        )
+        .is_err()
+    );
+
     previous_run.failure_evidence_id = Some("unexpected-evidence".into());
     assert!(
         task_board_dependency_fix_retry_request(

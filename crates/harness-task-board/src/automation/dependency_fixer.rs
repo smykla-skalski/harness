@@ -189,6 +189,8 @@ pub fn task_board_dependency_fix_retry_request(
     validate_task_board_dependency_fix_result(previous_result, previous_request)?;
     validate_prior_run(previous_request, previous_run)?;
     if checks.route_id != previous_request.route_id
+        || checks.identity.repository != previous_request.repository
+        || checks.identity.number != previous_request.pull_request_number
         || !valid_head_revision(&checks.exact_head_revision)
     {
         return Err(parse_error(
