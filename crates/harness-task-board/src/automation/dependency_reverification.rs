@@ -142,6 +142,10 @@ pub fn validate_task_board_dependency_reverification_request(
         || request.fixer_result.changed_paths.is_empty()
         || !request.fixer_result.remaining_blockers.is_empty()
         || request.diff.trim().is_empty()
+        || !request
+            .diff
+            .lines()
+            .any(|line| line.starts_with("diff --git "))
     {
         return Err(parse_error(
             "dependency reverification evidence does not match the changed pull request head",
@@ -316,7 +320,9 @@ fn validate_reverification_result(
     };
     if result.schema_version != TASK_BOARD_DEPENDENCY_REVERIFICATION_SCHEMA_VERSION
         || result.verification_id.trim().is_empty()
+        || result.verification_id.trim() != result.verification_id
         || result.repository.trim().is_empty()
+        || result.repository.trim() != result.repository
         || result.pull_request_number == 0
         || !valid_head_revision(&result.exact_head_revision)
         || result.reasoning.trim().is_empty()

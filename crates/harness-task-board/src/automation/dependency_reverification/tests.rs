@@ -103,6 +103,10 @@ fn request_rejects_failed_ci_stale_identity_and_inconsistent_gates() {
         .required_check_names
         .push("build".into());
     assert!(validate_task_board_dependency_reverification_request(&duplicate_required).is_err());
+
+    let mut invalid_diff = request().expect("valid request");
+    invalid_diff.diff = "Cargo.lock changed".into();
+    assert!(validate_task_board_dependency_reverification_request(&invalid_diff).is_err());
 }
 
 #[test]
@@ -175,6 +179,14 @@ fn stale_or_contradictory_results_fail_closed() {
     result.repair_instructions = vec!["unexpected repair".into()];
     let report = serde_json::to_string(&result).expect("report");
     assert!(parse_task_board_dependency_reverification_result(&report, &request).is_err());
+
+    result.repair_instructions.clear();
+    result.repository = " acme/widgets".into();
+    assert!(task_board_dependency_reverification_authorization(&result, REMOTE_HEAD).is_err());
+
+    result.repository = request.repository;
+    result.verification_id.push(' ');
+    assert!(task_board_dependency_reverification_authorization(&result, REMOTE_HEAD).is_err());
 }
 
 fn request() -> Result<TaskBoardDependencyReverificationRequest, CliError> {
