@@ -140,16 +140,18 @@ private enum TaskBoardReviewReportPreviewFixture {
     finishedAt: "2026-07-29T19:41:12Z"
   )
 
-  static let terminalResponse = TaskBoardAiReviewReportResponse.terminal(
-    executionId: "execution-preview-901",
-    executionState: .failed,
-    runtime: "openrouter",
-    requestedRuntime: "openrouter",
-    actualRuntime: "openrouter",
-    requestedModel: "deepseek/deepseek-v4-flash",
-    headRevision: currentHead,
-    startedAt: "2026-07-29T19:40:00Z",
-    finishedAt: "2026-07-29T19:41:12Z"
+  static let terminalResponse = TaskBoardAiReviewReportResponse.notStarted(
+    terminal: TaskBoardAiReviewUnavailableExecution(
+      executionId: "execution-preview-901",
+      executionState: .failed,
+      runtime: "openrouter",
+      requestedRuntime: "openrouter",
+      actualRuntime: "openrouter",
+      requestedModel: "deepseek/deepseek-v4-flash",
+      headRevision: currentHead,
+      startedAt: "2026-07-29T19:40:00Z",
+      finishedAt: "2026-07-29T19:41:12Z"
+    )
   )
 
   private static func makeItem(workflowStatus: TaskBoardWorkflowStatus) -> TaskBoardItem {

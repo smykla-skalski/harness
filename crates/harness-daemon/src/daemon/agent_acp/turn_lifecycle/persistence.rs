@@ -25,7 +25,7 @@ impl OpenRouterAgentTurnRuntime {
                 board_item_id: correlation.and_then(|c| c.board_item_id.clone()),
                 workflow_execution_id: correlation.and_then(|c| c.workflow_execution_id.clone()),
                 project_dir: self.project_dir.clone(),
-                runtime_run_id: Some(id.as_str().to_owned()),
+                runtime_turn_id: Some(id.as_str().to_owned()),
                 requested_runtime: OPENROUTER_RUNTIME.into(),
                 actual_runtime: Some(OPENROUTER_RUNTIME.into()),
                 requested_model,
@@ -51,12 +51,12 @@ impl OpenRouterAgentTurnRuntime {
         if run.status != AgentTurnRunStatus::Running {
             return Ok(());
         }
-        let runtime_run_id = run.runtime_run_id.as_deref().ok_or_else(|| {
+        let runtime_turn_id = run.runtime_turn_id.as_deref().ok_or_else(|| {
             CliError::from(CliErrorKind::invalid_transition(
                 "running OpenRouter turn has no provider turn id",
             ))
         })?;
-        let id = AgentTurnId::new(runtime_run_id)?;
+        let id = AgentTurnId::new(runtime_turn_id)?;
         if self.durable_run_id(&id) != run.run_id {
             return Err(CliErrorKind::invalid_transition(
                 "OpenRouter turn correlation does not match its durable run",
@@ -120,7 +120,7 @@ impl OpenRouterAgentTurnRuntime {
                 board_item_id: None,
                 workflow_execution_id: None,
                 project_dir: self.project_dir.clone(),
-                runtime_run_id: Some(id.as_str().to_owned()),
+                runtime_turn_id: Some(id.as_str().to_owned()),
                 requested_runtime: OPENROUTER_RUNTIME.into(),
                 actual_runtime: Some(OPENROUTER_RUNTIME.into()),
                 requested_model: None,

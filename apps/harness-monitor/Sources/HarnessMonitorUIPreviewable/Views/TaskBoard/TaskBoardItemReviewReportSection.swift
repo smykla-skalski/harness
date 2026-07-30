@@ -63,12 +63,10 @@ struct TaskBoardItemReviewReportSection: View {
   private var headerStatus: TaskBoardReviewHeaderStatus? {
     guard let response = state.response else { return nil }
     switch response {
-    case .notStarted:
-      return nil
+    case .notStarted(let terminal):
+      return terminal?.executionState.taskBoardReviewHeaderStatus
     case .running:
       return .init(title: "Running", systemImage: "bolt.fill", tint: HarnessMonitorTheme.accent)
-    case .terminal(_, let executionState, _, _, _, _, _, _, _):
-      return executionState.taskBoardReviewHeaderStatus
     case .completed:
       return .init(
         title: "Completed",
@@ -93,13 +91,27 @@ struct TaskBoardItemReviewReportSection: View {
   @ViewBuilder private var reportContent: some View {
     if let response = state.response {
       switch response {
-      case .notStarted:
-        TaskBoardReviewMessageCard(
-          icon: "clock",
-          title: "Waiting to start",
-          detail: "No review execution has been recorded for this item",
-          tint: HarnessMonitorTheme.secondaryInk
-        )
+      case .notStarted(let terminal):
+        if let terminal {
+          TaskBoardTerminalExecutionReport(
+            item: item,
+            executionState: terminal.executionState,
+            terminalReason: item.workflow?.lastError,
+            requestedRuntime: terminal.requestedRuntime,
+            actualRuntime: terminal.actualRuntime,
+            requestedModel: terminal.requestedModel,
+            headRevision: terminal.headRevision,
+            startedAt: terminal.startedAt,
+            finishedAt: terminal.finishedAt
+          )
+        } else {
+          TaskBoardReviewMessageCard(
+            icon: "clock",
+            title: "Waiting to start",
+            detail: "No review execution has been recorded for this item",
+            tint: HarnessMonitorTheme.secondaryInk
+          )
+        }
       case .running(
         let executionID,
         _,
@@ -121,28 +133,6 @@ struct TaskBoardItemReviewReportSection: View {
             startedAt: startedAt,
             finishedAt: nil
           )
-        )
-      case .terminal(
-        _,
-        let executionState,
-        _,
-        let requestedRuntime,
-        let actualRuntime,
-        let requestedModel,
-        let headRevision,
-        let startedAt,
-        let finishedAt
-      ):
-        TaskBoardTerminalExecutionReport(
-          item: item,
-          executionState: executionState,
-          terminalReason: item.workflow?.lastError,
-          requestedRuntime: requestedRuntime,
-          actualRuntime: actualRuntime,
-          requestedModel: requestedModel,
-          headRevision: headRevision,
-          startedAt: startedAt,
-          finishedAt: finishedAt
         )
       case .completed(let report):
         terminalReport(

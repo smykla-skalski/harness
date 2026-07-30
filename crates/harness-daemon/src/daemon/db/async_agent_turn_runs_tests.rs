@@ -20,7 +20,6 @@ fn snapshot(run_id: &str, status: AgentTurnRunStatus) -> AgentTurnRunSnapshot {
         board_item_id: Some("item-a".into()),
         workflow_execution_id: Some("wf-a".into()),
         project_dir: Some("/tmp/project".into()),
-        runtime_run_id: Some("acp-a".into()),
         requested_runtime: "openrouter".into(),
         actual_runtime: Some("openrouter".into()),
         runtime_turn_id: Some(format!("turn-{run_id}")),

@@ -279,7 +279,7 @@ async fn persist_agent_turn_snapshot(
             board_item_id: Some(offer.launch.board_item_id.clone()),
             workflow_execution_id: Some(offer.launch.workflow_execution_id.clone()),
             project_dir: Some(workspace.to_string_lossy().into_owned()),
-            runtime_run_id: Some(format!("acp:{}", identity.run_id)),
+            runtime_turn_id: Some(format!("acp:{}", identity.run_id)),
             requested_runtime: "openrouter".into(),
             actual_runtime: Some("openrouter".into()),
             requested_model: offer.launch.model.clone(),

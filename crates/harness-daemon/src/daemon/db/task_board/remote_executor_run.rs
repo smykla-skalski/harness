@@ -151,7 +151,7 @@ impl TaskBoardRemoteExecutorRun {
             workflow_execution_id: run.workflow_execution_id,
             display_name: Some(offer.launch.display_name.clone()),
             project_dir,
-            runtime_thread_id: run.runtime_run_id,
+            runtime_thread_id: run.runtime_turn_id,
             mode: offer.launch.mode,
             status: agent_turn_status(run.status),
             prompt: offer.launch.prompt.clone(),

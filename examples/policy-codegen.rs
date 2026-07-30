@@ -2793,6 +2793,7 @@ const TASK_BOARD_REVIEW_REPORT_EMIT_ONLY: &[&str] = &[
     "TaskBoardReportOnlyReviewFinding",
     "TaskBoardAiReviewReportStatus",
     "TaskBoardAiReviewReportRecord",
+    "TaskBoardAiReviewUnavailableExecution",
     "TaskBoardAiReviewReportResponse",
     "TaskBoardExecutionState",
 ];

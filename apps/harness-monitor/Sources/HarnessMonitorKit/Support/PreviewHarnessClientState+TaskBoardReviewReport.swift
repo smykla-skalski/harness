@@ -3,7 +3,7 @@ import Foundation
 extension PreviewHarnessClientState {
   func taskBoardItemReviewReport(id: String) throws -> TaskBoardAiReviewReportResponse {
     _ = try currentTaskBoardItem(id: id)
-    return taskBoardReviewReportsByItemID[id] ?? .notStarted
+    return taskBoardReviewReportsByItemID[id] ?? .notStarted(terminal: nil)
   }
 
   static func seededTaskBoardReviewReports(

@@ -197,9 +197,10 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         57 => 58,
         // v59 adds the durable agent_turn_runs table for provider-backed report runs.
         58 => 59,
-        // v60 splits provider turn identity and report runtime provenance so
-        // every ALTER remains recoverable across a crash.
-        59..=62 => 60,
+        // v60 retains the provider-owned turn identity for report harvesting.
+        59 => 60,
+        // v61 splits report runtime provenance across replayable ALTERs.
+        60..=62 => 61,
         _ => u64::MAX,
     }
 }

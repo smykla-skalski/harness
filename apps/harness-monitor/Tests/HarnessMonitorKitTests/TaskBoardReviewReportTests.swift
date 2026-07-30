@@ -24,15 +24,17 @@ struct TaskBoardReviewReportTests {
       """#,
       #"""
       {
-        "status":"terminal",
-        "execution_id":"execution-1",
-        "execution_state":"failed",
-        "runtime":"openrouter",
-        "actual_runtime":"openrouter",
-        "requested_model":"deepseek/deepseek-v4-flash",
-        "head_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "started_at":"2026-07-29T19:40:00Z",
-        "finished_at":"2026-07-29T19:41:00Z"
+        "status":"not_started",
+        "terminal":{
+          "execution_id":"execution-1",
+          "execution_state":"failed",
+          "runtime":"openrouter",
+          "actual_runtime":"openrouter",
+          "requested_model":"deepseek/deepseek-v4-flash",
+          "head_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "started_at":"2026-07-29T19:40:00Z",
+          "finished_at":"2026-07-29T19:41:00Z"
+        }
       }
       """#,
       sampleTaskBoardReviewReportText,
@@ -57,7 +59,7 @@ struct TaskBoardReviewReportTests {
     }
 
     #expect(responses.count == 6)
-    guard case .notStarted = responses[0] else {
+    guard case .notStarted(terminal: nil) = responses[0] else {
       Issue.record("Expected not-started response")
       return
     }
@@ -68,23 +70,13 @@ struct TaskBoardReviewReportTests {
     #expect(runtime == "openrouter")
     #expect(actualRuntime == "openrouter")
     #expect(model == "deepseek/deepseek-v4-flash")
-    guard case .terminal(
-      _,
-      let state,
-      _,
-      let requestedRuntime,
-      let actualRuntime,
-      _,
-      _,
-      _,
-      _
-    ) = responses[2] else {
+    guard case .notStarted(let terminal) = responses[2], let terminal else {
       Issue.record("Expected terminal execution response")
       return
     }
-    #expect(state == .failed)
-    #expect(requestedRuntime == "openrouter")
-    #expect(actualRuntime == "openrouter")
+    #expect(terminal.executionState == .failed)
+    #expect(terminal.requestedRuntime == "openrouter")
+    #expect(terminal.actualRuntime == "openrouter")
     guard case .completed(let completed) = responses[3] else {
       Issue.record("Expected completed response")
       return

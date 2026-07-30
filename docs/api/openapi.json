@@ -28742,6 +28742,16 @@
                 "enum": [
                   "not_started"
                 ]
+              },
+              "terminal": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TaskBoardAiReviewUnavailableExecution"
+                  }
+                ]
               }
             }
           },
@@ -28791,64 +28801,6 @@
                 "type": "string",
                 "enum": [
                   "running"
-                ]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "description": "The execution settled before a full immutable report was retained.",
-            "required": [
-              "execution_id",
-              "execution_state",
-              "runtime",
-              "requested_runtime",
-              "started_at",
-              "finished_at",
-              "status"
-            ],
-            "properties": {
-              "actual_runtime": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "execution_id": {
-                "type": "string"
-              },
-              "execution_state": {
-                "$ref": "#/components/schemas/TaskBoardExecutionState"
-              },
-              "finished_at": {
-                "type": "string"
-              },
-              "head_revision": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "requested_model": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "requested_runtime": {
-                "type": "string"
-              },
-              "runtime": {
-                "type": "string",
-                "description": "Compatibility alias for `requested_runtime`."
-              },
-              "started_at": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "terminal"
                 ]
               }
             }
@@ -28919,6 +28871,57 @@
           "failed",
           "cancelled"
         ]
+      },
+      "TaskBoardAiReviewUnavailableExecution": {
+        "type": "object",
+        "required": [
+          "execution_id",
+          "execution_state",
+          "runtime",
+          "requested_runtime",
+          "started_at",
+          "finished_at"
+        ],
+        "properties": {
+          "actual_runtime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "execution_state": {
+            "$ref": "#/components/schemas/TaskBoardExecutionState"
+          },
+          "finished_at": {
+            "type": "string"
+          },
+          "head_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_runtime": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string",
+            "description": "Compatibility alias for `requested_runtime`."
+          },
+          "started_at": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "TaskBoardAttemptResultArtifact": {
         "oneOf": [

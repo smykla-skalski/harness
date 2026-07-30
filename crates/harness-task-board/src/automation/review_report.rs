@@ -73,10 +73,31 @@ pub struct TaskBoardAiReviewReportRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardAiReviewUnavailableExecution {
+    pub execution_id: String,
+    pub execution_state: TaskBoardExecutionState,
+    /// Compatibility alias for `requested_runtime`.
+    pub runtime: String,
+    pub requested_runtime: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_runtime: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_revision: Option<String>,
+    pub started_at: String,
+    pub finished_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum TaskBoardAiReviewReportResponse {
     /// No review execution or retained terminal report exists for the item.
-    NotStarted,
+    NotStarted {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        terminal: Option<TaskBoardAiReviewUnavailableExecution>,
+    },
     /// The current review execution has not reached a terminal state.
     Running {
         execution_id: String,
@@ -90,22 +111,6 @@ pub enum TaskBoardAiReviewReportResponse {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         head_revision: Option<String>,
         started_at: String,
-    },
-    /// The execution settled before a full immutable report was retained.
-    Terminal {
-        execution_id: String,
-        execution_state: TaskBoardExecutionState,
-        /// Compatibility alias for `requested_runtime`.
-        runtime: String,
-        requested_runtime: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        actual_runtime: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        requested_model: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        head_revision: Option<String>,
-        started_at: String,
-        finished_at: String,
     },
     /// The latest review completed and the full immutable report is available.
     Completed {
