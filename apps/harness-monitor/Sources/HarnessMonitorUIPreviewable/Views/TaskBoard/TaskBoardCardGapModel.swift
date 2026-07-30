@@ -124,9 +124,7 @@ final class TaskBoardCardGapModel {
   @ObservationIgnored private(set) var gapHeight: CGFloat = 48
 
   @ObservationIgnored weak var coordinator: TaskBoardNativeListCoordinator?
-  @ObservationIgnored private var laneStates: [
-    TaskBoardInboxLane: TaskBoardLaneCardGapState
-  ] = [:]
+  @ObservationIgnored private var laneStates: [TaskBoardInboxLane: TaskBoardLaneCardGapState] = [:]
   @ObservationIgnored private var sourceLane: TaskBoardInboxLane?
   @ObservationIgnored private var sourceTarget: Target?
   @ObservationIgnored private var sourceAPIIndex = 0
@@ -250,9 +248,9 @@ final class TaskBoardCardGapModel {
       return visibleIndex
     }
     let visibleCount = max(0, sourceAPICount - 1)
-    if visibleIndex >= visibleCount { return sourceAPICount }   // past the last visible card
-    if visibleIndex <= sourceAPIIndex { return visibleIndex }   // at/above the old slot
-    return visibleIndex + 1                                     // below the old slot, skip it
+    if visibleIndex >= visibleCount { return sourceAPICount }  // past the last visible card
+    if visibleIndex <= sourceAPIIndex { return visibleIndex }  // at/above the old slot
+    return visibleIndex + 1  // below the old slot, skip it
   }
 
   private func startTracking() {

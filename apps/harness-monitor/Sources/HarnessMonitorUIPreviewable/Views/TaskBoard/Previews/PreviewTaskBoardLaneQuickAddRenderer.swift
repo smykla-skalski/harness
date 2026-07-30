@@ -160,9 +160,12 @@ private enum TaskBoardLaneQuickAddPreviewFixtures {
   static func items(in lane: TaskBoardInboxLane) -> [TaskBoardItem] {
     guard let status = lane.taskBoardDropStatus, lane != .planning else { return [] }
     return [
-      item(id: "quick-add-1", title: "Cap the dispatch retry budget", status: status, priority: .high),
-      item(id: "quick-add-2", title: "Skip stale conflict no-ops", status: status, priority: .medium),
-      item(id: "quick-add-3", title: "Let git reads reach the origin", status: status, priority: .low),
+      item(
+        id: "quick-add-1", title: "Cap the dispatch retry budget", status: status, priority: .high),
+      item(
+        id: "quick-add-2", title: "Skip stale conflict no-ops", status: status, priority: .medium),
+      item(
+        id: "quick-add-3", title: "Let git reads reach the origin", status: status, priority: .low),
     ]
   }
 

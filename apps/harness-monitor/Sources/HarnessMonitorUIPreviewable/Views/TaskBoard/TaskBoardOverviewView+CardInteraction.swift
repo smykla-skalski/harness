@@ -40,12 +40,14 @@ struct TaskBoardDropSessionTrace: Equatable {
     phaseCounts[phase, default: 0] += 1
     firstLocation = firstLocation ?? location
     lastLocation = location
-    minimumLocation = minimumLocation.map {
-      CGPoint(x: min($0.x, location.x), y: min($0.y, location.y))
-    } ?? location
-    maximumLocation = maximumLocation.map {
-      CGPoint(x: max($0.x, location.x), y: max($0.y, location.y))
-    } ?? location
+    minimumLocation =
+      minimumLocation.map {
+        CGPoint(x: min($0.x, location.x), y: min($0.y, location.y))
+      } ?? location
+    maximumLocation =
+      maximumLocation.map {
+        CGPoint(x: max($0.x, location.x), y: max($0.y, location.y))
+      } ?? location
     self.destinationSize = destinationSize
     if phase == "active", firstActiveElapsedMilliseconds == nil {
       firstActiveElapsedMilliseconds = elapsedMilliseconds
@@ -56,7 +58,8 @@ struct TaskBoardDropSessionTrace: Equatable {
   }
 
   var summary: String {
-    let phases = phaseCounts
+    let phases =
+      phaseCounts
       .sorted { $0.key < $1.key }
       .map { "\($0.key):\($0.value)" }
       .joined(separator: ",")
@@ -175,7 +178,8 @@ enum TaskBoardCardDragDiagnostics {
 
   private static func formattedDropSessions() -> String {
     guard !dropSessions.isEmpty else { return "none" }
-    return dropSessions
+    return
+      dropSessions
       .sorted { $0.key < $1.key }
       .map { "\($0.key){\($0.value.summary)}" }
       .joined(separator: "|")
@@ -347,8 +351,7 @@ extension TaskBoardOverviewView {
     // A single API card can also reorder within its source lane. Advertising that lane
     // as a move destination lets AppKit report `.move`, so `.forbidden` remains a real
     // cancellation instead of doubling as the same-lane commit signal.
-    if
-      cardIDs.count == 1,
+    if cardIDs.count == 1,
       case .api(let itemID) = cardIDs[0],
       let item = currentPresentation.taskBoardItem(id: itemID),
       let sourceLane = TaskBoardInboxLane(taskBoardItem: item)
@@ -358,10 +361,10 @@ extension TaskBoardOverviewView {
     cardDragRuntimeValue.begin(cardIDs: cardIDs, candidateLanes: candidates)
     traceTaskBoardCardDrag(
       "candidate-lanes ids=\(cardIDs.count) lanes="
-      + TaskBoardInboxLane.allCases
-      .filter(candidates.contains)
-      .map(\.rawValue)
-      .joined(separator: ",")
+        + TaskBoardInboxLane.allCases
+        .filter(candidates.contains)
+        .map(\.rawValue)
+        .joined(separator: ",")
     )
   }
 
@@ -376,7 +379,7 @@ extension TaskBoardOverviewView {
       return false
     }
     guard let target = cardGapModelValue.target,
-          let cardID = cardGapModelValue.draggedCardID
+      let cardID = cardGapModelValue.draggedCardID
     else {
       traceTaskBoardCardDrag("placeholder-commit skipped reason=\(reason) no-target")
       return false

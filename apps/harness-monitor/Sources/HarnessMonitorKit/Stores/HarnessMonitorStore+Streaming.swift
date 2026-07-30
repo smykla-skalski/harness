@@ -20,11 +20,10 @@ extension HarnessMonitorStore {
         // across the wait would keep a store nobody owns any more reconnecting
         // for the life of the process.
         let outcome: StreamPassOutcome
-        if let store = self {
-          outcome = await store.runGlobalStreamPass(using: client, state: &state)
-        } else {
+        guard let store = self else {
           return
         }
+        outcome = await store.runGlobalStreamPass(using: client, state: &state)
         guard case .retry(let delay) = outcome else {
           return
         }
@@ -44,15 +43,14 @@ extension HarnessMonitorStore {
       var attempt = 0
       while !Task.isCancelled {
         let outcome: StreamPassOutcome
-        if let store = self {
-          outcome = await store.runSessionStreamPass(
-            using: client,
-            sessionID: sessionID,
-            attempt: &attempt
-          )
-        } else {
+        guard let store = self else {
           return
         }
+        outcome = await store.runSessionStreamPass(
+          using: client,
+          sessionID: sessionID,
+          attempt: &attempt
+        )
         guard case .retry(let delay) = outcome else {
           return
         }

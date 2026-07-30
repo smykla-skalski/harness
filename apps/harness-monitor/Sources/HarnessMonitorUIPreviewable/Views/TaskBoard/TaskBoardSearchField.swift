@@ -25,7 +25,8 @@ struct TaskBoardSearchField: View {
     // Read once, so the task's identity and the snapshot it runs against are
     // the same value rather than two reads of state that can move between them.
     let request = suggestionRequest
-    return field
+    return
+      field
       .frame(
         minWidth: 150 * controlScale,
         idealWidth: 220 * controlScale,

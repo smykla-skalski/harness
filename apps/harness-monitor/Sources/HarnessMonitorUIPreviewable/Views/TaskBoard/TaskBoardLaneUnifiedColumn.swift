@@ -332,7 +332,8 @@ struct TaskBoardLaneUnifiedColumn: View {
       .dropDestination(for: TaskBoardCardDragPayload.self) { payloads, rowOffset in
         // A single-card exact move lands where the placeholder showed.
         // Multi-card and status drags fall back to the List's native row.
-        let insertionOffset = cardGapState.insertionOffset
+        let insertionOffset =
+          cardGapState.insertionOffset
           ?? laneListRows.prefix(rowOffset).count(where: \.isAPI)
         traceTaskBoardCardDrag(
           "indexed-destination lane=\(lane.rawValue) "
