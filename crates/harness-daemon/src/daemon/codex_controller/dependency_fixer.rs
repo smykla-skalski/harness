@@ -130,8 +130,12 @@ mod tests {
 
         assert_eq!(codex.mode, CodexRunMode::WorkspaceWrite);
         assert_eq!(
+            TASK_BOARD_DEPENDENCY_FIXER_MODEL,
+            "gpt-5.3-codex-spark"
+        );
+        assert_eq!(
             codex.model.as_deref(),
-            Some("gpt-5.3-codex-spark")
+            Some(TASK_BOARD_DEPENDENCY_FIXER_MODEL)
         );
         assert_eq!(
             codex.effort.as_deref(),
