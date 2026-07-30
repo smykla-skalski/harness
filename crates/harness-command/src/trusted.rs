@@ -111,7 +111,17 @@ fn validate_trusted_file(path: &Path, name: &str) -> Result<(), WorkerError> {
 #[cfg(unix)]
 fn validate_trusted_ancestors(path: &Path, name: &str) -> Result<(), WorkerError> {
     let trusted_uid = uzers::get_effective_uid();
-    for ancestor in path.parent().into_iter().flat_map(Path::ancestors) {
+    // Walk root-to-leaf (`Path::ancestors` yields the opposite order) so a
+    // sticky root like `/tmp` is seen before the trusted user's own
+    // directories beneath it, which the group-write exception below depends
+    // on having already observed.
+    let ancestors: Vec<&Path> = path
+        .parent()
+        .into_iter()
+        .flat_map(Path::ancestors)
+        .collect();
+    let mut under_sticky_root = false;
+    for ancestor in ancestors.into_iter().rev() {
         let metadata = ancestor.symlink_metadata().map_err(|error| {
             WorkerError::new(format!(
                 "inspect trusted Harness worker {name} ancestor {}: {error}",
@@ -119,8 +129,26 @@ fn validate_trusted_ancestors(path: &Path, name: &str) -> Result<(), WorkerError
             ))
         })?;
         let trusted_owner = metadata.uid() == trusted_uid || metadata.uid() == 0;
-        let sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
-        if !metadata.is_dir() || !trusted_owner || metadata.mode() & 0o022 != 0 && !sticky_root {
+        let is_sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
+        under_sticky_root |= is_sticky_root;
+        // World-write always disqualifies an ancestor unless it is itself the
+        // sticky root (matching `/tmp`'s own 1777 mode: its sticky bit already
+        // stops anyone but a file's owner from renaming or deleting it).
+        // Group-write is weaker: once under a sticky root, a directory the
+        // trusted user themselves created and owns can carry an incidental
+        // group-write bit (e.g. from `umask 002`) without being exploitable,
+        // because the sticky root above it already protects that directory's
+        // own entry from being swapped out by anyone else. Elsewhere - not
+        // under a sticky root - group-write on a trusted-owned ancestor still
+        // disqualifies it, since nothing backstops that directory's entries.
+        let disqualifying_mode = if is_sticky_root {
+            false
+        } else {
+            metadata.mode() & 0o002 != 0
+                || (metadata.mode() & 0o020 != 0
+                    && !(under_sticky_root && metadata.uid() == trusted_uid))
+        };
+        if !metadata.is_dir() || !trusted_owner || disqualifying_mode {
             return Err(WorkerError::new(format!(
                 "trusted Harness worker {name} has an untrusted ancestor: {}",
                 ancestor.display()
@@ -140,9 +168,22 @@ mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt as _;
 
+    use rustix::fs::Mode;
     use tempfile::tempdir;
 
     use super::*;
+
+    /// Restores the process umask on drop, including on test panic; `umask`
+    /// is process-wide state, and nextest gives each test its own process,
+    /// but restoring promptly still keeps a single test from leaking mode
+    /// bits into anything else that process goes on to do.
+    struct RestoreUmask(Mode);
+
+    impl Drop for RestoreUmask {
+        fn drop(&mut self) {
+            rustix::process::umask(self.0);
+        }
+    }
 
     #[test]
     fn trusted_worker_rejects_writable_executable() {
@@ -194,5 +235,34 @@ mod tests {
         let error = trusted_worker_path(&worker, "harness-systemd").expect_err("ancestor rejected");
 
         assert!(error.to_string().contains("untrusted ancestor"));
+    }
+
+    #[test]
+    fn trusted_worker_allows_own_tempdir_under_permissive_umask() {
+        // Issue #1239: `umask 002` leaves the group-write bit set on a plain
+        // `tempfile::tempdir()`, which sits under `/tmp`'s sticky root and is
+        // owned by this process - not writable by anyone the sticky bit
+        // doesn't already stop.
+        let previous = rustix::process::umask(Mode::from_raw_mode(0o002));
+        let _restore = RestoreUmask(previous);
+
+        let temporary = tempdir().expect("temporary directory");
+        let ancestor_mode = fs::symlink_metadata(temporary.path())
+            .expect("tempdir metadata")
+            .permissions()
+            .mode();
+        assert_eq!(
+            ancestor_mode & 0o022,
+            0o020,
+            "expected umask 002 to leave the tempdir group-writable but not world-writable, got {ancestor_mode:o}"
+        );
+
+        let worker = temporary.path().join("harness-systemd");
+        fs::write(&worker, "#!/bin/sh\n").expect("worker");
+        fs::set_permissions(&worker, fs::Permissions::from_mode(0o755))
+            .expect("worker permissions");
+
+        trusted_worker_path(&worker, "harness-systemd")
+            .expect("own tempdir under a sticky root is trusted regardless of ambient umask");
     }
 }
