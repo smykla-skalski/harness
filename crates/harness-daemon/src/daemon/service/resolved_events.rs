@@ -5,7 +5,7 @@
 //! per event. These helpers keep that construction in one place.
 
 use crate::daemon::index::ResolvedSession;
-use crate::daemon::snapshot;
+use harness_daemon_snapshot as snapshot;
 
 use super::observe_stream::stream_event;
 use super::{

@@ -1,12 +1,11 @@
 use tempfile::tempdir;
 
-use crate::daemon::snapshot::{
-    session_detail,
-    tests::support::{
-        sample_state, sample_state_for_runtime, sample_work_item, write_json, write_json_line,
-    },
+use harness_session::types::{AgentRegistration, AgentStatus, SessionRole, TaskSeverity};
+
+use crate::session_detail;
+use crate::tests::support::{
+    sample_state, sample_state_for_runtime, sample_work_item, write_json, write_json_line,
 };
-use crate::session::types::{AgentRegistration, AgentStatus, SessionRole, TaskSeverity};
 
 #[test]
 fn session_detail_applies_shared_agent_and_task_ordering() {
@@ -41,7 +40,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     managed_agent: None,
                     last_activity_at: Some("2026-03-28T14:06:00Z".into()),
                     current_task_id: None,
-                    runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                    runtime_capabilities: harness_agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
                     runtime_session_title: None,
                 },
@@ -61,7 +60,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     managed_agent: None,
                     last_activity_at: Some("2026-03-28T14:05:00Z".into()),
                     current_task_id: None,
-                    runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                    runtime_capabilities: harness_agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
                     runtime_session_title: None,
                 },

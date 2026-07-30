@@ -114,8 +114,6 @@ pub(crate) mod serve;
 pub(crate) mod server_state;
 #[cfg(feature = "daemon-runtime")]
 pub mod service;
-#[cfg(feature = "daemon-runtime")]
-pub mod snapshot;
 // `state` moved natively into `harness-daemon-state` (bridge-shared
 // primitives split further into `harness-daemon-root`), which now owns and
 // runs its own unit tests directly. A thin re-export over the real

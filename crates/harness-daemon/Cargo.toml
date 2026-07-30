@@ -34,6 +34,7 @@ harness-command = { path = "../harness-command", version = "55.0.0" }
 harness-daemon-acp-probe = { path = "../harness-daemon-acp-probe", version = "55.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.0" }
 harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.0" }
+harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "55.0.0" }
 harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.0" }
 harness-db-schema = { path = "../harness-db-schema", version = "55.0.0" }
 harness-feature-flags = { path = "../harness-feature-flags", version = "55.0.0" }

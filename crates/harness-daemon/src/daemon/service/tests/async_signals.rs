@@ -411,7 +411,7 @@ async fn expire_pending_signal_and_resync(
         .await
         .expect("resolve session")
         .expect("session present");
-    let signals = crate::daemon::snapshot::load_signals_for(&resolved.project, &resolved.state)
+    let signals = harness_daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)
         .expect("load signals");
     async_db
         .sync_signal_index(EXPIRED_DELIVERY_SESSION_ID, &signals)

@@ -1,11 +1,11 @@
 use serde_json::Value;
 
-use super::super::index::{self, DiscoveredProject};
-use super::super::protocol::{AgentPendingUserPrompt, AgentToolActivitySummary};
-use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
-use crate::session::types::SessionState;
+use harness_agents::runtime::event::{ConversationEvent, ConversationEventKind};
+use harness_hooks::protocol::payloads::AskUserQuestionPrompt;
 use harness_kernel::errors::CliError;
+use harness_session::index::{self, DiscoveredProject};
+use harness_session::types::SessionState;
+use harness_session::wire::{AgentPendingUserPrompt, AgentToolActivitySummary};
 
 #[derive(Debug, Clone)]
 struct PendingUserPromptInvocation {
@@ -44,7 +44,8 @@ pub fn load_agent_activity_for(
     Ok(summaries)
 }
 
-pub(crate) fn agent_activity_summary_from_events(
+#[must_use]
+pub fn agent_activity_summary_from_events(
     agent_id: &str,
     runtime: &str,
     fallback_last_activity: Option<&str>,
@@ -66,13 +67,13 @@ pub(crate) fn agent_activity_summary_from_events(
 /// [`Self::summary`] then matches [`agent_activity_summary_from_events`] over the
 /// same events.
 #[derive(Debug, Clone)]
-pub(crate) struct AgentActivityAccumulator {
+pub struct AgentActivityAccumulator {
     summary: AgentToolActivitySummary,
     pending_user_prompts: Vec<PendingUserPromptInvocation>,
 }
 
 impl AgentActivityAccumulator {
-    pub(crate) fn new(agent_id: &str, runtime: &str, fallback_last_activity: Option<&str>) -> Self {
+    pub fn new(agent_id: &str, runtime: &str, fallback_last_activity: Option<&str>) -> Self {
         Self {
             summary: AgentToolActivitySummary {
                 agent_id: agent_id.to_string(),
@@ -89,7 +90,7 @@ impl AgentActivityAccumulator {
         }
     }
 
-    pub(crate) fn apply(&mut self, event: &ConversationEvent) {
+    pub fn apply(&mut self, event: &ConversationEvent) {
         match &event.kind {
             ConversationEventKind::ToolInvocation {
                 tool_name,
@@ -142,7 +143,8 @@ impl AgentActivityAccumulator {
         }
     }
 
-    pub(crate) fn summary(&self) -> AgentToolActivitySummary {
+    #[must_use]
+    pub fn summary(&self) -> AgentToolActivitySummary {
         let mut summary = self.summary.clone();
         summary.pending_user_prompt = self
             .pending_user_prompts
@@ -297,7 +299,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::agent_activity_summary_from_events;
-    use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+    use harness_agents::runtime::event::{ConversationEvent, ConversationEventKind};
 
     #[test]
     fn unresolved_ask_user_invocation_surfaces_pending_prompt() {

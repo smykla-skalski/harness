@@ -281,6 +281,31 @@ impl DaemonDb {
     }
 }
 
+// `harness-daemon-snapshot` depends on this trait, not on `DaemonDb` itself
+// (see that crate's `storage` module); implementing it here, next to the
+// inherent methods it forwards to, is the same shape `AuditEventStore` and
+// `PullRequestActionStore` already use for a trait defined outside `db`.
+impl harness_daemon_snapshot::SessionSignalQueries for DaemonDb {
+    fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
+        Self::load_signals(self, session_id)
+    }
+
+    fn session_has_shared_runtime_signal_dir(
+        &self,
+        state: &SessionState,
+    ) -> Result<bool, CliError> {
+        Self::session_has_shared_runtime_signal_dir(self, state)
+    }
+
+    fn sync_signal_index(
+        &self,
+        session_id: &str,
+        signals: &[SessionSignalRecord],
+    ) -> Result<(), CliError> {
+        Self::sync_signal_index(self, session_id, signals)
+    }
+}
+
 pub(super) fn derive_effective_signal_status(
     stored: SessionSignalStatus,
     signal: &Signal,

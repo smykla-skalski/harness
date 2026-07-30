@@ -39,7 +39,9 @@ use super::protocol::{
     TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDeleteRequest,
     TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
 };
-use super::snapshot;
+// The session snapshot layer lives in its own crate now; see `daemon::db`'s
+// own `daemon_snapshot` alias for why.
+use harness_daemon_snapshot as snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};
 use super::timeline;
 use harness_protocol::daemon::DAEMON_WIRE_VERSION;

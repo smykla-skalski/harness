@@ -34,9 +34,13 @@ pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 pub(crate) use harness_timeline::TimelineDbSource;
 
 pub(crate) use super::{
-    index as daemon_index, launchd as daemon_launchd, protocol as daemon_protocol,
-    snapshot as daemon_snapshot, state, state as daemon_state, timeline as daemon_timeline,
+    index as daemon_index, launchd as daemon_launchd, protocol as daemon_protocol, state,
+    state as daemon_state, timeline as daemon_timeline,
 };
+// The session snapshot layer lives in its own crate, depended on by both
+// `service` and `db` (file-based signal reads, the activity-fold
+// accumulator); this alias keeps every call site below unchanged.
+pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 mod activity_fold;
 mod async_agent_turn_runs;

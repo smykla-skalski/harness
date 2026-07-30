@@ -334,6 +334,19 @@ impl DaemonDb {
     }
 }
 
+// `harness-daemon-snapshot` depends on this trait, not on `DaemonDb` itself
+// (see that crate's `storage` module); implementing it here, next to the
+// inherent method it forwards to, is the same shape `AuditEventStore` and
+// `PullRequestActionStore` already use for a trait defined outside `db`.
+impl harness_daemon_snapshot::ConversationQueries for DaemonDb {
+    fn load_agent_activity(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError> {
+        Self::load_agent_activity(self, session_id)
+    }
+}
+
 pub(super) fn prepare_agent_conversation_imports_and_activity<F>(
     state: &SessionState,
     mut load_events: F,
