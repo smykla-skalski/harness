@@ -288,7 +288,13 @@ fn resume_only_from_suspended_or_aborted() {
 #[test]
 fn snapshot_initial_state() {
     let state = make_initial_state("2026-01-01T00:00:00Z");
-    let json = serde_json::to_value(&state).expect("serialize state");
+    let mut json = serde_json::to_value(&state).expect("serialize state");
+    // Key order otherwise tracks the workspace-wide `preserve_order` Cargo
+    // feature, which some unrelated sibling crate flips on or off depending
+    // on which packages share this build (e.g. anything pulling in
+    // `harness-daemon`'s `utoipa` dependency); sorting keeps the snapshot
+    // stable regardless of which other crates are in the same invocation.
+    json.sort_all_objects();
     insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap());
 }
 
@@ -300,6 +306,9 @@ fn redact_timestamps(json: &mut serde_json::Value) {
             entry["timestamp"] = serde_json::json!("REDACTED");
         }
     }
+    // See snapshot_initial_state: key order otherwise tracks whichever
+    // sibling crates share this build's `preserve_order` feature state.
+    json.sort_all_objects();
 }
 
 #[test]
