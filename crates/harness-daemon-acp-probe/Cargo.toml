@@ -1,0 +1,20 @@
+[package]
+name = "harness-daemon-acp-probe"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[dependencies]
+harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["bridge-runtime"] }
+harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+tracing = "0.1.44"
+
+[dev-dependencies]
+harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["test-support"] }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

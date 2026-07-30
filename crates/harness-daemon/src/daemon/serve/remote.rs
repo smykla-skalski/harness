@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::JoinHandle;
 
-use crate::daemon::acp_probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
+use crate::daemon::bridge::install_acp_probe_bridge_refresh;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::{
@@ -22,6 +22,7 @@ use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use crate::workspace::utc_now;
+use harness_daemon_acp_probe::schedule_probe_cache_refresh;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::background_tasks::{self, spawn_background_tasks};
@@ -75,6 +76,7 @@ pub async fn serve_remote_https(
     initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await?;
     super::task_board_automation_startup::initialize_control_before_serving(&async_db).await?;
     super::audit::record_remote_daemon_bound(async_db.get(), &endpoint, config.sandboxed).await;
+    install_acp_probe_bridge_refresh();
     schedule_probe_cache_refresh();
     let remote_acme_renewal = start_remote_acme_renewal(&db, tls_config, shutdown_rx.clone())?;
 

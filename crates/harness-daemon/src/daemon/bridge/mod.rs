@@ -1,3 +1,5 @@
+#[cfg(feature = "daemon-runtime")]
+mod acp_probe_refresh;
 mod acp_rpc;
 mod agent_acp;
 mod agent_tui;
@@ -19,6 +21,8 @@ mod stale_codex;
 mod stream_handler;
 mod types;
 
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use acp_probe_refresh::install_acp_probe_bridge_refresh;
 #[allow(unused_imports)]
 pub(crate) use bridge_state::acquire_bridge_lock_exclusive;
 pub use bridge_state::{
