@@ -288,7 +288,11 @@ fn resume_only_from_suspended_or_aborted() {
 #[test]
 fn snapshot_initial_state() {
     let state = make_initial_state("2026-01-01T00:00:00Z");
-    let json = serde_json::to_value(&state).expect("serialize state");
+    let mut json = serde_json::to_value(&state).expect("serialize state");
+    // Key order otherwise tracks whether some unrelated sibling crate in
+    // this build unified serde_json's `preserve_order` feature on; sorting
+    // keeps the snapshot stable regardless of which crates share the build.
+    json.sort_all_objects();
     insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap());
 }
 
@@ -300,6 +304,9 @@ fn redact_timestamps(json: &mut serde_json::Value) {
             entry["timestamp"] = serde_json::json!("REDACTED");
         }
     }
+    // See snapshot_initial_state: key order otherwise tracks whether
+    // `serde_json/preserve_order` got unified on for this build.
+    json.sort_all_objects();
 }
 
 #[test]
