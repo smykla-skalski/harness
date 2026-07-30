@@ -11,13 +11,11 @@ use agent_client_protocol::schema::v1::{
 use crate::agents::acp::supervision::AcpSessionSupervisor;
 use crate::daemon::agent_acp::{
     AcpAgentTurnResult, AcpSessionConfigOptionState, AgentTurnFailure, AgentTurnFailureCategory,
-    AgentTurnFailureStage,
+    AgentTurnFailureStage, PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID,
 };
 use harness_kernel::remote_redaction::redact_known_secrets;
 
 use super::session_config::session_config_category_name;
-
-const PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID: &str = "harness_provider_effective_model";
 
 /// Seed the live state from whichever call opened the session; `session/new`
 /// and `session/resume` both report these two.

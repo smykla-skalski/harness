@@ -4,7 +4,9 @@ use crate::agents::turn::{
     AgentTurnFailure, AgentTurnFailureCategory, AgentTurnId, AgentTurnRequest, AgentTurnResult,
     AgentTurnRuntime, AgentTurnStatus,
 };
-use crate::daemon::agent_acp::AcpSessionConfigOptionState;
+use crate::daemon::agent_acp::{
+    AcpSessionConfigOptionState, PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID,
+};
 use crate::daemon::db::AgentTurnRunStatus;
 use harness_kernel::errors::CliError;
 
@@ -132,6 +134,6 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
 fn effective_model(options: &[AcpSessionConfigOptionState]) -> Option<String> {
     options
         .iter()
-        .find(|option| option.id == "model")
+        .find(|option| option.id == PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID)
         .map(|option| option.current_value.clone())
 }

@@ -49,12 +49,7 @@ impl Default for FakeManager {
 impl FakeManager {
     pub(super) fn complete(&self, report: &str) {
         let mut state = self.state.lock().expect("state lock");
-        state.config_options = vec![AcpSessionConfigOptionState {
-            id: "model".into(),
-            name: "Model".into(),
-            category: Some("model".into()),
-            current_value: MODEL.into(),
-        }];
+        state.config_options = observed_model_options();
         state.last_turn_result = Some(AcpAgentTurnResult {
             report: report.into(),
             stop_reason: "end_turn".into(),
@@ -63,12 +58,7 @@ impl FakeManager {
 
     pub(super) fn fail(&self, detail: &str) {
         let mut state = self.state.lock().expect("state lock");
-        state.config_options = vec![AcpSessionConfigOptionState {
-            id: "model".into(),
-            name: "Model".into(),
-            category: Some("model".into()),
-            current_value: MODEL.into(),
-        }];
+        state.config_options = observed_model_options();
         state.last_turn_failure = Some(AgentTurnFailure::new(
             AgentTurnFailureCategory::ProviderRejected,
             AgentTurnFailureStage::Execution,
@@ -84,6 +74,23 @@ impl FakeManager {
         *self.available.lock().expect("available lock") = false;
         self.evict();
     }
+}
+
+fn observed_model_options() -> Vec<AcpSessionConfigOptionState> {
+    vec![
+        AcpSessionConfigOptionState {
+            id: "model".into(),
+            name: "Model".into(),
+            category: Some("model".into()),
+            current_value: "requested-selection-is-not-provenance".into(),
+        },
+        AcpSessionConfigOptionState {
+            id: super::super::PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID.into(),
+            name: "Provider effective model".into(),
+            category: Some("model".into()),
+            current_value: MODEL.into(),
+        },
+    ]
 }
 
 impl OpenRouterTurnManager for FakeManager {

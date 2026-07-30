@@ -123,7 +123,9 @@ pub(crate) async fn load_agent_turn_report_run(
     run.actual_model = session
         .config_options
         .iter()
-        .find(|option| option.id == "harness_provider_effective_model")
+        .find(|option| {
+            option.id == crate::daemon::agent_acp::PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID
+        })
         .map(|option| option.current_value.clone());
     run.report = session
         .last_turn_result
