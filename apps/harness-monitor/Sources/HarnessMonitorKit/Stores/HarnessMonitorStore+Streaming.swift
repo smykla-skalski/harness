@@ -19,10 +19,7 @@ extension HarnessMonitorStore {
         // the recovery they schedule starts them again, so a reference held
         // across the wait would keep a store nobody owns any more reconnecting
         // for the life of the process.
-        let outcome: StreamPassOutcome
-        if let store = self {
-          outcome = await store.runGlobalStreamPass(using: client, state: &state)
-        } else {
+        guard let outcome = await self?.runGlobalStreamPass(using: client, state: &state) else {
           return
         }
         guard case .retry(let delay) = outcome else {
@@ -43,14 +40,13 @@ extension HarnessMonitorStore {
     sessionStreamTask = Task { @MainActor [weak self] in
       var attempt = 0
       while !Task.isCancelled {
-        let outcome: StreamPassOutcome
-        if let store = self {
-          outcome = await store.runSessionStreamPass(
+        guard
+          let outcome = await self?.runSessionStreamPass(
             using: client,
             sessionID: sessionID,
             attempt: &attempt
           )
-        } else {
+        else {
           return
         }
         guard case .retry(let delay) = outcome else {
