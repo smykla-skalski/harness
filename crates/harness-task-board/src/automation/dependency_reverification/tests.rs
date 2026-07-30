@@ -27,6 +27,10 @@ fn request_binds_original_context_fix_ci_diff_and_current_gates() {
     );
     let prompt =
         render_task_board_dependency_reverification_prompt(&request).expect("rendered prompt");
+    assert_prompt_mentions_resumed_context(&prompt);
+}
+
+fn assert_prompt_mentions_resumed_context(prompt: &str) {
     for expected in [
         "Resume dependency review context deepseek-turn-1",
         ORIGINAL_HEAD,
@@ -87,7 +91,10 @@ fn request_rejects_failed_ci_stale_identity_and_inconsistent_gates() {
         )
         .is_err()
     );
+}
 
+#[test]
+fn validate_rejects_duplicate_checks_required_names_and_diff_mismatches() {
     let mut duplicate_ci = request().expect("valid request");
     let TaskBoardDependencyCheckResumeStatus::ChecksPassed { checks } =
         &mut duplicate_ci.latest_ci.status

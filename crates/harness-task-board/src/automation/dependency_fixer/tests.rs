@@ -6,6 +6,7 @@ use crate::{
     TaskBoardDependencyConflictEvidence, TaskBoardDependencyConflictState,
     TaskBoardDependencyIdentity, TaskBoardDependencyRouteAdmission,
     TaskBoardDependencySettledCheck, TaskBoardDependencyTriageStep, TaskBoardDependencyUpdateClass,
+    github::PullRequestIdentity,
 };
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -178,8 +179,7 @@ fn retry_rejects_non_failure_and_mismatched_prior_run_evidence() {
     );
 
     checks = failed_checks(&previous_request.route_id);
-    checks.identity =
-        crate::github::PullRequestIdentity::from_slug("acme/other-widgets", 17);
+    checks.identity = PullRequestIdentity::from_slug("acme/other-widgets", 17);
     assert!(
         task_board_dependency_fix_retry_request(
             &previous_request,
@@ -333,7 +333,7 @@ fn failed_checks(route_id: &str) -> TaskBoardDependencyCheckResumeRecord {
     TaskBoardDependencyCheckResumeRecord {
         resume_id: format!("{route_id}:checks"),
         route_id: route_id.into(),
-        identity: crate::github::PullRequestIdentity::from_slug("acme/widgets", 17),
+        identity: PullRequestIdentity::from_slug("acme/widgets", 17),
         exact_head_revision: FAILED_HEAD.into(),
         status: TaskBoardDependencyCheckResumeStatus::ChecksFailed {
             checks: settled_checks(),
