@@ -104,7 +104,7 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
     pullRequestNumber = try container.decode(UInt64.self, forKey: .pullRequestNumber)
     headRevision = try container.decode(String.self, forKey: .headRevision)
     runtime = try container.decode(String.self, forKey: .runtime)
-    requestedRuntime = try container.decode(String.self, forKey: .requestedRuntime)
+    requestedRuntime = try container.decodeIfPresent(String.self, forKey: .requestedRuntime) ?? container.decode(String.self, forKey: .runtime)
     actualRuntime = try container.decodeIfPresent(String.self, forKey: .actualRuntime)
     requestedModel = try container.decode(String.self, forKey: .requestedModel)
     effectiveModel = try container.decodeIfPresent(String.self, forKey: .effectiveModel)
@@ -168,9 +168,9 @@ public enum TaskBoardAiReviewReportResponse: Codable, Equatable, Sendable {
     case "not_started":
       self = .notStarted
     case "running":
-      self = .running(executionId: try container.decode(String.self, forKey: .executionId), runtime: try container.decode(String.self, forKey: .runtime), requestedRuntime: try container.decode(String.self, forKey: .requestedRuntime), actualRuntime: try container.decodeIfPresent(String.self, forKey: .actualRuntime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt))
+      self = .running(executionId: try container.decode(String.self, forKey: .executionId), runtime: try container.decode(String.self, forKey: .runtime), requestedRuntime: try container.decodeIfPresent(String.self, forKey: .requestedRuntime) ?? container.decode(String.self, forKey: .runtime), actualRuntime: try container.decodeIfPresent(String.self, forKey: .actualRuntime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt))
     case "terminal":
-      self = .terminal(executionId: try container.decode(String.self, forKey: .executionId), executionState: try container.decode(TaskBoardExecutionState.self, forKey: .executionState), runtime: try container.decode(String.self, forKey: .runtime), requestedRuntime: try container.decode(String.self, forKey: .requestedRuntime), actualRuntime: try container.decodeIfPresent(String.self, forKey: .actualRuntime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt), finishedAt: try container.decode(String.self, forKey: .finishedAt))
+      self = .terminal(executionId: try container.decode(String.self, forKey: .executionId), executionState: try container.decode(TaskBoardExecutionState.self, forKey: .executionState), runtime: try container.decode(String.self, forKey: .runtime), requestedRuntime: try container.decodeIfPresent(String.self, forKey: .requestedRuntime) ?? container.decode(String.self, forKey: .runtime), actualRuntime: try container.decodeIfPresent(String.self, forKey: .actualRuntime), requestedModel: try container.decodeIfPresent(String.self, forKey: .requestedModel), headRevision: try container.decodeIfPresent(String.self, forKey: .headRevision), startedAt: try container.decode(String.self, forKey: .startedAt), finishedAt: try container.decode(String.self, forKey: .finishedAt))
     case "completed":
       self = .completed(report: try container.decode(TaskBoardAiReviewReportRecord.self, forKey: .report))
     case "failed":

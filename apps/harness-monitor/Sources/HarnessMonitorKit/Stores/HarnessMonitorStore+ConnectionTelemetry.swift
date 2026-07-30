@@ -49,7 +49,11 @@ extension HarnessMonitorStore {
   /// v5 renamed the task-board `backlog` status to `inbox`. The task-board
   /// decoder rejects unknown status values, so app and daemon must agree on
   /// that enum before exchanging board data.
-  nonisolated public static let minimumDaemonWireVersion: Int = 5
+  ///
+  /// v6 adds the terminal-without-report AI review response. The generated
+  /// decoder rejects unknown response tags, so app and daemon must agree on
+  /// that enum before exchanging review reports.
+  nonisolated public static let minimumDaemonWireVersion: Int = 6
 
   /// True when the connected daemon's `wire_version` predates the
   /// [`Self.minimumDaemonWireVersion`] this app expects.
