@@ -23,7 +23,7 @@ struct TaskBoardReviewDisclosureButton: View {
       .padding(.vertical, HarnessMonitorTheme.spacingXS)
       .contentShape(.rect)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(.borderless)
     .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
   }
 }

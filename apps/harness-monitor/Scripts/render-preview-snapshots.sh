@@ -111,9 +111,10 @@ while IFS= read -r snapshot; do
   pixel_width="$(sips -g pixelWidth "$destination_path" | awk '/pixelWidth/ { print $2 }')"
   pixel_height="$(sips -g pixelHeight "$destination_path" | awk '/pixelHeight/ { print $2 }')"
   dpi_width="$(sips -g dpiWidth "$destination_path" | awk '/dpiWidth/ { print $2 }')"
+  dpi_height="$(sips -g dpiHeight "$destination_path" | awk '/dpiHeight/ { print $2 }')"
   point_width="$(awk -v pixels="$pixel_width" -v dpi="$dpi_width" \
     'BEGIN { printf "%.0f", pixels * 72 / dpi }')"
-  point_height="$(awk -v pixels="$pixel_height" -v dpi="$dpi_width" \
+  point_height="$(awk -v pixels="$pixel_height" -v dpi="$dpi_height" \
     'BEGIN { printf "%.0f", pixels * 72 / dpi }')"
   render_scale="$(awk -v dpi="$dpi_width" 'BEGIN { printf "%.0f", dpi / 72 }')"
   printf '%s\n' "$destination_path"
