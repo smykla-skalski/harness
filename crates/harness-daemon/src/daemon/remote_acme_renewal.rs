@@ -17,11 +17,11 @@ use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_live::LiveRemoteAcmeIssuer;
 use super::remote_certificate_identity::{RemoteCertificateIdentityError, certificate_not_after};
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
-use super::remote_redaction::redact_secret_detail;
 use super::remote_tls::{
     RemoteTlsConfigError, RemoteTlsConfigHandle, build_remote_tls_server_config,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 const REMOTE_ACME_RENEWAL_WINDOW: ChronoDuration = ChronoDuration::days(30);
 const REMOTE_ACME_CHECK_INTERVAL: Duration = Duration::from_hours(1);

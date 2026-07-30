@@ -15,21 +15,21 @@ mod route53;
 #[path = "remote_acme_dns_visibility.rs"]
 mod visibility;
 
-pub(crate) use aftermarket::{AftermarketDns01Lease, AftermarketDns01Provider};
-pub(crate) use cloudflare::CloudflareDns01Lease;
-pub(crate) use cloudflare::CloudflareDns01Provider;
+pub use aftermarket::{AftermarketDns01Lease, AftermarketDns01Provider};
+pub use cloudflare::CloudflareDns01Lease;
+pub use cloudflare::CloudflareDns01Provider;
 #[cfg(test)]
-pub(crate) use exec::RemoteDnsCommandRunner;
-pub(crate) use exec::{ExecDns01Lease, ExecDns01Provider, TokioRemoteDnsCommandRunner};
-pub(crate) use route53::Route53Dns01Lease;
-pub(crate) use route53::{AwsRoute53Credentials, Route53Dns01Provider};
+pub use exec::RemoteDnsCommandRunner;
+pub use exec::{ExecDns01Lease, ExecDns01Provider, TokioRemoteDnsCommandRunner};
+pub use route53::Route53Dns01Lease;
+pub use route53::{AwsRoute53Credentials, Route53Dns01Provider};
 #[cfg(test)]
-pub(crate) use visibility::{DnsTxtRecordState, DnsTxtVisibilityWaiter};
+pub use visibility::{DnsTxtRecordState, DnsTxtVisibilityWaiter};
 
-use super::remote::RemoteDnsProvider;
+use super::remote_acme_dns::RemoteDnsProvider;
 
 #[derive(Clone, PartialEq, Eq)]
-pub(crate) struct RemoteDnsHttpRequest {
+pub struct RemoteDnsHttpRequest {
     method: Method,
     url: String,
     headers: Vec<(String, String)>,
@@ -48,7 +48,7 @@ impl fmt::Debug for RemoteDnsHttpRequest {
 }
 
 impl RemoteDnsHttpRequest {
-    pub(crate) fn new(
+    pub fn new(
         method: Method,
         url: impl Into<String>,
         headers: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
@@ -67,19 +67,19 @@ impl RemoteDnsHttpRequest {
 
     #[must_use]
     #[cfg(test)]
-    pub(crate) fn method(&self) -> Method {
+    pub fn method(&self) -> Method {
         self.method.clone()
     }
 
     #[must_use]
     #[cfg(test)]
-    pub(crate) fn url(&self) -> &str {
+    pub fn url(&self) -> &str {
         &self.url
     }
 
     #[must_use]
     #[cfg(test)]
-    pub(crate) fn header(&self, name: &str) -> Option<&str> {
+    pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
             .find(|(header, _)| header.eq_ignore_ascii_case(name))
@@ -88,18 +88,18 @@ impl RemoteDnsHttpRequest {
 
     #[must_use]
     #[cfg(test)]
-    pub(crate) fn body(&self) -> &str {
+    pub fn body(&self) -> &str {
         &self.body
     }
 
     #[cfg(test)]
-    pub(crate) fn json_body(&self) -> Result<serde_json::Value, serde_json::Error> {
+    pub fn json_body(&self) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::from_str(&self.body)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RemoteDnsHttpResponse {
+pub struct RemoteDnsHttpResponse {
     status: u16,
     body: String,
 }
@@ -107,7 +107,7 @@ pub(crate) struct RemoteDnsHttpResponse {
 impl RemoteDnsHttpResponse {
     #[must_use]
     #[cfg(test)]
-    pub(crate) fn new(status: u16, body: &str) -> Self {
+    pub fn new(status: u16, body: &str) -> Self {
         Self {
             status,
             body: body.to_string(),
@@ -115,28 +115,28 @@ impl RemoteDnsHttpResponse {
     }
 
     #[must_use]
-    pub(crate) const fn status(&self) -> u16 {
+    pub const fn status(&self) -> u16 {
         self.status
     }
 
     #[must_use]
-    pub(crate) fn body(&self) -> &str {
+    pub fn body(&self) -> &str {
         &self.body
     }
 
     #[must_use]
-    pub(crate) const fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.status >= 200 && self.status < 300
     }
 }
 
 #[async_trait]
-pub(crate) trait RemoteDnsHttpClient: Send + Sync {
+pub trait RemoteDnsHttpClient: Send + Sync {
     async fn send(&self, request: RemoteDnsHttpRequest) -> Result<RemoteDnsHttpResponse, String>;
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ReqwestRemoteDnsHttpClient {
+pub struct ReqwestRemoteDnsHttpClient {
     client: reqwest::Client,
 }
 
@@ -164,14 +164,14 @@ impl RemoteDnsHttpClient for ReqwestRemoteDnsHttpClient {
 }
 
 #[derive(Debug)]
-pub(crate) enum SystemDns01Provider {
+pub enum SystemDns01Provider {
     Aftermarket(AftermarketDns01Provider<ReqwestRemoteDnsHttpClient>),
     Cloudflare(CloudflareDns01Provider<ReqwestRemoteDnsHttpClient>),
     Route53(Route53Dns01Provider<ReqwestRemoteDnsHttpClient>),
     Exec(ExecDns01Provider<TokioRemoteDnsCommandRunner>),
 }
 
-pub(crate) enum SystemDns01Lease {
+pub enum SystemDns01Lease {
     Aftermarket(AftermarketDns01Lease),
     Cloudflare(CloudflareDns01Lease),
     Route53(Route53Dns01Lease),
@@ -179,7 +179,13 @@ pub(crate) enum SystemDns01Lease {
 }
 
 impl SystemDns01Provider {
-    pub(crate) fn from_environment(provider: RemoteDnsProvider) -> Result<Self, String> {
+    /// Build the configured DNS-01 provider client from its environment
+    /// variables.
+    ///
+    /// # Errors
+    /// Returns a detail string when a required credential or endpoint
+    /// variable for `provider` is missing or invalid.
+    pub fn from_environment(provider: RemoteDnsProvider) -> Result<Self, String> {
         match provider {
             RemoteDnsProvider::Aftermarket => Ok(Self::Aftermarket(AftermarketDns01Provider::new(
                 ReqwestRemoteDnsHttpClient::default(),
@@ -223,7 +229,12 @@ impl SystemDns01Provider {
         }
     }
 
-    pub(crate) async fn present(
+    /// Present a DNS-01 TXT record through the configured provider.
+    ///
+    /// # Errors
+    /// Returns a detail string when `provider` does not match the configured
+    /// provider or the underlying request fails.
+    pub async fn present(
         &self,
         provider: RemoteDnsProvider,
         record_name: &str,
@@ -250,7 +261,13 @@ impl SystemDns01Provider {
         }
     }
 
-    pub(crate) async fn wait_ready(&self, lease: &SystemDns01Lease) -> Result<bool, String> {
+    /// Wait for the leased record to become authoritative, when the provider
+    /// requires it. Returns whether a wait was performed.
+    ///
+    /// # Errors
+    /// Returns a detail string when `lease` does not match the configured
+    /// provider or the wait fails.
+    pub async fn wait_ready(&self, lease: &SystemDns01Lease) -> Result<bool, String> {
         match (self, lease) {
             (Self::Aftermarket(client), SystemDns01Lease::Aftermarket(lease)) => {
                 client.wait_ready(lease).await?;
@@ -263,7 +280,12 @@ impl SystemDns01Provider {
         }
     }
 
-    pub(crate) async fn cleanup(&self, lease: SystemDns01Lease) -> Result<(), String> {
+    /// Clean up the leased DNS-01 TXT record through the configured provider.
+    ///
+    /// # Errors
+    /// Returns a detail string when `lease` does not match the configured
+    /// provider or the underlying request fails.
+    pub async fn cleanup(&self, lease: SystemDns01Lease) -> Result<(), String> {
         match (self, lease) {
             (Self::Aftermarket(client), SystemDns01Lease::Aftermarket(lease)) => {
                 client.cleanup(lease).await

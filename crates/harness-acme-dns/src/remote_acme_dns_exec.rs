@@ -3,15 +3,15 @@ use std::fmt;
 use async_trait::async_trait;
 use tokio::process::Command;
 
-use crate::daemon::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 #[async_trait]
-pub(crate) trait RemoteDnsCommandRunner: Send + Sync {
+pub trait RemoteDnsCommandRunner: Send + Sync {
     async fn run(&self, program: &str, args: &[String]) -> Result<(), String>;
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct TokioRemoteDnsCommandRunner;
+pub struct TokioRemoteDnsCommandRunner;
 
 #[async_trait]
 impl RemoteDnsCommandRunner for TokioRemoteDnsCommandRunner {
@@ -34,7 +34,7 @@ impl RemoteDnsCommandRunner for TokioRemoteDnsCommandRunner {
     }
 }
 
-pub(crate) struct ExecDns01Provider<R> {
+pub struct ExecDns01Provider<R> {
     runner: R,
     program: String,
 }
@@ -51,7 +51,7 @@ impl<R> ExecDns01Provider<R>
 where
     R: RemoteDnsCommandRunner,
 {
-    pub(crate) fn new(runner: R, program: &str) -> Result<Self, String> {
+    pub fn new(runner: R, program: &str) -> Result<Self, String> {
         let program = program.trim();
         if program.is_empty() {
             return Err("remote ACME DNS exec hook program is required".to_string());
@@ -62,7 +62,7 @@ where
         })
     }
 
-    pub(crate) async fn present(
+    pub async fn present(
         &self,
         record_name: &str,
         record_value: &str,
@@ -72,7 +72,7 @@ where
         Ok(lease)
     }
 
-    pub(crate) async fn cleanup(&self, lease: ExecDns01Lease) -> Result<(), String> {
+    pub async fn cleanup(&self, lease: ExecDns01Lease) -> Result<(), String> {
         self.run("cleanup", &lease).await
     }
 
@@ -90,7 +90,7 @@ where
     }
 }
 
-pub(crate) struct ExecDns01Lease {
+pub struct ExecDns01Lease {
     record_name: String,
     record_value: String,
 }

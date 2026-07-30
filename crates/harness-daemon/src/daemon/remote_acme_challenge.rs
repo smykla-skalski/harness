@@ -21,9 +21,9 @@ use tokio::time::sleep;
 use tokio_rustls::TlsAcceptor;
 
 use super::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
-use super::remote_acme_dns_provider::{SystemDns01Lease, SystemDns01Provider};
 use super::remote_acme_issuer::{RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner};
 use super::remote_tls::build_remote_tls_alpn_challenge;
+use harness_acme_dns::{SystemDns01Lease, SystemDns01Provider};
 
 const HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 

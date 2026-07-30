@@ -1,9 +1,8 @@
 use super::{
     CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookInvocation,
     Dns01ProviderAction, Dns01ProviderChangeRunner, Dns01ProviderExecutionConfig,
-    Route53Dns01ChangeBatch,
+    RemoteDnsProvider, Route53Dns01ChangeBatch,
 };
-use crate::daemon::remote::RemoteDnsProvider;
 
 #[test]
 fn remote_dns01_provider_runner_dispatches_native_and_exec_operations() {

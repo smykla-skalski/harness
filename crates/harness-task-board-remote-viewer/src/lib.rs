@@ -19,11 +19,11 @@
 //! boundary onto the daemon, just carrying a data shape across it instead of
 //! a store trait.
 //!
-//! `remote_redaction`'s ownership stays with `harness-daemon`: the helper is
-//! shared with the remote-trust area and the agent-execution runtime, both
-//! out of scope here, so this crate pulls in the same physical file with
-//! `#[path]` that `harness-bridge` already carries for it instead of taking
-//! ownership.
+//! `remote_redaction` lives in `harness-kernel`: it moved there from
+//! `harness-daemon` because its callers (this crate, `codex_controller`,
+//! `agent_acp`) sit outside the remote-trust area the rest of `harness-daemon`
+//! owns it for, and `harness-kernel` is already a dependency every one of
+//! them has.
 
 use std::collections::HashMap;
 
@@ -38,13 +38,10 @@ use harness_task_board::{
     TaskBoardTriageOverride,
 };
 
+use harness_kernel::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
+
 mod list_query;
 mod review_report;
-
-#[path = "../../harness-daemon/src/daemon/remote_redaction.rs"]
-mod remote_redaction;
-
-use crate::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secrets};
 
 pub use list_query::{
     RevisionedTaskBoardItem, TaskBoardListProjectionSource, project_task_board_list,

@@ -3,7 +3,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::state::DaemonAuditEvent;
 
-use super::remote_redaction::redact_known_secrets;
+use harness_kernel::remote_redaction::redact_known_secrets;
 
 const REDACTED: &str = "[redacted]";
 

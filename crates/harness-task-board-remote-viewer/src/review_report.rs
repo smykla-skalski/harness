@@ -1,6 +1,6 @@
 use harness_task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportResponse};
 
-use crate::remote_redaction::REDACTION_PLACEHOLDER;
+use harness_kernel::remote_redaction::REDACTION_PLACEHOLDER;
 
 #[must_use]
 pub fn project_task_board_ai_review_report(
@@ -31,9 +31,7 @@ pub fn project_task_board_ai_review_report(
 }
 
 fn redact_report(mut report: TaskBoardAiReviewReportRecord) -> TaskBoardAiReviewReportRecord {
-    report.summary = report
-        .summary
-        .map(|_| REDACTION_PLACEHOLDER.to_string());
+    report.summary = report.summary.map(|_| REDACTION_PLACEHOLDER.to_string());
     for finding in &mut report.findings {
         finding.location.path = REDACTION_PLACEHOLDER.to_string();
         finding.evidence = REDACTION_PLACEHOLDER.to_string();

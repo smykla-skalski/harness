@@ -1,13 +1,12 @@
 use std::error::Error;
 use std::fmt;
 
-use super::remote::RemoteDnsProvider;
 use super::remote_acme_dns::{
     CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookError,
-    Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
+    Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError, RemoteDnsProvider,
     Route53Dns01ChangeBatch,
 };
-use super::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dns01ProviderExecutionConfig {
@@ -387,3 +386,7 @@ impl Dns01ProviderAction {
             .map_err(|detail| Dns01ExecHookError::runner_failed(redact_secret_detail(&detail)))
     }
 }
+
+#[cfg(test)]
+#[path = "remote_acme_dns_runner_tests.rs"]
+mod tests;

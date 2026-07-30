@@ -13,7 +13,7 @@ use crate::daemon::agent_acp::{
     AcpAgentTurnResult, AcpSessionConfigOptionState, AgentTurnFailure, AgentTurnFailureCategory,
     AgentTurnFailureStage,
 };
-use crate::daemon::remote_redaction::redact_known_secrets;
+use harness_kernel::remote_redaction::redact_known_secrets;
 
 use super::session_config::session_config_category_name;
 

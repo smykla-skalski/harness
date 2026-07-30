@@ -2,6 +2,7 @@
 members = [
   ".",
   "aff",
+  "crates/harness-acme-dns",
   "crates/harness-agents",
   "crates/harness-bridge",
   "crates/harness-command",

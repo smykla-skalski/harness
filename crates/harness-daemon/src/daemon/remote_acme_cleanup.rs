@@ -6,7 +6,7 @@ use std::thread;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{Notify, oneshot};
 
-use super::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 #[derive(Clone, Default)]
 pub(crate) struct RemoteAcmeCleanupTracker {
