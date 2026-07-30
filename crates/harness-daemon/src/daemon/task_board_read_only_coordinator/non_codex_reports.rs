@@ -165,6 +165,10 @@ async fn settle_terminal_run(
     error: Option<&str>,
     now: &str,
 ) -> Result<(), CliError> {
+    // Settle against the current attempt record, not the snapshot the tick was
+    // seeded with, so a transition here does not fail its CAS against a row a
+    // concurrent reconciler already moved. This mirrors the Codex report path.
+    let attempt = &current_attempt(db, attempt).await?;
     match status {
         AgentTurnRunStatus::Failed => {
             if !settlement_is_current(db, &execution.execution_id, now).await? {
