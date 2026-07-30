@@ -108,7 +108,10 @@ async fn failure_records_a_terminal_failure() {
         store.clone(),
     );
     let id = runtime.start(request()).await.expect("start");
-    manager.fail("provider rejected the request");
+    manager.fail_with_partial_output(
+        "provider rejected the request",
+        r#"{"summary":"Partial evidence"}"#,
+    );
 
     assert_eq!(
         runtime.status(&id).await.expect("status"),
@@ -132,6 +135,10 @@ async fn failure_records_a_terminal_failure() {
     );
     assert!(stored.stop_reason.is_none());
     assert_eq!(stored.actual_model.as_deref(), Some(MODEL));
+    assert_eq!(
+        stored.report.as_deref(),
+        Some(r#"{"summary":"Partial evidence"}"#)
+    );
 }
 
 #[tokio::test]

@@ -66,6 +66,14 @@ impl FakeManager {
         ));
     }
 
+    pub(super) fn fail_with_partial_output(&self, detail: &str, partial_output: &str) {
+        self.fail(detail);
+        self.state
+            .lock()
+            .expect("state lock")
+            .last_turn_partial_output = Some(partial_output.into());
+    }
+
     pub(super) fn evict(&self) {
         *self.attached.lock().expect("attached lock") = false;
     }

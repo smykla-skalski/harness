@@ -77,18 +77,16 @@ pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &P
     supervisor.mutate_session_state(|state| {
         state.last_stop_reason = Some(label.to_owned());
         state.last_turn_failure = failure;
-        state.last_turn_partial_output = state
-            .last_turn_failure
-            .as_ref()
-            .and_then(|_| report.clone())
-            .filter(|output| !output.trim().is_empty());
-        if state.last_turn_failure.is_none()
-            && let Some(report) = report
-        {
-            state.last_turn_result = Some(AcpAgentTurnResult {
-                report,
-                stop_reason: label.to_owned(),
-            });
+        if state.last_turn_failure.is_some() {
+            state.last_turn_partial_output = report.filter(|output| !output.trim().is_empty());
+        } else {
+            state.last_turn_partial_output = None;
+            if let Some(report) = report {
+                state.last_turn_result = Some(AcpAgentTurnResult {
+                    report,
+                    stop_reason: label.to_owned(),
+                });
+            }
         }
     });
     if let Some(emitter) = supervisor.event_emitter() {

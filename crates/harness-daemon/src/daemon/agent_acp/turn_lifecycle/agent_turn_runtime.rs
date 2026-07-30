@@ -85,6 +85,7 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         let Some(failure) = state.last_turn_failure else {
             return Ok(None);
         };
+        let partial_output = state.last_turn_partial_output;
         let actual_model = effective_model(&state.config_options);
         let (run_status, stop_reason, error) =
             if failure.category == AgentTurnFailureCategory::Cancelled {
@@ -100,8 +101,15 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
                     Some(failure.detail.clone()),
                 )
             };
-        self.persist_settlement(id, run_status, actual_model, None, stop_reason, error)
-            .await?;
+        self.persist_settlement(
+            id,
+            run_status,
+            actual_model,
+            partial_output,
+            stop_reason,
+            error,
+        )
+        .await?;
         Ok(Some(failure))
     }
 
