@@ -22,6 +22,9 @@ pub fn project_task_board_workflow_progress(
     if let Some(triage) = progress.triage.as_mut() {
         triage.reason = REDACTION_PLACEHOLDER.to_string();
         triage.source_result.safety_assumption = REDACTION_PLACEHOLDER.to_string();
+        for check in &mut triage.source_result.checks {
+            check.details_url = None;
+        }
         for step in &mut triage.source_result.next_steps {
             step.reason = REDACTION_PLACEHOLDER.to_string();
         }
@@ -72,6 +75,7 @@ mod tests {
         );
         assert_eq!(triage.reason, "[redacted]");
         assert_eq!(triage.source_result.safety_assumption, "[redacted]");
+        assert_eq!(triage.source_result.checks[0].details_url, None);
         assert_eq!(triage.source_result.next_steps[0].reason, "[redacted]");
         assert_eq!(progress.attempts[0].report.as_deref(), Some("[redacted]"));
         assert_eq!(
@@ -112,7 +116,11 @@ mod tests {
                             "target_version": "1.0.221",
                             "update_class": "patch"
                         },
-                        "checks": [],
+                        "checks": [{
+                            "name": "CI",
+                            "state": "failed",
+                            "details_url": "https://token@example.test/check/17"
+                        }],
                         "conflicts": {
                             "state": "clean",
                             "summary": "clean"
