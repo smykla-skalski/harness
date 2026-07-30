@@ -9,11 +9,11 @@ use super::{sessions, sync_file_state_from_async_db};
 
 impl AsyncSignalStorage for AsyncDaemonDb {
     async fn resolve_session(&self, session_id: &str) -> Result<Option<ResolvedSession>, CliError> {
-        Self::resolve_session(self, session_id).await
+        AsyncDaemonDb::resolve_session(self, session_id).await
     }
 
     async fn bump_change(&self, scope: &str) -> Result<(), CliError> {
-        Self::bump_change(self, scope).await
+        AsyncDaemonDb::bump_change(self, scope).await
     }
 
     async fn sync_signal_index(
@@ -21,11 +21,11 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        Self::sync_signal_index(self, session_id, records).await
+        AsyncDaemonDb::sync_signal_index(self, session_id, records).await
     }
 
     async fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        Self::load_signals(self, session_id).await
+        AsyncDaemonDb::load_signals(self, session_id).await
     }
 
     async fn update_session_state_immediate<F, T>(
@@ -37,11 +37,11 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         F: FnOnce(&mut SessionState) -> Result<T, CliError> + Send,
         T: Send,
     {
-        Self::update_session_state_immediate(self, session_id, update).await
+        AsyncDaemonDb::update_session_state_immediate(self, session_id, update).await
     }
 
     async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
-        Self::append_log_entry(self, entry).await
+        AsyncDaemonDb::append_log_entry(self, entry).await
     }
 
     async fn merge_signal_records(
@@ -49,7 +49,7 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        Self::merge_signal_records(self, session_id, records).await
+        AsyncDaemonDb::merge_signal_records(self, session_id, records).await
     }
 
     async fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {

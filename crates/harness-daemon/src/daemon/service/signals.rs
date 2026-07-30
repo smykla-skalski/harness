@@ -26,38 +26,38 @@ impl SignalStorage for DaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
-        Self::load_session_state_for_mutation(self, session_id)
+        DaemonDb::load_session_state_for_mutation(self, session_id)
     }
 
     fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
-        Self::load_session_state(self, session_id)
+        DaemonDb::load_session_state(self, session_id)
     }
 
     fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
-        Self::load_session_log(self, session_id)
+        DaemonDb::load_session_log(self, session_id)
     }
 
     fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        Self::project_id_for_session(self, session_id)
+        DaemonDb::project_id_for_session(self, session_id)
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        Self::project_dir_for_session(self, session_id)
+        DaemonDb::project_dir_for_session(self, session_id)
     }
 
     fn save_session_state(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        Self::save_session_state(self, project_id, state)
+        DaemonDb::save_session_state(self, project_id, state)
     }
 
     fn resolve_session(
         &self,
         session_id: &str,
     ) -> Result<Option<harness_session::index::ResolvedSession>, CliError> {
-        Self::resolve_session(self, session_id)
+        DaemonDb::resolve_session(self, session_id)
     }
 
     fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        Self::load_signals(self, session_id)
+        DaemonDb::load_signals(self, session_id)
     }
 
     fn merge_signal_records(
@@ -65,7 +65,7 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        Self::merge_signal_records(self, session_id, records)
+        DaemonDb::merge_signal_records(self, session_id, records)
     }
 
     fn sync_signal_index(
@@ -73,15 +73,15 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        Self::sync_signal_index(self, session_id, records)
+        DaemonDb::sync_signal_index(self, session_id, records)
     }
 
     fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
-        Self::append_log_entry(self, entry)
+        DaemonDb::append_log_entry(self, entry)
     }
 
     fn bump_change(&self, scope: &str) -> Result<(), CliError> {
-        Self::bump_change(self, scope)
+        DaemonDb::bump_change(self, scope)
     }
 
     fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
