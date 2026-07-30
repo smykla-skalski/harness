@@ -138,6 +138,10 @@ struct TaskBoardCardSelectionModelTests {
   func spawnedTaskNavigationCapabilityRequiresStoreAndSession() {
     let linked = Self.makeItem(id: "linked", sessionId: "session-a", workItemId: "task-a")
     let boardOnly = Self.makeItem(id: "board-only", sessionId: nil, workItemId: nil)
+    let sessionOnly = Self.makeItem(id: "session-only", sessionId: "session-a", workItemId: nil)
+    let taskOnly = Self.makeItem(id: "task-only", sessionId: nil, workItemId: "task-a")
+    let emptySession = Self.makeItem(id: "empty-session", sessionId: "", workItemId: "task-a")
+    let emptyTask = Self.makeItem(id: "empty-task", sessionId: "session-a", workItemId: "")
     let noStoreActions = TaskBoardOverviewActions(store: nil, scope: .dashboard)
     let storeActions = TaskBoardOverviewActions(
       store: HarnessMonitorPreviewStoreFactory.makeStore(for: .empty),
@@ -146,6 +150,10 @@ struct TaskBoardCardSelectionModelTests {
 
     #expect(!noStoreActions.canOpenSpawnedTask(linked))
     #expect(!storeActions.canOpenSpawnedTask(boardOnly))
+    #expect(!storeActions.canOpenSpawnedTask(sessionOnly))
+    #expect(!storeActions.canOpenSpawnedTask(taskOnly))
+    #expect(!storeActions.canOpenSpawnedTask(emptySession))
+    #expect(!storeActions.canOpenSpawnedTask(emptyTask))
     #expect(storeActions.canOpenSpawnedTask(linked))
   }
 

@@ -288,7 +288,9 @@ public struct TaskBoardOverviewActions: Equatable {
 
 extension TaskBoardOverviewActions {
   func canOpenSpawnedTask(_ item: TaskBoardItem) -> Bool {
-    store != nil && item.sessionId?.isEmpty == false
+    store != nil
+      && item.sessionId?.isEmpty == false
+      && item.workItemId?.isEmpty == false
   }
 
   @MainActor
@@ -296,7 +298,9 @@ extension TaskBoardOverviewActions {
     guard
       let store,
       let sessionID = item.sessionId,
-      !sessionID.isEmpty
+      !sessionID.isEmpty,
+      let workItemID = item.workItemId,
+      !workItemID.isEmpty
     else {
       return
     }
@@ -304,7 +308,7 @@ extension TaskBoardOverviewActions {
       store: store,
       openWindow: openWindow,
       sessionID: sessionID,
-      workItemID: item.workItemId
+      workItemID: workItemID
     )
   }
 }

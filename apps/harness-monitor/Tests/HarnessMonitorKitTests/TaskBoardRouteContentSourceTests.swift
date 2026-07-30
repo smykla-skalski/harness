@@ -431,7 +431,11 @@ struct TaskBoardRouteContentSourceTests {
       )
     )
     #expect(dashboardSource.contains("if isReviewsVisible {"))
-    #expect(!dashboardSource.contains("DashboardRetainedAuxiliaryRoute(isVisible: isReviewsVisible)"))
+    #expect(
+      !dashboardSource.contains(
+        "DashboardRetainedAuxiliaryRoute(isVisible: isReviewsVisible)"
+      )
+    )
     #expect(!dashboardSource.contains("selectedAuxiliaryRoute"))
   }
 
