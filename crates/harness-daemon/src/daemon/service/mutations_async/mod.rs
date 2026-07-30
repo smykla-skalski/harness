@@ -227,9 +227,6 @@ async fn wake_tui_async(
         session_id,
         agent_id: &record.agent_id,
         signal: &record.signal,
-        runtime,
-        project_dir,
-        signal_session_id: &record.signal_session_id,
     };
     let Some(woke_tui) = handled_active_signal_wake_result(
         &coords,

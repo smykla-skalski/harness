@@ -1,7 +1,4 @@
-use crate::agents::runtime::{
-    AgentRuntime,
-    signal::{Signal, SignalAck},
-};
+use crate::agents::runtime::{AgentRuntime, signal::SignalAck};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::session::{storage as session_storage, types::SessionState};
 use tokio::task::spawn_blocking;
@@ -81,27 +78,6 @@ pub(crate) async fn sync_file_state_from_async_db(
         .await?
         .ok_or_else(|| session_not_found(session_id))?;
     sync_file_state_for_resolved_async(&resolved).await
-}
-
-pub(crate) async fn write_runtime_signal_async(
-    runtime: &'static dyn AgentRuntime,
-    project_dir: PathBuf,
-    signal_session_id: String,
-    signal: Signal,
-    operation: &'static str,
-) -> Result<(), CliError> {
-    spawn_blocking(move || {
-        runtime
-            .write_signal(&project_dir, &signal_session_id, &signal)
-            .map(|_| ())
-    })
-    .await
-    .unwrap_or_else(|error| {
-        Err(
-            CliErrorKind::workflow_io(format!("{operation} signal write worker failed: {error}"))
-                .into(),
-        )
-    })
 }
 
 pub(crate) async fn read_runtime_acknowledgments_async(

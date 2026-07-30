@@ -1,5 +1,5 @@
-use super::signals::pending_signal_record;
 use super::{CliError, Path, SessionSignalRecord, session_service};
+use harness_daemon_session_service::pending_signal_record;
 
 pub(crate) fn task_drop_effect_signal_records(
     session_id: &str,

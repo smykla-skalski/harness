@@ -24,6 +24,7 @@ cargo_local="$ROOT/scripts/cargo-local.sh"
 "$cargo_local" check --all-targets -p harness-daemon-codex
 "$cargo_local" check --all-targets -p harness-daemon-remote-cli
 "$cargo_local" check --all-targets -p harness-daemon-root
+"$cargo_local" check --all-targets -p harness-daemon-session-service
 "$cargo_local" check --all-targets -p harness-daemon-state
 "$cargo_local" check --all-targets -p harness-daemon-watch
 "$cargo_local" check --all-targets -p harness-github-api

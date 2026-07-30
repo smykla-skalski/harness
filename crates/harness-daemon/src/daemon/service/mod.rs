@@ -3,6 +3,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::{Arc, Mutex, OnceLock};
+#[cfg(test)]
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -31,13 +32,15 @@ use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
+#[cfg(test)]
+use super::protocol::SignalSendRequest;
 use super::protocol::{
     AgentRemoveRequest, DaemonDiagnosticsReport, LeaderTransferRequest, ObserveSessionRequest,
     ProjectSummary, RoleChangeRequest, SessionDetail, SessionEndRequest, SessionExtensionsPayload,
     SessionLeaveRequest, SessionSummary, SessionUpdatedPayload, SessionsUpdatedDeltaPayload,
-    SessionsUpdatedPayload, SignalAckRequest, SignalCancelRequest, SignalSendRequest, StreamEvent,
-    TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest, TaskDeleteRequest,
-    TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
+    SessionsUpdatedPayload, SignalAckRequest, StreamEvent, TaskAssignRequest,
+    TaskCheckpointRequest, TaskCreateRequest, TaskDeleteRequest, TaskDropRequest,
+    TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
 };
 // The session snapshot layer lives in its own crate now; see `daemon::db`'s
 // own `daemon_snapshot` alias for why.
@@ -133,21 +136,11 @@ pub(crate) const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5)
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
-/// Per-signal coordinates for active wake delivery.
-///
-/// Deliberately holds no DB handle — that field used to live here but
-/// `&DaemonDb` carries `RefCell<rusqlite::Connection>` which is `!Sync`,
-/// so binding the struct once across an await pulled a non-Send future
-/// into `tokio::spawn`. Callers that need to record acks pass
-/// `Option<&DaemonDb>` as a separate argument.
 #[derive(Clone, Copy)]
 struct SignalCoords<'a> {
     session_id: &'a str,
     agent_id: &'a str,
     signal: &'a agents_runtime::signal::Signal,
-    runtime: &'a dyn agents_runtime::AgentRuntime,
-    project_dir: &'a Path,
-    signal_session_id: &'a str,
 }
 
 struct ManagedTuiWake<'a> {
@@ -209,7 +202,6 @@ mod sessions;
 mod signals;
 mod signals_async;
 mod signals_async_send;
-mod signals_timeout;
 mod status;
 mod sync_support;
 pub(crate) mod task_board;
@@ -431,9 +423,8 @@ pub(crate) use signals_async::{cancel_signal_async, record_signal_ack_direct_asy
 pub(crate) use signals_async_send::send_signal_async;
 pub(crate) use status::{diagnostics_report_async, github_api_status_async, health_response_async};
 pub(crate) use sync_support::{
-    acknowledged_signal_record, append_leave_signal_logs_to_db, append_task_drop_effect_logs,
-    append_transfer_logs_to_async_db, append_transfer_logs_to_db, build_log_entry,
-    build_signal_ack, effective_project_dir, pending_signal_record, project_dir_for_db_session,
+    append_leave_signal_logs_to_db, append_task_drop_effect_logs, append_transfer_logs_to_async_db,
+    append_transfer_logs_to_db, build_log_entry, effective_project_dir, project_dir_for_db_session,
     reconcile_expired_pending_signals_for_db, record_signal_ack, refresh_signal_index_for_db,
     resolve_hook_agent, session_not_found, sync_file_state_for_resolved,
     sync_file_state_from_async_db, task_drop_effect_signal_records, write_task_start_signals,

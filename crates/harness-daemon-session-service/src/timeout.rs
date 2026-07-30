@@ -1,4 +1,6 @@
-use super::{Duration, state};
+use std::time::Duration;
+
+use harness_daemon_root::append_event_best_effort;
 
 pub(super) fn warn_active_signal_delivery_timeout(
     session_id: &str,
@@ -6,7 +8,7 @@ pub(super) fn warn_active_signal_delivery_timeout(
     signal_id: &str,
     timeout: Duration,
 ) {
-    state::append_event_best_effort(
+    append_event_best_effort(
         "warn",
         &active_signal_delivery_timeout_message(session_id, agent_id, signal_id, timeout),
     );

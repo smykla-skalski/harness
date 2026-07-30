@@ -19,6 +19,7 @@ members = [
   "crates/harness-daemon-state",
   "crates/harness-daemon-watch",
   "crates/harness-daemon",
+  "crates/harness-daemon-session-service",
   "crates/harness-daemon-snapshot",
   "crates/harness-db-schema",
   "crates/harness-feature-flags",
