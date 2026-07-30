@@ -107,6 +107,13 @@ fn request_rejects_failed_ci_stale_identity_and_inconsistent_gates() {
     let mut invalid_diff = request().expect("valid request");
     invalid_diff.diff = "Cargo.lock changed".into();
     assert!(validate_task_board_dependency_reverification_request(&invalid_diff).is_err());
+
+    let mut partial_diff = request().expect("valid request");
+    partial_diff
+        .fixer_result
+        .changed_paths
+        .push("Cargo.toml".into());
+    assert!(validate_task_board_dependency_reverification_request(&partial_diff).is_err());
 }
 
 #[test]

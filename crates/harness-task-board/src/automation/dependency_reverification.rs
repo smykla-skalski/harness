@@ -142,10 +142,7 @@ pub fn validate_task_board_dependency_reverification_request(
         || request.fixer_result.changed_paths.is_empty()
         || !request.fixer_result.remaining_blockers.is_empty()
         || request.diff.trim().is_empty()
-        || !request
-            .diff
-            .lines()
-            .any(|line| line.starts_with("diff --git "))
+        || !diff_covers_changed_paths(&request.diff, &request.fixer_result.changed_paths)
     {
         return Err(parse_error(
             "dependency reverification evidence does not match the changed pull request head",
@@ -258,6 +255,23 @@ pub fn task_board_dependency_reverification_authorization(
             }
         }
     })
+}
+
+fn diff_covers_changed_paths(diff: &str, changed_paths: &[String]) -> bool {
+    let mut covered = BTreeSet::new();
+    for line in diff.lines() {
+        let Some(paths) = line.strip_prefix("diff --git a/") else {
+            continue;
+        };
+        let Some((old_path, new_path)) = paths.rsplit_once(" b/") else {
+            continue;
+        };
+        covered.insert(old_path);
+        covered.insert(new_path);
+    }
+    changed_paths
+        .iter()
+        .all(|path| covered.contains(path.as_str()))
 }
 
 fn validate_settled_gates(
