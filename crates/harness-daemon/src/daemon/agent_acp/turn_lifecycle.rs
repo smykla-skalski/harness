@@ -238,6 +238,7 @@ impl OpenRouterAgentTurnRuntime {
         request: AgentTurnRequest,
         resume_session_id: Option<String>,
     ) -> Result<AgentTurnId, CliError> {
+        let expected_resume_session_id = resume_session_id.clone();
         let request = request.into_validated()?;
         let source_revision = request
             .pull_request
@@ -259,6 +260,9 @@ impl OpenRouterAgentTurnRuntime {
             },
         )?;
         let id = AgentTurnId::new(snapshot.acp_id)?;
+        if let Some(expected) = expected_resume_session_id {
+            self.verify_resumed_session(&id, &expected)?;
+        }
         self.lock_bindings()?.insert(
             id.clone(),
             OpenRouterTurnBinding {
@@ -290,6 +294,33 @@ impl OpenRouterAgentTurnRuntime {
             return Err(error);
         }
         Ok(id)
+    }
+
+    fn verify_resumed_session(
+        &self,
+        id: &AgentTurnId,
+        expected_session_id: &str,
+    ) -> Result<(), CliError> {
+        let actual = self
+            .manager
+            .runtime_session_id(&self.session_id, id.as_str());
+        if actual
+            .as_ref()
+            .is_ok_and(|actual| actual.as_deref() == Some(expected_session_id))
+        {
+            return Ok(());
+        }
+        if let Err(error) = self.manager.stop(id.as_str()) {
+            tracing::warn!(
+                turn_id = %id,
+                %error,
+                "failed to stop OpenRouter turn after exact session resume was not honored"
+            );
+        }
+        Err(CliErrorKind::session_not_active(format!(
+            "OpenRouter turn '{id}' did not resume provider session '{expected_session_id}'"
+        ))
+        .into())
     }
 
     fn begin_cancellation(&self, id: &AgentTurnId) -> Result<bool, CliError> {

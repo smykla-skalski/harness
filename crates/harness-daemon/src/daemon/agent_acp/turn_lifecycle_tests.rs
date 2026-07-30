@@ -20,13 +20,26 @@ use super::{OpenRouterAgentTurnRuntime, OpenRouterTurnManager};
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 const MODEL: &str = "deepseek/deepseek-v4-flash";
 
-#[derive(Default)]
 struct FakeManager {
     request: Mutex<Option<AcpAgentStartRequest>>,
     state: Mutex<AcpAgentSessionState>,
+    runtime_session_id: Mutex<Option<String>>,
     stopped: Mutex<bool>,
     stop_probe: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     stop_fails: Mutex<bool>,
+}
+
+impl Default for FakeManager {
+    fn default() -> Self {
+        Self {
+            request: Mutex::default(),
+            state: Mutex::default(),
+            runtime_session_id: Mutex::new(Some("openrouter-session-1".into())),
+            stopped: Mutex::default(),
+            stop_probe: Mutex::default(),
+            stop_fails: Mutex::default(),
+        }
+    }
 }
 
 impl FakeManager {
@@ -89,7 +102,11 @@ impl OpenRouterTurnManager for FakeManager {
         _session_id: &str,
         _acp_id: &str,
     ) -> Result<Option<String>, CliError> {
-        Ok(Some("openrouter-session-1".into()))
+        Ok(self
+            .runtime_session_id
+            .lock()
+            .expect("runtime session lock")
+            .clone())
     }
 
     fn stop(&self, _acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
@@ -179,6 +196,24 @@ async fn resumed_turn_reuses_the_original_provider_session() {
         resumed.resume_session_id.as_deref(),
         Some("openrouter-session-1")
     );
+}
+
+#[tokio::test]
+async fn resumed_turn_fails_closed_when_the_provider_opens_a_new_session() {
+    let manager = Arc::new(FakeManager::default());
+    let runtime =
+        OpenRouterAgentTurnRuntime::with_manager(manager.clone(), "session-a".into(), None);
+    *manager
+        .runtime_session_id
+        .lock()
+        .expect("runtime session lock") = Some("fallback-session".into());
+
+    runtime
+        .start_with_resume_session(request(), Some("openrouter-session-1".into()))
+        .await
+        .expect_err("fallback session must fail closed");
+
+    assert!(*manager.stopped.lock().expect("stopped lock"));
 }
 
 #[tokio::test]
