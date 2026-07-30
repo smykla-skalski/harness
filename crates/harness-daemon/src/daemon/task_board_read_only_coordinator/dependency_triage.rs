@@ -179,7 +179,20 @@ async fn settle_terminal(
     let current = current_attempt(db, attempt).await?;
     match run.status {
         AgentTurnRunStatus::Completed => {
-            let route = parse_route(execution, run)?;
+            let route = match parse_route(execution, run) {
+                Ok(route) => route,
+                Err(error) => {
+                    mark_unknown(
+                        db,
+                        execution,
+                        &current,
+                        now,
+                        &format!("invalid dependency triage result: {error}"),
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            };
             transition_attempt(
                 db,
                 &current,

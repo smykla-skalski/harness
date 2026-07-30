@@ -133,6 +133,42 @@ async fn dependency_fixer_starts_only_after_explicit_triage_route() {
     );
 }
 
+#[tokio::test]
+async fn invalid_dependency_triage_fails_closed_without_workspace_write() {
+    let fixture = Box::pin(write_fixture::seed_write_execution_kind(
+        "dependency-invalid-triage",
+        TaskBoardWorkflowKind::PrFixReview,
+    ))
+    .await;
+    let runtime = FakeWriteRuntime::new([]);
+    let mut invalid = safe_triage_result();
+    invalid.exact_head_revision = "abcdefabcdefabcdefabcdefabcdefabcdefabcd".into();
+    runtime.plan_triage(invalid);
+
+    for _ in 0..8 {
+        tick(&fixture, &runtime).await;
+        if load_execution(&fixture).await.transition.execution_state
+            == TaskBoardExecutionState::HumanRequired
+        {
+            break;
+        }
+    }
+
+    let execution = load_execution(&fixture).await;
+    let attempt = execution
+        .attempts
+        .iter()
+        .find(|attempt| attempt.action_key == "dependency_triage")
+        .expect("dependency triage attempt");
+    assert_eq!(attempt.state, TaskBoardAttemptState::Unknown);
+    assert_eq!(
+        execution.transition.execution_state,
+        TaskBoardExecutionState::HumanRequired
+    );
+    assert_eq!(execution.blocked_reason.as_deref(), Some("attempt_outcome_unknown"));
+    assert_eq!(runtime.start_count(), 0);
+}
+
 fn safe_triage_result() -> TaskBoardDependencyTriageResult {
     TaskBoardDependencyTriageResult {
         schema_version: TASK_BOARD_DEPENDENCY_TRIAGE_SCHEMA_VERSION,
