@@ -11,17 +11,25 @@
 //! ones that read a live `AsyncDaemonDb`), because both depend on the root
 //! binary crate's daemon layer, which this leaf crate never does.
 
-use std::fmt;
 use std::ops::Not;
 
 use async_trait::async_trait;
-use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::types::{
     ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind,
+};
+
+// `ExternalProvider` relocated to
+// `harness_protocol::daemon::task_board::external` (#1145): pure data plus
+// pure inherent/trait-conversion methods, needed there because
+// `TaskBoardProviderSyncSummary` embeds it directly. `harness-task-board`'s
+// own `HARNESS_GITHUB_TOKEN_ENV`/`GH_TOKEN_ENV` moved alongside since
+// `ExternalProvider::token_env_names` is the only reader of either.
+pub use harness_protocol::daemon::task_board::external::{
+    ExternalProvider, GH_TOKEN_ENV, HARNESS_GITHUB_TOKEN_ENV,
 };
 
 mod capabilities;
@@ -72,53 +80,8 @@ pub use sync::{
 };
 pub use targeting::execution_repository_for_task;
 
-pub const HARNESS_GITHUB_TOKEN_ENV: &str = "HARNESS_GITHUB_TOKEN";
-pub const GH_TOKEN_ENV: &str = "GH_TOKEN";
 pub const HARNESS_GITHUB_REPOSITORY_ENV: &str = "HARNESS_GITHUB_REPOSITORY";
 pub const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
-#[value(rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum ExternalProvider {
-    #[value(name = "github", alias = "git_hub")]
-    #[serde(rename = "github", alias = "git_hub")]
-    GitHub,
-}
-
-impl ExternalProvider {
-    #[must_use]
-    pub const fn token_env_names(self) -> &'static [&'static str] {
-        match self {
-            Self::GitHub => &[HARNESS_GITHUB_TOKEN_ENV, GH_TOKEN_ENV],
-        }
-    }
-}
-
-impl fmt::Display for ExternalProvider {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::GitHub => formatter.write_str("github"),
-        }
-    }
-}
-
-impl From<ExternalRefProvider> for ExternalProvider {
-    fn from(provider: ExternalRefProvider) -> Self {
-        match provider {
-            ExternalRefProvider::GitHub => Self::GitHub,
-        }
-    }
-}
-
-impl From<ExternalProvider> for ExternalRefProvider {
-    fn from(provider: ExternalProvider) -> Self {
-        match provider {
-            ExternalProvider::GitHub => Self::GitHub,
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExternalTaskRef {

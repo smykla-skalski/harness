@@ -61,21 +61,6 @@ public struct TaskBoardEvaluationSummaryWire: Codable, Equatable, Sendable {
   }
 }
 
-public struct EvaluationSignalFailureWire: Codable, Equatable, Sendable {
-  public var boardItemId: String
-  public var message: String
-
-  public init(boardItemId: String, message: String) {
-    self.boardItemId = boardItemId
-    self.message = message
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case boardItemId = "board_item_id"
-    case message
-  }
-}
-
 public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
   public var boardItemId: String
   public var sessionId: String?
@@ -126,6 +111,21 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
     case updated
     case reason
     case item
+  }
+}
+
+public struct EvaluationSignalFailureWire: Codable, Equatable, Sendable {
+  public var boardItemId: String
+  public var message: String
+
+  public init(boardItemId: String, message: String) {
+    self.boardItemId = boardItemId
+    self.message = message
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case boardItemId = "board_item_id"
+    case message
   }
 }
 

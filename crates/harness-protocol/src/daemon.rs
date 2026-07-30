@@ -131,6 +131,10 @@ pub mod openrouter_models;
 /// the timeline pagination types tracked separately by issue #1102.
 pub mod summaries;
 
+/// Task-board wire types, relocated from `harness-task-board` (see the
+/// module's own doc comment for why).
+pub mod task_board;
+
 // Kept in sync by hand with `src/daemon/protocol/api_contract.rs`'s
 // route-table-derived `task_board_mcp_methods()`, which never chains in
 // `routes_task_board_orchestrator` or `routes_task_board_working_copies` --

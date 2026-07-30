@@ -5,6 +5,52 @@
 import Foundation
 import HarnessMonitorPolicyModels
 
+public struct DispatchExecutionSummaryWire: Codable, Equatable, Sendable {
+  public var plans: [DispatchPlanWire]
+  public var applied: [DispatchAppliedTaskWire]
+  public var failures: [DispatchFailureWire]
+
+  public init(plans: [DispatchPlanWire], applied: [DispatchAppliedTaskWire], failures: [DispatchFailureWire] = []) {
+    self.plans = plans
+    self.applied = applied
+    self.failures = failures
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    plans = try container.decode([DispatchPlanWire].self, forKey: .plans)
+    applied = try container.decode([DispatchAppliedTaskWire].self, forKey: .applied)
+    failures = try container.decodeIfPresent([DispatchFailureWire].self, forKey: .failures) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case plans
+    case applied
+    case failures
+  }
+}
+
+public struct DispatchAppliedTaskWire: Codable, Equatable, Sendable {
+  public var boardItemId: String
+  public var sessionId: String
+  public var workItemId: String
+  public var item: TaskBoardItemWire
+
+  public init(boardItemId: String, sessionId: String, workItemId: String, item: TaskBoardItemWire) {
+    self.boardItemId = boardItemId
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+    self.item = item
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case boardItemId = "board_item_id"
+    case sessionId = "session_id"
+    case workItemId = "work_item_id"
+    case item
+  }
+}
+
 public struct DispatchPlanWire: Codable, Equatable, Sendable {
   public var boardItemId: String
   public var renderedPrompt: String
@@ -59,52 +105,6 @@ public struct DispatchPlanWire: Codable, Equatable, Sendable {
     case policy
     case policyDecisionId = "policy_decision_id"
     case consumedApprovalGrantId = "consumed_approval_grant_id"
-  }
-}
-
-public struct DispatchExecutionSummaryWire: Codable, Equatable, Sendable {
-  public var plans: [DispatchPlanWire]
-  public var applied: [DispatchAppliedTaskWire]
-  public var failures: [DispatchFailureWire]
-
-  public init(plans: [DispatchPlanWire], applied: [DispatchAppliedTaskWire], failures: [DispatchFailureWire] = []) {
-    self.plans = plans
-    self.applied = applied
-    self.failures = failures
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    plans = try container.decode([DispatchPlanWire].self, forKey: .plans)
-    applied = try container.decode([DispatchAppliedTaskWire].self, forKey: .applied)
-    failures = try container.decodeIfPresent([DispatchFailureWire].self, forKey: .failures) ?? []
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case plans
-    case applied
-    case failures
-  }
-}
-
-public struct DispatchAppliedTaskWire: Codable, Equatable, Sendable {
-  public var boardItemId: String
-  public var sessionId: String
-  public var workItemId: String
-  public var item: TaskBoardItemWire
-
-  public init(boardItemId: String, sessionId: String, workItemId: String, item: TaskBoardItemWire) {
-    self.boardItemId = boardItemId
-    self.sessionId = sessionId
-    self.workItemId = workItemId
-    self.item = item
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case boardItemId = "board_item_id"
-    case sessionId = "session_id"
-    case workItemId = "work_item_id"
-    case item
   }
 }
 

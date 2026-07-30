@@ -208,6 +208,7 @@ pub use orchestrator::{
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
     TaskBoardOrchestratorStatusSnapshot, TaskBoardOrchestratorTickInfo,
     TaskBoardOrchestratorTickPhase, TaskBoardWorkflowExecutionCount,
+    validate_orchestrator_settings_update_admission_policy,
 };
 // Thin wire projections of `TaskBoardOrchestratorStatusSnapshot`/`PolicyPipelinePromoteOutcome`,
 // named for the boundary they serve rather than the module they live in: the
@@ -255,7 +256,10 @@ pub use runtime_config::{
 #[cfg(any(test, feature = "test-support"))]
 pub use store::TaskBoardStore;
 pub use store::default_board_root;
-pub use wire::{PolicyPipelinePromoteResponse, TaskBoardOrchestratorStatus};
+pub use wire::{
+    PolicyPipelinePromoteResponse, TaskBoardOrchestratorStatus,
+    task_board_orchestrator_status_from_snapshot,
+};
 // Gated to match root's own re-narrowing import in `src/task_board/mod.rs`
 // exactly: an unconditional export here would make the glob re-export leak
 // this as public API whenever root's narrowing line's condition is false,

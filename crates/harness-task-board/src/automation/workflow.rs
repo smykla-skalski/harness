@@ -3,6 +3,14 @@ use serde::{Deserialize, Serialize};
 use super::TaskBoardReportOnlyReviewFinding;
 use crate::{ExternalRefProvider, TaskBoardReviewerProfile, TaskBoardWorkflowKind};
 
+// `TaskBoardPhaseCapabilityProfile` relocated to
+// `harness_protocol::daemon::task_board::orchestrator_workflow` (#1145),
+// reached forward the same way this crate's own `automation::orchestrator_workflow`
+// already reaches `TaskBoardOrchestratorWorkflow` forward out of this file's
+// sibling: `TaskBoardLocalExecutionHostConfig` embeds it directly. The rest
+// of this file's execution-state types stay here.
+pub use harness_protocol::daemon::task_board::orchestrator_workflow::TaskBoardPhaseCapabilityProfile;
+
 pub const TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,16 +79,6 @@ pub enum TaskBoardPhaseVerdict {
     Pass,
     ChangesRequired,
     HumanRequired,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardPhaseCapabilityProfile {
-    PlanningReadOnly,
-    ImplementationWrite,
-    ReviewReadOnly,
-    EvaluateReadOnly,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

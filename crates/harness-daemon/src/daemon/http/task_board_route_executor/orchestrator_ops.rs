@@ -13,6 +13,10 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorStatus,
 };
 use crate::daemon::service;
+use crate::task_board::{
+    task_board_orchestrator_status_from_snapshot,
+    validate_orchestrator_settings_update_admission_policy,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonHttpState, require_async_db};
@@ -26,7 +30,7 @@ pub(crate) async fn orchestrator_status(
         "task board orchestrator status",
     )?)
     .await
-    .map(Into::into)
+    .map(task_board_orchestrator_status_from_snapshot)
 }
 
 pub(crate) async fn start_orchestrator(
@@ -37,7 +41,7 @@ pub(crate) async fn start_orchestrator(
         "task board orchestrator start",
     )?)
     .await
-    .map(Into::into)
+    .map(task_board_orchestrator_status_from_snapshot)
 }
 
 pub(crate) async fn stop_orchestrator(
@@ -48,7 +52,7 @@ pub(crate) async fn stop_orchestrator(
         "task board orchestrator stop",
     )?)
     .await
-    .map(Into::into)
+    .map(task_board_orchestrator_status_from_snapshot)
 }
 
 pub(crate) async fn automation_runs(
@@ -103,7 +107,7 @@ pub(crate) async fn update_orchestrator_settings(
     state: &DaemonHttpState,
     request: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
-    request.validate_admission_policy().map_err(|error| {
+    validate_orchestrator_settings_update_admission_policy(request).map_err(|error| {
         CliErrorKind::workflow_parse(format!("invalid task-board admission policy: {error}"))
     })?;
     service::update_task_board_orchestrator_settings_db(

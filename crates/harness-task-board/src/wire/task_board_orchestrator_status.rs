@@ -8,248 +8,152 @@
 //! through the task-board items list instead, the same way the daemon's own
 //! internal deep readers already re-fetch from the database rather than
 //! trust this copy.
+//!
+//! The six wire types below (and `last_run_applied_count`) relocated to
+//! `harness_protocol::daemon::task_board::orchestrator_status` (#1145),
+//! exactly the pure-data closure this module's own doc comment above already
+//! describes. The five `From` impls that build them out of their fat,
+//! `harness-task-board`-only counterparts could not come along: each one's
+//! `Self` (the moved wire type) is no longer local to this crate, and
+//! `harness-protocol` cannot depend back on `harness-task-board` to reach the
+//! fat source type, so neither crate can host the impl (see `PolicyDecision`'s
+//! module for the general rule). They became free functions instead, kept
+//! here next to the fixture-based tests that exercise them.
+//! `task_board_orchestrator_status_from_snapshot` is `harness-daemon`'s only
+//! external caller, in place of the `Into::into()` it used to reach through
+//! the removed `From` impl.
 
-use serde::{Deserialize, Serialize};
-
-use crate::dispatch::{
-    DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchPlan,
+pub use harness_protocol::daemon::task_board::orchestrator_status::{
+    TaskBoardOrchestratorAppliedTask, TaskBoardOrchestratorDispatchOutcome,
+    TaskBoardOrchestratorEvaluationOutcome, TaskBoardOrchestratorEvaluationRecord,
+    TaskBoardOrchestratorRunOutcome, TaskBoardOrchestratorStatus,
 };
-use crate::evaluation::{
-    EvaluationSignalFailure, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
-    TaskBoardEvaluationSummary,
-};
-use crate::orchestrator::{
-    TaskBoardHeldDispatchSummary, TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary,
-    TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatusSnapshot,
-    TaskBoardOrchestratorTickInfo,
-};
-use crate::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
-use crate::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
-use crate::{TaskBoardAutomationSnapshot, TaskBoardWorkflowExecutionCount};
-use harness_session::types::TaskStatus;
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorStatus {
-    pub enabled: bool,
-    pub running: bool,
-    #[serde(default)]
-    pub step_mode: bool,
-    #[serde(default)]
-    pub held_dispatches: TaskBoardHeldDispatchSummary,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub current_tick: Option<TaskBoardOrchestratorTickInfo>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_run: Option<TaskBoardOrchestratorRunOutcome>,
-    pub workflow_execution_counts: Vec<TaskBoardWorkflowExecutionCount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub automation: Option<TaskBoardAutomationSnapshot>,
-    pub settings: TaskBoardOrchestratorSettings,
-}
+use crate::dispatch::{DispatchAppliedTask, DispatchExecutionSummary};
+use crate::evaluation::{TaskBoardEvaluationRecord, TaskBoardEvaluationSummary};
+use crate::orchestrator::{TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorStatusSnapshot};
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorRunOutcome {
-    pub run_id: String,
-    pub started_at: String,
-    pub completed_at: String,
-    pub status: TaskBoardOrchestratorRunStatus,
-    pub dry_run: bool,
-    pub sync: TaskBoardSyncSummary,
-    pub audit: TaskBoardAuditSummary,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dispatch: Option<TaskBoardOrchestratorDispatchOutcome>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evaluation: Option<TaskBoardOrchestratorEvaluationOutcome>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub policy_trace_ids: Vec<String>,
-}
-
-/// Thin mirror of `DispatchExecutionSummary`. `plans` rides through
-/// unchanged: `DispatchPlan` names no `TaskBoardItem`, only a `board_item_id`
-/// key, so it carries no domain-entity closure to strip.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorDispatchOutcome {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub plans: Vec<DispatchPlan>,
-    pub applied: Vec<TaskBoardOrchestratorAppliedTask>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub failures: Vec<DispatchFailure>,
-}
-
-/// Thin mirror of `DispatchAppliedTask`: drops the embedded `TaskBoardItem`
-/// (keeping only its title, the one field real consumers read off it) and
-/// the `lifecycle`/`read_only_workflow`/`write_workflow` fields, which are
-/// daemon-internal worker-claim bookkeeping that Swift already omits on
-/// decode for the direct dispatch endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorAppliedTask {
-    pub board_item_id: String,
-    pub session_id: String,
-    pub work_item_id: String,
-    pub item_title: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorEvaluationOutcome {
-    pub total: usize,
-    pub evaluated: usize,
-    pub updated: usize,
-    pub skipped: usize,
-    pub completed: usize,
-    pub running: usize,
-    pub reviewing: usize,
-    pub blocked: usize,
-    pub failed: usize,
-    pub records: Vec<TaskBoardOrchestratorEvaluationRecord>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub signal_failures: Vec<EvaluationSignalFailure>,
-}
-
-/// Thin mirror of `TaskBoardEvaluationRecord`: `item: Option<TaskBoardItem>`
-/// becomes `item_title: Option<String>`, the only piece of it any consumer of
-/// this specific embedding reads.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardOrchestratorEvaluationRecord {
-    pub board_item_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub work_item_id: Option<String>,
-    pub outcome: TaskBoardEvaluationOutcome,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub task_status: Option<TaskStatus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub board_status: Option<TaskBoardStatus>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workflow_status: Option<TaskBoardWorkflowStatus>,
-    #[serde(default)]
-    pub updated: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub item_title: Option<String>,
-}
-
-impl TaskBoardOrchestratorStatus {
-    #[must_use]
-    pub fn last_run_applied_count(&self) -> usize {
-        self.last_run.as_ref().map_or(0, |run| {
-            let synced = run
-                .sync
-                .operations
-                .iter()
-                .filter(|operation| operation.applied)
-                .count();
-            let dispatched = run
-                .dispatch
-                .as_ref()
-                .map_or(0, |dispatch| dispatch.applied.len());
-            let evaluated = run
-                .evaluation
-                .as_ref()
-                .map_or(0, |evaluation| evaluation.updated);
-            synced + dispatched + evaluated
-        })
+#[must_use]
+pub fn task_board_orchestrator_status_from_snapshot(
+    snapshot: TaskBoardOrchestratorStatusSnapshot,
+) -> TaskBoardOrchestratorStatus {
+    TaskBoardOrchestratorStatus {
+        enabled: snapshot.enabled,
+        running: snapshot.running,
+        step_mode: snapshot.step_mode,
+        held_dispatches: snapshot.held_dispatches,
+        current_tick: snapshot.current_tick,
+        last_run: snapshot
+            .last_run
+            .map(task_board_orchestrator_run_outcome_from_summary),
+        workflow_execution_counts: snapshot.workflow_execution_counts,
+        automation: snapshot.automation,
+        settings: snapshot.settings,
     }
 }
 
-impl From<TaskBoardOrchestratorStatusSnapshot> for TaskBoardOrchestratorStatus {
-    fn from(snapshot: TaskBoardOrchestratorStatusSnapshot) -> Self {
-        Self {
-            enabled: snapshot.enabled,
-            running: snapshot.running,
-            step_mode: snapshot.step_mode,
-            held_dispatches: snapshot.held_dispatches,
-            current_tick: snapshot.current_tick,
-            last_run: snapshot.last_run.map(Into::into),
-            workflow_execution_counts: snapshot.workflow_execution_counts,
-            automation: snapshot.automation,
-            settings: snapshot.settings,
-        }
+#[must_use]
+pub fn task_board_orchestrator_run_outcome_from_summary(
+    run: TaskBoardOrchestratorRunSummary,
+) -> TaskBoardOrchestratorRunOutcome {
+    TaskBoardOrchestratorRunOutcome {
+        run_id: run.run_id,
+        started_at: run.started_at,
+        completed_at: run.completed_at,
+        status: run.status,
+        dry_run: run.dry_run,
+        sync: run.sync,
+        audit: run.audit,
+        dispatch: run
+            .dispatch
+            .map(task_board_orchestrator_dispatch_outcome_from_summary),
+        evaluation: run
+            .evaluation
+            .map(task_board_orchestrator_evaluation_outcome_from_summary),
+        error: run.error,
+        policy_trace_ids: run.policy_trace_ids,
     }
 }
 
-impl From<TaskBoardOrchestratorRunSummary> for TaskBoardOrchestratorRunOutcome {
-    fn from(run: TaskBoardOrchestratorRunSummary) -> Self {
-        Self {
-            run_id: run.run_id,
-            started_at: run.started_at,
-            completed_at: run.completed_at,
-            status: run.status,
-            dry_run: run.dry_run,
-            sync: run.sync,
-            audit: run.audit,
-            dispatch: run.dispatch.map(Into::into),
-            evaluation: run.evaluation.map(Into::into),
-            error: run.error,
-            policy_trace_ids: run.policy_trace_ids,
-        }
+#[must_use]
+pub fn task_board_orchestrator_dispatch_outcome_from_summary(
+    dispatch: DispatchExecutionSummary,
+) -> TaskBoardOrchestratorDispatchOutcome {
+    TaskBoardOrchestratorDispatchOutcome {
+        plans: dispatch.plans,
+        applied: dispatch
+            .applied
+            .into_iter()
+            .map(task_board_orchestrator_applied_task_from_dispatch)
+            .collect(),
+        failures: dispatch.failures,
     }
 }
 
-impl From<DispatchExecutionSummary> for TaskBoardOrchestratorDispatchOutcome {
-    fn from(dispatch: DispatchExecutionSummary) -> Self {
-        Self {
-            plans: dispatch.plans,
-            applied: dispatch.applied.into_iter().map(Into::into).collect(),
-            failures: dispatch.failures,
-        }
+#[must_use]
+pub fn task_board_orchestrator_applied_task_from_dispatch(
+    applied: DispatchAppliedTask,
+) -> TaskBoardOrchestratorAppliedTask {
+    TaskBoardOrchestratorAppliedTask {
+        board_item_id: applied.board_item_id,
+        session_id: applied.session_id,
+        work_item_id: applied.work_item_id,
+        item_title: applied.item.title,
     }
 }
 
-impl From<DispatchAppliedTask> for TaskBoardOrchestratorAppliedTask {
-    fn from(applied: DispatchAppliedTask) -> Self {
-        Self {
-            board_item_id: applied.board_item_id,
-            session_id: applied.session_id,
-            work_item_id: applied.work_item_id,
-            item_title: applied.item.title,
-        }
+#[must_use]
+pub fn task_board_orchestrator_evaluation_outcome_from_summary(
+    evaluation: TaskBoardEvaluationSummary,
+) -> TaskBoardOrchestratorEvaluationOutcome {
+    TaskBoardOrchestratorEvaluationOutcome {
+        total: evaluation.total,
+        evaluated: evaluation.evaluated,
+        updated: evaluation.updated,
+        skipped: evaluation.skipped,
+        completed: evaluation.completed,
+        running: evaluation.running,
+        reviewing: evaluation.reviewing,
+        blocked: evaluation.blocked,
+        failed: evaluation.failed,
+        records: evaluation
+            .records
+            .into_iter()
+            .map(task_board_orchestrator_evaluation_record_from_record)
+            .collect(),
+        signal_failures: evaluation.signal_failures,
     }
 }
 
-impl From<TaskBoardEvaluationSummary> for TaskBoardOrchestratorEvaluationOutcome {
-    fn from(evaluation: TaskBoardEvaluationSummary) -> Self {
-        Self {
-            total: evaluation.total,
-            evaluated: evaluation.evaluated,
-            updated: evaluation.updated,
-            skipped: evaluation.skipped,
-            completed: evaluation.completed,
-            running: evaluation.running,
-            reviewing: evaluation.reviewing,
-            blocked: evaluation.blocked,
-            failed: evaluation.failed,
-            records: evaluation.records.into_iter().map(Into::into).collect(),
-            signal_failures: evaluation.signal_failures,
-        }
-    }
-}
-
-impl From<TaskBoardEvaluationRecord> for TaskBoardOrchestratorEvaluationRecord {
-    fn from(record: TaskBoardEvaluationRecord) -> Self {
-        Self {
-            board_item_id: record.board_item_id,
-            session_id: record.session_id,
-            work_item_id: record.work_item_id,
-            outcome: record.outcome,
-            task_status: record.task_status,
-            board_status: record.board_status,
-            workflow_status: record.workflow_status,
-            updated: record.updated,
-            reason: record.reason,
-            item_title: record.item.map(|item| item.title),
-        }
+#[must_use]
+pub fn task_board_orchestrator_evaluation_record_from_record(
+    record: TaskBoardEvaluationRecord,
+) -> TaskBoardOrchestratorEvaluationRecord {
+    TaskBoardOrchestratorEvaluationRecord {
+        board_item_id: record.board_item_id,
+        session_id: record.session_id,
+        work_item_id: record.work_item_id,
+        outcome: record.outcome,
+        task_status: record.task_status,
+        board_status: record.board_status,
+        workflow_status: record.workflow_status,
+        updated: record.updated,
+        reason: record.reason,
+        item_title: record.item.map(|item| item.title),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use harness_protocol::daemon::task_board::evaluation::TaskBoardEvaluationOutcome;
+    use harness_protocol::daemon::task_board::orchestrator::TaskBoardOrchestratorRunStatus;
+
     use super::*;
     use crate::dispatch::{
         DispatchLifecycle, DispatchLifecyclePhase, DispatchLifecycleStatus, DispatchLifecycleStep,
     };
+    use crate::orchestrator::{TaskBoardHeldDispatchSummary, TaskBoardOrchestratorSettings};
+    use crate::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
     use crate::types::TaskBoardItem;
 
     fn sample_item(id: &str) -> TaskBoardItem {
@@ -289,7 +193,7 @@ mod tests {
             write_workflow: None,
         };
 
-        let thin = TaskBoardOrchestratorAppliedTask::from(full);
+        let thin = task_board_orchestrator_applied_task_from_dispatch(full);
 
         assert_eq!(thin.board_item_id, "board-1");
         assert_eq!(thin.session_id, "session-1");
@@ -312,7 +216,7 @@ mod tests {
             item: Some(sample_item("board-2")),
         };
 
-        let thin = TaskBoardOrchestratorEvaluationRecord::from(full);
+        let thin = task_board_orchestrator_evaluation_record_from_record(full);
 
         assert_eq!(thin.item_title.as_deref(), Some("board-2 title"));
     }
@@ -333,7 +237,7 @@ mod tests {
         };
 
         assert!(
-            TaskBoardOrchestratorEvaluationRecord::from(full)
+            task_board_orchestrator_evaluation_record_from_record(full)
                 .item_title
                 .is_none()
         );

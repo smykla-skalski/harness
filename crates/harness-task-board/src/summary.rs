@@ -12,7 +12,7 @@ use super::dispatch::DispatchPlan;
 use super::dispatch::build_dispatch_plans_with_policy;
 #[cfg(any(test, feature = "test-support"))]
 use super::dispatch::{build_dispatch_plans, build_dispatch_plans_with_policy_root};
-use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
+use super::external::{ExternalProvider, ExternalSyncConfig};
 #[cfg(any(test, feature = "daemon-runtime"))]
 use super::policy::PolicyApprovalGrant;
 use super::project::{TaskBoardProject, TaskBoardProjectSource};
@@ -20,38 +20,17 @@ use super::project_color::TaskBoardProjectColor;
 use super::project_shape::TaskBoardProjectShape;
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardAuditSummary {
-    pub total: usize,
-    pub ready: usize,
-    pub blocked: usize,
-    pub deleted: usize,
-    pub by_status: Vec<TaskBoardStatusCount>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardStatusCount {
-    pub status: TaskBoardStatus,
-    pub count: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardSyncSummary {
-    pub total: usize,
-    pub providers: Vec<TaskBoardProviderSyncSummary>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub operations: Vec<ExternalSyncOperation>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskBoardProviderSyncSummary {
-    pub provider: ExternalProvider,
-    pub configured: bool,
-    pub linked: usize,
-    pub pushable: usize,
-    pub blocked: usize,
-    pub token_env: Vec<String>,
-}
+// `TaskBoardAuditSummary`/`TaskBoardStatusCount`/`TaskBoardSyncSummary`/
+// `TaskBoardProviderSyncSummary` relocated to
+// `harness_protocol::daemon::task_board::summary` (#1145): pure data, needed
+// there because `TaskBoardOrchestratorRunOutcome` embeds
+// `TaskBoardAuditSummary`/`TaskBoardSyncSummary` directly.
+// `TaskBoardProjectSummary`/`TaskBoardMachineSummary` (below) stay here:
+// nothing in that closure embeds them.
+pub use harness_protocol::daemon::task_board::summary::{
+    TaskBoardAuditSummary, TaskBoardProviderSyncSummary, TaskBoardStatusCount,
+    TaskBoardSyncSummary,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardProjectSummary {

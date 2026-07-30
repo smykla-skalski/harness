@@ -258,7 +258,7 @@ mod tests {
         AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
     };
     use crate::task_board::dispatch::{
-        DispatchLifecycle, EvaluatorIntent, FollowUpPhase, ReviewerIntent, WorkerIntent,
+        EvaluatorIntent, FollowUpPhase, ReviewerIntent, WorkerIntent, dispatch_lifecycle_planned,
     };
     use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus};
 
@@ -270,7 +270,7 @@ mod tests {
             "2026-05-15T00:00:00Z".into(),
         );
         item.status = TaskBoardStatus::InProgress;
-        let lifecycle = DispatchLifecycle::planned(
+        let lifecycle = dispatch_lifecycle_planned(
             &WorkerIntent {
                 mode: AgentMode::Headless,
             },

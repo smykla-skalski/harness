@@ -12,9 +12,9 @@ pub struct TaskBoardUpdatedPayload {
 
 use crate::{
     DispatchExecutionSummary, Machine, PolicyGraphMode, PolicyInput, PolicyPipelineAuditSummary,
-    PolicyPipelineDocument, PolicyPipelineGoLiveDiff, PolicyPipelinePromoteOutcome,
-    PolicyPipelineReplayResult, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
-    PolicyScenario, TaskBoardAuditSummary, TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary,
+    PolicyPipelineDocument, PolicyPipelineGoLiveDiff, PolicyPipelineReplayResult,
+    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, PolicyScenario,
+    TaskBoardAuditSummary, TaskBoardAutomationSnapshot, TaskBoardEvaluationSummary,
     TaskBoardGitIdentityDefaults, TaskBoardGitRuntimeConfig, TaskBoardItem,
     TaskBoardMachineSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatusSnapshot,
     TaskBoardProgressRollup, TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
@@ -23,6 +23,14 @@ use crate::{
     project::TaskBoardProject,
     project_color::TaskBoardProjectColor,
 };
+
+// `PolicyPipelinePromoteResponse` relocated to
+// `harness_protocol::daemon::task_board::policy_pipeline` (#1145): pure data,
+// needed there because `daemon::protocol::task_board` re-exports it directly.
+// The `From<PolicyPipelinePromoteOutcome>` impl that used to sit next to it
+// had no callers anywhere in the workspace and was dropped rather than
+// carried forward.
+pub use harness_protocol::daemon::task_board::policy_pipeline::PolicyPipelinePromoteResponse;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardPlanBeginRequest {
@@ -374,28 +382,6 @@ pub type TaskBoardOrchestratorRunOnceResponse = TaskBoardOrchestratorStatusSnaps
 pub type TaskBoardOrchestratorSettingsResponse = TaskBoardOrchestratorSettings;
 pub type TaskBoardGitRuntimeConfigResponse = TaskBoardGitRuntimeConfig;
 pub type TaskBoardGitIdentityDefaultsResponse = TaskBoardGitIdentityDefaults;
-
-/// Thin wire projection of `PolicyPipelinePromoteOutcome`: drops the embedded
-/// `PolicyGraph` because the promote endpoint's real consumers never read it
-/// back off the response (Monitor's promote UI action calls the separate
-/// `make-live` endpoint instead, whose own response genuinely needs the full
-/// graph and is untouched here). A caller that still wants the graph after
-/// promoting reads it from the canvas/summary endpoints, the same place it
-/// already comes from today.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct PolicyPipelinePromoteResponse {
-    pub revision: u64,
-    pub trace_id: String,
-}
-
-impl From<PolicyPipelinePromoteOutcome> for PolicyPipelinePromoteResponse {
-    fn from(outcome: PolicyPipelinePromoteOutcome) -> Self {
-        Self {
-            revision: outcome.document.revision,
-            trace_id: outcome.trace_id,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardGitSigningVerifyRequest {

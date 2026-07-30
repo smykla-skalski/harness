@@ -1,12 +1,12 @@
 use super::*;
-use crate::planning::{approve_plan, submit_plan};
+use crate::planning::{PlanApprovalBlockReason, approve_plan, submit_plan};
 use crate::policy::{PolicyAction, PolicyReasonCode, PolicySubject};
 use crate::policy_graph::{
     PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode,
     PolicyGraphNodeKind, PolicyPipelinePromoteRequest, apply_promote, apply_save_draft,
     apply_simulate, store_gate_policy,
 };
-use crate::types::{ExternalRefProvider, TaskBoardItemKind};
+use crate::types::{ExternalRef, ExternalRefProvider, TaskBoardItemKind};
 use tempfile::tempdir;
 
 #[path = "dispatch_tests/policy_approval.rs"]

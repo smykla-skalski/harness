@@ -4,45 +4,6 @@
 
 import Foundation
 
-public struct TaskBoardAuditSummaryWire: Codable, Equatable, Sendable {
-  public var total: UInt
-  public var ready: UInt
-  public var blocked: UInt
-  public var deleted: UInt
-  public var byStatus: [TaskBoardStatusCountWire]
-
-  public init(total: UInt, ready: UInt, blocked: UInt, deleted: UInt, byStatus: [TaskBoardStatusCountWire]) {
-    self.total = total
-    self.ready = ready
-    self.blocked = blocked
-    self.deleted = deleted
-    self.byStatus = byStatus
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case total
-    case ready
-    case blocked
-    case deleted
-    case byStatus = "by_status"
-  }
-}
-
-public struct TaskBoardStatusCountWire: Codable, Equatable, Sendable {
-  public var status: TaskBoardStatus
-  public var count: UInt
-
-  public init(status: TaskBoardStatus, count: UInt) {
-    self.status = status
-    self.count = count
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case status
-    case count
-  }
-}
-
 public struct TaskBoardProjectSummaryWire: Codable, Equatable, Sendable {
   public var projectId: String
   public var source: TaskBoardProjectSource
@@ -91,6 +52,45 @@ public struct TaskBoardMachineSummaryWire: Codable, Equatable, Sendable {
     case mode
     case itemCount = "item_count"
     case readyCount = "ready_count"
+  }
+}
+
+public struct TaskBoardAuditSummaryWire: Codable, Equatable, Sendable {
+  public var total: UInt
+  public var ready: UInt
+  public var blocked: UInt
+  public var deleted: UInt
+  public var byStatus: [TaskBoardStatusCountWire]
+
+  public init(total: UInt, ready: UInt, blocked: UInt, deleted: UInt, byStatus: [TaskBoardStatusCountWire]) {
+    self.total = total
+    self.ready = ready
+    self.blocked = blocked
+    self.deleted = deleted
+    self.byStatus = byStatus
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case total
+    case ready
+    case blocked
+    case deleted
+    case byStatus = "by_status"
+  }
+}
+
+public struct TaskBoardStatusCountWire: Codable, Equatable, Sendable {
+  public var status: TaskBoardStatus
+  public var count: UInt
+
+  public init(status: TaskBoardStatus, count: UInt) {
+    self.status = status
+    self.count = count
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case status
+    case count
   }
 }
 

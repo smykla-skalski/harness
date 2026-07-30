@@ -6,6 +6,15 @@ use super::types::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
 
+// `TaskBoardEvaluationOutcome`/`EvaluationSignalFailure` relocated to
+// `harness_protocol::daemon::task_board::evaluation` (#1145): pure data,
+// needed there because `TaskBoardOrchestratorEvaluationOutcome`/`Record`
+// embed them directly. `TaskBoardEvaluationSummary`/`TaskBoardEvaluationRecord`
+// stay here: the latter embeds the full `TaskBoardItem` domain entity.
+pub use harness_protocol::daemon::task_board::evaluation::{
+    EvaluationSignalFailure, TaskBoardEvaluationOutcome,
+};
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardEvaluationSummary {
     pub total: usize,
@@ -20,12 +29,6 @@ pub struct TaskBoardEvaluationSummary {
     pub records: Vec<TaskBoardEvaluationRecord>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub signal_failures: Vec<EvaluationSignalFailure>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct EvaluationSignalFailure {
-    pub board_item_id: String,
-    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -48,22 +51,6 @@ pub struct TaskBoardEvaluationRecord {
     pub reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<TaskBoardItem>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum TaskBoardEvaluationOutcome {
-    SkippedUnlinked,
-    MissingSession,
-    MissingTask,
-    WorkerPending,
-    WorkerRunning,
-    ReviewPending,
-    ReviewRunning,
-    ReviewChangesRequested,
-    Completed,
-    Blocked,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

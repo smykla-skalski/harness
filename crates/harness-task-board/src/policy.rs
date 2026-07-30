@@ -2,9 +2,21 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{AgentMode, TaskBoardPriority};
 
-// Keep the historical task-board identifier for persisted decisions, replay
-// history, and comparisons written before the public policy API rename.
-pub const POLICY_VERSION: &str = "task-board-policy-v1";
+// `PolicyDecision`/`PolicyReasonCode`/`POLICY_VERSION` relocated to
+// `harness_protocol::daemon::task_board::policy_decision` (#1145):
+// `PolicyDecision` is pure data with one pure inherent method (`is_allow`),
+// needed there because `DispatchPlan`/`DispatchBlockReason` embed it
+// directly; `POLICY_VERSION` moved alongside since `TaskBoardOrchestratorSettings`'s
+// `policy_version` default (now in `harness-protocol` too) stamps it the same
+// way this file's own `allow`/`deny`/etc. helpers below do. The evaluation
+// engine that builds `PolicyDecision` values (`PolicyGate`, `BuiltInPolicyGate`,
+// `PolicyInput`, and everything below) stays here: it reaches
+// `TaskBoardPriority`/`AgentMode`-bearing subject state this move has no need
+// for.
+pub use harness_protocol::daemon::task_board::policy_decision::{
+    POLICY_VERSION, PolicyDecision, PolicyReasonCode,
+};
+
 pub const DEFAULT_AUTO_MERGE_RISK_THRESHOLD: u8 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,54 +36,6 @@ pub enum PolicyAction {
     StopAgent,
     AccessSecret,
     DestructiveFs,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "decision", rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum PolicyDecision {
-    Allow {
-        reason_code: PolicyReasonCode,
-        policy_version: String,
-    },
-    Deny {
-        reason_code: PolicyReasonCode,
-        policy_version: String,
-    },
-    RequireHuman {
-        reason_code: PolicyReasonCode,
-        policy_version: String,
-    },
-    RequireConsensus {
-        reason_code: PolicyReasonCode,
-        policy_version: String,
-    },
-    DryRunOnly {
-        reason_code: PolicyReasonCode,
-        policy_version: String,
-    },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum PolicyReasonCode {
-    DefaultAllow,
-    AutoMergeAllowed,
-    MissingMergeEvidence,
-    ChecksNotGreen,
-    BranchProtectionBlocked,
-    ReviewerNotApproved,
-    UnresolvedRequestedChanges,
-    ProtectedPathTouched,
-    RiskAboveThreshold,
-    HumanRequired,
-    DryRunRequired,
-    // WP3 spawn-policy reason codes (additive).
-    ApprovalRequired,
-    ApprovalDenied,
-    SpawnPolicyRequired,
-    SpawnKillSwitchEngaged,
 }
 
 /// Resolution state of a durable `ApprovalGate` (`crate::policy_graph`) grant,
@@ -261,13 +225,6 @@ impl PolicyInput {
     pub fn with_subject(mut self, subject: PolicySubject) -> Self {
         self.subject = subject;
         self
-    }
-}
-
-impl PolicyDecision {
-    #[must_use]
-    pub const fn is_allow(&self) -> bool {
-        matches!(self, Self::Allow { .. })
     }
 }
 

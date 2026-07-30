@@ -11,6 +11,7 @@ use crate::daemon::protocol::{
 use crate::task_board::{
     TaskBoardAutomationHistoryResponse, TaskBoardAutomationMetrics, TaskBoardAutomationRunDetail,
     TaskBoardOrchestratorSettings, TaskBoardOrchestratorStatus,
+    task_board_orchestrator_status_from_snapshot,
 };
 
 use super::DaemonHttpState;
@@ -158,7 +159,7 @@ async fn post_task_board_orchestrator_run_once(
         &state, &request,
     ))
     .await
-    .map(TaskBoardOrchestratorStatus::from);
+    .map(task_board_orchestrator_status_from_snapshot);
     timed_json(
         "POST",
         http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,

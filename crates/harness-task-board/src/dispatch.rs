@@ -13,13 +13,11 @@ use super::default_board_root;
 use super::machines::Machine;
 #[cfg(any(test, feature = "test-support"))]
 use super::machines::{Machine, MachineRegistry};
-use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
+use super::planning::{PlanApprovalGate, approval_gate};
 use super::policy::{PolicyApprovalGrant, PolicyDecision};
 #[cfg(any(test, feature = "test-support"))]
 use super::store::TaskBoardStore;
-use super::types::{
-    AgentMode, ExternalRef, TaskBoardItem, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus,
-};
+use super::types::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 use super::{
     TaskBoardPlanApprovalBinding, TaskBoardPlanningResult, TaskBoardPullRequestIdentity,
     TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer, TaskBoardWorkflowKind,
@@ -33,38 +31,24 @@ use readiness::{blocked, readiness};
 mod lifecycle;
 pub use lifecycle::{
     DispatchLifecycle, DispatchLifecyclePhase, DispatchLifecycleStatus, DispatchLifecycleStep,
-    DispatchNativeSignal,
+    DispatchNativeSignal, dispatch_lifecycle_planned,
+};
+
+// `DispatchPlan` and its pure-data closure (`DispatchReadiness`,
+// `DispatchBlockReason`, `SessionIntent`, `TaskCreationIntent`, `WorkerIntent`,
+// `ReviewerIntent`, `EvaluatorIntent`, `FollowUpPhase`, `DispatchFailure`,
+// `DispatchFailureKind`) relocated to
+// `harness_protocol::daemon::task_board::dispatch` (#1145). `DispatchAppliedTask`,
+// `DispatchExecutionSummary`, `TaskBoardReadOnlyWorkflowLaunch`, and
+// `TaskBoardWriteWorkflowLaunch` (below) stay here: they embed the full
+// `TaskBoardItem` domain entity or state reachable only from it.
+pub use harness_protocol::daemon::task_board::dispatch::{
+    DispatchBlockReason, DispatchFailure, DispatchFailureKind, DispatchPlan, DispatchReadiness,
+    EvaluatorIntent, FollowUpPhase, ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
 };
 
 const REVIEWER_PERSONA: &str = "code-reviewer";
 const REVIEWER_CONSENSUS: u8 = 2;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DispatchPlan {
-    pub board_item_id: String,
-    #[serde(default)]
-    pub rendered_prompt: String,
-    pub readiness: DispatchReadiness,
-    pub session: SessionIntent,
-    pub task: TaskCreationIntent,
-    pub worker: WorkerIntent,
-    pub reviewer: ReviewerIntent,
-    pub evaluator: EvaluatorIntent,
-    pub lifecycle: DispatchLifecycle,
-    pub policy: PolicyDecision,
-    /// Id of the recorded policy decision that produced `policy`, threaded into
-    /// reservation so the board workflow stores the real decision id instead of
-    /// an unrelated random trace. `None` when the built-in fallback gate decided
-    /// (no decision is recorded on that path).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub policy_decision_id: Option<String>,
-    /// Id of the durable approval grant this dispatch will consume at reservation.
-    /// Set only when an approved live grant matched the spawn evaluation and the
-    /// decision allowed; the reservation transaction consumes it one-shot so a
-    /// re-dispatch needs a fresh approval. `None` on every non-approval path.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consumed_approval_grant_id: Option<String>,
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchExecutionSummary {
@@ -129,119 +113,6 @@ pub struct TaskBoardWriteWorkflowLaunch {
     pub plan_approval: TaskBoardPlanApprovalBinding,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct DispatchFailure {
-    pub board_item_id: String,
-    pub kind: DispatchFailureKind,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum DispatchFailureKind {
-    CreateSession,
-    CreateTask,
-    LinkItem,
-    WorkerSpawnFailed,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "state", rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum DispatchReadiness {
-    Ready,
-    Blocked { reason: DispatchBlockReason },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum DispatchBlockReason {
-    AlreadyLinked {
-        work_item_id: String,
-    },
-    Deleted,
-    MachineMismatch {
-        required: Vec<String>,
-        declared: Vec<String>,
-    },
-    PlanApproval {
-        reason: PlanApprovalBlockReason,
-    },
-    Policy {
-        decision: PolicyDecision,
-    },
-    Status {
-        status: TaskBoardStatus,
-    },
-    Kind {
-        item_kind: TaskBoardItemKind,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum SessionIntent {
-    Existing {
-        session_id: String,
-    },
-    Create {
-        title: String,
-        context: Option<String>,
-        project_id: Option<String>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TaskCreationIntent {
-    pub title: String,
-    pub context: Option<String>,
-    pub severity: TaskSeverity,
-    pub suggested_fix: Option<String>,
-    pub source: TaskSource,
-    pub tags: Vec<String>,
-    pub external_refs: Vec<ExternalRef>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct WorkerIntent {
-    pub mode: AgentMode,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ReviewerIntent {
-    pub phase: FollowUpPhase,
-    pub suggested_persona: String,
-    pub required_consensus: u8,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct EvaluatorIntent {
-    pub phase: FollowUpPhase,
-    pub mode: AgentMode,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum FollowUpPhase {
-    AfterWorkerReview,
-}
-
-impl DispatchPlan {
-    #[must_use]
-    pub const fn is_ready(&self) -> bool {
-        matches!(self.readiness, DispatchReadiness::Ready)
-    }
-
-    #[must_use]
-    pub fn applied_lifecycle(&self) -> DispatchLifecycle {
-        self.lifecycle.applied()
-    }
-}
-
 impl DispatchExecutionSummary {
     #[must_use]
     pub fn dry_run(plans: Vec<DispatchPlan>) -> Self {
@@ -286,7 +157,7 @@ fn build_dispatch_plan_with_decision(
         readiness: readiness(item, &policy),
         session: session_intent(item),
         task: task_creation_intent(item),
-        lifecycle: DispatchLifecycle::planned(&worker, &reviewer, &evaluator),
+        lifecycle: dispatch_lifecycle_planned(&worker, &reviewer, &evaluator),
         worker,
         reviewer,
         evaluator,

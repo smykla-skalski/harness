@@ -1,6 +1,6 @@
 use chrono::{
     DateTime, Datelike, Days, Duration, LocalResult, NaiveDate, NaiveDateTime, NaiveTime,
-    SecondsFormat, TimeZone, Utc, Weekday,
+    SecondsFormat, TimeZone, Utc,
 };
 use chrono_tz::Tz;
 
@@ -199,21 +199,6 @@ struct WindowOccurrence {
 struct ResolvedBoundary {
     earliest: DateTime<Utc>,
     latest: DateTime<Utc>,
-}
-
-impl TaskBoardPolicyWeekday {
-    const fn matches(self, weekday: Weekday) -> bool {
-        matches!(
-            (self, weekday),
-            (Self::Monday, Weekday::Mon)
-                | (Self::Tuesday, Weekday::Tue)
-                | (Self::Wednesday, Weekday::Wed)
-                | (Self::Thursday, Weekday::Thu)
-                | (Self::Friday, Weekday::Fri)
-                | (Self::Saturday, Weekday::Sat)
-                | (Self::Sunday, Weekday::Sun)
-        )
-    }
 }
 
 fn parse_local_time(

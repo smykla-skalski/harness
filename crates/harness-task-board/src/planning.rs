@@ -2,6 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{PlanningState, TaskBoardItem, TaskBoardStatus};
 
+// `PlanApprovalBlockReason` relocated to
+// `harness_protocol::daemon::task_board::planning` (#1145): pure data with no
+// fields, needed there because `DispatchBlockReason::PlanApproval` embeds it
+// directly. `PlanApprovalGate`/`PlanningTransition` (below) stay here: they
+// reach the full `TaskBoardItem` domain entity. Re-exported here unchanged so
+// every existing caller keeps resolving `crate::planning::PlanApprovalBlockReason`.
+pub use harness_protocol::daemon::task_board::planning::PlanApprovalBlockReason;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PlanningTransition {
     pub board_item_id: String,
@@ -20,16 +28,6 @@ pub enum PlanApprovalGate {
     Blocked {
         reason: PlanApprovalBlockReason,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum PlanApprovalBlockReason {
-    Deleted,
-    MissingSummary,
-    MissingApprover,
-    MissingApprovalTime,
 }
 
 impl PlanningTransition {

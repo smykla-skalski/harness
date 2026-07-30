@@ -68,6 +68,13 @@ pub use store::{
     TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
 };
 
+// `ExternalSyncAction`/`ExternalSyncOperation` relocated to
+// `harness_protocol::daemon::task_board::external` (#1145): pure data, needed
+// there because `TaskBoardSyncSummary` embeds `ExternalSyncOperation`
+// directly. `ExternalSyncDirection` stays here: nothing in that closure
+// embeds it.
+pub use harness_protocol::daemon::task_board::external::{ExternalSyncAction, ExternalSyncOperation};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -77,34 +84,6 @@ pub enum ExternalSyncDirection {
     Push,
     #[default]
     Both,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(utoipa::ToSchema)]
-pub enum ExternalSyncAction {
-    Pull,
-    Push,
-    Conflict,
-    Delete,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ExternalSyncOperation {
-    pub provider: ExternalProvider,
-    pub action: ExternalSyncAction,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub board_item_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub external_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    pub dry_run: bool,
-    pub applied: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub changed_fields: Vec<ExternalSyncField>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub unsupported_fields: Vec<ExternalSyncField>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

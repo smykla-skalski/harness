@@ -9,6 +9,16 @@ use super::{
 
 use super::store_canvas::{apply_set_global_enforcement, new_trace_id, validation_error};
 
+// `PolicyPipelinePromoteRequest`/`PolicyPipelineMakeLiveRequest` relocated to
+// `harness_protocol::daemon::task_board::policy_pipeline` (#1145): pure
+// primitive data, needed there because `daemon::protocol::task_board`
+// re-exports both directly. `PolicyPipelinePromoteOutcome`/
+// `PolicyPipelineMakeLiveResponse` (below) stay here: both embed the full
+// `PolicyGraph` engine.
+pub use harness_protocol::daemon::task_board::policy_pipeline::{
+    PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest,
+};
+
 #[derive(Debug, Clone)]
 pub struct GraphPolicyGate {
     document: PolicyGraph,
@@ -35,15 +45,6 @@ pub struct PolicyPipelineSaveResponse {
     pub persisted: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct PolicyPipelinePromoteRequest {
-    pub revision: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub actor: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas_id: Option<String>,
-}
-
 /// The full result of promoting a canvas: the daemon's own working type,
 /// threaded internally (`apply_make_live` reuses it to build its own
 /// response) and exercised directly by this crate's tests. The wire-facing
@@ -56,15 +57,6 @@ pub struct PolicyPipelinePromoteRequest {
 pub struct PolicyPipelinePromoteOutcome {
     pub document: PolicyGraph,
     pub trace_id: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct PolicyPipelineMakeLiveRequest {
-    pub revision: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub actor: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
