@@ -1,15 +1,16 @@
-use super::super::index::{self, ResolvedSession};
-use super::super::protocol::{AgentToolActivitySummary, SessionDetail, SessionExtensionsPayload};
-use super::activity::load_agent_activity_for;
-use super::observer::load_observer_summary;
-use super::signals::load_signals_for_resolved;
-use super::summaries::summary_from_resolved;
 use tokio::task::spawn_blocking;
 
-use crate::daemon::db::DaemonDb;
-use crate::session::ordering::{sort_session_agents, sort_session_tasks};
-use crate::session::types::{AgentRegistration, SessionSignalRecord, SessionState, WorkItem};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_session::index::{self, ResolvedSession};
+use harness_session::ordering::{sort_session_agents, sort_session_tasks};
+use harness_session::types::{AgentRegistration, SessionSignalRecord, SessionState, WorkItem};
+use harness_session::wire::{AgentToolActivitySummary, SessionDetail, SessionExtensionsPayload};
+
+use crate::activity::load_agent_activity_for;
+use crate::observer::load_observer_summary;
+use crate::signals::load_signals_for_resolved;
+use crate::storage::SnapshotStorage;
+use crate::summaries::summary_from_resolved;
 
 /// Build a rich session detail snapshot, then persist it into the daemon cache.
 ///
@@ -34,14 +35,14 @@ pub fn session_detail_from_resolved(resolved: &ResolvedSession) -> Result<Sessio
 /// Returns [`CliError`] on parse failures.
 pub fn session_detail_from_resolved_with_db(
     resolved: &ResolvedSession,
-    db: &DaemonDb,
+    db: &dyn SnapshotStorage,
 ) -> Result<SessionDetail, CliError> {
     build_session_detail(resolved, Some(db))
 }
 
 fn build_session_detail(
     resolved: &ResolvedSession,
-    db: Option<&DaemonDb>,
+    db: Option<&dyn SnapshotStorage>,
 ) -> Result<SessionDetail, CliError> {
     let mut agents = visible_session_agents(&resolved.state);
     sort_session_agents(&mut agents);
@@ -113,7 +114,7 @@ fn visible_session_tasks(state: &SessionState) -> Vec<WorkItem> {
 /// Returns [`CliError`] on filesystem or database read failures.
 pub fn build_session_extensions(
     resolved: &ResolvedSession,
-    db: Option<&DaemonDb>,
+    db: Option<&dyn SnapshotStorage>,
 ) -> Result<SessionExtensionsPayload, CliError> {
     let signals = load_signals_for_resolved(resolved, db)?;
     let agent_activity = if let Some(db) = db {
@@ -136,7 +137,11 @@ pub(crate) fn build_session_detail_from_cached_runtime(
     Ok(detail)
 }
 
-pub(crate) fn build_session_extensions_from_cached_runtime(
+/// Build session extensions from already-resolved signals and activity.
+///
+/// # Errors
+/// Returns [`CliError`] on filesystem read failures.
+pub fn build_session_extensions_from_cached_runtime(
     resolved: &ResolvedSession,
     signals: Vec<SessionSignalRecord>,
     agent_activity: Vec<AgentToolActivitySummary>,
@@ -153,7 +158,7 @@ pub(crate) fn build_session_extensions_from_cached_runtime(
 ///
 /// # Errors
 /// Returns [`CliError`] on filesystem read failures or worker join failure.
-pub(crate) async fn build_session_detail_from_cached_runtime_async(
+pub async fn build_session_detail_from_cached_runtime_async(
     resolved: ResolvedSession,
     signals: Vec<SessionSignalRecord>,
     agent_activity: Vec<AgentToolActivitySummary>,
@@ -171,7 +176,7 @@ pub(crate) async fn build_session_detail_from_cached_runtime_async(
 ///
 /// # Errors
 /// Returns [`CliError`] on filesystem read failures or worker join failure.
-pub(crate) async fn build_session_extensions_from_cached_runtime_async(
+pub async fn build_session_extensions_from_cached_runtime_async(
     resolved: ResolvedSession,
     signals: Vec<SessionSignalRecord>,
     agent_activity: Vec<AgentToolActivitySummary>,

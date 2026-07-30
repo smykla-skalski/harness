@@ -38,6 +38,7 @@ mod schema_shape_repairs_admission;
 mod schema_shape_repairs_wake_events;
 mod schema_v43_legacy_target_controller;
 mod signals;
+mod snapshot_integration;
 mod sync;
 mod sync_change_tracking;
 pub(crate) mod task_board;

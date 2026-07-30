@@ -1,13 +1,13 @@
-use super::super::index::{self, DiscoveredProject};
-use super::super::protocol::{
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::read_json_typed;
+use harness_observe::types::ObserverState;
+use harness_session::index::{self, DiscoveredProject};
+use harness_session::types::SessionState;
+use harness_session::wire::{
     ObserverActiveWorker, ObserverAgentSessionSummary, ObserverOpenIssue, ObserverSummary,
 };
-use crate::infra::io::read_json_typed;
-use crate::observe::types::ObserverState;
-use crate::session::types::SessionState;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
-pub(super) fn load_observer_summary(
+pub(crate) fn load_observer_summary(
     project: &DiscoveredProject,
     state: &SessionState,
 ) -> Result<Option<ObserverSummary>, CliError> {

@@ -373,7 +373,7 @@ fn session_detail_core_db_direct_reopens_expired_pending_delivery() {
             .resolve_session(&state.session_id)
             .expect("resolve session")
             .expect("session present");
-        let signals = crate::daemon::snapshot::load_signals_for(&resolved.project, &resolved.state)
+        let signals = harness_daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)
             .expect("load signals");
         db.sync_signal_index(&state.session_id, &signals)
             .expect("refresh signal index");

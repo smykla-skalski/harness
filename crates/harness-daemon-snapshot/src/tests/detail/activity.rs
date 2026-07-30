@@ -1,21 +1,23 @@
 use tempfile::tempdir;
 
-use crate::daemon::snapshot::{
-    session_detail,
-    tests::support::{
-        sample_state, sample_state_for_runtime, sample_work_item, write_json, write_json_line,
-    },
+use harness_session::types::{AgentRegistration, AgentStatus, SessionRole, TaskSeverity};
+
+use crate::session_detail;
+use crate::tests::support::{
+    sample_state, sample_state_for_runtime, sample_work_item, write_json, write_json_line,
 };
-use crate::session::types::{AgentRegistration, AgentStatus, SessionRole, TaskSeverity};
 
 #[test]
 fn session_detail_applies_shared_agent_and_task_ordering() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-agent-task-ordering")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-ordering");
             let session_id = "1d60726f-61a3-5e01-a807-9210fb4044a6";
@@ -41,7 +43,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     managed_agent: None,
                     last_activity_at: Some("2026-03-28T14:06:00Z".into()),
                     current_task_id: None,
-                    runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                    runtime_capabilities: harness_agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
                     runtime_session_title: None,
                 },
@@ -61,7 +63,7 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
                     managed_agent: None,
                     last_activity_at: Some("2026-03-28T14:05:00Z".into()),
                     current_task_id: None,
-                    runtime_capabilities: crate::agents::runtime::RuntimeCapabilities::default(),
+                    runtime_capabilities: harness_agents::runtime::RuntimeCapabilities::default(),
                     persona: None,
                     runtime_session_title: None,
                 },
@@ -116,10 +118,13 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
 fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-copilot-ledger-fallback")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let session_id = "cd8a9518-8e52-51d7-b131-aaae722fdf1c";

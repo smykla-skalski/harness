@@ -1,27 +1,37 @@
+//! Integration coverage for `harness-daemon-snapshot`'s storage seam against
+//! a real `DaemonDb`, kept here rather than in that crate's own test tree:
+//! `harness-daemon-snapshot` cannot dev-depend on `harness-daemon` without
+//! Cargo compiling it twice (once as `harness-daemon`'s ordinary dependency,
+//! once for its own test binary), which produces two distinct instances of
+//! its `SnapshotStorage` trait that `DaemonDb`'s impl only satisfies for one.
+//! `tests` exercises exactly the db-backed paths that moved out of
+//! `harness-daemon-snapshot`'s own tests for that reason.
+
 use std::collections::BTreeMap;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 
+use super::*;
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::signal::{
-    AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
-    acknowledge_signal, write_signal_file,
+    AckResult, DeliveryConfig, SignalAck, SignalPayload, SignalPriority, acknowledge_signal,
+    write_signal_file,
 };
-use crate::daemon::index::DiscoveredProject;
 use crate::observe::types::{
     ActiveWorker, FixSafety, IssueCategory, IssueCode, IssueSeverity, ObserverState, OpenIssue,
 };
 use crate::session::types::{
-    AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole, SessionState,
-    SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
+    AgentStatus, CURRENT_VERSION, SessionMetrics, SessionPolicy, SessionRole,
 };
 
-pub(super) const OBSERVE_ID: &str = "observe-7d8914ed-1073-56a6-85c1-0582a49cf5ce";
+mod tests;
+
+const OBSERVE_ID: &str = "observe-7d8914ed-1073-56a6-85c1-0582a49cf5ce";
 const RUNTIME_SESSION_ID: &str = "codex-session-1";
 
-pub(super) fn write_json(path: &Path, value: &impl serde::Serialize) {
+fn write_json(path: &Path, value: &impl serde::Serialize) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("create parent");
     }
@@ -32,7 +42,7 @@ pub(super) fn write_json(path: &Path, value: &impl serde::Serialize) {
     .expect("write");
 }
 
-pub(super) fn write_json_line(path: &Path, value: &impl serde::Serialize) {
+fn write_json_line(path: &Path, value: &impl serde::Serialize) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("create parent");
     }
@@ -45,11 +55,11 @@ pub(super) fn write_json_line(path: &Path, value: &impl serde::Serialize) {
     writeln!(file, "{}", serde_json::to_string(value).expect("serialize")).expect("write");
 }
 
-pub(super) fn sample_state(session_id: &str) -> SessionState {
+fn sample_state(session_id: &str) -> SessionState {
     sample_state_for_runtime(session_id, "codex", RUNTIME_SESSION_ID)
 }
 
-pub(super) fn sample_state_for_runtime(
+fn sample_state_for_runtime(
     session_id: &str,
     runtime: &str,
     runtime_session_id: &str,
@@ -88,7 +98,7 @@ pub(super) fn sample_state_for_runtime(
         title: "test session".into(),
         context: "test goal".into(),
         status: SessionStatus::Active,
-        policy: crate::session::types::SessionPolicy::default(),
+        policy: SessionPolicy::default(),
         created_at: "2026-03-28T14:00:00Z".into(),
         updated_at: "2026-03-28T14:05:00Z".into(),
         agents,
@@ -106,7 +116,7 @@ pub(super) fn sample_state_for_runtime(
     state
 }
 
-pub(super) fn sample_signal_with_idempotency(
+fn sample_signal_with_idempotency(
     signal_id: &str,
     message: &str,
     idempotency_key: Option<&str>,
@@ -133,47 +143,11 @@ pub(super) fn sample_signal_with_idempotency(
     }
 }
 
-pub(super) fn sample_signal(signal_id: &str, message: &str) -> Signal {
+fn sample_signal(signal_id: &str, message: &str) -> Signal {
     sample_signal_with_idempotency(signal_id, message, None)
 }
 
-pub(super) fn sample_work_item(
-    task_id: &str,
-    severity: TaskSeverity,
-    created_at: &str,
-    updated_at: &str,
-) -> WorkItem {
-    WorkItem {
-        task_id: task_id.to_string(),
-        title: task_id.to_string(),
-        context: None,
-        severity,
-        status: TaskStatus::Open,
-        assigned_to: None,
-        queue_policy: TaskQueuePolicy::Locked,
-        queued_at: None,
-        created_at: created_at.to_string(),
-        updated_at: updated_at.to_string(),
-        created_by: None,
-        notes: vec![],
-        suggested_fix: None,
-        source: TaskSource::Manual,
-        observe_issue_id: None,
-        blocked_reason: None,
-        completed_at: None,
-        checkpoint_summary: None,
-        awaiting_review: None,
-        review_claim: None,
-        consensus: None,
-        review_history: Vec::new(),
-        review_round: 0,
-        arbitration: None,
-        suggested_persona: None,
-        deleted_at: None,
-    }
-}
-
-pub(super) fn observer_state(session_id: &str) -> ObserverState {
+fn observer_state(session_id: &str) -> ObserverState {
     ObserverState {
         schema_version: 1,
         state_version: 0,
@@ -208,7 +182,7 @@ pub(super) fn observer_state(session_id: &str) -> ObserverState {
     }
 }
 
-pub(super) fn build_project(context_root: PathBuf) -> DiscoveredProject {
+fn build_project(context_root: PathBuf) -> DiscoveredProject {
     DiscoveredProject {
         project_id: "project-alpha".into(),
         name: "project-alpha".into(),
@@ -222,7 +196,7 @@ pub(super) fn build_project(context_root: PathBuf) -> DiscoveredProject {
     }
 }
 
-pub(super) fn seed_snapshot_fixture(context_root: &Path, session_id: &str) {
+fn seed_snapshot_fixture(context_root: &Path, session_id: &str) {
     let state_path = context_root
         .join("orchestration")
         .join("sessions")

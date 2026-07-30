@@ -1,16 +1,17 @@
 use std::collections::BTreeMap;
 
-use super::super::index::{self, DiscoveredProject, ResolvedSession};
-use crate::agents::runtime::signal::{
+use harness_agents::runtime::signal::{
     read_acknowledged_signals, read_acknowledgments, read_pending_signals, signal_matches_session,
 };
-use crate::daemon::db::DaemonDb;
-use crate::session::types::{SessionSignalRecord, SessionSignalStatus, SessionState};
 use harness_kernel::errors::CliError;
+use harness_session::index::{self, DiscoveredProject, ResolvedSession};
+use harness_session::types::{SessionSignalRecord, SessionSignalStatus, SessionState};
 
-pub(super) fn load_signals_for_resolved(
+use crate::storage::SnapshotStorage;
+
+pub(crate) fn load_signals_for_resolved(
     resolved: &ResolvedSession,
-    db: Option<&DaemonDb>,
+    db: Option<&dyn SnapshotStorage>,
 ) -> Result<Vec<SessionSignalRecord>, CliError> {
     let file_signals = || load_signals_for(&resolved.project, &resolved.state);
 

@@ -3731,6 +3731,7 @@ dependencies = [
  "harness-daemon-acp-probe",
  "harness-daemon-client",
  "harness-daemon-provider-credentials",
+ "harness-daemon-snapshot",
  "harness-daemon-state",
  "harness-db-schema",
  "harness-feature-flags",
@@ -3863,6 +3864,24 @@ dependencies = [
  "tempfile",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "harness-daemon-snapshot"
+version = "55.0.0"
+dependencies = [
+ "fs-err",
+ "harness-agents",
+ "harness-hooks",
+ "harness-kernel",
+ "harness-observe",
+ "harness-session",
+ "harness-testkit",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

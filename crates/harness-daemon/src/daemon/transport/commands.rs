@@ -14,8 +14,8 @@ use super::super::codex_transport::codex_transport_from_env;
 use super::super::launchd;
 use super::super::serve::{self, DaemonServeConfig};
 use super::super::service;
-use super::super::snapshot;
 use super::super::state;
+use harness_daemon_snapshot as snapshot;
 use super::control::{
     adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
     restart_daemon, stop_daemon,

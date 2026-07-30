@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
-use super::super::index::{self, DiscoveredProject, ResolvedSession};
-use super::super::protocol::{ProjectSummary, SessionSummary, WorktreeSummary};
-use crate::session::types::SessionStatus;
 use harness_kernel::errors::CliError;
+use harness_session::index::{self, DiscoveredProject, ResolvedSession};
+use harness_session::types::SessionStatus;
+use harness_session::wire::{ProjectSummary, SessionSummary, WorktreeSummary};
 
 type SessionCounts = (usize, usize);
 
@@ -143,7 +143,8 @@ pub fn session_summaries(include_all: bool) -> Result<Vec<SessionSummary>, CliEr
     Ok(sessions)
 }
 
-pub(crate) fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
+#[must_use]
+pub fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
     SessionSummary {
         project_id: resolved.project.summary_project_id(),
         project_name: resolved.project.summary_project_name(),
