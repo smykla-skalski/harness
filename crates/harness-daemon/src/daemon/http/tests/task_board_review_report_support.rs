@@ -1,6 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardExecutionState,
+    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
     TaskBoardReadOnlyRunContext, TaskBoardResolvedReviewer, TaskBoardReviewerProfile,
     TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus, start_task_board_workflow,
@@ -62,38 +63,73 @@ pub(super) async fn seed_running_execution(
         completed_at: None,
         attempts: Vec::new(),
     };
-    db.create_or_load_task_board_workflow_execution(&execution)
+    let execution = db
+        .create_or_load_task_board_workflow_execution(&execution)
         .await
         .expect("create workflow execution")
-        .execution
-}
-
-pub(super) async fn clear_active_execution(
-    db: &AsyncDaemonDb,
-    execution: TaskBoardWorkflowExecutionRecord,
-) {
-    db.update_task_board_item_with_triage(&execution.item_id, |item| {
-        item.workflow.execution_id = None;
-        item.workflow.status = TaskBoardWorkflowStatus::Completed;
-        Ok(true)
+        .execution;
+    let reviewer = &execution.resolved_reviewers.profiles[1];
+    db.create_task_board_execution_attempt(&TaskBoardExecutionAttemptRecord {
+        execution_id: execution.execution_id.clone(),
+        action_key: format!("review:{}", reviewer.id),
+        attempt: 1,
+        idempotency_key: format!("{}-review-1", execution.execution_id),
+        state: TaskBoardAttemptState::Running,
+        failure_class: None,
+        available_at: None,
+        error: None,
+        artifact: None,
+        started_at: "2026-07-29T18:00:05Z".into(),
+        updated_at: "2026-07-29T18:00:05Z".into(),
+        completed_at: None,
     })
     .await
-    .expect("clear active workflow execution")
-    .expect("item mutation");
+    .expect("create active review attempt");
+    db.task_board_workflow_execution(&execution.execution_id)
+        .await
+        .expect("reload workflow execution")
+        .expect("workflow execution")
+}
+
+pub(super) async fn settle_active_review_attempt(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+) {
+    let attempt = execution.attempts.first().expect("active review attempt");
+    let mut settled = attempt.clone();
+    settled.state = TaskBoardAttemptState::Cancelled;
+    settled.updated_at = "2026-07-29T18:00:06Z".into();
+    settled.completed_at = Some("2026-07-29T18:00:06Z".into());
+    db.compare_and_set_task_board_execution_attempt(
+        &TaskBoardExecutionAttemptCas::from(attempt),
+        &settled,
+    )
+    .await
+    .expect("settle active review attempt");
 }
 
 fn resolved_reviewers() -> TaskBoardResolvedReviewer {
     TaskBoardResolvedReviewer {
-        reviewer_count: 1,
+        reviewer_count: 2,
         required_approvals: 1,
         max_revision_cycles: 1,
-        profiles: vec![TaskBoardReviewerProfile {
-            id: "reviewer".into(),
-            runtime: "codex".into(),
-            persona: "code-reviewer".into(),
-            agent_mode: AgentMode::Evaluate,
-            model: Some("gpt-5.3-codex-spark".into()),
-            effort: None,
-        }],
+        profiles: vec![
+            TaskBoardReviewerProfile {
+                id: "reviewer-configured-first".into(),
+                runtime: "codex".into(),
+                persona: "code-reviewer".into(),
+                agent_mode: AgentMode::Evaluate,
+                model: Some("gpt-5.3-codex-spark".into()),
+                effort: None,
+            },
+            TaskBoardReviewerProfile {
+                id: "reviewer-active".into(),
+                runtime: "openrouter".into(),
+                persona: "risk-reviewer".into(),
+                agent_mode: AgentMode::Evaluate,
+                model: Some("deepseek/deepseek-v4-flash".into()),
+                effort: None,
+            },
+        ],
     }
 }

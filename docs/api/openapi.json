@@ -11526,7 +11526,7 @@
         "tags": [
           "task-board"
         ],
-        "description": "Return the current AI review state for one task-board item. An active execution takes precedence over older terminal reports",
+        "description": "Return the current AI review state for one task-board item. A live review attempt takes precedence; otherwise the latest retained terminal report is returned",
         "operationId": "get_task_board_item_review_report",
         "parameters": [
           {

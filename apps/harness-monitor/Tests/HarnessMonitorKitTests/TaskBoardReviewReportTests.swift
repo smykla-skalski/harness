@@ -117,6 +117,22 @@ struct TaskBoardReviewReportTests {
     #expect(!report.isStale(comparedWith: String(repeating: "a", count: 40)))
     #expect(report.isStale(comparedWith: String(repeating: "b", count: 40)))
   }
+
+  @Test("Empty terminal findings preserve failure and cancellation semantics")
+  func emptyTerminalFindingsPreserveOutcome() {
+    #expect(
+      TaskBoardAiReviewReportStatus.completed.emptyFindingsMessage
+        == "No actionable findings"
+    )
+    #expect(
+      TaskBoardAiReviewReportStatus.failed.emptyFindingsMessage
+        == "Review failed before producing findings"
+    )
+    #expect(
+      TaskBoardAiReviewReportStatus.cancelled.emptyFindingsMessage
+        == "Review was cancelled before producing findings"
+    )
+  }
 }
 
 extension TaskBoardAPIClientTests {
