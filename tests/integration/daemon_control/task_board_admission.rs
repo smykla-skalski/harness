@@ -9,21 +9,53 @@
 //! duplicate execution across repeated transitions or a refresh.
 
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use super::*;
 
 const REVIEWER_MODEL: &str = "deepseek/deepseek-v4-flash";
 
-// A canned OpenRouter stand-in that serves every connection for the life of the
-// test, so the readiness probe the dispatch gate issues reaches a deterministic
-// provider response instead of the real network.
-fn spawn_persistent_mock_openrouter(status: &'static str, body: &'static str) -> String {
+// A canned OpenRouter stand-in that serves the same response on every connection
+// for the life of the test, so the readiness probe the dispatch gate issues
+// reaches a deterministic provider response instead of the real network. Dropping
+// the guard stops the worker: it flips the shutdown flag, then opens a throwaway
+// connection to wake the parked `accept`, so the thread does not outlive the test.
+struct MockOpenRouter {
+    url: String,
+    address: SocketAddr,
+    shutdown: Arc<AtomicBool>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl MockOpenRouter {
+    fn url(&self) -> &str {
+        &self.url
+    }
+}
+
+impl Drop for MockOpenRouter {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        let _ = TcpStream::connect(self.address);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+fn spawn_persistent_mock_openrouter(status: &'static str, body: &'static str) -> MockOpenRouter {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock openrouter");
     let address = listener.local_addr().expect("mock openrouter address");
-    thread::spawn(move || {
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let worker_shutdown = Arc::clone(&shutdown);
+    let worker = thread::spawn(move || {
         for stream in listener.incoming() {
+            if worker_shutdown.load(Ordering::SeqCst) {
+                break;
+            }
             let Ok(mut stream) = stream else { continue };
             let mut request = [0_u8; 4096];
             let _ = stream.read(&mut request);
@@ -34,7 +66,12 @@ fn spawn_persistent_mock_openrouter(status: &'static str, body: &'static str) ->
             );
         }
     });
-    format!("http://{address}")
+    MockOpenRouter {
+        url: format!("http://{address}"),
+        address,
+        shutdown,
+        worker: Some(worker),
+    }
 }
 
 fn spawn_daemon_with_openrouter_url(
@@ -480,7 +517,7 @@ fn an_unavailable_reviewer_runtime_fails_the_review_before_agent_work_and_stays_
     // The provider rejects the configured credential, so the supported openrouter
     // runtime is configured but cannot run.
     let mock = spawn_persistent_mock_openrouter("401 Unauthorized", "");
-    let mut daemon = spawn_daemon_with_openrouter_url(&home, &xdg, &mock);
+    let mut daemon = spawn_daemon_with_openrouter_url(&home, &xdg, mock.url());
     let _status = wait_for_daemon_ready(&home, &xdg);
     let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
@@ -559,7 +596,7 @@ fn a_satisfied_reviewer_runtime_prerequisite_lets_the_dispatch_pass_the_readines
         "200 OK",
         r#"{"data":[{"id":"deepseek/deepseek-v4-flash"}]}"#,
     );
-    let mut daemon = spawn_daemon_with_openrouter_url(&home, &xdg, &mock);
+    let mut daemon = spawn_daemon_with_openrouter_url(&home, &xdg, mock.url());
     let _status = wait_for_daemon_ready(&home, &xdg);
     let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
 
