@@ -184,20 +184,10 @@ async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
         .clone();
     assert_eq!(runtime.start_count(), 1);
 
-    // A restart settles the interrupted run to exactly one Failed outcome; a
-    // second sweep is a no-op.
-    assert_eq!(
-        db.reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("settle interrupted runs"),
-        1
-    );
-    assert_eq!(
-        db.reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("second sweep settles nothing"),
-        0
-    );
+    // A fresh runtime cannot observe the old provider turn and settles it once
+    // when the coordinator reloads the durable run.
+    runtime.evict_agent_turn_on_next_load();
+    reconcile(&db, &runtime, NOW).await;
     assert_eq!(
         db.agent_turn_run(&first_key)
             .await
@@ -209,7 +199,6 @@ async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
 
     // Seeing the failed run, the coordinator retries the review rather than
     // restarting the dead turn: no new turn starts for the same attempt.
-    reconcile(&db, &runtime, NOW).await;
     assert_eq!(runtime.start_count(), 1);
     assert_eq!(
         load(&fixture, &db).await.transition.execution_state,

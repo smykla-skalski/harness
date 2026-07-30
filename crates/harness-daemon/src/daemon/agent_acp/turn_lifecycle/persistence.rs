@@ -71,9 +71,11 @@ impl OpenRouterAgentTurnRuntime {
                 cancelled: false,
                 terminal_persisted: false,
             });
-        let attached = self
-            .manager
-            .inspect(&self.session_id)?
+        let inspection = self.manager.inspect(&self.session_id)?;
+        if !inspection.available {
+            return Ok(());
+        }
+        let attached = inspection
             .agents
             .iter()
             .any(|agent| agent.acp_id == runtime_turn_id);

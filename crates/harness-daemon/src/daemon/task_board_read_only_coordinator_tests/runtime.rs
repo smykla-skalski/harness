@@ -110,6 +110,7 @@ pub(super) struct FakeReadOnlyRuntime {
     report_entered: Semaphore,
     report_release: Semaphore,
     fail_start_after_persist: AtomicBool,
+    evict_agent_turn_on_load: AtomicBool,
     publishes: AtomicUsize,
     block_publish: AtomicBool,
     publish_entered: Semaphore,
@@ -135,6 +136,7 @@ impl FakeReadOnlyRuntime {
             report_entered: Semaphore::new(0),
             report_release: Semaphore::new(0),
             fail_start_after_persist: AtomicBool::new(false),
+            evict_agent_turn_on_load: AtomicBool::new(false),
             publishes: AtomicUsize::new(0),
             block_publish: AtomicBool::new(false),
             publish_entered: Semaphore::new(0),
@@ -205,6 +207,11 @@ impl FakeReadOnlyRuntime {
 
     pub(super) fn fail_next_start_after_persist(&self) {
         self.fail_start_after_persist.store(true, Ordering::SeqCst);
+    }
+
+    pub(super) fn evict_agent_turn_on_next_load(&self) {
+        self.evict_agent_turn_on_load
+            .store(true, Ordering::SeqCst);
     }
 }
 
@@ -337,6 +344,27 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             .into());
         }
         Ok(())
+    }
+
+    async fn load_agent_turn_report_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
+        let db = self.durable_db.as_ref().ok_or_else(|| {
+            CliError::from(CliErrorKind::invalid_transition(
+                "fake agent-turn runtime needs a durable database",
+            ))
+        })?;
+        let Some(mut run) = db.agent_turn_run(run_id).await? else {
+            return Ok(None);
+        };
+        if run.status.is_active() && self.evict_agent_turn_on_load.swap(false, Ordering::SeqCst) {
+            run.status = AgentTurnRunStatus::Failed;
+            run.error = Some("provider turn is no longer attached to this daemon".into());
+            db.save_agent_turn_run(&run).await?;
+            return db.agent_turn_run(run_id).await;
+        }
+        Ok(Some(run))
     }
 
     async fn resolve_exact_head(

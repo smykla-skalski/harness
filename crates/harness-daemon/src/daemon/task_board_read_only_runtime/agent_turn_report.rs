@@ -98,6 +98,9 @@ pub(crate) async fn load_agent_turn_report_run(
         CliErrorKind::workflow_io("active agent-turn report has no provider turn identity")
     })?;
     let inspect = state.acp_agent_manager.inspect(Some(session_id))?;
+    if !inspect.available {
+        return Ok(Some(run));
+    }
     let Some(agent) = inspect
         .agents
         .into_iter()

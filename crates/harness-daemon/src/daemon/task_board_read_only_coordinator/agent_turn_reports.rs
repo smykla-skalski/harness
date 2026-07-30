@@ -46,7 +46,10 @@ where
         refuse_unsupported_runtime(db, execution, attempt, runtime_name, now).await?;
         return Ok(true);
     }
-    match db.agent_turn_run(&attempt.idempotency_key).await? {
+    match runtime
+        .load_agent_turn_report_run(&attempt.idempotency_key)
+        .await?
+    {
         Some(run) if run.status.is_active() => {
             mark_running(db, execution, attempt, now).await?;
             Ok(true)

@@ -121,3 +121,47 @@ async fn correlated_probe_settles_turn_evicted_by_daemon_restart() {
         Some("provider turn is no longer attached to this daemon")
     );
 }
+
+#[tokio::test]
+async fn correlated_probe_preserves_turn_while_manager_is_unavailable() {
+    let (_dir, store) = open_store().await;
+    let correlation = OpenRouterRunCorrelation {
+        run_id: "remote-run-unavailable".into(),
+        board_item_id: Some("item-unavailable".into()),
+        workflow_execution_id: Some("execution-unavailable".into()),
+        task_id: None,
+    };
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_store_and_correlation(
+        manager.clone(),
+        "session-a".into(),
+        Some("/tmp/project".into()),
+        store.clone(),
+        correlation.clone(),
+    );
+    runtime
+        .start(request())
+        .await
+        .expect("start correlated turn");
+    let running = store
+        .agent_turn_run(&correlation.run_id)
+        .await
+        .expect("load running turn")
+        .expect("running turn");
+
+    manager.make_unavailable();
+    runtime
+        .reconcile_correlated_turn(&running)
+        .await
+        .expect("defer unavailable inspection");
+
+    assert_eq!(
+        store
+            .agent_turn_run(&correlation.run_id)
+            .await
+            .expect("reload running turn")
+            .expect("running turn")
+            .status,
+        AgentTurnRunStatus::Running
+    );
+}

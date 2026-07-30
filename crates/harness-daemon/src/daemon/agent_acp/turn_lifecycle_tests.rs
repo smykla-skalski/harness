@@ -25,6 +25,7 @@ pub(super) struct FakeManager {
     state: Mutex<AcpAgentSessionState>,
     runtime_session_id: Mutex<Option<String>>,
     attached: Mutex<bool>,
+    available: Mutex<bool>,
     stopped: Mutex<bool>,
     stop_probe: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     stop_fails: Mutex<bool>,
@@ -37,6 +38,7 @@ impl Default for FakeManager {
             state: Mutex::default(),
             runtime_session_id: Mutex::new(Some("openrouter-session-1".into())),
             attached: Mutex::new(true),
+            available: Mutex::new(true),
             stopped: Mutex::default(),
             stop_probe: Mutex::default(),
             stop_fails: Mutex::default(),
@@ -77,6 +79,11 @@ impl FakeManager {
     pub(super) fn evict(&self) {
         *self.attached.lock().expect("attached lock") = false;
     }
+
+    pub(super) fn make_unavailable(&self) {
+        *self.available.lock().expect("available lock") = false;
+        self.evict();
+    }
 }
 
 impl OpenRouterTurnManager for FakeManager {
@@ -100,11 +107,12 @@ impl OpenRouterTurnManager for FakeManager {
         } else {
             Vec::new()
         };
+        let available = *self.available.lock().expect("available lock");
         Ok(AcpAgentInspectResponse {
             agents,
             daemon_perceived_now: None,
-            available: true,
-            issue_message: None,
+            available,
+            issue_message: (!available).then(|| "bridge unavailable".into()),
         })
     }
 
