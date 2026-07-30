@@ -31,7 +31,7 @@ pub struct TaskBoardDependencyFixRemoteHeadEvidence {
 pub enum TaskBoardDependencyFixDeliveryBlockReason {
     FixerBlocked,
     IsolatedCheckoutUnavailable,
-    PullRequestTargetChanged,
+    PullRequestSourceChanged,
     HeadRace,
     ForkAccessUnavailable,
     PermissionDenied,
@@ -152,7 +152,7 @@ pub async fn deliver_task_board_dependency_fix(
     };
     if !same_source(&before.head, frozen_head) {
         return Ok(human_required(
-            TaskBoardDependencyFixDeliveryBlockReason::PullRequestTargetChanged,
+            TaskBoardDependencyFixDeliveryBlockReason::PullRequestSourceChanged,
             "pull request source repository or branch changed after fixer dispatch",
         ));
     }

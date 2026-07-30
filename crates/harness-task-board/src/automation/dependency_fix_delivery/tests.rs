@@ -51,7 +51,7 @@ async fn changed_source_target_stops_before_publication() {
 
     assert_human_required(
         &client,
-        TaskBoardDependencyFixDeliveryBlockReason::PullRequestTargetChanged,
+        TaskBoardDependencyFixDeliveryBlockReason::PullRequestSourceChanged,
     )
     .await;
     assert!(client.published.lock().expect("published").is_none());
