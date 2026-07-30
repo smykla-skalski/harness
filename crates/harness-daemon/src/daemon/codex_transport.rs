@@ -65,7 +65,7 @@ fn log_rejected_sandboxed_endpoint(source: &'static str, endpoint: &str) {
     tracing::warn!(
         source,
         endpoint,
-        "ignoring non-loopback Codex websocket endpoint for sandboxed daemon"
+        "ignoring disallowed Codex websocket endpoint for sandboxed daemon"
     );
 }
 
