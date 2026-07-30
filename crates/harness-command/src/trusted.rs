@@ -134,13 +134,27 @@ fn validate_trusted_ancestors(path: &Path, name: &str) -> Result<(), WorkerError
         // World-write always disqualifies an ancestor unless it is itself the
         // sticky root (matching `/tmp`'s own 1777 mode: its sticky bit already
         // stops anyone but a file's owner from renaming or deleting it).
-        // Group-write is weaker: once under a sticky root, a directory the
-        // trusted user themselves created and owns can carry an incidental
-        // group-write bit (e.g. from `umask 002`) without being exploitable,
-        // because the sticky root above it already protects that directory's
-        // own entry from being swapped out by anyone else. Elsewhere - not
-        // under a sticky root - group-write on a trusted-owned ancestor still
-        // disqualifies it, since nothing backstops that directory's entries.
+        //
+        // Group-write is weaker, and only forgiven once under a sticky root
+        // and only for a directory the trusted user themselves owns: an
+        // ambient `umask 002` is enough to leave a plain `tempfile::tempdir()`
+        // group-writable (issue #1239), and rejecting that made every
+        // worker-override test under a permissive umask fail before reaching
+        // the fake worker it stood up. This is a deliberate, narrower trust
+        // boundary, not a fully closed one: `/tmp`'s sticky bit stops another
+        // user from renaming or deleting the trusted-owned directory *entry*
+        // within `/tmp`, but a directory that is itself merely group-writable
+        // (not sticky itself) still lets any member of its owning group
+        // replace entries *inside* it - including the worker binary - between
+        // this check and the later `Command::new(&worker)` exec. Closing that
+        // gap needs opening the worker by fd and exec'ing the already-open,
+        // already-validated fd instead of a path (tracked in #1242); until
+        // then, this exception intentionally treats members of the trusted
+        // user's own group as trusted for directories the trusted user
+        // themselves created under a sticky root, matching the issue's own
+        // framing of "not writable by anyone outside the trusted user's own
+        // group-write policy". Outside a sticky root, group-write on a
+        // trusted-owned ancestor still disqualifies it unconditionally.
         let disqualifying_mode = if is_sticky_root {
             false
         } else {
