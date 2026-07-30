@@ -5,6 +5,7 @@ use super::{
     TaskBoardDependencyFixResult, TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
     valid_head_revision,
 };
+use crate::normalize_repository_slug;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskBoardDependencyFixDeliveryRequest {
@@ -226,12 +227,12 @@ fn validate_delivery_request(
     let changed = !request.fix_result.changed_paths.is_empty();
     let blocked = !request.fix_result.remaining_blockers.is_empty();
     if request.pull_request.number == 0
-        || request.pull_request.repository.trim() != request.pull_request.repository
-        || request.pull_request.repository.split('/').count() != 2
+        || normalize_repository_slug(Some(&request.pull_request.repository)).as_deref()
+            != Some(request.pull_request.repository.as_str())
         || request.worktree.trim().is_empty()
         || request.worktree.trim() != request.worktree
-        || head.repository.trim() != head.repository
-        || head.repository.split('/').count() != 2
+        || normalize_repository_slug(Some(&head.repository)).as_deref()
+            != Some(head.repository.as_str())
         || head.branch.trim().is_empty()
         || head.branch.trim() != head.branch
         || !valid_head_revision(&head.revision)
