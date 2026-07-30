@@ -242,11 +242,24 @@ mod tests {
         // Issue #1239: `umask 002` leaves the group-write bit set on a plain
         // `tempfile::tempdir()`, which sits under `/tmp`'s sticky root and is
         // owned by this process - not writable by anyone the sticky bit
-        // doesn't already stop.
+        // doesn't already stop. Built explicitly under `/tmp` (bypassing
+        // `TMPDIR`) so the sticky-root ancestor this test relies on is
+        // guaranteed rather than however the host's temp directory happens
+        // to be configured.
+        let root_metadata = fs::symlink_metadata("/tmp").expect("/tmp metadata");
+        assert_eq!(root_metadata.uid(), 0, "expected /tmp to be root-owned");
+        assert_ne!(
+            root_metadata.mode() & 0o1000,
+            0,
+            "expected /tmp to carry the sticky bit"
+        );
+
         let previous = rustix::process::umask(Mode::from_raw_mode(0o002));
         let _restore = RestoreUmask(previous);
 
-        let temporary = tempdir().expect("temporary directory");
+        let temporary = tempfile::Builder::new()
+            .tempdir_in("/tmp")
+            .expect("temporary directory under /tmp");
         let ancestor_mode = fs::symlink_metadata(temporary.path())
             .expect("tempdir metadata")
             .permissions()
