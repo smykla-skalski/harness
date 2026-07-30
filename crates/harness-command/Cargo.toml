@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.95"
 
 [dependencies]
+rustix = { version = "=1.1.4", default-features = false, features = ["fs", "process", "std"] }
 uzers = { version = "0.12.2", default-features = false }
 
 [lints.clippy]
@@ -14,5 +15,4 @@ pedantic = { level = "deny", priority = 1 }
 unused = { level = "deny", priority = 1 }
 
 [dev-dependencies]
-rustix = { version = "=1.1.4", default-features = false, features = ["fs", "process"] }
 tempfile = "=3.27.0"
