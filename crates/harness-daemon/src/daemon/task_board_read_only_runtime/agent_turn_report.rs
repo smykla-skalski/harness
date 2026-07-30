@@ -103,7 +103,11 @@ pub(crate) async fn load_agent_turn_report_run(
         .into_iter()
         .find(|agent| agent.acp_id == runtime_turn_id)
     else {
-        return Ok(None);
+        run.status = AgentTurnRunStatus::Failed;
+        run.error = Some("provider turn is no longer attached to this daemon".into());
+        run.updated_at = harness_workspace::workspace::utc_now();
+        db.save_agent_turn_run(&run).await?;
+        return db.agent_turn_run(run_id).await;
     };
     let Some(session) = agent.session_state else {
         return Ok(Some(run));
