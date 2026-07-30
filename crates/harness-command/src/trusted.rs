@@ -111,7 +111,17 @@ fn validate_trusted_file(path: &Path, name: &str) -> Result<(), WorkerError> {
 #[cfg(unix)]
 fn validate_trusted_ancestors(path: &Path, name: &str) -> Result<(), WorkerError> {
     let trusted_uid = uzers::get_effective_uid();
-    for ancestor in path.parent().into_iter().flat_map(Path::ancestors) {
+    // Walk root-to-leaf (`Path::ancestors` yields the opposite order) so a
+    // sticky root like `/tmp` is seen before the trusted user's own
+    // directories beneath it, which the group-write exception below depends
+    // on having already observed.
+    let ancestors: Vec<&Path> = path
+        .parent()
+        .into_iter()
+        .flat_map(Path::ancestors)
+        .collect();
+    let mut under_sticky_root = false;
+    for ancestor in ancestors.into_iter().rev() {
         let metadata = ancestor.symlink_metadata().map_err(|error| {
             WorkerError::new(format!(
                 "inspect trusted Harness worker {name} ancestor {}: {error}",
@@ -119,8 +129,45 @@ fn validate_trusted_ancestors(path: &Path, name: &str) -> Result<(), WorkerError
             ))
         })?;
         let trusted_owner = metadata.uid() == trusted_uid || metadata.uid() == 0;
-        let sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
-        if !metadata.is_dir() || !trusted_owner || metadata.mode() & 0o022 != 0 && !sticky_root {
+        let is_sticky_root = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
+        under_sticky_root |= is_sticky_root;
+        // World-write always disqualifies an ancestor unless it is itself the
+        // sticky root (matching `/tmp`'s own 1777 mode: its sticky bit already
+        // stops anyone but a file's owner from renaming or deleting it).
+        //
+        // Group-write is weaker, and only forgiven once under a sticky root,
+        // for every ancestor from there down that the trusted user themselves
+        // own: an ambient `umask 002` is enough to leave a plain
+        // `tempfile::tempdir()` group-writable (issue #1239), and rejecting
+        // that made every worker-override test under a permissive umask fail
+        // before reaching the fake worker it stood up. This has to reach more
+        // than the sticky root's immediate children: `TMPDIR` and equivalent
+        // sandboxing routinely nest a process- or lane-scoped scratch
+        // directory (still trusted-user-owned, still under the same umask)
+        // between the sticky root and the actual leaf tempdir, exactly as
+        // this repository's own test lane does; restricting the exception to
+        // one hop reopens the original bug there. `trusted_owner` above is
+        // still checked unconditionally on every ancestor in the chain, so
+        // the exception never crosses into a directory some other identity
+        // owns - only the trusted user's own group-write policy is being
+        // forgiven, matching the issue's own framing of "not writable by
+        // anyone outside the trusted user's own group-write policy". This is
+        // a deliberate, narrower trust boundary, not a fully closed one: even
+        // a direct child lets a member of its owning group replace entries
+        // *inside* it - including the worker binary - between this check and
+        // the later `Command::new(&worker)` exec. Closing that gap needs
+        // opening the worker by fd and exec'ing the already-open,
+        // already-validated fd instead of a path (tracked in #1242).
+        // Outside a sticky root, group-write on a trusted-owned ancestor
+        // still disqualifies it unconditionally.
+        let disqualifying_mode = if is_sticky_root {
+            false
+        } else {
+            metadata.mode() & 0o002 != 0
+                || (metadata.mode() & 0o020 != 0
+                    && !(under_sticky_root && metadata.uid() == trusted_uid))
+        };
+        if !metadata.is_dir() || !trusted_owner || disqualifying_mode {
             return Err(WorkerError::new(format!(
                 "trusted Harness worker {name} has an untrusted ancestor: {}",
                 ancestor.display()
@@ -140,9 +187,47 @@ mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt as _;
 
+    use std::sync::{Mutex, MutexGuard};
+
+    use rustix::fs::Mode;
     use tempfile::tempdir;
 
     use super::*;
+
+    /// Serializes umask mutation across tests in this module. `umask` is
+    /// process-wide state: nextest (this repo's canonical gate) runs each
+    /// test in its own process and never needs this, but `cargo test`'s
+    /// shared, multi-threaded process could let two umask-mutating tests
+    /// race and leak mode bits into each other without it.
+    static UMASK_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Holds `UMASK_LOCK` and restores the process umask on drop, including
+    /// on test panic. A custom `Drop` impl's body always runs before its
+    /// struct's fields drop, so the umask is restored, by the impl below,
+    /// before `_guard` releases the lock - never the other way around.
+    struct RestoreUmask<'a> {
+        previous: Mode,
+        _guard: MutexGuard<'a, ()>,
+    }
+
+    impl RestoreUmask<'_> {
+        fn set(new_mask: Mode) -> Self {
+            let guard = UMASK_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let previous = rustix::process::umask(new_mask);
+            Self {
+                previous,
+                _guard: guard,
+            }
+        }
+    }
+
+    impl Drop for RestoreUmask<'_> {
+        fn drop(&mut self) {
+            rustix::process::umask(self.previous);
+        }
+    }
 
     #[test]
     fn trusted_worker_rejects_writable_executable() {
@@ -193,6 +278,110 @@ mod tests {
 
         let error = trusted_worker_path(&worker, "harness-systemd").expect_err("ancestor rejected");
 
+        assert!(error.to_string().contains("untrusted ancestor"));
+    }
+
+    #[test]
+    fn trusted_worker_allows_own_tempdir_under_permissive_umask() {
+        // Issue #1239: `umask 002` leaves the group-write bit set on a plain
+        // `tempfile::tempdir()`, which sits under `/tmp`'s sticky root and is
+        // owned by this process - not writable by anyone the sticky bit
+        // doesn't already stop. Built explicitly under `/tmp` (bypassing
+        // `TMPDIR`) so the sticky-root ancestor this test relies on is
+        // guaranteed rather than however the host's temp directory happens
+        // to be configured.
+        // Follows symlinks (`/tmp` is a symlink to `/private/tmp` on macOS):
+        // the canonicalized worker path this test exercises resolves through
+        // it the same way, so the precondition must check the real target.
+        let root_metadata = fs::metadata("/tmp").expect("/tmp metadata");
+        assert_eq!(root_metadata.uid(), 0, "expected /tmp to be root-owned");
+        assert_ne!(
+            root_metadata.mode() & 0o1000,
+            0,
+            "expected /tmp to carry the sticky bit"
+        );
+
+        let _restore = RestoreUmask::set(Mode::from_raw_mode(0o002));
+
+        let temporary = tempfile::Builder::new()
+            .tempdir_in("/tmp")
+            .expect("temporary directory under /tmp");
+        let ancestor_mode = fs::symlink_metadata(temporary.path())
+            .expect("tempdir metadata")
+            .permissions()
+            .mode();
+        assert_eq!(
+            ancestor_mode & 0o022,
+            0o020,
+            "expected umask 002 to leave the tempdir group-writable but not world-writable, got {ancestor_mode:o}"
+        );
+
+        let worker = temporary.path().join("harness-systemd");
+        fs::write(&worker, "#!/bin/sh\n").expect("worker");
+        fs::set_permissions(&worker, fs::Permissions::from_mode(0o755))
+            .expect("worker permissions");
+
+        trusted_worker_path(&worker, "harness-systemd")
+            .expect("own tempdir under a sticky root is trusted regardless of ambient umask");
+    }
+
+    #[test]
+    fn trusted_worker_allows_nested_group_writable_directories_under_sticky_root() {
+        // Sandboxed test lanes (this repository's own included) commonly nest
+        // a process-scoped scratch directory between the sticky root and the
+        // actual leaf tempdir, all trusted-user-owned under the same ambient
+        // umask. The group-write exception has to reach every such ancestor,
+        // not just a sticky root's immediate child, or this exact shape of
+        // worker-override path fails again under a permissive umask.
+        let _restore = RestoreUmask::set(Mode::from_raw_mode(0o002));
+
+        let temporary = tempfile::Builder::new()
+            .tempdir_in("/tmp")
+            .expect("temporary directory under /tmp");
+        let nested = temporary.path().join("nested");
+        fs::create_dir(&nested).expect("nested directory");
+        let nested_mode = fs::symlink_metadata(&nested)
+            .expect("nested directory metadata")
+            .permissions()
+            .mode();
+        assert_eq!(
+            nested_mode & 0o022,
+            0o020,
+            "expected umask 002 to leave the nested directory group-writable but not world-writable, got {nested_mode:o}"
+        );
+
+        let worker = nested.join("harness-systemd");
+        fs::write(&worker, "#!/bin/sh\n").expect("worker");
+        fs::set_permissions(&worker, fs::Permissions::from_mode(0o755))
+            .expect("worker permissions");
+
+        trusted_worker_path(&worker, "harness-systemd")
+            .expect("nested trusted-owned directories under a sticky root are still trusted");
+    }
+
+    #[test]
+    fn trusted_worker_rejects_world_writable_ancestor_at_any_depth_under_sticky_root() {
+        // The group-write exception never covers world-write, no matter how
+        // deep under a sticky root the ancestor sits: unlike group
+        // membership, world-write means literally anyone could have swapped
+        // this ancestor's contents, which is exactly the case the sticky
+        // root's own protection was never meant to excuse.
+        let temporary = tempfile::Builder::new()
+            .tempdir_in("/tmp")
+            .expect("temporary directory under /tmp");
+        let nested = temporary.path().join("nested");
+        fs::create_dir(&nested).expect("nested directory");
+        let writable = nested.join("writable");
+        fs::create_dir(&writable).expect("writable directory");
+        fs::set_permissions(&writable, fs::Permissions::from_mode(0o777))
+            .expect("writable permissions");
+        let worker = writable.join("harness-systemd");
+        fs::write(&worker, "#!/bin/sh\n").expect("worker");
+        fs::set_permissions(&worker, fs::Permissions::from_mode(0o755))
+            .expect("worker permissions");
+
+        let error = trusted_worker_path(&worker, "harness-systemd")
+            .expect_err("world-writable ancestor rejected regardless of sticky-root depth");
         assert!(error.to_string().contains("untrusted ancestor"));
     }
 }
