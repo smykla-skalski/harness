@@ -244,7 +244,7 @@ fn attempt_replay_matches(
         && expected.idempotency_key == current.idempotency_key
 }
 
-fn validate_attempt_phase(
+pub(super) fn validate_attempt_phase(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<(), CliError> {
@@ -292,12 +292,13 @@ fn validate_attempt_phase(
     let valid_artifact = match (phase, attempt.artifact.as_ref()) {
         (
             TaskBoardExecutionPhase::Implementation,
-            Some(
-                TaskBoardAttemptResultArtifact::DependencyTriage(_)
-                | TaskBoardAttemptResultArtifact::Implementation(_),
-            ),
-        )
-        | (
+            Some(TaskBoardAttemptResultArtifact::DependencyTriage(_)),
+        ) => attempt.action_key == "dependency_triage",
+        (
+            TaskBoardExecutionPhase::Implementation,
+            Some(TaskBoardAttemptResultArtifact::Implementation(_)),
+        ) => attempt.action_key.starts_with("implementation:"),
+        (
             TaskBoardExecutionPhase::Evaluate,
             Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
         )

@@ -470,12 +470,13 @@ fn validate_completed_artifact(
     let valid = match (phase, attempt.artifact.as_ref()) {
         (
             TaskBoardExecutionPhase::Implementation,
-            Some(
-                TaskBoardAttemptResultArtifact::DependencyTriage(_)
-                | TaskBoardAttemptResultArtifact::Implementation(_),
-            ),
-        )
-        | (
+            Some(TaskBoardAttemptResultArtifact::DependencyTriage(_)),
+        ) => attempt.action_key == "dependency_triage",
+        (
+            TaskBoardExecutionPhase::Implementation,
+            Some(TaskBoardAttemptResultArtifact::Implementation(_)),
+        ) => attempt.action_key.starts_with("implementation:"),
+        (
             TaskBoardExecutionPhase::Evaluate,
             Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
         )
@@ -497,3 +498,7 @@ fn validate_completed_artifact(
         ))
     }
 }
+
+#[cfg(test)]
+#[path = "workflow_execution_attempts_tests.rs"]
+mod tests;

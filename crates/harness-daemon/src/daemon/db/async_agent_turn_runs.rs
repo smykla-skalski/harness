@@ -209,20 +209,22 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// Settle every agent turn run left active by a daemon restart. `OpenRouter`
-    /// report turns start with resume disabled, so an interrupted run cannot be
-    /// re-attached; it is settled to `Failed` exactly once and its admission is
-    /// released so the board can decide what happens next. Idempotent: a second
-    /// sweep finds nothing active and settles zero runs.
+    /// Settle legacy agent turn runs that lack a provider turn identity after a
+    /// daemon restart. Correlated runs stay active so runtime reconciliation can
+    /// harvest their terminal result. Idempotent: a second sweep finds nothing
+    /// eligible and settles zero runs.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub(crate) async fn reconcile_interrupted_agent_turn_runs(&self) -> Result<usize, CliError> {
         let active: Vec<String> =
-            query_scalar("SELECT run_id FROM agent_turn_runs WHERE status IN ('queued', 'running')")
-                .fetch_all(self.pool())
-                .await
-                .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
+            query_scalar(
+                "SELECT run_id FROM agent_turn_runs \
+                 WHERE status IN ('queued', 'running') AND runtime_turn_id IS NULL",
+            )
+            .fetch_all(self.pool())
+            .await
+            .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
         let mut settled = 0;
         for run_id in active {
             settled += self.settle_interrupted_agent_turn_run(&run_id).await?;
@@ -242,7 +244,9 @@ impl AsyncDaemonDb {
              SET status = 'failed', \
                  error = COALESCE(error, 'agent turn was interrupted by a daemon restart'), \
                  updated_at = ?2 \
-             WHERE run_id = ?1 AND status IN ('queued', 'running')",
+             WHERE run_id = ?1 \
+               AND status IN ('queued', 'running') \
+               AND runtime_turn_id IS NULL",
         )
         .bind(run_id)
         .bind(utc_now())

@@ -4,14 +4,15 @@ use crate::task_board::{
     TaskBoardExecutionAttemptCasOutcome, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase, TaskBoardExecutionState,
     TaskBoardFailureClass, TaskBoardPhaseVerdict, TaskBoardRetrySchedule, TaskBoardReviewResult,
-    TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
-    TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard,
+    TaskBoardReviewerOutcome, TaskBoardImplementationResult, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowKind, TaskBoardWorkflowRevisionGuard,
 };
 
 use super::task_board_workflow_execution::{
     TaskBoardWorkflowExecutionCreateRequest, advance_workflow_execution,
     create_or_load_workflow_execution, create_workflow_execution_attempt,
     record_workflow_execution_attempt, resume_workflow_retry, schedule_workflow_retry,
+    validate_attempt_phase,
 };
 use super::task_board_workflow_review::record_workflow_reviewer_outcome;
 use super::task_board_workflow_test_support::{
@@ -336,6 +337,47 @@ async fn attempt_create_and_cas_are_fenced_by_durable_parent_phase() {
         .await
         .expect_err("wrong-phase CAS must fail inside transaction");
     assert!(cas_error.to_string().contains("does not belong to phase"));
+}
+
+#[tokio::test]
+async fn dependency_triage_action_rejects_implementation_artifact() {
+    let test = TestDatabase::open().await;
+    let mut execution = Box::pin(create_execution(
+        &test.db,
+        "task-artifact-action-pair",
+        TaskBoardWorkflowKind::PR_REVIEW,
+        reviewers(1, 1),
+        Some("head-amber"),
+    ))
+    .await;
+    execution.snapshot.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    execution.transition.phase = Some(TaskBoardExecutionPhase::Implementation);
+    let attempt = TaskBoardExecutionAttemptRecord {
+        execution_id: execution.execution_id.clone(),
+        action_key: "dependency_triage".into(),
+        attempt: 1,
+        idempotency_key: "triage-artifact-mismatch".into(),
+        state: TaskBoardAttemptState::Completed,
+        failure_class: None,
+        available_at: None,
+        error: None,
+        artifact: Some(TaskBoardAttemptResultArtifact::Implementation(
+            TaskBoardImplementationResult {
+                revision_cycle: 1,
+                base_head_revision: "head-amber".into(),
+                head_revision: "head-bronze".into(),
+                summary: "wrong artifact".into(),
+                evidence: Vec::new(),
+            },
+        )),
+        started_at: CREATED_AT.into(),
+        updated_at: CREATED_AT.into(),
+        completed_at: Some(CREATED_AT.into()),
+    };
+
+    let error = validate_attempt_phase(&execution, &attempt)
+        .expect_err("action and artifact kind must agree");
+    assert!(error.to_string().contains("contradicts its frozen phase"));
 }
 
 fn review_attempt(execution_id: &str, idempotency_key: &str) -> TaskBoardExecutionAttemptRecord {
