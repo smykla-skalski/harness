@@ -10,6 +10,7 @@ members = [
   "crates/harness-daemon-bin",
   "crates/harness-daemon-cli",
   "crates/harness-daemon-client",
+  "crates/harness-daemon-codex",
   "crates/harness-daemon-discovery",
   "crates/harness-daemon-launchd",
   "crates/harness-daemon-provider-credentials",

@@ -1,0 +1,22 @@
+[package]
+name = "harness-daemon-codex"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+
+[dependencies]
+async-trait = "0.1.83"
+futures-util = "0.3.31"
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+tokio = { version = "1.50.0", features = ["io-util", "net", "process", "rt", "sync"] }
+tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect"] }
+tracing = "0.1.44"
+
+[dev-dependencies]
+tokio = { version = "1.50.0", features = ["io-util", "macros", "net", "rt-multi-thread"] }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

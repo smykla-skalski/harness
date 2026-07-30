@@ -3732,6 +3732,7 @@ dependencies = [
  "harness-command",
  "harness-daemon-acp-probe",
  "harness-daemon-client",
+ "harness-daemon-codex",
  "harness-daemon-discovery",
  "harness-daemon-launchd",
  "harness-daemon-provider-credentials",
@@ -3876,6 +3877,18 @@ dependencies = [
  "tracing",
  "user_dirs",
  "uzers",
+]
+
+[[package]]
+name = "harness-daemon-codex"
+version = "55.0.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "harness-kernel",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
+ "tracing",
 ]
 
 [[package]]
