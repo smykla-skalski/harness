@@ -386,6 +386,9 @@ pub struct AcpAgentSessionState {
     /// Structured terminal failure for the most recent unsuccessful prompt turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_turn_failure: Option<AgentTurnFailure>,
+    /// Provider text observed before the most recent unsuccessful prompt turn ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_turn_partial_output: Option<String>,
 }
 
 /// One session an agent reports from `session/list`.

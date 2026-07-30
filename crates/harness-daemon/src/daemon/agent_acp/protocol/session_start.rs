@@ -22,6 +22,7 @@ struct RouteRegistration<'a> {
     guard: &'a SessionRouteGuard,
     acp_id: &'a str,
     session_id: &'a str,
+    report_only_review: bool,
 }
 
 impl RouteRegistration<'_> {
@@ -31,6 +32,7 @@ impl RouteRegistration<'_> {
             RouteTarget {
                 acp_id: self.acp_id.to_string(),
                 session_id: self.session_id.to_string(),
+                report_only_review: self.report_only_review,
             },
         );
     }
@@ -77,6 +79,7 @@ pub(super) async fn initialize_and_bind_runtime_session(
         guard: session_guard,
         acp_id,
         session_id,
+        report_only_review: session_config.report_only_review(),
     };
     let started_session = initialize_runtime_session(
         supervisor,

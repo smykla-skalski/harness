@@ -22,6 +22,7 @@ pub(in crate::daemon::agent_acp) struct AcpSessionRequestConfig {
     model: Option<String>,
     effort: Option<String>,
     allow_custom_model: bool,
+    report_only_review: bool,
     session_configuration: AcpSessionConfiguration,
 }
 
@@ -34,6 +35,10 @@ impl AcpSessionRequestConfig {
             model: trimmed_owned(request.model.as_deref()),
             effort: trimmed_owned(request.effort.as_deref()),
             allow_custom_model: request.allow_custom_model,
+            report_only_review: request
+                .capabilities
+                .iter()
+                .any(|capability| capability == super::super::REPORT_ONLY_REVIEW_CAPABILITY),
             session_configuration: merge_session_inputs(&descriptor.session_configuration, request),
         }
     }
@@ -74,6 +79,11 @@ impl AcpSessionRequestConfig {
                 self.session_configuration.effort,
                 AcpSessionEffortTransport::Disabled
             )
+    }
+
+    #[must_use]
+    pub(in crate::daemon::agent_acp) const fn report_only_review(&self) -> bool {
+        self.report_only_review
     }
 }
 
@@ -127,6 +137,14 @@ pub(super) async fn apply_requested_session_configuration(
     session_config: &AcpSessionRequestConfig,
     advertised: SessionConfigurationAdvertisement<'_>,
 ) -> AcpResult<()> {
+    apply_capability_profile(
+        supervisor,
+        connection,
+        session_id,
+        session_config.report_only_review(),
+        advertised.config_options,
+    )
+    .await?;
     if let Some(model) = session_config.requested_model() {
         apply_model_configuration(
             supervisor,
@@ -150,6 +168,45 @@ pub(super) async fn apply_requested_session_configuration(
         .await?;
     }
     Ok(())
+}
+
+async fn apply_capability_profile(
+    supervisor: &AcpSessionSupervisor,
+    connection: &ConnectionTo<Agent>,
+    session_id: &SessionId,
+    report_only_review: bool,
+    config_options: &[SessionConfigOption],
+) -> AcpResult<()> {
+    let selector = AcpSessionConfigOptionBinding {
+        option_id: Some("harness_capability_profile".into()),
+        category: None,
+    };
+    if find_config_option(config_options, &selector, None).is_none() {
+        return if report_only_review {
+            Err(configuration_error(
+                "capability profile",
+                "ACP agent does not advertise the required report-only capability profile"
+                    .to_string(),
+            ))
+        } else {
+            Ok(())
+        };
+    }
+    apply_config_option_value(
+        supervisor,
+        connection,
+        session_id,
+        &selector,
+        None,
+        if report_only_review {
+            "report_only"
+        } else {
+            "standard"
+        },
+        config_options,
+        "capability profile",
+    )
+    .await
 }
 
 async fn apply_model_configuration(

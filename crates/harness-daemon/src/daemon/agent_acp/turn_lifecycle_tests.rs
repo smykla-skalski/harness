@@ -165,6 +165,10 @@ async fn openrouter_turn_keeps_model_report_and_frozen_source_revision() {
         .expect("captured start");
     assert_eq!(started.agent, "openrouter");
     assert_eq!(started.model.as_deref(), Some(MODEL));
+    assert_eq!(
+        started.capabilities,
+        vec![super::super::REPORT_ONLY_REVIEW_CAPABILITY]
+    );
     assert!(started.resume_disabled);
     assert!(started.prompt.as_deref().is_some_and(|prompt| {
         prompt.contains(HEAD)

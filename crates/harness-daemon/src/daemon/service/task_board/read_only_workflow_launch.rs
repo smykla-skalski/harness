@@ -10,10 +10,11 @@ use crate::daemon::service::{
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
 use crate::sandbox;
-use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
-    AgentMode, DispatchAppliedTask, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
+    AgentMode, DispatchAppliedTask, MAX_TASK_BOARD_REVIEW_REVISION_CYCLES,
+    TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TASK_BOARD_REPORT_ONLY_REVIEW_MODEL, TaskBoardItem,
     TaskBoardPullRequestIdentity, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
+    TaskBoardResolvedReviewer, TaskBoardReviewerProfile, TaskBoardReviewerSettings,
     TaskBoardWorkflowKind, resolve_task_board_pull_request_identity, resolve_task_board_reviewers,
     task_board_read_only_execution_repository, validate_task_board_read_only_item_revisions,
     validate_task_board_read_only_run_context,
@@ -55,12 +56,11 @@ pub(super) async fn prepare_read_only_workflow_launch(
     let configuration_revision = u64::try_from(settings.row_revision)
         .map_err(|_| invalid_transition("orchestrator settings revision is out of range"))?;
     let execution_repository = normalized_execution_repository(&item)?;
-    let resolved_reviewers = resolve_task_board_reviewers(
+    let resolved_reviewers = resolve_read_only_reviewers(
         &settings.settings.reviewers,
         item.workflow_kind,
         execution_repository.as_deref(),
-    )
-    .map_err(|error| invalid_transition(error.to_string()))?;
+    )?;
     ensure_supported_read_only_runtimes(&resolved_reviewers)?;
     ensure_reviewer_runtimes_available(&resolved_reviewers).await?;
     let (pull_request, exact_head_revision) = resolve_exact_head(&item, worktree).await?;
@@ -106,12 +106,11 @@ pub(crate) async fn validate_read_only_workflow_launch(
     let configuration_revision = u64::try_from(settings.row_revision)
         .map_err(|_| invalid_transition("orchestrator settings revision is out of range"))?;
     let execution_repository = normalized_execution_repository(&item)?;
-    let reviewers = resolve_task_board_reviewers(
+    let reviewers = resolve_read_only_reviewers(
         &settings.settings.reviewers,
         item.workflow_kind,
         execution_repository.as_deref(),
-    )
-    .map_err(|error| invalid_transition(error.to_string()))?;
+    )?;
     ensure_supported_read_only_runtimes(&reviewers)?;
     // Re-check provider prerequisites at the durable start, not only at prepare:
     // a daemon restart between the two, or a credential revoked after prepare,
@@ -136,15 +135,22 @@ pub(crate) async fn validate_read_only_workflow_launch(
             "read-only workflow launch contract changed before worker start",
         ));
     }
+    let worktree = item
+        .workflow
+        .worktree
+        .as_deref()
+        .ok_or_else(|| invalid_transition("Review workflow has no local worktree"))?;
+    let local_head = resolve_worktree_head(worktree).await?;
     let fresh_head = if let Some(identity) = launch.pull_request.as_ref() {
-        resolve_pr_review_head(identity).await?
+        let remote_head = resolve_pr_review_head(identity).await?;
+        if local_head != remote_head {
+            return Err(invalid_transition(
+                "requested-review worktree does not match the recorded pull request head",
+            ));
+        }
+        remote_head
     } else {
-        let worktree = item
-            .workflow
-            .worktree
-            .as_deref()
-            .ok_or_else(|| invalid_transition("Review workflow has no local worktree"))?;
-        resolve_worktree_head(worktree).await?
+        local_head
     };
     if fresh_head != launch.exact_head_revision {
         return Err(invalid_transition(
@@ -169,6 +175,37 @@ pub(crate) async fn resolve_pr_review_head(
         )));
     }
     required_head(&review.head_sha)
+}
+
+fn resolve_read_only_reviewers(
+    settings: &TaskBoardReviewerSettings,
+    workflow_kind: TaskBoardWorkflowKind,
+    repository: Option<&str>,
+) -> Result<TaskBoardResolvedReviewer, CliError> {
+    if workflow_kind != TaskBoardWorkflowKind::PrReview {
+        return resolve_task_board_reviewers(settings, workflow_kind, repository)
+            .map_err(|error| invalid_transition(error.to_string()));
+    }
+    if settings.max_revision_cycles == 0
+        || settings.max_revision_cycles > MAX_TASK_BOARD_REVIEW_REVISION_CYCLES
+    {
+        return Err(invalid_transition(
+            "review revision cycle limit must be between one and three",
+        ));
+    }
+    Ok(TaskBoardResolvedReviewer {
+        reviewer_count: 1,
+        required_approvals: 1,
+        max_revision_cycles: settings.max_revision_cycles,
+        profiles: vec![TaskBoardReviewerProfile {
+            id: "requested-review-deepseek".into(),
+            runtime: "openrouter".into(),
+            persona: "code-reviewer".into(),
+            agent_mode: AgentMode::Evaluate,
+            model: Some(TASK_BOARD_REPORT_ONLY_REVIEW_MODEL.into()),
+            effort: None,
+        }],
+    })
 }
 
 async fn resolve_exact_head(
@@ -338,6 +375,24 @@ mod tests {
             .expect("openrouter accepted");
         ensure_supported_read_only_runtimes(&resolved(&["codex", "openrouter"]))
             .expect("a mixed supported set is accepted");
+    }
+
+    #[test]
+    fn requested_review_pins_one_openrouter_deepseek_reviewer() {
+        let reviewers = resolve_read_only_reviewers(
+            &TaskBoardReviewerSettings::default(),
+            TaskBoardWorkflowKind::PrReview,
+            Some("smykla-skalski/harness"),
+        )
+        .expect("requested-review defaults");
+        assert_eq!(reviewers.reviewer_count, 1);
+        assert_eq!(reviewers.required_approvals, 1);
+        assert_eq!(reviewers.profiles.len(), 1);
+        assert_eq!(reviewers.profiles[0].runtime, "openrouter");
+        assert_eq!(
+            reviewers.profiles[0].model.as_deref(),
+            Some(TASK_BOARD_REPORT_ONLY_REVIEW_MODEL)
+        );
     }
 
     #[test]

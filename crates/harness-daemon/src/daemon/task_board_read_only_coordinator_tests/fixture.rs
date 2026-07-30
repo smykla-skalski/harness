@@ -105,7 +105,7 @@ async fn seed_execution_at_phase(
     }
 }
 
-/// Seed a local Review execution whose single reviewer profile names the given
+/// Seed a pull-request review whose single reviewer profile names the given
 /// runtime, so the coordinator selects that runtime when it starts the report.
 pub(super) async fn seed_execution_with_reviewer_runtime(label: &str, runtime: &str) -> Fixture {
     let test = TestDatabase::open().await;
@@ -125,7 +125,7 @@ pub(super) async fn seed_execution_with_reviewer_runtime(label: &str, runtime: &
     let (item_id, execution_id) = Box::pin(seed_execution_in_database(
         &test.db,
         label,
-        TaskBoardWorkflowKind::Review,
+        TaskBoardWorkflowKind::PrReview,
         crate::task_board::TaskBoardExecutionPhase::Review,
         TaskBoardExecutionState::Pending,
         None,

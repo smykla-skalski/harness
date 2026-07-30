@@ -43,10 +43,21 @@ fn commit_file(
     contents: &[u8],
     parents: Vec<gix::ObjectId>,
 ) -> (gix::ObjectId, gix::ObjectId) {
+    commit_file_mode(repo, ref_name, message, contents, 0o100_644, parents)
+}
+
+fn commit_file_mode(
+    repo: &gix::Repository,
+    ref_name: &str,
+    message: &str,
+    contents: &[u8],
+    mode: u32,
+    parents: Vec<gix::ObjectId>,
+) -> (gix::ObjectId, gix::ObjectId) {
     let blob_oid = repo.write_blob(contents).expect("blob").detach();
     let mut tree = gix::objs::Tree::empty();
     tree.entries.push(gix::objs::tree::Entry {
-        mode: gix::objs::tree::EntryKind::Blob.into(),
+        mode: mode.try_into().expect("valid test file mode"),
         filename: "fixture.txt".into(),
         oid: blob_oid,
     });
@@ -71,7 +82,7 @@ fn make_source_repo(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
     )
 }
 
-fn make_two_commit_source(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId) {
+fn make_two_commit_source(path: &std::path::Path) -> (gix::ObjectId, gix::ObjectId, gix::ObjectId) {
     gix::init_bare(path).expect("init bare");
     set_test_user(path);
     let repo = gix::open(path).expect("reopen bare");
@@ -89,14 +100,14 @@ fn make_two_commit_source(path: &std::path::Path) -> (gix::ObjectId, gix::Object
         "base branch",
     )
     .expect("base ref");
-    let (head_oid, _) = commit_file(
+    let (head_oid, head_blob_oid) = commit_file(
         &repo,
         "refs/heads/main",
         "head commit",
         b"hello changed\nnew line\n",
         vec![base_oid],
     );
-    (base_oid, head_oid)
+    (base_oid, head_oid, head_blob_oid)
 }
 
 #[tokio::test]
@@ -201,7 +212,7 @@ async fn ensure_clone_twice_reuses_existing_bare_dir_via_fetch_path() {
 async fn ensure_clone_refs_fetches_non_head_pull_ref() {
     let dir = tempfile::tempdir().expect("tempdir");
     let source = dir.path().join("source.git");
-    let (_, head_oid) = make_two_commit_source(&source);
+    let (_, head_oid, _) = make_two_commit_source(&source);
     let repo = gix::open(&source).expect("open source");
     repo.reference("refs/pull/7/head", head_oid, PreviousValue::Any, "pull ref")
         .expect("pull ref");
@@ -227,7 +238,7 @@ async fn ensure_clone_refs_fetches_non_head_pull_ref() {
 async fn diff_refs_returns_merge_base_patches_and_stats() {
     let dir = tempfile::tempdir().expect("tempdir");
     let source = dir.path().join("source.git");
-    let (base_oid, head_oid) = make_two_commit_source(&source);
+    let (base_oid, head_oid, head_blob_oid) = make_two_commit_source(&source);
 
     let clones_root = LocalCloneRoot::new(dir.path().join("clones"));
     let runtime = Arc::new(LocalCloneRuntime::new(clones_root));
@@ -256,6 +267,71 @@ async fn diff_refs_returns_merge_base_patches_and_stats() {
     assert_eq!(diff.stats.deletions, 1);
     assert_eq!(diff.patches[0].path, "fixture.txt");
     assert!(diff.patches[0].patch.contains("+hello changed"));
+    assert!(diff.patches[0].patch.contains("index "));
+    assert!(
+        diff.patches[0]
+            .patch
+            .contains(&head_blob_oid.to_hex().to_string())
+    );
+}
+
+#[tokio::test]
+async fn diff_refs_preserves_mode_only_metadata() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let source = dir.path().join("source.git");
+    gix::init_bare(&source).expect("init bare");
+    set_test_user(&source);
+    let repo = gix::open(&source).expect("open source");
+    let (base_oid, _) = commit_file_mode(
+        &repo,
+        "refs/heads/main",
+        "base commit",
+        b"same contents\n",
+        0o100_644,
+        Vec::new(),
+    );
+    repo.reference(
+        "refs/heads/base",
+        base_oid,
+        PreviousValue::Any,
+        "base branch",
+    )
+    .expect("base ref");
+    let (head_oid, _) = commit_file_mode(
+        &repo,
+        "refs/heads/main",
+        "make executable",
+        b"same contents\n",
+        0o100_755,
+        vec![base_oid],
+    );
+
+    let runtime = Arc::new(LocalCloneRuntime::new(LocalCloneRoot::new(
+        dir.path().join("clones"),
+    )));
+    let base_ref = LocalCloneFetchRef::mirrored("refs/heads/base");
+    let head_ref = LocalCloneFetchRef::mirrored("refs/heads/main");
+    let ensured = runtime
+        .ensure_clone_refs_with_url(
+            "fixture/source",
+            &format!("file://{}", source.display()),
+            &[base_ref.clone(), head_ref.clone()],
+            &head_ref.local_ref,
+            Arc::new(DiscardProgressSink),
+        )
+        .await
+        .expect("ensure clone");
+    let diff = runtime
+        .diff_refs(&ensured, &base_ref.local_ref, &head_ref.local_ref, &[])
+        .await
+        .expect("mode-only diff");
+
+    assert_eq!(diff.head_ref_oid, head_oid.to_hex().to_string());
+    assert_eq!(diff.stats.files_changed, 1);
+    assert_eq!(diff.stats.additions, 0);
+    assert_eq!(diff.stats.deletions, 0);
+    assert!(diff.patches[0].patch.contains("old mode 100644"));
+    assert!(diff.patches[0].patch.contains("new mode 100755"));
 }
 
 #[tokio::test]

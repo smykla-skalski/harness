@@ -39,14 +39,16 @@ where
     // agent-turn path, which accepts the supported set and refuses anything else
     // by name rather than silently running it as Codex.
     if identity.runtime != "codex" {
-        return super::agent_turn_reports::reconcile_agent_turn_report_attempt(
-            db,
-            runtime,
-            execution,
-            attempt,
-            &identity.runtime,
-            allow_start,
-            now,
+        return Box::pin(
+            super::agent_turn_reports::reconcile_agent_turn_report_attempt(
+                db,
+                runtime,
+                execution,
+                attempt,
+                &identity.runtime,
+                allow_start,
+                now,
+            ),
         )
         .await;
     }
@@ -151,14 +153,14 @@ async fn handle_run_status(
             Ok(())
         }
         CodexRunStatus::Failed => {
-            if !super::attempts::settlement_is_current(db, &execution.execution_id, now).await? {
-                return Ok(());
-            }
             let detail = run.error.as_deref().unwrap_or("Codex Report run failed");
             super::review_report_retention::retain_failed_review_run(
                 db, execution, attempt, &run, detail,
             )
             .await?;
+            if !super::attempts::settlement_is_current(db, &execution.execution_id, now).await? {
+                return Ok(());
+            }
             record_retry_or_human(db, execution, attempt, detail, now).await
         }
         CodexRunStatus::Cancelled => {

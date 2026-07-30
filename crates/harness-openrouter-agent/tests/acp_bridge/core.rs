@@ -1,17 +1,4 @@
-//! Integration tests for the ACP bridge.
-//!
-//! Spawn the real `harness-openrouter-agent` binary, drive it from a parent
-//! `Client`-role connection, point its `OPENROUTER_API_URL` at a wiremock
-//! server, and verify the full session lifecycle:
-//!
-//! - `initialize` round-trips with the right agent info.
-//! - `session/new` returns a session id and the curated model state.
-//! - `session/prompt` streams `AgentMessageChunk` notifications and resolves
-//!   with the right `StopReason`.
-//! - Tool calls round-trip through the daemon-side ACP client: the model
-//!   asks for `read_text_file`, the bridge sends `ReadTextFileRequest`, the
-//!   test responds with file contents, and the model receives them back as
-//!   a tool message before issuing the final assistant turn.
+//! ACP bridge integration helpers and lifecycle tests.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -38,6 +25,7 @@ const BIN_PATH: &str = env!("CARGO_BIN_EXE_harness-openrouter-agent");
 pub(super) struct ChunkLog {
     inner: Arc<Mutex<Vec<String>>>,
     diagnostics: Arc<Mutex<Vec<String>>>,
+    effective_models: Arc<Mutex<Vec<String>>>,
 }
 
 impl ChunkLog {
@@ -55,6 +43,14 @@ impl ChunkLog {
 
     pub(super) fn diagnostic_snapshot(&self) -> Vec<String> {
         self.diagnostics.lock().expect("lock").clone()
+    }
+
+    pub(super) fn push_effective_model(&self, model: String) {
+        self.effective_models.lock().expect("lock").push(model);
+    }
+
+    pub(super) fn effective_model_snapshot(&self) -> Vec<String> {
+        self.effective_models.lock().expect("lock").clone()
     }
 }
 
@@ -113,6 +109,17 @@ pub(super) fn client_builder_with_chunks(
                     SessionUpdate::AgentThoughtChunk(chunk) => {
                         if let ContentBlock::Text(text) = chunk.content {
                             log.push_diagnostic(text.text);
+                        }
+                    }
+                    SessionUpdate::ConfigOptionUpdate(update) => {
+                        for option in update.config_options {
+                            if option.id.0.as_ref() == "harness_provider_effective_model"
+                                && let SessionConfigKind::Select(select) = option.kind
+                            {
+                                log.push_effective_model(
+                                    select.current_value.0.as_ref().to_string(),
+                                );
+                            }
                         }
                     }
                     _ => {}

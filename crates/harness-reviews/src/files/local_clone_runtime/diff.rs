@@ -211,6 +211,7 @@ fn render_hunks(
 
 fn render_patch(change: &Change<'_, '_, '_>, paths: &ChangePaths, hunk: &str) -> String {
     let mut patch = format!("diff --git a/{} b/{}\n", paths.old_path, paths.new_path);
+    render_change_metadata(&mut patch, change, paths);
     match change {
         Change::Addition { .. } => patch.push_str("--- /dev/null\n"),
         _ => {
@@ -225,6 +226,62 @@ fn render_patch(change: &Change<'_, '_, '_>, paths: &ChangePaths, hunk: &str) ->
     }
     patch.push_str(hunk);
     patch
+}
+
+fn render_change_metadata(patch: &mut String, change: &Change<'_, '_, '_>, paths: &ChangePaths) {
+    match change {
+        Change::Addition { entry_mode, id, .. } => {
+            let _ = writeln!(patch, "new file mode {entry_mode:o}");
+            let _ = writeln!(patch, "index 0000000..{}", id.detach().to_hex());
+        }
+        Change::Deletion { entry_mode, id, .. } => {
+            let _ = writeln!(patch, "deleted file mode {entry_mode:o}");
+            let _ = writeln!(patch, "index {}..0000000", id.detach().to_hex());
+        }
+        Change::Modification {
+            previous_entry_mode,
+            previous_id,
+            entry_mode,
+            id,
+            ..
+        } => {
+            if previous_entry_mode != entry_mode {
+                let _ = writeln!(patch, "old mode {previous_entry_mode:o}");
+                let _ = writeln!(patch, "new mode {entry_mode:o}");
+            }
+            let _ = writeln!(
+                patch,
+                "index {}..{}",
+                previous_id.detach().to_hex(),
+                id.detach().to_hex()
+            );
+        }
+        Change::Rewrite {
+            source_entry_mode,
+            source_id,
+            entry_mode,
+            id,
+            copy,
+            ..
+        } => {
+            if source_id == id {
+                patch.push_str("similarity index 100%\n");
+            }
+            let operation = if *copy { "copy" } else { "rename" };
+            let _ = writeln!(patch, "{operation} from {}", paths.old_path);
+            let _ = writeln!(patch, "{operation} to {}", paths.new_path);
+            if source_entry_mode != entry_mode {
+                let _ = writeln!(patch, "old mode {source_entry_mode:o}");
+                let _ = writeln!(patch, "new mode {entry_mode:o}");
+            }
+            let _ = writeln!(
+                patch,
+                "index {}..{}",
+                source_id.detach().to_hex(),
+                id.detach().to_hex()
+            );
+        }
+    }
 }
 
 fn change_matches(change: &Change<'_, '_, '_>, requested: &BTreeSet<String>) -> bool {

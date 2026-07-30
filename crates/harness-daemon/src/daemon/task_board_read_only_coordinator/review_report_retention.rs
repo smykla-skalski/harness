@@ -1,8 +1,9 @@
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AgentTurnRunSnapshot, AsyncDaemonDb};
 use crate::daemon::protocol::CodexRunSnapshot;
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardExecutionAttemptRecord,
-    TaskBoardReviewResult, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardReportOnlyReviewReport, TaskBoardReviewResult, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind,
 };
 use harness_kernel::errors::CliError;
 
@@ -71,6 +72,83 @@ pub(super) async fn retain_cancelled_review_run(
     .await
 }
 
+pub(super) async fn retain_invalid_review_run(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    run: &CodexRunSnapshot,
+    reason: &str,
+) -> Result<(), CliError> {
+    retain_unsuccessful_review_run(
+        db,
+        execution,
+        attempt,
+        run,
+        TaskBoardAiReviewReportStatus::Failed,
+        reason,
+    )
+    .await
+}
+
+pub(super) async fn retain_completed_agent_turn_review_run(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    run: &AgentTurnRunSnapshot,
+    result: &TaskBoardReportOnlyReviewReport,
+) -> Result<(), CliError> {
+    let Some(mut report) = agent_turn_review_report(
+        execution,
+        attempt,
+        run,
+        TaskBoardAiReviewReportStatus::Completed,
+    )?
+    else {
+        return Ok(());
+    };
+    report.summary = Some(result.summary.clone());
+    report.findings.clone_from(&result.findings);
+    db.append_task_board_ai_review_report(&report)
+        .await
+        .map(|_| ())
+}
+
+pub(super) async fn retain_failed_agent_turn_review_run(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    run: &AgentTurnRunSnapshot,
+    reason: &str,
+) -> Result<(), CliError> {
+    retain_unsuccessful_agent_turn_review_run(
+        db,
+        execution,
+        attempt,
+        run,
+        TaskBoardAiReviewReportStatus::Failed,
+        reason,
+    )
+    .await
+}
+
+pub(super) async fn retain_cancelled_agent_turn_review_run(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    run: &AgentTurnRunSnapshot,
+    reason: &str,
+) -> Result<(), CliError> {
+    retain_unsuccessful_agent_turn_review_run(
+        db,
+        execution,
+        attempt,
+        run,
+        TaskBoardAiReviewReportStatus::Cancelled,
+        reason,
+    )
+    .await
+}
+
 async fn retain_unsuccessful_review_run(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -89,6 +167,24 @@ async fn retain_unsuccessful_review_run(
     report.terminal_reason = Some(reason.to_owned());
     db.append_task_board_ai_review_report(&report).await?;
     Ok(())
+}
+
+async fn retain_unsuccessful_agent_turn_review_run(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    run: &AgentTurnRunSnapshot,
+    status: TaskBoardAiReviewReportStatus,
+    reason: &str,
+) -> Result<(), CliError> {
+    let Some(mut report) = agent_turn_review_report(execution, attempt, run, status)? else {
+        return Ok(());
+    };
+    report.partial_output.clone_from(&run.report);
+    report.terminal_reason = Some(reason.to_owned());
+    db.append_task_board_ai_review_report(&report)
+        .await
+        .map(|_| ())
 }
 
 fn review_report(
@@ -127,6 +223,52 @@ fn review_report(
         actual_runtime: Some("codex".into()),
         requested_model,
         effective_model: run.model.clone(),
+        status,
+        summary: None,
+        findings: Vec::new(),
+        partial_output: None,
+        terminal_reason: None,
+        started_at: run.created_at.clone(),
+        finished_at: run.updated_at.clone(),
+    }))
+}
+
+fn agent_turn_review_report(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    run: &AgentTurnRunSnapshot,
+    status: TaskBoardAiReviewReportStatus,
+) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
+    if execution.snapshot.workflow_kind != TaskBoardWorkflowKind::PrReview
+        || !attempt.action_key.starts_with("review:")
+    {
+        return Ok(None);
+    }
+    let Some(pull_request) = execution.transition.pull_request.as_ref() else {
+        return Ok(None);
+    };
+    let profile = harness_task_board_codex_requests::attempt_profile(execution, attempt)?;
+    let requested_model = profile
+        .model
+        .clone()
+        .unwrap_or_else(|| "provider-default".into());
+    let head_revision = execution
+        .transition
+        .exact_head_revision
+        .clone()
+        .ok_or_else(|| invalid_transition("AI review report requires a frozen exact head"))?;
+    Ok(Some(TaskBoardAiReviewReportRecord {
+        report_id: format!("review-report:{}", attempt.idempotency_key),
+        item_id: execution.item_id.clone(),
+        correlation_id: run.run_id.clone(),
+        repository: pull_request.repository.clone(),
+        pull_request_number: pull_request.number,
+        head_revision,
+        runtime: profile.runtime.clone(),
+        requested_runtime: profile.runtime.clone(),
+        actual_runtime: run.actual_runtime.clone(),
+        requested_model,
+        effective_model: run.actual_model.clone(),
         status,
         summary: None,
         findings: Vec::new(),

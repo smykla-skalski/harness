@@ -72,10 +72,7 @@ fn accepted_key_without_offered_model_reports_unavailable() {
 }
 
 #[test]
-fn accepted_key_with_unreadable_body_leaves_model_undetermined() {
-    // A 200 the deserializer cannot map to a model list (unknown envelope) must
-    // not read as "model unavailable"; it leaves the decision to the caller's
-    // static-catalog fallback via `None`.
+fn unreadable_success_body_is_not_accepted_as_live_readiness() {
     let (base_url, server) = serve_once("200 OK", r#"{"models":[{"id":"x"}]}"#);
     let readiness = block_on(probe_at(
         &base_url,
@@ -83,7 +80,10 @@ fn accepted_key_with_unreadable_body_leaves_model_undetermined() {
         "deepseek/deepseek-v4-flash",
     ));
     server.join().expect("mock server finishes");
-    assert_eq!(readiness.credential, OpenRouterCredential::Accepted);
+    assert_eq!(
+        readiness.credential,
+        OpenRouterCredential::Unverified("provider returned an unrecognized model catalog".into())
+    );
     assert_eq!(readiness.model_available, None);
 }
 

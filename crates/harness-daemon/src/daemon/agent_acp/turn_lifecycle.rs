@@ -1,16 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use async_trait::async_trait;
-
-use crate::agents::turn::{
-    AgentTurnFailure, AgentTurnFailureCategory, AgentTurnId, AgentTurnRequest, AgentTurnResult,
-    AgentTurnRuntime, AgentTurnStatus,
-};
-use crate::daemon::agent_acp::{
-    AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest, AcpSessionConfigOptionState,
-};
-use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
+use crate::agents::turn::{AgentTurnId, AgentTurnRequest};
+use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest};
+use crate::daemon::db::AsyncDaemonDb;
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -19,6 +12,8 @@ use super::AcpAgentManagerHandle;
 mod persistence;
 
 const OPENROUTER_RUNTIME: &str = "openrouter";
+
+mod agent_turn_runtime;
 
 /// Ties a durable agent-turn run to a caller-owned lifecycle instead of the
 /// self-generated ACP id. The task-board coordinator drives runs by an attempt
@@ -245,6 +240,11 @@ impl OpenRouterAgentTurnRuntime {
             .pull_request
             .as_ref()
             .map(|pull_request| pull_request.head_revision.clone());
+        let capabilities = if request.pull_request.is_some() {
+            vec![super::REPORT_ONLY_REVIEW_CAPABILITY.to_string()]
+        } else {
+            Vec::new()
+        };
         let requested_model = request.requested_model.clone();
         let snapshot = self.manager.start(
             &self.session_id,
@@ -255,6 +255,7 @@ impl OpenRouterAgentTurnRuntime {
                 project_dir: self.project_dir.clone(),
                 name: Some("OpenRouter report turn".into()),
                 model: requested_model.clone(),
+                capabilities,
                 resume_disabled: resume_session_id.is_none(),
                 resume_session_id,
                 ..AcpAgentStartRequest::default()
@@ -364,144 +365,6 @@ impl OpenRouterAgentTurnRuntime {
                 .into()
             })
     }
-}
-
-#[async_trait]
-impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
-    fn runtime(&self) -> &'static str {
-        OPENROUTER_RUNTIME
-    }
-
-    async fn start(&self, request: AgentTurnRequest) -> Result<AgentTurnId, CliError> {
-        self.start_with_resume_session(request, None).await
-    }
-
-    async fn status(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {
-        let binding = self.binding(id)?;
-        if binding.cancelled {
-            return Ok(AgentTurnStatus::Cancelled);
-        }
-        // Read-only, like the Codex turn runtime: durable terminal state is
-        // written once by `result`/`failure`/`cancel`, so status polling never
-        // touches the database.
-        let state = self.inspect_turn(id)?.session_state.unwrap_or_default();
-        if let Some(failure) = state.last_turn_failure {
-            return Ok(if failure.category == AgentTurnFailureCategory::Cancelled {
-                AgentTurnStatus::Cancelled
-            } else {
-                AgentTurnStatus::Failed
-            });
-        }
-        if state.last_turn_result.is_some() {
-            Ok(AgentTurnStatus::Completed)
-        } else {
-            Ok(AgentTurnStatus::Running)
-        }
-    }
-
-    async fn result(&self, id: &AgentTurnId) -> Result<Option<AgentTurnResult>, CliError> {
-        let binding = self.binding(id)?;
-        if binding.cancelled {
-            return Ok(None);
-        }
-        let snapshot = self.inspect_turn(id)?;
-        let state = snapshot.session_state.unwrap_or_default();
-        let Some(result) = state.last_turn_result else {
-            return Ok(None);
-        };
-        let effective_model = effective_model(&state.config_options);
-        self.persist_settlement(
-            id,
-            AgentTurnRunStatus::Completed,
-            effective_model.clone(),
-            Some(result.report.clone()),
-            Some(result.stop_reason.clone()),
-            None,
-        )
-        .await?;
-        Ok(Some(AgentTurnResult {
-            correlation_id: id.clone(),
-            report: result.report,
-            stop_reason: result.stop_reason,
-            requested_model: binding.requested_model,
-            effective_model,
-            source_revision: binding.source_revision,
-        }))
-    }
-
-    async fn failure(&self, id: &AgentTurnId) -> Result<Option<AgentTurnFailure>, CliError> {
-        let binding = self.binding(id)?;
-        if binding.cancelled {
-            // `cancel()` already persisted the terminal cancellation.
-            return Ok(Some(AgentTurnFailure::cancelled(
-                "OpenRouter turn cancelled",
-            )));
-        }
-        let Some(state) = self.inspect_turn(id)?.session_state else {
-            return Ok(None);
-        };
-        let Some(failure) = state.last_turn_failure else {
-            return Ok(None);
-        };
-        let actual_model = effective_model(&state.config_options);
-        let (run_status, stop_reason, error) =
-            if failure.category == AgentTurnFailureCategory::Cancelled {
-                (
-                    AgentTurnRunStatus::Cancelled,
-                    Some(failure.detail.clone()),
-                    None,
-                )
-            } else {
-                (
-                    AgentTurnRunStatus::Failed,
-                    None,
-                    Some(failure.detail.clone()),
-                )
-            };
-        self.persist_settlement(id, run_status, actual_model, None, stop_reason, error)
-            .await?;
-        Ok(Some(failure))
-    }
-
-    async fn cancel(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {
-        if !self.begin_cancellation(id)? {
-            return Ok(AgentTurnStatus::Cancelled);
-        }
-        if let Err(error) = self.manager.stop(id.as_str()) {
-            self.rollback_cancellation(id)?;
-            return Err(error);
-        }
-        // A cancelled run keeps `error` NULL and records the reason in
-        // `stop_reason`, matching the Codex path so a downstream reader never
-        // mistakes a deliberate cancellation for a failure.
-        if let Err(error) = self
-            .persist_settlement(
-                id,
-                AgentTurnRunStatus::Cancelled,
-                None,
-                None,
-                Some("cancelled".into()),
-                None,
-            )
-            .await
-        {
-            // The provider stop already succeeded but the terminal write did
-            // not. Drop the local cancellation flag so later polling of
-            // `status`/`failure` re-observes the provider-side cancellation and
-            // persists it, instead of short-circuiting on the flag forever and
-            // leaving the row stuck `running` with its admission unreleased.
-            self.rollback_cancellation(id)?;
-            return Err(error);
-        }
-        Ok(AgentTurnStatus::Cancelled)
-    }
-}
-
-fn effective_model(options: &[AcpSessionConfigOptionState]) -> Option<String> {
-    options
-        .iter()
-        .find(|option| option.id == "model")
-        .map(|option| option.current_value.clone())
 }
 
 #[cfg(test)]

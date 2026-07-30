@@ -11,8 +11,13 @@ use crate::reviews::{ReviewsFilesPatchRequest, ReviewsFilesPatchResponse, Review
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::token::github_token;
+use super::token::{github_token, missing_token_error};
 use super::{local_clone_runtime, progress_sink};
+
+pub(crate) struct ExactReviewsFilesPatchResponse {
+    pub(crate) response: ReviewsFilesPatchResponse,
+    pub(crate) merge_base_oid: String,
+}
 
 /// Fetch patches for selected paths in one pull request.
 ///
@@ -35,6 +40,54 @@ pub async fn patch_review_files(
         .into());
     }
     patch_review_files_inner(request, pull_request_id).await
+}
+
+/// Fetch a revision-bound diff from the local clone without a REST fallback.
+///
+/// # Errors
+/// Returns an error when any immutable repository/base/head coordinate is
+/// missing or the exact objects cannot be fetched and diffed.
+pub(crate) async fn exact_patch_review_files(
+    request: &ReviewsFilesPatchRequest,
+) -> Result<ExactReviewsFilesPatchResponse, CliError> {
+    let pull_request_id = request.normalized_pull_request_id();
+    let repository = request
+        .repository_full_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            CliErrorKind::workflow_parse("exact review diff requires repository_full_name")
+        })?;
+    let base_oid = request
+        .base_ref_oid_expected
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| CliErrorKind::workflow_parse("exact review diff requires base ref oid"))?;
+    if pull_request_id.is_empty() || request.head_ref_oid_expected.trim().is_empty() {
+        return Err(CliErrorKind::workflow_parse(
+            "exact review diff requires pull request id and head ref oid",
+        )
+        .into());
+    }
+    let token =
+        github_token(Some(repository)).ok_or_else(|| missing_token_error(Some(repository)))?;
+    let refs = LocalClonePatchRefs {
+        head_ref_oid: &request.head_ref_oid_expected,
+        base_oid,
+        number: request.number,
+        head_ref_name: request.head_ref_name.as_deref(),
+        base_ref_name: request.base_ref_name.as_deref(),
+    };
+    run_exact_local_clone_patch(
+        &pull_request_id,
+        repository,
+        &token,
+        &refs,
+        &request.normalized_paths(),
+    )
+    .await
 }
 
 #[expect(
@@ -267,6 +320,59 @@ async fn run_local_clone_patch(
         current_head_ref_oid: refs.head_ref_oid.to_string(),
         fetched_at: utc_now(),
         rate_limit_snapshot: None,
+    })
+}
+
+async fn run_exact_local_clone_patch(
+    pull_request_id: &str,
+    repo_full_name: &str,
+    token: &str,
+    refs: &LocalClonePatchRefs<'_>,
+    paths: &[String],
+) -> Result<ExactReviewsFilesPatchResponse, CliError> {
+    let runtime = local_clone_runtime();
+    let sink = progress_sink();
+    let (fetch_refs, head_ref) =
+        local_clone_fetch_context(refs.number, refs.head_ref_name, refs.base_ref_name);
+    let token = Sensitive::new(token);
+    let clone_url = pat_clone_url(repo_full_name, &token);
+    let ensured = runtime
+        .ensure_clone_refs_with_url(
+            repo_full_name,
+            clone_url.expose(),
+            &fetch_refs,
+            &head_ref,
+            sink,
+        )
+        .await
+        .map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!("ensure exact local clone failed: {error}")).into()
+        })?;
+    let diff = runtime
+        .diff_refs(&ensured, refs.base_oid, refs.head_ref_oid, paths)
+        .await
+        .map_err(|error| -> CliError {
+            CliErrorKind::workflow_io(format!("compute exact merge-base diff failed: {error}"))
+                .into()
+        })?;
+    if diff.base_ref_oid != refs.base_oid || diff.head_ref_oid != refs.head_ref_oid {
+        return Err(CliErrorKind::invalid_transition(format!(
+            "exact review diff resolved unexpected revisions: base '{}' head '{}'",
+            diff.base_ref_oid, diff.head_ref_oid
+        ))
+        .into());
+    }
+    let response = ReviewsFilesPatchResponse {
+        pull_request_id: pull_request_id.to_string(),
+        patches: diff.patches,
+        drifted: false,
+        current_head_ref_oid: diff.head_ref_oid,
+        fetched_at: utc_now(),
+        rate_limit_snapshot: None,
+    };
+    Ok(ExactReviewsFilesPatchResponse {
+        response,
+        merge_base_oid: diff.merge_base_oid,
     })
 }
 

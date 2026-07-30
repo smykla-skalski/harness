@@ -36,9 +36,8 @@ pub(crate) struct OpenRouterReadiness {
 
 #[derive(Deserialize)]
 struct UserModelList {
-    // No serde default: a 200 whose body lacks `data` (an unrecognized envelope)
-    // must deserialize-fail into `model_available: None` so the caller falls back
-    // to the static catalog, rather than silently reading as "model unavailable".
+    // No serde default: a 200 whose body lacks `data` is not proof that the
+    // credential or requested model is usable.
     data: Vec<UserModel>,
 }
 
@@ -89,10 +88,7 @@ async fn classify_response(
                 credential: OpenRouterCredential::Accepted,
                 model_available: Some(list.data.iter().any(|model| model.id == requested_model)),
             },
-            Err(_) => OpenRouterReadiness {
-                credential: OpenRouterCredential::Accepted,
-                model_available: None,
-            },
+            Err(_) => unverified("provider returned an unrecognized model catalog"),
         };
     }
     if matches!(

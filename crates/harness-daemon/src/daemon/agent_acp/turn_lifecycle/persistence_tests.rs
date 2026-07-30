@@ -191,6 +191,8 @@ async fn correlation_keys_the_durable_run_to_the_caller_id() {
     assert_eq!(stored.status, AgentTurnRunStatus::Running);
     assert_eq!(stored.board_item_id.as_deref(), Some("item-9"));
     assert_eq!(stored.workflow_execution_id.as_deref(), Some("execution-9"));
+    assert_eq!(stored.requested_model.as_deref(), Some(MODEL));
+    assert_eq!(stored.source_revision.as_deref(), Some(HEAD));
 
     manager.complete(r#"{"summary":"Reviewed.","findings":[]}"#);
     runtime.result(&id).await.expect("result").expect("result");

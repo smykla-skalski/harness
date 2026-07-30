@@ -16,7 +16,8 @@ use uuid::Uuid;
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, CancelNotification, Implementation, InitializeRequest, InitializeResponse,
     NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, ResumeSessionRequest,
-    ResumeSessionResponse, SessionCapabilities, SessionId, SessionResumeCapabilities,
+    ResumeSessionResponse, SessionCapabilities, SessionConfigOption, SessionConfigSelectOption,
+    SessionConfigSelectOptions, SessionId, SessionResumeCapabilities,
     SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::util::internal_error;
@@ -27,6 +28,10 @@ use crate::openrouter::{AgentConfig, ConfigError, OpenRouterClient, discard_api_
 use super::model_catalog::{DEFAULT_MODEL_ID, MODEL_CONFIG_OPTION_ID, build_model_config_option};
 use super::session::{SessionState, SessionStore};
 use super::turn::drive_turn;
+
+const CAPABILITY_PROFILE_CONFIG_OPTION_ID: &str = "harness_capability_profile";
+const STANDARD_CAPABILITY_PROFILE: &str = "standard";
+const REPORT_ONLY_CAPABILITY_PROFILE: &str = "report_only";
 
 /// Run the ACP agent server on stdio until the client disconnects. The
 /// daemon-supplied `api_key_file` carries the OpenRouter API key (Monitor →
@@ -189,7 +194,8 @@ async fn handle_new_session(
         )
         .await;
 
-    NewSessionResponse::new(session_id).config_options(vec![model_option])
+    NewSessionResponse::new(session_id)
+        .config_options(vec![model_option, capability_profile_option(false)])
 }
 
 async fn handle_resume_session(
@@ -208,7 +214,10 @@ async fn handle_resume_session(
         )));
     }
     let model_option = build_model_config_option(client, &snapshot.model).await;
-    Ok(ResumeSessionResponse::new().config_options(vec![model_option]))
+    Ok(ResumeSessionResponse::new().config_options(vec![
+        model_option,
+        capability_profile_option(snapshot.report_only_review),
+    ]))
 }
 
 async fn handle_set_config_option(
@@ -216,6 +225,34 @@ async fn handle_set_config_option(
     client: &OpenRouterClient,
     request: SetSessionConfigOptionRequest,
 ) -> Result<SetSessionConfigOptionResponse, agent_client_protocol::Error> {
+    if request.config_id.0.as_ref() == CAPABILITY_PROFILE_CONFIG_OPTION_ID {
+        let Some(profile) = request.value.as_value_id() else {
+            return Err(internal_error(
+                "capability profile config option expects a select value",
+            ));
+        };
+        let report_only = match profile.0.as_ref() {
+            STANDARD_CAPABILITY_PROFILE => false,
+            REPORT_ONLY_CAPABILITY_PROFILE => true,
+            value => {
+                return Err(internal_error(format!(
+                    "unknown capability profile '{value}'"
+                )));
+            }
+        };
+        if !store
+            .set_report_only_review(&request.session_id, report_only)
+            .await
+        {
+            return Err(internal_error(format!(
+                "unknown ACP session '{}'",
+                request.session_id.0
+            )));
+        }
+        return Ok(SetSessionConfigOptionResponse::new(vec![
+            capability_profile_option(report_only),
+        ]));
+    }
     if request.config_id.0.as_ref() != MODEL_CONFIG_OPTION_ID {
         return Err(internal_error(format!(
             "unknown session config option '{}'",
@@ -234,6 +271,22 @@ async fn handle_set_config_option(
     }
     let option = build_model_config_option(client, &model).await;
     Ok(SetSessionConfigOptionResponse::new(vec![option]))
+}
+
+fn capability_profile_option(report_only: bool) -> SessionConfigOption {
+    SessionConfigOption::select(
+        CAPABILITY_PROFILE_CONFIG_OPTION_ID,
+        "Capability profile",
+        if report_only {
+            REPORT_ONLY_CAPABILITY_PROFILE
+        } else {
+            STANDARD_CAPABILITY_PROFILE
+        },
+        SessionConfigSelectOptions::Ungrouped(vec![
+            SessionConfigSelectOption::new(STANDARD_CAPABILITY_PROFILE, "Standard"),
+            SessionConfigSelectOption::new(REPORT_ONLY_CAPABILITY_PROFILE, "Report only"),
+        ]),
+    )
 }
 
 #[cfg(test)]
@@ -312,6 +365,39 @@ mod tests {
         let (current, choice_count) = model_option_state(option);
         assert_eq!(current, DEFAULT_MODEL_ID);
         assert!(choice_count > 0);
+        let capability = options
+            .iter()
+            .find(|option| option.id.0.as_ref() == CAPABILITY_PROFILE_CONFIG_OPTION_ID)
+            .expect("capability profile option");
+        let (current, _) = model_option_state(capability);
+        assert_eq!(current, STANDARD_CAPABILITY_PROFILE);
+    }
+
+    #[tokio::test]
+    async fn report_only_profile_is_durable_session_state() {
+        let store = SessionStore::new();
+        let client = test_client();
+        let response = handle_new_session(
+            &store,
+            &client,
+            NewSessionRequest::new(PathBuf::from("/tmp")),
+        )
+        .await;
+        let set = SetSessionConfigOptionRequest::new(
+            response.session_id.clone(),
+            CAPABILITY_PROFILE_CONFIG_OPTION_ID,
+            REPORT_ONLY_CAPABILITY_PROFILE,
+        );
+        handle_set_config_option(&store, &client, set)
+            .await
+            .expect("set report-only profile");
+        assert!(
+            store
+                .snapshot(&response.session_id)
+                .await
+                .expect("session")
+                .report_only_review
+        );
     }
 
     #[tokio::test]

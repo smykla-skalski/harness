@@ -115,16 +115,36 @@ pub(crate) async fn load_agent_turn_report_run(
     let Some(session) = agent.session_state else {
         return Ok(Some(run));
     };
+    let terminal_observed =
+        session.last_turn_result.is_some() || session.last_turn_failure.is_some();
+    if !terminal_observed {
+        return Ok(Some(run));
+    }
     run.actual_model = session
         .config_options
         .iter()
-        .find(|option| option.id == "model")
+        .find(|option| option.id == "harness_provider_effective_model")
         .map(|option| option.current_value.clone());
+    run.report = session
+        .last_turn_result
+        .as_ref()
+        .map(|result| result.report.clone())
+        .or_else(|| session.last_turn_partial_output.clone());
+    if let Err(detail) =
+        verify_effective_model(run.requested_model.as_deref(), run.actual_model.as_deref())
+    {
+        run.status = AgentTurnRunStatus::Failed;
+        run.error = Some(detail);
+        run.updated_at = harness_workspace::workspace::utc_now();
+        db.save_agent_turn_run(&run).await?;
+        return db.agent_turn_run(run_id).await;
+    }
     if let Some(result) = session.last_turn_result {
         run.status = AgentTurnRunStatus::Completed;
         run.report = Some(result.report);
         run.stop_reason = Some(result.stop_reason);
     } else if let Some(failure) = session.last_turn_failure {
+        run.report = session.last_turn_partial_output;
         run.status = if failure.category == AgentTurnFailureCategory::Cancelled {
             AgentTurnRunStatus::Cancelled
         } else {
@@ -135,10 +155,49 @@ pub(crate) async fn load_agent_turn_report_run(
         } else {
             run.error = Some(failure.detail);
         }
-    } else {
-        return Ok(Some(run));
     }
     run.updated_at = harness_workspace::workspace::utc_now();
     db.save_agent_turn_run(&run).await?;
     db.agent_turn_run(run_id).await
+}
+
+fn verify_effective_model(
+    requested_model: Option<&str>,
+    actual_model: Option<&str>,
+) -> Result<(), String> {
+    let Some(requested_model) = requested_model else {
+        return Ok(());
+    };
+    if actual_model == Some(requested_model) {
+        return Ok(());
+    }
+    Err(format!(
+        "provider effective model mismatch: requested '{requested_model}', observed '{}'",
+        actual_model.unwrap_or("<missing>")
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify_effective_model;
+
+    #[test]
+    fn effective_model_accepts_an_exact_match() {
+        assert!(verify_effective_model(Some("deepseek/v4"), Some("deepseek/v4")).is_ok());
+    }
+
+    #[test]
+    fn effective_model_rejects_a_mismatch_and_missing_observation() {
+        for observed in [Some("other/model"), None] {
+            let error = verify_effective_model(Some("deepseek/v4"), observed)
+                .expect_err("mismatch must fail");
+            assert!(error.contains("deepseek/v4"));
+            assert!(error.contains(observed.unwrap_or("<missing>")));
+        }
+    }
+
+    #[test]
+    fn provider_default_profiles_do_not_gain_a_false_requested_model() {
+        assert!(verify_effective_model(None, Some("provider/default")).is_ok());
+    }
 }

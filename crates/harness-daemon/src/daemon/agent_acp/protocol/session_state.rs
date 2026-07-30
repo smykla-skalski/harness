@@ -17,6 +17,8 @@ use harness_kernel::remote_redaction::redact_known_secrets;
 
 use super::session_config::session_config_category_name;
 
+const PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID: &str = "harness_provider_effective_model";
+
 /// Seed the live state from whichever call opened the session; `session/new`
 /// and `session/resume` both report these two.
 pub(super) fn seed_from_session_start(
@@ -43,7 +45,7 @@ pub(super) fn record_config_snapshot(
     response: &SetSessionConfigOptionResponse,
 ) {
     supervisor.mutate_session_state(|state| {
-        state.config_options = config_option_states(&response.config_options);
+        merge_config_option_states(&mut state.config_options, &response.config_options);
     });
 }
 
@@ -53,6 +55,10 @@ pub(super) fn begin_turn(supervisor: &AcpSessionSupervisor) {
         state.last_stop_reason = None;
         state.last_turn_result = None;
         state.last_turn_failure = None;
+        state.last_turn_partial_output = None;
+        state
+            .config_options
+            .retain(|option| option.id != PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID);
     });
 }
 
@@ -73,6 +79,11 @@ pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &P
     supervisor.mutate_session_state(|state| {
         state.last_stop_reason = Some(label.to_owned());
         state.last_turn_failure = failure;
+        state.last_turn_partial_output = state
+            .last_turn_failure
+            .as_ref()
+            .and_then(|_| report.clone())
+            .filter(|output| !output.trim().is_empty());
         if state.last_turn_failure.is_none()
             && let Some(report) = report
         {
@@ -88,7 +99,9 @@ pub(super) fn record_stop_reason(supervisor: &AcpSessionSupervisor, response: &P
 }
 
 pub(super) fn record_prompt_error(supervisor: &AcpSessionSupervisor, error: &AcpError) {
-    supervisor.discard_turn_report();
+    let partial_output = supervisor
+        .take_turn_report()
+        .filter(|output| !output.trim().is_empty());
     let mut failure = error
         .data
         .clone()
@@ -101,6 +114,7 @@ pub(super) fn record_prompt_error(supervisor: &AcpSessionSupervisor, error: &Acp
         state.last_stop_reason = None;
         state.last_turn_result = None;
         state.last_turn_failure = Some(failure);
+        state.last_turn_partial_output = partial_output;
     });
 }
 
@@ -151,7 +165,7 @@ pub(super) fn apply_session_update(
 ) -> Option<String> {
     match update {
         SessionUpdate::ConfigOptionUpdate(update) => supervisor.mutate_session_state(|state| {
-            state.config_options = config_option_states(&update.config_options);
+            merge_config_option_states(&mut state.config_options, &update.config_options);
         }),
         SessionUpdate::CurrentModeUpdate(update) => supervisor.mutate_session_state(|state| {
             state.current_mode_id = Some(update.current_mode_id.0.to_string());
@@ -204,4 +218,17 @@ fn config_option_states(options: &[SessionConfigOption]) -> Vec<AcpSessionConfig
             },
         })
         .collect()
+}
+
+fn merge_config_option_states(
+    current: &mut Vec<AcpSessionConfigOptionState>,
+    updates: &[SessionConfigOption],
+) {
+    for update in config_option_states(updates) {
+        if let Some(existing) = current.iter_mut().find(|existing| existing.id == update.id) {
+            *existing = update;
+        } else {
+            current.push(update);
+        }
+    }
 }
