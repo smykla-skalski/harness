@@ -61,36 +61,16 @@ async fn remote_offer_freezes_the_same_openrouter_runtime_as_the_local_attempt()
     ))
     .await;
     refresh_fixture_observation(&fixture, 1, 0).await;
-    let phase = crate::task_board::TaskBoardExecutionPhase::Review;
-    let source = super::requests::prepare_source(&fixture.execution, phase, None)
-        .expect("prepare remote source")
-        .expect("remote source is ready");
-    let host = fixture
-        .db
-        .resolve_task_board_remote_host(
-            &fixture.execution,
-            source.source.repository(),
-            phase,
-            "openrouter",
-            &canonical_now(),
-        )
-        .await
-        .expect("resolve OpenRouter host")
-        .expect("OpenRouter host is eligible");
-    let prepared = super::requests::prepare_offer(
-        &fixture.execution,
-        &fixture.attempt,
-        &host,
-        source,
-        &canonical_now(),
-    )
-    .expect("prepare OpenRouter offer")
-    .expect("configuration remains current");
+    let mut report = TaskBoardRemoteControllerReport::default();
 
-    assert_eq!(prepared.request.launch.runtime, "openrouter");
+    offer_remote_candidates(&fixture.db, &mut report)
+        .await
+        .expect("select the OpenRouter-capable host");
+
+    assert_eq!(report.offered_attempts, 1);
     assert_eq!(
-        prepared.request.launch.runtime,
-        fixture.execution.resolved_reviewers.profiles[0].runtime
+        offered_runtime(&fixture).await,
+        fixture.execution.resolved_reviewers.profiles[0].runtime,
     );
 }
 
@@ -336,4 +316,15 @@ async fn codex_run_count(fixture: &crate::daemon::db::RemoteControllerFixture) -
         .fetch_one(fixture.db.pool())
         .await
         .expect("count local Codex runs")
+}
+
+async fn offered_runtime(fixture: &crate::daemon::db::RemoteControllerFixture) -> String {
+    query_scalar(
+        "SELECT json_extract(request_json, '$.launch.runtime') \
+         FROM task_board_remote_assignments WHERE execution_id = ?1",
+    )
+    .bind(&fixture.execution.execution_id)
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load offered runtime")
 }

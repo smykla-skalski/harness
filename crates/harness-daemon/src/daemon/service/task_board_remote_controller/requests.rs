@@ -65,11 +65,7 @@ pub(super) fn prepare_offer(
     let deadline_at = offered_at + Duration::seconds(REMOTE_ATTEMPT_DEADLINE_SECONDS);
     let binding = binding(execution, attempt, host, phase, source.repository())?;
     let launch = remote_codex_attempt_request(execution, attempt)?;
-    let runtime = if phase == TaskBoardExecutionPhase::Implementation {
-        "codex"
-    } else {
-        attempt_profile(execution, attempt)?.runtime.as_str()
-    };
+    let runtime = offer_runtime(execution, attempt, phase)?;
     let request = RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding,
@@ -90,6 +86,18 @@ pub(super) fn prepare_offer(
         lease_expires_at: canonical(lease_expires_at),
         deadline_at: canonical(deadline_at),
     }))
+}
+
+pub(super) fn offer_runtime<'a>(
+    execution: &'a TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+    phase: TaskBoardExecutionPhase,
+) -> Result<&'a str, CliError> {
+    if phase == TaskBoardExecutionPhase::Implementation {
+        Ok("codex")
+    } else {
+        Ok(attempt_profile(execution, attempt)?.runtime.as_str())
+    }
 }
 
 pub(super) fn prepare_source(

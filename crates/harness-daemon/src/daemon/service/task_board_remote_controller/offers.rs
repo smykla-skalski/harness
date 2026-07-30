@@ -38,8 +38,9 @@ pub(super) async fn offer_remote_candidate(
         return Ok(());
     };
     let source_repository = prepared_source.repository().to_owned();
+    let runtime = requests::offer_runtime(execution, attempt, phase)?;
     let host = db
-        .resolve_task_board_remote_host(execution, &source_repository, phase, "codex", &now)
+        .resolve_task_board_remote_host(execution, &source_repository, phase, runtime, &now)
         .await?;
     let Some(host) = host else {
         select_local_target(db, execution, attempt, &now).await?;
