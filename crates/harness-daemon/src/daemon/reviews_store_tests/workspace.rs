@@ -1,7 +1,7 @@
 use sqlx::query;
 use tempfile::{TempDir, tempdir};
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_duplicate};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -17,6 +17,33 @@ async fn connect() -> (TempDir, AsyncDaemonDb) {
 async fn load_unseeded_workspace_returns_none() {
     let (_dir, db) = connect().await;
     assert!(db.load_policy_workspace().await.expect("load").is_none());
+}
+
+#[test]
+fn sync_load_unseeded_returns_none() {
+    let db = DaemonDb::open_in_memory().expect("open in-memory db");
+    assert!(db.load_policy_workspace().expect("load").is_none());
+}
+
+#[tokio::test]
+async fn sync_reads_workspace_written_by_async() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("harness.db");
+    let workspace = PolicyCanvasWorkspace::seeded();
+    let async_db = AsyncDaemonDb::connect(&path)
+        .await
+        .expect("connect async db");
+    async_db
+        .replace_policy_workspace(&workspace)
+        .await
+        .expect("write workspace via async stack");
+    drop(async_db);
+    let db = DaemonDb::open(&path).expect("open sync db on same file");
+    let loaded = db
+        .load_policy_workspace()
+        .expect("sync load")
+        .expect("workspace present");
+    assert_eq!(loaded, workspace);
 }
 
 #[tokio::test]
