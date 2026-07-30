@@ -1,10 +1,10 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardDependencyRecoveryStep, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome,
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
-    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
-    TaskBoardWorkflowRevisionGuard, classify_task_board_dependency_workflow_recovery,
+    TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
+    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard,
+    classify_task_board_dependency_workflow_recovery,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use sha2::{Digest, Sha256};
@@ -27,13 +27,13 @@ pub(super) async fn reconcile_execution<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    let recovery = classify_task_board_dependency_workflow_recovery(&execution)?;
-    if recovery.step == TaskBoardDependencyRecoveryStep::Stop && is_stopped(&execution) {
+    if is_stopped(&execution) {
         return Ok(());
     }
     if refuse_unusable_execution(db, &execution, now).await? {
         return Ok(());
     }
+    classify_task_board_dependency_workflow_recovery(&execution)?;
     if execution.transition.execution_state == TaskBoardExecutionState::RetryWait {
         crate::daemon::service::task_board_workflow_execution::resume_workflow_retry(
             db,
