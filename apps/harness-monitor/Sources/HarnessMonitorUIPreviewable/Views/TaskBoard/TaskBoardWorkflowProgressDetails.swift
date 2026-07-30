@@ -14,8 +14,6 @@ struct TaskBoardWorkflowAttemptSelection: Identifiable {
 
 struct TaskBoardWorkflowStepDetailSheet: View {
   let step: TaskBoardDependencyTriageStep
-  @Environment(\.dismiss)
-  private var dismiss
   @Environment(\.fontScale)
   private var fontScale
 
@@ -23,8 +21,7 @@ struct TaskBoardWorkflowStepDetailSheet: View {
     TaskBoardWorkflowDetailSheetFrame(
       title: step.action.displayTitle,
       subtitle: "Next step \(step.order)",
-      systemImage: "\(max(1, min(step.order, 50))).circle",
-      dismiss: dismiss.callAsFunction
+      systemImage: "\(max(1, min(step.order, 50))).circle"
     ) {
       Text(step.reason.withoutTrailingPeriod)
         .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
@@ -37,8 +34,6 @@ struct TaskBoardWorkflowStepDetailSheet: View {
 
 struct TaskBoardWorkflowAttemptDetailSheet: View {
   let attempt: TaskBoardWorkflowAttemptProgress
-  @Environment(\.dismiss)
-  private var dismiss
   @Environment(\.fontScale)
   private var fontScale
 
@@ -47,8 +42,7 @@ struct TaskBoardWorkflowAttemptDetailSheet: View {
       title: attempt.actionKey.displayTitle,
       subtitle: "Attempt \(attempt.attempt) for this step",
       systemImage: attempt.state.systemImage,
-      tint: attempt.state.tint,
-      dismiss: dismiss.callAsFunction
+      tint: attempt.state.tint
     ) {
       VStack(spacing: 0) {
         TaskBoardWorkflowValueRow(
@@ -113,8 +107,9 @@ private struct TaskBoardWorkflowDetailSheetFrame<Content: View>: View {
   let subtitle: String
   let systemImage: String
   var tint = HarnessMonitorTheme.secondaryInk
-  let dismiss: () -> Void
   let content: Content
+  @Environment(\.dismiss)
+  private var dismiss
   @Environment(\.fontScale)
   private var fontScale
 
@@ -123,14 +118,12 @@ private struct TaskBoardWorkflowDetailSheetFrame<Content: View>: View {
     subtitle: String,
     systemImage: String,
     tint: Color = HarnessMonitorTheme.secondaryInk,
-    dismiss: @escaping () -> Void,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
     self.subtitle = subtitle
     self.systemImage = systemImage
     self.tint = tint
-    self.dismiss = dismiss
     self.content = content()
   }
 
@@ -148,8 +141,10 @@ private struct TaskBoardWorkflowDetailSheetFrame<Content: View>: View {
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Button("Done", action: dismiss)
-          .keyboardShortcut(.cancelAction)
+        Button("Done") {
+          dismiss()
+        }
+        .keyboardShortcut(.cancelAction)
       }
       .padding(HarnessMonitorTheme.spacingMD)
       Divider()

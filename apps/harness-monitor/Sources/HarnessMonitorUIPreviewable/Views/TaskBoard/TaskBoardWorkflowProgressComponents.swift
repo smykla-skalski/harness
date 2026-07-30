@@ -1,6 +1,15 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private struct TaskBoardWorkflowRowButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .foregroundStyle(HarnessMonitorTheme.ink)
+      .opacity(configuration.isPressed ? 0.72 : 1)
+      .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+  }
+}
+
 private struct TaskBoardWorkflowBadgeChrome: ViewModifier {
   let tint: Color
   @Environment(\.accessibilityReduceTransparency)
@@ -201,7 +210,7 @@ struct TaskBoardWorkflowChecksCard: View {
             Link(destination: url) {
               checkRow(check, showsExternalLink: true)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TaskBoardWorkflowRowButtonStyle())
             .help("Open check")
           } else {
             checkRow(check, showsExternalLink: false)
@@ -277,7 +286,7 @@ struct TaskBoardWorkflowStepsCard: View {
           }
           .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TaskBoardWorkflowRowButtonStyle())
         .help("Show step details")
         .padding(HarnessMonitorTheme.spacingSM)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -338,7 +347,7 @@ struct TaskBoardWorkflowAttemptsCard: View {
           }
           .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TaskBoardWorkflowRowButtonStyle())
         .help("Show attempt details")
         .padding(HarnessMonitorTheme.spacingSM)
         .frame(maxWidth: .infinity, alignment: .leading)
