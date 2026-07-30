@@ -306,8 +306,8 @@ fn redact_timestamps(json: &mut serde_json::Value) {
             entry["timestamp"] = serde_json::json!("REDACTED");
         }
     }
-    // See snapshot_initial_state: key order otherwise tracks whichever
-    // sibling crates share this build's `preserve_order` feature state.
+    // See snapshot_initial_state: key order otherwise tracks whether
+    // `serde_json/preserve_order` got unified on for this build.
     json.sort_all_objects();
 }
 
