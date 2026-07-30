@@ -71,6 +71,24 @@ impl OpenRouterAgentTurnRuntime {
                 cancelled: false,
                 terminal_persisted: false,
             });
+        let attached = self
+            .manager
+            .inspect(&self.session_id)?
+            .agents
+            .iter()
+            .any(|agent| agent.acp_id == runtime_turn_id);
+        if !attached {
+            self.persist_settlement(
+                &id,
+                AgentTurnRunStatus::Failed,
+                None,
+                None,
+                None,
+                Some("provider turn is no longer attached to this daemon".into()),
+            )
+            .await?;
+            return Ok(());
+        }
         match self.status(&id).await? {
             AgentTurnStatus::Completed => {
                 self.result(&id).await?.ok_or_else(|| {

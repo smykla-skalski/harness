@@ -123,17 +123,11 @@ async fn run_openrouter_restart_case(tls: &TestTlsMaterial) {
         executor_db
             .reconcile_interrupted_agent_turn_runs()
             .await
-            .expect("settle interrupted OpenRouter run"),
-        1
-    );
-    assert_eq!(
-        executor_db
-            .reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("repeat restart reconciliation"),
+            .expect("preserve correlated OpenRouter run"),
         0
     );
-    reconcile_executor_tick(&executor, "consume restart-settled OpenRouter run").await;
+    drop(seam);
+    reconcile_executor_tick(&executor, "settle restart-evicted OpenRouter run").await;
     let run_count: i64 = query_scalar("SELECT COUNT(*) FROM agent_turn_runs WHERE run_id = ?1")
         .bind(&identity.run_id)
         .fetch_one(executor_db.pool())
@@ -148,6 +142,7 @@ async fn run_openrouter_restart_case(tls: &TestTlsMaterial) {
         &claimed,
     )
     .await;
+    let retry_seam = install_deterministic_runtime_seam().await;
     reconcile_executor_tick(&executor, "acquire retried OpenRouter start authority").await;
     reconcile_executor_tick(&executor, "start retried durable OpenRouter turn").await;
     let second_executor_record =
@@ -155,7 +150,7 @@ async fn run_openrouter_restart_case(tls: &TestTlsMaterial) {
     let second_identity = crate::daemon::db::remote_executor_identity(&second_executor_record)
         .expect("retried OpenRouter executor identity");
     assert_ne!(second_identity.run_id, identity.run_id);
-    assert_eq!(seam.start_count().await, 2);
+    assert_eq!(retry_seam.start_count().await, 1);
     assert_eq!(
         query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_turn_runs")
             .fetch_one(executor_db.pool())

@@ -148,27 +148,19 @@ async fn openrouter_start_is_durable_and_restart_settles_once_body() {
             .db
             .reconcile_interrupted_agent_turn_runs()
             .await
-            .expect("settle interrupted OpenRouter run"),
-        1
-    );
-    assert_eq!(
-        fixture
-            .db
-            .reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("replay interrupted reconciliation"),
+            .expect("preserve correlated OpenRouter run"),
         0
     );
+    drop(scope);
     reconcile_task_board_remote_executor_tick(&state)
         .await
-        .expect("consume the restart-settled run");
+        .expect("settle the turn evicted from the restarted runtime");
     assert_eq!(
         load_assignment(&fixture.db, &before.assignment_id)
             .await
             .state,
         TaskBoardRemoteAssignmentState::Failed
     );
-    assert_eq!(scope.calls().await.len(), 2);
 }
 
 #[test]

@@ -24,6 +24,7 @@ pub(super) struct FakeManager {
     request: Mutex<Option<AcpAgentStartRequest>>,
     state: Mutex<AcpAgentSessionState>,
     runtime_session_id: Mutex<Option<String>>,
+    attached: Mutex<bool>,
     stopped: Mutex<bool>,
     stop_probe: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     stop_fails: Mutex<bool>,
@@ -35,6 +36,7 @@ impl Default for FakeManager {
             request: Mutex::default(),
             state: Mutex::default(),
             runtime_session_id: Mutex::new(Some("openrouter-session-1".into())),
+            attached: Mutex::new(true),
             stopped: Mutex::default(),
             stop_probe: Mutex::default(),
             stop_fails: Mutex::default(),
@@ -71,6 +73,10 @@ impl FakeManager {
             detail,
         ));
     }
+
+    pub(super) fn evict(&self) {
+        *self.attached.lock().expect("attached lock") = false;
+    }
 }
 
 impl OpenRouterTurnManager for FakeManager {
@@ -87,10 +93,15 @@ impl OpenRouterTurnManager for FakeManager {
     }
 
     fn inspect(&self, _session_id: &str) -> Result<AcpAgentInspectResponse, CliError> {
-        Ok(AcpAgentInspectResponse {
-            agents: vec![inspect_snapshot(
+        let agents = if *self.attached.lock().expect("attached lock") {
+            vec![inspect_snapshot(
                 self.state.lock().expect("state lock").clone(),
-            )],
+            )]
+        } else {
+            Vec::new()
+        };
+        Ok(AcpAgentInspectResponse {
+            agents,
             daemon_perceived_now: None,
             available: true,
             issue_message: None,
