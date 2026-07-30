@@ -12,6 +12,7 @@ use crate::session::types::{AgentStatus, SessionRole};
 
 mod admission_recovery;
 mod completion_evidence;
+mod dependency_fixer;
 mod registration_recovery;
 mod request_validation;
 mod task_lifecycle;

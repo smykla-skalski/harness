@@ -345,7 +345,7 @@ fn validate_disposition(
         Err(TaskBoardDependencyTriageError::DispositionContradictsEvidence)
     }
 }
-fn valid_head_revision(revision: &str) -> bool {
+pub(super) fn valid_head_revision(revision: &str) -> bool {
     matches!(revision.len(), 40 | 64)
         && revision
             .bytes()
