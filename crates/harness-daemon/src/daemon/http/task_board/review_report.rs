@@ -16,7 +16,7 @@ use super::items::authenticated_task_board_read;
     get,
     path = "/v1/task-board/items/{item_id}/review-report",
     tag = "task-board",
-    description = "Return the current AI review state for one task-board item. An active execution takes precedence over older terminal reports",
+    description = "Return the current AI review state for one task-board item. A live review attempt takes precedence; otherwise the latest retained terminal report is returned",
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "Not-started, running, completed, failed, or cancelled AI review state", body = TaskBoardAiReviewReportResponse),

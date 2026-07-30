@@ -1,8 +1,8 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardAiReviewReportResponse, TaskBoardAiReviewUnavailableExecution,
-    TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardAiReviewReportResponse, TaskBoardAiReviewUnavailableExecution, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptRecord, TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_codex_requests::attempt_profile;
@@ -29,15 +29,16 @@ pub(crate) async fn get_task_board_ai_review_report_db(
     };
 
     if let Some(execution) = execution.as_ref()
-        && is_review_execution(execution.snapshot.workflow_kind)
-        && !is_terminal(execution.transition.execution_state)
+        && let Some(attempt) = active_review_attempt(execution)?
     {
-        return running_review_response(db, execution).await;
+        return running_review_response(db, execution, attempt).await;
     }
 
     let latest = db.task_board_latest_ai_review_report(&request.id).await?;
     if let Some(report) = latest {
-        return Ok(TaskBoardAiReviewReportResponse::from_terminal_report(report));
+        return Ok(TaskBoardAiReviewReportResponse::from_terminal_report(
+            report,
+        ));
     }
     let Some(execution) = execution.as_ref().filter(|execution| {
         is_review_execution(execution.snapshot.workflow_kind)
@@ -51,6 +52,7 @@ pub(crate) async fn get_task_board_ai_review_report_db(
 async fn running_review_response(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardAiReviewReportResponse, CliError> {
     let provenance = review_runtime_provenance(db, execution).await?;
     Ok(TaskBoardAiReviewReportResponse::Running {
@@ -60,7 +62,7 @@ async fn running_review_response(
         actual_runtime: provenance.actual_runtime,
         requested_model: provenance.requested_model,
         head_revision: execution.transition.exact_head_revision.clone(),
-        started_at: execution.created_at.clone(),
+        started_at: attempt.started_at.clone(),
     })
 }
 
@@ -209,15 +211,53 @@ const fn is_terminal(state: TaskBoardExecutionState) -> bool {
     )
 }
 
+fn active_review_attempt(
+    execution: &TaskBoardWorkflowExecutionRecord,
+) -> Result<Option<&TaskBoardExecutionAttemptRecord>, CliError> {
+    if !is_review_execution(execution.snapshot.workflow_kind) {
+        return Ok(None);
+    }
+    let Some(attempt) = execution
+        .attempts
+        .iter()
+        .find(|attempt| is_active(attempt.state) && attempt.action_key.starts_with("review:"))
+    else {
+        return Ok(None);
+    };
+    attempt_profile(execution, attempt)?;
+    Ok(Some(attempt))
+}
+
+const fn is_active(state: TaskBoardAttemptState) -> bool {
+    matches!(
+        state,
+        TaskBoardAttemptState::Preparing
+            | TaskBoardAttemptState::Starting
+            | TaskBoardAttemptState::Running
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_terminal, select_latest_review_attempt};
+    use super::{is_active, is_terminal, select_latest_review_attempt};
     use crate::task_board::{
         TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
     };
 
     #[test]
-    fn human_required_review_remains_observable_as_running() {
+    fn only_live_attempt_states_are_active() {
+        assert!(is_active(TaskBoardAttemptState::Preparing));
+        assert!(is_active(TaskBoardAttemptState::Starting));
+        assert!(is_active(TaskBoardAttemptState::Running));
+        assert!(!is_active(TaskBoardAttemptState::RetryWait));
+        assert!(!is_active(TaskBoardAttemptState::Completed));
+        assert!(!is_active(TaskBoardAttemptState::Failed));
+        assert!(!is_active(TaskBoardAttemptState::Cancelled));
+        assert!(!is_active(TaskBoardAttemptState::Unknown));
+    }
+
+    #[test]
+    fn only_finished_execution_states_are_terminal() {
         assert!(!is_terminal(TaskBoardExecutionState::HumanRequired));
         assert!(is_terminal(TaskBoardExecutionState::Completed));
         assert!(is_terminal(TaskBoardExecutionState::Failed));

@@ -22,6 +22,20 @@ import SwiftUI
   .harnessPreviewSceneAppearance()
 }
 
+#Preview("Task Board Review Report — Failed") {
+  TaskBoardReviewReportPreviewSurface(
+    response: .failed(report: TaskBoardReviewReportPreviewFixture.failedReport)
+  )
+  .harnessPreviewSceneAppearance()
+}
+
+#Preview("Task Board Review Report — Cancelled") {
+  TaskBoardReviewReportPreviewSurface(
+    response: .cancelled(report: TaskBoardReviewReportPreviewFixture.cancelledReport)
+  )
+  .harnessPreviewSceneAppearance()
+}
+
 @MainActor
 private struct TaskBoardReviewReportPreviewSurface: View {
   @State private var state: TaskBoardReviewReportState
@@ -186,6 +200,26 @@ private enum TaskBoardReviewReportPreviewFixture {
       deletedAt: nil
     )
   }
+
+  static var failedReport: TaskBoardAiReviewReportRecord {
+    var report = report
+    report.status = .failed
+    report.summary = nil
+    report.findings = []
+    report.partialOutput = "The provider returned an incomplete structured response."
+    report.terminalReason = "The response did not satisfy the report-only result contract."
+    return report
+  }
+
+  static var cancelledReport: TaskBoardAiReviewReportRecord {
+    var report = report
+    report.status = .cancelled
+    report.summary = nil
+    report.findings = []
+    report.partialOutput = nil
+    report.terminalReason = "Cancelled by the operator before findings were produced."
+    return report
+  }
 }
 
 @MainActor
@@ -227,6 +261,18 @@ public enum TaskBoardReviewReportPreviewRenderer {
         textSizeIndex: HarnessMonitorTextSize.defaultIndex,
         item: TaskBoardReviewReportPreviewFixture.terminalItem,
         response: TaskBoardReviewReportPreviewFixture.terminalResponse,
+        directory: directory
+      )
+      && renderReviewReport(
+        name: "review-report-failed",
+        textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        response: .failed(report: TaskBoardReviewReportPreviewFixture.failedReport),
+        directory: directory
+      )
+      && renderReviewReport(
+        name: "review-report-cancelled",
+        textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        response: .cancelled(report: TaskBoardReviewReportPreviewFixture.cancelledReport),
         directory: directory
       )
       && renderReviewReport(

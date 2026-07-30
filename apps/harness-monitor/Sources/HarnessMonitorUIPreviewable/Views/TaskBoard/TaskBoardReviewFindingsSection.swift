@@ -5,6 +5,7 @@ struct TaskBoardReviewFindingsSection: View {
   let findings: [TaskBoardReportOnlyReviewFinding]
   let repository: String
   let revision: String
+  let status: TaskBoardAiReviewReportStatus
   @Environment(\.fontScale)
   private var fontScale
 
@@ -43,7 +44,7 @@ struct TaskBoardReviewFindingsSection: View {
 
   @ViewBuilder private var findingsContent: some View {
     if findings.isEmpty {
-      Text("No actionable findings")
+      Text(status.emptyFindingsMessage)
         .font(captionFont)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .padding(HarnessMonitorTheme.spacingMD)
@@ -99,7 +100,8 @@ struct TaskBoardReviewFindingsSection: View {
     }
   }
 
-  @ViewBuilder private func locationLink(
+  @ViewBuilder
+  private func locationLink(
     _ location: TaskBoardReviewFindingLocation
   ) -> some View {
     let line = location.line.map { ":\($0)" } ?? ""
@@ -128,6 +130,19 @@ struct TaskBoardReviewFindingsSection: View {
       .fixedSize(horizontal: false, vertical: true)
       .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
       .clipped()
+  }
+}
+
+extension TaskBoardAiReviewReportStatus {
+  var emptyFindingsMessage: String {
+    switch self {
+    case .completed:
+      "No actionable findings"
+    case .failed:
+      "Review failed before producing findings"
+    case .cancelled:
+      "Review was cancelled before producing findings"
+    }
   }
 }
 

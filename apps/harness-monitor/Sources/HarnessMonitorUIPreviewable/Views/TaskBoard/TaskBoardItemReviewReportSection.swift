@@ -137,16 +137,19 @@ struct TaskBoardItemReviewReportSection: View {
       case .completed(let report):
         terminalReport(
           report,
+          status: .completed,
           tint: HarnessMonitorTheme.success
         )
       case .failed(let report):
         terminalReport(
           report,
+          status: .failed,
           tint: HarnessMonitorTheme.danger
         )
       case .cancelled(let report):
         terminalReport(
           report,
+          status: .cancelled,
           tint: HarnessMonitorTheme.caution
         )
       }
@@ -170,6 +173,7 @@ struct TaskBoardItemReviewReportSection: View {
 
   private func terminalReport(
     _ report: TaskBoardAiReviewReportRecord,
+    status: TaskBoardAiReviewReportStatus,
     tint: Color
   ) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
@@ -221,7 +225,8 @@ struct TaskBoardItemReviewReportSection: View {
       TaskBoardReviewFindingsSection(
         findings: report.findings,
         repository: report.repository,
-        revision: report.headRevision
+        revision: report.headRevision,
+        status: status
       )
     }
     .fixedSize(horizontal: false, vertical: true)

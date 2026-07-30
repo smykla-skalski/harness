@@ -12,7 +12,9 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus};
 
-use super::task_board_review_report_support::{clear_active_execution, seed_running_execution};
+use super::task_board_review_report_support::{
+    seed_running_execution, settle_active_review_attempt,
+};
 
 #[test]
 fn task_board_http_and_ws_item_payloads_and_errors_match() {
@@ -112,6 +114,12 @@ async fn run_task_board_transport_parity() {
 
     let http_execution = seed_running_execution(&db, "parity-http").await;
     let ws_execution = seed_running_execution(&db, "parity-ws").await;
+    db.append_task_board_ai_review_report(&completed_report("parity-http"))
+        .await
+        .expect("append older HTTP review report");
+    db.append_task_board_ai_review_report(&completed_report("parity-ws"))
+        .await
+        .expect("append older WebSocket review report");
     let http_review = get_json(
         &client,
         &base_url,
@@ -130,21 +138,16 @@ async fn run_task_board_transport_parity() {
         normalized_running_review(&ws_review)
     );
     assert_eq!(http_review["status"], "running");
-    assert_eq!(http_review["runtime"], "codex");
-    assert_eq!(http_review["requested_model"], "gpt-5.3-codex-spark");
+    assert_eq!(http_review["runtime"], "openrouter");
+    assert_eq!(http_review["requested_model"], "deepseek/deepseek-v4-flash");
     assert_eq!(
         http_review["head_revision"],
         "0123456789abcdef0123456789abcdef01234567"
     );
-    clear_active_execution(&db, http_execution).await;
-    clear_active_execution(&db, ws_execution).await;
+    assert_eq!(http_review["started_at"], "2026-07-29T18:00:05Z");
+    settle_active_review_attempt(&db, &http_execution).await;
+    settle_active_review_attempt(&db, &ws_execution).await;
 
-    db.append_task_board_ai_review_report(&completed_report("parity-http"))
-        .await
-        .expect("append HTTP review report");
-    db.append_task_board_ai_review_report(&completed_report("parity-ws"))
-        .await
-        .expect("append WebSocket review report");
     let http_review = get_json(
         &client,
         &base_url,
