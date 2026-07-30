@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[cfg(unix)]
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 #[cfg(unix)]
-use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
+use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd as _;
 
@@ -152,16 +152,19 @@ fn check_trusted_metadata(
 /// survive exec, or when its owner or permissions don't pass validation.
 #[cfg(unix)]
 fn open_validated_trusted_file(path: &Path, name: &str) -> Result<File, WorkerError> {
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)
+    let file = File::from(
+        rustix::fs::open(
+            path,
+            rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        )
         .map_err(|error| {
             WorkerError::new(format!(
                 "open trusted Harness worker {name} at {}: {error}",
                 path.display()
             ))
-        })?;
+        })?,
+    );
     let metadata = file.metadata().map_err(|error| {
         WorkerError::new(format!(
             "inspect trusted Harness worker {name} at {}: {error}",

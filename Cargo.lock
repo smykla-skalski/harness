@@ -3698,7 +3698,6 @@ dependencies = [
 name = "harness-command"
 version = "55.0.0"
 dependencies = [
- "libc",
  "rustix",
  "tempfile",
  "uzers",
