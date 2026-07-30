@@ -81,7 +81,10 @@ pub fn load_provider_credentials(instance_id: &str) {
 // selects that branch (e.g. Linux, or any `test-support` build) sees no
 // caller at all.
 #[must_use]
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(
+    any(not(target_os = "macos"), feature = "test-support"),
+    allow(dead_code)
+)]
 fn database_credential_account(instance_id: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(instance_id.as_bytes());
