@@ -226,6 +226,29 @@ PYEOF
     if [ "${missing_count:-0}" -gt 0 ]; then
       return 0
     fi
+
+    local undeclared_count
+    undeclared_count="$(
+      /usr/bin/python3 - "$ROOT/Tuist/Package.swift" "$resolved_path" <<'PYEOF'
+import json, re, sys
+with open(sys.argv[1]) as f:
+    manifest = f.read()
+urls = re.findall(r'\.package\(url:\s*"([^"]+)', manifest)
+def identity_from_url(url):
+    last = url.rstrip('/').split('/')[-1]
+    if last.endswith('.git'):
+        last = last[:-4]
+    return last.lower()
+declared = {identity_from_url(u) for u in urls}
+with open(sys.argv[2]) as f:
+    resolved = json.load(f)
+pinned = {p["identity"] for p in resolved.get("pins", [])}
+print(len(declared - pinned))
+PYEOF
+    )"
+    if [ "${undeclared_count:-0}" -gt 0 ]; then
+      return 0
+    fi
   fi
 
   return 1
