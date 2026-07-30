@@ -1,7 +1,7 @@
 use clap::Parser;
 
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote_pairing::RemotePairingCode;
+use harness_daemon::daemon::db::DaemonDb;
+use harness_remote_trust::remote_pairing::RemotePairingCode;
 
 use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand};
 

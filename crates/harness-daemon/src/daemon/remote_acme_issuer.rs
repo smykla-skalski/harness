@@ -475,7 +475,8 @@ fn redacted_acme_error(error: &instant_acme::Error) -> String {
 #[path = "remote_acme_system_issuer.rs"]
 mod system;
 
-pub(crate) use system::{SystemRemoteAcmeIssuer, run_acme_future};
+pub use system::SystemRemoteAcmeIssuer;
+pub(crate) use system::run_acme_future;
 
 #[cfg(test)]
 #[path = "remote_acme_issuer_tests.rs"]

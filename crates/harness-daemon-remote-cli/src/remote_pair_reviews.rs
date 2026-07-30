@@ -1,8 +1,8 @@
 use clap::Args;
 
-use crate::daemon::remote_pairing::normalize_remote_reviews_query;
-use crate::reviews::ReviewsQueryRequest;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_remote_trust::remote_pairing::normalize_remote_reviews_query;
+use harness_reviews::ReviewsQueryRequest;
 
 use super::remote::DaemonRemotePairCreateArgs;
 

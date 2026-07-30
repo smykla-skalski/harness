@@ -4,7 +4,7 @@
 //! `db/remote_identity.rs` (sync) and `db/remote_identity_async.rs` (async)
 //! persist this area's state, but the traits live here, next to the domain
 //! code that calls them (`daemon::http::auth`, `daemon::websocket::connection`,
-//! `daemon::transport::remote_clients`) rather than inside `db`. `db` doesn't
+//! `harness-daemon-remote-cli`) rather than inside `db`. `db` doesn't
 //! own either type's callers, and an inherent `impl` block for this area could
 //! never move into a crate `db` doesn't share with them; a trait this module
 //! declares has no such problem, since Rust's orphan rule only needs one of
@@ -63,7 +63,7 @@ pub(crate) trait RemoteIdentityQueries: Send + Sync {
     reason = "the crate-boundary seam this module exists for; every caller \
               still goes through the inherent method each one forwards to"
 )]
-pub(crate) trait RemoteIdentitySyncQueries {
+pub trait RemoteIdentitySyncQueries {
     /// # Errors
     /// Returns [`CliError`] on SQL or scope serialization failures.
     fn register_remote_client(

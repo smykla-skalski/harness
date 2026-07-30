@@ -85,9 +85,9 @@ pub mod remote_acme;
 #[cfg(feature = "daemon-runtime")]
 mod remote_acme_challenge;
 #[cfg(feature = "daemon-runtime")]
-mod remote_acme_cleanup;
+pub mod remote_acme_cleanup;
 #[cfg(feature = "daemon-runtime")]
-mod remote_acme_issuer;
+pub mod remote_acme_issuer;
 #[cfg(feature = "daemon-runtime")]
 mod remote_acme_lease_guard;
 #[cfg(feature = "daemon-runtime")]
@@ -99,7 +99,7 @@ mod remote_acme_renewal;
 #[cfg(feature = "daemon-runtime")]
 pub mod remote_auth;
 #[cfg(feature = "daemon-runtime")]
-pub(crate) mod remote_certificate_identity;
+pub mod remote_certificate_identity;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_crypto;
 #[cfg(feature = "daemon-runtime")]
@@ -156,8 +156,6 @@ pub(crate) mod task_board_remote_transport;
 // one of them.
 #[cfg(feature = "daemon-runtime")]
 pub use crate::timeline;
-#[cfg(feature = "daemon-runtime")]
-pub mod transport;
 #[cfg(feature = "daemon-runtime")]
 pub mod voice;
 #[cfg(feature = "daemon-runtime")]

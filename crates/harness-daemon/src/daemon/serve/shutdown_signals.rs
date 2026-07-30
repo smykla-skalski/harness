@@ -20,13 +20,17 @@ enum ShutdownSignalAction {
     ForceExit(i32),
 }
 
-pub(crate) struct ShutdownSignalGuard {
+pub struct ShutdownSignalGuard {
     handle: SignalHandle,
     thread: Option<JoinHandle<()>>,
 }
 
 impl ShutdownSignalGuard {
-    pub(crate) fn install(shutdown_tx: tokio_watch::Sender<bool>) -> Result<Self, CliError> {
+    /// Install the daemon's graceful-shutdown signal handlers.
+    ///
+    /// # Errors
+    /// Returns an error when a signal handler or its worker thread cannot be installed.
+    pub fn install(shutdown_tx: tokio_watch::Sender<bool>) -> Result<Self, CliError> {
         ignore_sigpipe()?;
         let mut signals = Signals::new([SIGTERM, SIGINT, SIGHUP]).map_err(|error| {
             CliErrorKind::workflow_io(format!("install daemon signal handlers: {error}"))

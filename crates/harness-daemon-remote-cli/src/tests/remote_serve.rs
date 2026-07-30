@@ -9,14 +9,14 @@ use std::time::Duration;
 use tokio::sync::{Notify, watch as tokio_watch};
 use tokio::time::{sleep, timeout};
 
-use crate::daemon::db::DaemonDb;
-use crate::daemon::http::DaemonHttpAuthMode;
-use crate::daemon::remote::RemoteDaemonServeConfig;
-use crate::daemon::remote_acme::{
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::http::DaemonHttpAuthMode;
+use harness_daemon::daemon::remote::RemoteDaemonServeConfig;
+use harness_daemon::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
     RemoteCertificateBundle,
 };
-use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use harness_daemon::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use harness_kernel::errors::CliError;
 
 use super::super::remote::DaemonRemoteServeArgs;
@@ -305,9 +305,8 @@ async fn daemon_remote_initial_acme_shutdown_persists_account_cleanup_and_failur
         .expect("load ACME issuance state");
     assert_eq!(
         issuance
-            .account
-            .as_ref()
-            .map(crate::daemon::remote_acme::RemoteAcmeAccountCredentials::account_id),
+            .account()
+            .map(harness_daemon::daemon::remote_acme::RemoteAcmeAccountCredentials::account_id),
         Some("https://acme.test/acct/startup")
     );
     let state = db.load_remote_acme_state().expect("load ACME state");

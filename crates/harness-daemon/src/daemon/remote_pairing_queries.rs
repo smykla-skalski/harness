@@ -4,7 +4,7 @@
 //! `db/remote_pairing.rs`, `db/remote_pairing/{inventory,status}.rs`,
 //! `db/remote_pairing_expiry.rs`, and `db/remote_pairing_revoke.rs` persist
 //! this area's state, but the traits live here, next to the domain code that
-//! calls them (`daemon::http::remote_pairing`, `daemon::transport`) rather
+//! calls them (`daemon::http::remote_pairing`, `harness-daemon-remote-cli`) rather
 //! than inside `db`. `db` doesn't own either type's callers, and an inherent
 //! `impl` block for this area could never move into a crate `db` doesn't
 //! share with them; a trait this module declares has no such problem, since

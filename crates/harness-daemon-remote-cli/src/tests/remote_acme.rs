@@ -1,8 +1,10 @@
 use clap::Parser;
 
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
-use crate::daemon::remote_acme::{
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::remote::{
+    RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider,
+};
+use harness_daemon::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
     RemoteCertificateBundle,
 };
@@ -170,9 +172,8 @@ fn daemon_remote_acme_renew_replaces_legacy_account_without_credentials() {
         .expect("load issuance state");
     assert_eq!(
         issuance
-            .account
-            .as_ref()
-            .map(crate::daemon::remote_acme::RemoteAcmeAccountCredentials::account_id),
+            .account()
+            .map(harness_daemon::daemon::remote_acme::RemoteAcmeAccountCredentials::account_id),
         Some("https://acme.test/acct/initial")
     );
 }
@@ -287,7 +288,7 @@ fn daemon_remote_acme_renew_bootstraps_account_and_initial_certificate() {
     let issuance = db
         .load_remote_acme_issuance_state()
         .expect("load issuance state");
-    let account = issuance.account.as_ref().expect("persisted ACME account");
+    let account = issuance.account().expect("persisted ACME account");
     assert_eq!(account.account_id(), "https://acme.test/acct/initial");
     assert!(account.serialized().contains("account-key-secret"));
     assert!(!format!("{issuance:?}").contains("account-key-secret"));

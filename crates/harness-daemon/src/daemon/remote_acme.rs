@@ -391,6 +391,18 @@ pub struct RemoteAcmeIssuanceState {
     pub(crate) previous_private_key_pem: Option<String>,
 }
 
+impl RemoteAcmeIssuanceState {
+    #[must_use]
+    pub const fn account(&self) -> Option<&RemoteAcmeAccountCredentials> {
+        self.account.as_ref()
+    }
+
+    #[must_use]
+    pub fn previous_private_key_pem(&self) -> Option<&str> {
+        self.previous_private_key_pem.as_deref()
+    }
+}
+
 impl fmt::Debug for RemoteAcmeIssuanceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RemoteAcmeIssuanceState")
@@ -421,7 +433,7 @@ impl fmt::Debug for RemoteCertificateBundle {
 }
 
 impl RemoteCertificateBundle {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn new_for_tests(certificate_pem: &str, private_key_pem: &str) -> Self {
         Self::new(certificate_pem, private_key_pem)
@@ -447,7 +459,7 @@ impl RemoteCertificateBundle {
     }
 
     #[must_use]
-    pub(crate) fn certificate_pem(&self) -> &str {
+    pub fn certificate_pem(&self) -> &str {
         &self.certificate_pem
     }
 
@@ -456,7 +468,11 @@ impl RemoteCertificateBundle {
         &self.private_key_pem
     }
 
-    pub(crate) fn spki_sha256_pin(
+    /// Return the certificate's SHA-256 SPKI pin.
+    ///
+    /// # Errors
+    /// Returns an error when the certificate PEM cannot be decoded or parsed.
+    pub fn spki_sha256_pin(
         &self,
     ) -> Result<String, super::remote_certificate_identity::RemoteCertificateIdentityError> {
         super::remote_certificate_identity::spki_sha256_pin(self)

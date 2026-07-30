@@ -4,29 +4,29 @@ use clap::{Args, Subcommand, ValueEnum};
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
-use crate::daemon::db::DaemonDb;
-use crate::daemon::http::companion::CompanionAuthToken;
-use crate::daemon::http::{
+use harness_daemon::app::{AppContext, Execute};
+use harness_daemon::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
+use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::http::companion::CompanionAuthToken;
+use harness_daemon::daemon::http::{
     CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX, DaemonHttpAuthMode,
     RemoteRequestLimitConfig,
 };
-use crate::daemon::remote::{
+use harness_daemon::daemon::remote::{
     RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
     validate_remote_serve_config,
 };
 mod values;
 pub use values::{DaemonRemotePairTtl, DaemonRemoteRole, DaemonRemoteScope};
 
-use crate::daemon::remote_pairing::{
+use harness_daemon::daemon::remote_pairing::{
     RemotePairingCode, RemotePairingCreateParams, create_remote_pairing, pairing_expires_at,
 };
-use crate::daemon::serve::DaemonServeConfig;
-use crate::daemon::state;
-use crate::reviews::ReviewsQueryRequest;
-use crate::workspace::utc_now;
+use harness_daemon::daemon::serve::DaemonServeConfig;
+use harness_daemon::daemon::state;
+use harness_daemon::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_reviews::ReviewsQueryRequest;
 
 use super::remote_doctor::execute_remote_doctor;
 use super::remote_pair_reviews::DaemonRemotePairReviewsArgs;

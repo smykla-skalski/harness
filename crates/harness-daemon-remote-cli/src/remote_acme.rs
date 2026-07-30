@@ -1,19 +1,22 @@
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
-use crate::daemon::db::{DaemonDb, RemoteAcmeStoredState};
-use crate::daemon::remote::{RemoteAccessScope, RemoteDaemonServeConfig};
-use crate::daemon::remote_acme::{
+use harness_daemon::app::{AppContext, Execute};
+use harness_daemon::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
+use harness_daemon::daemon::db::{
+    DaemonDb, RemoteAcmeQueries, RemoteAcmeStoredState, RemoteIdentitySyncQueries,
+};
+use harness_daemon::daemon::remote::RemoteDaemonServeConfig;
+use harness_daemon::daemon::remote_acme::{
     RemoteAcmeIssuanceState, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
 };
-use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
-use crate::daemon::remote_identity::{
+use harness_daemon::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
+use harness_daemon::workspace::utc_now;
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_remote_trust::remote::RemoteAccessScope;
+use harness_remote_trust::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision,
 };
-use crate::workspace::utc_now;
-use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::remote::{DaemonRemoteAcmeCommand, open_remote_daemon_db};
 
@@ -225,7 +228,7 @@ where
         db.record_remote_acme_renewal_failure(missing_serve_config_failure_detail(), now)?;
         return Ok(RemoteAuditOutcome::Failure);
     };
-    let account = match issuance.account.as_ref() {
+    let account = match issuance.account() {
         Some(account) => account.clone(),
         None => match issuer.create_account(serve_config) {
             Ok(account) => {
@@ -241,7 +244,7 @@ where
     let request = RemoteAcmeRenewalRequest::new(
         &account,
         state.certificate_fingerprint.as_deref(),
-        issuance.previous_private_key_pem.as_deref(),
+        issuance.previous_private_key_pem(),
         serve_config,
     );
     match issuer.renew_certificate(&request) {

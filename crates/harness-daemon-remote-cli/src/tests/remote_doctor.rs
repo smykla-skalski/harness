@@ -1,7 +1,7 @@
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
-use crate::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
-use crate::daemon::remote_identity::RemoteClientRegistration;
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
+use harness_remote_trust::remote::{RemoteAccessScope, RemoteRole};
+use harness_remote_trust::remote_identity::RemoteClientRegistration;
 
 use super::super::remote_doctor::run_remote_doctor_with;
 

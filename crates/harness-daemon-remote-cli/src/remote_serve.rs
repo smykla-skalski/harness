@@ -1,15 +1,15 @@
 use std::thread;
 
-use crate::daemon::cli_support::adopt_daemon_root_for_transport_command;
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::RemoteDaemonServeConfig;
+use harness_daemon::daemon::cli_support::adopt_daemon_root_for_transport_command;
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries};
+use harness_daemon::daemon::remote::RemoteDaemonServeConfig;
 #[cfg(test)]
-use crate::daemon::remote_acme::RemoteAcmeRenewalIssuer;
-use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
-use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
-use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
-use crate::daemon::serve::{self, DaemonServeConfig, ShutdownSignalGuard};
-use crate::workspace::utc_now;
+use harness_daemon::daemon::remote_acme::RemoteAcmeRenewalIssuer;
+use harness_daemon::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
+use harness_daemon::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use harness_daemon::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
+use harness_daemon::daemon::serve::{self, DaemonServeConfig, ShutdownSignalGuard};
+use harness_daemon::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::watch as tokio_watch;
@@ -151,7 +151,7 @@ where
 {
     let state = db.load_remote_acme_state()?;
     let issuance = db.load_remote_acme_issuance_state()?;
-    if state.certificate_configured && issuance.account.is_some() && certificate_domain_matches {
+    if state.certificate_configured && issuance.account().is_some() && certificate_domain_matches {
         return Ok(());
     }
     let audit_event_id = format!("remote-acme-initial-{}", uuid::Uuid::new_v4());

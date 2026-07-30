@@ -5,15 +5,15 @@ use async_trait::async_trait;
 use tokio::sync::watch as tokio_watch;
 use tokio::time::timeout;
 
-use crate::daemon::db::DaemonDb;
-use crate::daemon::remote::RemoteDaemonServeConfig;
-use crate::daemon::remote_acme::{
+use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries};
+use harness_daemon::daemon::remote::RemoteDaemonServeConfig;
+use harness_daemon::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
 };
-use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
-use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
-use crate::daemon::remote_identity::RemoteAuditOutcome;
+use harness_daemon::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use harness_daemon::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_remote_trust::remote_identity::RemoteAuditOutcome;
 
 use super::remote_acme::record_remote_acme_audit;
 
@@ -71,7 +71,7 @@ where
 {
     let state = db.load_remote_acme_state()?;
     let issuance = db.load_remote_acme_issuance_state()?;
-    if state.certificate_configured && issuance.account.is_some() && certificate_domain_matches {
+    if state.certificate_configured && issuance.account().is_some() && certificate_domain_matches {
         return Ok(());
     }
     let audit_event_id = format!("remote-acme-initial-{}", uuid::Uuid::new_v4());
@@ -83,8 +83,8 @@ where
             "remote daemon requires persisted remote ACME serve config",
         );
     };
-    let account = match issuance.account {
-        Some(account) => account,
+    let account = match issuance.account() {
+        Some(account) => account.clone(),
         None => match issuer.create_account(serve_config).await {
             Ok(account) => {
                 db.record_remote_acme_account(&account, now)?;
@@ -98,7 +98,7 @@ where
     let request = RemoteAcmeRenewalRequest::new(
         &account,
         state.certificate_fingerprint.as_deref(),
-        issuance.previous_private_key_pem.as_deref(),
+        issuance.previous_private_key_pem(),
         serve_config,
     );
     match issuer.renew_certificate(&request, cleanup_tracker).await {

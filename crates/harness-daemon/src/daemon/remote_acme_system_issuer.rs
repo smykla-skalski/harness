@@ -13,10 +13,14 @@ use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 
 use super::InstantAcmeIssuer;
 
-pub(crate) struct SystemRemoteAcmeIssuer;
+pub struct SystemRemoteAcmeIssuer;
 
 impl SystemRemoteAcmeIssuer {
-    pub(crate) async fn create_account_async(
+    /// Create the ACME account used by a remote daemon.
+    ///
+    /// # Errors
+    /// Returns an error when challenge configuration is invalid or the ACME provider rejects the account.
+    pub async fn create_account_async(
         &self,
         config: &RemoteDaemonServeConfig,
     ) -> Result<RemoteAcmeAccountCredentials, String> {
@@ -26,7 +30,11 @@ impl SystemRemoteAcmeIssuer {
             .await
     }
 
-    pub(crate) async fn renew_certificate_async(
+    /// Renew the remote daemon certificate and track challenge cleanup.
+    ///
+    /// # Errors
+    /// Returns an error when challenge configuration, issuance, or cleanup setup fails.
+    pub async fn renew_certificate_async(
         &self,
         request: &RemoteAcmeRenewalRequest,
         cleanup_tracker: RemoteAcmeCleanupTracker,

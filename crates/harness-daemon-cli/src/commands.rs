@@ -11,10 +11,10 @@ use harness_daemon::daemon::cli_support::{
 };
 use harness_daemon::daemon::codex_transport::codex_transport_from_env;
 use harness_daemon::daemon::serve::{self, DaemonServeConfig};
-use harness_daemon::daemon::transport::DaemonRemoteCommand;
 use harness_daemon::daemon::{launchd, service, state};
 use harness_daemon::feature_flags;
 use harness_daemon::workspace::{host_home_dir, normalized_env_value};
+use harness_daemon_remote_cli::{DaemonRemoteCommand, execute_remote_command};
 use harness_daemon_snapshot as snapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -86,18 +86,6 @@ impl Execute for DaemonCommand {
             Self::Snapshot(args) => args.execute(context),
         }
     }
-}
-
-fn execute_remote_command(
-    command: &DaemonRemoteCommand,
-    systemd_unit: Option<&str>,
-    context: &AppContext,
-) -> Result<i32, CliError> {
-    let _root_override = systemd_unit
-        .map(harness_daemon::daemon::transport::systemd_state::daemon_root)
-        .transpose()?
-        .map(|root| state::ScopedDaemonRootOverride::set(Some(root)));
-    command.execute(context)
 }
 
 #[derive(Debug, Clone, Args)]
