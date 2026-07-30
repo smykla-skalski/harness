@@ -69,6 +69,7 @@ impl AcpProtocolHandle {
         session_id: &str,
         project_dir: PathBuf,
         session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
     ) -> ProtocolCommandResult<SessionId> {
         let (response_tx, response_rx) = mpsc::sync_channel(1);
         self.dispatch(ProtocolCommand::AttachSession {
@@ -76,17 +77,23 @@ impl AcpProtocolHandle {
             session_id: session_id.to_string(),
             project_dir,
             session_config,
+            resume_session_id,
             response_tx,
         })?;
         self.receive(&response_rx)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the command carries separate logical and provider session identities"
+    )]
     pub(in crate::daemon::agent_acp) fn prompt_session(
         &self,
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
         session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
         prompt: String,
         prompt_lease: PromptLease,
     ) -> ProtocolCommandResult<SessionId> {
@@ -96,6 +103,7 @@ impl AcpProtocolHandle {
             session_id: session_id.to_string(),
             project_dir,
             session_config,
+            resume_session_id,
             prompt,
             prompt_lease,
             response_tx,

@@ -68,12 +68,14 @@ impl ActiveAcpSession {
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        resume_session_id: Option<String>,
     ) -> Result<String, String> {
         self.process.attach_protocol_session(
             acp_id,
             session_id,
             project_dir,
             self.session_config.clone(),
+            resume_session_id,
         )
     }
 
@@ -82,6 +84,7 @@ impl ActiveAcpSession {
         acp_id: &str,
         session_id: &str,
         project_dir: PathBuf,
+        resume_session_id: Option<String>,
         prompt: String,
     ) -> Result<String, String> {
         self.process.prompt_protocol_session(
@@ -89,6 +92,7 @@ impl ActiveAcpSession {
             session_id,
             project_dir,
             self.session_config.clone(),
+            resume_session_id,
             prompt,
         )
     }

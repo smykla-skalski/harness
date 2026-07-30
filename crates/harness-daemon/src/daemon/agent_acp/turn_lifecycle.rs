@@ -47,6 +47,12 @@ trait OpenRouterTurnManager: Send + Sync {
 
     fn inspect(&self, session_id: &str) -> Result<AcpAgentInspectResponse, CliError>;
 
+    fn runtime_session_id(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<String>, CliError>;
+
     fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError>;
 }
 
@@ -56,11 +62,19 @@ impl OpenRouterTurnManager for AcpAgentManagerHandle {
         session_id: &str,
         request: &AcpAgentStartRequest,
     ) -> Result<AcpAgentSnapshot, CliError> {
-        Self::start(self, session_id, request)
+        Self::start_with_pooling_disabled(self, session_id, request, false)
     }
 
     fn inspect(&self, session_id: &str) -> Result<AcpAgentInspectResponse, CliError> {
         Self::inspect(self, Some(session_id))
+    }
+
+    fn runtime_session_id(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        Self::runtime_session_id(self, session_id, acp_id)
     }
 
     fn stop(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
@@ -69,7 +83,7 @@ impl OpenRouterTurnManager for AcpAgentManagerHandle {
 }
 
 #[derive(Debug, Clone)]
-struct OpenRouterTurnBinding {
+pub(super) struct OpenRouterTurnBinding {
     requested_model: Option<String>,
     source_revision: Option<String>,
     cancelled: bool,
@@ -201,10 +215,112 @@ impl OpenRouterAgentTurnRuntime {
         })
     }
 
-    fn binding(&self, id: &AgentTurnId) -> Result<OpenRouterTurnBinding, CliError> {
+    pub(super) fn binding(&self, id: &AgentTurnId) -> Result<OpenRouterTurnBinding, CliError> {
         self.lock_bindings()?.get(id).cloned().ok_or_else(|| {
             CliErrorKind::session_not_active(format!("OpenRouter turn '{id}' is unknown")).into()
         })
+    }
+
+    pub(super) fn runtime_session_id(&self, id: &AgentTurnId) -> Result<String, CliError> {
+        self.binding(id)?;
+        self.manager
+            .runtime_session_id(&self.session_id, id.as_str())?
+            .ok_or_else(|| {
+                CliErrorKind::session_not_active(format!(
+                    "OpenRouter turn '{id}' has no bound provider session"
+                ))
+                .into()
+            })
+    }
+
+    pub(super) async fn start_with_resume_session(
+        &self,
+        request: AgentTurnRequest,
+        resume_session_id: Option<String>,
+    ) -> Result<AgentTurnId, CliError> {
+        let expected_resume_session_id = resume_session_id.clone();
+        let request = request.into_validated()?;
+        let source_revision = request
+            .pull_request
+            .as_ref()
+            .map(|pull_request| pull_request.head_revision.clone());
+        let requested_model = request.requested_model.clone();
+        let snapshot = self.manager.start(
+            &self.session_id,
+            &AcpAgentStartRequest {
+                agent: OPENROUTER_RUNTIME.into(),
+                role: SessionRole::Worker,
+                prompt: Some(request.prompt),
+                project_dir: self.project_dir.clone(),
+                name: Some("OpenRouter report turn".into()),
+                model: requested_model.clone(),
+                resume_disabled: resume_session_id.is_none(),
+                resume_session_id,
+                ..AcpAgentStartRequest::default()
+            },
+        )?;
+        let id = AgentTurnId::new(snapshot.acp_id)?;
+        if let Some(expected) = expected_resume_session_id {
+            self.verify_resumed_session(&id, &expected)?;
+        }
+        self.lock_bindings()?.insert(
+            id.clone(),
+            OpenRouterTurnBinding {
+                requested_model: requested_model.clone(),
+                source_revision: source_revision.clone(),
+                cancelled: false,
+                terminal_persisted: false,
+            },
+        );
+        if let Err(error) = self
+            .persist_start(&id, requested_model, source_revision)
+            .await
+        {
+            // The remote turn is already running and the binding is inserted,
+            // but the run could not be recorded durably. Leaving both in place
+            // would strand agent work and let a retry start a second turn -- the
+            // exact double-start this durable tracking exists to prevent. Undo
+            // both on a best-effort basis, then surface the persistence error.
+            if let Ok(mut bindings) = self.lock_bindings() {
+                bindings.remove(&id);
+            }
+            if let Err(stop_error) = self.manager.stop(id.as_str()) {
+                tracing::warn!(
+                    turn_id = %id,
+                    %stop_error,
+                    "failed to stop OpenRouter turn after its start could not be recorded; provider work may be orphaned"
+                );
+            }
+            return Err(error);
+        }
+        Ok(id)
+    }
+
+    fn verify_resumed_session(
+        &self,
+        id: &AgentTurnId,
+        expected_session_id: &str,
+    ) -> Result<(), CliError> {
+        let actual = self
+            .manager
+            .runtime_session_id(&self.session_id, id.as_str());
+        if actual
+            .as_ref()
+            .is_ok_and(|actual| actual.as_deref() == Some(expected_session_id))
+        {
+            return Ok(());
+        }
+        if let Err(error) = self.manager.stop(id.as_str()) {
+            tracing::warn!(
+                turn_id = %id,
+                %error,
+                "failed to stop OpenRouter turn after exact session resume was not honored"
+            );
+        }
+        Err(CliErrorKind::session_not_active(format!(
+            "OpenRouter turn '{id}' did not resume provider session '{expected_session_id}'"
+        ))
+        .into())
     }
 
     fn begin_cancellation(&self, id: &AgentTurnId) -> Result<bool, CliError> {
@@ -344,54 +460,7 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
     }
 
     async fn start(&self, request: AgentTurnRequest) -> Result<AgentTurnId, CliError> {
-        let request = request.into_validated()?;
-        let source_revision = request
-            .pull_request
-            .as_ref()
-            .map(|pull_request| pull_request.head_revision.clone());
-        let requested_model = request.requested_model.clone();
-        let snapshot = self.manager.start(
-            &self.session_id,
-            &AcpAgentStartRequest {
-                agent: OPENROUTER_RUNTIME.into(),
-                role: SessionRole::Worker,
-                prompt: Some(request.prompt),
-                project_dir: self.project_dir.clone(),
-                name: Some("OpenRouter report turn".into()),
-                model: requested_model.clone(),
-                resume_disabled: true,
-                ..AcpAgentStartRequest::default()
-            },
-        )?;
-        let id = AgentTurnId::new(snapshot.acp_id)?;
-        self.lock_bindings()?.insert(
-            id.clone(),
-            OpenRouterTurnBinding {
-                requested_model: requested_model.clone(),
-                source_revision: source_revision.clone(),
-                cancelled: false,
-                terminal_persisted: false,
-            },
-        );
-        if let Err(error) = self.persist_start(&id, requested_model, source_revision).await {
-            // The remote turn is already running and the binding is inserted,
-            // but the run could not be recorded durably. Leaving both in place
-            // would strand agent work and let a retry start a second turn -- the
-            // exact double-start this durable tracking exists to prevent. Undo
-            // both on a best-effort basis, then surface the persistence error.
-            if let Ok(mut bindings) = self.lock_bindings() {
-                bindings.remove(&id);
-            }
-            if let Err(stop_error) = self.manager.stop(id.as_str()) {
-                tracing::warn!(
-                    turn_id = %id,
-                    %stop_error,
-                    "failed to stop OpenRouter turn after its start could not be recorded; provider work may be orphaned"
-                );
-            }
-            return Err(error);
-        }
-        Ok(id)
+        self.start_with_resume_session(request, None).await
     }
 
     async fn status(&self, id: &AgentTurnId) -> Result<AgentTurnStatus, CliError> {
@@ -464,9 +533,17 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         let actual_model = effective_model(&state.config_options);
         let (run_status, stop_reason, error) =
             if failure.category == AgentTurnFailureCategory::Cancelled {
-                (AgentTurnRunStatus::Cancelled, Some(failure.detail.clone()), None)
+                (
+                    AgentTurnRunStatus::Cancelled,
+                    Some(failure.detail.clone()),
+                    None,
+                )
             } else {
-                (AgentTurnRunStatus::Failed, None, Some(failure.detail.clone()))
+                (
+                    AgentTurnRunStatus::Failed,
+                    None,
+                    Some(failure.detail.clone()),
+                )
             };
         self.persist_settlement(id, run_status, actual_model, None, stop_reason, error)
             .await?;

@@ -35,10 +35,12 @@ const DETACH_CLOSE_BUDGET: Duration = Duration::from_secs(2);
 
 mod handle;
 mod prompt;
+mod resume;
 
 pub(in crate::daemon::agent_acp) use handle::AcpProtocolHandle;
 pub(super) use handle::response_timeout_for;
 use prompt::send_prompt;
+use resume::resume_protocol_session;
 
 pub(super) enum ProtocolCommand {
     AttachSession {
@@ -46,6 +48,7 @@ pub(super) enum ProtocolCommand {
         session_id: String,
         project_dir: PathBuf,
         session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<SessionId>>,
     },
     PromptSession {
@@ -53,6 +56,7 @@ pub(super) enum ProtocolCommand {
         session_id: String,
         project_dir: PathBuf,
         session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
         prompt: String,
         prompt_lease: PromptLease,
         response_tx: mpsc::SyncSender<ProtocolCommandResult<SessionId>>,
@@ -158,6 +162,7 @@ async fn handle_routed_command(
             session_id,
             project_dir,
             session_config,
+            resume_session_id,
             response_tx,
         } => {
             let result = attach_protocol_session(
@@ -168,6 +173,7 @@ async fn handle_routed_command(
                 session_id,
                 project_dir,
                 &session_config,
+                resume_session_id.as_deref(),
             )
             .await;
             let _ = response_tx.send(result);
@@ -177,6 +183,7 @@ async fn handle_routed_command(
             session_id,
             project_dir,
             session_config,
+            resume_session_id,
             prompt,
             prompt_lease,
             response_tx,
@@ -191,6 +198,7 @@ async fn handle_routed_command(
                     session_id,
                     project_dir,
                     session_config,
+                    resume_session_id,
                     prompt,
                     prompt_lease,
                 },
@@ -274,6 +282,10 @@ async fn send_logout(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the protocol route carries separate logical and provider session identities"
+)]
 async fn attach_protocol_session(
     supervisor: &AcpSessionSupervisor,
     connection: &ConnectionTo<Agent>,
@@ -282,7 +294,21 @@ async fn attach_protocol_session(
     session_id: String,
     project_dir: PathBuf,
     session_config: &AcpSessionRequestConfig,
+    resume_session_id: Option<&str>,
 ) -> ProtocolCommandResult<SessionId> {
+    if let Some(resume_session_id) = resume_session_id {
+        return resume_protocol_session(
+            supervisor,
+            connection,
+            session_guard,
+            acp_id,
+            session_id,
+            project_dir,
+            session_config,
+            resume_session_id,
+        )
+        .await;
+    }
     let request = super::session_inputs::new_session_request(
         project_dir,
         session_config,
@@ -327,6 +353,7 @@ async fn attach_prompt_session(
         session_id,
         project_dir,
         session_config,
+        resume_session_id,
         prompt,
         prompt_lease,
     } = input;
@@ -338,6 +365,7 @@ async fn attach_prompt_session(
         session_id,
         project_dir,
         &session_config,
+        resume_session_id.as_deref(),
     )
     .await?;
     if let Err(error) = spawn_prompt_task(
@@ -360,6 +388,7 @@ struct AttachPromptInput {
     session_id: String,
     project_dir: PathBuf,
     session_config: AcpSessionRequestConfig,
+    resume_session_id: Option<String>,
     prompt: String,
     prompt_lease: PromptLease,
 }

@@ -228,6 +228,7 @@ fn run_wake_prompt(
         &acp_id,
         &signal_session_id,
         project_dir.clone(),
+        None,
         prompt_text,
     );
     match result {

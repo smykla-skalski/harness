@@ -1,9 +1,9 @@
 //! ACP agent-side bridge entry point.
 //!
 //! Wires up the `Agent.builder()` from `agent_client_protocol`, registers
-//! handlers for `initialize`, `session/new`, `session/set_config_option`,
-//! `session/prompt`, and the `session/cancel` notification, then connects
-//! to stdio.
+//! handlers for `initialize`, `session/new`, `session/resume`,
+//! `session/set_config_option`, `session/prompt`, and the `session/cancel`
+//! notification, then connects to stdio.
 //!
 //! The handlers share a [`SessionStore`] and an [`OpenRouterClient`] built at
 //! process start. The `session/prompt` turn loop runs in `cx.spawn` so the
@@ -15,7 +15,8 @@ use uuid::Uuid;
 
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, CancelNotification, Implementation, InitializeRequest, InitializeResponse,
-    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, SessionId,
+    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, ResumeSessionRequest,
+    ResumeSessionResponse, SessionCapabilities, SessionId, SessionResumeCapabilities,
     SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
 };
 use agent_client_protocol::util::internal_error;
@@ -54,6 +55,8 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
     let client_new = client.clone();
     let store_config = store.clone();
     let client_config = client.clone();
+    let store_resume = store.clone();
+    let client_resume = client.clone();
     let store_prompt = store.clone();
     let client_prompt = client;
     let store_cancel = store.clone();
@@ -71,6 +74,16 @@ pub async fn run_stdio(api_key_file: Option<PathBuf>) -> Result<(), agent_client
             async move |request: NewSessionRequest, responder, _connection| {
                 let response = handle_new_session(&store_new, &client_new, request).await;
                 responder.respond(response)
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ResumeSessionRequest, responder, _connection| {
+                let response = handle_resume_session(&store_resume, &client_resume, request).await;
+                match response {
+                    Ok(response) => responder.respond(response),
+                    Err(error) => responder.respond_with_error(error),
+                }
             },
             agent_client_protocol::on_receive_request!(),
         )
@@ -152,7 +165,9 @@ fn build_client(config: AgentConfig) -> Result<OpenRouterClient, agent_client_pr
 
 fn initialize_response(request: InitializeRequest) -> InitializeResponse {
     InitializeResponse::new(request.protocol_version)
-        .agent_capabilities(AgentCapabilities::new())
+        .agent_capabilities(AgentCapabilities::new().session_capabilities(
+            SessionCapabilities::new().resume(SessionResumeCapabilities::new()),
+        ))
         .agent_info(Some(Implementation::new(
             "harness-openrouter-agent",
             env!("CARGO_PKG_VERSION"),
@@ -175,6 +190,25 @@ async fn handle_new_session(
         .await;
 
     NewSessionResponse::new(session_id).config_options(vec![model_option])
+}
+
+async fn handle_resume_session(
+    store: &SessionStore,
+    client: &OpenRouterClient,
+    request: ResumeSessionRequest,
+) -> Result<ResumeSessionResponse, agent_client_protocol::Error> {
+    let snapshot = store
+        .snapshot(&request.session_id)
+        .await
+        .ok_or_else(|| internal_error(format!("unknown ACP session '{}'", request.session_id.0)))?;
+    if snapshot.project_dir != request.cwd {
+        return Err(internal_error(format!(
+            "ACP session '{}' belongs to a different working directory",
+            request.session_id.0
+        )));
+    }
+    let model_option = build_model_config_option(client, &snapshot.model).await;
+    Ok(ResumeSessionResponse::new().config_options(vec![model_option]))
 }
 
 async fn handle_set_config_option(
@@ -235,6 +269,13 @@ mod tests {
         let info = response.agent_info.expect("agent info");
         assert_eq!(info.name, "harness-openrouter-agent");
         assert_eq!(info.version, env!("CARGO_PKG_VERSION"));
+        assert!(
+            response
+                .agent_capabilities
+                .session_capabilities
+                .resume
+                .is_some()
+        );
     }
 
     fn model_option_state(option: &SessionConfigOption) -> (String, usize) {
@@ -271,6 +312,36 @@ mod tests {
         let (current, choice_count) = model_option_state(option);
         assert_eq!(current, DEFAULT_MODEL_ID);
         assert!(choice_count > 0);
+    }
+
+    #[tokio::test]
+    async fn resume_session_reuses_existing_state_and_rejects_unknown_ids() {
+        let store = SessionStore::new();
+        let client = test_client();
+        let response = handle_new_session(
+            &store,
+            &client,
+            NewSessionRequest::new(PathBuf::from("/tmp/proj")),
+        )
+        .await;
+        let session_id = response.session_id;
+
+        handle_resume_session(
+            &store,
+            &client,
+            ResumeSessionRequest::new(session_id.clone(), PathBuf::from("/tmp/proj")),
+        )
+        .await
+        .expect("resume existing session");
+        assert!(store.snapshot(&session_id).await.is_some());
+
+        handle_resume_session(
+            &store,
+            &client,
+            ResumeSessionRequest::new("missing-session", PathBuf::from("/tmp/proj")),
+        )
+        .await
+        .expect_err("unknown session must fail");
     }
 
     #[tokio::test]

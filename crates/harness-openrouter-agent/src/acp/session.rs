@@ -6,7 +6,7 @@
 //! directory, the chosen model, and a cancellation flag the prompt loop polls
 //! between SSE chunks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -15,6 +15,10 @@ use agent_client_protocol::schema::v1::SessionId;
 use tokio::sync::Mutex;
 
 use crate::openrouter::ChatMessage;
+
+// Pooled agents outlive logical turns. Once this bound evicts an old context,
+// exact resume fails closed instead of retaining conversation history forever.
+const MAX_RETAINED_SESSIONS: usize = 128;
 
 /// Per-session state held in `SessionStore`.
 #[derive(Debug)]
@@ -44,7 +48,13 @@ impl SessionState {
 /// `Arc<Mutex<…>>`).
 #[derive(Debug, Clone, Default)]
 pub struct SessionStore {
-    inner: Arc<Mutex<HashMap<SessionId, SessionState>>>,
+    inner: Arc<Mutex<SessionCollection>>,
+}
+
+#[derive(Debug, Default)]
+struct SessionCollection {
+    sessions: HashMap<SessionId, SessionState>,
+    insertion_order: VecDeque<SessionId>,
 }
 
 impl SessionStore {
@@ -55,7 +65,17 @@ impl SessionStore {
 
     /// Insert a fresh session keyed by `session_id`.
     pub async fn insert(&self, session_id: SessionId, state: SessionState) {
-        self.inner.lock().await.insert(session_id, state);
+        let mut inner = self.inner.lock().await;
+        if !inner.sessions.contains_key(&session_id) {
+            while inner.sessions.len() >= MAX_RETAINED_SESSIONS {
+                let Some(expired) = inner.insertion_order.pop_front() else {
+                    break;
+                };
+                inner.sessions.remove(&expired);
+            }
+            inner.insertion_order.push_back(session_id.clone());
+        }
+        inner.sessions.insert(session_id, state);
     }
 
     /// Snapshot the session's history, project dir, model, reasoning effort,
@@ -64,6 +84,7 @@ impl SessionStore {
         self.inner
             .lock()
             .await
+            .sessions
             .get(session_id)
             .map(|state| SessionSnapshot {
                 project_dir: state.project_dir.clone(),
@@ -77,14 +98,14 @@ impl SessionStore {
     /// Append `messages` to the named session's history. Silently drops the
     /// extension when the session has been forgotten (e.g., racing cancel).
     pub async fn extend_history(&self, session_id: &SessionId, messages: Vec<ChatMessage>) {
-        if let Some(state) = self.inner.lock().await.get_mut(session_id) {
+        if let Some(state) = self.inner.lock().await.sessions.get_mut(session_id) {
             state.history.extend(messages);
         }
     }
 
     /// Update the session's model. Returns `true` when the session existed.
     pub async fn set_model(&self, session_id: &SessionId, model: &str) -> bool {
-        if let Some(state) = self.inner.lock().await.get_mut(session_id) {
+        if let Some(state) = self.inner.lock().await.sessions.get_mut(session_id) {
             state.model = model.to_owned();
             true
         } else {
@@ -96,7 +117,7 @@ impl SessionStore {
     /// returns `StopReason::Cancelled`. Returns `true` when the session
     /// existed.
     pub async fn cancel(&self, session_id: &SessionId) -> bool {
-        if let Some(state) = self.inner.lock().await.get(session_id) {
+        if let Some(state) = self.inner.lock().await.sessions.get(session_id) {
             state.cancel_flag.store(true, Ordering::SeqCst);
             true
         } else {
@@ -107,7 +128,7 @@ impl SessionStore {
     /// Reset the cancellation flag before starting a new turn so a previously
     /// cancelled session can be prompted again without leaking the stale flag.
     pub async fn reset_cancel(&self, session_id: &SessionId) {
-        if let Some(state) = self.inner.lock().await.get(session_id) {
+        if let Some(state) = self.inner.lock().await.sessions.get(session_id) {
             state.cancel_flag.store(false, Ordering::SeqCst);
         }
     }
@@ -222,5 +243,26 @@ mod tests {
         assert_eq!(snap.history.len(), 2);
         assert_eq!(snap.history[0].content.as_deref(), Some("first"));
         assert_eq!(snap.history[1].content.as_deref(), Some("reply"));
+    }
+
+    #[tokio::test]
+    async fn insert_bounds_retained_sessions_and_evicts_the_oldest() {
+        let store = SessionStore::new();
+        for index in 0..=MAX_RETAINED_SESSIONS {
+            store
+                .insert(
+                    session(&format!("openrouter-{index}")),
+                    SessionState::new(PathBuf::from("/tmp"), "m".to_owned()),
+                )
+                .await;
+        }
+
+        assert!(store.snapshot(&session("openrouter-0")).await.is_none());
+        assert!(
+            store
+                .snapshot(&session(&format!("openrouter-{MAX_RETAINED_SESSIONS}")))
+                .await
+                .is_some()
+        );
     }
 }

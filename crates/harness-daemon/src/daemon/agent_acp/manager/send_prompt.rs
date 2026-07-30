@@ -78,7 +78,7 @@ fn prompt_protocol_session_thread(
     project_dir: PathBuf,
     prompt: String,
 ) {
-    let result = session.prompt_protocol_session(acp_id, session_id, project_dir, prompt);
+    let result = session.prompt_protocol_session(acp_id, session_id, project_dir, None, prompt);
     if let Err(error) = result {
         tracing::warn!(
             target: "harness::acp_manager",

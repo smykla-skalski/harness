@@ -47,6 +47,8 @@
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod active;
 #[cfg(feature = "daemon-runtime")]
+mod dependency_reverification;
+#[cfg(feature = "daemon-runtime")]
 mod dependency_triage;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod event_frame;

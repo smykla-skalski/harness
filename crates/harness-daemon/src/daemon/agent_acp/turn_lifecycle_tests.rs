@@ -20,13 +20,26 @@ use super::{OpenRouterAgentTurnRuntime, OpenRouterTurnManager};
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 const MODEL: &str = "deepseek/deepseek-v4-flash";
 
-#[derive(Default)]
 struct FakeManager {
     request: Mutex<Option<AcpAgentStartRequest>>,
     state: Mutex<AcpAgentSessionState>,
+    runtime_session_id: Mutex<Option<String>>,
     stopped: Mutex<bool>,
     stop_probe: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     stop_fails: Mutex<bool>,
+}
+
+impl Default for FakeManager {
+    fn default() -> Self {
+        Self {
+            request: Mutex::default(),
+            state: Mutex::default(),
+            runtime_session_id: Mutex::new(Some("openrouter-session-1".into())),
+            stopped: Mutex::default(),
+            stop_probe: Mutex::default(),
+            stop_fails: Mutex::default(),
+        }
+    }
 }
 
 impl FakeManager {
@@ -82,6 +95,18 @@ impl OpenRouterTurnManager for FakeManager {
             available: true,
             issue_message: None,
         })
+    }
+
+    fn runtime_session_id(
+        &self,
+        _session_id: &str,
+        _acp_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        Ok(self
+            .runtime_session_id
+            .lock()
+            .expect("runtime session lock")
+            .clone())
     }
 
     fn stop(&self, _acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
@@ -143,6 +168,52 @@ async fn openrouter_turn_keeps_model_report_and_frozen_source_revision() {
     assert_eq!(result.effective_model.as_deref(), Some(MODEL));
     assert_eq!(result.source_revision.as_deref(), Some(HEAD));
     assert_eq!(result.stop_reason, "end_turn");
+}
+
+#[tokio::test]
+async fn resumed_turn_reuses_the_original_provider_session() {
+    let manager = Arc::new(FakeManager::default());
+    let runtime =
+        OpenRouterAgentTurnRuntime::with_manager(manager.clone(), "session-a".into(), None);
+    let original_id = runtime.start(request()).await.expect("start original turn");
+    let original_session_id = runtime
+        .runtime_session_id(&original_id)
+        .expect("original provider session");
+
+    runtime
+        .start_with_resume_session(request(), Some(original_session_id))
+        .await
+        .expect("resume turn");
+
+    let resumed = manager
+        .request
+        .lock()
+        .expect("request lock")
+        .clone()
+        .expect("captured resumed start");
+    assert!(!resumed.resume_disabled);
+    assert_eq!(
+        resumed.resume_session_id.as_deref(),
+        Some("openrouter-session-1")
+    );
+}
+
+#[tokio::test]
+async fn resumed_turn_fails_closed_when_the_provider_opens_a_new_session() {
+    let manager = Arc::new(FakeManager::default());
+    let runtime =
+        OpenRouterAgentTurnRuntime::with_manager(manager.clone(), "session-a".into(), None);
+    *manager
+        .runtime_session_id
+        .lock()
+        .expect("runtime session lock") = Some("fallback-session".into());
+
+    runtime
+        .start_with_resume_session(request(), Some("openrouter-session-1".into()))
+        .await
+        .expect_err("fallback session must fail closed");
+
+    assert!(*manager.stopped.lock().expect("stopped lock"));
 }
 
 #[tokio::test]
@@ -335,7 +406,11 @@ async fn failure_records_a_terminal_failure() {
         runtime.status(&id).await.expect("status"),
         AgentTurnStatus::Failed
     );
-    runtime.failure(&id).await.expect("failure").expect("failure present");
+    runtime
+        .failure(&id)
+        .await
+        .expect("failure")
+        .expect("failure present");
 
     let stored = store
         .agent_turn_run(id.as_str())

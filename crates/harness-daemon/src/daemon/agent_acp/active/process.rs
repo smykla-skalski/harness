@@ -250,9 +250,16 @@ impl ActiveAcpProcess {
         session_id: &str,
         project_dir: PathBuf,
         session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
     ) -> Result<String, String> {
         self.protocol_handle
-            .attach_session(acp_id, session_id, project_dir, session_config)
+            .attach_session(
+                acp_id,
+                session_id,
+                project_dir,
+                session_config,
+                resume_session_id,
+            )
             .map(|session_id| session_id.to_string())
     }
 
@@ -262,6 +269,7 @@ impl ActiveAcpProcess {
         session_id: &str,
         project_dir: PathBuf,
         session_config: AcpSessionRequestConfig,
+        resume_session_id: Option<String>,
         prompt: String,
     ) -> Result<String, String> {
         let lease = self
@@ -274,6 +282,7 @@ impl ActiveAcpProcess {
                 session_id,
                 project_dir,
                 session_config,
+                resume_session_id,
                 prompt,
                 lease,
             )

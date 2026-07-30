@@ -3,12 +3,13 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, InitializeRequest, InitializeResponse, NewSessionRequest,
-    NewSessionResponse, PromptRequest, PromptResponse, SessionConfigOption,
-    SessionConfigOptionCategory, SessionConfigSelectOption, SetSessionConfigOptionRequest,
-    SetSessionConfigOptionResponse, StopReason,
+    AgentCapabilities, CancelNotification, InitializeRequest, InitializeResponse,
+    NewSessionRequest, NewSessionResponse, PromptRequest, PromptResponse, ResumeSessionRequest,
+    ResumeSessionResponse, SessionConfigOption, SessionConfigOptionCategory,
+    SessionConfigSelectOption, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse,
+    StopReason,
 };
-use agent_client_protocol::{Channel, Client};
+use agent_client_protocol::{Agent, Channel, Client};
 
 use crate::agents::acp::catalog::{
     AcpAgentDescriptor, AcpSessionConfigOptionBinding, AcpSessionConfiguration,
@@ -39,6 +40,84 @@ fn descriptor_with_session_configuration(
         excluded_from_initial_default: false,
         bundled_with_harness: false,
     }
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn pooled_attach_resumes_the_exact_provider_session() {
+    let mut supervisor_child = Command::new("sleep")
+        .arg("60")
+        .spawn()
+        .expect("spawn supervisor child");
+    let supervisor = Arc::new(AcpSessionSupervisor::new(
+        &supervisor_child,
+        SupervisionConfig::default(),
+    ));
+    supervisor.record_handshake(crate::daemon::agent_acp::AcpAgentHandshake {
+        supports_session_resume: true,
+        ..Default::default()
+    });
+    let (client_transport, agent_transport) = Channel::duplex();
+    let resumed = Arc::new(Mutex::new(None));
+    let agent_task = tokio::spawn(run_resume_agent(agent_transport, Arc::clone(&resumed)));
+    let session_config = AcpSessionRequestConfig::from_request(
+        &crate::daemon::agent_acp::manager::AcpAgentStartRequest::default(),
+        &descriptor_with_session_configuration(AcpSessionConfiguration::default()),
+    );
+
+    Client
+        .builder()
+        .name("harness-test")
+        .connect_with(client_transport, async move |connection| {
+            attach_protocol_session(
+                &supervisor,
+                &connection,
+                &SessionRouteGuard::default(),
+                "agent-acp-2".into(),
+                "orchestration-2".into(),
+                PathBuf::from("/tmp/harness"),
+                &session_config,
+                Some("provider-session-1"),
+            )
+            .await
+            .expect("resume pooled session");
+            Ok(())
+        })
+        .await
+        .expect("client");
+
+    assert_eq!(
+        resumed.lock().expect("resumed lock").as_deref(),
+        Some("provider-session-1")
+    );
+    agent_task.abort();
+    let _ = supervisor_child.kill();
+    let _ = supervisor_child.wait();
+}
+
+async fn run_resume_agent(
+    transport: Channel,
+    resumed: Arc<Mutex<Option<String>>>,
+) -> agent_client_protocol::Result<()> {
+    Agent
+        .builder()
+        .name("resume-agent")
+        .on_receive_request(
+            async move |request: ResumeSessionRequest, responder, _connection| {
+                resumed
+                    .lock()
+                    .expect("resumed lock")
+                    .replace(request.session_id.0.to_string());
+                responder.respond(ResumeSessionResponse::new())
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |_cancel: CancelNotification, _connection| Ok(()),
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_to(transport)
+        .await
 }
 
 /// A prompt is spawned, not awaited, so its caller waits for the `session/new`
@@ -88,6 +167,7 @@ async fn attach_prompt_session_returns_before_the_prompt_completes() {
                         session_id: "orchestration-1".to_string(),
                         project_dir: PathBuf::from("/tmp/harness"),
                         session_config,
+                        resume_session_id: None,
                         prompt: "resume work".to_string(),
                         prompt_lease: PromptGate::default()
                             .acquire(PromptOwner::new("agent-acp-1", "orchestration-1"))
@@ -179,6 +259,7 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
                         session_id: "orchestration-1".to_string(),
                         project_dir: PathBuf::from("/tmp/harness"),
                         session_config,
+                        resume_session_id: None,
                         prompt: "resume work".to_string(),
                         prompt_lease: PromptGate::default()
                             .acquire(PromptOwner::new("agent-acp-1", "orchestration-1"))
