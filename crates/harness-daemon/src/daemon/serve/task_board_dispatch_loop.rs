@@ -12,10 +12,11 @@ use crate::daemon::db::{
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::task_board_managed_agents::{
-    maintain_task_board_dispatch_claim, managed_worker_id, resume_worker_compensation,
+    maintain_task_board_dispatch_claim, resume_worker_compensation,
     settle_claimed_task_board_worker,
 };
 use crate::daemon::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows;
+use crate::task_board::managed_worker_id;
 use harness_kernel::errors::CliError;
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);

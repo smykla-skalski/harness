@@ -9,13 +9,16 @@ use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
-use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability};
+use crate::task_board::{
+    AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, codex_worker_id, managed_worker_id,
+    terminal_worker_id,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
 mod requests;
-use requests::{codex_worker_request, terminal_worker_request, worker_prompt};
+use requests::{codex_worker_request, terminal_worker_request};
 
 mod workflow_launch;
 use workflow_launch::{validate_recovered_workflow_worker, validate_workflow_launch};
@@ -420,22 +423,6 @@ const fn launch_capability(mode: AgentMode) -> Option<TaskBoardLaunchCapability>
     }
 }
 
-fn codex_worker_id(dispatch_intent_id: &str) -> String {
-    format!("codex-{dispatch_intent_id}")
-}
-
-fn terminal_worker_id(dispatch_intent_id: &str) -> String {
-    format!("agent-tui-{dispatch_intent_id}")
-}
-
-pub(crate) fn managed_worker_id(applied: &DispatchAppliedTask, dispatch_intent_id: &str) -> String {
-    if applied.item.agent_mode == AgentMode::Interactive {
-        terminal_worker_id(dispatch_intent_id)
-    } else {
-        codex_worker_id(dispatch_intent_id)
-    }
-}
-
 pub(crate) fn managed_admission_owner_id(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
@@ -446,20 +433,6 @@ pub(crate) fn managed_admission_owner_id(
     } else {
         managed_worker_id(applied, dispatch_intent_id)
     }
-}
-
-/// The prompt this dispatch will start its worker with, rendered the same way
-/// the start path renders it.
-///
-/// # Errors
-/// Returns an error when the configured prompt cannot be rendered for this
-/// item.
-pub(crate) fn rendered_worker_prompt(
-    applied: &DispatchAppliedTask,
-    dispatch_intent_id: &str,
-) -> Result<String, CliError> {
-    let managed_run_id = managed_worker_id(applied, dispatch_intent_id);
-    worker_prompt(applied, &managed_run_id)
 }
 
 #[cfg(test)]

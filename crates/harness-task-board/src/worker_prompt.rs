@@ -4,7 +4,10 @@ use std::fmt::Write as _;
 use harness_kernel::errors::CliError;
 
 use super::prompt_catalog::{PromptId, render_prompt};
-use super::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
+use super::{
+    AgentMode, DispatchAppliedTask, ExternalRef, ExternalRefProvider, TaskBoardItem,
+    TaskBoardStatus,
+};
 
 pub(crate) const DISPATCH_PLACEHOLDER: &str = "<assigned-at-dispatch>";
 
@@ -180,6 +183,61 @@ pub fn plan_worker_prompt(item: &TaskBoardItem) -> String {
         },
     )
     .unwrap_or_else(|error| error.message())
+}
+
+#[must_use]
+pub fn codex_worker_id(dispatch_intent_id: &str) -> String {
+    format!("codex-{dispatch_intent_id}")
+}
+
+#[must_use]
+pub fn terminal_worker_id(dispatch_intent_id: &str) -> String {
+    format!("agent-tui-{dispatch_intent_id}")
+}
+
+#[must_use]
+pub fn managed_worker_id(applied: &DispatchAppliedTask, dispatch_intent_id: &str) -> String {
+    if applied.item.agent_mode == AgentMode::Interactive {
+        terminal_worker_id(dispatch_intent_id)
+    } else {
+        codex_worker_id(dispatch_intent_id)
+    }
+}
+
+/// Render the ordinary worker prompt for one dispatched item.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item.
+pub fn worker_prompt(
+    applied: &DispatchAppliedTask,
+    managed_run_id: &str,
+) -> Result<String, CliError> {
+    render_worker_prompt(
+        &applied.item,
+        &WorkerPromptContext {
+            board_item_id: &applied.board_item_id,
+            work_item_id: &applied.work_item_id,
+            worktree: applied.item.workflow.worktree.as_deref(),
+            session_id: Some(&applied.session_id),
+            managed_run_id: Some(managed_run_id),
+            status: applied.item.status,
+        },
+    )
+}
+
+/// The prompt this dispatch will start its worker with, rendered the same way
+/// the start path renders it.
+///
+/// # Errors
+/// Returns an error when the configured prompt cannot be rendered for this
+/// item.
+pub fn rendered_worker_prompt(
+    applied: &DispatchAppliedTask,
+    dispatch_intent_id: &str,
+) -> Result<String, CliError> {
+    let managed_run_id = managed_worker_id(applied, dispatch_intent_id);
+    worker_prompt(applied, &managed_run_id)
 }
 
 fn render_external_refs(references: &[ExternalRef]) -> Option<String> {

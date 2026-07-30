@@ -10,7 +10,7 @@ use crate::task_board::{
     TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReadOnlyWorkflowLaunch,
     TaskBoardReportOnlyReviewFinding, TaskBoardReviewFindingLocation,
     TaskBoardReviewFindingSeverity, TaskBoardReviewResult, TaskBoardReviewerOutcome,
-    TaskBoardWriteWorkflowLaunch, WorkerPromptContext, render_worker_prompt,
+    TaskBoardWriteWorkflowLaunch, worker_prompt,
 };
 use harness_kernel::errors::CliError;
 
@@ -346,26 +346,4 @@ fn write_capabilities(item_id: &str, tags: &[String], managed_run_id: &str) -> V
     capabilities.push("task-board:workflow:write".into());
     capabilities.push(format!("task-board:attempt:{managed_run_id}"));
     capabilities
-}
-
-/// Render the ordinary worker prompt for one dispatched item.
-///
-/// # Errors
-/// Returns an error when the configured prompt cannot be rendered for this
-/// item.
-pub(super) fn worker_prompt(
-    applied: &DispatchAppliedTask,
-    managed_run_id: &str,
-) -> Result<String, CliError> {
-    render_worker_prompt(
-        &applied.item,
-        &WorkerPromptContext {
-            board_item_id: &applied.board_item_id,
-            work_item_id: &applied.work_item_id,
-            worktree: applied.item.workflow.worktree.as_deref(),
-            session_id: Some(&applied.session_id),
-            managed_run_id: Some(managed_run_id),
-            status: applied.item.status,
-        },
-    )
 }

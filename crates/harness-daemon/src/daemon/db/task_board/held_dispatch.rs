@@ -20,11 +20,11 @@ use crate::daemon::db::policy::{
     consume_approval_grant_in_tx_at, live_approval_grant_in_tx_at, load_workspace_in_tx,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
-use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
-    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches, TaskBoardHeldDispatchSummary,
-    TaskBoardItem, consumed_grant_id, dispatch_policy_from_graph,
+    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches,
+    TaskBoardHeldDispatchSummary, TaskBoardItem, consumed_grant_id, dispatch_policy_from_graph,
+    rendered_worker_prompt,
 };
 
 #[derive(Debug)]
@@ -68,7 +68,8 @@ impl AsyncDaemonDb {
         &self,
         board_item_id: &str,
     ) -> Result<ClaimedHeldTaskBoardDispatch, CliError> {
-        <Self as DispatchAdmissionQueries>::claim_held_task_board_dispatch(self, board_item_id).await
+        <Self as DispatchAdmissionQueries>::claim_held_task_board_dispatch(self, board_item_id)
+            .await
     }
 }
 
