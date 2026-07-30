@@ -381,6 +381,14 @@ fn credential_provider(runtime: &str) -> Option<&'static str> {
     (runtime == "openrouter").then_some("openrouter")
 }
 
+/// Whether `runtime` runs through a provider that requires a validated
+/// credential. Only such runtimes carry the credential/model prerequisites this
+/// module can evaluate; the rest settle readiness on their own path. Shares
+/// `credential_provider` so the set stays in one place.
+pub(crate) fn runtime_requires_provider_credential(runtime: &str) -> bool {
+    credential_provider(runtime).is_some()
+}
+
 fn push_failure(reasons: &mut Vec<String>, passed: bool, reason: String) {
     if !passed {
         reasons.push(reason);

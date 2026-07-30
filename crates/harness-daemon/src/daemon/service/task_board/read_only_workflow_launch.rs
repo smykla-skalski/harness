@@ -5,7 +5,7 @@ use tokio::task::spawn_blocking;
 use crate::agents::runtime::models;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::{
-    CredentialAssessment, assess_provider_readiness, provider_prerequisite_reasons,
+    assess_provider_readiness, provider_prerequisite_reasons, runtime_requires_provider_credential,
 };
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
@@ -244,19 +244,26 @@ pub(super) fn ensure_supported_read_only_runtimes(
 /// preparation lets a later dispatch proceed once the prerequisite is met.
 ///
 /// A runtime that needs no provider credential (Codex) carries no prerequisite
-/// this gate can evaluate; its readiness is settled on its own durable path.
+/// this gate can evaluate; its readiness is settled on its own durable path, so
+/// it is skipped up front before any model resolution or provider probe.
 async fn ensure_reviewer_runtimes_available(
     reviewers: &TaskBoardResolvedReviewer,
 ) -> Result<(), CliError> {
     for profile in &reviewers.profiles {
         let runtime = profile.runtime.as_str();
-        let model = models::effective_model(runtime, profile.model.as_deref())
-            .or_else(|| profile.model.clone())
-            .unwrap_or_default();
-        let (credential, model_available) = assess_provider_readiness(runtime, &model).await;
-        if matches!(credential, CredentialAssessment::NotRequired) {
+        if !runtime_requires_provider_credential(runtime) {
             continue;
         }
+        // A credential-backed runtime must resolve to a concrete model. An
+        // unresolvable model is itself an unmet prerequisite, named rather than
+        // defaulted to an empty string that the readiness check would then
+        // silently treat as a model.
+        let Some(model) = models::effective_model(runtime, profile.model.as_deref()) else {
+            return Err(invalid_transition(format!(
+                "reviewer runtime '{runtime}' cannot run: no model is configured or catalogued for it"
+            )));
+        };
+        let (credential, model_available) = assess_provider_readiness(runtime, &model).await;
         if let Some(reason) =
             provider_prerequisite_reasons(runtime, &model, &credential, model_available)
                 .into_iter()

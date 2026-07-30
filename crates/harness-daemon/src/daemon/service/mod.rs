@@ -394,8 +394,9 @@ pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 
 pub(crate) use headless_readiness::{
-    CredentialAssessment, HeadlessReadinessInputs, RuntimeProbe, assess_provider_readiness,
+    HeadlessReadinessInputs, RuntimeProbe, assess_provider_readiness,
     build_headless_readiness_report, provider_prerequisite_reasons,
+    runtime_requires_provider_credential,
 };
 pub(crate) use observe_async::{observe_session_async, run_daemon_observe_task_async};
 pub(crate) use observe_loop::*;
