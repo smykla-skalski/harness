@@ -14,7 +14,7 @@ known_groups="harness-lib supporting-crates agents task-board systemd daemon dae
 
 validate_names() {
   local label="$1" raw="$2"
-  local trimmed found
+  local trimmed found t k
   local save_ifs="$IFS"
   local restore_f=0
   if [[ $- != *f* ]]; then

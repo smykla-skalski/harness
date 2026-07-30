@@ -246,6 +246,11 @@ scenario_skip_groups_skips_only_those() {
     return
   fi
   if assert_call_count 5 \
+    && assert_call_matches 1 nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime \
+    && assert_call_matches 2 nextest run --config-file .config/nextest.toml --user-config-file none -p harness-acme-dns -p harness-command -p harness-daemon-acp-probe -p harness-daemon-cli -p harness-daemon-client -p harness-daemon-discovery -p harness-daemon-launchd -p harness-daemon-provider-credentials -p harness-daemon-root -p harness-daemon-snapshot -p harness-daemon-state -p harness-db-schema -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-policy-graph-store -p harness-protocol -p harness-remote-trust -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-task-board-codex-requests -p harness-task-board-provider-sync -p harness-task-board-remote-viewer -p harness-telemetry -p harness-testkit -p harness-timeline -p harness-voice -p harness-workspace \
+    && assert_call_matches 3 nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime \
+    && assert_call_matches 4 nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib \
+    && assert_call_matches 5 nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon-bin \
     && grep -Fq "==> test:unit 3/7: harness-agents (bridge-runtime feature) (skipped)" "$SANDBOX/skip-groups.log" \
     && grep -Fq "==> test:unit 5/7: Linux systemd crate (skipped)" "$SANDBOX/skip-groups.log" \
     && ! grep -q "unknown group" "$SANDBOX/skip-groups.log"; then
