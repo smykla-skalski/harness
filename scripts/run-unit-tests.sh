@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-total_groups=7
 known_groups="harness-lib supporting-crates agents task-board systemd daemon daemon-bin"
+total_groups=$(printf '%s' "$known_groups" | wc -w | tr -d ' ')
 
 # HARNESS_SKIP_UNIT_GROUPS: comma-separated group names to skip
 #   (e.g. "systemd,agents").
@@ -97,20 +97,36 @@ run_group() {
 run_group 1 harness-lib "root Harness library" \
   ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime "$@"
 
+# harness-panel's build script shells out to npm to produce the assets it embeds;
+# the unit-test gate exercises the Rust side only, so it gets the placeholder
+# bundle instead of a frontend build on every run.
 run_group 2 supporting-crates "supporting workspace crates" \
   env HARNESS_PANEL_SKIP_FRONTEND_BUILD=1 ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-acme-dns -p harness-command -p harness-daemon-acp-probe -p harness-daemon-cli -p harness-daemon-client -p harness-daemon-discovery -p harness-daemon-launchd -p harness-daemon-provider-credentials -p harness-daemon-root -p harness-daemon-snapshot -p harness-daemon-state -p harness-db-schema -p harness-feature-flags -p harness-hooks -p harness-infra -p harness-kernel -p harness-mcp -p harness-observe -p harness-panel -p harness-policy-graph-store -p harness-protocol -p harness-remote-trust -p harness-reviews -p harness-run -p harness-sybra -p harness-systemd-protocol -p harness-task-board -p harness-task-board-codex-requests -p harness-task-board-provider-sync -p harness-task-board-remote-viewer -p harness-telemetry -p harness-testkit -p harness-timeline -p harness-voice -p harness-workspace "$@"
 
+# Own invocation: `acp` only compiles with `bridge-runtime`, which the rest of
+# the supporting group above has no reason to build.
 run_group 3 agents "harness-agents (bridge-runtime feature)" \
   ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime "$@"
 
+# Extra invocation, on top of harness-task-board's own default-feature run above:
+# `policy_runtime`'s tests live behind `daemon-runtime`, which the rest of the
+# supporting group has no reason to build.
 run_group 4 task-board "harness-task-board (daemon-runtime feature)" \
   ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-task-board --lib --features daemon-runtime "$@"
 
+# Linux-only guard: the real run-linux-only.sh skips on other hosts; the test
+# stand-in passes through unconditionally so filtering is validated everywhere.
 run_group 5 systemd "Linux systemd crate" \
   ./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd "$@"
 
+# Own invocation: harness-daemon runs its own unit tests directly (`--lib`),
+# no longer mirrored through root's own test build.
 run_group 6 daemon "harness-daemon (own lib)" \
   ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --lib "$@"
 
+# Separate invocation: nextest's target-type flags (`--lib`) apply to every
+# `-p` package in one invocation, not just the one they're written next to.
+# harness-daemon-bin has no lib target (its `[[bin]]` moved in #1230), so
+# combining it with harness-daemon's `--lib` would silently drop its tests.
 run_group 7 daemon-bin "harness-daemon-bin (binary unit and integration tests)" \
   ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon-bin "$@"
