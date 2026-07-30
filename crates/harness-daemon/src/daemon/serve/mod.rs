@@ -19,6 +19,7 @@ mod task_board_automation_startup;
 mod task_board_migration;
 #[cfg(test)]
 pub(crate) mod test_support;
+mod watch_port;
 
 pub(crate) use shutdown_signals::ShutdownSignalGuard;
 
@@ -279,7 +280,13 @@ fn spawn_startup_background_tasks(
     sender: broadcast::Sender<super::protocol::StreamEvent>,
     poll_interval: Duration,
 ) {
-    let _watch = watch::spawn_watch_loop(sender, poll_interval, Some(db), async_db_slot);
+    let _watch = watch::spawn_watch_loop(
+        sender,
+        poll_interval,
+        Some(db),
+        async_db_slot,
+        Arc::new(watch_port::DaemonWatchServicePort),
+    );
     let _reviews_policy_timers = service::spawn_reviews_policy_timer_loop(poll_interval);
     let _reviews_policy_events = service::spawn_reviews_policy_event_loop(poll_interval);
 }

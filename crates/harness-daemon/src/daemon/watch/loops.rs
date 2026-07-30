@@ -13,6 +13,7 @@ use super::paths::{
     WatchPathTarget, session_id_from_path_with_cache, watch_target_from_path_with_cache,
 };
 use super::refresh::{emit_watch_changes, refresh_watch_snapshot};
+use super::service_port::WatchServicePort;
 use super::state::{
     PendingWatchPaths, RefreshScope, RuntimeSessionResolveCache, WatchChanges, WatchSnapshot,
 };
@@ -22,7 +23,6 @@ use crate::daemon::db::{
 };
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::service;
 use harness_kernel::errors::CliError;
 
 /// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
@@ -34,10 +34,11 @@ pub(crate) fn spawn_watch_loop(
     interval: Duration,
     db: Option<Arc<Mutex<DaemonDb>>>,
     async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    port: Arc<dyn WatchServicePort>,
 ) -> JoinHandle<()> {
     match db {
-        Some(db) => spawn_db_watch_loop(sender, interval, db, async_db),
-        None => spawn_legacy_watch_loop(sender, interval),
+        Some(db) => spawn_db_watch_loop(sender, interval, db, async_db, port),
+        None => spawn_legacy_watch_loop(sender, interval, port),
     }
 }
 
@@ -46,6 +47,7 @@ fn spawn_db_watch_loop(
     interval: Duration,
     db: Arc<Mutex<DaemonDb>>,
     async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    port: Arc<dyn WatchServicePort>,
 ) -> JoinHandle<()> {
     spawn(async move {
         let root = index::projects_root();
@@ -94,11 +96,16 @@ fn spawn_db_watch_loop(
             let changes =
                 poll_change_tracking_prefer_async(async_db.get(), &db, &mut last_change_seq).await;
             let now = Instant::now();
-            if liveness_reconcile_due(&changes, last_liveness_reconcile_at, now) {
-                reconcile_session_liveness_for_watch(async_db.get(), &db).await;
+            if liveness_reconcile_due(
+                &changes,
+                last_liveness_reconcile_at,
+                now,
+                port.liveness_refresh_ttl(),
+            ) {
+                reconcile_session_liveness_for_watch(async_db.get(), &db, port.as_ref()).await;
                 last_liveness_reconcile_at = Some(now);
             }
-            emit_watch_changes(&sender, changes, Some(&db), async_db.get()).await;
+            emit_watch_changes(&sender, changes, Some(&db), async_db.get(), port.as_ref()).await;
         }
     })
 }
@@ -111,21 +118,23 @@ pub(super) fn liveness_reconcile_due(
     changes: &WatchChanges,
     last_reconcile_at: Option<Instant>,
     now: Instant,
+    refresh_ttl: Duration,
 ) -> bool {
     if changes.has_session_activity() {
         return true;
     }
     match last_reconcile_at {
         None => true,
-        Some(last) => now.saturating_duration_since(last) >= service::SESSION_LIVENESS_REFRESH_TTL,
+        Some(last) => now.saturating_duration_since(last) >= refresh_ttl,
     }
 }
 
 async fn reconcile_session_liveness_for_watch(
     async_db: Option<&Arc<AsyncDaemonDb>>,
     db: &Arc<Mutex<DaemonDb>>,
+    port: &dyn WatchServicePort,
 ) {
-    let Err(error) = reconcile_session_liveness_result(async_db, db).await else {
+    let Err(error) = reconcile_session_liveness_result(async_db, db, port).await else {
         return;
     };
 
@@ -135,19 +144,17 @@ async fn reconcile_session_liveness_for_watch(
 async fn reconcile_session_liveness_result(
     async_db: Option<&Arc<AsyncDaemonDb>>,
     db: &Arc<Mutex<DaemonDb>>,
+    port: &dyn WatchServicePort,
 ) -> Result<(), CliError> {
     if let Some(async_db) = async_db {
-        return service::reconcile_active_session_liveness_background_async(Some(
-            async_db.as_ref(),
-        ))
-        .await;
+        return port.reconcile_liveness_async(Some(async_db.as_ref())).await;
     }
 
     let Ok(db_guard) = db.lock() else {
         return Ok(());
     };
 
-    service::reconcile_active_session_liveness_background(Some(&db_guard))
+    port.reconcile_liveness(Some(&db_guard))
 }
 
 #[expect(
@@ -169,6 +176,7 @@ fn current_change_sequence(db: &Arc<Mutex<DaemonDb>>) -> i64 {
 fn spawn_legacy_watch_loop(
     sender: broadcast::Sender<StreamEvent>,
     interval: Duration,
+    port: Arc<dyn WatchServicePort>,
 ) -> JoinHandle<()> {
     spawn(async move {
         let root = index::projects_root();
@@ -222,7 +230,7 @@ fn spawn_legacy_watch_loop(
             else {
                 continue;
             };
-            emit_watch_changes(&sender, changes, None, None).await;
+            emit_watch_changes(&sender, changes, None, None, port.as_ref()).await;
         }
     })
 }

@@ -2,19 +2,111 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use async_trait::async_trait;
 use tempfile::tempdir;
+use tokio::sync::broadcast::Sender;
 
 use crate::daemon::db::{
     AsyncDaemonDb, DaemonDb, LOAD_CHANGE_TRACKING_SQL, session_status_db_label,
 };
 use crate::daemon::index::DiscoveredProject;
-use crate::daemon::service::SESSION_LIVENESS_REFRESH_TTL;
+use crate::daemon::protocol::StreamEvent;
 use crate::session::service::build_new_session;
 use crate::session::types::SessionStatus;
+use crate::workspace::utc_now;
+use harness_kernel::errors::CliError;
 
 use super::loops::{liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async};
 use super::refresh::{emit_watch_changes, emit_watch_changes_with};
+use super::service_port::WatchServicePort;
 use super::state::WatchChanges;
+
+/// Mirrors `service::SESSION_LIVENESS_REFRESH_TTL` for tests that exercise the
+/// loop's own due-or-not arithmetic; `watch` takes the real value as a
+/// `WatchServicePort` parameter instead of reading it off `service`.
+const TEST_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
+
+/// A `WatchServicePort` double that sends a same-named, empty-payload
+/// `StreamEvent` for every broadcast call instead of resolving real session
+/// data. The tests using it assert event names and ordering, not payload
+/// content, so this is enough to exercise `watch`'s own orchestration without
+/// pulling `service`'s broadcast logic into a `watch` test.
+struct RecordingWatchServicePort;
+
+#[async_trait]
+impl WatchServicePort for RecordingWatchServicePort {
+    fn liveness_refresh_ttl(&self) -> Duration {
+        TEST_LIVENESS_REFRESH_TTL
+    }
+
+    fn reconcile_liveness(&self, _db: Option<&DaemonDb>) -> Result<(), CliError> {
+        Ok(())
+    }
+
+    async fn reconcile_liveness_async(
+        &self,
+        _async_db: Option<&AsyncDaemonDb>,
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
+
+    fn broadcast_sessions_updated(&self, sender: &Sender<StreamEvent>, _db: Option<&DaemonDb>) {
+        send_stub_event(sender, "sessions_updated", None);
+    }
+
+    fn broadcast_session_updated_core(
+        &self,
+        sender: &Sender<StreamEvent>,
+        session_id: &str,
+        _db: Option<&DaemonDb>,
+    ) {
+        send_stub_event(sender, "session_updated", Some(session_id));
+    }
+
+    fn broadcast_session_extensions(
+        &self,
+        sender: &Sender<StreamEvent>,
+        session_id: &str,
+        _db: Option<&DaemonDb>,
+    ) {
+        send_stub_event(sender, "session_extensions", Some(session_id));
+    }
+
+    async fn broadcast_sessions_updated_async(
+        &self,
+        sender: &Sender<StreamEvent>,
+        _async_db: Option<&AsyncDaemonDb>,
+    ) {
+        send_stub_event(sender, "sessions_updated", None);
+    }
+
+    async fn broadcast_session_updated_core_async(
+        &self,
+        sender: &Sender<StreamEvent>,
+        session_id: &str,
+        _async_db: Option<&AsyncDaemonDb>,
+    ) {
+        send_stub_event(sender, "session_updated", Some(session_id));
+    }
+
+    async fn broadcast_session_extensions_async(
+        &self,
+        sender: &Sender<StreamEvent>,
+        session_id: &str,
+        _async_db: Option<&AsyncDaemonDb>,
+    ) {
+        send_stub_event(sender, "session_extensions", Some(session_id));
+    }
+}
+
+fn send_stub_event(sender: &Sender<StreamEvent>, event: &str, session_id: Option<&str>) {
+    let _ = sender.send(StreamEvent {
+        event: event.to_string(),
+        recorded_at: utc_now(),
+        session_id: session_id.map(ToString::to_string),
+        payload: serde_json::Value::Null,
+    });
+}
 
 #[test]
 fn poll_change_tracking_accepts_raw_session_scope() {
@@ -120,31 +212,6 @@ fn emit_watch_changes_releases_db_lock_before_extensions() {
 async fn emit_watch_changes_prefers_async_broadcast_builders() {
     let db_dir = tempdir().expect("tempdir");
     let db_path = db_dir.path().join("watch.db");
-    let db = DaemonDb::open(&db_path).expect("open file db");
-    let project = DiscoveredProject {
-        project_id: "project-watch".into(),
-        name: "harness".into(),
-        project_dir: Some("/tmp/harness".into()),
-        repository_root: Some("/tmp/harness".into()),
-        checkout_id: "checkout-watch".into(),
-        checkout_name: "main".into(),
-        context_root: "/tmp/harness-context".into(),
-        is_worktree: false,
-        worktree_name: None,
-    };
-    db.sync_project(&project).expect("sync project");
-    let state = build_new_session(
-        "watch async snapshot",
-        "",
-        "ae60b5c5-37cf-5a50-a816-8f454bb9e92e",
-        "claude",
-        Some("ae60b5c5-37cf-5a50-a816-8f454bb9e92eion"),
-        "2026-04-15T00:00:00Z",
-    );
-    db.sync_session(&project.project_id, &state)
-        .expect("sync session");
-    drop(db);
-
     let async_db = Arc::new(
         AsyncDaemonDb::connect(&db_path)
             .await
@@ -161,6 +228,7 @@ async fn emit_watch_changes_prefers_async_broadcast_builders() {
         },
         None,
         Some(&async_db),
+        &RecordingWatchServicePort,
     )
     .await;
 
@@ -196,8 +264,13 @@ fn spawn_watch_loop_does_not_replay_historical_changes_on_startup() {
 
             let (sender, mut receiver) = tokio::sync::broadcast::channel(8);
             let async_db = Arc::new(std::sync::OnceLock::new());
-            let handle =
-                super::spawn_watch_loop(sender, Duration::from_millis(25), Some(db), async_db);
+            let handle = super::spawn_watch_loop(
+                sender,
+                Duration::from_millis(25),
+                Some(db),
+                async_db,
+                Arc::new(RecordingWatchServicePort),
+            );
 
             let result = tokio::time::timeout(Duration::from_millis(150), receiver.recv()).await;
             handle.abort();
@@ -219,14 +292,24 @@ fn liveness_reconcile_due_runs_on_any_session_activity() {
         session_ids: BTreeSet::new(),
         ..WatchChanges::default()
     };
-    assert!(liveness_reconcile_due(&global, Some(now), now));
+    assert!(liveness_reconcile_due(
+        &global,
+        Some(now),
+        now,
+        TEST_LIVENESS_REFRESH_TTL
+    ));
 
     let scoped = WatchChanges {
         sessions_updated: false,
         session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
         ..WatchChanges::default()
     };
-    assert!(liveness_reconcile_due(&scoped, Some(now), now));
+    assert!(liveness_reconcile_due(
+        &scoped,
+        Some(now),
+        now,
+        TEST_LIVENESS_REFRESH_TTL
+    ));
 }
 
 #[test]
@@ -235,19 +318,19 @@ fn liveness_reconcile_due_first_tick_runs_then_gates_idle_on_ttl() {
     let idle = WatchChanges::default();
 
     assert!(
-        liveness_reconcile_due(&idle, None, now),
+        liveness_reconcile_due(&idle, None, now, TEST_LIVENESS_REFRESH_TTL),
         "the first idle tick must reconcile to establish a baseline"
     );
     assert!(
-        !liveness_reconcile_due(&idle, Some(now), now),
+        !liveness_reconcile_due(&idle, Some(now), now, TEST_LIVENESS_REFRESH_TTL),
         "an idle tick within the TTL must skip the sweep"
     );
 
     let past_ttl = now
-        .checked_add(SESSION_LIVENESS_REFRESH_TTL + Duration::from_secs(1))
+        .checked_add(TEST_LIVENESS_REFRESH_TTL + Duration::from_secs(1))
         .expect("instant within range");
     assert!(
-        liveness_reconcile_due(&idle, Some(now), past_ttl),
+        liveness_reconcile_due(&idle, Some(now), past_ttl, TEST_LIVENESS_REFRESH_TTL),
         "an idle tick past the TTL must reconcile so dead-process detection stays bounded"
     );
 }

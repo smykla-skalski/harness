@@ -1,6 +1,7 @@
 mod loops;
 mod paths;
 mod refresh;
+mod service_port;
 mod state;
 mod storage;
 
@@ -16,3 +17,4 @@ mod snapshot_tests;
 mod test_support;
 
 pub(crate) use loops::spawn_watch_loop;
+pub(crate) use service_port::WatchServicePort;
