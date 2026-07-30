@@ -18,6 +18,7 @@
     "security:openssf-scorecard",
     "group:linters"
   ],
+  "dependencyDashboardLabels": ["automation/renovate"],
   "gitIgnoredAuthors": ["205507218+smyklot[bot]@users.noreply.github.com"],
   "ignorePaths": [
     "**/tmp/**",
