@@ -1,10 +1,9 @@
-//! Starts a supported non-Codex reviewer runtime for a durable board attempt.
+//! Starts a supported agent-turn reviewer runtime for a durable board attempt.
 //!
-//! The coordinator drives Codex report runs through `codex_runs`; a non-Codex
-//! runtime (`openrouter` today) runs the shared turn through the
-//! `agent_turn_runs` store instead. The run is correlated to the attempt's
-//! managed run id so start-by-id, restart reconciliation, and admission release
-//! all key on the coordinator's attempt rather than a self-generated turn id.
+//! `OpenRouter` runs the shared turn through the `agent_turn_runs` store. The run
+//! is correlated to the attempt's managed run id so start-by-id, restart
+//! reconciliation, and admission release all key on the coordinator's attempt
+//! rather than a self-generated turn id.
 
 use crate::agents::turn::{AgentTurnPullRequestContext, AgentTurnRequest, AgentTurnRuntime};
 use crate::daemon::agent_acp::{
@@ -14,9 +13,9 @@ use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb}
 use crate::daemon::http::DaemonHttpState;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-/// Everything a non-Codex report start needs from the frozen attempt, apart
+/// Everything an agent-turn report start needs from the frozen attempt, apart
 /// from the runtime handle the production state supplies.
-pub(crate) struct NonCodexReportStart<'a> {
+pub(crate) struct AgentTurnReportStart<'a> {
     pub(crate) runtime: &'a str,
     pub(crate) session_id: &'a str,
     pub(crate) project_dir: Option<String>,
@@ -30,27 +29,27 @@ pub(crate) struct NonCodexReportStart<'a> {
     pub(crate) workflow_execution_id: &'a str,
 }
 
-/// Start the named non-Codex runtime for one report attempt, recording it in
+/// Start the named agent-turn runtime for one report attempt, recording it in
 /// the `agent_turn_runs` store keyed to the attempt.
 ///
 /// # Errors
 ///
-/// Returns an error when the runtime is not a supported non-Codex runtime, the
+/// Returns an error when the runtime is not a supported agent-turn runtime, the
 /// durable store is unavailable, or the runtime cannot accept the turn.
-pub(crate) async fn start_non_codex_report_run(
+pub(crate) async fn start_agent_turn_report_run(
     state: &DaemonHttpState,
-    start: NonCodexReportStart<'_>,
+    start: AgentTurnReportStart<'_>,
 ) -> Result<(), CliError> {
     if start.runtime != "openrouter" {
         return Err(CliErrorKind::invalid_transition(format!(
-            "unsupported non-Codex reviewer runtime '{}'",
+            "unsupported agent-turn reviewer runtime '{}'",
             start.runtime
         ))
         .into());
     }
     let store = state.async_db.get().cloned().ok_or_else(|| {
         CliError::from(CliErrorKind::workflow_io(
-            "non-Codex report run needs the canonical async database",
+            "agent-turn report run needs the canonical async database",
         ))
     })?;
     let runtime = OpenRouterAgentTurnRuntime::new_correlated(
@@ -75,13 +74,13 @@ pub(crate) async fn start_non_codex_report_run(
         .map(|_| ())
 }
 
-/// Load one durable non-Codex run and harvest a live terminal ACP result when available.
+/// Load one durable agent-turn report and harvest a live terminal ACP result when available.
 ///
 /// # Errors
 ///
 /// Returns an error when the durable row is malformed, live inspection fails, or settlement
 /// cannot be persisted.
-pub(crate) async fn load_non_codex_report_run(
+pub(crate) async fn load_agent_turn_report_run(
     state: &DaemonHttpState,
     db: &AsyncDaemonDb,
     run_id: &str,
@@ -93,10 +92,10 @@ pub(crate) async fn load_non_codex_report_run(
         return Ok(Some(run));
     }
     let session_id = run.session_id.as_deref().ok_or_else(|| {
-        CliErrorKind::workflow_io("active non-Codex report has no Harness session")
+        CliErrorKind::workflow_io("active agent-turn report has no Harness session")
     })?;
     let runtime_turn_id = run.runtime_turn_id.as_deref().ok_or_else(|| {
-        CliErrorKind::workflow_io("active non-Codex report has no provider turn identity")
+        CliErrorKind::workflow_io("active agent-turn report has no provider turn identity")
     })?;
     let inspect = state.acp_agent_manager.inspect(Some(session_id))?;
     let Some(agent) = inspect
@@ -104,7 +103,7 @@ pub(crate) async fn load_non_codex_report_run(
         .into_iter()
         .find(|agent| agent.acp_id == runtime_turn_id)
     else {
-        return Ok(Some(run));
+        return Ok(None);
     };
     let Some(session) = agent.session_state else {
         return Ok(Some(run));

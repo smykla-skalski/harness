@@ -9,7 +9,9 @@ use super::{ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{
+    AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb,
+};
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
     default_remote_pairing_limiter, default_remote_pairing_status_limiter,
@@ -52,6 +54,31 @@ async fn production_load_reconciles_unattached_active_report_after_restart() {
             .status,
         CodexRunStatus::Failed
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn production_load_treats_evicted_agent_turn_as_missing() {
+    let directory = tempdir().expect("tempdir");
+    let db_path = directory.path().join("harness.db");
+    let db = Arc::new(
+        AsyncDaemonDb::connect(&db_path)
+            .await
+            .expect("open async database"),
+    );
+    let run = active_agent_turn_report_run();
+    seed_session(db.as_ref(), run.session_id.as_deref().expect("session id")).await;
+    db.save_agent_turn_run(&run)
+        .await
+        .expect("save active agent-turn run");
+    let state = restarted_state(&db_path, db.clone());
+    let runtime = ProductionTaskBoardReadOnlyRuntime::new(&state, db.as_ref());
+
+    let reconciled = runtime
+        .load_agent_turn_report_run(&run.run_id)
+        .await
+        .expect("load evicted agent-turn run");
+
+    assert!(reconciled.is_none());
 }
 
 async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
@@ -192,5 +219,28 @@ fn active_report_run() -> CodexRunSnapshot {
         updated_at: "2026-07-17T23:59:00Z".into(),
         model: Some("gpt-5.3-codex".into()),
         effort: Some("high".into()),
+    }
+}
+
+fn active_agent_turn_report_run() -> AgentTurnRunSnapshot {
+    AgentTurnRunSnapshot {
+        run_id: "openrouter-workflow-restart-triage-1".into(),
+        session_id: Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into()),
+        task_id: None,
+        board_item_id: Some("item-restart".into()),
+        workflow_execution_id: Some("execution-restart".into()),
+        project_dir: Some("/tmp/read-only-worktree".into()),
+        requested_runtime: "openrouter".into(),
+        actual_runtime: Some("openrouter".into()),
+        runtime_turn_id: Some("turn-evicted".into()),
+        requested_model: Some("deepseek/deepseek-v4-flash".into()),
+        actual_model: None,
+        status: AgentTurnRunStatus::Running,
+        source_revision: Some("0123456789abcdef0123456789abcdef01234567".into()),
+        report: None,
+        stop_reason: None,
+        error: None,
+        created_at: "2026-07-17T23:59:00Z".into(),
+        updated_at: "2026-07-17T23:59:00Z".into(),
     }
 }

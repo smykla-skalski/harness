@@ -11,9 +11,9 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 /// Reviewer runtimes a local write workflow can dispatch. Only Codex has a
-/// durable write execution path; the non-Codex runtimes the read-only gate
-/// accepts have no write execution yet (#908), so admitting one here would
-/// stamp a workflow that cannot run.
+/// durable write execution path; the provider runtimes accepted by the
+/// read-only gate have no write execution yet (#908), so admitting one here
+/// would stamp a workflow that cannot run.
 const SUPPORTED_WRITE_RUNTIMES: [&str; 1] = ["codex"];
 
 pub(super) async fn prepare_write_workflow_launch(

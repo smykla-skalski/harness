@@ -36,10 +36,10 @@ where
     // finished has to be harvestable no matter what the prompt file says now.
     let identity = attempt_run_identity(execution, attempt)?;
     // Only Codex uses the codex_runs path; every other runtime is handled by the
-    // non-Codex path, which accepts the supported set and refuses anything else
+    // agent-turn path, which accepts the supported set and refuses anything else
     // by name rather than silently running it as Codex.
     if identity.runtime != "codex" {
-        return super::non_codex_reports::reconcile_non_codex_report_attempt(
+        return super::agent_turn_reports::reconcile_agent_turn_report_attempt(
             db,
             runtime,
             execution,

@@ -206,10 +206,10 @@ fn local_head(worktree: &Path) -> Result<String, CliError> {
 }
 
 /// Reviewer runtimes a local read-only workflow can dispatch. Codex runs the
-/// long-standing durable path; `openrouter` runs the shared non-Codex turn
-/// through the `agent_turn_runs` store. The write launch path is stricter -
-/// there is no non-Codex write execution yet - so it keeps its own set rather
-/// than sharing this one.
+/// long-standing durable path; `openrouter` runs a shared provider turn through
+/// the `agent_turn_runs` store. The write launch path is stricter because it
+/// does not yet support provider-backed write execution, so it keeps its own
+/// set rather than sharing this one.
 pub(super) const SUPPORTED_READ_ONLY_RUNTIMES: [&str; 2] = ["codex", "openrouter"];
 
 /// Refuse a reviewer profile whose runtime is not in `allowed`, before any side

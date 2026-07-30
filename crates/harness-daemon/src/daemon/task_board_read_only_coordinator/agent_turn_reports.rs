@@ -1,7 +1,6 @@
-//! Reconciles a report attempt whose reviewer profile names a non-Codex
-//! runtime. Codex report runs live in `codex_runs`; a non-Codex runtime
-//! (`openrouter` today) runs the shared turn through the `agent_turn_runs`
-//! store instead, keyed to the attempt's managed run id.
+//! Reconciles a report attempt whose reviewer profile names an agent-turn
+//! runtime. `OpenRouter` runs the shared turn through the `agent_turn_runs` store,
+//! keyed to the attempt's managed run id.
 //!
 //! Slice A of #1001 wires selection and a durable start: the turn starts, is
 //! recorded from the moment it starts, and a restart-settled failure resumes
@@ -16,12 +15,11 @@ use crate::task_board::{
 };
 use harness_kernel::errors::CliError;
 
-/// Non-Codex reviewer runtimes the coordinator can drive. Codex is handled by
-/// its own path; anything outside this set is refused by name before any side
-/// effect, so a stray or hand-edited profile never silently runs as Codex.
-const SUPPORTED_NON_CODEX_RUNTIMES: [&str; 1] = ["openrouter"];
+/// Agent-turn reviewer runtimes the coordinator can drive. Anything outside
+/// this set is refused by name before any side effect.
+const SUPPORTED_AGENT_TURN_RUNTIMES: [&str; 1] = ["openrouter"];
 
-use super::super::task_board_read_only_runtime::{NonCodexReportStart, TaskBoardReadOnlyRuntime};
+use super::super::task_board_read_only_runtime::{AgentTurnReportStart, TaskBoardReadOnlyRuntime};
 use super::attempts::{require_human, set_execution_state, settlement_is_current};
 use super::report_starts::{claim_report_side_effect, refuse_unrenderable_request};
 use super::reports::{
@@ -30,9 +28,9 @@ use super::reports::{
 };
 use super::requests::{codex_attempt_request, run_context};
 
-/// Reconcile one report attempt on a non-Codex runtime. `Ok(true)` means this
+/// Reconcile one report attempt on an agent-turn runtime. `Ok(true)` means this
 /// attempt was handled this tick; `Ok(false)` leaves it for the caller.
-pub(super) async fn reconcile_non_codex_report_attempt<R>(
+pub(super) async fn reconcile_agent_turn_report_attempt<R>(
     db: &AsyncDaemonDb,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -44,7 +42,7 @@ pub(super) async fn reconcile_non_codex_report_attempt<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
-    if !SUPPORTED_NON_CODEX_RUNTIMES.contains(&runtime_name) {
+    if !SUPPORTED_AGENT_TURN_RUNTIMES.contains(&runtime_name) {
         refuse_unsupported_runtime(db, execution, attempt, runtime_name, now).await?;
         return Ok(true);
     }
@@ -62,7 +60,7 @@ where
             if !report_claim_verification_due(attempt, now)? {
                 return Ok(false);
             }
-            mark_unknown(db, execution, attempt, now, "durable non-Codex run is missing").await?;
+            mark_unknown(db, execution, attempt, now, "durable agent-turn run is missing").await?;
             Ok(true)
         }
         None if !allow_start => Ok(false),
@@ -134,7 +132,7 @@ where
         return Ok(false);
     };
     let context = run_context(execution)?;
-    let start = NonCodexReportStart {
+    let start = AgentTurnReportStart {
         runtime: runtime_name,
         session_id: context.session_id.as_str(),
         project_dir: Some(context.worktree.clone()),
@@ -145,7 +143,7 @@ where
         board_item_id: &execution.item_id,
         workflow_execution_id: &execution.execution_id,
     };
-    match runtime.start_non_codex_report_run(start).await {
+    match runtime.start_agent_turn_report_run(start).await {
         Ok(()) => Ok(true),
         Err(error) => reconcile_start_error(db, execution, &claimed, &error, now).await,
     }
@@ -216,7 +214,7 @@ async fn settle_terminal_run(
             if !settlement_is_current(db, &execution.execution_id, now).await? {
                 return Ok(());
             }
-            let detail = error.unwrap_or("non-Codex report run failed");
+            let detail = error.unwrap_or("agent-turn report run failed");
             record_retry_or_human(db, execution, attempt, detail, now).await
         }
         AgentTurnRunStatus::Cancelled => {
@@ -226,7 +224,7 @@ async fn settle_terminal_run(
                 TaskBoardAttemptState::Cancelled,
                 now,
                 None,
-                Some("non-Codex report run was cancelled"),
+                Some("agent-turn report run was cancelled"),
                 None,
             )
             .await?;

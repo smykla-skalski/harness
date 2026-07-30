@@ -18,7 +18,7 @@ mod dependency_triage;
 mod in_progress;
 mod ingestion;
 mod lifecycle;
-mod non_codex_reports;
+mod agent_turn_reports;
 mod refusal;
 mod report_evidence;
 mod report_starts;

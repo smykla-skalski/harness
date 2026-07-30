@@ -15,7 +15,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::super::task_board_read_only_runtime::{
-    NonCodexReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
+    AgentTurnReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
 };
 use super::{BASE_HEAD, NOW};
 
@@ -284,7 +284,7 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
         self.start_run(session_id, request, run_id)
     }
 
-    async fn load_non_codex_report_run(
+    async fn load_agent_turn_report_run(
         &self,
         run_id: &str,
     ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
@@ -296,9 +296,9 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
             .cloned())
     }
 
-    async fn start_non_codex_report_run(
+    async fn start_agent_turn_report_run(
         &self,
-        start: NonCodexReportStart<'_>,
+        start: AgentTurnReportStart<'_>,
     ) -> Result<(), CliError> {
         self.triage_starts.fetch_add(1, Ordering::SeqCst);
         let result = self

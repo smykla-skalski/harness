@@ -1,4 +1,4 @@
-//! Durable storage and restart reconciliation for non-Codex agent turn runs.
+//! Durable storage and restart reconciliation for agent turn runs.
 //!
 //! Codex runs persist through `codex_runs`; this table (`agent_turn_runs`)
 //! covers every other supported runtime (`OpenRouter` today). A run is recorded
@@ -40,7 +40,7 @@ macro_rules! bind_run {
     };
 }
 
-/// Lifecycle of a non-Codex run. `Queued` and `Running` are active; the rest
+/// Lifecycle of an agent turn run. `Queued` and `Running` are active; the rest
 /// are terminal. There is no `WaitingApproval`: report runs never gate on an
 /// approval the way codex workspace turns can.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,7 +79,7 @@ impl AgentTurnRunStatus {
     }
 }
 
-/// Durable snapshot of one non-Codex run. `run_id` doubles as the task-board
+/// Durable snapshot of one agent turn run. `run_id` doubles as the task-board
 /// `managed_worker_id`, so persisting a terminal status releases the matching
 /// concurrency admission in the same transaction.
 #[derive(Debug, Clone)]
@@ -148,7 +148,7 @@ const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_
      WHERE agent_turn_runs.status NOT IN ('completed', 'failed', 'cancelled')";
 
 impl AsyncDaemonDb {
-    /// Record a non-Codex run at start. Idempotent by `run_id`: a repeat start
+    /// Record an agent turn run at start. Idempotent by `run_id`: a repeat start
     /// leaves the stored row untouched and returns it, so a reclaimed dispatch
     /// claim never doubles the agent work.
     ///
@@ -167,7 +167,7 @@ impl AsyncDaemonDb {
             .ok_or_else(|| db_error("agent turn run vanished immediately after start"))
     }
 
-    /// Save or update a non-Codex run. A terminal status is sticky and releases
+    /// Save or update an agent turn run. A terminal status is sticky and releases
     /// the run's task-board concurrency admission in the same transaction.
     ///
     /// # Errors
@@ -192,7 +192,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit agent turn run save: {error}")))
     }
 
-    /// Load one non-Codex run.
+    /// Load one agent turn run.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
@@ -209,7 +209,7 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// Settle every non-Codex run left active by a daemon restart. `OpenRouter`
+    /// Settle every agent turn run left active by a daemon restart. `OpenRouter`
     /// report turns start with resume disabled, so an interrupted run cannot be
     /// re-attached; it is settled to `Failed` exactly once and its admission is
     /// released so the board can decide what happens next. Idempotent: a second
@@ -228,7 +228,7 @@ impl AsyncDaemonDb {
             settled += self.settle_interrupted_agent_turn_run(&run_id).await?;
         }
         if settled > 0 {
-            tracing::info!(settled, "settled interrupted non-Codex agent turn runs");
+            tracing::info!(settled, "settled interrupted agent turn runs");
         }
         Ok(settled)
     }
@@ -240,7 +240,7 @@ impl AsyncDaemonDb {
         let changed = query(
             "UPDATE agent_turn_runs \
              SET status = 'failed', \
-                 error = COALESCE(error, 'non-Codex turn was interrupted by a daemon restart'), \
+                 error = COALESCE(error, 'agent turn was interrupted by a daemon restart'), \
                  updated_at = ?2 \
              WHERE run_id = ?1 AND status IN ('queued', 'running')",
         )

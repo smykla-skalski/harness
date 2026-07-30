@@ -19,7 +19,7 @@ pub(crate) use harness_task_board_codex_requests::{
 pub(super) struct AttemptRunIdentity {
     pub(super) mode: CodexRunMode,
     /// Reviewer runtime the resolved profile names. `codex` drives the durable
-    /// Codex path; a supported non-Codex runtime (`openrouter`) drives the
+    /// Codex path; a supported agent-turn runtime (`openrouter`) drives the
     /// shared turn through the `agent_turn_runs` store. Implementation attempts
     /// have no reviewer profile and are Codex-only.
     pub(super) runtime: String,

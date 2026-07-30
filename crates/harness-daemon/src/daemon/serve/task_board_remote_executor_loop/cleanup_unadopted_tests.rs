@@ -252,11 +252,11 @@ async fn preclaim_superseded_cleanup_is_restart_safe_and_mutation_free() {
 }
 
 #[test]
-fn non_codex_no_run_start_failure_settles_failed_at_claimed() {
-    run_deep_cleanup_async(non_codex_no_run_start_failure_settles_failed_at_claimed_body);
+fn provider_no_run_start_failure_settles_failed_at_claimed() {
+    run_deep_cleanup_async(provider_no_run_start_failure_settles_failed_at_claimed_body);
 }
 
-async fn non_codex_no_run_start_failure_settles_failed_at_claimed_body() {
+async fn provider_no_run_start_failure_settles_failed_at_claimed_body() {
     Box::pin(with_isolated_sessions(
         "remote-sandbox-no-run-failure",
         async {

@@ -19,7 +19,7 @@ use super::AcpAgentManagerHandle;
 
 const OPENROUTER_RUNTIME: &str = "openrouter";
 
-/// Ties a durable non-Codex run to a caller-owned lifecycle instead of the
+/// Ties a durable agent-turn run to a caller-owned lifecycle instead of the
 /// self-generated ACP id. The task-board coordinator drives runs by an attempt
 /// `idempotency_key` (the managed run id, which doubles as the concurrency
 /// admission's `managed_worker_id`), so when it owns the turn it supplies that
@@ -99,7 +99,7 @@ pub struct OpenRouterAgentTurnRuntime {
     session_id: String,
     project_dir: Option<String>,
     bindings: Arc<Mutex<BTreeMap<AgentTurnId, OpenRouterTurnBinding>>>,
-    /// Durable non-Codex run store. `None` only in ACP-behavior unit tests that
+    /// Durable agent-turn run store. `None` only in ACP-behavior unit tests that
     /// do not exercise persistence; the production `new` path always supplies
     /// one so every turn is recorded the moment it starts and settles to one
     /// terminal outcome that survives a restart.

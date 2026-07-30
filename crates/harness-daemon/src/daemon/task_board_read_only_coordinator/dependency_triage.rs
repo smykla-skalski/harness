@@ -10,7 +10,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::task_board_read_only_runtime::{NonCodexReportStart, TaskBoardReadOnlyRuntime};
+use super::super::task_board_read_only_runtime::{AgentTurnReportStart, TaskBoardReadOnlyRuntime};
 use super::attempts::{require_human, set_execution_state, settlement_is_current};
 use super::report_starts::claim_report_side_effect;
 use super::reports::{
@@ -33,7 +33,7 @@ where
     R: TaskBoardReadOnlyRuntime,
 {
     let run = runtime
-        .load_non_codex_report_run(&attempt.idempotency_key)
+        .load_agent_turn_report_run(&attempt.idempotency_key)
         .await?;
     match run {
         Some(run) if run.status.is_active() => mark_running(db, execution, attempt, now).await,
@@ -71,7 +71,7 @@ where
     };
     let context = run_context(execution)?;
     let pull_request = pull_request_context(execution)?;
-    let start = NonCodexReportStart {
+    let start = AgentTurnReportStart {
         runtime: "openrouter",
         session_id: &context.session_id,
         project_dir: Some(context.worktree.clone()),
@@ -82,9 +82,9 @@ where
         board_item_id: &execution.item_id,
         workflow_execution_id: &execution.execution_id,
     };
-    if let Err(error) = runtime.start_non_codex_report_run(start).await {
+    if let Err(error) = runtime.start_agent_turn_report_run(start).await {
         match runtime
-            .load_non_codex_report_run(&claimed.idempotency_key)
+            .load_agent_turn_report_run(&claimed.idempotency_key)
             .await
         {
             Ok(Some(_)) => {}

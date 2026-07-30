@@ -434,13 +434,13 @@ async fn stop_any_managed_agent(
     match state.codex_controller.session_id_for_run(agent_id) {
         Ok(session_id) => stop_codex_managed_agent(state, &session_id, agent_id).await,
         Err(error) if error.code() == "KSRCLI090" => {
-            stop_non_codex_managed_agent(state, agent_id).await
+            stop_provider_managed_agent(state, agent_id).await
         }
         Err(error) => Err(error),
     }
 }
 
-async fn stop_non_codex_managed_agent(
+async fn stop_provider_managed_agent(
     state: &DaemonHttpState,
     agent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {

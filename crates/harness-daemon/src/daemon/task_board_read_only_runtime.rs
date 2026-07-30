@@ -15,10 +15,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[path = "task_board_read_only_runtime/git_evidence.rs"]
 mod git_evidence;
-#[path = "task_board_read_only_runtime/non_codex.rs"]
-pub(crate) mod non_codex;
+#[path = "task_board_read_only_runtime/agent_turn_report.rs"]
+pub(crate) mod agent_turn_report;
 
-pub(crate) use non_codex::NonCodexReportStart;
+pub(crate) use agent_turn_report::AgentTurnReportStart;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardPublishVerification {
@@ -60,21 +60,21 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
         ))
     }
 
-    async fn start_non_codex_report_run(
+    async fn start_agent_turn_report_run(
         &self,
-        _start: NonCodexReportStart<'_>,
+        _start: AgentTurnReportStart<'_>,
     ) -> Result<(), CliError> {
         Err(invalid_transition(
-            "runtime does not support non-Codex report runs",
+            "runtime does not support agent-turn report runs",
         ))
     }
 
-    async fn load_non_codex_report_run(
+    async fn load_agent_turn_report_run(
         &self,
         _run_id: &str,
     ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
         Err(invalid_transition(
-            "runtime does not support non-Codex report run loading",
+            "runtime does not support agent-turn report run loading",
         ))
     }
 
@@ -200,18 +200,18 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         .await
     }
 
-    async fn start_non_codex_report_run(
+    async fn start_agent_turn_report_run(
         &self,
-        start: NonCodexReportStart<'_>,
+        start: AgentTurnReportStart<'_>,
     ) -> Result<(), CliError> {
-        non_codex::start_non_codex_report_run(self.state, start).await
+        agent_turn_report::start_agent_turn_report_run(self.state, start).await
     }
 
-    async fn load_non_codex_report_run(
+    async fn load_agent_turn_report_run(
         &self,
         run_id: &str,
     ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
-        non_codex::load_non_codex_report_run(self.state, self.db, run_id).await
+        agent_turn_report::load_agent_turn_report_run(self.state, self.db, run_id).await
     }
 
     async fn resolve_exact_head(
