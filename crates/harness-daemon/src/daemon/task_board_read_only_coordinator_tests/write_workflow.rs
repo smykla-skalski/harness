@@ -361,7 +361,11 @@ async fn invalid_recovery_state_requires_human_instead_of_retrying_forever() {
     ))
     .await;
     let mut corrupted = load_execution(&fixture).await;
-    corrupted.attempts = vec![active_attempt(1), active_attempt(2)];
+    let execution_id = corrupted.execution_id.clone();
+    corrupted.attempts = vec![
+        active_attempt(&execution_id, 1),
+        active_attempt(&execution_id, 2),
+    ];
 
     assert!(
         crate::daemon::task_board_read_only_coordinator::refuse_invalid_recovery(
@@ -391,12 +395,12 @@ async fn invalid_recovery_state_requires_human_instead_of_retrying_forever() {
     );
 }
 
-fn active_attempt(attempt: u32) -> TaskBoardExecutionAttemptRecord {
+fn active_attempt(execution_id: &str, attempt: u32) -> TaskBoardExecutionAttemptRecord {
     TaskBoardExecutionAttemptRecord {
-        execution_id: "execution-write-invalid-recovery".into(),
+        execution_id: execution_id.into(),
         action_key: "implementation:1".into(),
         attempt,
-        idempotency_key: format!("execution-write-invalid-recovery:implementation:1:{attempt}"),
+        idempotency_key: format!("{execution_id}:implementation:1:{attempt}"),
         state: TaskBoardAttemptState::Running,
         failure_class: None,
         available_at: None,
