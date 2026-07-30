@@ -7,6 +7,8 @@ use super::*;
 use crate::{AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardReadOnlyRunContext};
 
 const NOW: &str = "2026-07-18T10:00:00Z";
+const DEPENDENCY_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+const UPDATED_DEPENDENCY_HEAD: &str = "1111111111111111111111111111111111111111";
 
 #[test]
 fn implementation_phase_requires_revision_bound_plan_approval() {
@@ -133,6 +135,71 @@ fn pr_fix_cycle_one_implementation_binds_the_frozen_pull_request_head() {
             field: "attempt.artifact.implementation",
             detail: "base head does not match the frozen pull request head".into(),
         }
+    );
+}
+
+#[test]
+fn dependency_triage_uses_exact_head_when_pull_request_head_is_absent() {
+    let mut record = write_execution();
+    record.snapshot.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    record.transition.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    record.transition.exact_head_revision = Some(DEPENDENCY_HEAD.into());
+    record.transition.pull_request = Some(TaskBoardPullRequestIdentity {
+        repository: "acme/widgets".into(),
+        number: 17,
+        head: None,
+    });
+    let result = dependency_triage_result();
+    let route =
+        compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
+            .expect("compile dependency route");
+    let attempt = completed_attempt(
+        "dependency_triage",
+        TaskBoardAttemptResultArtifact::DependencyTriage(Box::new(route)),
+    );
+
+    assert!(
+        validate_write_attempt_artifact(&record, &attempt)
+            .expect("exact head is the canonical triage binding")
+    );
+}
+
+#[test]
+fn dependency_triage_retains_its_initial_head_after_implementation() {
+    let mut record = write_execution();
+    record.snapshot.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    record.transition.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    record.transition.exact_head_revision = Some(UPDATED_DEPENDENCY_HEAD.into());
+    record.transition.pull_request = Some(TaskBoardPullRequestIdentity {
+        repository: "acme/widgets".into(),
+        number: 17,
+        head: Some(TaskBoardPullRequestHeadIdentity {
+            repository: "acme/widgets".into(),
+            branch: "dependencies".into(),
+            revision: DEPENDENCY_HEAD.into(),
+        }),
+    });
+    let result = dependency_triage_result();
+    let route =
+        compile_task_board_dependency_route(&result, "acme/widgets", 17, DEPENDENCY_HEAD)
+            .expect("compile dependency route");
+    let triage = completed_attempt(
+        "dependency_triage",
+        TaskBoardAttemptResultArtifact::DependencyTriage(Box::new(route)),
+    );
+    let mut implementation = implementation_attempt(1);
+    let Some(TaskBoardAttemptResultArtifact::Implementation(result)) =
+        implementation.artifact.as_mut()
+    else {
+        panic!("implementation artifact")
+    };
+    result.base_head_revision = DEPENDENCY_HEAD.into();
+    result.head_revision = UPDATED_DEPENDENCY_HEAD.into();
+    record.attempts.push(implementation);
+
+    assert!(
+        validate_write_attempt_artifact(&record, &triage)
+            .expect("triage remains bound to the pre-implementation head")
     );
 }
 
@@ -348,6 +415,50 @@ fn completed_attempt(
         started_at: NOW.into(),
         updated_at: NOW.into(),
         completed_at: Some(NOW.into()),
+    }
+}
+
+fn dependency_triage_result() -> TaskBoardDependencyTriageResult {
+    TaskBoardDependencyTriageResult {
+        schema_version: TASK_BOARD_DEPENDENCY_TRIAGE_SCHEMA_VERSION,
+        repository: "acme/widgets".into(),
+        pull_request_number: 17,
+        exact_head_revision: DEPENDENCY_HEAD.into(),
+        dependency: TaskBoardDependencyIdentity {
+            name: "serde".into(),
+            ecosystem: "cargo".into(),
+            current_version: "1.0.0".into(),
+            target_version: "1.0.1".into(),
+            update_class: TaskBoardDependencyUpdateClass::Patch,
+        },
+        checks: vec![TaskBoardDependencyCheck {
+            name: "build".into(),
+            state: TaskBoardDependencyCheckState::Passed,
+            details_url: None,
+        }],
+        conflicts: TaskBoardDependencyConflictEvidence {
+            state: TaskBoardDependencyConflictState::Clean,
+            summary: "clean".into(),
+        },
+        approvals: TaskBoardDependencyApprovalEvidence {
+            current: 1,
+            required: 1,
+        },
+        safety_assumption: "current evidence is complete".into(),
+        disposition: TaskBoardDependencyTriageDisposition::ContinueSafe,
+        required_tools: vec!["task_board.audit".into(), "task_board.advance".into()],
+        next_steps: vec![
+            TaskBoardDependencyTriageStep {
+                order: 1,
+                action: "record_result".into(),
+                reason: "retain source result".into(),
+            },
+            TaskBoardDependencyTriageStep {
+                order: 2,
+                action: "continue_workflow".into(),
+                reason: "all current evidence passes".into(),
+            },
+        ],
     }
 }
 

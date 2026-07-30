@@ -98,7 +98,7 @@ struct NewSessionAPIClientTests {
     #expect(records[3].body?["approval_id"] == nil)
   }
 
-  @Test("Codex convenience HTTP wrapper rejects non-Codex managed-agent responses")
+  @Test("Codex convenience HTTP wrapper rejects mismatched runtime responses")
   func codexConvenienceWrapperRejectsUnexpectedManagedAgentFamily() async throws {
     StartSessionURLProtocol.reset(responseKind: .terminalSnapshot)
     let client = try makeClient()

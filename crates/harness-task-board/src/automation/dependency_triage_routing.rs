@@ -10,7 +10,7 @@ use super::{
     validate_task_board_dependency_triage_evidence,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TaskBoardDependencyRouteStatus {
     ReportCompleted,
@@ -20,7 +20,7 @@ pub enum TaskBoardDependencyRouteStatus {
     ReadyToContinue,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TaskBoardDependencyRouteRecord {
     pub route_id: String,
@@ -76,15 +76,12 @@ pub async fn route_task_board_dependency_triage_result(
     expected_head_revision: &str,
     store: &dyn TaskBoardDependencyRouteStore,
 ) -> Result<TaskBoardDependencyRouteOutcome, CliError> {
-    let plan = validate_task_board_dependency_triage_evidence(
+    let route = compile_task_board_dependency_route(
         result,
         expected_repository,
         expected_pull_request_number,
         expected_head_revision,
-    )
-    .and_then(|()| compile_task_board_dependency_action_plan(result))
-    .map_err(|error| triage_error(&error))?;
-    let route = build_route(result, &plan)?;
+    )?;
 
     match store.admit(route.clone()).await? {
         TaskBoardDependencyRouteAdmission::Claimed => Ok(TaskBoardDependencyRouteOutcome {
@@ -103,6 +100,31 @@ pub async fn route_task_board_dependency_triage_result(
         ))
         .into()),
     }
+}
+
+/// Validate one model result and compile its exact-head route without admitting side effects.
+///
+/// The workflow execution store uses this boundary before atomically retaining the route as
+/// attempt evidence. Callers must not schedule the compiled action until that persistence succeeds.
+///
+/// # Errors
+///
+/// Returns a fail-closed validation error for malformed or contradictory evidence.
+pub fn compile_task_board_dependency_route(
+    result: &TaskBoardDependencyTriageResult,
+    expected_repository: &str,
+    expected_pull_request_number: u64,
+    expected_head_revision: &str,
+) -> Result<TaskBoardDependencyRouteRecord, CliError> {
+    let plan = validate_task_board_dependency_triage_evidence(
+        result,
+        expected_repository,
+        expected_pull_request_number,
+        expected_head_revision,
+    )
+    .and_then(|()| compile_task_board_dependency_action_plan(result))
+    .map_err(|error| triage_error(&error))?;
+    build_route(result, &plan)
 }
 
 fn build_route(

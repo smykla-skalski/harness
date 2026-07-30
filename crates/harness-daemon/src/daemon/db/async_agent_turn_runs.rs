@@ -1,4 +1,4 @@
-//! Durable storage and restart reconciliation for non-Codex agent turn runs.
+//! Durable storage and restart reconciliation for agent turn runs.
 //!
 //! Codex runs persist through `codex_runs`; this table (`agent_turn_runs`)
 //! covers every other supported runtime (`OpenRouter` today). A run is recorded
@@ -27,6 +27,7 @@ macro_rules! bind_run {
             .bind(&$snapshot.project_dir)
             .bind(&$snapshot.requested_runtime)
             .bind(&$snapshot.actual_runtime)
+            .bind(&$snapshot.runtime_turn_id)
             .bind(&$snapshot.requested_model)
             .bind(&$snapshot.actual_model)
             .bind($snapshot.status.as_str())
@@ -39,7 +40,7 @@ macro_rules! bind_run {
     };
 }
 
-/// Lifecycle of a non-Codex run. `Queued` and `Running` are active; the rest
+/// Lifecycle of an agent turn run. `Queued` and `Running` are active; the rest
 /// are terminal. There is no `WaitingApproval`: report runs never gate on an
 /// approval the way codex workspace turns can.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +79,7 @@ impl AgentTurnRunStatus {
     }
 }
 
-/// Durable snapshot of one non-Codex run. `run_id` doubles as the task-board
+/// Durable snapshot of one agent turn run. `run_id` doubles as the task-board
 /// `managed_worker_id`, so persisting a terminal status releases the matching
 /// concurrency admission in the same transaction.
 #[derive(Debug, Clone)]
@@ -91,6 +92,7 @@ pub(crate) struct AgentTurnRunSnapshot {
     pub project_dir: Option<String>,
     pub requested_runtime: String,
     pub actual_runtime: Option<String>,
+    pub runtime_turn_id: Option<String>,
     pub requested_model: Option<String>,
     pub actual_model: Option<String>,
     pub status: AgentTurnRunStatus,
@@ -106,13 +108,13 @@ pub(crate) struct AgentTurnRunSnapshot {
 /// progressed, so start-by-id inserts only when absent.
 const RECORD_STARTED_SQL: &str = "INSERT OR IGNORE INTO agent_turn_runs (run_id, session_id, \
      task_id, board_item_id, workflow_execution_id, project_dir, requested_runtime, \
-     actual_runtime, requested_model, actual_model, status, source_revision, report, stop_reason, \
-     error, created_at, updated_at) \
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)";
+     actual_runtime, runtime_turn_id, requested_model, actual_model, status, source_revision, \
+     report, stop_reason, error, created_at, updated_at) \
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)";
 
 const SELECT_BY_ID_SQL: &str = "SELECT run_id, session_id, task_id, board_item_id, \
-     workflow_execution_id, project_dir, requested_runtime, actual_runtime, requested_model, \
-     actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at \
+     workflow_execution_id, project_dir, requested_runtime, actual_runtime, runtime_turn_id, \
+     requested_model, actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at \
      FROM agent_turn_runs WHERE run_id = ?1";
 
 // A later save carries only the columns it learned. `requested_runtime` is
@@ -124,9 +126,9 @@ const SELECT_BY_ID_SQL: &str = "SELECT run_id, session_id, task_id, board_item_i
 // column become immutable, so exactly one terminal outcome survives every later
 // write and every restart even under a racing caller.
 const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_id, board_item_id, \
-     workflow_execution_id, project_dir, requested_runtime, actual_runtime, requested_model, \
-     actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at) \
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17) \
+     workflow_execution_id, project_dir, requested_runtime, actual_runtime, runtime_turn_id, \
+     requested_model, actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at) \
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18) \
      ON CONFLICT(run_id) DO UPDATE SET \
         session_id = COALESCE(excluded.session_id, agent_turn_runs.session_id), \
         task_id = COALESCE(excluded.task_id, agent_turn_runs.task_id), \
@@ -134,6 +136,7 @@ const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_
         workflow_execution_id = COALESCE(excluded.workflow_execution_id, agent_turn_runs.workflow_execution_id), \
         project_dir = COALESCE(excluded.project_dir, agent_turn_runs.project_dir), \
         actual_runtime = COALESCE(excluded.actual_runtime, agent_turn_runs.actual_runtime), \
+        runtime_turn_id = COALESCE(excluded.runtime_turn_id, agent_turn_runs.runtime_turn_id), \
         requested_model = COALESCE(excluded.requested_model, agent_turn_runs.requested_model), \
         actual_model = COALESCE(excluded.actual_model, agent_turn_runs.actual_model), \
         status = excluded.status, \
@@ -145,7 +148,7 @@ const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_
      WHERE agent_turn_runs.status NOT IN ('completed', 'failed', 'cancelled')";
 
 impl AsyncDaemonDb {
-    /// Record a non-Codex run at start. Idempotent by `run_id`: a repeat start
+    /// Record an agent turn run at start. Idempotent by `run_id`: a repeat start
     /// leaves the stored row untouched and returns it, so a reclaimed dispatch
     /// claim never doubles the agent work.
     ///
@@ -164,7 +167,7 @@ impl AsyncDaemonDb {
             .ok_or_else(|| db_error("agent turn run vanished immediately after start"))
     }
 
-    /// Save or update a non-Codex run. A terminal status is sticky and releases
+    /// Save or update an agent turn run. A terminal status is sticky and releases
     /// the run's task-board concurrency admission in the same transaction.
     ///
     /// # Errors
@@ -189,7 +192,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit agent turn run save: {error}")))
     }
 
-    /// Load one non-Codex run.
+    /// Load one agent turn run.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
@@ -206,26 +209,28 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// Settle every non-Codex run left active by a daemon restart. `OpenRouter`
-    /// report turns start with resume disabled, so an interrupted run cannot be
-    /// re-attached; it is settled to `Failed` exactly once and its admission is
-    /// released so the board can decide what happens next. Idempotent: a second
-    /// sweep finds nothing active and settles zero runs.
+    /// Settle legacy agent turn runs that lack a provider turn identity after a
+    /// daemon restart. Correlated runs stay active so runtime reconciliation can
+    /// harvest their terminal result. Idempotent: a second sweep finds nothing
+    /// eligible and settles zero runs.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub(crate) async fn reconcile_interrupted_agent_turn_runs(&self) -> Result<usize, CliError> {
         let active: Vec<String> =
-            query_scalar("SELECT run_id FROM agent_turn_runs WHERE status IN ('queued', 'running')")
-                .fetch_all(self.pool())
-                .await
-                .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
+            query_scalar(
+                "SELECT run_id FROM agent_turn_runs \
+                 WHERE status IN ('queued', 'running') AND runtime_turn_id IS NULL",
+            )
+            .fetch_all(self.pool())
+            .await
+            .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
         let mut settled = 0;
         for run_id in active {
             settled += self.settle_interrupted_agent_turn_run(&run_id).await?;
         }
         if settled > 0 {
-            tracing::info!(settled, "settled interrupted non-Codex agent turn runs");
+            tracing::info!(settled, "settled interrupted agent turn runs");
         }
         Ok(settled)
     }
@@ -237,9 +242,11 @@ impl AsyncDaemonDb {
         let changed = query(
             "UPDATE agent_turn_runs \
              SET status = 'failed', \
-                 error = COALESCE(error, 'non-Codex turn was interrupted by a daemon restart'), \
+                 error = COALESCE(error, 'agent turn was interrupted by a daemon restart'), \
                  updated_at = ?2 \
-             WHERE run_id = ?1 AND status IN ('queued', 'running')",
+             WHERE run_id = ?1 \
+               AND status IN ('queued', 'running') \
+               AND runtime_turn_id IS NULL",
         )
         .bind(run_id)
         .bind(utc_now())
@@ -267,6 +274,7 @@ struct AgentTurnRunRow {
     project_dir: Option<String>,
     requested_runtime: String,
     actual_runtime: Option<String>,
+    runtime_turn_id: Option<String>,
     requested_model: Option<String>,
     actual_model: Option<String>,
     status: String,
@@ -289,6 +297,7 @@ impl AgentTurnRunRow {
             project_dir: self.project_dir,
             requested_runtime: self.requested_runtime,
             actual_runtime: self.actual_runtime,
+            runtime_turn_id: self.runtime_turn_id,
             requested_model: self.requested_model,
             actual_model: self.actual_model,
             status: AgentTurnRunStatus::parse(&self.status)?,

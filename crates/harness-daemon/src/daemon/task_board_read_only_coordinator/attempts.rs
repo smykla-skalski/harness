@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::{
-    attempt_recovery, in_progress, ingestion, lifecycle, refusal, reports, revision_validation,
+    attempt_recovery, dependency_triage, in_progress, ingestion, lifecycle, refusal, reports,
+    revision_validation,
 };
 
 #[expect(
@@ -144,6 +145,9 @@ async fn reconcile_active_attempt<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
+    if attempt.action_key == dependency_triage::DEPENDENCY_TRIAGE_ACTION {
+        return dependency_triage::reconcile(db, runtime, execution, attempt, true, now).await;
+    }
     match execution.transition.phase {
         Some(
             TaskBoardExecutionPhase::Implementation
@@ -214,6 +218,12 @@ async fn schedule_next_attempt(
 
 fn next_action_key(execution: &TaskBoardWorkflowExecutionRecord) -> Result<String, CliError> {
     match execution.transition.phase {
+        Some(TaskBoardExecutionPhase::Implementation)
+            if execution.snapshot.workflow_kind.has_dependency_update_intent()
+                && execution.artifacts.dependency_triage.is_none() =>
+        {
+            Ok(dependency_triage::DEPENDENCY_TRIAGE_ACTION.into())
+        }
         Some(TaskBoardExecutionPhase::Implementation) => Ok(format!(
             "implementation:{}",
             execution.artifacts.current_revision_cycle

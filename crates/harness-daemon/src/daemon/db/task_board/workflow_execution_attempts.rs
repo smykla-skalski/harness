@@ -407,8 +407,11 @@ pub(super) fn validate_attempt_phase(
         .ok_or_else(|| db_error("workflow execution has no active phase"))?;
     let valid_action = match phase {
         TaskBoardExecutionPhase::Implementation => {
-            attempt.action_key
-                == format!("implementation:{}", parent.artifacts.current_revision_cycle)
+            (parent.snapshot.workflow_kind.has_dependency_update_intent()
+                && parent.artifacts.dependency_triage.is_none()
+                && attempt.action_key == "dependency_triage")
+                || attempt.action_key
+                    == format!("implementation:{}", parent.artifacts.current_revision_cycle)
         }
         TaskBoardExecutionPhase::Review => attempt.action_key.starts_with("review:"),
         TaskBoardExecutionPhase::Evaluate => {
@@ -467,9 +470,13 @@ fn validate_completed_artifact(
     let valid = match (phase, attempt.artifact.as_ref()) {
         (
             TaskBoardExecutionPhase::Implementation,
+            Some(TaskBoardAttemptResultArtifact::DependencyTriage(_)),
+        ) => attempt.action_key == "dependency_triage",
+        (
+            TaskBoardExecutionPhase::Implementation,
             Some(TaskBoardAttemptResultArtifact::Implementation(_)),
-        )
-        | (
+        ) => attempt.action_key.starts_with("implementation:"),
+        (
             TaskBoardExecutionPhase::Evaluate,
             Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
         )
@@ -491,3 +498,7 @@ fn validate_completed_artifact(
         ))
     }
 }
+
+#[cfg(test)]
+#[path = "workflow_execution_attempts_tests.rs"]
+mod tests;

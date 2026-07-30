@@ -342,7 +342,10 @@ const fn active(attempt: &TaskBoardExecutionAttemptRecord) -> bool {
 fn action_matches_phase(record: &TaskBoardWorkflowExecutionRecord, action: &str) -> bool {
     match record.transition.phase {
         Some(TaskBoardExecutionPhase::Implementation) => {
-            action == format!("implementation:{}", record.artifacts.current_revision_cycle)
+            (record.snapshot.workflow_kind.has_dependency_update_intent()
+                && record.artifacts.dependency_triage.is_none()
+                && action == "dependency_triage")
+                || action == format!("implementation:{}", record.artifacts.current_revision_cycle)
         }
         Some(TaskBoardExecutionPhase::Review) => action.starts_with("review:") && action.len() > 7,
         Some(TaskBoardExecutionPhase::Evaluate) => {

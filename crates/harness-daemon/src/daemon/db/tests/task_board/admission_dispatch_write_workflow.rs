@@ -1,7 +1,8 @@
 use super::*;
 use crate::daemon::db::ClaimedTaskBoardDispatchPreparation;
 use crate::task_board::{
-    DispatchAppliedTask, TaskBoardExecutionPhase, TaskBoardExecutionState,
+    DispatchAppliedTask, ExternalRef, ExternalRefProvider, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardPullRequestHeadIdentity, TaskBoardPullRequestIdentity,
     TaskBoardWorkflowSnapshot,
 };
 
@@ -68,6 +69,48 @@ async fn write_dispatch_atomically_starts_approved_implementation() {
     assert_eq!(
         execution.ownership.resources.get("admission_owner"),
         Some(&owner)
+    );
+}
+
+#[tokio::test]
+async fn dependency_dispatch_starts_triage_before_implementation() {
+    let (db, intent, preparation, launch) =
+        Box::pin(reserved_dependency_write("dependency-triage")).await;
+    let applied = publish_write(&db, &preparation, launch).await;
+    let execution_id = applied
+        .item
+        .workflow
+        .execution_id
+        .clone()
+        .expect("execution id");
+    let claim = db
+        .claim_task_board_dispatch(&applied.board_item_id)
+        .await
+        .expect("claim dependency dispatch")
+        .expect("pending dependency dispatch");
+
+    db.complete_task_board_dispatch(
+        &intent,
+        &claim.claim_token,
+        &workflow_owner(&execution_id),
+    )
+    .await
+    .expect("complete dependency dispatch");
+
+    let execution = db
+        .task_board_workflow_execution(&execution_id)
+        .await
+        .expect("load execution")
+        .expect("durable dependency execution");
+    assert_eq!(
+        execution.transition.phase,
+        Some(TaskBoardExecutionPhase::Implementation)
+    );
+    assert_eq!(execution.attempts.len(), 1);
+    assert_eq!(execution.attempts[0].action_key, "dependency_triage");
+    assert_eq!(
+        execution.attempts[0].idempotency_key,
+        format!("dependency-triage-{intent}")
     );
 }
 
@@ -174,6 +217,122 @@ async fn reserved_write(
         false,
     ))
     .await
+}
+
+async fn reserved_dependency_write(
+    label: &str,
+) -> (
+    TestDb,
+    String,
+    ClaimedTaskBoardDispatchPreparation,
+    TaskBoardWriteWorkflowLaunch,
+) {
+    let (db, item_id) =
+        Box::pin(prepare_reserved_write_item(label, Some("example/compass"), false)).await;
+    db.update_task_board_item(&item_id, |item| {
+        item.workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+        item.workflow.pr_number = Some(17);
+        item.workflow.pr_url = Some("https://github.com/example/compass/pull/17".into());
+        item.external_refs.push(ExternalRef {
+            provider: ExternalRefProvider::GitHub,
+            external_id: "example/compass#17".into(),
+            url: Some("https://github.com/example/compass/pull/17".into()),
+            sync_state: None,
+        });
+        Ok(true)
+    })
+    .await
+    .expect("configure dependency item")
+    .expect("dependency item changed");
+    let plan = create_plan_for_existing(&db, &item_id).await;
+    let intent = preparing_intent(
+        db.reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
+            .await
+            .expect("reserve dependency dispatch"),
+    );
+    let preparation = db
+        .claim_task_board_dispatch_preparation(&intent)
+        .await
+        .expect("claim dependency preparation")
+        .expect("pending dependency preparation");
+    let snapshot = db
+        .task_board_item_snapshot(&item_id)
+        .await
+        .expect("source dependency snapshot");
+    let settings = db
+        .task_board_orchestrator_settings_snapshot()
+        .await
+        .expect("settings snapshot");
+    let workflow_kind = TaskBoardWorkflowKind::PrFixReview;
+    let reviewers = resolve_task_board_reviewers(
+        &settings.settings.reviewers,
+        workflow_kind,
+        Some("example/compass"),
+    )
+    .expect("resolved reviewers");
+    let workflow_snapshot = TaskBoardWorkflowSnapshot {
+        workflow_kind,
+        execution_repository: Some("example/compass".into()),
+        item_revision: snapshot.item_revision,
+        configuration_revision: u64::try_from(settings.row_revision).expect("settings revision"),
+        policy_version: settings.settings.policy_version,
+        reviewer: reviewers.clone(),
+        read_only_run_context: None,
+        provider_revision: None,
+    };
+    let planning_result = build_planning_result(
+        snapshot.item.planning.summary.as_deref().expect("plan"),
+        [snapshot.item.body.clone()],
+        &workflow_snapshot,
+        &preparation.preparation.workflow_execution_id,
+    )
+    .expect("build planning result");
+    let plan_approval = bind_plan_approval(
+        &planning_result,
+        &workflow_snapshot,
+        &preparation.preparation.workflow_execution_id,
+        "lead",
+        APPROVED_AT,
+    )
+    .expect("bind plan approval");
+    let pull_request = TaskBoardPullRequestIdentity {
+        repository: "example/compass".into(),
+        number: 17,
+        head: Some(TaskBoardPullRequestHeadIdentity {
+            repository: "example/compass".into(),
+            branch: "renovate/dependency".into(),
+            revision: "0123456789abcdef0123456789abcdef01234567".into(),
+        }),
+    };
+    let launch = TaskBoardWriteWorkflowLaunch {
+        workflow_kind,
+        execution_repository: Some("example/compass".into()),
+        configuration_revision: workflow_snapshot.configuration_revision,
+        policy_version: workflow_snapshot.policy_version,
+        resolved_reviewers: reviewers,
+        source_item_revision: snapshot.item_revision,
+        prepared_item_revision: snapshot.item_revision,
+        task_id: preparation.preparation.work_item_id.clone(),
+        run_context: crate::task_board::TaskBoardReadOnlyRunContext {
+            schema_version: crate::task_board::TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
+            session_id: preparation.preparation.session_id.clone(),
+            title: snapshot.item.title.clone(),
+            body: snapshot.item.body.clone(),
+            tags: snapshot.item.tags.clone(),
+            worktree: "/tmp/worktree".into(),
+        },
+        provider_revision: None,
+        pull_request: Some(pull_request.clone()),
+        base_head_revision: pull_request
+            .head
+            .as_ref()
+            .expect("pull request head")
+            .revision
+            .clone(),
+        planning_result,
+        plan_approval,
+    };
+    (db, intent, preparation, launch)
 }
 
 pub(super) async fn reserved_write_at(

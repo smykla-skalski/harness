@@ -83,7 +83,7 @@ fn parse_completed_dependency_triage(
     .map_err(|error| CliErrorKind::workflow_parse(error.to_string()).into())
 }
 
-fn dependency_triage_prompt() -> String {
+pub(crate) fn dependency_triage_prompt() -> String {
     let version = TASK_BOARD_DEPENDENCY_TRIAGE_SCHEMA_VERSION;
     format!(
         "Analyze this dependency update using only the immutable pull request snapshot above. \

@@ -9,7 +9,9 @@ use super::{ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{
+    AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb,
+};
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
     default_remote_pairing_limiter, default_remote_pairing_status_limiter,
@@ -52,6 +54,76 @@ async fn production_load_reconciles_unattached_active_report_after_restart() {
             .status,
         CodexRunStatus::Failed
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn production_load_settles_evicted_agent_turn_and_releases_admission() {
+    let directory = tempdir().expect("tempdir");
+    let db_path = directory.path().join("harness.db");
+    let db = Arc::new(
+        AsyncDaemonDb::connect(&db_path)
+            .await
+            .expect("open async database"),
+    );
+    let run = active_agent_turn_report_run();
+    seed_session(db.as_ref(), run.session_id.as_deref().expect("session id")).await;
+    insert_committed_admission(db.as_ref(), "ledger-evicted", &run.run_id).await;
+    db.save_agent_turn_run(&run)
+        .await
+        .expect("save active agent-turn run");
+    assert_eq!(admission_state(db.as_ref(), "ledger-evicted").await, "committed");
+    let state = restarted_state(&db_path, db.clone());
+    let runtime = ProductionTaskBoardReadOnlyRuntime::new(&state, db.as_ref());
+
+    let reconciled = runtime
+        .load_agent_turn_report_run(&run.run_id)
+        .await
+        .expect("load evicted agent-turn run")
+        .expect("settled durable run");
+
+    assert_eq!(reconciled.status, AgentTurnRunStatus::Failed);
+    assert_eq!(
+        reconciled.error.as_deref(),
+        Some("provider turn is no longer attached to this daemon")
+    );
+    assert_eq!(admission_state(db.as_ref(), "ledger-evicted").await, "released");
+}
+
+async fn insert_committed_admission(
+    db: &AsyncDaemonDb,
+    ledger_id: &str,
+    managed_worker_id: &str,
+) {
+    let mut conn = db.pool().acquire().await.expect("acquire connection");
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await
+        .expect("suspend foreign keys");
+    let inserted = sqlx::query(
+        "INSERT INTO task_board_dispatch_admission_ledger (
+             ledger_id, decision_id, decision, intent_id, generation, item_id, canonical_key,
+             kind, scope, amount, limit_value, state, managed_worker_id, reserved_at, committed_at
+         ) VALUES (?1, 'dec-evicted', 'allowed', 'intent-evicted', 1, 'item-evicted',
+             'key-evicted', 'concurrency', 'scope-evicted', 1, 1, 'committed', ?2,
+             '2026-07-29T00:00:00Z', '2026-07-29T00:00:00Z')",
+    )
+    .bind(ledger_id)
+    .bind(managed_worker_id)
+    .execute(&mut *conn)
+    .await;
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&mut *conn)
+        .await
+        .expect("restore foreign keys");
+    inserted.expect("insert committed admission");
+}
+
+async fn admission_state(db: &AsyncDaemonDb, ledger_id: &str) -> String {
+    sqlx::query_scalar("SELECT state FROM task_board_dispatch_admission_ledger WHERE ledger_id = ?1")
+        .bind(ledger_id)
+        .fetch_one(db.pool())
+        .await
+        .expect("read admission state")
 }
 
 async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
@@ -192,5 +264,28 @@ fn active_report_run() -> CodexRunSnapshot {
         updated_at: "2026-07-17T23:59:00Z".into(),
         model: Some("gpt-5.3-codex".into()),
         effort: Some("high".into()),
+    }
+}
+
+fn active_agent_turn_report_run() -> AgentTurnRunSnapshot {
+    AgentTurnRunSnapshot {
+        run_id: "openrouter-workflow-restart-triage-1".into(),
+        session_id: Some("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into()),
+        task_id: None,
+        board_item_id: Some("item-restart".into()),
+        workflow_execution_id: Some("execution-restart".into()),
+        project_dir: Some("/tmp/read-only-worktree".into()),
+        requested_runtime: "openrouter".into(),
+        actual_runtime: Some("openrouter".into()),
+        runtime_turn_id: Some("turn-evicted".into()),
+        requested_model: Some("deepseek/deepseek-v4-flash".into()),
+        actual_model: None,
+        status: AgentTurnRunStatus::Running,
+        source_revision: Some("0123456789abcdef0123456789abcdef01234567".into()),
+        report: None,
+        stop_reason: None,
+        error: None,
+        created_at: "2026-07-17T23:59:00Z".into(),
+        updated_at: "2026-07-17T23:59:00Z".into(),
     }
 }

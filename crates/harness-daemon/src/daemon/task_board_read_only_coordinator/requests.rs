@@ -1,6 +1,8 @@
 use crate::daemon::protocol::CodexRunMode;
 use crate::task_board::{
-    TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardWorkflowExecutionRecord,
+    TASK_BOARD_DEPENDENCY_FIXER_EFFORT, TASK_BOARD_DEPENDENCY_FIXER_MODEL,
+    TaskBoardDependencyRouteStatus, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
+    TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::CliError;
 use harness_task_board_codex_requests::{attempt_profile, invalid_transition};
@@ -17,7 +19,7 @@ pub(crate) use harness_task_board_codex_requests::{
 pub(super) struct AttemptRunIdentity {
     pub(super) mode: CodexRunMode,
     /// Reviewer runtime the resolved profile names. `codex` drives the durable
-    /// Codex path; a supported non-Codex runtime (`openrouter`) drives the
+    /// Codex path; a supported agent-turn runtime (`openrouter`) drives the
     /// shared turn through the `agent_turn_runs` store. Implementation attempts
     /// have no reviewer profile and are Codex-only.
     pub(super) runtime: String,
@@ -37,12 +39,17 @@ pub(super) fn attempt_run_identity(
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<AttemptRunIdentity, CliError> {
     if execution.transition.phase == Some(TaskBoardExecutionPhase::Implementation) {
+        let dependency_fix = execution
+            .artifacts
+            .dependency_triage
+            .as_ref()
+            .is_some_and(|route| route.status == TaskBoardDependencyRouteStatus::FixRequested);
         return Ok(AttemptRunIdentity {
             mode: CodexRunMode::WorkspaceWrite,
             runtime: "codex".to_string(),
             task_id: Some(write_task_id(execution)?.to_string()),
-            model: None,
-            effort: None,
+            model: dependency_fix.then(|| TASK_BOARD_DEPENDENCY_FIXER_MODEL.into()),
+            effort: dependency_fix.then(|| TASK_BOARD_DEPENDENCY_FIXER_EFFORT.into()),
         });
     }
     if !matches!(

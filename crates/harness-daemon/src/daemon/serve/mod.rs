@@ -187,7 +187,7 @@ async fn run_startup_recovery(app_state: &DaemonHttpState) -> Result<(), CliErro
             app_state, async_db,
         ))
         .await?;
-        // Settle interrupted non-Codex runs before the codex controller scans
+        // Settle interrupted agent turn runs before the codex controller scans
         // the admission ledger, so their concurrency admissions are already
         // released rather than surfacing as unsupported entries for one pass.
         async_db.reconcile_interrupted_agent_turn_runs().await?;

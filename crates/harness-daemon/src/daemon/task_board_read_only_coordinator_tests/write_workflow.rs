@@ -12,11 +12,12 @@ use runtime::{FakeWriteRuntime, PlannedRun};
 
 mod fixture;
 mod runtime;
+mod dependency_triage;
 mod verification_exhaustion;
 
-const BASE_HEAD: &str = "head-base";
-const FIRST_HEAD: &str = "head-first";
-const SECOND_HEAD: &str = "head-second";
+const BASE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+const FIRST_HEAD: &str = "1111111111111111111111111111111111111111";
+const SECOND_HEAD: &str = "2222222222222222222222222222222222222222";
 const RETRY_AT: &str = "2026-07-17T10:05:00Z";
 
 #[tokio::test]

@@ -27,7 +27,7 @@ impl CodexControllerHandle {
 
     #[expect(
         clippy::cognitive_complexity,
-        reason = "routes one recovered admission worker to its existing-run or missing-run path, skipping non-codex and already-active workers; the tracing::warn! for an unsupported type costs 7 of its 11 points, leaving structural 4"
+        reason = "routes one recovered admission worker to its existing-run or missing-run path, skipping other runtimes and already-active workers; the tracing::warn! for an unsupported type costs 7 of its 11 points, leaving structural 4"
     )]
     async fn reconcile_one_admission_worker(
         &self,

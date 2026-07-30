@@ -1,8 +1,5 @@
 #[cfg(test)]
 use std::collections::BTreeMap;
-use std::fmt::Display;
-
-use chrono::{DateTime, SecondsFormat, Utc};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
@@ -22,7 +19,15 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCreateOutcome, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
     start_task_board_workflow,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::CliError;
+
+#[path = "task_board_workflow_execution/support.rs"]
+mod support;
+
+pub(super) use support::canonical_time;
+use support::{invalid_transition, parse_time, workflow_error};
+#[cfg(test)]
+use support::required;
 
 #[cfg(test)]
 pub(crate) struct TaskBoardWorkflowExecutionCreateRequest {
@@ -239,7 +244,7 @@ fn attempt_replay_matches(
         && expected.idempotency_key == current.idempotency_key
 }
 
-fn validate_attempt_phase(
+pub(super) fn validate_attempt_phase(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<(), CliError> {
@@ -254,11 +259,14 @@ fn validate_attempt_phase(
         .ok_or_else(|| invalid_transition("workflow execution has no active phase"))?;
     let valid_action = match phase {
         TaskBoardExecutionPhase::Implementation => {
-            attempt.action_key
-                == format!(
-                    "implementation:{}",
-                    execution.artifacts.current_revision_cycle
-                )
+            (execution.snapshot.workflow_kind.has_dependency_update_intent()
+                && execution.artifacts.dependency_triage.is_none()
+                && attempt.action_key == "dependency_triage")
+                || attempt.action_key
+                    == format!(
+                        "implementation:{}",
+                        execution.artifacts.current_revision_cycle
+                    )
         }
         TaskBoardExecutionPhase::Review => attempt.action_key.starts_with("review:"),
         TaskBoardExecutionPhase::Evaluate => {
@@ -284,9 +292,13 @@ fn validate_attempt_phase(
     let valid_artifact = match (phase, attempt.artifact.as_ref()) {
         (
             TaskBoardExecutionPhase::Implementation,
+            Some(TaskBoardAttemptResultArtifact::DependencyTriage(_)),
+        ) => attempt.action_key == "dependency_triage",
+        (
+            TaskBoardExecutionPhase::Implementation,
             Some(TaskBoardAttemptResultArtifact::Implementation(_)),
-        )
-        | (
+        ) => attempt.action_key.starts_with("implementation:"),
+        (
             TaskBoardExecutionPhase::Evaluate,
             Some(TaskBoardAttemptResultArtifact::Evaluation(_)),
         )
@@ -366,7 +378,16 @@ fn phase_evidence_allows_advance(
         }
         Some(TaskBoardExecutionPhase::Implementation) => {
             let action = format!("implementation:{}", record.artifacts.current_revision_cycle);
-            let present = completed_attempt(record, &action, ArtifactKind::Implementation);
+            let triage_continues = record
+                .artifacts
+                .dependency_triage
+                .as_ref()
+                .is_some_and(|route| {
+                    route.status
+                        == crate::task_board::TaskBoardDependencyRouteStatus::ReadyToContinue
+                });
+            let present = triage_continues
+                || completed_attempt(record, &action, ArtifactKind::Implementation);
             evidence_or_wait(
                 record,
                 present,
@@ -474,32 +495,4 @@ pub(crate) fn require_human(
     record.blocked_reason = Some(reason.to_owned());
     record.available_at = None;
     updated_at.clone_into(&mut record.updated_at);
-}
-
-pub(super) fn canonical_time(value: &str) -> Result<String, CliError> {
-    parse_time(value).map(|value| value.to_rfc3339_opts(SecondsFormat::AutoSi, true))
-}
-
-fn parse_time(value: &str) -> Result<DateTime<Utc>, CliError> {
-    DateTime::parse_from_rfc3339(value.trim())
-        .map(|value| value.with_timezone(&Utc))
-        .map_err(|error| invalid_transition(format!("invalid workflow timestamp: {error}")))
-}
-
-#[cfg(test)]
-fn required(value: &str, field: &str) -> Result<String, CliError> {
-    let value = value.trim();
-    if value.is_empty() {
-        Err(invalid_transition(format!("{field} is empty")))
-    } else {
-        Ok(value.to_owned())
-    }
-}
-
-fn workflow_error(error: impl Display) -> CliError {
-    invalid_transition(error.to_string())
-}
-
-fn invalid_transition(detail: impl Into<String>) -> CliError {
-    CliErrorKind::invalid_transition(detail.into()).into()
 }

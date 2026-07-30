@@ -22,6 +22,7 @@ fn snapshot(run_id: &str, status: AgentTurnRunStatus) -> AgentTurnRunSnapshot {
         project_dir: Some("/tmp/project".into()),
         requested_runtime: "openrouter".into(),
         actual_runtime: Some("openrouter".into()),
+        runtime_turn_id: Some(format!("turn-{run_id}")),
         requested_model: Some("auto".into()),
         actual_model: None,
         status,
@@ -31,6 +32,13 @@ fn snapshot(run_id: &str, status: AgentTurnRunStatus) -> AgentTurnRunSnapshot {
         error: None,
         created_at: now.clone(),
         updated_at: now,
+    }
+}
+
+fn legacy_snapshot(run_id: &str, status: AgentTurnRunStatus) -> AgentTurnRunSnapshot {
+    AgentTurnRunSnapshot {
+        runtime_turn_id: None,
+        ..snapshot(run_id, status)
     }
 }
 
@@ -166,11 +174,11 @@ async fn terminal_row_is_frozen_against_later_writes() {
 }
 
 #[tokio::test]
-async fn restart_settles_interrupted_run_exactly_once() {
+async fn restart_settles_uncorrelated_legacy_run_exactly_once() {
     let (_dir, db) = open_db().await;
-    db.record_agent_turn_run_started(&snapshot("run-3", AgentTurnRunStatus::Running))
+    db.record_agent_turn_run_started(&legacy_snapshot("run-3", AgentTurnRunStatus::Running))
         .await
-        .expect("record start");
+        .expect("record legacy start");
 
     let settled = db
         .reconcile_interrupted_agent_turn_runs()
@@ -199,6 +207,29 @@ async fn restart_settles_interrupted_run_exactly_once() {
 }
 
 #[tokio::test]
+async fn restart_preserves_correlated_active_run_for_harvesting() {
+    let (_dir, db) = open_db().await;
+    db.record_agent_turn_run_started(&snapshot("run-correlated", AgentTurnRunStatus::Running))
+        .await
+        .expect("record correlated start");
+
+    let settled = db
+        .reconcile_interrupted_agent_turn_runs()
+        .await
+        .expect("reconcile");
+
+    assert_eq!(settled, 0);
+    assert_eq!(
+        db.agent_turn_run("run-correlated")
+            .await
+            .expect("load")
+            .expect("run exists")
+            .status,
+        AgentTurnRunStatus::Running
+    );
+}
+
+#[tokio::test]
 async fn terminal_save_releases_managed_worker_admission() {
     let (_dir, db) = open_db().await;
     insert_committed_admission(&db, "led-1", "run-4").await;
@@ -218,9 +249,9 @@ async fn terminal_save_releases_managed_worker_admission() {
 async fn restart_reconcile_releases_managed_worker_admission() {
     let (_dir, db) = open_db().await;
     insert_committed_admission(&db, "led-2", "run-5").await;
-    db.record_agent_turn_run_started(&snapshot("run-5", AgentTurnRunStatus::Running))
+    db.record_agent_turn_run_started(&legacy_snapshot("run-5", AgentTurnRunStatus::Running))
         .await
-        .expect("record start");
+        .expect("record legacy start");
 
     let settled = db
         .reconcile_interrupted_agent_turn_runs()

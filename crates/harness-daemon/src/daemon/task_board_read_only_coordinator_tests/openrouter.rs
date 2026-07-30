@@ -1,5 +1,5 @@
 //! Coordinator-level proof of slice A of #1001: a local board review whose
-//! reviewer profile names a non-Codex runtime starts on that runtime, is
+//! reviewer profile names an agent-turn runtime starts on that runtime, is
 //! recorded durably in `agent_turn_runs` the moment it starts, and resumes
 //! exactly once across a daemon restart without duplicating agent work. A
 //! Codex profile is left on the unchanged Codex path (covered elsewhere).
@@ -18,7 +18,7 @@ async fn reconcile(db: &AsyncDaemonDb, runtime: &FakeReadOnlyRuntime, now: &str)
     let report = super::super::task_board_read_only_coordinator::
         reconcile_task_board_read_only_workflows_with_runtime(db, runtime, now, 8)
             .await
-            .expect("reconcile non-Codex workflow");
+            .expect("reconcile agent-turn workflow");
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 }
 
@@ -30,7 +30,7 @@ async fn load(fixture: &Fixture, db: &AsyncDaemonDb) -> crate::task_board::TaskB
 }
 
 #[tokio::test]
-async fn openrouter_reviewer_starts_and_durably_tracks_a_non_codex_turn() {
+async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {
     let fixture = Box::pin(seed_execution_with_reviewer_runtime("or-start", "openrouter")).await;
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
@@ -67,7 +67,7 @@ async fn openrouter_reviewer_starts_and_durably_tracks_a_non_codex_turn() {
         run.workflow_execution_id.as_deref(),
         Some(fixture.execution_id.as_str())
     );
-    // The turn is tracked as a non-Codex run, not a Codex run.
+    // The turn is tracked in the provider-neutral agent turn store.
     assert!(
         db.codex_run(&attempt_key)
             .await
@@ -113,7 +113,7 @@ async fn an_unknown_reviewer_runtime_is_refused_by_name_not_run_as_codex() {
         execution.blocked_reason.as_deref(),
         Some("reviewer_runtime_unsupported")
     );
-    // Nothing was started: no turn, no Codex run, no durable non-Codex run.
+    // Nothing was started: no turn and no durable agent-turn run.
     assert_eq!(runtime.start_count(), 0);
     let attempt_key = execution.attempts[0].idempotency_key.clone();
     assert!(

@@ -140,16 +140,17 @@ pub(super) async fn apply_cancel(
     cancelled_attempt.artifact = None;
     cancelled_attempt.updated_at = completed_at.clone();
     cancelled_attempt.completed_at = Some(completed_at);
-    let persisted = db
-        .compare_and_set_task_board_remote_cancel_with_audit(
+    let persisted = Box::pin(
+        db.compare_and_set_task_board_remote_cancel_with_audit(
             &TaskBoardWorkflowExecutionCas::from(&current),
             target,
             &stopped,
             &TaskBoardExecutionAttemptCas::from(&attempt),
             &cancelled_attempt,
             success_audit,
-        )
-        .await?;
+        ),
+    )
+    .await?;
     let Some(record) = persisted.record else {
         return replay_after_race(
             db,

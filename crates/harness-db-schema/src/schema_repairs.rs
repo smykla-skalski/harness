@@ -59,10 +59,11 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("task_board_projects", "shape"),
 ];
 
-const CURRENT_SCHEMA_CODEX_RUN_COLUMNS: &[(&str, &str)] = &[
+const CURRENT_SCHEMA_RUN_COLUMNS: &[(&str, &str)] = &[
     ("codex_runs", "task_id"),
     ("codex_runs", "board_item_id"),
     ("codex_runs", "workflow_execution_id"),
+    ("agent_turn_runs", "runtime_turn_id"),
 ];
 
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
@@ -243,7 +244,7 @@ fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliE
             return Ok(true);
         }
     }
-    for (table, column) in CURRENT_SCHEMA_CODEX_RUN_COLUMNS {
+    for (table, column) in CURRENT_SCHEMA_RUN_COLUMNS {
         if !column_exists(conn, table, column)? {
             return Ok(true);
         }
@@ -338,6 +339,7 @@ pub fn repair_current_schema_shape(
     super::schema_v57::run(conn)?;
     super::schema_v58::run(conn)?;
     super::schema_v59::run(conn)?;
+    super::schema_v60::run(conn)?;
     super::schema_repairs_external_creates::require_complete_shape(conn)?;
     super::schema_repairs_wake_events::require_complete_shape(conn)?;
     super::schema_repairs_admission::require_complete_shape(conn)?;

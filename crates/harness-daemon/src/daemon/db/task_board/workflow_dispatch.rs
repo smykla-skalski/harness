@@ -155,11 +155,22 @@ pub(super) async fn insert_started_write_workflow_in_tx(
     .map_err(|error| db_error(format!("start write workflow: {error}")))?;
     transition.execution_state = TaskBoardExecutionState::Preparing;
     let now = utc_now();
+    let dependency_triage = launch.workflow_kind.has_dependency_update_intent();
+    let action_key = if dependency_triage {
+        "dependency_triage"
+    } else {
+        "implementation:1"
+    };
+    let idempotency_key = if dependency_triage {
+        format!("dependency-triage-{intent_id}")
+    } else {
+        format!("codex-{intent_id}")
+    };
     let attempt = TaskBoardExecutionAttemptRecord {
         execution_id: execution_id.to_string(),
-        action_key: "implementation:1".into(),
+        action_key: action_key.into(),
         attempt: 1,
-        idempotency_key: format!("codex-{intent_id}"),
+        idempotency_key,
         state: TaskBoardAttemptState::Preparing,
         failure_class: None,
         available_at: None,

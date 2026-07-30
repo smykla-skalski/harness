@@ -28870,6 +28870,24 @@
               "kind": {
                 "type": "string",
                 "enum": [
+                  "dependency_triage"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/TaskBoardDependencyRouteRecord"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "value",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
                   "implementation"
                 ]
               },
@@ -29763,6 +29781,345 @@
             "$ref": "#/components/schemas/TaskBoardWorkflowKind"
           }
         }
+      },
+      "TaskBoardDependencyApprovalEvidence": {
+        "type": "object",
+        "required": [
+          "current",
+          "required"
+        ],
+        "properties": {
+          "current": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "required": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyCheck": {
+        "type": "object",
+        "required": [
+          "name",
+          "state"
+        ],
+        "properties": {
+          "details_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TaskBoardDependencyCheckState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyCheckState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "passed",
+          "failed",
+          "cancelled",
+          "skipped"
+        ]
+      },
+      "TaskBoardDependencyConflictEvidence": {
+        "type": "object",
+        "required": [
+          "state",
+          "summary"
+        ],
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/TaskBoardDependencyConflictState"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyConflictState": {
+        "type": "string",
+        "enum": [
+          "clean",
+          "conflicted",
+          "unknown"
+        ]
+      },
+      "TaskBoardDependencyIdentity": {
+        "type": "object",
+        "required": [
+          "name",
+          "ecosystem",
+          "current_version",
+          "target_version",
+          "update_class"
+        ],
+        "properties": {
+          "current_version": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "target_version": {
+            "type": "string"
+          },
+          "update_class": {
+            "$ref": "#/components/schemas/TaskBoardDependencyUpdateClass"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyRouteRecord": {
+        "type": "object",
+        "required": [
+          "route_id",
+          "repository",
+          "pull_request_number",
+          "exact_head_revision",
+          "status",
+          "reason",
+          "source_result"
+        ],
+        "properties": {
+          "exact_head_revision": {
+            "type": "string"
+          },
+          "pull_request_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "route_id": {
+            "type": "string"
+          },
+          "source_result": {
+            "$ref": "#/components/schemas/TaskBoardDependencyTriageResult"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskBoardDependencyRouteStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyRouteStatus": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "report_completed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "unmet_requirement",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "human_required"
+                ]
+              },
+              "unmet_requirement": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "pending_checks",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "waiting_for_checks"
+                ]
+              },
+              "pending_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "fix_requested"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ready_to_continue"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "TaskBoardDependencyTriageDisposition": {
+        "type": "string",
+        "enum": [
+          "report_only",
+          "human_required",
+          "wait_for_checks",
+          "fix_required",
+          "continue_safe"
+        ]
+      },
+      "TaskBoardDependencyTriageResult": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "repository",
+          "pull_request_number",
+          "exact_head_revision",
+          "dependency",
+          "checks",
+          "conflicts",
+          "approvals",
+          "safety_assumption",
+          "disposition",
+          "required_tools",
+          "next_steps"
+        ],
+        "properties": {
+          "approvals": {
+            "$ref": "#/components/schemas/TaskBoardDependencyApprovalEvidence"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardDependencyCheck"
+            }
+          },
+          "conflicts": {
+            "$ref": "#/components/schemas/TaskBoardDependencyConflictEvidence"
+          },
+          "dependency": {
+            "$ref": "#/components/schemas/TaskBoardDependencyIdentity"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/TaskBoardDependencyTriageDisposition"
+          },
+          "exact_head_revision": {
+            "type": "string"
+          },
+          "next_steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardDependencyTriageStep"
+            }
+          },
+          "pull_request_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "repository": {
+            "type": "string"
+          },
+          "required_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "safety_assumption": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyTriageStep": {
+        "type": "object",
+        "required": [
+          "order",
+          "action",
+          "reason"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardDependencyUpdateClass": {
+        "type": "string",
+        "enum": [
+          "patch",
+          "minor",
+          "major",
+          "digest",
+          "pin",
+          "unknown"
+        ]
       },
       "TaskBoardDispatchDeliverRequest": {
         "type": "object",

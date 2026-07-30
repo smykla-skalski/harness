@@ -9,6 +9,7 @@ use crate::{
     TaskBoardLifecycleOutcome, TaskBoardPlanApprovalBinding, TaskBoardPlanApprovalInvalidation,
     TaskBoardPlanningResult, TaskBoardResolvedReviewer, TaskBoardReviewRoundDecision,
     TaskBoardReviewerOutcome, TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
+    TaskBoardDependencyRouteRecord,
 };
 
 pub const TASK_BOARD_WORKFLOW_EXECUTION_SCHEMA_VERSION: u32 = 1;
@@ -78,6 +79,8 @@ pub struct TaskBoardWorkflowExecutionArtifacts {
     pub retry: Option<TaskBoardRetrySchedule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<TaskBoardExecutionDiagnostic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dependency_triage: Option<TaskBoardDependencyRouteRecord>,
     /// Known-but-unverified publication evidence retained for recovery and audit.
     ///
     /// This evidence never satisfies a completed attempt or successful terminal outcome.
@@ -100,6 +103,7 @@ impl Default for TaskBoardWorkflowExecutionArtifacts {
             review_cycles: Vec::new(),
             retry: None,
             diagnostics: Vec::new(),
+            dependency_triage: None,
             provisional_publication: None,
             terminal_outcome: None,
         }
@@ -121,6 +125,7 @@ pub struct TaskBoardExecutionOwnership {
 #[derive(utoipa::ToSchema)]
 pub enum TaskBoardAttemptResultArtifact {
     Planning(TaskBoardPlanningResult),
+    DependencyTriage(Box<TaskBoardDependencyRouteRecord>),
     Implementation(TaskBoardImplementationResult),
     Review(TaskBoardReviewerOutcome),
     Evaluation(TaskBoardEvaluationResult),

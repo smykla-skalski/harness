@@ -18,7 +18,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_read_only_runtime::{
-    NonCodexReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
+    AgentTurnReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
 };
 use super::fixture::{FROZEN_HEAD, NOW};
 
@@ -296,9 +296,9 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
         Ok(run)
     }
 
-    async fn start_non_codex_report_run(
+    async fn start_agent_turn_report_run(
         &self,
-        start: NonCodexReportStart<'_>,
+        start: AgentTurnReportStart<'_>,
     ) -> Result<(), CliError> {
         self.starts
             .lock()
@@ -306,7 +306,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             .push(start.run_id.into());
         let db = self.durable_db.as_ref().ok_or_else(|| {
             CliError::from(CliErrorKind::invalid_transition(
-                "fake non-Codex runtime needs a durable database",
+                "fake agent-turn runtime needs a durable database",
             ))
         })?;
         db.record_agent_turn_run_started(&AgentTurnRunSnapshot {
@@ -318,6 +318,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             project_dir: start.project_dir.clone(),
             requested_runtime: start.runtime.into(),
             actual_runtime: Some(start.runtime.into()),
+            runtime_turn_id: Some(format!("turn-{}", start.run_id)),
             requested_model: start.requested_model.clone(),
             actual_model: None,
             status: AgentTurnRunStatus::Running,
@@ -331,7 +332,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
         .await?;
         if self.fail_start_after_persist.swap(false, Ordering::SeqCst) {
             return Err(CliErrorKind::workflow_io(
-                "non-Codex start response was lost after durable persistence",
+                "agent-turn start response was lost after durable persistence",
             )
             .into());
         }

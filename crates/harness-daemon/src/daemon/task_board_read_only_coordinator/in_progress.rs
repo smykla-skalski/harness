@@ -6,7 +6,7 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
-use super::{lifecycle, reports};
+use super::{dependency_triage, lifecycle, reports};
 
 /// Drives an attempt that is already under way. `Ok(true)` means this pass is
 /// finished with the execution; `Ok(false)` means no in-progress attempt
@@ -21,6 +21,17 @@ pub(super) async fn reconcile_active_attempt_in_progress<R>(
 where
     R: TaskBoardReadOnlyRuntime,
 {
+    if let Some(attempt) = active_attempt.filter(|attempt| {
+        attempt.action_key == dependency_triage::DEPENDENCY_TRIAGE_ACTION
+            && matches!(
+                attempt.state,
+                TaskBoardAttemptState::Starting | TaskBoardAttemptState::Running
+            )
+    }) {
+        let allow_start = attempt.state == TaskBoardAttemptState::Starting;
+        dependency_triage::reconcile(db, runtime, execution, attempt, allow_start, now).await?;
+        return Ok(true);
+    }
     if let Some(attempt) = active_attempt.filter(|attempt| {
         matches!(
             execution.transition.phase,
