@@ -1,166 +1,107 @@
-use super::signals_timeout::warn_active_signal_delivery_timeout;
-use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
-use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, AgentRegistration,
-    AgentTuiManagerHandle, CliError, CliErrorKind, Duration, Instant, ManagedTuiWake, Path,
-    PathBuf, SessionDetail, SessionState, SignalAck, SignalCoords, SignalSendRequest,
-    acknowledged_signal_record, agents_runtime, broadcast_session_snapshot, build_log_entry,
-    build_signal_ack, effective_project_dir, index, pending_signal_record,
-    project_dir_for_db_session, record_signal_ack, refresh_signal_index_for_db, session_detail,
-    session_detail_from_daemon_db, session_not_found, session_service, thread, utc_now,
-};
-use crate::daemon::agent_acp::AcpWakePrompt;
-use crate::daemon::protocol::CodexSteerRequest;
+use std::path::Path;
+use std::time::Duration;
+
+use harness_agents::runtime;
+use harness_agents::runtime::signal::{AckResult, Signal, SignalAck};
+use harness_daemon_session_service::{SignalStorage, SignalWake, attempt_active_signal_delivery};
+use harness_kernel::errors::CliError;
+use harness_session::service as session_service;
+use harness_session::types::{SessionLogEntry, SessionSignalRecord, SessionState};
 use tokio::sync::broadcast;
 
-mod tui_identity;
+use super::super::agent_acp::AcpWakePrompt;
+use super::super::agent_tui::AgentTuiManagerHandle;
+use super::super::db::DaemonDb;
+use super::super::protocol::{
+    CodexSteerRequest, SessionDetail, SignalCancelRequest, SignalSendRequest, StreamEvent,
+};
+use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
+use super::{ManagedTuiWake, SignalCoords, broadcast_session_snapshot, sessions};
 
-pub(crate) use tui_identity::managed_tui_id_for_registration;
+pub(crate) use harness_daemon_session_service::build_active_signal_prompt;
+pub(crate) use harness_daemon_session_service::managed_tui_id_for_registration;
 
-/// Send a signal through the shared session service.
-///
-/// Signal files are always written to disk for runtime pickup, even in
-/// the DB-direct path, because agent runtimes poll the filesystem.
-///
-/// # Errors
-/// Returns `CliError` when the session cannot be resolved or signal delivery setup fails.
-pub fn send_signal(
-    session_id: &str,
-    request: &SignalSendRequest,
-    db: Option<&super::db::DaemonDb>,
-    agent_tui_manager: Option<&AgentTuiManagerHandle>,
-) -> Result<SessionDetail, CliError> {
-    if let Some(db) = db
-        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
-    {
-        // DB-direct: apply state mutation to SQLite, then write signal file.
-        let now = utc_now();
-        let project_dir = project_dir_for_db_session(db, session_id)?;
-        let (runtime_name, target_agent_session_id) = session_service::apply_send_signal_state(
-            &mut state,
-            &request.agent_id,
-            &request.actor,
-            &now,
-        )?;
-        let target_tui_id = state
-            .agents
-            .get(&request.agent_id)
-            .and_then(managed_tui_id_for_registration)
-            .map(ToString::to_string);
-        let project_id = db
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| session_not_found(session_id))?;
-        db.save_session_state(&project_id, &state)?;
-
-        // Write signal file for runtime pickup (always file-based).
-        let signal = session_service::build_signal(
-            &request.actor,
-            &request.command,
-            &request.message,
-            request.action_hint.as_deref(),
-            session_id,
-            &request.agent_id,
-            &now,
-        );
-        let runtime = agents_runtime::runtime_for_name(&runtime_name).ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "unknown runtime '{runtime_name}'"
-            )))
-        })?;
-        let signal_session_id = target_agent_session_id.as_deref().unwrap_or(session_id);
-        runtime.write_signal(&project_dir, signal_session_id, &signal)?;
-
-        db.append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_signal_sent(
-                &signal.signal_id,
-                &request.agent_id,
-                &request.command,
-            ),
-            Some(&request.actor),
-            None,
-        ))?;
-        let actively_delivered = attempt_active_signal_delivery(
-            &SignalCoords {
-                session_id,
-                agent_id: &request.agent_id,
-                signal: &signal,
-                runtime,
-                project_dir: &project_dir,
-                signal_session_id,
-            },
-            Some(db),
-            managed_tui_wake(target_tui_id.as_deref(), agent_tui_manager),
-        );
-        if !actively_delivered {
-            db.merge_signal_records(
-                session_id,
-                &[pending_signal_record(
-                    session_id,
-                    &runtime_name,
-                    &request.agent_id,
-                    &signal,
-                )],
-            )?;
-        }
-        db.bump_change(session_id)?;
-        db.bump_change("global")?;
-        return session_detail_from_daemon_db(session_id, db);
+impl SignalStorage for DaemonDb {
+    fn load_session_state_for_mutation(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionState>, CliError> {
+        Self::load_session_state_for_mutation(self, session_id)
     }
 
-    // File-based fallback
-    let resolved = index::resolve_session(session_id)?;
-    let project_dir = effective_project_dir(&resolved).to_path_buf();
-    let _ = session_service::send_signal_local(
-        session_id,
-        &request.agent_id,
-        &request.command,
-        &request.message,
-        request.action_hint.as_deref(),
-        &request.actor,
-        &project_dir,
-    )?;
-    session_detail(session_id, db)
-}
-
-pub(crate) fn managed_tui_wake<'a>(
-    tui_id: Option<&'a str>,
-    agent_tui_manager: Option<&'a AgentTuiManagerHandle>,
-) -> Option<ManagedTuiWake<'a>> {
-    Some(ManagedTuiWake {
-        tui_id: tui_id?,
-        manager: agent_tui_manager?,
-    })
-}
-
-pub(crate) fn attempt_active_signal_delivery(
-    coords: &SignalCoords<'_>,
-    db: Option<&super::db::DaemonDb>,
-    managed_tui: Option<ManagedTuiWake<'_>>,
-) -> bool {
-    let Some(managed_tui) = managed_tui else {
-        return false;
-    };
-    let ack_timeout = managed_tui
-        .manager
-        .ack_timeout_override()
-        .unwrap_or(ACTIVE_SIGNAL_ACK_TIMEOUT);
-
-    let Some(woke_tui) =
-        handled_active_signal_wake_result(coords, wake_tui_for_signal(&managed_tui, coords.signal))
-    else {
-        return false;
-    };
-
-    if woke_tui {
-        return process_active_signal_ack(coords, db, ack_timeout);
+    fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
+        Self::load_session_state(self, session_id)
     }
-    false
+
+    fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
+        Self::load_session_log(self, session_id)
+    }
+
+    fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
+        Self::project_id_for_session(self, session_id)
+    }
+
+    fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
+        Self::project_dir_for_session(self, session_id)
+    }
+
+    fn save_session_state(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
+        Self::save_session_state(self, project_id, state)
+    }
+
+    fn resolve_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<harness_session::index::ResolvedSession>, CliError> {
+        Self::resolve_session(self, session_id)
+    }
+
+    fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
+        Self::load_signals(self, session_id)
+    }
+
+    fn merge_signal_records(
+        &self,
+        session_id: &str,
+        records: &[SessionSignalRecord],
+    ) -> Result<(), CliError> {
+        Self::merge_signal_records(self, session_id, records)
+    }
+
+    fn sync_signal_index(
+        &self,
+        session_id: &str,
+        records: &[SessionSignalRecord],
+    ) -> Result<(), CliError> {
+        Self::sync_signal_index(self, session_id, records)
+    }
+
+    fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
+        Self::append_log_entry(self, entry)
+    }
+
+    fn bump_change(&self, scope: &str) -> Result<(), CliError> {
+        Self::bump_change(self, scope)
+    }
+
+    fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
+        sessions::session_detail_from_daemon_db(session_id, self)
+    }
+}
+
+impl SignalWake for AgentTuiManagerHandle {
+    fn ack_timeout_override(&self) -> Option<Duration> {
+        Self::ack_timeout_override(self)
+    }
+
+    fn prompt(&self, managed_id: &str, prompt: &str) -> Result<bool, CliError> {
+        self.prompt_tui(managed_id, prompt)
+    }
 }
 
 pub(crate) fn wake_tui_for_signal(
     managed_tui: &ManagedTuiWake<'_>,
-    signal: &agents_runtime::signal::Signal,
+    signal: &Signal,
 ) -> Result<bool, CliError> {
     let prompt = build_active_signal_prompt(signal);
     managed_tui.manager.prompt_tui(managed_tui.tui_id, &prompt)
@@ -177,28 +118,6 @@ pub(crate) fn handled_active_signal_wake_result(
             None
         }
     }
-}
-
-pub(crate) fn process_active_signal_ack(
-    coords: &SignalCoords<'_>,
-    db: Option<&super::db::DaemonDb>,
-    ack_timeout: Duration,
-) -> bool {
-    let Some(ack) = handled_active_signal_ack_wait_result(
-        coords,
-        wait_for_signal_ack(
-            coords.runtime,
-            coords.project_dir,
-            coords.signal_session_id,
-            &coords.signal.signal_id,
-            ack_timeout,
-        ),
-        ack_timeout,
-    ) else {
-        return false;
-    };
-
-    record_active_signal_ack(coords, db, &ack)
 }
 
 pub(crate) fn handled_active_signal_ack_wait_result(
@@ -224,86 +143,11 @@ pub(crate) fn handled_active_signal_ack_wait_result(
     }
 }
 
-pub(crate) fn record_active_signal_ack(
-    coords: &SignalCoords<'_>,
-    db: Option<&super::db::DaemonDb>,
-    ack: &SignalAck,
-) -> bool {
-    let result = record_signal_ack_and_broadcast(
-        coords.session_id,
-        coords.agent_id,
-        &coords.signal.signal_id,
-        ack.result,
-        coords.project_dir,
-        db,
-        None,
-    );
-    match result {
-        Ok(()) => true,
-        Err(error) => {
-            warn_active_signal_ack_record_failure(coords, &error);
-            false
-        }
-    }
-}
-
-pub(crate) fn record_signal_ack_and_broadcast(
-    session_id: &str,
-    agent_id: &str,
-    signal_id: &str,
-    result: AckResult,
-    project_dir: &Path,
-    db: Option<&super::db::DaemonDb>,
-    sender: Option<&broadcast::Sender<super::StreamEvent>>,
-) -> Result<(), CliError> {
-    record_signal_ack(session_id, agent_id, signal_id, result, project_dir, db)?;
-    if let Some(sender) = sender {
-        broadcast_session_snapshot(sender, session_id, db);
-    }
-    Ok(())
-}
-
-pub(crate) fn build_active_signal_prompt(signal: &agents_runtime::signal::Signal) -> String {
-    match signal.payload.action_hint.as_deref() {
-        Some(action_hint) => format!(
-            "[Harness signal] {}: {} ({action_hint})",
-            signal.command, signal.payload.message
-        ),
-        None => format!(
-            "[Harness signal] {}: {}",
-            signal.command, signal.payload.message
-        ),
-    }
-}
-
-pub(crate) fn wait_for_signal_ack(
-    runtime: &dyn agents_runtime::AgentRuntime,
-    project_dir: &Path,
-    signal_session_id: &str,
-    signal_id: &str,
-    timeout: Duration,
-) -> Result<Option<SignalAck>, CliError> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Some(ack) = runtime
-            .read_acknowledgments(project_dir, signal_session_id)?
-            .into_iter()
-            .find(|ack| ack.signal_id == signal_id)
-        {
-            return Ok(Some(ack));
-        }
-        if Instant::now() >= deadline {
-            return Ok(None);
-        }
-        thread::sleep(ACTIVE_SIGNAL_ACK_POLL_INTERVAL);
-    }
-}
-
 #[expect(
     clippy::cognitive_complexity,
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
-pub(crate) fn warn_active_signal_wake_failure(coords: &SignalCoords<'_>, error: &CliError) {
+fn warn_active_signal_wake_failure(coords: &SignalCoords<'_>, error: &CliError) {
     tracing::warn!(
         %error,
         session_id = coords.session_id,
@@ -317,7 +161,7 @@ pub(crate) fn warn_active_signal_wake_failure(coords: &SignalCoords<'_>, error: 
     clippy::cognitive_complexity,
     reason = "structured tracing macro expansion inflates this simple logging helper"
 )]
-pub(crate) fn warn_active_signal_ack_wait_failure(coords: &SignalCoords<'_>, error: &CliError) {
+fn warn_active_signal_ack_wait_failure(coords: &SignalCoords<'_>, error: &CliError) {
     tracing::warn!(
         %error,
         session_id = coords.session_id,
@@ -341,13 +185,79 @@ pub(crate) fn warn_active_signal_ack_record_failure(coords: &SignalCoords<'_>, e
     );
 }
 
-/// Best-effort active wake for `Started` task-drop effects.
+fn warn_active_signal_delivery_timeout(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    timeout: Duration,
+) {
+    let message = format!(
+        "session '{session_id}' signal '{signal_id}' to agent '{agent_id}' stayed pending after active TUI wake-up for {} ms",
+        timeout.as_millis()
+    );
+    super::super::state::append_event_best_effort("warn", &message);
+    tracing::warn!(
+        session_id,
+        agent_id,
+        signal_id,
+        timeout_ms = timeout.as_millis(),
+        "active TUI signal delivery timed out"
+    );
+}
+
+/// Send a signal through the daemon's persistence and wake adapters.
 ///
-/// For each `TaskDropEffect::Started`, look up the worker's TUI id and try to
-/// prompt the managed runtime so it picks the new task up immediately rather
-/// than on its next signal-dir scan. Failures are logged and ignored: the
-/// pending signal record was already merged by the caller, so the worker will
-/// still pick the signal up via its periodic poll.
+/// # Errors
+/// Returns an error when the session cannot be resolved or delivery setup fails.
+pub fn send_signal(
+    session_id: &str,
+    request: &SignalSendRequest,
+    db: Option<&DaemonDb>,
+    manager: Option<&AgentTuiManagerHandle>,
+) -> Result<SessionDetail, CliError> {
+    harness_daemon_session_service::send_signal(
+        session_id,
+        request,
+        db,
+        manager.map(|manager| manager as &dyn SignalWake),
+    )
+}
+
+/// Cancel a pending signal through the daemon persistence adapter.
+///
+/// # Errors
+/// Returns an error when the session or signal cannot be resolved or updated.
+pub fn cancel_signal(
+    session_id: &str,
+    request: &SignalCancelRequest,
+    db: Option<&DaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    harness_daemon_session_service::cancel_signal(session_id, request, db)
+}
+
+pub(crate) fn record_signal_ack_and_broadcast(
+    session_id: &str,
+    agent_id: &str,
+    signal_id: &str,
+    result: AckResult,
+    project_dir: &Path,
+    db: Option<&DaemonDb>,
+    sender: Option<&broadcast::Sender<StreamEvent>>,
+) -> Result<(), CliError> {
+    harness_daemon_session_service::record_signal_ack(
+        session_id,
+        agent_id,
+        signal_id,
+        result,
+        project_dir,
+        db,
+    )?;
+    if let Some(sender) = sender {
+        broadcast_session_snapshot(sender, session_id, db);
+    }
+    Ok(())
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
@@ -357,14 +267,14 @@ pub(crate) fn try_wake_started_workers(
     effects: &[session_service::TaskDropEffect],
     session_id: &str,
     project_dir: &Path,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&DaemonDb>,
     dispatch: WakeDispatch<'_>,
 ) {
     for effect in effects {
         let session_service::TaskDropEffect::Started(record) = effect else {
             continue;
         };
-        let Some(runtime) = agents_runtime::runtime_for_name(&record.runtime) else {
+        let Some(agent_runtime) = runtime::runtime_for_name(&record.runtime) else {
             tracing::warn!(session_id, agent_id = %record.agent_id, runtime = %record.runtime, signal_id = %record.signal.signal_id, "task wake skipped: unknown runtime");
             continue;
         };
@@ -374,26 +284,26 @@ pub(crate) fn try_wake_started_workers(
         match route {
             WakeRoute::Tui { tui_id, manager } => {
                 let _ = attempt_active_signal_delivery(
-                    &SignalCoords {
-                        session_id,
-                        agent_id: &record.agent_id,
-                        signal: &record.signal,
-                        runtime,
-                        project_dir,
-                        signal_session_id: &record.signal_session_id,
-                    },
+                    session_id,
+                    &record.agent_id,
+                    &record.signal,
+                    agent_runtime,
+                    project_dir,
+                    &record.signal_session_id,
                     db,
-                    Some(ManagedTuiWake { tui_id, manager }),
+                    Some(tui_id),
+                    Some(manager as &dyn SignalWake),
                 );
             }
             WakeRoute::Acp { acp_id, manager } => {
                 manager.dispatch_wake_prompt(
-                    runtime,
+                    agent_runtime,
                     AcpWakePrompt {
                         acp_id: acp_id.to_string(),
                         orchestration_session_id: session_id.to_string(),
                         signal_session_id: record.signal_session_id.clone(),
-                        signal_dir: runtime.signal_dir(project_dir, &record.signal_session_id),
+                        signal_dir: agent_runtime
+                            .signal_dir(project_dir, &record.signal_session_id),
                         project_dir: project_dir.to_path_buf(),
                         prompt: build_active_signal_prompt(&record.signal),
                         signal_id: record.signal.signal_id.clone(),
@@ -414,69 +324,4 @@ pub(crate) fn try_wake_started_workers(
             }
         }
     }
-}
-
-/// Cancel a pending signal by writing a rejected acknowledgment.
-///
-/// # Errors
-/// Returns `CliError` when the session cannot be resolved, the signal is not
-/// pending, or ack persistence fails.
-pub fn cancel_signal(
-    session_id: &str,
-    request: &super::protocol::SignalCancelRequest,
-    db: Option<&super::db::DaemonDb>,
-) -> Result<SessionDetail, CliError> {
-    let project_dir = if let Some(db) = db
-        && let Some(dir) = db.project_dir_for_session(session_id)?
-    {
-        PathBuf::from(dir)
-    } else {
-        let resolved = index::resolve_session(session_id)?;
-        effective_project_dir(&resolved).to_path_buf()
-    };
-
-    session_service::cancel_signal_local(
-        session_id,
-        &request.agent_id,
-        &request.signal_id,
-        &request.actor,
-        &project_dir,
-    )?;
-
-    if let Some(db) = db {
-        if let Some(signal) = db.load_signals(session_id)?.into_iter().find(|record| {
-            record.agent_id == request.agent_id && record.signal.signal_id == request.signal_id
-        }) {
-            let ack_agent = db
-                .load_session_state(session_id)?
-                .and_then(|state| {
-                    state
-                        .agents
-                        .get(&request.agent_id)
-                        .and_then(|agent| agent.agent_session_id.clone())
-                })
-                .unwrap_or_else(|| session_id.to_string());
-            db.merge_signal_records(
-                session_id,
-                &[acknowledged_signal_record(
-                    &signal.runtime,
-                    &request.agent_id,
-                    &signal.signal,
-                    &build_signal_ack(
-                        session_id,
-                        &signal.signal.signal_id,
-                        &utc_now(),
-                        AckResult::Rejected,
-                        &ack_agent,
-                        Some(format!("cancelled by {}", request.actor)),
-                    ),
-                )],
-            )?;
-        } else {
-            refresh_signal_index_for_db(db, session_id)?;
-        }
-        db.bump_change(session_id)?;
-        db.bump_change("global")?;
-    }
-    session_detail(session_id, db)
 }
