@@ -372,7 +372,7 @@ pub fn parse_task_board_dependency_fix_result(
     Ok(result)
 }
 
-fn validate_task_board_dependency_fix_result(
+pub(super) fn validate_task_board_dependency_fix_result(
     result: &TaskBoardDependencyFixResult,
     request: &TaskBoardDependencyFixRequest,
 ) -> Result<(), CliError> {

@@ -81,6 +81,7 @@ impl AcpAgentManagerHandle {
                 input.acp_id,
                 input.session_id,
                 input.project_dir.to_path_buf(),
+                input.request.resume_session_id.clone(),
                 prompt,
             )
         } else {
@@ -88,6 +89,7 @@ impl AcpAgentManagerHandle {
                 input.acp_id,
                 input.session_id,
                 input.project_dir.to_path_buf(),
+                input.request.resume_session_id.clone(),
             )
         })
         .map_err(|error| {

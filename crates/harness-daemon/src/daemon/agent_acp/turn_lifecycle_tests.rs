@@ -84,6 +84,14 @@ impl OpenRouterTurnManager for FakeManager {
         })
     }
 
+    fn runtime_session_id(
+        &self,
+        _session_id: &str,
+        _acp_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        Ok(Some("openrouter-session-1".into()))
+    }
+
     fn stop(&self, _acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {
         if let Some(probe) = self.stop_probe.lock().expect("stop probe lock").take() {
             probe();
@@ -143,6 +151,34 @@ async fn openrouter_turn_keeps_model_report_and_frozen_source_revision() {
     assert_eq!(result.effective_model.as_deref(), Some(MODEL));
     assert_eq!(result.source_revision.as_deref(), Some(HEAD));
     assert_eq!(result.stop_reason, "end_turn");
+}
+
+#[tokio::test]
+async fn resumed_turn_reuses_the_original_provider_session() {
+    let manager = Arc::new(FakeManager::default());
+    let runtime =
+        OpenRouterAgentTurnRuntime::with_manager(manager.clone(), "session-a".into(), None);
+    let original_id = runtime.start(request()).await.expect("start original turn");
+    let original_session_id = runtime
+        .runtime_session_id(&original_id)
+        .expect("original provider session");
+
+    runtime
+        .start_with_resume_session(request(), Some(original_session_id))
+        .await
+        .expect("resume turn");
+
+    let resumed = manager
+        .request
+        .lock()
+        .expect("request lock")
+        .clone()
+        .expect("captured resumed start");
+    assert!(!resumed.resume_disabled);
+    assert_eq!(
+        resumed.resume_session_id.as_deref(),
+        Some("openrouter-session-1")
+    );
 }
 
 #[tokio::test]
@@ -335,7 +371,11 @@ async fn failure_records_a_terminal_failure() {
         runtime.status(&id).await.expect("status"),
         AgentTurnStatus::Failed
     );
-    runtime.failure(&id).await.expect("failure").expect("failure present");
+    runtime
+        .failure(&id)
+        .await
+        .expect("failure")
+        .expect("failure present");
 
     let stored = store
         .agent_turn_run(id.as_str())

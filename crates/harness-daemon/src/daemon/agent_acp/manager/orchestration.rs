@@ -302,6 +302,24 @@ impl AcpManagerPort for DaemonAcpManagerPort {
             .map(|(_, id)| id.clone()))
     }
 
+    fn runtime_session_id(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        let Some(db) = self.db.get() else {
+            return Ok(None);
+        };
+        let Some(state) = Self::lock_db(db)?.load_session_state(session_id)? else {
+            return Ok(None);
+        };
+        Ok(state
+            .agents
+            .values()
+            .find(|agent| agent.managed_agent == Some(ManagedAgentRef::acp(acp_id)))
+            .and_then(|agent| agent.agent_session_id.clone()))
+    }
+
     fn persist_conversation_events(
         &self,
         session_id: &str,

@@ -145,6 +145,14 @@ impl AcpAgentManagerHandle {
         self.start_with_pooling_disabled(session_id, request, true)
     }
 
+    pub(in crate::daemon::agent_acp) fn runtime_session_id(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        self.state.port.runtime_session_id(session_id, acp_id)
+    }
+
     pub(crate) fn start_with_pooling_disabled(
         &self,
         session_id: &str,
