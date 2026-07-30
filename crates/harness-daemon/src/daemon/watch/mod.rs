@@ -2,6 +2,7 @@ mod loops;
 mod paths;
 mod refresh;
 mod state;
+mod storage;
 
 #[cfg(test)]
 mod db_tests;

@@ -53,9 +53,15 @@ mod async_runtime;
 mod async_signal_writes;
 mod async_writes;
 mod audit;
+mod change_tracking;
+#[cfg(test)]
+pub(crate) use change_tracking::LOAD_CHANGE_TRACKING_SQL;
 mod conversation;
 mod diagnostics;
 mod imports;
+pub(crate) use imports::{
+    prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
+};
 mod policy;
 mod pull_request_actions;
 mod rebuild;

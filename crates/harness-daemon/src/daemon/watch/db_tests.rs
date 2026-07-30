@@ -4,16 +4,15 @@ use std::time::{Duration, Instant};
 
 use tempfile::tempdir;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_status_db_label};
+use crate::daemon::db::{
+    AsyncDaemonDb, DaemonDb, LOAD_CHANGE_TRACKING_SQL, session_status_db_label,
+};
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::service::SESSION_LIVENESS_REFRESH_TTL;
 use crate::session::service::build_new_session;
 use crate::session::types::SessionStatus;
 
-use super::loops::{
-    CHANGE_TRACKING_POLL_SQL, liveness_reconcile_due, poll_change_tracking,
-    poll_change_tracking_async,
-};
+use super::loops::{liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async};
 use super::refresh::{emit_watch_changes, emit_watch_changes_with};
 use super::state::WatchChanges;
 
@@ -39,7 +38,7 @@ fn poll_change_tracking_uses_change_seq_index() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let details: Vec<String> = db
         .connection()
-        .prepare(&format!("EXPLAIN QUERY PLAN {CHANGE_TRACKING_POLL_SQL}"))
+        .prepare(&format!("EXPLAIN QUERY PLAN {LOAD_CHANGE_TRACKING_SQL}"))
         .expect("prepare explain")
         .query_map([0_i64], |row| row.get(3))
         .expect("query explain")

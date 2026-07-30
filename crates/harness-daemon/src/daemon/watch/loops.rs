@@ -16,16 +16,14 @@ use super::refresh::{emit_watch_changes, refresh_watch_snapshot};
 use super::state::{
     PendingWatchPaths, RefreshScope, RuntimeSessionResolveCache, WatchChanges, WatchSnapshot,
 };
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_id_from_change_scope};
+use crate::daemon::db::{
+    AsyncDaemonDb, DaemonDb, prepare_runtime_transcript_resync, prepare_session_resync,
+    session_id_from_change_scope,
+};
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use harness_kernel::errors::CliError;
-
-pub(super) const CHANGE_TRACKING_POLL_SQL: &str = "SELECT scope, version, change_seq
-     FROM change_tracking
-     WHERE change_seq > ?1
-     ORDER BY change_seq";
 
 /// Spawn the daemon's refresh loop for SSE/WS subscribers. When a database
 /// is available, uses `change_tracking` versions instead of full filesystem
@@ -232,25 +230,11 @@ fn spawn_legacy_watch_loop(
 pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> WatchChanges {
     let mut changes = WatchChanges::default();
 
-    let Ok(rows) = db
-        .connection()
-        .prepare_cached(CHANGE_TRACKING_POLL_SQL)
-        .and_then(|mut statement| {
-            statement
-                .query_map([*last_change_seq], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, i64>(2)?,
-                    ))
-                })
-                .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
-        })
-    else {
+    let Ok(rows) = db.load_change_tracking_since(*last_change_seq) else {
         return changes;
     };
 
-    for (scope, _version, change_seq) in rows {
+    for (scope, change_seq) in rows {
         *last_change_seq = change_seq;
         if scope == "global" {
             changes.sessions_updated = true;
@@ -340,7 +324,7 @@ fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
     let mut fallback_session_ids = work.full_session_ids;
 
     for target in &work.transcript_targets {
-        match DaemonDb::prepare_runtime_transcript_resync(
+        match prepare_runtime_transcript_resync(
             &target.session_id,
             &target.runtime_name,
             &target.runtime_session_id,
@@ -363,7 +347,7 @@ fn reindex_extracted_work(db: &Arc<Mutex<DaemonDb>>, work: ReindexWork) {
     }
 
     for session_id in &fallback_session_ids {
-        match DaemonDb::prepare_session_resync(session_id) {
+        match prepare_session_resync(session_id) {
             Ok(import) => prepared_sessions.push(import),
             Err(error) => tracing::warn!(
                 %error,

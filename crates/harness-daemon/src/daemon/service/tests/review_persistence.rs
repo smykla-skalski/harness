@@ -275,9 +275,8 @@ fn stale_prepared_session_resync_does_not_clobber_async_review_state() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");
-            let prepared =
-                crate::daemon::db::DaemonDb::prepare_session_resync(&fixture.state.session_id)
-                    .expect("prepare stale session resync");
+            let prepared = crate::daemon::db::prepare_session_resync(&fixture.state.session_id)
+                .expect("prepare stale session resync");
 
             submit_for_review_async(
                 &fixture.state.session_id,
