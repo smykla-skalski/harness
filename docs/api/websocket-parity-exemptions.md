@@ -1,6 +1,6 @@
 # WebSocket parity exemptions
 
-The daemon HTTP API is dual-transport: almost every route mirrors a WebSocket JSON-RPC method, recorded per route in the contract at `src/daemon/protocol/api_contract/`. A route without a mirror is an **exemption** and must say why in classified terms. This file is the audit that judged each current exemption sound, so the classification can be trusted without re-deriving it. It records the conclusions of the audit tracked in issue #508 (part of #466).
+The daemon HTTP API is dual-transport: almost every route mirrors a WebSocket JSON-RPC method, recorded per route in the contract at `crates/harness-protocol/src/daemon/api_contract/` (re-exported unchanged at `harness-daemon`'s original `daemon::protocol::api_contract` path). A route without a mirror is an **exemption** and must say why in classified terms. This file is the audit that judged each current exemption sound, so the classification can be trusted without re-deriving it. It records the conclusions of the audit tracked in issue #508 (part of #466).
 
 ## The two kinds of exemption
 

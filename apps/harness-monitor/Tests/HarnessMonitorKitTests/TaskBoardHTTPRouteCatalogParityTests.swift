@@ -90,7 +90,9 @@ private func daemonHTTPRoutes(prefix: String) throws -> [TaskBoardHTTPRoute] {
 }
 
 private func daemonHTTPPathConstants() throws -> [String: String] {
-  let source = try repoFileContents(relativePath: "src/daemon/protocol/api_contract/http_paths.rs")
+  let source = try repoFileContents(
+    relativePath: "crates/harness-protocol/src/daemon/api_contract/http_paths.rs"
+  )
   let matches = try captures(
     in: source,
     pattern: "pub const\\s+([A-Z0-9_]+):\\s*&str\\s*=\\s*\"([^\"]+)\";"
@@ -136,7 +138,7 @@ private func swiftReviewsHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
   try swiftHTTPRoutes(prefix: "/v1/reviews/")
 }
 
-private let daemonContractDirectory = "src/daemon/protocol/api_contract"
+private let daemonContractDirectory = "crates/harness-protocol/src/daemon/api_contract"
 private let swiftAPIDirectory = "apps/harness-monitor/Sources/HarnessMonitorKit/API"
 
 private func daemonRouteContractFiles() throws -> [URL] {
