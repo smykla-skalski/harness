@@ -10,8 +10,8 @@ use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     AgentMode, SpawnGateSwitches, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
     TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardReadOnlyRunContext,
-    TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
-    resolve_task_board_reviewers,
+    TaskBoardReadOnlyWorkflowLaunch, TaskBoardReviewerProfile, TaskBoardWorkflowKind,
+    build_dispatch_plans_with_policy, resolve_task_board_reviewers,
 };
 
 use super::start_authorization_test_support::StartAuthorizationPause;
@@ -78,6 +78,44 @@ async fn managed_read_only_start_rejects_revision_drift_before_codex() {
     );
     assert_eq!(codex_run_count(&db).await, 0);
     assert_eq!(workflow_execution_count(&db).await, 0);
+    assert_eq!(intent_status(&db, &claim.intent_id).await, "failed");
+}
+
+#[tokio::test]
+async fn managed_read_only_start_rejects_an_unavailable_reviewer_runtime_before_codex() {
+    // The launch was prepared while the openrouter reviewer was runnable; by the
+    // durable start its credential is gone (none is configured here). The start
+    // must re-check provider prerequisites and stop before any turn, not only at
+    // prepare - otherwise a restart between prepare and start would run agent
+    // work with an unmet prerequisite.
+    let (state, mut claim, _worktree) =
+        Box::pin(claimed_read_only_dispatch_with_openrouter_reviewer()).await;
+    let db = state.async_db.get().cloned().expect("test async db");
+
+    let error = settle_claimed_task_board_worker(&state, &db, &mut claim)
+        .await
+        .expect_err("an unavailable reviewer runtime must not reach Codex start");
+
+    assert!(
+        error
+            .to_string()
+            .contains("reviewer runtime 'openrouter' cannot run"),
+        "the durable start must name the runtime that cannot run: {error}"
+    );
+    assert!(
+        error.to_string().contains("credential is not configured"),
+        "the durable start must name the unmet prerequisite: {error}"
+    );
+    assert_eq!(
+        codex_run_count(&db).await,
+        0,
+        "no agent work may start once the runtime is unavailable"
+    );
+    assert_eq!(
+        workflow_execution_count(&db).await,
+        0,
+        "a blocked start records no durable execution, so the ticket stays retryable"
+    );
     assert_eq!(intent_status(&db, &claim.intent_id).await, "failed");
 }
 
@@ -271,16 +309,26 @@ async fn stale_claim_after_probe_keeps_exact_worker_running() {
 
 pub(super) async fn claimed_read_only_dispatch()
 -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
-    Box::pin(claimed_read_only_dispatch_with_policy(true)).await
+    Box::pin(claimed_read_only_dispatch_with_policy(true, None)).await
 }
 
 pub(super) async fn claimed_read_only_dispatch_without_policy()
 -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
-    Box::pin(claimed_read_only_dispatch_with_policy(false)).await
+    Box::pin(claimed_read_only_dispatch_with_policy(false, None)).await
+}
+
+async fn claimed_read_only_dispatch_with_openrouter_reviewer()
+-> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
+    Box::pin(claimed_read_only_dispatch_with_policy(
+        true,
+        Some("openrouter"),
+    ))
+    .await
 }
 
 async fn claimed_read_only_dispatch_with_policy(
     finite_policy: bool,
+    reviewer_runtime: Option<&str>,
 ) -> (DaemonHttpState, ClaimedTaskBoardDispatch, TempDir) {
     let state = test_http_state();
     let db = state.async_db.get().cloned().expect("test async db");
@@ -297,6 +345,23 @@ async fn claimed_read_only_dispatch_with_policy(
         db.replace_task_board_orchestrator_settings(&settings)
             .await
             .expect("configure finite workflow admission");
+    }
+    if let Some(runtime) = reviewer_runtime {
+        let mut settings = db
+            .task_board_orchestrator_settings()
+            .await
+            .expect("load settings");
+        settings.reviewers.profiles = vec![TaskBoardReviewerProfile {
+            id: "openrouter-reviewer".into(),
+            runtime: runtime.into(),
+            persona: "code-reviewer".into(),
+            agent_mode: AgentMode::Evaluate,
+            model: Some("deepseek/deepseek-v4-flash".into()),
+            effort: None,
+        }];
+        db.replace_task_board_orchestrator_settings(&settings)
+            .await
+            .expect("configure reviewer runtime");
     }
     let worktree = tempfile::tempdir().expect("review worktree");
     harness_testkit::init_git_repo_with_seed(worktree.path());

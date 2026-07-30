@@ -113,6 +113,11 @@ pub(crate) async fn validate_read_only_workflow_launch(
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
     ensure_supported_read_only_runtimes(&reviewers)?;
+    // Re-check provider prerequisites at the durable start, not only at prepare:
+    // a daemon restart between the two, or a credential revoked after prepare,
+    // must still stop the review before any turn begins rather than start a
+    // worker that fails at runtime. Stays retryable with the named prerequisite.
+    ensure_reviewer_runtimes_available(&reviewers).await?;
     if item.workflow_kind != launch.workflow_kind
         || item.agent_mode != AgentMode::Evaluate
         || execution_repository != launch.execution_repository
