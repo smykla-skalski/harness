@@ -13,23 +13,18 @@ extension HarnessMonitorStore {
         // This loop never ends on its own, so a reference held between ticks
         // would keep a store nobody owns any more probing a daemon nobody is
         // watching for the life of the process.
-        let interval: Duration
-        guard let store = self else {
+        guard let interval = self?.connectionProbeInterval else {
           return
         }
-        interval = store.connectionProbeInterval
         try? await Task.sleep(for: interval)
         guard !Task.isCancelled else {
           return
         }
-        guard let store = self else {
-          return
-        }
         guard
-          await store.runConnectionProbePass(
+          await self?.runConnectionProbePass(
             using: client,
             consecutiveFailures: &consecutiveFailures
-          )
+          ) == true
         else {
           return
         }

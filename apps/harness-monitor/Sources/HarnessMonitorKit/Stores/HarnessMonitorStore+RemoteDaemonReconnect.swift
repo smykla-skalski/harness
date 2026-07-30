@@ -39,11 +39,14 @@ extension HarnessMonitorStore {
         // This loop only ends once the store says so, so a reference held
         // across the backoff would keep a store nobody owns any more retrying
         // for the life of the process.
-        let step: RemoteDaemonReconnectStep
-        guard let store = self else {
+        guard
+          let step = self?.nextRemoteDaemonReconnectStep(
+            generation: generation,
+            attempt: attempt
+          )
+        else {
           return
         }
-        step = store.nextRemoteDaemonReconnectStep(generation: generation, attempt: attempt)
         guard case .wait(let delay, let sleeper) = step else {
           return
         }
@@ -53,10 +56,7 @@ extension HarnessMonitorStore {
           self?.finishRemoteDaemonReconnect(generation: generation)
           return
         }
-        guard let store = self else {
-          return
-        }
-        guard await store.retryRemoteDaemonConnection(generation: generation) else {
+        guard await self?.retryRemoteDaemonConnection(generation: generation) == true else {
           return
         }
         attempt += 1
