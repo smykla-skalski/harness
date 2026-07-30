@@ -1,16 +1,17 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
-    TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
-    TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard,
+    TaskBoardAttemptState, TaskBoardDependencyRecoveryClass, TaskBoardExecutionAttemptRecord,
+    TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome,
+    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
+    TaskBoardWorkflowExecutionCasOutcome, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowRevisionGuard,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use sha2::{Digest, Sha256};
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::{
-    attempt_recovery, in_progress, ingestion, lifecycle, reports, requests, revision_validation,
+    attempt_recovery, in_progress, ingestion, lifecycle, refusal, reports, revision_validation,
 };
 
 #[expect(
@@ -29,9 +30,12 @@ where
     if is_stopped(&execution) {
         return Ok(());
     }
-    if refuse_unusable_execution(db, &execution, now).await? {
+    if refusal::refuse_unusable_execution(db, &execution, now).await? {
         return Ok(());
     }
+    let Some(recovery) = refusal::recovery_decision_or_refuse(db, &execution, now).await? else {
+        return Ok(());
+    };
     if execution.transition.execution_state == TaskBoardExecutionState::RetryWait {
         crate::daemon::service::task_board_workflow_execution::resume_workflow_retry(
             db,
@@ -62,14 +66,37 @@ where
         ))
         .await;
     }
-    if attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await? {
-        return Ok(());
-    }
-    if let Some(attempt) = ingestion::unapplied_completed_attempt(&execution) {
-        return ingestion::ingest_completed_attempt(
-            db, runtime, &execution, attempt, &revisions, now,
-        )
-        .await;
+    match recovery.class {
+        TaskBoardDependencyRecoveryClass::Completed => {
+            let attempt = ingestion::unapplied_completed_attempt(&execution).ok_or_else(|| {
+                invalid_transition("completed recovery has no unapplied durable attempt")
+            })?;
+            return ingestion::ingest_completed_attempt(
+                db, runtime, &execution, attempt, &revisions, now,
+            )
+            .await;
+        }
+        TaskBoardDependencyRecoveryClass::Failed | TaskBoardDependencyRecoveryClass::Uncertain => {
+            if attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await? {
+                return Ok(());
+            }
+            return Err(invalid_transition(
+                "terminal recovery decision has no recoverable durable attempt",
+            ));
+        }
+        TaskBoardDependencyRecoveryClass::Resumable => {
+            let retry_wait = recovery.action_key.as_deref().is_some_and(|action_key| {
+                execution.attempts.iter().any(|attempt| {
+                    attempt.action_key == action_key
+                        && attempt.state == TaskBoardAttemptState::RetryWait
+                })
+            });
+            if retry_wait
+                && attempt_recovery::recover_terminal_attempt_state(db, &execution, now).await?
+            {
+                return Ok(());
+            }
+        }
     }
     if execution.transition.phase == Some(TaskBoardExecutionPhase::Publish)
         && !lifecycle::preflight_publish(db, runtime, &execution, now).await?
@@ -77,44 +104,6 @@ where
         return Ok(());
     }
     schedule_next_attempt(db, &execution, now).await
-}
-
-/// Refuses an execution whose immutable inputs cannot be used at all. These are
-/// configuration mistakes rather than transient faults, so each one ends the
-/// execution with a human-required outcome instead of being retried.
-/// `Ok(true)` means the execution was refused and needs no further reconciling.
-async fn refuse_unusable_execution(
-    db: &AsyncDaemonDb,
-    execution: &TaskBoardWorkflowExecutionRecord,
-    now: &str,
-) -> Result<bool, CliError> {
-    if let Err(error) = requests::run_context(execution) {
-        require_human(
-            db,
-            &execution.execution_id,
-            "read_only_run_context_missing",
-            &error.to_string(),
-            TaskBoardTerminalOutcomeKind::HumanRequired,
-            now,
-        )
-        .await?;
-        return Ok(true);
-    }
-    if execution.snapshot.workflow_kind.is_write()
-        && let Err(error) = requests::write_task_id(execution)
-    {
-        require_human(
-            db,
-            &execution.execution_id,
-            "write_task_id_missing",
-            &error.to_string(),
-            TaskBoardTerminalOutcomeKind::HumanRequired,
-            now,
-        )
-        .await?;
-        return Ok(true);
-    }
-    Ok(false)
 }
 
 async fn current_revisions_or_invalidate(

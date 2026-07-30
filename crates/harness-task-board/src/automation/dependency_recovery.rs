@@ -1,0 +1,339 @@
+use harness_kernel::errors::{CliError, CliErrorKind};
+use serde::{Deserialize, Serialize};
+
+use super::{
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardDependencyCheckResumeRecord,
+    TaskBoardDependencyCheckWait, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord, valid_head_revision,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskBoardDependencyRecoveryClass {
+    Resumable,
+    Completed,
+    Uncertain,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskBoardDependencyRecoveryStep {
+    AgentRun,
+    CheckWait,
+    GitHubAction,
+    Advance,
+    Stop,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskBoardDependencyRecoveryDecision {
+    pub class: TaskBoardDependencyRecoveryClass,
+    pub step: TaskBoardDependencyRecoveryStep,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exact_head_revision: Option<String>,
+    pub detail: String,
+}
+
+/// Classify the one dependency workflow step a restarted daemon may safely resume.
+///
+/// # Errors
+/// Returns an invalid-transition error when durable state names multiple current attempts.
+pub fn classify_task_board_dependency_workflow_recovery(
+    execution: &TaskBoardWorkflowExecutionRecord,
+) -> Result<TaskBoardDependencyRecoveryDecision, CliError> {
+    if let Some(decision) = terminal_decision(execution) {
+        return Ok(decision);
+    }
+    let mut active_attempts = execution.attempts.iter().filter(|attempt| {
+        matches!(
+            attempt.state,
+            TaskBoardAttemptState::Preparing
+                | TaskBoardAttemptState::Starting
+                | TaskBoardAttemptState::Running
+        )
+    });
+    let active_attempt = active_attempts.next();
+    if active_attempts.next().is_some() {
+        return Err(recovery_error(
+            "dependency workflow has multiple active attempts",
+        ));
+    }
+    if active_attempt.is_some_and(|attempt| !attempt_is_current(execution, attempt)) {
+        return Err(recovery_error(
+            "dependency workflow active attempt does not match its current step",
+        ));
+    }
+    let mut attempt = None;
+    for candidate in execution.attempts.iter().filter(|candidate| {
+        attempt_is_current(execution, candidate)
+            && completed_attempt_matches_exact_head(execution, candidate)
+    }) {
+        if candidate.state == TaskBoardAttemptState::Completed && candidate.artifact.is_none() {
+            return Err(recovery_error(
+                "dependency workflow completed attempt has no result artifact",
+            ));
+        }
+        if attempt.is_none_or(|current: &TaskBoardExecutionAttemptRecord| {
+            candidate.attempt > current.attempt
+        }) {
+            attempt = Some(candidate);
+        }
+    }
+    Ok(match attempt {
+        Some(attempt) => classify_attempt(execution, attempt),
+        None => resumable_without_attempt(execution),
+    })
+}
+
+/// Classify a durable exact-head check wait after a daemon restart.
+///
+/// # Errors
+/// Returns an invalid-transition error when the wait or retained result is malformed or mismatched.
+pub fn classify_task_board_dependency_check_recovery(
+    wait: &TaskBoardDependencyCheckWait,
+    result: Option<&TaskBoardDependencyCheckResumeRecord>,
+) -> Result<TaskBoardDependencyRecoveryDecision, CliError> {
+    validate_task_board_dependency_check_wait(wait)?;
+    let Some(result) = result else {
+        return Ok(decision(
+            TaskBoardDependencyRecoveryClass::Resumable,
+            TaskBoardDependencyRecoveryStep::CheckWait,
+            Some(wait.resume_id.clone()),
+            Some(wait.exact_head_revision.clone()),
+            "resume the retained check wait on its original head",
+        ));
+    };
+    if result.resume_id != wait.resume_id
+        || result.route_id != wait.route_id
+        || result.identity.repository != wait.identity.repository
+        || result.identity.number != wait.identity.number
+        || result.exact_head_revision != wait.exact_head_revision
+    {
+        return Err(recovery_error(
+            "dependency check recovery result does not match its retained exact-head wait",
+        ));
+    }
+    Ok(decision(
+        TaskBoardDependencyRecoveryClass::Completed,
+        TaskBoardDependencyRecoveryStep::Advance,
+        Some(wait.resume_id.clone()),
+        Some(wait.exact_head_revision.clone()),
+        "the retained check wait already has one terminal result",
+    ))
+}
+
+fn terminal_decision(
+    execution: &TaskBoardWorkflowExecutionRecord,
+) -> Option<TaskBoardDependencyRecoveryDecision> {
+    let class = match execution.transition.execution_state {
+        TaskBoardExecutionState::Completed => TaskBoardDependencyRecoveryClass::Completed,
+        TaskBoardExecutionState::HumanRequired
+        | TaskBoardExecutionState::Failed
+        | TaskBoardExecutionState::Cancelled => TaskBoardDependencyRecoveryClass::Failed,
+        _ => return None,
+    };
+    Some(decision(
+        class,
+        TaskBoardDependencyRecoveryStep::Stop,
+        None,
+        execution.transition.exact_head_revision.clone(),
+        "the dependency workflow is already terminal",
+    ))
+}
+
+fn classify_attempt(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> TaskBoardDependencyRecoveryDecision {
+    let head = execution.transition.exact_head_revision.clone();
+    let key = Some(attempt.action_key.clone());
+    match attempt.state {
+        TaskBoardAttemptState::Completed => decision(
+            TaskBoardDependencyRecoveryClass::Completed,
+            TaskBoardDependencyRecoveryStep::Advance,
+            key,
+            head,
+            "the interrupted step completed and its next transition may be applied once",
+        ),
+        TaskBoardAttemptState::Unknown => decision(
+            TaskBoardDependencyRecoveryClass::Uncertain,
+            step_for(execution),
+            key,
+            head,
+            "the interrupted step outcome must be reconciled before retrying",
+        ),
+        TaskBoardAttemptState::Failed | TaskBoardAttemptState::Cancelled => decision(
+            TaskBoardDependencyRecoveryClass::Failed,
+            TaskBoardDependencyRecoveryStep::Stop,
+            key,
+            head,
+            "the interrupted step ended without a resumable result",
+        ),
+        TaskBoardAttemptState::Running
+            if execution.transition.phase == Some(TaskBoardExecutionPhase::Publish) =>
+        {
+            decision(
+                TaskBoardDependencyRecoveryClass::Uncertain,
+                TaskBoardDependencyRecoveryStep::GitHubAction,
+                key,
+                head,
+                "reconcile the claimed GitHub side effect before retrying",
+            )
+        }
+        TaskBoardAttemptState::RetryWait => decision(
+            TaskBoardDependencyRecoveryClass::Resumable,
+            step_for(execution),
+            key,
+            head,
+            "resume the durable retry delay without starting a duplicate attempt",
+        ),
+        TaskBoardAttemptState::Preparing
+        | TaskBoardAttemptState::Starting
+        | TaskBoardAttemptState::Running => decision(
+            TaskBoardDependencyRecoveryClass::Resumable,
+            step_for(execution),
+            key,
+            head,
+            "reconnect to the deterministic step or resume its start",
+        ),
+    }
+}
+
+fn resumable_without_attempt(
+    execution: &TaskBoardWorkflowExecutionRecord,
+) -> TaskBoardDependencyRecoveryDecision {
+    decision(
+        TaskBoardDependencyRecoveryClass::Resumable,
+        step_for(execution),
+        None,
+        execution.transition.exact_head_revision.clone(),
+        "schedule the next eligible dependency workflow step once",
+    )
+}
+
+fn step_for(execution: &TaskBoardWorkflowExecutionRecord) -> TaskBoardDependencyRecoveryStep {
+    match execution.transition.phase {
+        Some(TaskBoardExecutionPhase::Publish) => TaskBoardDependencyRecoveryStep::GitHubAction,
+        Some(TaskBoardExecutionPhase::Cleanup | TaskBoardExecutionPhase::Terminal) => {
+            TaskBoardDependencyRecoveryStep::Advance
+        }
+        _ => TaskBoardDependencyRecoveryStep::AgentRun,
+    }
+}
+
+fn attempt_is_current(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    match execution.transition.phase {
+        Some(TaskBoardExecutionPhase::Implementation) => {
+            attempt.action_key
+                == format!(
+                    "implementation:{}",
+                    execution.artifacts.current_revision_cycle
+                )
+        }
+        Some(TaskBoardExecutionPhase::Review) => attempt
+            .action_key
+            .strip_prefix("review:")
+            .is_some_and(|profile_id| {
+                !profile_id.is_empty()
+                    && !execution.artifacts.review_cycles.iter().any(|cycle| {
+                        cycle.revision_cycle == execution.artifacts.current_revision_cycle
+                            && cycle
+                                .outcomes
+                                .iter()
+                                .any(|outcome| outcome.profile_id == profile_id)
+                    })
+            }),
+        Some(TaskBoardExecutionPhase::Evaluate) => {
+            attempt.action_key == "evaluate"
+                || attempt.action_key
+                    == format!("evaluate:{}", execution.artifacts.current_revision_cycle)
+        }
+        Some(TaskBoardExecutionPhase::Publish) => attempt.action_key == "publish",
+        Some(TaskBoardExecutionPhase::Cleanup) => attempt.action_key == "cleanup",
+        _ => false,
+    }
+}
+
+fn completed_attempt_matches_exact_head(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    if attempt.state != TaskBoardAttemptState::Completed {
+        return true;
+    }
+    let Some(exact_head) = execution.transition.exact_head_revision.as_deref() else {
+        return true;
+    };
+    match attempt.artifact.as_ref() {
+        Some(TaskBoardAttemptResultArtifact::Implementation(result)) => {
+            result.base_head_revision == exact_head
+        }
+        Some(TaskBoardAttemptResultArtifact::Review(outcome)) => {
+            outcome.result.head_revision == exact_head
+        }
+        Some(TaskBoardAttemptResultArtifact::Evaluation(result)) => {
+            if execution.snapshot.workflow_kind.is_write() {
+                result.head_revision.as_deref() == Some(exact_head)
+                    && result.revision_cycle == Some(execution.artifacts.current_revision_cycle)
+            } else {
+                result.head_revision.is_none() && result.revision_cycle.is_none()
+            }
+        }
+        _ => true,
+    }
+}
+
+/// Validate the durable identity and exact-head binding for a dependency check wait.
+///
+/// # Errors
+/// Returns an invalid-transition error when required recovery state is incomplete.
+pub fn validate_task_board_dependency_check_wait(
+    wait: &TaskBoardDependencyCheckWait,
+) -> Result<(), CliError> {
+    if wait.resume_id.trim().is_empty()
+        || wait.route_id.trim().is_empty()
+        || wait.identity.repository.trim().is_empty()
+        || wait.identity.number == 0
+        || !valid_head_revision(&wait.exact_head_revision)
+        || wait.required_checks.is_empty()
+        || wait
+            .required_checks
+            .iter()
+            .any(|check| check.trim().is_empty())
+    {
+        return Err(recovery_error(
+            "dependency check recovery wait has incomplete exact-head state",
+        ));
+    }
+    Ok(())
+}
+
+fn decision(
+    class: TaskBoardDependencyRecoveryClass,
+    step: TaskBoardDependencyRecoveryStep,
+    action_key: Option<String>,
+    exact_head_revision: Option<String>,
+    detail: &str,
+) -> TaskBoardDependencyRecoveryDecision {
+    TaskBoardDependencyRecoveryDecision {
+        class,
+        step,
+        action_key,
+        exact_head_revision,
+        detail: detail.into(),
+    }
+}
+
+fn recovery_error(detail: &str) -> CliError {
+    CliErrorKind::invalid_transition(detail.to_owned()).into()
+}
+
+#[cfg(test)]
+mod tests;
