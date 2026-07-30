@@ -75,12 +75,6 @@ mod remote_acme_challenge;
 #[cfg(feature = "daemon-runtime")]
 mod remote_acme_cleanup;
 #[cfg(feature = "daemon-runtime")]
-pub mod remote_acme_dns;
-#[cfg(feature = "daemon-runtime")]
-mod remote_acme_dns_provider;
-#[cfg(feature = "daemon-runtime")]
-pub mod remote_acme_dns_runner;
-#[cfg(feature = "daemon-runtime")]
 mod remote_acme_issuer;
 #[cfg(feature = "daemon-runtime")]
 mod remote_acme_lease_guard;
@@ -108,8 +102,6 @@ pub mod remote_pairing;
 mod remote_pairing_expiry_loop;
 #[cfg(feature = "daemon-runtime")]
 mod remote_pairing_queries;
-#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
-pub(crate) mod remote_redaction;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_request_audit;
 #[cfg(feature = "daemon-runtime")]

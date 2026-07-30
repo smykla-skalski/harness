@@ -1,9 +1,17 @@
+//! Secret redaction for remote-trust error strings and audit output.
+//!
+//! Extracted from `harness-daemon`'s `daemon::remote_redaction`: the rules
+//! here have callers well outside remote-trust (`codex_controller`,
+//! `agent_acp`), and every remaining caller already depends on this crate,
+//! so this is the shared home rather than the new `harness-acme-dns` crate
+//! or a future `harness-remote-trust` one.
+
 use std::borrow::Cow;
 use std::sync::LazyLock;
 
 use regex::Regex;
 
-pub(crate) const REDACTION_PLACEHOLDER: &str = "[redacted]";
+pub const REDACTION_PLACEHOLDER: &str = "[redacted]";
 
 static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
     vec![
@@ -59,7 +67,7 @@ static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(
 });
 
 #[must_use]
-pub(crate) fn redact_known_secrets(value: &str) -> String {
+pub fn redact_known_secrets(value: &str) -> String {
     apply_redaction_rules(value.to_string(), &KNOWN_SECRET_RULES)
 }
 
@@ -78,8 +86,8 @@ fn apply_redaction_rules(mut redacted: String, rules: &[(Regex, &'static str)]) 
     redacted
 }
 
-#[cfg(feature = "daemon-runtime")]
-pub(crate) fn redact_secret_detail(detail: &str) -> String {
+#[must_use]
+pub fn redact_secret_detail(detail: &str) -> String {
     let mut redacted = String::with_capacity(detail.len());
     let mut offset = 0;
 
@@ -107,7 +115,6 @@ pub(crate) fn redact_secret_detail(detail: &str) -> String {
     redacted
 }
 
-#[cfg(feature = "daemon-runtime")]
 fn is_secret_value_terminator(value_char: char) -> bool {
     value_char.is_whitespace()
         || matches!(value_char, '&' | ';' | ',' | ')' | ']' | '}' | '"' | '\'')

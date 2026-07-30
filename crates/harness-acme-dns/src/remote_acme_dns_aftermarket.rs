@@ -10,9 +10,9 @@ use super::visibility::{
     AuthoritativeDnsTxtVisibilityWaiter, DnsTxtRecordState, DnsTxtVisibilityWaiter,
 };
 use super::{RemoteDnsHttpClient, RemoteDnsHttpRequest, RemoteDnsHttpResponse};
-use crate::daemon::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
-pub(crate) struct AftermarketDns01Provider<C> {
+pub struct AftermarketDns01Provider<C> {
     http: C,
     api_base: String,
     zone_name: String,
@@ -36,7 +36,7 @@ impl<C> AftermarketDns01Provider<C>
 where
     C: RemoteDnsHttpClient,
 {
-    pub(crate) fn new(
+    pub fn new(
         http: C,
         api_base: &str,
         zone_name: &str,
@@ -54,7 +54,7 @@ where
         )
     }
 
-    pub(crate) fn new_with_visibility(
+    pub fn new_with_visibility(
         http: C,
         api_base: &str,
         zone_name: &str,
@@ -78,7 +78,7 @@ where
         })
     }
 
-    pub(crate) async fn present(
+    pub async fn present(
         &self,
         record_name: &str,
         record_value: &str,
@@ -104,7 +104,7 @@ where
         })
     }
 
-    pub(crate) async fn wait_ready(&self, lease: &AftermarketDns01Lease) -> Result<(), String> {
+    pub async fn wait_ready(&self, lease: &AftermarketDns01Lease) -> Result<(), String> {
         self.visibility
             .wait_for(
                 &lease.record_name,
@@ -114,7 +114,7 @@ where
             .await
     }
 
-    pub(crate) async fn cleanup(&self, lease: AftermarketDns01Lease) -> Result<(), String> {
+    pub async fn cleanup(&self, lease: AftermarketDns01Lease) -> Result<(), String> {
         let entry_id = lease.entry_id.to_string();
         let response = self
             .send(
@@ -160,7 +160,7 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) struct AftermarketDns01Lease {
+pub struct AftermarketDns01Lease {
     entry_id: u64,
     record_name: String,
     record_value: String,

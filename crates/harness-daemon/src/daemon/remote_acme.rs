@@ -11,21 +11,15 @@ use super::remote::{
     validate_remote_serve_config,
 };
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
-pub use super::remote_acme_dns::{
+use super::remote_certificate_identity::RemotePrivateKeyPem;
+pub use harness_acme_dns::{
     CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookError,
-    Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
+    Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderAction, Dns01ProviderChangeError,
+    Dns01ProviderChangeRunner, Dns01ProviderExecutionConfig, Dns01ProviderExecutionError,
     Route53Dns01ChangeBatch,
 };
-pub use super::remote_acme_dns_runner::{
-    Dns01ProviderAction, Dns01ProviderChangeRunner, Dns01ProviderExecutionConfig,
-    Dns01ProviderExecutionError,
-};
-use super::remote_certificate_identity::RemotePrivateKeyPem;
-use super::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
-#[cfg(test)]
-#[path = "remote_acme_dns_runner_tests.rs"]
-mod dns_runner_tests;
 #[cfg(test)]
 #[path = "remote_acme_tests.rs"]
 mod tests;

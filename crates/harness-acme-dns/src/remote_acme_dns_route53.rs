@@ -7,12 +7,12 @@ use http::Method;
 use sha2::{Digest as _, Sha256};
 
 use super::{RemoteDnsHttpClient, RemoteDnsHttpRequest};
-use crate::daemon::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Clone)]
-pub(crate) struct AwsRoute53Credentials {
+pub struct AwsRoute53Credentials {
     access_key_id: String,
     secret_access_key: String,
     session_token: Option<String>,
@@ -32,7 +32,7 @@ impl fmt::Debug for AwsRoute53Credentials {
 }
 
 impl AwsRoute53Credentials {
-    pub(crate) fn new(
+    pub fn new(
         access_key_id: &str,
         secret_access_key: &str,
         session_token: Option<&str>,
@@ -50,7 +50,7 @@ impl AwsRoute53Credentials {
     }
 }
 
-pub(crate) struct Route53Dns01Provider<C> {
+pub struct Route53Dns01Provider<C> {
     http: C,
     endpoint: String,
     hosted_zone_id: String,
@@ -71,7 +71,7 @@ impl<C> Route53Dns01Provider<C>
 where
     C: RemoteDnsHttpClient,
 {
-    pub(crate) fn new(
+    pub fn new(
         http: C,
         endpoint: &str,
         hosted_zone_id: &str,
@@ -91,7 +91,7 @@ where
         })
     }
 
-    pub(crate) async fn present_at(
+    pub async fn present_at(
         &self,
         record_name: &str,
         record_value: &str,
@@ -102,7 +102,7 @@ where
         Ok(lease)
     }
 
-    pub(crate) async fn cleanup_at(
+    pub async fn cleanup_at(
         &self,
         lease: Route53Dns01Lease,
         timestamp: &str,
@@ -187,7 +187,7 @@ where
     }
 }
 
-pub(crate) struct Route53Dns01Lease {
+pub struct Route53Dns01Lease {
     record_name: String,
     record_value: String,
 }

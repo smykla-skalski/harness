@@ -4,9 +4,9 @@ use http::Method;
 use serde_json::json;
 
 use super::{RemoteDnsHttpClient, RemoteDnsHttpRequest, RemoteDnsHttpResponse};
-use crate::daemon::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
-pub(crate) struct CloudflareDns01Provider<C> {
+pub struct CloudflareDns01Provider<C> {
     http: C,
     api_base: String,
     zone_id: String,
@@ -27,7 +27,7 @@ impl<C> CloudflareDns01Provider<C>
 where
     C: RemoteDnsHttpClient,
 {
-    pub(crate) fn new(http: C, api_base: &str, zone_id: &str, token: &str) -> Result<Self, String> {
+    pub fn new(http: C, api_base: &str, zone_id: &str, token: &str) -> Result<Self, String> {
         let api_base = required("Cloudflare API base URL", api_base)?;
         let zone_id = required("Cloudflare zone id", zone_id)?;
         let token = required("Cloudflare API token", token)?;
@@ -39,7 +39,7 @@ where
         })
     }
 
-    pub(crate) async fn present(
+    pub async fn present(
         &self,
         record_name: &str,
         record_value: &str,
@@ -66,7 +66,7 @@ where
         Ok(CloudflareDns01Lease { record_id })
     }
 
-    pub(crate) async fn cleanup(&self, lease: CloudflareDns01Lease) -> Result<(), String> {
+    pub async fn cleanup(&self, lease: CloudflareDns01Lease) -> Result<(), String> {
         let response = self
             .http
             .send(RemoteDnsHttpRequest::new(
@@ -94,7 +94,7 @@ where
     }
 }
 
-pub(crate) struct CloudflareDns01Lease {
+pub struct CloudflareDns01Lease {
     record_id: String,
 }
 

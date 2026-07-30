@@ -11,3 +11,4 @@ pub mod hooks;
 pub mod io;
 pub mod kernel;
 pub mod redact;
+pub mod remote_redaction;

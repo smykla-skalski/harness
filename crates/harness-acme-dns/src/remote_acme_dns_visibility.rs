@@ -13,7 +13,7 @@ use hickory_resolver::proto::rr::RData;
 use hickory_resolver::{Resolver, TokioResolver};
 use tokio::time::{Instant, sleep, timeout};
 
-use crate::daemon::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 const TIMEOUT_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS";
 const POLL_INTERVAL_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_POLL_SECONDS";
@@ -23,7 +23,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_STABLE_POLLS: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DnsTxtRecordState {
+pub enum DnsTxtRecordState {
     Present,
     Absent,
 }
@@ -63,7 +63,7 @@ impl DnsTxtValueState {
 }
 
 #[async_trait]
-pub(crate) trait DnsTxtVisibilityWaiter: Send + Sync {
+pub trait DnsTxtVisibilityWaiter: Send + Sync {
     async fn wait_for(
         &self,
         record_name: &str,
@@ -73,7 +73,7 @@ pub(crate) trait DnsTxtVisibilityWaiter: Send + Sync {
 }
 
 #[derive(Clone)]
-pub(crate) struct AuthoritativeDnsTxtVisibilityWaiter {
+pub struct AuthoritativeDnsTxtVisibilityWaiter {
     zone_name: String,
     timeout: Duration,
     poll_interval: Duration,
@@ -93,7 +93,7 @@ impl fmt::Debug for AuthoritativeDnsTxtVisibilityWaiter {
 }
 
 impl AuthoritativeDnsTxtVisibilityWaiter {
-    pub(crate) fn from_environment(zone_name: &str) -> Result<Self, String> {
+    pub fn from_environment(zone_name: &str) -> Result<Self, String> {
         Ok(Self::new_with_observer(
             zone_name,
             duration_from_env(TIMEOUT_ENV, DEFAULT_TIMEOUT)?,

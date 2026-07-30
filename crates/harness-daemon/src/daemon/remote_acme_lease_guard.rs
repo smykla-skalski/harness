@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_issuer::RemoteAcmeChallengeProvisioner;
-use super::remote_redaction::redact_secret_detail;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 pub(crate) struct RemoteAcmeChallengeLeaseGuard<P>
 where

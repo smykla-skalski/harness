@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::fmt;
 
+pub use harness_acme_dns::RemoteDnsProvider;
+
 use super::protocol::{HttpApiRouteContract, http_paths, ws_methods};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -151,26 +153,6 @@ impl RemoteAcmeChallenge {
             Self::TlsAlpn => "tls-alpn",
             Self::Http => "http",
             Self::Dns => "dns",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RemoteDnsProvider {
-    Aftermarket,
-    Cloudflare,
-    Route53,
-    Exec,
-}
-
-impl RemoteDnsProvider {
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Aftermarket => "aftermarket",
-            Self::Cloudflare => "cloudflare",
-            Self::Route53 => "route53",
-            Self::Exec => "exec",
         }
     }
 }

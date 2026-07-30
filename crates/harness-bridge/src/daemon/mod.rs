@@ -42,13 +42,6 @@ pub mod bridge {
 }
 #[path = "../../../../crates/harness-daemon/src/daemon/discovery/mod.rs"]
 pub mod discovery;
-// Real `harness-daemon` is `pub(crate)` on its own `remote_redaction`, so
-// there is nothing to re-export under `daemon-runtime`; this mirrored copy's
-// only caller (`agent_acp`'s `protocol::session_state`) moves to the real
-// crate's own copy of it in that build, leaving this one with none.
-#[cfg(not(feature = "daemon-runtime"))]
-#[path = "../../../../crates/harness-daemon/src/daemon/remote_redaction.rs"]
-pub(crate) mod remote_redaction;
 pub mod protocol {
     pub use harness_protocol::daemon::StreamEvent;
 }

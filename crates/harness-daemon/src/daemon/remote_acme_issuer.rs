@@ -16,8 +16,8 @@ use super::remote::{
 use super::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_lease_guard::RemoteAcmeChallengeLeaseGuard;
-use super::remote_redaction::redact_secret_detail;
 use super::remote_tls::ensure_rustls_provider;
+use harness_kernel::remote_redaction::redact_secret_detail;
 
 type AccountBuilderFactory = dyn Fn() -> Result<AccountBuilder, String> + Send + Sync + 'static;
 

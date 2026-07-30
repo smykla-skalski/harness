@@ -5,9 +5,9 @@ use crate::agents::turn::{
     AgentTurnRequest, AgentTurnResult, AgentTurnRuntime, AgentTurnStatus,
 };
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
-use crate::daemon::remote_redaction::redact_known_secrets;
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::remote_redaction::redact_known_secrets;
 
 use super::{CodexControllerHandle, wire};
 

@@ -5,16 +5,6 @@ edition = "2024"
 rust-version = "1.95"
 publish = false
 
-[features]
-# `remote_redaction.rs` is pulled in verbatim from `harness-daemon` with
-# `#[path]`, matching the copy `harness-bridge` already carries, rather than
-# owned here: the helper is shared with the remote-trust area and the
-# agent-execution runtime (out of scope for this crate) and gets its own home
-# once those settle theirs. Declaring the feature, even though this crate
-# never enables it, keeps the file's `#[cfg(feature = "daemon-runtime")]`
-# gate from tripping the unexpected-cfg lint.
-daemon-runtime = []
-
 [dependencies]
 harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
 harness-task-board = { path = "../harness-task-board", version = "55.0.0" }
