@@ -48,6 +48,7 @@ pub enum TaskBoardExecutionState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardAttemptState {
     Preparing,
     Starting,

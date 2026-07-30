@@ -473,7 +473,7 @@ fn emit_tagged_coding_keys(out: &mut String, spec: &SwiftTaggedEnum) {
     if let Some(content) = &spec.content {
         writeln!(out, "    case {content}").unwrap();
     }
-    let mut seen: Vec<&str> = Vec::new();
+    let mut seen = vec![spec.tag.as_str()];
     for variant in &spec.variants {
         let VariantPayload::Fields(fields) = &variant.payload else {
             continue;
@@ -2797,6 +2797,36 @@ const TASK_BOARD_REVIEW_REPORT_EMIT_ONLY: &[&str] = &[
     "TaskBoardAiReviewReportResponse",
     "TaskBoardExecutionState",
 ];
+const TASK_BOARD_WORKFLOW_EXECUTION_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/workflow_execution.rs");
+const TASK_BOARD_WORKFLOW_PROGRESS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/workflow_progress.rs");
+const TASK_BOARD_DEPENDENCY_TRIAGE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/dependency_triage.rs");
+const TASK_BOARD_DEPENDENCY_ROUTE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/automation/dependency_triage_routing.rs");
+const TASK_BOARD_WORKFLOW_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkflowProgressWireTypes.generated.swift";
+const TASK_BOARD_WORKFLOW_PROGRESS_EMIT_ONLY: &[&str] = &[
+    "TaskBoardExecutionPhase",
+    "TaskBoardAttemptState",
+    "TaskBoardTerminalOutcomeKind",
+    "TaskBoardTerminalOutcome",
+    "TaskBoardDependencyUpdateClass",
+    "TaskBoardDependencyCheckState",
+    "TaskBoardDependencyConflictState",
+    "TaskBoardDependencyTriageDisposition",
+    "TaskBoardDependencyIdentity",
+    "TaskBoardDependencyCheck",
+    "TaskBoardDependencyConflictEvidence",
+    "TaskBoardDependencyApprovalEvidence",
+    "TaskBoardDependencyTriageStep",
+    "TaskBoardDependencyTriageResult",
+    "TaskBoardDependencyRouteStatus",
+    "TaskBoardDependencyRouteRecord",
+    "TaskBoardWorkflowAttemptProgress",
+    "TaskBoardWorkflowProgress",
+    "TaskBoardWorkflowProgressResponse",
+];
 const TASK_BOARD_TRIAGE_SOURCE: &str = include_str!("../crates/harness-task-board/src/triage.rs");
 const TASK_BOARD_TRIAGE_OVERRIDE_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/triage_override.rs");
@@ -3566,6 +3596,19 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: TASK_BOARD_WORKFLOW_PROGRESS_OUTPUT,
+            description: "the Rust task-board durable workflow progress response",
+            defaults: &[],
+            sources: &[
+                TASK_BOARD_ITEM_INTENT_SOURCE,
+                TASK_BOARD_WORKFLOW_SOURCE,
+                TASK_BOARD_WORKFLOW_EXECUTION_SOURCE,
+                TASK_BOARD_DEPENDENCY_TRIAGE_SOURCE,
+                TASK_BOARD_DEPENDENCY_ROUTE_SOURCE,
+                TASK_BOARD_WORKFLOW_PROGRESS_SOURCE,
+            ],
+        },
+        GeneratedModule {
             output: TASK_BOARD_TRIAGE_OUTPUT,
             description: "the Rust task-board triage decision record, its override, and its read/mutation responses",
             defaults: &[TASK_BOARD_TRIAGE_SOURCE, TASK_BOARD_TRIAGE_OVERRIDE_SOURCE],
@@ -3850,6 +3893,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
         TASK_BOARD_REVIEW_REPORT_OUTPUT => TASK_BOARD_REVIEW_REPORT_EMIT_ONLY,
+        TASK_BOARD_WORKFLOW_PROGRESS_OUTPUT => TASK_BOARD_WORKFLOW_PROGRESS_EMIT_ONLY,
         TASK_BOARD_TRIAGE_OUTPUT => TASK_BOARD_TRIAGE_EMIT_ONLY,
         TASK_BOARD_TRIAGE_RULES_OUTPUT => TASK_BOARD_TRIAGE_RULES_EMIT_ONLY,
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,

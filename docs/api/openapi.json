@@ -11872,6 +11872,67 @@
         "x-websocket-method": "task_board.triage_override_clear"
       }
     },
+    "/v1/task-board/items/{item_id}/workflow-progress": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "description": "Return durable dependency workflow progress and attempt evidence for one task-board item",
+        "operationId": "get_task_board_item_workflow_progress",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "Task-board item identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current durable workflow progress or an empty response when no workflow has started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardWorkflowProgressResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed or missing task-board item identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.workflow_progress_get"
+      }
+    },
     "/v1/task-board/machines": {
       "get": {
         "tags": [
@@ -29042,6 +29103,19 @@
           }
         ]
       },
+      "TaskBoardAttemptState": {
+        "type": "string",
+        "enum": [
+          "preparing",
+          "starting",
+          "running",
+          "retry_wait",
+          "completed",
+          "failed",
+          "cancelled",
+          "unknown"
+        ]
+      },
       "TaskBoardAuditSummary": {
         "type": "object",
         "required": [
@@ -33624,6 +33698,36 @@
           }
         }
       },
+      "TaskBoardTerminalOutcome": {
+        "type": "object",
+        "required": [
+          "kind",
+          "summary",
+          "recorded_at"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TaskBoardTerminalOutcomeKind"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardTerminalOutcomeKind": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "failed",
+          "cancelled",
+          "human_required",
+          "unknown"
+        ]
+      },
       "TaskBoardTombstoneCause": {
         "type": "string",
         "enum": [
@@ -34158,6 +34262,66 @@
           }
         }
       },
+      "TaskBoardWorkflowAttemptProgress": {
+        "type": "object",
+        "required": [
+          "action_key",
+          "attempt",
+          "state",
+          "started_at",
+          "updated_at"
+        ],
+        "properties": {
+          "action_key": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "report": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TaskBoardAttemptState"
+          },
+          "terminal_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "TaskBoardWorkflowExecutionCount": {
         "type": "object",
         "required": [
@@ -34185,6 +34349,117 @@
           "pr_fix_review",
           "review"
         ]
+      },
+      "TaskBoardWorkflowProgress": {
+        "type": "object",
+        "required": [
+          "execution_id",
+          "workflow_kind",
+          "state",
+          "attempts",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardWorkflowAttemptProgress"
+            }
+          },
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "current_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current_runtime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exact_head_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "phase": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardExecutionPhase"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/TaskBoardExecutionState"
+          },
+          "terminal_outcome": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardTerminalOutcome"
+              }
+            ]
+          },
+          "triage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardDependencyRouteRecord"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "workflow_kind": {
+            "$ref": "#/components/schemas/TaskBoardWorkflowKind"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskBoardWorkflowProgressResponse": {
+        "type": "object",
+        "properties": {
+          "progress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardWorkflowProgress"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "TaskBoardWorkflowState": {
         "type": "object",

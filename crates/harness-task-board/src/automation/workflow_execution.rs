@@ -46,6 +46,7 @@ pub struct TaskBoardRetrySchedule {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(utoipa::ToSchema)]
 pub enum TaskBoardTerminalOutcomeKind {
     Succeeded,
     Failed,
@@ -56,6 +57,7 @@ pub enum TaskBoardTerminalOutcomeKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[derive(utoipa::ToSchema)]
 pub struct TaskBoardTerminalOutcome {
     pub kind: TaskBoardTerminalOutcomeKind,
     pub summary: String,

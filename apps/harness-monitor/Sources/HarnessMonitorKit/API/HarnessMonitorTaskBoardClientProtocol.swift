@@ -6,6 +6,7 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func taskBoardItemsSnapshot(status: TaskBoardStatus?) async throws -> TaskBoardListItemsSnapshot
   func taskBoardItem(id: String) async throws -> TaskBoardItem
   func taskBoardItemReviewReport(id: String) async throws -> TaskBoardAiReviewReportResponse
+  func taskBoardItemWorkflowProgress(id: String) async throws -> TaskBoardWorkflowProgressResponse
   func taskBoardItemPositionSnapshot(id: String) async throws -> TaskBoardItemPositionSnapshot
   func setTaskBoardItemPosition(id: String, request: TaskBoardSetItemPositionRequest) async throws
     -> TaskBoardItemPositionMutationResponse

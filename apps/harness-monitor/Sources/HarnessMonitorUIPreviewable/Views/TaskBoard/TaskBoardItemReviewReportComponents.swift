@@ -340,7 +340,7 @@ extension TaskBoardReviewMessageCard where Accessory == EmptyView {
 }
 
 extension String {
-  @MainActor fileprivate var taskBoardReviewDisplayTimestamp: String {
+  @MainActor var taskBoardReviewDisplayTimestamp: String {
     let date =
       reviewFractionalFormatter.date(from: self)
       ?? reviewTimestampFormatter.date(from: self)

@@ -17,6 +17,7 @@ pub(super) mod triage;
 pub(super) mod triage_escalation;
 pub(super) mod triage_rules;
 pub(super) mod working_copies;
+pub(super) mod workflow_progress;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 pub(super) use self::policy_io::{
@@ -60,6 +61,7 @@ fn task_board_item_routes() -> OpenApiRouter<DaemonHttpState> {
             items::delete_task_board_item
         ))
         .routes(routes!(review_report::get_task_board_item_review_report))
+        .routes(routes!(workflow_progress::get_task_board_item_workflow_progress))
 }
 
 fn task_board_position_routes() -> OpenApiRouter<DaemonHttpState> {

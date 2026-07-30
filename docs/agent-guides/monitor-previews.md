@@ -18,9 +18,9 @@ List the registered snapshot suites with:
 mise run monitor:preview -- --list
 ```
 
-`monitor:preview` builds the `HarnessMonitorUIPreviews` scheme in the active build lane, runs `HarnessMonitorPreviewHost` with no window or Dock presence, verifies that the renderer produced fresh non-empty PNGs, copies them to the requested directory, and prints their absolute paths. Keep generated snapshots under the worktree's ignored `tmp/preview-snapshots/` tree and do not commit them.
+`monitor:preview` builds the `HarnessMonitorUIPreviews` scheme in the active build lane, runs `HarnessMonitorPreviewHost` with no window or Dock presence, verifies that the renderer produced fresh non-empty PNGs, copies them to the requested directory, and generates an `index.html` gallery. The gallery shows each image at its exact point dimensions and render scale and links to the original PNG. Keep generated snapshots and galleries under the worktree's ignored `tmp/preview-snapshots/` tree and do not commit them.
 
-After every visual task, render the affected suite and inspect every emitted image with the environment's native image inspection tool. Include clickable snapshot paths in the handoff so the user can review the result without launching the application.
+After every visual task, render the affected suite and inspect every emitted image with the environment's native image inspection tool. Obtain explicit user approval of the generated gallery before starting PR delivery. Include the clickable gallery path in the approval request so the user can review every exact-size snapshot without launching the application.
 
 ## Authoring rules
 

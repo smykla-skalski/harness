@@ -9,7 +9,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_remote_viewer::{
     project_task_board_ai_review_report, project_task_board_item,
     project_task_board_position_snapshot, project_task_board_triage_current,
-    project_task_board_triage_history,
+    project_task_board_triage_history, project_task_board_workflow_progress,
 };
 
 use super::super::connection::ConnectionState;
@@ -69,6 +69,21 @@ pub(super) async fn dispatch_task_board_review_report_get(
     let result = task_board_route_executor::get_item_ai_review_report(state, &body)
         .await
         .map(|report| project_task_board_ai_review_report(report, viewer));
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_workflow_progress_get(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardGetItemRequest>(request) else {
+        return invalid_params(request);
+    };
+    let viewer = remote_viewer_projection_required(connection);
+    let result = task_board_route_executor::get_item_workflow_progress(state, &body)
+        .await
+        .map(|progress| project_task_board_workflow_progress(progress, viewer));
     dispatch_query_result(&request.id, result)
 }
 

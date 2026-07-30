@@ -42,11 +42,13 @@ use harness_kernel::remote_redaction::{REDACTION_PLACEHOLDER, redact_known_secre
 
 mod list_query;
 mod review_report;
+mod workflow_progress;
 
 pub use list_query::{
     RevisionedTaskBoardItem, TaskBoardListProjectionSource, project_task_board_list,
 };
 pub use review_report::project_task_board_ai_review_report;
+pub use workflow_progress::project_task_board_workflow_progress;
 
 const BODY_PREVIEW_CHAR_LIMIT: usize = 180;
 const BODY_PREVIEW_PREFIX_LIMIT: usize = BODY_PREVIEW_CHAR_LIMIT - 3;
