@@ -16,11 +16,12 @@ use super::{
 };
 use crate::acp::client::{ClientCallCancel, ClientError, ClientResult, REQUEST_CANCELLED};
 
-/// Bound on how long exit finalization waits for the PTY reader to observe
-/// EOF before reporting a terminal's exit status. A terminal descendant that
-/// keeps the PTY slave open past the direct child's exit would otherwise wedge
-/// this wait forever, so this is a safety net, not the expected latency: the
-/// reader normally closes as soon as the exiting process's fds do.
+/// Caps how long exit finalization waits for the PTY reader to close before
+/// reporting a terminal's exit status; if the timeout elapses first, the exit
+/// status is reported anyway. A terminal descendant that keeps the PTY slave
+/// open past the direct child's exit would otherwise wedge this wait forever,
+/// so the cap is a safety net, not the expected latency: the reader normally
+/// closes as soon as the exiting process's fds do.
 const OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(50);
 
 pub(super) fn spawn_exit_monitor(
