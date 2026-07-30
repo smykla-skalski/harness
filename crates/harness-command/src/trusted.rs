@@ -152,12 +152,19 @@ fn check_trusted_metadata(
 /// survive exec, or when its owner or permissions don't pass validation.
 #[cfg(unix)]
 fn open_validated_trusted_file(path: &Path, name: &str) -> Result<File, WorkerError> {
-    let file = File::open(path).map_err(|error| {
-        WorkerError::new(format!(
-            "open trusted Harness worker {name} at {}: {error}",
-            path.display()
-        ))
-    })?;
+    let file = File::from(
+        rustix::fs::open(
+            path,
+            rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        )
+        .map_err(|error| {
+            WorkerError::new(format!(
+                "open trusted Harness worker {name} at {}: {error}",
+                path.display()
+            ))
+        })?,
+    );
     let metadata = file.metadata().map_err(|error| {
         WorkerError::new(format!(
             "inspect trusted Harness worker {name} at {}: {error}",
@@ -529,5 +536,26 @@ mod tests {
 
         let contents = fs::read_to_string(&dev_fd_path).expect("read via /dev/fd exec target");
         assert_eq!(contents, "original");
+    }
+
+    #[test]
+    fn validated_worker_refuses_to_follow_a_symlink() {
+        let temporary = tempdir().expect("temporary directory");
+        let real = temporary.path().join("harness-systemd");
+        fs::write(&real, "original").expect("write real worker");
+        fs::set_permissions(&real, fs::Permissions::from_mode(0o755))
+            .expect("real worker permissions");
+
+        let link = temporary.path().join("link-to-worker");
+        std::os::unix::fs::symlink(&real, &link).expect("create symlink");
+
+        let error = open_validated_trusted_file(&link, "harness-systemd")
+            .expect_err("symlink rejected at open time");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("open trusted Harness worker harness-systemd"),
+            "expected an open error, got: {message}"
+        );
     }
 }
