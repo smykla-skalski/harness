@@ -303,7 +303,7 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             )
 
             captured = captured_env_path.read_text()
-            self.assertIn("CARGO_ARGS=rustc --package harness-daemon --bin harness-daemon", captured)
+            self.assertIn("CARGO_ARGS=rustc --package harness-daemon-bin --bin harness-daemon", captured)
             self.assertIn("--features harness-daemon/tokio-console", captured)
 
     def test_unsets_xcode_only_swift_debug_environment_before_cargo(self) -> None:

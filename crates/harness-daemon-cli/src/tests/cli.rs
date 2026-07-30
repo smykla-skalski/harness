@@ -103,10 +103,10 @@ fn daemon_dev_execution_plan_includes_codex_ws_url() {
     temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
         let plan = dev.execution_plan();
         match &plan.serve_config.codex_transport {
-            super::super::super::codex_transport::CodexTransportKind::WebSocket { endpoint } => {
+            harness_daemon::daemon::codex_transport::CodexTransportKind::WebSocket { endpoint } => {
                 assert_eq!(endpoint, "ws://127.0.0.1:7777");
             }
-            other @ super::super::super::codex_transport::CodexTransportKind::Stdio => {
+            other @ harness_daemon::daemon::codex_transport::CodexTransportKind::Stdio => {
                 panic!("expected websocket transport, got {other:?}")
             }
         }
@@ -127,7 +127,7 @@ fn daemon_dev_execution_plan_skips_blank_codex_ws_url() {
         let plan = dev.execution_plan();
         assert!(matches!(
             plan.serve_config.codex_transport,
-            super::super::super::codex_transport::CodexTransportKind::Stdio
+            harness_daemon::daemon::codex_transport::CodexTransportKind::Stdio
         ));
     });
 }
@@ -234,7 +234,8 @@ fn daemon_serve_args_accept_disable_acp_flag() {
 fn daemon_serve_args_enables_sandbox_via_env() {
     temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
         let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
-        let effective = parsed.args.sandboxed || super::super::super::service::sandboxed_from_env();
+        let effective =
+            parsed.args.sandboxed || harness_daemon::daemon::service::sandboxed_from_env();
         assert!(effective);
     });
 }
@@ -243,7 +244,8 @@ fn daemon_serve_args_enables_sandbox_via_env() {
 fn daemon_serve_args_ignores_env_when_unset() {
     temp_env::with_var("HARNESS_SANDBOXED", Option::<&str>::None, || {
         let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
-        let effective = parsed.args.sandboxed || super::super::super::service::sandboxed_from_env();
+        let effective =
+            parsed.args.sandboxed || harness_daemon::daemon::service::sandboxed_from_env();
         assert!(!effective);
     });
 }

@@ -4,11 +4,6 @@ version = "55.0.0"
 edition = "2024"
 rust-version = "1.95"
 
-[[bin]]
-name = "harness-daemon"
-path = "src/main.rs"
-required-features = ["daemon-runtime"]
-
 [dependencies]
 agent-client-protocol = "=2.0.0"
 agent-client-protocol-http = { version = "=2.0.0", default-features = false, features = ["client"], optional = true }

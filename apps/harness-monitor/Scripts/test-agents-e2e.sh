@@ -203,7 +203,7 @@ run_stale_preflight
 "$ROOT/Scripts/generate.sh"
 "$CHECKOUT_ROOT/scripts/cargo-local.sh" build \
   --package harness \
-  --package harness-daemon \
+  --package harness-daemon-bin \
   --package harness-bridge \
   --bins
 

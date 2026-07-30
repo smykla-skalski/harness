@@ -5,7 +5,9 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 const SERVICE_SUFFIX: &str = ".service";
 const RECOVERY_UNIT_SUFFIX: &str = "-harness-recovery";
 
-pub(super) fn daemon_root(input: &str) -> Result<PathBuf, CliError> {
+/// # Errors
+/// Returns [`CliError`] off Linux, or when `input` is not a canonical systemd unit name.
+pub fn daemon_root(input: &str) -> Result<PathBuf, CliError> {
     if !cfg!(target_os = "linux") {
         return Err(CliErrorKind::workflow_io(
             "remote daemon systemd state requires Linux".to_string(),

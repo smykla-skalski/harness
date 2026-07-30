@@ -4,7 +4,8 @@ use std::time::Duration;
 
 use clap::Parser;
 use harness_daemon::app::{AppContext, Execute};
-use harness_daemon::daemon::{state, transport::DaemonCommand};
+use harness_daemon::daemon::state;
+use harness_daemon_cli::DaemonCommand;
 use harness_kernel::errors;
 use harness_telemetry::init_daemon_tracing_subscriber;
 use tracing_subscriber::EnvFilter;

@@ -334,7 +334,7 @@ scenario_build_group_allocates_one_budget() {
   done
   assert_contains "--locked -p harness --bin harness" \
     "$(command cat "$events")" || ok=0
-  assert_contains "--locked -p harness-daemon --bin harness-daemon --features tokio-console" \
+  assert_contains "--locked -p harness-daemon-bin --bin harness-daemon --features harness-daemon/tokio-console" \
     "$(command cat "$events")" || ok=0
   assert_contains "--locked -p harness-systemd --bin harness-systemd" \
     "$(command cat "$events")" || ok=0

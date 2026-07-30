@@ -5,14 +5,10 @@ use std::sync::LazyLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::infra::exec::RUNTIME;
+use harness_daemon::daemon::{launchd, service, state};
 use harness_kernel::errors::{CliError, CliErrorKind};
-
-use super::super::discovery::{self, AdoptionOutcome};
-use super::super::launchd;
-use super::super::service;
-use super::super::state;
 use harness_protocol::daemon::summaries::DaemonControlResponse;
+use tokio::runtime::{Builder, Runtime};
 
 const DAEMON_CONTROL_TIMEOUT: Duration = Duration::from_secs(15);
 const DAEMON_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -20,36 +16,18 @@ const DAEMON_HTTP_TIMEOUT: Duration = Duration::from_secs(2);
 
 static DAEMON_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "explicit outcome-specific logging keeps daemon root adoption auditable"
-)]
-pub(super) fn adopt_daemon_root_for_transport_command(command: &'static str) {
-    match discovery::adopt_running_daemon_root() {
-        AdoptionOutcome::AlreadyCoherent { root } => {
-            tracing::debug!(
-                command,
-                root = %root.display(),
-                "daemon: root already coherent"
-            );
-        }
-        AdoptionOutcome::Adopted { from, to } => {
-            tracing::info!(
-                command,
-                from = %from.display(),
-                to = %to.display(),
-                "daemon: adopted running daemon root"
-            );
-        }
-        AdoptionOutcome::NoRunningDaemon { default_root } => {
-            tracing::debug!(
-                command,
-                default_root = %default_root.display(),
-                "daemon: no running daemon found during root adoption"
-            );
-        }
-    }
-}
+// This crate's only user of a blocking-on-async bridge: the health checks and
+// stop/restart requests below run against the local daemon's HTTP API from
+// otherwise-synchronous command dispatch. `harness-daemon` had the same
+// runtime under `infra::exec::RUNTIME`, unused by anything else there, so it
+// moved here with its only caller instead of staying behind as a
+// single-purpose `pub` export.
+static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+    Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("failed to initialize tokio runtime")
+});
 
 pub(super) fn stop_daemon() -> Result<DaemonControlResponse, CliError> {
     let launch_agent = launchd::launch_agent_status();
@@ -393,23 +371,4 @@ pub(super) fn spawn_daemon(sandboxed: bool, binary: &Path) -> Result<Child, CliE
                 binary.display()
             )))
         })
-}
-
-pub(super) fn print_daemon_control_response(
-    response: &DaemonControlResponse,
-    json: bool,
-) -> Result<(), CliError> {
-    if json {
-        print_json(response)
-    } else {
-        println!("{}", response.status);
-        Ok(())
-    }
-}
-
-pub(super) fn print_json<T: serde::Serialize>(value: &T) -> Result<(), CliError> {
-    let json = serde_json::to_string_pretty(value)
-        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
-    println!("{json}");
-    Ok(())
 }

@@ -199,7 +199,7 @@ run = "./scripts/cargo-local.sh test -p harness-architecture-tests --lib"
 description = "Run source-tree contracts plus runtime integration tests with process isolation"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-architecture-tests --lib",
-  "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-daemon-bin -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --test integration_daemon --features full-runtime",
 ]
@@ -208,7 +208,7 @@ run = [
 description = "Run standalone worker integration and parity tests"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon -p harness-bridge --test standalone_parity",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --test systemd_compat",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon-bin --test systemd_compat",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-hook --test standalone",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-mcp --test cli --test dependency_guard",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd --test dependency_guard",
@@ -218,7 +218,7 @@ run = [
 description = "Run self-contained ignored tests; use test:perf for timing budgets and e2e:swarm:full for the real-runtime swarm lane"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-agents --lib --features bridge-runtime --run-ignored only -E 'test(=acp::throughput_bench::tests::throughput_meets_threshold)'",
-  "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-daemon-bin -p harness-bridge -p harness-mcp",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --test integration_daemon --features full-runtime --run-ignored only -E 'not test(~integration::daemon_perf::) and not test(=integration::commands::session::swarm_full_flow::swarm_full_flow_mise_lane_passes)'",
 ]
@@ -242,21 +242,21 @@ run = "./scripts/profile-rust-tests.sh integration"
 [tasks."remote-daemon:e2e"]
 description = "Run the real remote daemon ACME, HTTPS, WSS, pairing, and revocation proof"
 run = [
-  "./scripts/cargo-local.sh build -p harness-daemon",
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-daemon-bin",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test remote_daemon_e2e --features full-runtime --run-ignored only",
 ]
 
 [tasks."remote-daemon:public-acme-e2e"]
 description = "Run the Linux Let's Encrypt staging proof for TLS-ALPN-01, HTTP-01, and DNS-01"
 run = [
-  "./scripts/cargo-local.sh build -p harness-daemon",
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-daemon-bin",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test remote_daemon_public_acme_e2e --features full-runtime --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_daemon_public_acme_staging_proves_all_challenges)'",
 ]
 
 [tasks."remote-daemon:systemd-e2e"]
 description = "Run the real Linux systemd lifecycle and effective security proof"
 run = [
-  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build --release -p harness-daemon",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build --release -p harness-daemon -p harness-daemon-bin",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build --release -p harness-systemd --features remote-systemd-e2e-faults",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --release --config-file .config/nextest.toml --user-config-file none -p harness --test remote_systemd_e2e --features full-runtime,remote-systemd-e2e-faults --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_systemd_e2e_proves_lifecycle_and_effective_security)'",
 ]
@@ -411,7 +411,7 @@ run = [
   # harness-daemon's default-on standalone-daemon forward breaks the same
   # FocusPreset-dependent items harness-observe's own isolation exists for.
   "./scripts/cargo-local.sh clippy --all-targets -p harness-session",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-acme-dns -p harness-agents -p harness-command -p harness-daemon-acp-probe -p harness-daemon-client -p harness-daemon-provider-credentials -p harness-daemon-root -p harness-daemon-snapshot -p harness-daemon-state -p harness-db-schema -p harness-feature-flags -p harness-github-api -p harness-hooks -p harness-infra -p harness-kernel -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-task-board-codex-requests -p harness-task-board-provider-sync -p harness-task-board-remote-viewer -p harness-telemetry -p harness-timeline -p harness-voice -p harness-workspace -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-acme-dns -p harness-agents -p harness-command -p harness-daemon-acp-probe -p harness-daemon-cli -p harness-daemon-client -p harness-daemon-provider-credentials -p harness-daemon-root -p harness-daemon-snapshot -p harness-daemon-state -p harness-db-schema -p harness-feature-flags -p harness-github-api -p harness-hooks -p harness-infra -p harness-kernel -p harness-policy-graph-store -p harness-protocol -p harness-reviews -p harness-run -p harness-systemd-protocol -p harness-task-board -p harness-task-board-codex-requests -p harness-task-board-provider-sync -p harness-task-board-remote-viewer -p harness-telemetry -p harness-timeline -p harness-voice -p harness-workspace -p harness-daemon -p harness-daemon-bin -p harness-bridge -p harness-mcp -p harness-hook -p harness-panel -p harness-architecture-tests -p policy-codegen -p openapi-codegen",
   "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 

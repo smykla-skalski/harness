@@ -2,6 +2,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
@@ -11,7 +12,6 @@ use crate::daemon::remote_identity::{
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote::{DaemonRemoteClientIdArgs, DaemonRemoteClientsCommand, open_remote_daemon_db};
 
 impl Execute for DaemonRemoteClientsCommand {

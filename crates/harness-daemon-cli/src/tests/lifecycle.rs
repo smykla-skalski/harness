@@ -2,9 +2,10 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
-use super::super::super::launchd;
-use super::super::super::state;
-use super::super::control::{restart_daemon_with, spawn_daemon, stop_daemon_with};
+use harness_daemon::daemon::launchd;
+use harness_daemon::daemon::state;
+
+use crate::control::{restart_daemon_with, spawn_daemon, stop_daemon_with};
 
 pub(super) fn sample_launch_agent_status(
     installed: bool,
@@ -36,7 +37,7 @@ fn sample_manifest(endpoint: &str) -> state::DaemonManifest {
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
-        ownership: crate::daemon::state::DaemonOwnership::default(),
+        ownership: harness_daemon::daemon::state::DaemonOwnership::default(),
     }
 }
 

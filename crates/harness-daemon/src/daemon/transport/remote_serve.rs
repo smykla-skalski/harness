@@ -1,5 +1,6 @@
 use std::thread;
 
+use crate::daemon::cli_support::adopt_daemon_root_for_transport_command;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::RemoteDaemonServeConfig;
 #[cfg(test)]
@@ -13,7 +14,6 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::watch as tokio_watch;
 
-use super::control::adopt_daemon_root_for_transport_command;
 #[cfg(test)]
 use super::remote::DaemonRemoteAcmeCommand;
 use super::remote::{DaemonRemoteServeArgs, open_remote_daemon_db};

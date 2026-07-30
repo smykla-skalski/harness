@@ -5,22 +5,19 @@ use std::time::Duration;
 use clap::{Args, Subcommand};
 use tokio::runtime::Runtime;
 
-use crate::app::command_context::{AppContext, Execute};
-use crate::feature_flags;
-use crate::workspace::{host_home_dir, normalized_env_value};
+use harness_daemon::app::{AppContext, Execute};
+use harness_daemon::daemon::cli_support::{
+    adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
+};
+use harness_daemon::daemon::codex_transport::codex_transport_from_env;
+use harness_daemon::daemon::serve::{self, DaemonServeConfig};
+use harness_daemon::daemon::transport::DaemonRemoteCommand;
+use harness_daemon::daemon::{launchd, service, snapshot, state};
+use harness_daemon::feature_flags;
+use harness_daemon::workspace::{host_home_dir, normalized_env_value};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::codex_transport::codex_transport_from_env;
-use super::super::launchd;
-use super::super::serve::{self, DaemonServeConfig};
-use super::super::service;
-use super::super::state;
-use harness_daemon_snapshot as snapshot;
-use super::control::{
-    adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
-    restart_daemon, stop_daemon,
-};
-use super::remote::DaemonRemoteCommand;
+use crate::control::{restart_daemon, stop_daemon};
 
 /// Local daemon operations and remote-daemon scaffolding.
 #[derive(Debug, Clone, Subcommand)]
@@ -78,7 +75,7 @@ impl Execute for DaemonCommand {
             Self::Doctor => {
                 adopt_daemon_root_for_transport_command("daemon-doctor");
                 let db_path = state::daemon_root().join("harness.db");
-                let db = super::super::db::DaemonDb::open(&db_path)?;
+                let db = harness_daemon::daemon::db::DaemonDb::open(&db_path)?;
                 let report = service::diagnostics_report(Some(&db))?;
                 print_json(&report)?;
                 Ok(0)
@@ -96,7 +93,7 @@ fn execute_remote_command(
     context: &AppContext,
 ) -> Result<i32, CliError> {
     let _root_override = systemd_unit
-        .map(super::systemd_state::daemon_root)
+        .map(harness_daemon::daemon::transport::systemd_state::daemon_root)
         .transpose()?
         .map(|root| state::ScopedDaemonRootOverride::set(Some(root)));
     command.execute(context)
@@ -215,7 +212,7 @@ impl DaemonServeArgs {
         let sandboxed = self.sandboxed || service::sandboxed_from_env();
         let codex_transport = match self.codex_ws_url.as_ref() {
             Some(url) if !url.trim().is_empty() => {
-                super::super::codex_transport::CodexTransportKind::WebSocket {
+                harness_daemon::daemon::codex_transport::CodexTransportKind::WebSocket {
                     endpoint: url.trim().to_string(),
                 }
             }
@@ -224,7 +221,7 @@ impl DaemonServeArgs {
         DaemonServeConfig {
             host: self.host.clone(),
             port: self.port,
-            auth_mode: super::super::http::DaemonHttpAuthMode::Local,
+            auth_mode: harness_daemon::daemon::http::DaemonHttpAuthMode::Local,
             remote_domain: None,
             remote_request_limits: None,
             companion: None,
@@ -239,7 +236,7 @@ impl DaemonServeArgs {
 /// Default macOS app group identifier for the sandboxed Harness Monitor app.
 /// The unsandboxed dev daemon writes its manifest into this group's container
 /// so the sandboxed `SwiftUI` app can read it without extra env plumbing.
-pub use crate::daemon::HARNESS_MONITOR_APP_GROUP_ID;
+pub use harness_daemon::daemon::HARNESS_MONITOR_APP_GROUP_ID;
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonDevArgs {
@@ -310,7 +307,7 @@ impl DaemonDevArgs {
 
         let codex_transport = match self.codex_ws_url.as_deref().map(str::trim) {
             Some(url) if !url.is_empty() => {
-                super::super::codex_transport::CodexTransportKind::WebSocket {
+                harness_daemon::daemon::codex_transport::CodexTransportKind::WebSocket {
                     endpoint: url.to_string(),
                 }
             }
@@ -323,7 +320,7 @@ impl DaemonDevArgs {
             serve_config: DaemonServeConfig {
                 host: self.host.clone(),
                 port: self.port,
-                auth_mode: super::super::http::DaemonHttpAuthMode::Local,
+                auth_mode: harness_daemon::daemon::http::DaemonHttpAuthMode::Local,
                 remote_domain: None,
                 remote_request_limits: None,
                 companion: None,

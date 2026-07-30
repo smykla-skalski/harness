@@ -5,6 +5,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::http::companion::CompanionAuthToken;
 use crate::daemon::http::{
@@ -27,7 +28,6 @@ use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote_doctor::execute_remote_doctor;
 use super::remote_pair_reviews::DaemonRemotePairReviewsArgs;
 use super::remote_serve::execute_remote_serve;

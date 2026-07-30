@@ -21,7 +21,7 @@ fi
 
 "$ROOT/scripts/cargo-local.sh" build \
   -p harness \
-  -p harness-daemon \
+  -p harness-daemon-bin \
   -p harness-bridge \
   --bin harness \
   --bin harness-daemon \

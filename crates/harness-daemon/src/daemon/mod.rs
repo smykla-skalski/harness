@@ -44,6 +44,8 @@ pub(crate) mod audit_events;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub mod bridge;
 #[cfg(feature = "daemon-runtime")]
+pub mod cli_support;
+#[cfg(feature = "daemon-runtime")]
 pub mod codex_controller;
 #[cfg(feature = "daemon-runtime")]
 pub mod codex_transport;
@@ -107,9 +109,10 @@ pub mod remote_tls;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_viewer;
 #[cfg(feature = "daemon-runtime")]
+#[cfg(feature = "daemon-runtime")]
 mod reviews_store;
 #[cfg(feature = "daemon-runtime")]
-pub(crate) mod serve;
+pub mod serve;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod server_state;
 #[cfg(feature = "daemon-runtime")]

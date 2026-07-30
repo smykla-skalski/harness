@@ -1,0 +1,37 @@
+[package]
+name = "harness-daemon-bin"
+version = "55.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[[bin]]
+name = "harness-daemon"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.0", features = ["derive", "env"] }
+harness-command = { path = "../harness-command", version = "55.0.0" }
+# Always built with `daemon-runtime`: this bin is the daemon-runtime entry
+# point, unlike `harness-daemon`(lib), whose own `[[bin]]` this replaces used
+# `required-features` to guard because the lib's *default* feature set (not
+# an unconditional dependency edge) is what used to carry `daemon-runtime`.
+harness-daemon = { path = "../harness-daemon", version = "55.0.0", features = ["daemon-runtime"] }
+harness-daemon-cli = { path = "../harness-daemon-cli", version = "55.0.0" }
+harness-github-api = { path = "../harness-github-api", version = "55.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+assert_cmd = "=2.2.2"
+fs-err = "3.3.0"
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "=3.27.0"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

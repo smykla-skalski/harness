@@ -3,13 +3,13 @@ use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use harness::daemon::HARNESS_MONITOR_APP_GROUP_ID;
 use harness::daemon::agent_tui::{AgentTuiSnapshot, AgentTuiStatus};
 use harness::daemon::bridge::BridgeStatusReport;
 use harness::daemon::protocol::{
     CodexRunSnapshot, CodexRunStatus, ManagedAgentSnapshot, SessionMutationResponse,
 };
 use harness::daemon::service::DaemonStatusReport;
-use harness::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 use harness::session::types::SessionState;
 use harness_testkit::{CommandEnvExt, isolated_home_vars};
 use serde_json::{Value, json};

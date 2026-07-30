@@ -1,16 +1,17 @@
 use std::fs;
 use std::path::PathBuf;
 
-use harness::daemon::transport::{
+use harness_daemon::app::{AppContext, Execute};
+// `DaemonCommand` moved into its own crate (#1230). It compiles natively
+// against `harness-daemon`'s own `#[path]`-duplicated `command_context.rs`
+// for its nominal `AppContext`/`Execute` identity (see
+// `crates/harness-daemon/src/app.rs`), distinct from
+// `harness_workspace::command_context`'s own copy; this import has to match
+// the one `harness-daemon-cli`'s own `commands` module actually implements
+// `Execute` against, or `DaemonCommand::execute` fails to resolve.
+use harness_daemon_cli::{
     DaemonCommand, DaemonInstallLaunchAgentArgs, DaemonRemoveLaunchAgentArgs,
 };
-// `DaemonCommand` compiles natively inside `harness-daemon` now, which
-// `#[path]`-duplicates `command_context.rs` for its own nominal
-// `AppContext`/`Execute` identity (see `crates/harness-daemon/src/app.rs`),
-// distinct from `harness_workspace::command_context`'s own copy; this import
-// has to match the one `crate::daemon::transport::commands` actually
-// implements `Execute` against, or `DaemonCommand::execute` fails to resolve.
-use harness_daemon::app::{AppContext, Execute};
 use tempfile::tempdir;
 
 #[test]

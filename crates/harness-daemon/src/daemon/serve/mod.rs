@@ -36,7 +36,7 @@ pub(crate) use reconciliation::{
 };
 pub(crate) use remote::serve_remote_https;
 
-pub(crate) use config::DaemonServeConfig;
+pub use config::DaemonServeConfig;
 use std::path::Path;
 use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
