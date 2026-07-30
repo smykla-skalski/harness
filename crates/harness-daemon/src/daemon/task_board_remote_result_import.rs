@@ -1,3 +1,10 @@
+//! Applies and adopts a completed remote implementation result: git-bundle
+//! import, `db` state transitions, and cleanup, with no state of its own.
+//! `service` is the only production caller, but `db`'s tests need to drive
+//! the same import/adopt/cleanup sequence to build realistic fixtures, so
+//! this lives here as a sibling of both under `crate::daemon` instead of
+//! behind `service`, keeping `db`'s tests from depending on it.
+
 use std::path::Path;
 
 use tokio::task::spawn_blocking;

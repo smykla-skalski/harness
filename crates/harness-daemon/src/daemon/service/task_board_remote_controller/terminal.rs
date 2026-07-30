@@ -4,7 +4,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
     TaskBoardRemoteResultAdoptionOutcome, exact_active_remote_target, parent_points_to_assignment,
 };
-use crate::daemon::service::import_and_adopt_task_board_remote_implementation_result;
+use crate::daemon::task_board_remote_result_import::import_and_adopt_task_board_remote_implementation_result;
 use crate::task_board::remote_wire::wire::RemoteSettledRequest;
 use crate::task_board::remote_wire::wire_cleanup::RemoteCleanupObservationRequest;
 use crate::workspace::utc_now;

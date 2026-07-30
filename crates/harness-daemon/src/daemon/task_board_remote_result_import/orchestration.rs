@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tokio::task::spawn_blocking;
 
-use super::super::super::db::{
+use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRequest,
 };
