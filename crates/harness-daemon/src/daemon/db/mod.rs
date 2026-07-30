@@ -207,15 +207,6 @@ pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
     }
 }
 
-pub(crate) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
-    if scope == "global" || scope.starts_with("task_board:") {
-        None
-    } else {
-        Some(scope.strip_prefix("session:").unwrap_or(scope))
-            .filter(|session_id| !session_id.is_empty())
-    }
-}
-
 pub(crate) fn session_status_db_label(status: SessionStatus) -> Result<String, CliError> {
     let value = serde_json::to_value(status)
         .map_err(|error| db_error(format!("serialize session status: {error}")))?;

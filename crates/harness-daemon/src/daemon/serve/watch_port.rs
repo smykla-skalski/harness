@@ -15,7 +15,7 @@ use harness_kernel::errors::CliError;
 pub(super) struct DaemonWatchServicePort;
 
 #[async_trait]
-impl WatchServicePort for DaemonWatchServicePort {
+impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
     fn liveness_refresh_ttl(&self) -> Duration {
         service::SESSION_LIVENESS_REFRESH_TTL
     }

@@ -3,17 +3,19 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast::Sender;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::protocol::{SessionSummary, StreamEvent, TaskBoardUpdatedPayload};
-use crate::daemon::timeline;
-use crate::feature_flags::task_board_automation_v2_enabled_from_env;
-use crate::task_board::TaskBoardAutomationSnapshot;
-use crate::workspace::utc_now;
 use harness_daemon_snapshot as snapshot;
+use harness_feature_flags::feature_flags::task_board_automation_v2_enabled_from_env;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::daemon::StreamEvent;
+use harness_protocol::daemon::task_board::automation_snapshot::TaskBoardAutomationSnapshot;
+use harness_session::wire::SessionSummary;
+use harness_task_board::wire::TaskBoardUpdatedPayload;
+use harness_timeline as timeline;
+use harness_workspace::workspace::utc_now;
 
 use super::service_port::WatchServicePort;
 use super::state::{RefreshScope, SessionDigest, WatchChanges, WatchSnapshot};
+use super::storage::AsyncWatchStorage;
 
 pub(super) fn refresh_watch_snapshot(
     snapshot: &mut WatchSnapshot,
@@ -115,13 +117,15 @@ fn prune_removed_sessions(
     }
 }
 
-pub(super) async fn emit_watch_changes(
+pub async fn emit_watch_changes<Db, AsyncDb>(
     sender: &Sender<StreamEvent>,
     changes: WatchChanges,
-    db: Option<&Arc<Mutex<DaemonDb>>>,
-    async_db: Option<&Arc<AsyncDaemonDb>>,
-    port: &dyn WatchServicePort,
-) {
+    db: Option<&Arc<Mutex<Db>>>,
+    async_db: Option<&Arc<AsyncDb>>,
+    port: &dyn WatchServicePort<Db, AsyncDb>,
+) where
+    AsyncDb: AsyncWatchStorage,
+{
     if let Some(async_db) = async_db {
         emit_watch_changes_async(sender, changes, async_db, port).await;
         return;
@@ -136,12 +140,14 @@ pub(super) async fn emit_watch_changes(
     );
 }
 
-async fn emit_watch_changes_async(
+async fn emit_watch_changes_async<Db, AsyncDb>(
     sender: &Sender<StreamEvent>,
     changes: WatchChanges,
-    async_db: &Arc<AsyncDaemonDb>,
-    port: &dyn WatchServicePort,
-) {
+    async_db: &Arc<AsyncDb>,
+    port: &dyn WatchServicePort<Db, AsyncDb>,
+) where
+    AsyncDb: AsyncWatchStorage,
+{
     emit_task_board_updated_async(sender, &changes, async_db.as_ref()).await;
     let session_ids: Vec<_> = changes.session_ids.into_iter().collect();
     if changes.sessions_updated {
@@ -153,11 +159,11 @@ async fn emit_watch_changes_async(
 
 /// Core updates go out for every session before any extension payload, so a
 /// client never sees an extension for a session it has not been told about.
-async fn broadcast_session_fanout_async(
+async fn broadcast_session_fanout_async<Db, AsyncDb>(
     sender: &Sender<StreamEvent>,
     session_ids: Vec<String>,
-    async_db: &Arc<AsyncDaemonDb>,
-    port: &dyn WatchServicePort,
+    async_db: &Arc<AsyncDb>,
+    port: &dyn WatchServicePort<Db, AsyncDb>,
 ) {
     for session_id in &session_ids {
         port.broadcast_session_updated_core_async(sender, session_id, Some(async_db.as_ref()))
@@ -173,10 +179,10 @@ async fn broadcast_session_fanout_async(
     clippy::cognitive_complexity,
     reason = "builds the automation snapshot behind its feature flag before emitting a task-board update; the tracing::warn! for a failed snapshot costs 7 of its 12 points, leaving structural 5"
 )]
-async fn emit_task_board_updated_async(
+async fn emit_task_board_updated_async<AsyncDb: AsyncWatchStorage>(
     sender: &Sender<StreamEvent>,
     changes: &WatchChanges,
-    db: &AsyncDaemonDb,
+    db: &AsyncDb,
 ) {
     if changes.task_board_revision.is_none() {
         return;
@@ -231,16 +237,16 @@ fn emit_task_board_updated(
     });
 }
 
-pub(super) fn emit_watch_changes_with<SessionsUpdated, SessionUpdatedCore, SessionExtensions>(
+pub fn emit_watch_changes_with<Db, SessionsUpdated, SessionUpdatedCore, SessionExtensions>(
     changes: WatchChanges,
-    db: Option<&Arc<Mutex<DaemonDb>>>,
+    db: Option<&Arc<Mutex<Db>>>,
     mut broadcast_sessions_updated: SessionsUpdated,
     mut broadcast_session_updated_core: SessionUpdatedCore,
     mut broadcast_session_extensions: SessionExtensions,
 ) where
-    SessionsUpdated: FnMut(Option<&DaemonDb>),
-    SessionUpdatedCore: FnMut(&str, Option<&DaemonDb>),
-    SessionExtensions: FnMut(&str, Option<&DaemonDb>),
+    SessionsUpdated: FnMut(Option<&Db>),
+    SessionUpdatedCore: FnMut(&str, Option<&Db>),
+    SessionExtensions: FnMut(&str, Option<&Db>),
 {
     let db_guard = db.and_then(|db| db.lock().ok());
     let db_ref = db_guard.as_deref();

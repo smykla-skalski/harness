@@ -16,6 +16,7 @@ members = [
   "crates/harness-daemon-remote-cli",
   "crates/harness-daemon-root",
   "crates/harness-daemon-state",
+  "crates/harness-daemon-watch",
   "crates/harness-daemon",
   "crates/harness-daemon-snapshot",
   "crates/harness-db-schema",
