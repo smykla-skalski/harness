@@ -112,6 +112,7 @@ pub(in crate::daemon::agent_acp) trait AcpManagerPort:
     ) -> Result<Option<String>, CliError>;
 
     /// The runtime session bound to one exact managed ACP agent.
+    #[cfg(feature = "daemon-runtime")]
     fn runtime_session_id(
         &self,
         session_id: &str,
@@ -248,6 +249,7 @@ impl AcpManagerPort for BridgeAcpManagerPort {
         Ok(None)
     }
 
+    #[cfg(feature = "daemon-runtime")]
     fn runtime_session_id(
         &self,
         _session_id: &str,

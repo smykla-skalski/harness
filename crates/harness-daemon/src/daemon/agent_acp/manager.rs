@@ -145,6 +145,7 @@ impl AcpAgentManagerHandle {
         self.start_with_pooling_disabled(session_id, request, true)
     }
 
+    #[cfg(feature = "daemon-runtime")]
     pub(in crate::daemon::agent_acp) fn runtime_session_id(
         &self,
         session_id: &str,
