@@ -7,25 +7,33 @@
 //! depending on it here would recreate the daemon-crate dependency this
 //! extraction exists to remove. The daemon's own startup sequence resolves
 //! the task-board instance id and passes it in as a plain string instead.
+//!
+//! `harness-daemon`'s own tests (e.g. `daemon::service::tests::startup_telemetry`)
+//! call all the way through `serve::serve` into `load_provider_credentials`, but
+//! depend on this crate as an ordinary library, so `cfg(test)` never activates for
+//! this crate's own compilation in that context. The `test-support` feature (see
+//! this crate's `Cargo.toml`, forwarded by `harness-daemon`'s dev-dependency)
+//! keeps that path off the real Keychain the same way `cfg(test)` already does for
+//! this crate's own unit tests, matching `harness-daemon-state`'s own pattern.
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 use harness_daemon_state::{replace_task_board_github_tokens, replace_task_board_openrouter_token};
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 use harness_task_board::{
     TaskBoardGitHubCredentialSnapshot, TaskBoardGitHubTokensSyncRequest,
     TaskBoardOpenRouterCredentialSnapshot, TaskBoardOpenRouterTokenSyncRequest,
 };
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 use security_framework::base::Error as SecError;
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 use security_framework::passwords::get_generic_password;
 use sha1::{Digest, Sha1};
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 const SERVICE_OPENROUTER: &str = "io.harnessmonitor.task-board.openrouter-credentials";
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 const LEGACY_ACCOUNT: &str = "default";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,9 +45,9 @@ struct ProviderCredentialStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProviderCredentialSource {
-    #[cfg(all(target_os = "macos", not(test)))]
+    #[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
     Database,
-    #[cfg(all(target_os = "macos", not(test)))]
+    #[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
     Legacy,
     Unavailable,
 }
@@ -67,11 +75,11 @@ pub fn load_provider_credentials(instance_id: &str) {
     log_load_issue("OpenRouter", &report.openrouter);
 }
 
-// Only `load_for_instance` (macOS, non-test) calls this in production; the
-// hash format itself stays cross-platform testable via
-// `database_account_matches_monitor_scope` below, so a non-macOS,
-// non-test build (e.g. `--features full-runtime` on Linux) sees no caller
-// at all.
+// Only the real `load_for_instance` (macOS, no test/test-support) calls this
+// in production; the hash format itself stays cross-platform testable via
+// `database_account_matches_monitor_scope` below, so a build that never
+// selects that branch (e.g. Linux, or any `test-support` build) sees no
+// caller at all.
 #[must_use]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn database_credential_account(instance_id: &str) -> String {
@@ -93,7 +101,7 @@ fn log_load_issue(provider: &str, status: &ProviderCredentialStatus) {
     }
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn load_for_instance(instance_id: &str) -> ProviderCredentialLoadReport {
     let account = database_credential_account(instance_id);
     let (github, github_status) = load_snapshot(
@@ -132,12 +140,12 @@ fn load_for_instance(instance_id: &str) -> ProviderCredentialLoadReport {
     }
 }
 
-#[cfg(any(not(target_os = "macos"), test))]
+#[cfg(any(not(target_os = "macos"), test, feature = "test-support"))]
 fn load_for_instance(_instance_id: &str) -> ProviderCredentialLoadReport {
     ProviderCredentialLoadReport::default()
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn load_snapshot<T>(
     service: &str,
     database_account: &str,
@@ -177,7 +185,7 @@ fn load_snapshot<T>(
     }
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn snapshot_result<T>(
     snapshot: Result<T, String>,
     source: ProviderCredentialSource,
@@ -207,7 +215,7 @@ fn unavailable_status(error: Option<String>) -> ProviderCredentialStatus {
     }
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn read_keychain(service: &str, account: &str) -> Result<Option<Vec<u8>>, String> {
     match get_generic_password(service, account) {
         Ok(bytes) => Ok(Some(bytes)),
@@ -218,18 +226,18 @@ fn read_keychain(service: &str, account: &str) -> Result<Option<Vec<u8>>, String
     }
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn is_not_found(error: SecError) -> bool {
     error.code() == -25300
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn parse_github_snapshot(bytes: &[u8]) -> Result<TaskBoardGitHubCredentialSnapshot, String> {
     serde_json::from_slice(bytes)
         .map_err(|error| format!("stored GitHub credential payload is unreadable: {error}"))
 }
 
-#[cfg(all(target_os = "macos", not(test)))]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn parse_openrouter_snapshot(
     bytes: &[u8],
 ) -> Result<TaskBoardOpenRouterCredentialSnapshot, String> {

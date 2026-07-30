@@ -114,6 +114,7 @@ security-framework = "3"
 agent-client-protocol-http = { version = "=2.0.0", default-features = false, features = ["client", "server"] }
 assert_cmd = "=2.2.2"
 harness-agents = { path = "../harness-agents", version = "55.0.0", features = ["test-support"] }
+harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.0", features = ["test-support"] }
 harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.0", features = ["test-support"] }
 harness-db-schema = { path = "../harness-db-schema", version = "55.0.0", features = ["test-support"] }
 harness-github-api = { path = "../harness-github-api", version = "55.0.0", features = ["test-support"] }
