@@ -16,10 +16,13 @@ use super::support::{build_project, sample_signal_with_idempotency, sample_state
 fn load_signals_for_filters_shared_runtime_session_history() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-shared-runtime-signals")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let shared_runtime_session = "codex-shared-session";

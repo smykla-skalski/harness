@@ -8,10 +8,13 @@ use super::*;
 fn snapshot_round_trip_smoke_covers_public_surface() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-round-trip-smoke")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let session_id = "b5f69752-76b7-5e74-b38f-ab709a833e60";
@@ -84,10 +87,13 @@ fn snapshot_round_trip_smoke_covers_public_surface() {
 fn snapshot_summary_and_detail_preserve_adoption_metadata() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-adoption-metadata")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-adopted");
             let session_id = "7b0bd761-6a0b-5a7f-9147-69a5cc647f67";
@@ -156,10 +162,13 @@ fn snapshot_summary_and_detail_preserve_adoption_metadata() {
 fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-shared-runtime-refresh")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let shared_runtime_session = "codex-shared-session";

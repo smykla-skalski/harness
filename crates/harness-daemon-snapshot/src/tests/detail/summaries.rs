@@ -21,10 +21,13 @@ use crate::{session_detail, session_summaries};
 fn session_detail_includes_signals_observer_and_cache() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-detail-signals-observer")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let session_id = "7d8914ed-1073-56a6-85c1-0582a49cf5ce";
@@ -123,10 +126,13 @@ fn session_detail_includes_signals_observer_and_cache() {
 fn session_detail_preserves_idle_agent_status() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-idle-agent-status")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let session_id = "9ffbd4b8-f504-5df4-a711-42e7ccbeefdb";

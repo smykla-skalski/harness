@@ -11,10 +11,13 @@ use crate::tests::support::{
 fn session_detail_applies_shared_agent_and_task_ordering() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-agent-task-ordering")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-ordering");
             let session_id = "1d60726f-61a3-5e01-a807-9210fb4044a6";
@@ -115,10 +118,13 @@ fn session_detail_applies_shared_agent_and_task_ordering() {
 fn session_detail_agent_activity_falls_back_to_ledger_for_copilot() {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
-        [(
-            "XDG_DATA_HOME",
-            Some(tmp.path().to_str().expect("utf8 path")),
-        )],
+        [
+            (
+                "XDG_DATA_HOME",
+                Some(tmp.path().to_str().expect("utf8 path")),
+            ),
+            ("CLAUDE_SESSION_ID", Some("snapshot-copilot-ledger-fallback")),
+        ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");
             let session_id = "cd8a9518-8e52-51d7-b131-aaae722fdf1c";
