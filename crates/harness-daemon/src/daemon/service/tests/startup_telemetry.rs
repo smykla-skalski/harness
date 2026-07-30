@@ -66,10 +66,12 @@ fn daemon_serve_startup_groups_db_spans_under_startup_root() {
                     // fires only once every descendant span has *also*
                     // closed. Nothing here guarantees every such descendant
                     // has wound down by the time the manifest appears, so
-                    // export can lag the manifest write by an
-                    // unbounded amount; wait for it directly instead of
-                    // assuming it already happened.
-                    tokio::time::timeout(StdDuration::from_secs(5), async {
+                    // export can lag the manifest write by an unbounded
+                    // amount; wait for it directly instead of assuming it
+                    // already happened. A longer budget than the manifest
+                    // wait above: measured runs occasionally needed more than
+                    // 5s for this specific wait under adverse scheduling.
+                    tokio::time::timeout(StdDuration::from_secs(20), async {
                         loop {
                             let spans = exporter.finished_spans();
                             if let Some(startup_span) = spans
