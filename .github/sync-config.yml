@@ -11,6 +11,8 @@ sync:
         arrayStrategies:
           "$.ignorePaths": "append"
         overrides:
+          dependencyDashboardLabels:
+            - "automation/renovate"
           timezone: "Europe/Warsaw"
           schedule:
             - "* 4 * * 6"
