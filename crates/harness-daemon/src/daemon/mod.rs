@@ -51,7 +51,14 @@ pub mod codex_controller;
 pub mod codex_transport;
 #[cfg(feature = "daemon-runtime")]
 pub mod db;
-pub mod discovery;
+// `discovery` moved natively into `harness-daemon-discovery`, which
+// `harness-bridge` now depends on directly instead of duplicating this
+// module's source through a `#[path]` include. A thin re-export over the
+// real dependency keeps every existing `crate::daemon::discovery::*` call
+// site unchanged.
+pub mod discovery {
+    pub use harness_daemon_discovery::*;
+}
 #[cfg(feature = "daemon-runtime")]
 pub mod http;
 // Filesystem-scanning session/project discovery lives in `session::index`;
@@ -59,7 +66,12 @@ pub mod http;
 // mutation-fallback call sites across this subtree keep resolving
 // `crate::daemon::index::*` without touching every one of them.
 pub use crate::session::index;
-pub mod launchd;
+// `launchd` moved natively into `harness-daemon-launchd`. A thin re-export
+// over the real dependency keeps every existing `crate::daemon::launchd::*`
+// call site unchanged.
+pub mod launchd {
+    pub use harness_daemon_launchd::*;
+}
 pub mod ordering;
 #[cfg(feature = "daemon-runtime")]
 mod policy_runtime_store;

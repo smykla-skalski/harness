@@ -1,11 +1,17 @@
+//! macOS `LaunchAgent` install, status, and removal integration the daemon
+//! depends on for its own lifecycle.
+//!
+//! `harness-daemon` depends on this crate, not the other way around: this
+//! extraction has no `harness-bridge` counterpart, since bridge control
+//! commands never touch `launchctl` themselves.
+
 use std::env::current_dir;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use harness_daemon_root as state;
 use harness_kernel::errors::{CliError, CliErrorKind};
-
-use super::state;
 
 mod operations;
 mod status;

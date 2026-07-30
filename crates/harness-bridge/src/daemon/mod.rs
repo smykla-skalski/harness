@@ -40,7 +40,6 @@ pub mod bridge;
 pub mod bridge {
     pub use harness_daemon::daemon::bridge::*;
 }
-#[path = "../../../../crates/harness-daemon/src/daemon/discovery/mod.rs"]
 pub mod discovery;
 pub mod protocol {
     pub use harness_protocol::daemon::StreamEvent;

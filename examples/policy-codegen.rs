@@ -3045,7 +3045,7 @@ const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 const MANAGED_AGENTS_EMIT_ONLY: &[&str] = &["ManagedAgentSnapshot", "ManagedAgentListResponse"];
 const DAEMON_STATE_SOURCE: &str = include_str!("../crates/harness-daemon-root/src/lib.rs");
 const DAEMON_LAUNCHD_SOURCE: &str =
-    include_str!("../crates/harness-daemon/src/daemon/launchd/mod.rs");
+    include_str!("../crates/harness-daemon-launchd/src/lib.rs");
 const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/DaemonStateWireTypes.generated.swift";
 // The /v1/diagnostics report (DaemonDiagnosticsReport from summaries.rs) and the daemon-state
 // cluster it nests: the manifest tree (DaemonManifest -> HostBridgeManifest ->
