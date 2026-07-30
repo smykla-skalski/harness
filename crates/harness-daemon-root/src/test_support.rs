@@ -101,12 +101,7 @@ pub fn read_http_request(stream: &mut TcpStream) -> String {
 /// # Panics
 /// Panics if the response cannot be written to the stream.
 #[cfg(any(test, feature = "test-support"))]
-pub fn write_http_response(
-    stream: &mut TcpStream,
-    status: &str,
-    content_type: &str,
-    body: &str,
-) {
+pub fn write_http_response(stream: &mut TcpStream, status: &str, content_type: &str, body: &str) {
     let response = format!(
         "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()

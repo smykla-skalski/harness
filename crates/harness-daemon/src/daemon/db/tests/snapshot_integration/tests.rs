@@ -24,13 +24,14 @@ fn snapshot_round_trip_smoke_covers_public_surface() {
             let sessions = daemon_snapshot::session_summaries(true).expect("session summaries");
             let detail = daemon_snapshot::session_detail(session_id).expect("session detail");
             let resolved = daemon_index::resolve_session(session_id).expect("resolve session");
-            let detail_from_resolved = daemon_snapshot::session_detail_from_resolved(&resolved)
-                .expect("resolved detail");
+            let detail_from_resolved =
+                daemon_snapshot::session_detail_from_resolved(&resolved).expect("resolved detail");
             let core = daemon_snapshot::build_session_detail_core(&resolved);
             let extensions = daemon_snapshot::build_session_extensions(&resolved, None)
                 .expect("session extensions");
-            let activity = daemon_snapshot::load_agent_activity_for(&resolved.project, &resolved.state)
-                .expect("activity");
+            let activity =
+                daemon_snapshot::load_agent_activity_for(&resolved.project, &resolved.state)
+                    .expect("activity");
             let signals = daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)
                 .expect("signals");
             let db = DaemonDb::open_in_memory().expect("open db");
@@ -112,8 +113,8 @@ fn snapshot_summary_and_detail_preserve_adoption_metadata() {
             let summaries = daemon_snapshot::session_summaries(true).expect("session summaries");
             let detail = daemon_snapshot::session_detail(session_id).expect("session detail");
             let resolved = daemon_index::resolve_session(session_id).expect("resolve session");
-            let detail_from_resolved = daemon_snapshot::session_detail_from_resolved(&resolved)
-                .expect("resolved detail");
+            let detail_from_resolved =
+                daemon_snapshot::session_detail_from_resolved(&resolved).expect("resolved detail");
             let db = DaemonDb::open_in_memory().expect("open db");
             db.sync_project(&resolved.project).expect("sync project");
             db.sync_session(&resolved.project.project_id, &resolved.state)

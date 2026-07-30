@@ -49,7 +49,9 @@ pub use locks::{
     flock_is_held_at,
 };
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};
-pub use ownership::{DaemonOwnership, ScopedOwnershipOverride, daemon_ownership_from_env_or_default};
+pub use ownership::{
+    DaemonOwnership, ScopedOwnershipOverride, daemon_ownership_from_env_or_default,
+};
 pub use paths::{
     ScopedDaemonRootOverride, auth_token_path, base_daemon_dir, config_path, daemon_root,
     daemon_root_for_ownership, default_daemon_root, ensure_daemon_dirs, events_path, identity_path,

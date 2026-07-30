@@ -231,7 +231,10 @@ fn attempt_is_current(
 ) -> bool {
     match execution.transition.phase {
         Some(TaskBoardExecutionPhase::Implementation) => {
-            (execution.snapshot.workflow_kind.has_dependency_update_intent()
+            (execution
+                .snapshot
+                .workflow_kind
+                .has_dependency_update_intent()
                 && execution.artifacts.dependency_triage.is_none()
                 && attempt.action_key == "dependency_triage")
                 || attempt.action_key

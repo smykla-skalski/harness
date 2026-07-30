@@ -217,14 +217,13 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     pub(crate) async fn reconcile_interrupted_agent_turn_runs(&self) -> Result<usize, CliError> {
-        let active: Vec<String> =
-            query_scalar(
-                "SELECT run_id FROM agent_turn_runs \
+        let active: Vec<String> = query_scalar(
+            "SELECT run_id FROM agent_turn_runs \
                  WHERE status IN ('queued', 'running') AND runtime_turn_id IS NULL",
-            )
-            .fetch_all(self.pool())
-            .await
-            .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
+        )
+        .fetch_all(self.pool())
+        .await
+        .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
         let mut settled = 0;
         for run_id in active {
             settled += self.settle_interrupted_agent_turn_run(&run_id).await?;

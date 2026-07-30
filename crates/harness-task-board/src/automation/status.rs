@@ -11,10 +11,10 @@ pub use harness_protocol::daemon::task_board::automation_snapshot::{
     TASK_BOARD_AUTOMATION_SNAPSHOT_SCHEMA_VERSION, TaskBoardAutomationAdmissionState,
     TaskBoardAutomationCancelTarget, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationEffectiveState, TaskBoardAutomationHistoryRequest,
-    TaskBoardAutomationHistoryResponse, TaskBoardAutomationMetrics, TaskBoardAutomationQueueSummary,
-    TaskBoardAutomationRunDetail, TaskBoardAutomationRunInfo, TaskBoardAutomationRunOutcome,
-    TaskBoardAutomationRunStage, TaskBoardAutomationRunState, TaskBoardAutomationRunTrigger,
-    TaskBoardAutomationScope, TaskBoardAutomationSnapshot,
+    TaskBoardAutomationHistoryResponse, TaskBoardAutomationMetrics,
+    TaskBoardAutomationQueueSummary, TaskBoardAutomationRunDetail, TaskBoardAutomationRunInfo,
+    TaskBoardAutomationRunOutcome, TaskBoardAutomationRunStage, TaskBoardAutomationRunState,
+    TaskBoardAutomationRunTrigger, TaskBoardAutomationScope, TaskBoardAutomationSnapshot,
 };
 
 #[cfg(test)]

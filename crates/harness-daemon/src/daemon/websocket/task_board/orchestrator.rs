@@ -6,8 +6,8 @@ use crate::daemon::protocol::{
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationHistoryRequest,
     TaskBoardAutomationRunDetailRequest, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    WsRequest, WsResponse, ws_methods,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::task_board::task_board_orchestrator_status_from_snapshot;
 

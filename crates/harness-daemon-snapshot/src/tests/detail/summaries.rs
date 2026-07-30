@@ -26,7 +26,10 @@ fn session_detail_includes_signals_observer_and_cache() {
                 "XDG_DATA_HOME",
                 Some(tmp.path().to_str().expect("utf8 path")),
             ),
-            ("CLAUDE_SESSION_ID", Some("snapshot-detail-signals-observer")),
+            (
+                "CLAUDE_SESSION_ID",
+                Some("snapshot-detail-signals-observer"),
+            ),
         ],
         || {
             let context_root = tmp.path().join("harness/projects/project-alpha");

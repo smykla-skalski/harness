@@ -126,11 +126,8 @@ impl TaskBoardDispatchAdmissionTxExt for Transaction<'_, Sqlite> {
         &mut self,
         managed_worker_id: &str,
     ) -> Result<bool, CliError> {
-        super::admission_lifecycle::release_managed_worker_admission_in_tx(
-            self,
-            managed_worker_id,
-        )
-        .await
+        super::admission_lifecycle::release_managed_worker_admission_in_tx(self, managed_worker_id)
+            .await
     }
 
     async fn revalidate_dispatch_admission_in_tx(

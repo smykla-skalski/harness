@@ -25,9 +25,9 @@ use harness_kernel::errors::CliError;
 mod support;
 
 pub(super) use support::canonical_time;
-use support::{invalid_transition, parse_time, workflow_error};
 #[cfg(test)]
 use support::required;
+use support::{invalid_transition, parse_time, workflow_error};
 
 #[cfg(test)]
 pub(crate) struct TaskBoardWorkflowExecutionCreateRequest {
@@ -259,7 +259,10 @@ pub(super) fn validate_attempt_phase(
         .ok_or_else(|| invalid_transition("workflow execution has no active phase"))?;
     let valid_action = match phase {
         TaskBoardExecutionPhase::Implementation => {
-            (execution.snapshot.workflow_kind.has_dependency_update_intent()
+            (execution
+                .snapshot
+                .workflow_kind
+                .has_dependency_update_intent()
                 && execution.artifacts.dependency_triage.is_none()
                 && attempt.action_key == "dependency_triage")
                 || attempt.action_key
@@ -378,14 +381,15 @@ fn phase_evidence_allows_advance(
         }
         Some(TaskBoardExecutionPhase::Implementation) => {
             let action = format!("implementation:{}", record.artifacts.current_revision_cycle);
-            let triage_continues = record
-                .artifacts
-                .dependency_triage
-                .as_ref()
-                .is_some_and(|route| {
-                    route.status
-                        == crate::task_board::TaskBoardDependencyRouteStatus::ReadyToContinue
-                });
+            let triage_continues =
+                record
+                    .artifacts
+                    .dependency_triage
+                    .as_ref()
+                    .is_some_and(|route| {
+                        route.status
+                            == crate::task_board::TaskBoardDependencyRouteStatus::ReadyToContinue
+                    });
             let present = triage_continues
                 || completed_attempt(record, &action, ArtifactKind::Implementation);
             evidence_or_wait(

@@ -13,12 +13,12 @@ use crate::daemon::protocol::{
     TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::remote_viewer::is_remote_viewer;
-use harness_task_board_remote_viewer::{TaskBoardReadListResponse, project_task_board_item};
 use crate::task_board::{
     AgentMode, TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
     TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, TaskBoardPriority, TaskBoardStatus,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board_remote_viewer::{TaskBoardReadListResponse, project_task_board_item};
 
 use super::super::DaemonHttpState;
 use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};

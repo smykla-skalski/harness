@@ -74,9 +74,7 @@ impl RemoteTokenHash {
     /// # Errors
     /// Returns [`RemoteIdentityError::InvalidStoredTokenHash`] when the value is
     /// not a `sha256:`-prefixed 32-byte digest encoded as 64 hex characters.
-    pub fn try_from_storage_value(
-        value: impl Into<String>,
-    ) -> Result<Self, RemoteIdentityError> {
+    pub fn try_from_storage_value(value: impl Into<String>) -> Result<Self, RemoteIdentityError> {
         let storage_value = value.into();
         if parse_sha256_storage_digest(&storage_value).is_none() {
             return Err(RemoteIdentityError::InvalidStoredTokenHash);

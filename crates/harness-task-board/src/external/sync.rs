@@ -73,7 +73,9 @@ pub use store::{
 // there because `TaskBoardSyncSummary` embeds `ExternalSyncOperation`
 // directly. `ExternalSyncDirection` stays here: nothing in that closure
 // embeds it.
-pub use harness_protocol::daemon::task_board::external::{ExternalSyncAction, ExternalSyncOperation};
+pub use harness_protocol::daemon::task_board::external::{
+    ExternalSyncAction, ExternalSyncOperation,
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]

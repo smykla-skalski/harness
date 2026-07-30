@@ -22,7 +22,10 @@ async fn reconcile(db: &AsyncDaemonDb, runtime: &FakeReadOnlyRuntime, now: &str)
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 }
 
-async fn load(fixture: &Fixture, db: &AsyncDaemonDb) -> crate::task_board::TaskBoardWorkflowExecutionRecord {
+async fn load(
+    fixture: &Fixture,
+    db: &AsyncDaemonDb,
+) -> crate::task_board::TaskBoardWorkflowExecutionRecord {
     db.task_board_workflow_execution(&fixture.execution_id)
         .await
         .expect("load execution")
@@ -31,7 +34,11 @@ async fn load(fixture: &Fixture, db: &AsyncDaemonDb) -> crate::task_board::TaskB
 
 #[tokio::test]
 async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {
-    let fixture = Box::pin(seed_execution_with_reviewer_runtime("or-start", "openrouter")).await;
+    let fixture = Box::pin(seed_execution_with_reviewer_runtime(
+        "or-start",
+        "openrouter",
+    ))
+    .await;
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
@@ -132,7 +139,11 @@ async fn an_unknown_reviewer_runtime_is_refused_by_name_not_run_as_codex() {
 
 #[tokio::test]
 async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
-    let fixture = Box::pin(seed_execution_with_reviewer_runtime("or-restart", "openrouter")).await;
+    let fixture = Box::pin(seed_execution_with_reviewer_runtime(
+        "or-restart",
+        "openrouter",
+    ))
+    .await;
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
@@ -143,7 +154,9 @@ async fn interrupted_openrouter_review_resumes_exactly_once_across_a_restart() {
 
     reconcile(&db, &runtime, NOW).await;
     reconcile(&db, &runtime, NOW).await;
-    let first_key = load(&fixture, &db).await.attempts[0].idempotency_key.clone();
+    let first_key = load(&fixture, &db).await.attempts[0]
+        .idempotency_key
+        .clone();
     assert_eq!(runtime.start_count(), 1);
 
     // A restart settles the interrupted run to exactly one Failed outcome; a

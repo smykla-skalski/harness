@@ -219,7 +219,10 @@ async fn schedule_next_attempt(
 fn next_action_key(execution: &TaskBoardWorkflowExecutionRecord) -> Result<String, CliError> {
     match execution.transition.phase {
         Some(TaskBoardExecutionPhase::Implementation)
-            if execution.snapshot.workflow_kind.has_dependency_update_intent()
+            if execution
+                .snapshot
+                .workflow_kind
+                .has_dependency_update_intent()
                 && execution.artifacts.dependency_triage.is_none() =>
         {
             Ok(dependency_triage::DEPENDENCY_TRIAGE_ACTION.into())

@@ -61,9 +61,7 @@ impl RemotePairingState {
 
 /// Derive the current pairing state from persistence-owned observations.
 #[must_use]
-pub fn derive_remote_pairing_state(
-    observed: &RemotePairingObservation<'_>,
-) -> RemotePairingState {
+pub fn derive_remote_pairing_state(observed: &RemotePairingObservation<'_>) -> RemotePairingState {
     RemotePairingState::derive(observed)
 }
 

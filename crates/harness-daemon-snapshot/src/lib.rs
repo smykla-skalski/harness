@@ -33,8 +33,8 @@ pub use activity::{
 pub use detail::{
     build_session_detail_core, build_session_detail_from_cached_runtime_async,
     build_session_extensions, build_session_extensions_from_cached_runtime,
-    build_session_extensions_from_cached_runtime_async, session_detail, session_detail_from_resolved,
-    session_detail_from_resolved_with_db,
+    build_session_extensions_from_cached_runtime_async, session_detail,
+    session_detail_from_resolved, session_detail_from_resolved_with_db,
 };
 pub use signals::load_signals_for;
 pub use storage::{ConversationQueries, SessionSignalQueries, SnapshotStorage};

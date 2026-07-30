@@ -35,7 +35,10 @@ pub fn dispatch_lifecycle_planned(
     }
 }
 
-fn lifecycle_worker_step(mode: AgentMode, status: DispatchLifecycleStatus) -> DispatchLifecycleStep {
+fn lifecycle_worker_step(
+    mode: AgentMode,
+    status: DispatchLifecycleStatus,
+) -> DispatchLifecycleStep {
     DispatchLifecycleStep {
         phase: DispatchLifecyclePhase::Worker,
         status,

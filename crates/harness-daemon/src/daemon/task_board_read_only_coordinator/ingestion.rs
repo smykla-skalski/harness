@@ -1,7 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
-    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
-    TaskBoardDependencyRouteRecord, TaskBoardDependencyRouteStatus, TaskBoardExecutionPhase,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardDependencyRouteRecord,
+    TaskBoardDependencyRouteStatus, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardExecutionState, TaskBoardPhaseVerdict, TaskBoardPullRequestIdentity,
     TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowRevisionGuard, normalize_repository_slug,
@@ -127,10 +127,7 @@ async fn apply_dependency_triage(
                 db,
                 &current.execution_id,
                 "dependency_checks_pending",
-                &format!(
-                    "required checks are pending: {}",
-                    pending_checks.join(", ")
-                ),
+                &format!("required checks are pending: {}", pending_checks.join(", ")),
                 TaskBoardTerminalOutcomeKind::HumanRequired,
                 now,
             )

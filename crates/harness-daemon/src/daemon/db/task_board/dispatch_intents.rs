@@ -283,11 +283,10 @@ pub(super) async fn claim_task_board_dispatch(
     };
     let applied = decode_applied(&pending.payload_json)?;
     let (mut transaction, action) =
-        resolve_dispatch_claim_action_in_tx(transaction, board_item_id, &pending, &applied)
-            .await?;
+        resolve_dispatch_claim_action_in_tx(transaction, board_item_id, &pending, &applied).await?;
     let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
-    let changed = claim_task_board_dispatch_intent_in_tx(&mut transaction, &pending, &claim_token)
-        .await?;
+    let changed =
+        claim_task_board_dispatch_intent_in_tx(&mut transaction, &pending, &claim_token).await?;
     transaction
         .commit()
         .await
@@ -334,7 +333,8 @@ pub(super) async fn complete_task_board_dispatch(
     let mut transaction = db
         .begin_immediate_transaction("task board dispatch completion")
         .await?;
-    let screened = screen_dispatch_completion_in_tx(&mut transaction, intent_id, claim_token).await?;
+    let screened =
+        screen_dispatch_completion_in_tx(&mut transaction, intent_id, claim_token).await?;
     let item = apply_dispatch_completion_in_tx(&mut transaction, *screened, intent_id).await?;
     settle_dispatch_intent_in_tx(&mut transaction, intent_id, claim_token, managed_worker_id)
         .await?;

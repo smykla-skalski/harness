@@ -179,9 +179,7 @@ impl RemotePairingCodeHash {
     /// # Errors
     /// Returns [`RemotePairingError::InvalidStoredCodeHash`] when the value is
     /// not a `sha256:`-prefixed 32-byte digest encoded as 64 hex characters.
-    pub fn try_from_storage_value(
-        value: impl Into<String>,
-    ) -> Result<Self, RemotePairingError> {
+    pub fn try_from_storage_value(value: impl Into<String>) -> Result<Self, RemotePairingError> {
         let storage_value = value.into();
         if parse_sha256_storage_digest(&storage_value).is_none() {
             return Err(RemotePairingError::InvalidStoredCodeHash);

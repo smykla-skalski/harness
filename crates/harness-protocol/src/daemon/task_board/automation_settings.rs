@@ -5,7 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::orchestrator_workflow::{TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile};
+use super::orchestrator_workflow::{
+    TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile,
+};
 use super::types::AgentMode;
 use crate::daemon::task_board::github_config::{
     GitHubAutomationLabels, GitHubAutomationToggles, GitHubRequestedReviewers, ProtectedPathRule,

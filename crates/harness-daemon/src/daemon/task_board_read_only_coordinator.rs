@@ -12,13 +12,13 @@ use super::task_board_read_only_runtime::{
     ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime,
 };
 
+mod agent_turn_reports;
 mod attempt_recovery;
 mod attempts;
 mod dependency_triage;
 mod in_progress;
 mod ingestion;
 mod lifecycle;
-mod agent_turn_reports;
 mod refusal;
 mod report_evidence;
 mod report_starts;

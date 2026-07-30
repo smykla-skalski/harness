@@ -52,15 +52,29 @@ where
             Ok(true)
         }
         Some(run) => {
-            settle_terminal_run(db, execution, attempt, run.status, run.error.as_deref(), now)
-                .await?;
+            settle_terminal_run(
+                db,
+                execution,
+                attempt,
+                run.status,
+                run.error.as_deref(),
+                now,
+            )
+            .await?;
             Ok(true)
         }
         None if attempt.state == TaskBoardAttemptState::Running => {
             if !report_claim_verification_due(attempt, now)? {
                 return Ok(false);
             }
-            mark_unknown(db, execution, attempt, now, "durable agent-turn run is missing").await?;
+            mark_unknown(
+                db,
+                execution,
+                attempt,
+                now,
+                "durable agent-turn run is missing",
+            )
+            .await?;
             Ok(true)
         }
         None if !allow_start => Ok(false),
