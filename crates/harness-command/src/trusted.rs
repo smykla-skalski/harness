@@ -4,7 +4,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[cfg(unix)]
+use std::fs::File;
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd as _;
 
 use super::{
     WORKER_DIR_ENV, WorkerError, exec, resolve_sibling_worker, validate_override,
@@ -14,11 +18,37 @@ use super::{
 /// Replace the current process with a trusted sibling worker.
 ///
 /// Unlike ordinary worker delegation, this validates executable ownership,
-/// permissions, and ancestors before probing or executing a development override.
+/// permissions, and ancestors before probing or executing a development
+/// override, and execs the exact file descriptor it validated instead of
+/// reopening the worker's path: a file swapped in after validation can't
+/// change what actually runs.
 ///
 /// # Errors
 /// Returns an error when resolution, trust validation, version probing, or
 /// process replacement fails.
+#[cfg(unix)]
+pub fn exec_trusted_worker<I, S>(
+    name: &str,
+    expected_version: &str,
+    args: I,
+) -> Result<i32, WorkerError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let worker = resolve_trusted_worker(name, expected_version)?;
+    let file = open_validated_trusted_file(&worker, name)?;
+    let mut command = Command::new(format!("/dev/fd/{}", file.as_raw_fd()));
+    command.args(args);
+    exec(&mut command, &worker)
+}
+
+/// Replace the current process with a trusted sibling worker.
+///
+/// # Errors
+/// Returns an error when resolution, trust validation, version probing, or
+/// process replacement fails.
+#[cfg(not(unix))]
 pub fn exec_trusted_worker<I, S>(
     name: &str,
     expected_version: &str,
@@ -82,6 +112,20 @@ fn validate_trusted_file(path: &Path, name: &str) -> Result<(), WorkerError> {
             path.display()
         ))
     })?;
+    check_trusted_metadata(&metadata, name, path)
+}
+
+/// Shared by the path-based check above (used while resolving a worker,
+/// including for purposes - like writing a systemd unit file - that need a
+/// stable path rather than an open file) and the fd-based check in
+/// [`open_validated_trusted_file`] below (used right before exec, where an
+/// open descriptor's `fstat` result can't be swapped out from under it).
+#[cfg(unix)]
+fn check_trusted_metadata(
+    metadata: &std::fs::Metadata,
+    name: &str,
+    path: &Path,
+) -> Result<(), WorkerError> {
     let trusted_uid = uzers::get_effective_uid();
     if !metadata.is_file()
         || metadata.uid() != trusted_uid
@@ -94,6 +138,44 @@ fn validate_trusted_file(path: &Path, name: &str) -> Result<(), WorkerError> {
         )));
     }
     Ok(())
+}
+
+/// Opens the already-resolved, already-validated worker path and re-checks
+/// ownership and permissions through the open descriptor's own `fstat`
+/// result, rather than trusting the earlier path-based check to still hold.
+/// The returned file is the exec target `exec_trusted_worker` uses via
+/// `/dev/fd/{fd}`, so whatever this validated is exactly what runs, even if
+/// the file at `path` is replaced immediately afterward.
+///
+/// # Errors
+/// Returns an error when the file can't be opened, inspected, or marked to
+/// survive exec, or when its owner or permissions don't pass validation.
+#[cfg(unix)]
+fn open_validated_trusted_file(path: &Path, name: &str) -> Result<File, WorkerError> {
+    let file = File::open(path).map_err(|error| {
+        WorkerError::new(format!(
+            "open trusted Harness worker {name} at {}: {error}",
+            path.display()
+        ))
+    })?;
+    let metadata = file.metadata().map_err(|error| {
+        WorkerError::new(format!(
+            "inspect trusted Harness worker {name} at {}: {error}",
+            path.display()
+        ))
+    })?;
+    check_trusted_metadata(&metadata, name, path)?;
+    // A shebang'd worker's interpreter reopens `/dev/fd/{fd}` itself once the
+    // kernel hands it control, which only resolves if this descriptor is
+    // still open in the exec'd image; a plain executable doesn't need it,
+    // but leaving it open for one is harmless.
+    rustix::io::fcntl_setfd(&file, rustix::io::FdFlags::empty()).map_err(|error| {
+        WorkerError::new(format!(
+            "clear close-on-exec for trusted Harness worker {name} at {}: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(file)
 }
 
 #[cfg(not(unix))]
@@ -185,6 +267,7 @@ fn validate_trusted_ancestors(_path: &Path, _name: &str) -> Result<(), WorkerErr
 #[cfg(all(test, unix))]
 mod tests {
     use std::fs;
+    use std::io::Read as _;
     use std::os::unix::fs::PermissionsExt as _;
 
     use std::sync::{Mutex, MutexGuard};
@@ -383,5 +466,68 @@ mod tests {
         let error = trusted_worker_path(&worker, "harness-systemd")
             .expect_err("world-writable ancestor rejected regardless of sticky-root depth");
         assert!(error.to_string().contains("untrusted ancestor"));
+    }
+
+    /// Replaces whatever inode `path` names with a brand new one holding
+    /// `contents`, the way an attacker's `rename` or `unlink`-then-`create`
+    /// would: an in-place `fs::write` instead truncates the *same* inode,
+    /// which every existing open descriptor (validated or not) would also
+    /// see, so it can't stand in for "the file got swapped out" here.
+    fn replace_file_at_path(path: &Path, contents: &str) {
+        fs::remove_file(path).expect("remove original before replacing");
+        fs::write(path, contents).expect("create replacement at the same path");
+    }
+
+    #[test]
+    fn validated_worker_descriptor_is_immune_to_a_later_path_swap() {
+        // The whole point of validating through an open descriptor: once
+        // `open_validated_trusted_file` returns, nothing that happens to the
+        // path afterward - including an attacker replacing the file the
+        // instant after validation - can change what that descriptor reads.
+        let temporary = tempdir().expect("temporary directory");
+        let worker = temporary.path().join("harness-systemd");
+        fs::write(&worker, "original").expect("write worker");
+        fs::set_permissions(&worker, fs::Permissions::from_mode(0o755))
+            .expect("worker permissions");
+
+        let mut file =
+            open_validated_trusted_file(&worker, "harness-systemd").expect("open validated worker");
+
+        replace_file_at_path(&worker, "swapped");
+
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .expect("read from the already-open descriptor");
+        assert_eq!(contents, "original");
+
+        // Confirm the swap really happened at the path level, so the
+        // assertion above is about the descriptor, not an accident.
+        assert_eq!(
+            fs::read_to_string(&worker).expect("read swapped path"),
+            "swapped"
+        );
+    }
+
+    #[test]
+    fn dev_fd_exec_target_survives_a_later_path_swap() {
+        // `exec_trusted_worker` execs `/dev/fd/{fd}`, not the worker's path.
+        // This proves that mechanism itself - not just the descriptor
+        // object - resolves to the validated content even after the file at
+        // the original path is replaced, exactly what the kernel does
+        // internally when `Command::new` execs that target.
+        let temporary = tempdir().expect("temporary directory");
+        let worker = temporary.path().join("harness-systemd");
+        fs::write(&worker, "original").expect("write worker");
+        fs::set_permissions(&worker, fs::Permissions::from_mode(0o755))
+            .expect("worker permissions");
+
+        let file =
+            open_validated_trusted_file(&worker, "harness-systemd").expect("open validated worker");
+        let dev_fd_path = format!("/dev/fd/{}", file.as_raw_fd());
+
+        replace_file_at_path(&worker, "swapped");
+
+        let contents = fs::read_to_string(&dev_fd_path).expect("read via /dev/fd exec target");
+        assert_eq!(contents, "original");
     }
 }
