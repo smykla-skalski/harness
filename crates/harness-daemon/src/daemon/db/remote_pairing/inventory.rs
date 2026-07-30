@@ -8,7 +8,8 @@ use super::{
     DaemonDb, OptionalExtension, db_error, decode_remote_pairing_metadata, pairing_is_expired,
 };
 use crate::daemon::remote_pairing::{
-    RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation, RemotePairingState,
+    RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation,
+    derive_remote_pairing_state,
 };
 use crate::daemon::remote_pairing_queries::RemotePairingOwner;
 use harness_kernel::errors::CliError;
@@ -211,7 +212,7 @@ fn entry_from_columns(
         .revoked_at
         .clone()
         .or_else(|| columns.revoked_at.clone());
-    let state = RemotePairingState::derive(&RemotePairingObservation {
+    let state = derive_remote_pairing_state(&RemotePairingObservation {
         claimed_at: columns.claimed_at.as_deref(),
         revoked_at: revoked_at.as_deref(),
         last_seen_at: columns.last_seen_at.as_deref(),

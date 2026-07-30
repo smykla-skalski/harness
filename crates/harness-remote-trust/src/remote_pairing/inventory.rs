@@ -38,7 +38,7 @@ impl RemotePairingState {
     /// before it was claimed must not read as pending and invite someone to
     /// wait for a claim that can no longer happen.
     #[must_use]
-    pub fn derive(observed: &RemotePairingObservation<'_>) -> Self {
+    pub(crate) fn derive(observed: &RemotePairingObservation<'_>) -> Self {
         if observed.revoked_at.is_some() {
             return Self::Revoked;
         }
@@ -57,6 +57,14 @@ impl RemotePairingState {
         }
         Self::Pending
     }
+}
+
+/// Derive the current pairing state from persistence-owned observations.
+#[must_use]
+pub fn derive_remote_pairing_state(
+    observed: &RemotePairingObservation<'_>,
+) -> RemotePairingState {
+    RemotePairingState::derive(observed)
 }
 
 /// The stored facts a state is derived from, named so the derivation reads as

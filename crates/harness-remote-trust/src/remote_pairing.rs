@@ -27,7 +27,10 @@ mod events;
 mod inventory;
 pub use events::{RemotePairingChange, RemotePairingEvent};
 pub use inventory::RemotePairingObservation;
-pub use inventory::{RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingState};
+pub use inventory::{
+    RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingState,
+    derive_remote_pairing_state,
+};
 #[cfg(test)]
 #[path = "remote_pairing_tests.rs"]
 mod tests;
