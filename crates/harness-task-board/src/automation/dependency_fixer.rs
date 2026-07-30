@@ -13,7 +13,7 @@ use super::{
 };
 
 pub const TASK_BOARD_DEPENDENCY_FIX_RESULT_SCHEMA_VERSION: u32 = 1;
-pub const TASK_BOARD_DEPENDENCY_FIXER_MODEL: &str = "gpt-5.4-mini";
+pub const TASK_BOARD_DEPENDENCY_FIXER_MODEL: &str = "gpt-5.3-codex-spark";
 pub const TASK_BOARD_DEPENDENCY_FIXER_EFFORT: &str = "low";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

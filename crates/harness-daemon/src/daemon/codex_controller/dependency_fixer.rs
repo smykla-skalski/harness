@@ -124,15 +124,17 @@ mod tests {
     const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 
     #[test]
-    fn codex_request_is_write_scoped_and_pinned_to_mini_low() {
+    fn codex_request_is_write_scoped_and_pinned_to_spark_low() {
         let request = dependency_fix_request();
         let codex = dependency_fix_codex_request(&request).expect("Codex request");
 
         assert_eq!(codex.mode, CodexRunMode::WorkspaceWrite);
+        assert_eq!(TASK_BOARD_DEPENDENCY_FIXER_MODEL, "gpt-5.3-codex-spark");
         assert_eq!(
             codex.model.as_deref(),
             Some(TASK_BOARD_DEPENDENCY_FIXER_MODEL)
         );
+        assert_eq!(TASK_BOARD_DEPENDENCY_FIXER_EFFORT, "low");
         assert_eq!(
             codex.effort.as_deref(),
             Some(TASK_BOARD_DEPENDENCY_FIXER_EFFORT)
