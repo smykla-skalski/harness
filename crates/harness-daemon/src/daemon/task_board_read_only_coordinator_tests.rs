@@ -1,5 +1,6 @@
 mod driver;
 mod fixture;
+mod openrouter;
 mod prepared_report_fixture;
 mod quorum;
 mod recovery;

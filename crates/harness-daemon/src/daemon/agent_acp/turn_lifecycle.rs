@@ -19,6 +19,25 @@ use super::AcpAgentManagerHandle;
 
 const OPENROUTER_RUNTIME: &str = "openrouter";
 
+/// Ties a durable non-Codex run to a caller-owned lifecycle instead of the
+/// self-generated ACP id. The task-board coordinator drives runs by an attempt
+/// `idempotency_key` (the managed run id, which doubles as the concurrency
+/// admission's `managed_worker_id`), so when it owns the turn it supplies that
+/// id here and the run records, resumes, and releases its admission against the
+/// attempt rather than an id the coordinator never sees. Absent correlation
+/// keeps the merged behavior: the run keys on the ACP turn id.
+#[derive(Debug, Clone)]
+#[expect(
+    clippy::struct_field_names,
+    reason = "fields mirror the agent_turn_runs store columns; renaming them off their column names would obscure the mapping"
+)]
+pub(crate) struct OpenRouterRunCorrelation {
+    pub run_id: String,
+    pub board_item_id: Option<String>,
+    pub workflow_execution_id: Option<String>,
+    pub task_id: Option<String>,
+}
+
 trait OpenRouterTurnManager: Send + Sync {
     fn start(
         &self,
@@ -71,6 +90,10 @@ pub struct OpenRouterAgentTurnRuntime {
     /// one so every turn is recorded the moment it starts and settles to one
     /// terminal outcome that survives a restart.
     store: Option<Arc<AsyncDaemonDb>>,
+    /// Caller-owned run identity. `None` keeps the run keyed on the ACP turn id;
+    /// `Some` keys it on the coordinator's attempt lifecycle. One turn runs per
+    /// instance, so a single correlation covers it.
+    correlation: Option<OpenRouterRunCorrelation>,
 }
 
 impl OpenRouterAgentTurnRuntime {
@@ -87,6 +110,27 @@ impl OpenRouterAgentTurnRuntime {
             project_dir,
             bindings: Arc::new(Mutex::new(BTreeMap::new())),
             store: Some(store),
+            correlation: None,
+        }
+    }
+
+    /// Build a runtime whose durable run keys on a caller-owned identity. The
+    /// task-board coordinator uses this so the run correlates to its attempt.
+    #[must_use]
+    pub(crate) fn new_correlated(
+        manager: AcpAgentManagerHandle,
+        session_id: impl Into<String>,
+        project_dir: Option<String>,
+        store: Arc<AsyncDaemonDb>,
+        correlation: OpenRouterRunCorrelation,
+    ) -> Self {
+        Self {
+            manager: Arc::new(manager),
+            session_id: session_id.into(),
+            project_dir,
+            bindings: Arc::new(Mutex::new(BTreeMap::new())),
+            store: Some(store),
+            correlation: Some(correlation),
         }
     }
 
@@ -102,6 +146,7 @@ impl OpenRouterAgentTurnRuntime {
             project_dir,
             bindings: Arc::new(Mutex::new(BTreeMap::new())),
             store: None,
+            correlation: None,
         }
     }
 
@@ -118,7 +163,34 @@ impl OpenRouterAgentTurnRuntime {
             project_dir,
             bindings: Arc::new(Mutex::new(BTreeMap::new())),
             store: Some(store),
+            correlation: None,
         }
+    }
+
+    #[cfg(test)]
+    fn with_manager_store_and_correlation(
+        manager: Arc<dyn OpenRouterTurnManager>,
+        session_id: String,
+        project_dir: Option<String>,
+        store: Arc<AsyncDaemonDb>,
+        correlation: OpenRouterRunCorrelation,
+    ) -> Self {
+        Self {
+            manager,
+            session_id,
+            project_dir,
+            bindings: Arc::new(Mutex::new(BTreeMap::new())),
+            store: Some(store),
+            correlation: Some(correlation),
+        }
+    }
+
+    /// The durable `run_id` for this turn: the caller-owned correlation id when
+    /// present, else the ACP turn id.
+    fn durable_run_id(&self, id: &AgentTurnId) -> String {
+        self.correlation
+            .as_ref()
+            .map_or_else(|| id.as_str().to_string(), |c| c.run_id.clone())
     }
 
     fn lock_bindings(
@@ -186,13 +258,14 @@ impl OpenRouterAgentTurnRuntime {
             return Ok(());
         };
         let now = utc_now();
+        let correlation = self.correlation.as_ref();
         store
             .record_agent_turn_run_started(&AgentTurnRunSnapshot {
-                run_id: id.as_str().to_string(),
+                run_id: self.durable_run_id(id),
                 session_id: Some(self.session_id.clone()),
-                task_id: None,
-                board_item_id: None,
-                workflow_execution_id: None,
+                task_id: correlation.and_then(|c| c.task_id.clone()),
+                board_item_id: correlation.and_then(|c| c.board_item_id.clone()),
+                workflow_execution_id: correlation.and_then(|c| c.workflow_execution_id.clone()),
                 project_dir: self.project_dir.clone(),
                 requested_runtime: OPENROUTER_RUNTIME.into(),
                 actual_runtime: Some(OPENROUTER_RUNTIME.into()),
@@ -236,7 +309,7 @@ impl OpenRouterAgentTurnRuntime {
         let now = utc_now();
         store
             .save_agent_turn_run(&AgentTurnRunSnapshot {
-                run_id: id.as_str().to_string(),
+                run_id: self.durable_run_id(id),
                 session_id: Some(self.session_id.clone()),
                 task_id: None,
                 board_item_id: None,

@@ -105,6 +105,40 @@ async fn seed_execution_at_phase(
     }
 }
 
+/// Seed a local Review execution whose single reviewer profile names the given
+/// runtime, so the coordinator selects that runtime when it starts the report.
+pub(super) async fn seed_execution_with_reviewer_runtime(label: &str, runtime: &str) -> Fixture {
+    let test = TestDatabase::open().await;
+    let reviewers = crate::task_board::TaskBoardResolvedReviewer {
+        reviewer_count: 1,
+        required_approvals: 1,
+        max_revision_cycles: 3,
+        profiles: vec![crate::task_board::TaskBoardReviewerProfile {
+            id: "reviewer-amber".into(),
+            runtime: runtime.into(),
+            persona: "risk-reviewer".into(),
+            agent_mode: AgentMode::Evaluate,
+            model: Some("deepseek/deepseek-v4-flash".into()),
+            effort: None,
+        }],
+    };
+    let (item_id, execution_id) = Box::pin(seed_execution_in_database(
+        &test.db,
+        label,
+        TaskBoardWorkflowKind::Review,
+        crate::task_board::TaskBoardExecutionPhase::Review,
+        TaskBoardExecutionState::Pending,
+        None,
+        reviewers,
+    ))
+    .await;
+    Fixture {
+        test,
+        item_id,
+        execution_id,
+    }
+}
+
 pub(super) async fn seed_execution_with_reviewers(
     label: &str,
     workflow_kind: TaskBoardWorkflowKind,

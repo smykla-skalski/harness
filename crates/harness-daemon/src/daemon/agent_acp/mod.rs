@@ -91,3 +91,5 @@ pub use manager::AcpWakePrompt;
 pub use manager::{AcpAgentManagerHandle, AcpAgentReconcileResponse};
 #[cfg(feature = "daemon-runtime")]
 pub use turn_lifecycle::OpenRouterAgentTurnRuntime;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use turn_lifecycle::OpenRouterRunCorrelation;

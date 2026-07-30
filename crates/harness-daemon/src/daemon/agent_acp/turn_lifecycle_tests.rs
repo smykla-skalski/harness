@@ -376,6 +376,54 @@ async fn cancellation_records_a_terminal_run() {
     assert_eq!(stored.stop_reason.as_deref(), Some("cancelled"));
 }
 
+#[tokio::test]
+async fn correlation_keys_the_durable_run_to_the_caller_id() {
+    let (_dir, store) = open_store().await;
+    let manager = Arc::new(FakeManager::default());
+    let runtime = OpenRouterAgentTurnRuntime::with_manager_store_and_correlation(
+        manager.clone(),
+        "session-a".into(),
+        None,
+        store.clone(),
+        super::OpenRouterRunCorrelation {
+            run_id: "codex-workflow-attempt-9".into(),
+            board_item_id: Some("item-9".into()),
+            workflow_execution_id: Some("execution-9".into()),
+            task_id: None,
+        },
+    );
+    let id = runtime.start(request()).await.expect("start");
+    // The turn id the manager assigned is not the durable key.
+    assert_ne!(id.as_str(), "codex-workflow-attempt-9");
+    assert!(
+        store
+            .agent_turn_run(id.as_str())
+            .await
+            .expect("load by acp id")
+            .is_none()
+    );
+
+    let stored = store
+        .agent_turn_run("codex-workflow-attempt-9")
+        .await
+        .expect("load by correlation id")
+        .expect("run recorded under the correlation id");
+    assert_eq!(stored.status, AgentTurnRunStatus::Running);
+    assert_eq!(stored.board_item_id.as_deref(), Some("item-9"));
+    assert_eq!(stored.workflow_execution_id.as_deref(), Some("execution-9"));
+
+    // Settlement stays keyed to the same correlation id, and start-by-id under
+    // that key preserves the running row rather than doubling it.
+    manager.complete(r#"{"summary":"Reviewed.","findings":[]}"#);
+    runtime.result(&id).await.expect("result").expect("result");
+    let settled = store
+        .agent_turn_run("codex-workflow-attempt-9")
+        .await
+        .expect("load settled")
+        .expect("settled run");
+    assert_eq!(settled.status, AgentTurnRunStatus::Completed);
+}
+
 fn request() -> AgentTurnRequest {
     let pull_request = AgentTurnPullRequest {
         repository: "smykla-skalski/harness".into(),

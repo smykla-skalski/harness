@@ -111,7 +111,7 @@ where
     }
 }
 
-async fn claim_report_side_effect(
+pub(super) async fn claim_report_side_effect(
     db: &AsyncDaemonDb,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -174,7 +174,7 @@ fn report_claim_deadline(now: &str) -> Result<String, CliError> {
 /// A prompt that cannot render is a configuration mistake, not a transient
 /// fault, and nothing was started. Retrying it on a backoff would only repeat
 /// the same refusal, so the attempt fails permanently and says what to fix.
-async fn refuse_unrenderable_request(
+pub(super) async fn refuse_unrenderable_request(
     db: &AsyncDaemonDb,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,

@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::Semaphore;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
@@ -18,7 +18,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_read_only_runtime::{
-    TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
+    NonCodexReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
 };
 use super::fixture::{FROZEN_HEAD, NOW};
 
@@ -294,6 +294,48 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             .into());
         }
         Ok(run)
+    }
+
+    async fn start_non_codex_report_run(
+        &self,
+        start: NonCodexReportStart<'_>,
+    ) -> Result<(), CliError> {
+        self.starts
+            .lock()
+            .expect("starts lock")
+            .push(start.run_id.into());
+        let db = self.durable_db.as_ref().ok_or_else(|| {
+            CliError::from(CliErrorKind::invalid_transition(
+                "fake non-Codex runtime needs a durable database",
+            ))
+        })?;
+        db.record_agent_turn_run_started(&AgentTurnRunSnapshot {
+            run_id: start.run_id.into(),
+            session_id: Some(start.session_id.into()),
+            task_id: None,
+            board_item_id: Some(start.board_item_id.into()),
+            workflow_execution_id: Some(start.workflow_execution_id.into()),
+            project_dir: start.project_dir.clone(),
+            requested_runtime: start.runtime.into(),
+            actual_runtime: Some(start.runtime.into()),
+            requested_model: start.requested_model.clone(),
+            actual_model: None,
+            status: AgentTurnRunStatus::Running,
+            source_revision: None,
+            report: None,
+            stop_reason: None,
+            error: None,
+            created_at: NOW.into(),
+            updated_at: NOW.into(),
+        })
+        .await?;
+        if self.fail_start_after_persist.swap(false, Ordering::SeqCst) {
+            return Err(CliErrorKind::workflow_io(
+                "non-Codex start response was lost after durable persistence",
+            )
+            .into());
+        }
+        Ok(())
     }
 
     async fn resolve_exact_head(

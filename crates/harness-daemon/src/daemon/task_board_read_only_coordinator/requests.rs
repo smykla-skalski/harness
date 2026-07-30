@@ -16,6 +16,11 @@ pub(crate) use harness_task_board_codex_requests::{
 /// harvested: the render came first, so the result was never even loaded.
 pub(super) struct AttemptRunIdentity {
     pub(super) mode: CodexRunMode,
+    /// Reviewer runtime the resolved profile names. `codex` drives the durable
+    /// Codex path; a supported non-Codex runtime (`openrouter`) drives the
+    /// shared turn through the `agent_turn_runs` store. Implementation attempts
+    /// have no reviewer profile and are Codex-only.
+    pub(super) runtime: String,
     pub(super) task_id: Option<String>,
     pub(super) model: Option<String>,
     pub(super) effort: Option<String>,
@@ -34,6 +39,7 @@ pub(super) fn attempt_run_identity(
     if execution.transition.phase == Some(TaskBoardExecutionPhase::Implementation) {
         return Ok(AttemptRunIdentity {
             mode: CodexRunMode::WorkspaceWrite,
+            runtime: "codex".to_string(),
             task_id: Some(write_task_id(execution)?.to_string()),
             model: None,
             effort: None,
@@ -50,6 +56,7 @@ pub(super) fn attempt_run_identity(
     let profile = attempt_profile(execution, attempt)?;
     Ok(AttemptRunIdentity {
         mode: CodexRunMode::Report,
+        runtime: profile.runtime.clone(),
         task_id: None,
         model: profile.model.clone(),
         effort: profile.effort.clone(),

@@ -17,6 +17,7 @@ mod attempts;
 mod in_progress;
 mod ingestion;
 mod lifecycle;
+mod non_codex_reports;
 mod report_evidence;
 mod report_starts;
 mod reports;
