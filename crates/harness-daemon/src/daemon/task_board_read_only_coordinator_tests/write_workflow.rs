@@ -120,6 +120,13 @@ async fn dependency_update_review_resumes_every_stage_after_restart() {
     );
     assert_eq!(runtime.start_count(), 3);
     assert_eq!(runtime.publish_count(), 1);
+
+    let attempts_before_restart = execution.attempts.clone();
+    tick(&fixture, &runtime).await;
+    let after_restart = load_execution(&fixture).await;
+    assert_eq!(after_restart.attempts, attempts_before_restart);
+    assert_eq!(runtime.start_count(), 3);
+    assert_eq!(runtime.publish_count(), 1);
 }
 
 #[tokio::test]

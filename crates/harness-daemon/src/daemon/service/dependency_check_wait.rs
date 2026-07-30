@@ -9,7 +9,8 @@ use harness_kernel::errors::CliError;
 use crate::task_board::github::{CheckWaitControls, PullRequestEvidenceSource};
 use crate::task_board::{
     TaskBoardDependencyCheckResumeOutcome, TaskBoardDependencyCheckResumeSink,
-    TaskBoardDependencyCheckWait, observe_task_board_dependency_check_wait,
+    TaskBoardDependencyCheckWait, classify_task_board_dependency_check_recovery,
+    observe_task_board_dependency_check_wait,
 };
 
 /// Run one exact-head dependency check observer inside the daemon runtime.
@@ -25,6 +26,7 @@ pub fn spawn_dependency_check_wait(
     sink: Arc<dyn TaskBoardDependencyCheckResumeSink>,
 ) -> JoinHandle<Result<TaskBoardDependencyCheckResumeOutcome, CliError>> {
     tokio::spawn(async move {
+        classify_task_board_dependency_check_recovery(&wait, None)?;
         observe_task_board_dependency_check_wait(
             source.as_ref(),
             &wait,

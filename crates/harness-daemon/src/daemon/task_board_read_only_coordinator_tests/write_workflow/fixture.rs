@@ -90,7 +90,10 @@ async fn seed_write_execution_configured(
         .task_board_orchestrator_settings_snapshot()
         .await
         .expect("settings snapshot");
-    let resolved_reviewers = reviewers(1, 1);
+    let mut resolved_reviewers = reviewers(1, 1);
+    for profile in &mut resolved_reviewers.profiles {
+        profile.runtime = "codex".into();
+    }
     let snapshot = write_snapshot(
         label,
         &item_id,
