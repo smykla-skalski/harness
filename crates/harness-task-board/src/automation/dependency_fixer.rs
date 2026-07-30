@@ -409,13 +409,13 @@ fn validate_prior_run(
     request: &TaskBoardDependencyFixRequest,
     run: &TaskBoardDependencyFixRun,
 ) -> Result<(), CliError> {
-    if run.run_id.trim().is_empty()
+    let expected_evidence_id = request
+        .retry_evidence
+        .as_ref()
+        .map(|evidence| evidence.evidence_id.as_str());
+    if run.run_id != request.dispatch_id
         || run.attempt != request.attempt
-        || run.failure_evidence_id
-            != request
-                .retry_evidence
-                .as_ref()
-                .map(|evidence| evidence.evidence_id.clone())
+        || run.failure_evidence_id.as_deref() != expected_evidence_id
     {
         return Err(parse_error(
             "dependency fixer retry run does not match its prior request",

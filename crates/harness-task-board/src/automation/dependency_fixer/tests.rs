@@ -187,6 +187,18 @@ fn retry_rejects_non_failure_and_mismatched_prior_run_evidence() {
         .is_err()
     );
 
+    previous_run.run_id = "different-run".into();
+    assert!(
+        task_board_dependency_fix_retry_request(
+            &previous_request,
+            &previous_run,
+            &previous_result,
+            &failed_checks(&previous_request.route_id),
+        )
+        .is_err()
+    );
+
+    previous_run = run_for(&previous_request);
     previous_run.failure_evidence_id = Some("unexpected-evidence".into());
     assert!(
         task_board_dependency_fix_retry_request(
