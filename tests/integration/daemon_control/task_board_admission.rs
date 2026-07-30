@@ -8,9 +8,106 @@
 //! writes), keeps both intents on a combined ticket, and never stamps a
 //! duplicate execution across repeated transitions or a refresh.
 
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::time::Instant;
 
 use super::*;
+
+const REVIEWER_MODEL: &str = "deepseek/deepseek-v4-flash";
+
+// A canned OpenRouter stand-in that serves every connection for the life of the
+// test, so the readiness probe the dispatch gate issues reaches a deterministic
+// provider response instead of the real network.
+fn spawn_persistent_mock_openrouter(status: &'static str, body: &'static str) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock openrouter");
+    let address = listener.local_addr().expect("mock openrouter address");
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            let mut request = [0_u8; 4096];
+            let _ = stream.read(&mut request);
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+        }
+    });
+    format!("http://{address}")
+}
+
+fn spawn_daemon_with_openrouter_url(
+    home: &Path,
+    xdg: &Path,
+    openrouter_api_url: &str,
+) -> ManagedChild {
+    let mut command = Command::new(daemon_binary());
+    configure_daemon_serve_command(&mut command, home, xdg, &[]);
+    command.env("OPENROUTER_API_URL", openrouter_api_url);
+    ManagedChild::spawn(&mut command).expect("spawn daemon with openrouter url")
+}
+
+fn open_spawn_gate(endpoint: &str, token: &str) {
+    let (code, body) = post_json(
+        endpoint,
+        token,
+        "/v1/policy-canvases/spawn-requires-live-policy",
+        json!({ "enabled": false }),
+    );
+    assert_eq!(code, 200, "open spawn gate: {body}");
+}
+
+fn select_openrouter_reviewer(endpoint: &str, token: &str) {
+    let (code, body) = request_json(
+        "PUT",
+        endpoint,
+        token,
+        "/v1/task-board/orchestrator/settings",
+        json!({
+            "reviewers": {
+                "reviewer_count": 1,
+                "required_approvals": 1,
+                "max_revision_cycles": 3,
+                "profiles": [{
+                    "id": "openrouter-reviewer",
+                    "runtime": "openrouter",
+                    "persona": "code-reviewer",
+                    "agent_mode": "evaluate",
+                    "model": REVIEWER_MODEL,
+                }],
+            }
+        }),
+    );
+    assert_eq!(code, 200, "select openrouter reviewer: {body}");
+}
+
+fn store_openrouter_token(endpoint: &str, token: &str, value: &str) {
+    let (code, body) = request_json(
+        "PUT",
+        endpoint,
+        token,
+        "/v1/task-board/orchestrator/openrouter-token",
+        json!({ "token": value }),
+    );
+    assert_eq!(code, 200, "store openrouter token: {body}");
+    assert_eq!(body["token_configured"], json!(true), "{body}");
+}
+
+fn dispatch_review(endpoint: &str, token: &str, id: &str, project: &Path) -> Value {
+    let (code, body) = post_json(
+        endpoint,
+        token,
+        "/v1/task-board/dispatch",
+        json!({
+            "item_id": id,
+            "dry_run": false,
+            "project_dir": project.to_string_lossy(),
+        }),
+    );
+    assert_eq!(code, 200, "dispatch {id}: {body}");
+    body
+}
 
 fn create_imported_pull_request(
     endpoint: &str,
@@ -359,6 +456,133 @@ fn repeated_transitions_and_a_refresh_stamp_no_duplicate_execution() {
     assert_eq!(
         workflow_status, "idle",
         "a dry-run refresh must not stamp an execution: {item}"
+    );
+
+    let output = run_harness(&home, &xdg, &["daemon", "stop"]);
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn an_unavailable_reviewer_runtime_fails_the_review_before_agent_work_and_stays_retryable() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    // The provider rejects the configured credential, so the supported openrouter
+    // runtime is configured but cannot run.
+    let mock = spawn_persistent_mock_openrouter("401 Unauthorized", "");
+    let mut daemon = spawn_daemon_with_openrouter_url(&home, &xdg, &mock);
+    let _status = wait_for_daemon_ready(&home, &xdg);
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+
+    open_spawn_gate(&endpoint, &token);
+    select_openrouter_reviewer(&endpoint, &token);
+    let secret = "sk-or-rejected-launch-secret-value";
+    store_openrouter_token(&endpoint, &token, secret);
+
+    create_imported_pull_request(&endpoint, &token, "review-blocked", "pr_review");
+    move_to_status(&endpoint, &token, "review-blocked", "todo");
+
+    let body = dispatch_review(&endpoint, &token, "review-blocked", &project);
+    let failures = body["failures"].as_array().expect("failures array");
+    assert_eq!(
+        failures.len(),
+        1,
+        "an unavailable reviewer runtime must fail the dispatch: {body}"
+    );
+    let message = failures[0]["message"].as_str().expect("failure message");
+    assert!(
+        message.contains("reviewer runtime 'openrouter' cannot run"),
+        "the block must name the runtime that cannot run: {message}"
+    );
+    assert!(
+        message.contains("credential was rejected by the provider"),
+        "the block must name the specific unmet prerequisite: {message}"
+    );
+    assert!(
+        !body.to_string().contains(secret),
+        "the dispatch response leaked the credential value: {body}"
+    );
+    assert!(
+        body["applied"]
+            .as_array()
+            .is_none_or(|applied| applied.is_empty()),
+        "a runtime that cannot run must not apply the dispatch: {body}"
+    );
+
+    // The block is retryable, not a permanent human-required stop: the ticket
+    // returns to a clean state that a later dispatch can pick up once the
+    // prerequisite is met.
+    let item = get_item(&endpoint, &token, "review-blocked");
+    let workflow = &item["workflow"];
+    assert_ne!(
+        workflow["status"],
+        json!("admitting"),
+        "an unavailable runtime must not strand the ticket in Admitting: {item}"
+    );
+    assert!(
+        workflow["execution_id"].is_null(),
+        "a blocked launch must not pin the ticket to a dead execution: {item}"
+    );
+
+    let output = run_harness(&home, &xdg, &["daemon", "stop"]);
+    assert!(
+        output.status.success(),
+        "stop failed: {}",
+        output_text(&output)
+    );
+    wait_for_child_exit(&mut daemon);
+}
+
+#[test]
+fn a_satisfied_reviewer_runtime_prerequisite_lets_the_dispatch_pass_the_readiness_gate() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg = tmp.path().join("xdg");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home).expect("create home");
+    std::fs::create_dir_all(&xdg).expect("create xdg");
+    init_git_repo(&project);
+
+    // The provider accepts the credential and offers the requested model, so the
+    // readiness prerequisite is met.
+    let mock = spawn_persistent_mock_openrouter(
+        "200 OK",
+        r#"{"data":[{"id":"deepseek/deepseek-v4-flash"}]}"#,
+    );
+    let mut daemon = spawn_daemon_with_openrouter_url(&home, &xdg, &mock);
+    let _status = wait_for_daemon_ready(&home, &xdg);
+    let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
+
+    open_spawn_gate(&endpoint, &token);
+    select_openrouter_reviewer(&endpoint, &token);
+    store_openrouter_token(&endpoint, &token, "sk-or-accepted-launch-key");
+
+    create_imported_pull_request(&endpoint, &token, "review-ready", "pr_review");
+    move_to_status(&endpoint, &token, "review-ready", "todo");
+
+    // With the prerequisite met, the readiness gate no longer blocks. The dispatch
+    // moves past it to exact-head resolution; in this offline test that later step
+    // is what fails, never the reviewer-runtime gate.
+    let body = dispatch_review(&endpoint, &token, "review-ready", &project);
+    let gate_blocked = body["failures"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|failure| failure["message"].as_str())
+        .any(|message| message.contains("cannot run"));
+    assert!(
+        !gate_blocked,
+        "a met prerequisite must let the dispatch pass the readiness gate: {body}"
     );
 
     let output = run_harness(&home, &xdg, &["daemon", "stop"]);

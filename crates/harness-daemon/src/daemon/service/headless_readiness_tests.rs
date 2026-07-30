@@ -301,3 +301,66 @@ fn catalogued_but_live_unavailable_model_is_rejected() {
         "an accepted credential must not add a credential failure"
     );
 }
+
+#[test]
+fn provider_prerequisite_reasons_name_a_missing_credential_first() {
+    let reasons = provider_prerequisite_reasons(
+        "openrouter",
+        "deepseek/deepseek-v4-flash",
+        &CredentialAssessment::Missing,
+        false,
+    );
+    assert_eq!(
+        reasons.first().map(String::as_str),
+        Some("openrouter credential is not configured"),
+        "a missing credential must be the first named prerequisite, got {reasons:?}"
+    );
+}
+
+#[test]
+fn provider_prerequisite_reasons_redact_a_rejected_credential_detail() {
+    let reasons = provider_prerequisite_reasons(
+        "openrouter",
+        "deepseek/deepseek-v4-flash",
+        &CredentialAssessment::Rejected("HTTP 401 Unauthorized".to_string()),
+        false,
+    );
+    assert!(
+        reasons
+            .iter()
+            .any(|reason| reason.contains("was rejected by the provider (HTTP 401 Unauthorized)")),
+        "expected the rejection detail without any secret, got {reasons:?}"
+    );
+}
+
+#[test]
+fn provider_prerequisite_reasons_surface_an_unavailable_model_when_the_credential_is_accepted() {
+    let reasons = provider_prerequisite_reasons(
+        "openrouter",
+        "deepseek/deepseek-v4-flash",
+        &CredentialAssessment::Accepted,
+        false,
+    );
+    assert_eq!(
+        reasons,
+        vec![
+            "model 'deepseek/deepseek-v4-flash' is unavailable for runtime 'openrouter'"
+                .to_string()
+        ],
+        "an accepted credential with an unavailable model must name only the model"
+    );
+}
+
+#[test]
+fn provider_prerequisite_reasons_are_empty_when_everything_is_met() {
+    let reasons = provider_prerequisite_reasons(
+        "openrouter",
+        "deepseek/deepseek-v4-flash",
+        &CredentialAssessment::Accepted,
+        true,
+    );
+    assert!(
+        reasons.is_empty(),
+        "a met credential and model must produce no prerequisite failure, got {reasons:?}"
+    );
+}

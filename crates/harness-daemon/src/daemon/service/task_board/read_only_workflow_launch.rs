@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 
 use tokio::task::spawn_blocking;
 
+use crate::agents::runtime::models;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::service::{
+    CredentialAssessment, assess_provider_readiness, provider_prerequisite_reasons,
+};
 use crate::git::GitRepository;
 use crate::reviews::ReviewPullRequestState;
 use crate::sandbox;
@@ -58,6 +62,7 @@ pub(super) async fn prepare_read_only_workflow_launch(
     )
     .map_err(|error| invalid_transition(error.to_string()))?;
     ensure_supported_read_only_runtimes(&resolved_reviewers)?;
+    ensure_reviewer_runtimes_available(&resolved_reviewers).await?;
     let (pull_request, exact_head_revision) = resolve_exact_head(&item, worktree).await?;
     Ok(Some(TaskBoardReadOnlyWorkflowLaunch {
         workflow_kind: item.workflow_kind,
@@ -230,6 +235,41 @@ pub(super) fn ensure_supported_read_only_runtimes(
     ensure_runtimes_supported(reviewers, &SUPPORTED_READ_ONLY_RUNTIMES, "read-only")
 }
 
+/// Fail the launch before any agent work when a selected reviewer runtime is
+/// configured but cannot currently run - a missing, rejected, or unverifiable
+/// provider credential, or a model the live provider does not offer. This is
+/// distinct from the unsupported-runtime refusal above: the runtime is
+/// supported, so the block names the specific unmet prerequisite (reusing the
+/// headless-readiness vocabulary) and stays retryable, because releasing the
+/// preparation lets a later dispatch proceed once the prerequisite is met.
+///
+/// A runtime that needs no provider credential (Codex) carries no prerequisite
+/// this gate can evaluate; its readiness is settled on its own durable path.
+async fn ensure_reviewer_runtimes_available(
+    reviewers: &TaskBoardResolvedReviewer,
+) -> Result<(), CliError> {
+    for profile in &reviewers.profiles {
+        let runtime = profile.runtime.as_str();
+        let model = models::effective_model(runtime, profile.model.as_deref())
+            .or_else(|| profile.model.clone())
+            .unwrap_or_default();
+        let (credential, model_available) = assess_provider_readiness(runtime, &model).await;
+        if matches!(credential, CredentialAssessment::NotRequired) {
+            continue;
+        }
+        if let Some(reason) =
+            provider_prerequisite_reasons(runtime, &model, &credential, model_available)
+                .into_iter()
+                .next()
+        {
+            return Err(invalid_transition(format!(
+                "reviewer runtime '{runtime}' cannot run: {reason}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn normalized_execution_repository(item: &TaskBoardItem) -> Result<Option<String>, CliError> {
     task_board_read_only_execution_repository(item)
         .map_err(|error| invalid_transition(error.to_string()))
@@ -292,6 +332,32 @@ mod tests {
             .expect_err("unsupported runtime");
         assert!(error.to_string().contains("gemini"), "{error}");
         assert!(error.to_string().contains("read-only"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn availability_gate_skips_a_credential_free_runtime() {
+        // Codex needs no provider credential, so the availability gate has no
+        // prerequisite to evaluate and must not block it.
+        ensure_reviewer_runtimes_available(&resolved(&["codex"]))
+            .await
+            .expect("codex has no provider prerequisite to gate");
+    }
+
+    #[tokio::test]
+    async fn availability_gate_blocks_openrouter_without_a_credential() {
+        // No token is configured in this isolated test process, so the supported
+        // openrouter runtime cannot run. The block must name the runtime and the
+        // specific unmet prerequisite rather than refusing the runtime by name.
+        let error = ensure_reviewer_runtimes_available(&resolved(&["openrouter"]))
+            .await
+            .expect_err("openrouter without a credential cannot run");
+        let message = error.to_string();
+        assert!(message.contains("openrouter"), "{message}");
+        assert!(message.contains("cannot run"), "{message}");
+        assert!(
+            message.contains("credential is not configured"),
+            "{message}"
+        );
     }
 
     #[test]
