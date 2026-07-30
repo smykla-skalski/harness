@@ -12,6 +12,7 @@ use crate::TaskBoardWorkflowKind;
 mod admission;
 mod attempt_result_validation;
 mod dependency_check_resume;
+mod dependency_fix_delivery;
 mod dependency_fixer;
 mod dependency_triage;
 mod dependency_triage_actions;
@@ -48,6 +49,7 @@ pub use admission::*;
 // longer reaches that far once the two crates are separate compilation units.
 pub use attempt_result_validation::*;
 pub use dependency_check_resume::*;
+pub use dependency_fix_delivery::*;
 pub use dependency_fixer::*;
 pub use dependency_triage::*;
 pub use dependency_triage_actions::*;
