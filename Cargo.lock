@@ -3847,6 +3847,7 @@ version = "55.0.0"
 dependencies = [
  "clap",
  "harness-daemon",
+ "harness-daemon-snapshot",
  "harness-kernel",
  "harness-protocol",
  "reqwest",

@@ -12,9 +12,10 @@ use harness_daemon::daemon::cli_support::{
 use harness_daemon::daemon::codex_transport::codex_transport_from_env;
 use harness_daemon::daemon::serve::{self, DaemonServeConfig};
 use harness_daemon::daemon::transport::DaemonRemoteCommand;
-use harness_daemon::daemon::{launchd, service, snapshot, state};
+use harness_daemon::daemon::{launchd, service, state};
 use harness_daemon::feature_flags;
 use harness_daemon::workspace::{host_home_dir, normalized_env_value};
+use harness_daemon_snapshot as snapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::control::{restart_daemon, stop_daemon};
