@@ -21,6 +21,14 @@ use super::{
     start_worker_for_applied_task,
 };
 
+mod read_only_start_revision_support;
+
+pub(super) use read_only_start_revision_support::{admission_state_counts, intent_status};
+use read_only_start_revision_support::{
+    bump_settings_revision, codex_run_count, current_intent_claim, engage_spawn_kill_switch,
+    intent_compensation_pending, workflow_execution_count,
+};
+
 #[tokio::test]
 async fn workflow_dispatch_persists_before_any_codex_start() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
@@ -493,89 +501,4 @@ async fn seed_exact_read_only_worker(
         .await
         .expect("persist exact read-only worker");
     snapshot
-}
-
-async fn bump_settings_revision(db: &crate::daemon::db::AsyncDaemonDb) {
-    let mut settings = db
-        .task_board_orchestrator_settings()
-        .await
-        .expect("load current settings");
-    settings.dry_run_default = !settings.dry_run_default;
-    db.replace_task_board_orchestrator_settings(&settings)
-        .await
-        .expect("bump settings revision");
-}
-
-async fn engage_spawn_kill_switch(db: &crate::daemon::db::AsyncDaemonDb) {
-    db.update_policy_workspace(|workspace| {
-        workspace.spawn_kill_switch = true;
-        Ok(())
-    })
-    .await
-    .expect("engage spawn kill switch");
-}
-
-async fn codex_run_count(db: &crate::daemon::db::AsyncDaemonDb) -> i64 {
-    sqlx::query_scalar("SELECT COUNT(*) FROM codex_runs")
-        .fetch_one(db.pool())
-        .await
-        .expect("count Codex runs")
-}
-
-async fn workflow_execution_count(db: &crate::daemon::db::AsyncDaemonDb) -> i64 {
-    sqlx::query_scalar("SELECT COUNT(*) FROM task_board_workflow_executions")
-        .fetch_one(db.pool())
-        .await
-        .expect("count workflow executions")
-}
-
-pub(super) async fn intent_status(
-    db: &crate::daemon::db::AsyncDaemonDb,
-    intent_id: &str,
-) -> String {
-    sqlx::query_scalar("SELECT status FROM task_board_dispatch_intents WHERE intent_id = ?1")
-        .bind(intent_id)
-        .fetch_one(db.pool())
-        .await
-        .expect("load intent status")
-}
-
-async fn intent_compensation_pending(
-    db: &crate::daemon::db::AsyncDaemonDb,
-    intent_id: &str,
-) -> bool {
-    sqlx::query_scalar(
-        "SELECT compensation_pending FROM task_board_dispatch_intents WHERE intent_id = ?1",
-    )
-    .bind(intent_id)
-    .fetch_one(db.pool())
-    .await
-    .expect("load intent compensation state")
-}
-
-pub(super) async fn admission_state_counts(
-    db: &crate::daemon::db::AsyncDaemonDb,
-    intent_id: &str,
-) -> (i64, i64) {
-    sqlx::query_as(
-        "SELECT
-             COALESCE(SUM(CASE WHEN state = 'reserved' THEN 1 ELSE 0 END), 0),
-             COALESCE(SUM(CASE WHEN state = 'committed' THEN 1 ELSE 0 END), 0)
-         FROM task_board_dispatch_admission_ledger WHERE intent_id = ?1",
-    )
-    .bind(intent_id)
-    .fetch_one(db.pool())
-    .await
-    .expect("load dispatch admission states")
-}
-
-async fn current_intent_claim(
-    db: &crate::daemon::db::AsyncDaemonDb,
-    intent_id: &str,
-) -> Option<String> {
-    sqlx::query_scalar("SELECT claim_token FROM task_board_dispatch_intents WHERE intent_id = ?1")
-        .bind(intent_id)
-        .fetch_one(db.pool())
-        .await
-        .expect("load current intent claim")
 }
