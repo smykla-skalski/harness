@@ -25,6 +25,9 @@ pub(super) async fn resume_protocol_session(
     session_config: &AcpSessionRequestConfig,
     resume_session_id: &str,
 ) -> ProtocolCommandResult<SessionId> {
+    if !valid_resume_session_id(resume_session_id) {
+        return Err("ACP exact session resume requires a non-empty normalized session id".into());
+    }
     if !supervisor
         .handshake()
         .is_some_and(|handshake| handshake.supports_session_resume)
@@ -55,4 +58,22 @@ pub(super) async fn resume_protocol_session(
         return Err(error.to_string());
     }
     Ok(protocol_session_id)
+}
+
+fn valid_resume_session_id(session_id: &str) -> bool {
+    !session_id.trim().is_empty() && session_id.trim() == session_id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::valid_resume_session_id;
+
+    #[test]
+    fn exact_resume_session_id_must_be_nonempty_and_normalized() {
+        assert!(valid_resume_session_id("openrouter-session-1"));
+        assert!(!valid_resume_session_id(""));
+        assert!(!valid_resume_session_id("  "));
+        assert!(!valid_resume_session_id(" openrouter-session-1"));
+        assert!(!valid_resume_session_id("openrouter-session-1\n"));
+    }
 }
