@@ -2,9 +2,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    TaskBoardAttemptState, TaskBoardDependencyCheckResumeRecord, TaskBoardDependencyCheckWait,
-    TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase, TaskBoardExecutionState,
-    TaskBoardFailureClass, TaskBoardWorkflowExecutionRecord, valid_head_revision,
+    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardDependencyCheckResumeRecord,
+    TaskBoardDependencyCheckWait, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
+    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionRecord,
+    valid_head_revision,
 };
 use crate::github::{ActionState, PullRequestActionFailureClass, RecordedAction};
 
@@ -71,7 +72,10 @@ pub fn classify_task_board_dependency_workflow_recovery(
     let mut attempts = execution
         .attempts
         .iter()
-        .filter(|attempt| attempt_is_current(execution, attempt))
+        .filter(|attempt| {
+            attempt_is_current(execution, attempt)
+                && completed_attempt_matches_exact_head(execution, attempt)
+        })
         .collect::<Vec<_>>();
     attempts.sort_by_key(|attempt| attempt.attempt);
     let attempt = attempts.last().copied();
@@ -298,6 +302,36 @@ fn attempt_is_current(
         Some(TaskBoardExecutionPhase::Publish) => attempt.action_key == "publish",
         Some(TaskBoardExecutionPhase::Cleanup) => attempt.action_key == "cleanup",
         _ => false,
+    }
+}
+
+fn completed_attempt_matches_exact_head(
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &TaskBoardExecutionAttemptRecord,
+) -> bool {
+    if attempt.state != TaskBoardAttemptState::Completed {
+        return true;
+    }
+    let Some(exact_head) = execution.transition.exact_head_revision.as_deref() else {
+        return true;
+    };
+    match attempt.artifact.as_ref() {
+        Some(TaskBoardAttemptResultArtifact::Implementation(result)) => {
+            result.base_head_revision == exact_head
+        }
+        Some(TaskBoardAttemptResultArtifact::Review(outcome)) => {
+            outcome.result.head_revision == exact_head
+        }
+        Some(TaskBoardAttemptResultArtifact::Evaluation(result)) => {
+            result
+                .head_revision
+                .as_deref()
+                .is_none_or(|head| head == exact_head)
+                && result
+                    .revision_cycle
+                    .is_none_or(|cycle| cycle == execution.artifacts.current_revision_cycle)
+        }
+        _ => true,
     }
 }
 

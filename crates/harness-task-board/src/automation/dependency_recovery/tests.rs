@@ -1,7 +1,8 @@
 use super::*;
 use crate::github::{PullRequestAction, PullRequestActionKind, PullRequestIdentity};
 use crate::{
-    TaskBoardExecutionOwnership, TaskBoardResolvedReviewer, TaskBoardWorkflowExecutionArtifacts,
+    TaskBoardExecutionOwnership, TaskBoardPhaseVerdict, TaskBoardResolvedReviewer,
+    TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionArtifacts,
     TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
 };
 
@@ -139,6 +140,32 @@ fn active_attempt_must_belong_to_the_current_step() {
             .to_string()
             .contains("does not match its current step")
     );
+}
+
+#[test]
+fn completed_review_from_an_old_head_does_not_advance_the_current_step() {
+    let mut execution = execution(TaskBoardExecutionPhase::Review);
+    let mut stale = attempt("review:reviewer-amber", TaskBoardAttemptState::Completed);
+    stale.artifact = Some(TaskBoardAttemptResultArtifact::Review(
+        TaskBoardReviewerOutcome {
+            profile_id: "reviewer-amber".into(),
+            result: TaskBoardReviewResult {
+                verdict: TaskBoardPhaseVerdict::Pass,
+                head_revision: "123456789abcdef0123456789abcdef012345678".into(),
+                summary: "approved an older head".into(),
+                findings: Vec::new(),
+                structured_findings: Vec::new(),
+            },
+        },
+    ));
+    execution.attempts.push(stale);
+
+    let recovery = classify_task_board_dependency_workflow_recovery(&execution)
+        .expect("classify stale review");
+
+    assert_eq!(recovery.class, TaskBoardDependencyRecoveryClass::Resumable);
+    assert_eq!(recovery.step, TaskBoardDependencyRecoveryStep::AgentRun);
+    assert_eq!(recovery.action_key, None);
 }
 
 fn check_wait() -> TaskBoardDependencyCheckWait {
