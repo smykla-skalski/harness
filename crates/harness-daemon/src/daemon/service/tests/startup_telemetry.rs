@@ -58,6 +58,43 @@ fn daemon_serve_startup_groups_db_spans_under_startup_root() {
                     .await
                     .expect("daemon manifest written");
 
+                    // The manifest write happens strictly after
+                    // `initialize_startup_state` returns, but that only drops
+                    // the tracing::Span's last handle -- `tracing-opentelemetry`
+                    // defers the matching OTel start+end (and therefore the
+                    // export this test reads) to that same `on_close`, which
+                    // fires only once every descendant span has *also*
+                    // closed. Nothing here guarantees every such descendant
+                    // has wound down by the time the manifest appears, so
+                    // export can lag the manifest write by an
+                    // unbounded amount; wait for it directly instead of
+                    // assuming it already happened.
+                    tokio::time::timeout(StdDuration::from_secs(5), async {
+                        loop {
+                            let spans = exporter.finished_spans();
+                            if let Some(startup_span) = spans
+                                .iter()
+                                .find(|span| span.name.as_ref() == "daemon.lifecycle.startup")
+                            {
+                                let has_schema_event =
+                                    startup_span.events.events.iter().any(|event| {
+                                        event.name == "initializing daemon database schema"
+                                    });
+                                let has_pool_event = startup_span
+                                    .events
+                                    .events
+                                    .iter()
+                                    .any(|event| event.name == "async database pool ready");
+                                if has_schema_event && has_pool_event {
+                                    break;
+                                }
+                            }
+                            tokio::time::sleep(StdDuration::from_millis(50)).await;
+                        }
+                    })
+                    .await
+                    .expect("startup span exported with both db-readiness events");
+
                     request_shutdown().expect("request shutdown");
                     serve_task
                         .await
