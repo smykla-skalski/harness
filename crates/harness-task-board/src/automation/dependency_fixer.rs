@@ -316,7 +316,8 @@ pub fn render_task_board_dependency_fix_prompt(
          Do not work from or publish against another revision.\n\
          Fixer attempt: {attempt}\n\
          Requested repair: {repair}\n{retry}\n\
-         Triage report and check evidence:\n{triage}\n\n\
+         Original triage report for historical head {triage_head}; the repair head remains {head}:\n\
+         {triage}\n\n\
          Make only the changes required by this repair. Run the smallest relevant validation.\n\
          Return exactly one JSON object matching this contract:\n{response}",
         repository = request.repository,
@@ -324,6 +325,7 @@ pub fn render_task_board_dependency_fix_prompt(
         head = request.exact_head_revision,
         attempt = request.attempt,
         repair = request.requested_repair,
+        triage_head = request.triage_result.exact_head_revision,
     ))
 }
 

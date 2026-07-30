@@ -133,6 +133,7 @@ async fn retry_binds_failed_head_diagnostics_and_prior_attempt() {
     for expected in [
         "Fixer attempt: 2",
         "Retry failure evidence received by this run",
+        "Original triage report for historical head",
         FAILED_HEAD,
         "https://ci.example.test/build/17",
         "\"availability\": \"unavailable\"",
