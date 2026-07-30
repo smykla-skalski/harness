@@ -3,6 +3,7 @@ name = "harness-daemon-codex"
 version = "55.0.0"
 edition = "2024"
 rust-version = "1.95"
+publish = false
 
 [dependencies]
 async-trait = "0.1.83"
