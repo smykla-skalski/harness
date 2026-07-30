@@ -331,13 +331,12 @@ fn completed_attempt_matches_exact_head(
             outcome.result.head_revision == exact_head
         }
         Some(TaskBoardAttemptResultArtifact::Evaluation(result)) => {
-            result
-                .head_revision
-                .as_deref()
-                .is_none_or(|head| head == exact_head)
-                && result
-                    .revision_cycle
-                    .is_none_or(|cycle| cycle == execution.artifacts.current_revision_cycle)
+            if execution.snapshot.workflow_kind.is_write() {
+                result.head_revision.as_deref() == Some(exact_head)
+                    && result.revision_cycle == Some(execution.artifacts.current_revision_cycle)
+            } else {
+                result.head_revision.is_none() && result.revision_cycle.is_none()
+            }
         }
         _ => true,
     }

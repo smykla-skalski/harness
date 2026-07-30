@@ -1,10 +1,10 @@
 use super::*;
 use crate::github::{PullRequestAction, PullRequestActionKind, PullRequestIdentity};
 use crate::{
-    TaskBoardExecutionOwnership, TaskBoardLifecycleOutcome, TaskBoardPhaseVerdict,
-    TaskBoardResolvedReviewer, TaskBoardReviewResult, TaskBoardReviewerOutcome,
-    TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
-    TaskBoardWorkflowTransitionState,
+    TaskBoardEvaluationResult, TaskBoardExecutionOwnership, TaskBoardLifecycleOutcome,
+    TaskBoardPhaseVerdict, TaskBoardResolvedReviewer, TaskBoardReviewResult,
+    TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowKind,
+    TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
 };
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -202,6 +202,29 @@ fn completed_review_from_an_old_head_does_not_advance_the_current_step() {
 
     let recovery = classify_task_board_dependency_workflow_recovery(&execution)
         .expect("classify stale review");
+
+    assert_eq!(recovery.class, TaskBoardDependencyRecoveryClass::Resumable);
+    assert_eq!(recovery.step, TaskBoardDependencyRecoveryStep::AgentRun);
+    assert_eq!(recovery.action_key, None);
+}
+
+#[test]
+fn completed_write_evaluation_without_provenance_does_not_advance() {
+    let mut execution = execution(TaskBoardExecutionPhase::Evaluate);
+    let mut incomplete = attempt("evaluate:1", TaskBoardAttemptState::Completed);
+    incomplete.artifact = Some(TaskBoardAttemptResultArtifact::Evaluation(
+        TaskBoardEvaluationResult {
+            verdict: TaskBoardPhaseVerdict::Pass,
+            summary: "missing write provenance".into(),
+            evidence: Vec::new(),
+            head_revision: None,
+            revision_cycle: None,
+        },
+    ));
+    execution.attempts.push(incomplete);
+
+    let recovery =
+        classify_task_board_dependency_workflow_recovery(&execution).expect("classify evaluation");
 
     assert_eq!(recovery.class, TaskBoardDependencyRecoveryClass::Resumable);
     assert_eq!(recovery.step, TaskBoardDependencyRecoveryStep::AgentRun);
