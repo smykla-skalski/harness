@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use crate::infra::io::read_json_typed;
-use crate::observe::types::ObserverState;
-use crate::session::types::SessionState;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::io::read_json_typed;
+use harness_observe::types::ObserverState;
+use harness_protocol::session::SessionState;
+use harness_protocol::timeline::TimelineEntry;
+use harness_session::index;
 
-use super::super::index;
-use super::super::protocol::TimelineEntry;
 use super::{TimelinePayloadScope, timeline_payload};
 
 pub(super) fn observer_snapshot_entry(

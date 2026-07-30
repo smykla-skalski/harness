@@ -31,6 +31,8 @@ members = [
   "crates/harness-task-board-provider-sync",
   "crates/harness-task-board-remote-viewer",
   "crates/harness-telemetry",
+  "crates/harness-timeline",
+  "crates/harness-voice",
   "crates/harness-workspace",
   "testkit",
   "tools/architecture-tests",

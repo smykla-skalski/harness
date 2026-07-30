@@ -1,5 +1,5 @@
-use crate::agents::runtime::signal::AckResult;
-use crate::session::types::{SessionRole, SessionTransition, TaskSeverity, TaskStatus};
+use harness_agents::runtime::signal::AckResult;
+use harness_protocol::session::{SessionRole, SessionTransition, TaskSeverity, TaskStatus};
 
 pub(super) fn transition_summary(
     transition: &SessionTransition,
@@ -297,7 +297,7 @@ fn signal_ack_verb(result: AckResult) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::transition_summary;
-    use crate::session::types::{SessionTransition, TaskStatus};
+    use harness_protocol::session::{SessionTransition, TaskStatus};
 
     #[test]
     fn task_deleted_transition_maps_to_task_deleted_summary() {

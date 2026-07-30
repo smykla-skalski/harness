@@ -50,6 +50,8 @@ harness-task-board-codex-requests = { path = "../harness-task-board-codex-reques
 harness-task-board-provider-sync = { path = "../harness-task-board-provider-sync", version = "55.0.0" }
 harness-task-board-remote-viewer = { path = "../harness-task-board-remote-viewer", version = "55.0.0" }
 harness-telemetry = { path = "../harness-telemetry", version = "55.0.0" }
+harness-timeline = { path = "../harness-timeline", version = "55.0.0", optional = true }
+harness-voice = { path = "../harness-voice", version = "55.0.0", optional = true }
 hex = "0.4.3"
 hickory-resolver = "0.26.1"
 hmac = "0.13.0"
@@ -124,7 +126,7 @@ tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 [features]
 default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]
 bridge-runtime = []
-daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http", "harness-daemon-state/daemon-runtime", "harness-reviews/daemon-runtime", "harness-session/daemon-runtime", "harness-task-board/daemon-runtime", "harness-task-board-provider-sync/daemon-runtime"]
+daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol", "dep:agent-client-protocol-http", "dep:harness-timeline", "dep:harness-voice", "harness-daemon-state/daemon-runtime", "harness-reviews/daemon-runtime", "harness-session/daemon-runtime", "harness-task-board/daemon-runtime", "harness-task-board-provider-sync/daemon-runtime"]
 standalone-daemon = ["harness-observe/standalone-daemon"]
 standalone-worker = []
 # Exposes items normally `cfg(test)`-only (`DaemonDb::open_in_memory`, the

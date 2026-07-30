@@ -51,6 +51,8 @@ pub mod task_board;
 pub mod telemetry {
     pub use harness_telemetry::*;
 }
+#[cfg(feature = "daemon-runtime")]
+pub mod timeline;
 pub mod workspace;
 
 pub const DEFAULT_LOG_LEVEL: &str = "info";

@@ -41,6 +41,7 @@ mod signals;
 mod sync;
 mod sync_change_tracking;
 pub(crate) mod task_board;
+mod timeline;
 
 #[test]
 fn db_round_trip_smoke_covers_public_surface() {
