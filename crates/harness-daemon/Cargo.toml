@@ -44,6 +44,7 @@ harness-observe = { path = "../harness-observe", version = "55.0.0", default-fea
 harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
 harness-policy-graph-store = { path = "../harness-policy-graph-store", version = "55.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "55.0.0" }
+harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.0", features = ["openapi"] }
 harness-reviews = { path = "../harness-reviews", version = "55.0.0" }
 harness-session = { path = "../harness-session", version = "55.0.0" }
 harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "55.0.0", optional = true }
@@ -118,6 +119,7 @@ harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.0", f
 harness-db-schema = { path = "../harness-db-schema", version = "55.0.0", features = ["test-support"] }
 harness-github-api = { path = "../harness-github-api", version = "55.0.0", features = ["test-support"] }
 harness-policy-graph-store = { path = "../harness-policy-graph-store", version = "55.0.0", features = ["test-support"] }
+harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.0", features = ["test-support"] }
 harness-reviews = { path = "../harness-reviews", version = "55.0.0", features = ["test-support"] }
 harness-task-board = { path = "../harness-task-board", version = "55.0.0", features = ["test-support"] }
 harness-testkit = { path = "../../testkit" }

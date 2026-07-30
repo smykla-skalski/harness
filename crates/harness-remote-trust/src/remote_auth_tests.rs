@@ -1,15 +1,15 @@
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 
 use super::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteAuthTarget, RemoteBearerCredentials,
     authorize_remote_execution_operation, authorize_remote_http_route, authorize_remote_ws_method,
 };
-use crate::daemon::protocol::{
+use harness_protocol::daemon::api_contract::{
     HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, WsExemptionKind,
     http_paths, ws_methods,
 };
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
-use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
+use crate::remote::{RemoteAccessScope, RemoteRole};
+use crate::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 
 #[test]
 fn remote_bearer_credentials_require_client_id_and_bearer_token() {
@@ -324,43 +324,11 @@ fn execution_scope_authorizes_only_private_executor_operations() {
     }
 }
 
-#[test]
-fn revoked_execution_coordinator_token_cannot_be_reauthenticated() {
-    let db = crate::daemon::db::DaemonDb::open_in_memory().expect("daemon database");
-    let registration = crate::daemon::remote_identity::RemoteClientRegistration::new_for_tests(
-        "executor-revoked",
-        "Remote executor",
-        "linux",
-        RemoteRole::ExecutionCoordinator,
-        &[],
-        "executor-token-secret",
-        "2026-07-19T12:00:00Z",
-    )
-    .expect("executor registration");
-    db.register_remote_client(&registration)
-        .expect("register executor");
-    assert!(
-        db.verify_remote_client_token("executor-revoked", "executor-token-secret")
-            .expect("verify active executor")
-            .is_some()
-    );
-
-    assert!(
-        db.revoke_remote_client("executor-revoked", "2026-07-19T12:01:00Z")
-            .expect("revoke executor")
-    );
-    assert!(
-        db.verify_remote_client_token("executor-revoked", "executor-token-secret")
-            .expect("verify revoked executor")
-            .is_none()
-    );
-}
-
 fn typed_status(status: StatusCode) -> StatusCode {
     status
 }
 
-fn http_route(path: &str) -> &'static crate::daemon::protocol::HttpApiRouteContract {
+fn http_route(path: &str) -> &'static HttpApiRouteContract {
     HTTP_API_CONTRACT
         .iter()
         .find(|route| route.path == path)

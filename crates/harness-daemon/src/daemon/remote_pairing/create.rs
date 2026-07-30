@@ -10,8 +10,7 @@
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 
 use super::invitation::build_remote_pairing_invitation;
-use super::subject::RemotePairingSubject;
-use super::{RemotePairingCode, RemotePairingRecord};
+use super::{RemotePairingCode, RemotePairingRecord, RemotePairingSubject};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::RemoteAuditEvent;

@@ -1,6 +1,7 @@
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
-use crate::daemon::remote_identity::expand_client_scopes;
-use crate::reviews::ReviewsQueryRequest;
+use harness_protocol::daemon::reviews::types::ReviewsQueryRequest;
+
+use crate::remote::{RemoteAccessScope, RemoteRole};
+use crate::remote_identity::expand_client_scopes;
 
 use super::{RemotePairingCodeHash, RemotePairingError, RemotePairingRecord};
 
@@ -41,7 +42,7 @@ impl RemotePairingRecord {
     /// # Errors
     /// Returns [`RemotePairingError`] when pairing identity, scopes, or the
     /// Reviews query is invalid.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn new_with_reviews_query_for_tests(
         pairing_id: impl Into<String>,
         role: RemoteRole,
@@ -63,7 +64,12 @@ impl RemotePairingRecord {
     }
 }
 
-pub(crate) fn normalize_remote_reviews_query(
+/// Normalize and validate a review query embedded in a pairing record.
+///
+/// # Errors
+/// Returns [`RemotePairingError::InvalidReviewsQuery`] when the normalized
+/// query violates the reviews query contract.
+pub fn normalize_remote_reviews_query(
     query: &ReviewsQueryRequest,
 ) -> Result<ReviewsQueryRequest, RemotePairingError> {
     let normalized = ReviewsQueryRequest {

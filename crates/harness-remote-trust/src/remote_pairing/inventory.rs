@@ -14,7 +14,8 @@ use super::RemotePairingSubject;
 /// Ordered by how far the link has travelled, so a reader can see that
 /// `Revoked` overrides everything else: a device whose credential was cut off
 /// is revoked whether or not its link had also expired.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum RemotePairingState {
     /// Minted, still claimable, nobody has used it.
@@ -58,21 +59,30 @@ impl RemotePairingState {
     }
 }
 
+/// Derive the current pairing state from persistence-owned observations.
+#[must_use]
+pub fn derive_remote_pairing_state(
+    observed: &RemotePairingObservation<'_>,
+) -> RemotePairingState {
+    RemotePairingState::derive(observed)
+}
+
 /// The stored facts a state is derived from, named so the derivation reads as
 /// the rule it is rather than as four positional booleans.
 ///
-/// Crate-private: it is the argument to a derivation the daemon runs on its own
-/// rows, not something a caller of this module ever builds.
+/// Persistence adapters build this from their own rows and pass it into the
+/// trust-domain derivation.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct RemotePairingObservation<'a> {
-    pub(crate) claimed_at: Option<&'a str>,
-    pub(crate) revoked_at: Option<&'a str>,
-    pub(crate) last_seen_at: Option<&'a str>,
-    pub(crate) expired: bool,
+pub struct RemotePairingObservation<'a> {
+    pub claimed_at: Option<&'a str>,
+    pub revoked_at: Option<&'a str>,
+    pub last_seen_at: Option<&'a str>,
+    pub expired: bool,
 }
 
 /// The device a claimed link became.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RemotePairingDevice {
     pub client_id: String,
     pub display_name: String,
@@ -85,7 +95,8 @@ pub struct RemotePairingDevice {
 }
 
 /// One link and what became of it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RemotePairingInventoryEntry {
     pub pairing_id: String,
     /// The enum rather than its label, so the schema enumerates what a reader

@@ -13,7 +13,8 @@ use super::RemotePairingError;
 /// the pairing metadata column as free storage.
 const MAX_SUBJECT_FIELD_CHARS: usize = 200;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RemotePairingSubject {
     /// Identity provider that authenticated the person, such as `github`.
     pub provider: String,
