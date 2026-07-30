@@ -16,7 +16,11 @@ validate_names() {
   local label="$1" raw="$2"
   local trimmed found
   local save_ifs="$IFS"
-  set -f
+  local restore_f=0
+  if [[ $- != *f* ]]; then
+    restore_f=1
+    set -f
+  fi
   IFS=','
   for t in $raw; do
     trimmed="${t#"${t%%[![:space:]]*}"}"
@@ -32,12 +36,14 @@ validate_names() {
     IFS=','
     if (( ! found )); then
       IFS="$save_ifs"
+      (( restore_f )) && set +f
       printf 'test:unit: unknown group name in %s: %q\n' "$label" "$trimmed" >&2
       printf '  known groups: %s\n' "$known_groups" >&2
       return 1
     fi
   done
   IFS="$save_ifs"
+  (( restore_f )) && set +f
   return 0
 }
 
@@ -58,14 +64,22 @@ should_run() {
   local skip_list="${HARNESS_SKIP_UNIT_GROUPS:-}"
   if [[ -n "$skip_list" ]]; then
     validate_names HARNESS_SKIP_UNIT_GROUPS "$skip_list" || exit 1
-    set -f
+    local restore_f=0
+    if [[ $- != *f* ]]; then
+      restore_f=1
+      set -f
+    fi
     local IFS=','
     for s in $skip_list; do
       local t="${s#"${s%%[![:space:]]*}"}"
       t="${t%"${t##*[![:space:]]}"}"
       [[ -n "$t" ]] || continue
-      [[ "$t" == "$name" ]] && return 1
+      if [[ "$t" == "$name" ]]; then
+        (( restore_f )) && set +f
+        return 1
+      fi
     done
+    (( restore_f )) && set +f
   fi
   return 0
 }
