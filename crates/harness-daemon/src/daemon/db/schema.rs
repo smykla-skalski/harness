@@ -38,7 +38,7 @@ impl DaemonDb {
     pub fn open(path: &Path) -> Result<Self, CliError> {
         let conn = Connection::open(path)
             .map_err(|error| db_error(format!("open daemon database: {error}")))?;
-        apply_pragmas(&conn)?;
+        init::apply_pragmas(&conn)?;
         let db = Self {
             conn,
             path: Some(path.to_path_buf()),
@@ -62,7 +62,7 @@ impl DaemonDb {
     pub fn open_in_memory() -> Result<Self, CliError> {
         let conn = Connection::open_in_memory()
             .map_err(|error| db_error(format!("open in-memory database: {error}")))?;
-        apply_pragmas(&conn)?;
+        init::apply_pragmas(&conn)?;
         let db = Self {
             conn,
             path: None,
@@ -99,8 +99,8 @@ impl DaemonDb {
     fn ensure_schema(&self) -> Result<(), CliError> {
         let transaction = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)
             .map_err(|error| db_error(format!("begin schema bootstrap transaction: {error}")))?;
-        if !schema_exists(&transaction)? {
-            create_schema(&transaction)?;
+        if !init::schema_exists(&transaction)? {
+            init::create_schema(&transaction)?;
         }
         transaction
             .commit()
@@ -113,7 +113,7 @@ impl DaemonDb {
             .lock()
             .map_err(|error| db_error(format!("lock schema migrations: {error}")))?;
         let version = self.schema_version()?;
-        let version_number = parse_and_check_schema_version(version.as_str())?;
+        let version_number = init::parse_and_check_schema_version(version.as_str())?;
         if version_number < 7 {
             let should_reclaim_space =
                 super::schema_migrations::run_pre_v7_migrations(&self.conn, version.as_str())?;
@@ -123,7 +123,7 @@ impl DaemonDb {
                 super::SCHEMA_VERSION,
             )?;
             if should_reclaim_space {
-                reclaim_unused_pages(&self.conn)?;
+                init::reclaim_unused_pages(&self.conn)?;
             }
         } else {
             self.run_post_v7_migrations(version.as_str())?;
@@ -140,7 +140,7 @@ impl DaemonDb {
     }
 
     fn run_post_v7_migrations(&self, version: &str) -> Result<(), CliError> {
-        self.apply_pending_migrations(parse_and_check_schema_version(version)?)
+        self.apply_pending_migrations(init::parse_and_check_schema_version(version)?)
     }
 
     fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
@@ -420,106 +420,5 @@ impl DaemonDb {
     }
 }
 
-fn schema_exists(conn: &Connection) -> Result<bool, CliError> {
-    conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_meta'",
-        [],
-        |row| row.get::<_, i64>(0),
-    )
-    .map(|count| count > 0)
-    .map_err(|error| db_error(format!("check schema_meta existence: {error}")))
-}
-
-fn create_schema(conn: &Connection) -> Result<(), CliError> {
-    emit_schema_init_info();
-    test_support::run_schema_init_hook();
-    conn.execute_batch(CREATE_SCHEMA)
-        .map_err(|error| db_error(format!("create daemon database schema: {error}")))
-}
-
-fn reclaim_unused_pages(conn: &Connection) -> Result<(), CliError> {
-    conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;")
-        .map_err(|error| db_error(format!("reclaim unused database pages: {error}")))
-}
-
-/// Manual tracing event dispatch. The `info!` macro has inherent cognitive
-/// complexity of 8 due to its internal expansion (tokio-rs/tracing#553),
-/// which exceeds the pedantic threshold of 7.
-fn emit_schema_init_info() {
-    use tracing::callsite::DefaultCallsite;
-    use tracing::field::{FieldSet, Value};
-    use tracing::metadata::Kind;
-    use tracing::{Event, Level, Metadata, callsite::Identifier};
-
-    static FIELDS: &[&str] = &["message"];
-    static CALLSITE: DefaultCallsite = DefaultCallsite::new(&META);
-    static META: Metadata<'static> = Metadata::new(
-        "info",
-        "harness::daemon::db",
-        Level::INFO,
-        Some(file!()),
-        Some(line!()),
-        Some(module_path!()),
-        FieldSet::new(FIELDS, Identifier(&CALLSITE)),
-        Kind::EVENT,
-    );
-
-    let message = "initializing daemon database schema";
-    let values: &[Option<&dyn Value>] = &[Some(&message)];
-    Event::dispatch(&META, &META.fields().value_set_all(values));
-}
-
-fn parse_and_check_schema_version(version: &str) -> Result<u8, CliError> {
-    let version_number = version.parse::<u8>().map_err(|error| {
-        db_error(format!(
-            "invalid daemon database schema version '{version}': {error}"
-        ))
-    })?;
-    let expected_version = super::SCHEMA_VERSION.parse::<u8>().map_err(|error| {
-        db_error(format!(
-            "invalid compiled daemon database schema version '{}': {error}",
-            super::SCHEMA_VERSION
-        ))
-    })?;
-    if version_number > expected_version {
-        return Err(db_error(format!(
-            "daemon database schema version '{version}' is newer than expected '{}'; downgrade is not supported",
-            super::SCHEMA_VERSION
-        )));
-    }
-    Ok(version_number)
-}
-
-fn apply_pragmas(conn: &Connection) -> Result<(), CliError> {
-    conn.busy_timeout(Duration::from_secs(5))
-        .map_err(|error| db_error(format!("set database busy timeout: {error}")))?;
-    configure_journal_mode(conn)?;
-    conn.execute_batch(
-        "PRAGMA synchronous = NORMAL;
-         PRAGMA foreign_keys = ON;
-         PRAGMA cache_size = -8000;",
-    )
-    .map_err(|error| db_error(format!("set database pragmas: {error}")))
-}
-
-fn configure_journal_mode(conn: &Connection) -> Result<(), CliError> {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        match conn.query_row("PRAGMA journal_mode = WAL", [], |row| {
-            row.get::<_, String>(0)
-        }) {
-            Ok(_) => return Ok(()),
-            Err(error) if pragma_error_is_retryable(&error) && Instant::now() < deadline => {
-                thread::sleep(Duration::from_millis(50));
-            }
-            Err(error) => return Err(db_error(format!("set database journal mode: {error}"))),
-        }
-    }
-}
-
-fn pragma_error_is_retryable(error: &rusqlite::Error) -> bool {
-    matches!(
-        error.sqlite_error_code(),
-        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
-    )
-}
+#[path = "schema_init.rs"]
+mod init;
