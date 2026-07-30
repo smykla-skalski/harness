@@ -7,6 +7,7 @@ use crate::daemon::protocol::{
     TaskBoardEvaluateRequest, TaskBoardEvaluationResponse, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse,
 };
+use crate::daemon::serve;
 use crate::daemon::service;
 use crate::daemon::task_board_managed_agents::rendered_worker_prompt;
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
@@ -50,7 +51,7 @@ pub(crate) async fn dispatch(
     request: TaskBoardDispatchRequest,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let async_db = require_async_db(state, "task board dispatch")?;
-    Box::pin(service::recover_remote_assignments_before_local_work(
+    Box::pin(serve::recover_remote_assignments_before_local_work(
         state, async_db,
     ))
     .await?;
@@ -63,7 +64,7 @@ pub(crate) async fn deliver(
     request: &TaskBoardDispatchDeliverRequest,
 ) -> Result<TaskBoardDispatchDeliverResponse, CliError> {
     let db = require_async_db(state, "task board dispatch deliver")?;
-    Box::pin(service::recover_remote_assignments_before_local_work(
+    Box::pin(serve::recover_remote_assignments_before_local_work(
         state, db,
     ))
     .await?;
@@ -96,7 +97,7 @@ pub(crate) async fn pick(
     state: &DaemonHttpState,
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
     let db = require_async_db(state, "task board dispatch pick")?;
-    Box::pin(service::recover_remote_assignments_before_local_work(
+    Box::pin(serve::recover_remote_assignments_before_local_work(
         state, db,
     ))
     .await?;
@@ -133,7 +134,7 @@ pub(crate) async fn run_once_with_trigger(
     trigger: TaskBoardAutomationRunTrigger,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let async_db = require_async_db(state, "task board orchestrator run once")?;
-    Box::pin(service::recover_remote_assignments_before_local_work(
+    Box::pin(serve::recover_remote_assignments_before_local_work(
         state, async_db,
     ))
     .await?;

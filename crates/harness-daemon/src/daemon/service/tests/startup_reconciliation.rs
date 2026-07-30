@@ -4,7 +4,7 @@ use std::time::Duration as StdDuration;
 
 use tempfile::tempdir;
 
-use crate::daemon::service::serve::reconciliation_test_gate;
+use crate::daemon::serve::{self, DaemonServeConfig, reconciliation_test_gate};
 
 /// Reconciliation walks every discovered project, and the manifest is the only
 /// way the Monitor learns the daemon's port. Running it inside the awaited
@@ -29,7 +29,7 @@ fn manifest_is_published_without_waiting_for_background_reconciliation() {
                     .expect("runtime");
                 runtime.block_on(async {
                     let serve_task = tokio::spawn(async {
-                        serve(DaemonServeConfig {
+                        serve::serve(DaemonServeConfig {
                             host: "127.0.0.1".into(),
                             port: 0,
                             ..DaemonServeConfig::default()

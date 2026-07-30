@@ -58,13 +58,13 @@ pub(super) async fn invalidate_revisions(
                 validate_plan_approval(binding, result, &current_snapshot, &execution.execution_id)
                     .invalidations;
         }
-        super::super::task_board_workflow_execution::require_human(
+        crate::daemon::service::task_board_workflow_execution::require_human(
             &mut updated,
             "plan_approval_invalidated",
             now,
         );
     } else {
-        super::super::task_board_workflow_execution::require_human(
+        crate::daemon::service::task_board_workflow_execution::require_human(
             &mut updated,
             "frozen_revision_changed",
             now,

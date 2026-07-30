@@ -35,23 +35,32 @@ pub(crate) use reconciliation::{
 };
 pub(crate) use remote::serve_remote_https;
 
-use super::{
-    AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, DaemonHttpState,
-    DaemonServeConfig, Duration, Mutex, OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL,
-    SessionStatus, bridge, broadcast, http, index, process_id, state, tokio_watch, watch,
-};
+pub(crate) use config::DaemonServeConfig;
+use std::path::Path;
+use std::process::id as process_id;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use tokio::sync::{broadcast, watch as tokio_watch};
+
 use crate::daemon::acp_probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
-use crate::daemon::http::AsyncDaemonDbSlot;
+use crate::daemon::agent_tui::AgentTuiManagerHandle;
+use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState};
+use crate::daemon::server_state::ReplayBuffer;
+use crate::daemon::service::{self, SHUTDOWN_SIGNAL};
+use crate::daemon::{bridge, http, index, state, watch};
+use crate::session::types::SessionStatus;
 use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 use crate::telemetry::current_trace_id;
 pub(crate) use background_tasks::recover_remote_assignments_before_local_work;
 use background_tasks::{
     recover_remote_assignments_at_startup_with_controller, spawn_background_tasks,
 };
+use harness_kernel::errors::{CliError, CliErrorKind};
 use local_listener::{bind_local_listener_and_build_manifest, prepare_local_daemon_environment};
 use manifest::persist_manifest;
-use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
@@ -74,7 +83,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
     let db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>> = Arc::new(OnceLock::new());
     let async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>> = Arc::new(OnceLock::new());
-    super::install_observe_runtime(
+    service::install_observe_runtime(
         sender.clone(),
         config.observe_interval,
         db.clone(),
@@ -222,7 +231,7 @@ pub(crate) async fn initialize_startup_state(
             task_board_migration::migrate_task_board(async_db).await?;
             reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
-            super::super::provider_credentials::load_provider_credentials(async_db).await?;
+            super::provider_credentials::load_provider_credentials(async_db).await?;
         }
         spawn_startup_background_tasks(
             Arc::clone(&db),
@@ -271,10 +280,8 @@ fn spawn_startup_background_tasks(
     poll_interval: Duration,
 ) {
     let _watch = watch::spawn_watch_loop(sender, poll_interval, Some(db), async_db_slot);
-    let _reviews_policy_timers =
-        super::reviews::policy::spawn_reviews_policy_timer_loop(poll_interval);
-    let _reviews_policy_events =
-        super::reviews::policy_event_inbox::spawn_reviews_policy_event_loop(poll_interval);
+    let _reviews_policy_timers = service::spawn_reviews_policy_timer_loop(poll_interval);
+    let _reviews_policy_events = service::spawn_reviews_policy_event_loop(poll_interval);
 }
 
 pub(crate) async fn initialize_async_db(

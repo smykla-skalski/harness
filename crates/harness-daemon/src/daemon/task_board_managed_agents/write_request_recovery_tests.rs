@@ -72,7 +72,7 @@ fn durable_initial_write_request_matches_the_managed_launch() {
     };
 
     let recovered =
-        crate::daemon::service::task_board_read_only_coordinator::requests::codex_attempt_request(
+        crate::daemon::task_board_read_only_coordinator::requests::codex_attempt_request(
             &execution, &attempt,
         )
         .expect("reconstruct durable request");

@@ -329,12 +329,13 @@ async fn claim_lifecycle_attempt(
             )
             .await;
     }
-    let outcome = super::super::task_board_workflow_execution::record_workflow_execution_attempt(
-        db,
-        &TaskBoardExecutionAttemptCas::from(attempt),
-        &claimed,
-    )
-    .await?;
+    let outcome =
+        crate::daemon::service::task_board_workflow_execution::record_workflow_execution_attempt(
+            db,
+            &TaskBoardExecutionAttemptCas::from(attempt),
+            &claimed,
+        )
+        .await?;
     match outcome {
         TaskBoardExecutionAttemptCasOutcome::Updated(record) => Ok(Some(record)),
         TaskBoardExecutionAttemptCasOutcome::Unchanged(_)

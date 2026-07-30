@@ -465,7 +465,7 @@ fn require_human_for_unknown_outcome(
     });
 }
 
-pub(super) fn require_human(
+pub(crate) fn require_human(
     record: &mut TaskBoardWorkflowExecutionRecord,
     reason: &str,
     updated_at: &str,

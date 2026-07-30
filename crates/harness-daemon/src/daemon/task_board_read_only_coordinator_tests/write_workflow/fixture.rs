@@ -9,9 +9,9 @@ use crate::task_board::{
     bind_plan_approval, build_planning_result,
 };
 
-use super::super::super::task_board_workflow_test_support::{TestDatabase, reviewers};
 use super::super::fixture::{Fixture, NOW, insert_committed_admission};
 use super::BASE_HEAD;
+use crate::daemon::service::task_board_workflow_test_support::{TestDatabase, reviewers};
 
 pub(super) async fn seed_write_execution(label: &str) -> Fixture {
     Box::pin(seed_write_execution_kind(

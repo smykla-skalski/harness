@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::serve::{self, DaemonServeConfig, session_import_required};
 
 #[test]
 fn serve_helpers_round_trip_smoke_covers_public_surface() {
@@ -19,10 +20,10 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
 
         append_project_ledger_entry(project);
 
-        super::super::serve::validate_serve_config(&DaemonServeConfig {
+        serve::validate_serve_config(&DaemonServeConfig {
             host: "127.0.0.1".into(),
             port: 0,
-            auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
+            auth_mode: crate::daemon::server_state::DaemonHttpAuthMode::Local,
             remote_domain: None,
             remote_request_limits: None,
             companion: None,
@@ -35,14 +36,13 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
 
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
         let db_path = state::daemon_root().join("harness.db");
-        let standalone_db =
-            super::super::serve::open_daemon_db(&db_path).expect("open standalone daemon db");
+        let standalone_db = serve::open_daemon_db(&db_path).expect("open standalone daemon db");
         drop(standalone_db);
 
         let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
-        let db = super::super::serve::open_and_publish_db(&db_slot).expect("publish daemon db");
+        let db = serve::open_and_publish_db(&db_slot).expect("publish daemon db");
 
-        let (projects, sessions) = super::super::serve::discover_background_reconciliation_inputs()
+        let (projects, sessions) = serve::discover_background_reconciliation_inputs()
             .expect("discover reconciliation inputs");
         assert_eq!(projects.len(), 1);
         assert!(
@@ -53,7 +53,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
         );
 
         let mut result = crate::daemon::db::ReconcileResult::default();
-        let candidates = super::super::serve::sync_background_projects_and_collect_candidates(
+        let candidates = serve::sync_background_projects_and_collect_candidates(
             &db,
             &projects,
             &sessions,
@@ -67,29 +67,28 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
             .iter()
             .find(|resolved| resolved.state.session_id == state.session_id)
             .expect("resolved session");
-        let prepared = super::super::serve::prepare_background_session_import(resolved)
-            .expect("prepare session import");
+        let prepared =
+            serve::prepare_background_session_import(resolved).expect("prepare session import");
 
         let db_guard = db.lock().expect("db lock");
         assert!(
-            super::super::serve::session_import_required(&db_guard, resolved)
-                .expect("session import required"),
+            serve::session_import_required(&db_guard, resolved).expect("session import required"),
             "file-backed session should require initial import"
         );
         assert_eq!(
-            super::super::serve::prepared_session_import_required(&db_guard, &prepared),
+            serve::prepared_session_import_required(&db_guard, &prepared),
             Some(true)
         );
         db_guard
             .apply_prepared_session_resync(&prepared)
             .expect("apply prepared import");
         assert!(
-            !super::super::serve::session_import_required(&db_guard, resolved)
+            !serve::session_import_required(&db_guard, resolved)
                 .expect("session import no longer required"),
             "indexed session should not require re-import"
         );
         assert_eq!(
-            super::super::serve::prepared_session_import_required(&db_guard, &prepared),
+            serve::prepared_session_import_required(&db_guard, &prepared),
             Some(false)
         );
     });
@@ -190,8 +189,8 @@ fn background_project_sync_surfaces_a_poisoned_db_lock() {
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
 
         let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
-        let db = super::super::serve::open_and_publish_db(&db_slot).expect("publish daemon db");
-        let (projects, sessions) = super::super::serve::discover_background_reconciliation_inputs()
+        let db = serve::open_and_publish_db(&db_slot).expect("publish daemon db");
+        let (projects, sessions) = serve::discover_background_reconciliation_inputs()
             .expect("discover reconciliation inputs");
         assert!(!projects.is_empty(), "expected a discoverable project");
 
@@ -204,7 +203,7 @@ fn background_project_sync_surfaces_a_poisoned_db_lock() {
         assert!(db.is_poisoned(), "expected the db lock to be poisoned");
 
         let mut result = crate::daemon::db::ReconcileResult::default();
-        let error = super::super::serve::sync_background_projects_and_collect_candidates(
+        let error = serve::sync_background_projects_and_collect_candidates(
             &db,
             &projects,
             &sessions,
@@ -231,7 +230,7 @@ fn poisoned_db_lock_never_reports_a_clean_reconciliation() {
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
 
         let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
-        let db = super::super::serve::open_and_publish_db(&db_slot).expect("publish daemon db");
+        let db = serve::open_and_publish_db(&db_slot).expect("publish daemon db");
 
         let poisoner = Arc::clone(&db);
         let _ = std::thread::spawn(move || {
@@ -241,7 +240,7 @@ fn poisoned_db_lock_never_reports_a_clean_reconciliation() {
         .join();
         assert!(db.is_poisoned(), "expected the db lock to be poisoned");
 
-        super::super::serve::run_background_reconciliation(&db);
+        serve::run_background_reconciliation(&db);
 
         let events =
             std::fs::read_to_string(state::daemon_root().join("events.jsonl")).unwrap_or_default();

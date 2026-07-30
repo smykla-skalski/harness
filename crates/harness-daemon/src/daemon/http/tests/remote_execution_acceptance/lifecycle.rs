@@ -6,10 +6,10 @@ use super::fixture::{
     git,
 };
 use crate::daemon::db::remote_executor_identity;
-use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller;
-use crate::daemon::service::{
+use crate::daemon::serve::test_support::{
     install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
+use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller;
 use crate::daemon::task_board_remote_transport::controller_authority_test_support::{
     TestTlsMaterial, test_tls_material,
 };

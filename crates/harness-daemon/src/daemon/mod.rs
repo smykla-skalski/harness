@@ -115,6 +115,8 @@ pub mod remote_tls;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod remote_viewer;
 #[cfg(feature = "daemon-runtime")]
+pub(crate) mod serve;
+#[cfg(feature = "daemon-runtime")]
 pub(crate) mod server_state;
 #[cfg(feature = "daemon-runtime")]
 pub mod service;
@@ -131,6 +133,12 @@ pub mod state {
 }
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_managed_agents;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) mod task_board_read_only_coordinator;
+#[cfg(all(feature = "daemon-runtime", test))]
+mod task_board_read_only_coordinator_tests;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) mod task_board_read_only_runtime;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_remote_transport;
 #[cfg(feature = "daemon-runtime")]

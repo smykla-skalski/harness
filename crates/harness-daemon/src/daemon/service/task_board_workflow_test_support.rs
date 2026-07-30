@@ -14,7 +14,7 @@ use super::task_board_workflow_execution::{
 
 pub(super) const CREATED_AT: &str = "2026-07-15T10:00:00Z";
 
-pub(super) struct TestDatabase {
+pub(crate) struct TestDatabase {
     pub db: AsyncDaemonDb,
     pub path: std::path::PathBuf,
     _temp: TempDir,
@@ -33,7 +33,7 @@ impl TestDatabase {
     }
 }
 
-pub(super) fn reviewers(reviewer_count: u32, required_approvals: u32) -> TaskBoardResolvedReviewer {
+pub(crate) fn reviewers(reviewer_count: u32, required_approvals: u32) -> TaskBoardResolvedReviewer {
     let profiles = [
         ("reviewer-amber", "risk-reviewer"),
         ("reviewer-indigo", "maintainability-reviewer"),

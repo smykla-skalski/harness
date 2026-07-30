@@ -24,11 +24,12 @@ use crate::workspace::orphan_cleanup::run_startup_sweep;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::super::{DaemonServeConfig, SHUTDOWN_SIGNAL};
 use super::background_tasks::{self, spawn_background_tasks};
 use super::binary_stamp::current_binary_stamp;
+use super::config::{DaemonServeConfig, log_sandbox_startup};
 use super::initialize_startup_state;
 use super::legacy_migration::log_legacy_daemon_root_migration;
+use super::service::{self, SHUTDOWN_SIGNAL};
 
 /// Start the remote daemon HTTPS API.
 ///
@@ -56,7 +57,7 @@ pub async fn serve_remote_https(
     let (sender, _) = broadcast::channel(256);
     let db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>> = Arc::new(OnceLock::new());
     let async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>> = Arc::new(OnceLock::new());
-    super::super::install_observe_runtime(
+    service::install_observe_runtime(
         sender.clone(),
         config.observe_interval,
         db.clone(),
@@ -175,7 +176,7 @@ fn log_companion_route(companion: &CompanionRouteConfig) {
 }
 
 fn prepare_remote_daemon_environment(config: &DaemonServeConfig) -> Result<(), CliError> {
-    super::super::log_sandbox_startup(config.sandboxed);
+    log_sandbox_startup(config.sandboxed);
     run_startup_sweep();
 
     let legacy_migration_report = state::migrate_legacy_daemon_root_for_current_process()?;
@@ -321,7 +322,7 @@ fn remote_audit_bound_summary(endpoint: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::daemon::http::{DaemonHttpAuthMode, RemoteRequestLimitConfig};
-    use crate::daemon::service::DaemonServeConfig;
+    use crate::daemon::serve::DaemonServeConfig;
 
     use super::{
         remote_audit_bound_summary, remote_bound_event_message, validate_remote_https_config,

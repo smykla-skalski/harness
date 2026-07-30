@@ -217,7 +217,7 @@ pub(super) async fn record_retry_or_human(
                 .task_board_workflow_execution(&execution.execution_id)
                 .await?
                 .ok_or_else(|| invalid_transition("workflow execution disappeared"))?;
-            super::super::task_board_workflow_execution::schedule_workflow_retry(
+            crate::daemon::service::task_board_workflow_execution::schedule_workflow_retry(
                 db,
                 &TaskBoardWorkflowExecutionCas::from(&current),
                 retry,
@@ -321,12 +321,13 @@ pub(super) async fn transition_attempt(
     ) {
         updated.completed_at = Some(now.to_string());
     }
-    let outcome = super::super::task_board_workflow_execution::record_workflow_execution_attempt(
-        db,
-        &TaskBoardExecutionAttemptCas::from(current),
-        &updated,
-    )
-    .await?;
+    let outcome =
+        crate::daemon::service::task_board_workflow_execution::record_workflow_execution_attempt(
+            db,
+            &TaskBoardExecutionAttemptCas::from(current),
+            &updated,
+        )
+        .await?;
     match outcome {
         TaskBoardExecutionAttemptCasOutcome::Updated(record)
         | TaskBoardExecutionAttemptCasOutcome::Unchanged(record) => Ok(record),

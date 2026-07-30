@@ -2,11 +2,12 @@ use super::acp_inspect_coalesce::{
     ACP_INSPECT_DEBOUNCE, InspectCoalescer, inspect_content_fingerprint,
 };
 use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentManagerHandle};
-use crate::daemon::service::protocol::{StreamEvent, WsAcpInspect};
-use crate::daemon::service::{broadcast, tokio_watch, utc_now};
+use crate::daemon::protocol::{StreamEvent, WsAcpInspect};
+use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future;
+use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, sleep_until};
 

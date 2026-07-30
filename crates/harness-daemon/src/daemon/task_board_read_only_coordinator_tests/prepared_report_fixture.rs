@@ -12,8 +12,8 @@ use crate::task_board::{
     resolve_task_board_reviewers,
 };
 
-use super::super::task_board_workflow_test_support::TestDatabase;
 use super::fixture::{FROZEN_HEAD, Fixture, NOW, seed_settings};
+use crate::daemon::service::task_board_workflow_test_support::TestDatabase;
 
 pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
     let test = TestDatabase::open().await;
