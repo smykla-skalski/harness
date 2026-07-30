@@ -40,6 +40,7 @@ members = [
   "crates/harness-systemd-protocol",
   "crates/harness-task-board",
   "crates/harness-task-board-codex-requests",
+  "crates/harness-task-board-git-runtime",
   "crates/harness-task-board-provider-sync",
   "crates/harness-task-board-remote-viewer",
   "crates/harness-telemetry",

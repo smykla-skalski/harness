@@ -3754,6 +3754,7 @@ dependencies = [
  "harness-systemd-protocol",
  "harness-task-board",
  "harness-task-board-codex-requests",
+ "harness-task-board-git-runtime",
  "harness-task-board-provider-sync",
  "harness-task-board-remote-viewer",
  "harness-telemetry",
@@ -4473,6 +4474,15 @@ dependencies = [
  "harness-protocol",
  "harness-task-board",
  "serde_json",
+]
+
+[[package]]
+name = "harness-task-board-git-runtime"
+version = "55.0.0"
+dependencies = [
+ "harness-daemon-state",
+ "harness-kernel",
+ "harness-task-board",
 ]
 
 [[package]]

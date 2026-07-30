@@ -1,12 +1,17 @@
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::protocol::{
+    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
+};
+use crate::daemon::state;
+use crate::task_board::{
+    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
+    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
+    TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
+};
 use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
-use super::{
-    TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
-    update_task_board_git_runtime_config, validate_repository_tokens,
-};
+use super::{update_task_board_git_runtime_config, validate_repository_tokens};
 
 #[test]
 fn runtime_key_material_sync_never_persists_durable_config() {
@@ -69,11 +74,6 @@ fn runtime_key_material_sync_retains_redacted_configured_secrets() {
         assert!(cleared.ssh_private_key.is_none());
     });
 }
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::state;
-use crate::task_board::{
-    TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
-};
 
 #[test]
 fn update_runtime_config_normalizes_and_persists_repository_overrides() {
