@@ -29,7 +29,16 @@ enum HeadBehavior {
     Error(String),
 }
 
-pub(super) struct FakeReadOnlyRuntime {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::daemon) struct CapturedAgentTurnStart {
+    pub(in crate::daemon) runtime: String,
+    pub(in crate::daemon) prompt: String,
+    pub(in crate::daemon) requested_model: Option<String>,
+    pub(in crate::daemon) pull_request_body: Option<String>,
+    pub(in crate::daemon) head_revision: Option<String>,
+}
+
+pub(in crate::daemon) struct FakeReadOnlyRuntime {
     durable_db: Option<AsyncDaemonDb>,
     reports: Mutex<VecDeque<PlannedReport>>,
     runs: Mutex<BTreeMap<String, CodexRunSnapshot>>,
@@ -37,6 +46,7 @@ pub(super) struct FakeReadOnlyRuntime {
     immutable_content: Mutex<Result<String, String>>,
     immutable_content_loads: AtomicUsize,
     starts: Mutex<Vec<String>>,
+    agent_turn_starts: Mutex<Vec<CapturedAgentTurnStart>>,
     requests: Mutex<Vec<CodexRunRequest>>,
     load_error: Mutex<Option<String>>,
     block_report: AtomicBool,
@@ -56,7 +66,7 @@ pub(super) struct FakeReadOnlyRuntime {
 }
 
 impl FakeReadOnlyRuntime {
-    pub(super) fn new(reports: impl IntoIterator<Item = PlannedReport>) -> Self {
+    pub(in crate::daemon) fn new(reports: impl IntoIterator<Item = PlannedReport>) -> Self {
         Self {
             durable_db: None,
             reports: Mutex::new(reports.into_iter().collect()),
@@ -67,6 +77,7 @@ impl FakeReadOnlyRuntime {
             )),
             immutable_content_loads: AtomicUsize::new(0),
             starts: Mutex::new(Vec::new()),
+            agent_turn_starts: Mutex::new(Vec::new()),
             requests: Mutex::new(Vec::new()),
             load_error: Mutex::new(None),
             block_report: AtomicBool::new(false),
@@ -86,9 +97,16 @@ impl FakeReadOnlyRuntime {
         }
     }
 
-    pub(super) fn with_durable_db(mut self, db: AsyncDaemonDb) -> Self {
+    pub(in crate::daemon) fn with_durable_db(mut self, db: AsyncDaemonDb) -> Self {
         self.durable_db = Some(db);
         self
+    }
+
+    pub(in crate::daemon) fn set_immutable_content(&self, content: &str) {
+        *self
+            .immutable_content
+            .lock()
+            .expect("immutable content lock") = Ok(content.into());
     }
 
     pub(super) fn fail_immutable_content(&self, detail: &str) {
@@ -102,7 +120,7 @@ impl FakeReadOnlyRuntime {
         self.immutable_content_loads.load(Ordering::SeqCst)
     }
 
-    pub(super) fn set_head(&self, head: &str) {
+    pub(in crate::daemon) fn set_head(&self, head: &str) {
         *self.head.lock().expect("head lock") = HeadBehavior::Exact(head.into());
     }
 
@@ -110,12 +128,21 @@ impl FakeReadOnlyRuntime {
         *self.head.lock().expect("head lock") = HeadBehavior::Error(detail.into());
     }
 
-    pub(super) fn start_count(&self) -> usize {
+    pub(in crate::daemon) fn start_count(&self) -> usize {
         self.starts.lock().expect("starts lock").len()
     }
 
-    pub(super) fn publish_count(&self) -> usize {
+    pub(in crate::daemon) fn publish_count(&self) -> usize {
         self.publishes.load(Ordering::SeqCst)
+    }
+
+    pub(in crate::daemon) fn last_agent_turn_start(&self) -> CapturedAgentTurnStart {
+        self.agent_turn_starts
+            .lock()
+            .expect("agent-turn starts lock")
+            .last()
+            .expect("captured agent-turn start")
+            .clone()
     }
 
     pub(super) fn last_request(&self) -> CodexRunRequest {
@@ -254,6 +281,22 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
         &self,
         start: AgentTurnReportStart<'_>,
     ) -> Result<(), CliError> {
+        self.agent_turn_starts
+            .lock()
+            .expect("agent-turn starts lock")
+            .push(CapturedAgentTurnStart {
+                runtime: start.runtime.into(),
+                prompt: start.prompt.clone(),
+                requested_model: start.requested_model.clone(),
+                pull_request_body: start
+                    .pull_request
+                    .as_ref()
+                    .map(|pull_request| pull_request.content.body.clone()),
+                head_revision: start
+                    .pull_request
+                    .as_ref()
+                    .map(|pull_request| pull_request.pull_request.head_revision.clone()),
+            });
         self.starts
             .lock()
             .expect("starts lock")

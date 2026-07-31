@@ -143,7 +143,7 @@ pub(crate) mod task_board_managed_agents;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_read_only_coordinator;
 #[cfg(all(feature = "daemon-runtime", test))]
-mod task_board_read_only_coordinator_tests;
+pub(in crate::daemon) mod task_board_read_only_coordinator_tests;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_read_only_runtime;
 #[cfg(feature = "daemon-runtime")]
