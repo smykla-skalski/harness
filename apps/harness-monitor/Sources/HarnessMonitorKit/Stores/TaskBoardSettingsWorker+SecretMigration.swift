@@ -149,7 +149,7 @@ extension TaskBoardSettingsWorker {
       newGithub: newGithub,
       known: knownRepositories
     )
-    for slug in repoSlugs {
+    for slug in repoSlugs.sorted() {
       for target in keyMaterialTargets {
         try carryKeyMaterial(
           target.store,
