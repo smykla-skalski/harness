@@ -60,7 +60,7 @@ struct TaskBoardWorkflowAttemptDetailSheet: View {
         Divider()
         TaskBoardWorkflowValueRow(
           label: "Updated",
-          value: attempt.updatedAt.taskBoardReviewDisplayTimestamp
+          value: attempt.updatedAt.taskBoardDisplayTimestamp
         )
       }
       .taskBoardWorkflowDetailCard()

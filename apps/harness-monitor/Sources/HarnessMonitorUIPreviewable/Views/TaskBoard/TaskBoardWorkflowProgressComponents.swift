@@ -154,11 +154,11 @@ struct TaskBoardWorkflowMetadataCard: View {
       rows.append(.init(label: "Execution", value: executionID, monospaced: true))
     }
     rows.append(
-      .init(label: "Started", value: provenance.startedAt.taskBoardReviewDisplayTimestamp)
+      .init(label: "Started", value: provenance.startedAt.taskBoardDisplayTimestamp)
     )
     if let finishedAt = provenance.finishedAt {
       rows.append(
-        .init(label: "Finished", value: finishedAt.taskBoardReviewDisplayTimestamp)
+        .init(label: "Finished", value: finishedAt.taskBoardDisplayTimestamp)
       )
     }
     return rows
@@ -209,6 +209,21 @@ struct TaskBoardWorkflowTriageCard: View {
   }
 }
 
+extension TaskBoardDependencyCheck {
+  var detailsWebURL: URL? {
+    guard let detailsUrl else { return nil }
+    let trimmed = detailsUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let url = URL(string: trimmed),
+      let scheme = url.scheme?.lowercased(),
+      scheme == "https" || scheme == "http"
+    else {
+      return nil
+    }
+    return url
+  }
+}
+
 struct TaskBoardWorkflowChecksCard: View {
   let checks: [TaskBoardDependencyCheck]
   @Environment(\.fontScale)
@@ -218,7 +233,7 @@ struct TaskBoardWorkflowChecksCard: View {
     VStack(spacing: 0) {
       ForEach(Array(checks.enumerated()), id: \.offset) { index, check in
         Group {
-          if let value = check.detailsUrl, let url = URL(string: value) {
+          if let url = check.detailsWebURL {
             Link(destination: url) {
               checkRow(check, showsExternalLink: true)
             }

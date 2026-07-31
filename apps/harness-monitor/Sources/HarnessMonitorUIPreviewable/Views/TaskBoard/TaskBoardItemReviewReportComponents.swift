@@ -221,10 +221,10 @@ struct TaskBoardReviewMetadataCard: View {
       result.append(.init(label: "Execution", value: executionID, monospaced: true))
     }
     result.append(
-      .init(label: "Started", value: provenance.startedAt.taskBoardReviewDisplayTimestamp)
+      .init(label: "Started", value: provenance.startedAt.taskBoardDisplayTimestamp)
     )
     if let finishedAt = provenance.finishedAt {
-      result.append(.init(label: "Finished", value: finishedAt.taskBoardReviewDisplayTimestamp))
+      result.append(.init(label: "Finished", value: finishedAt.taskBoardDisplayTimestamp))
     }
     return result
   }
@@ -340,7 +340,7 @@ extension TaskBoardReviewMessageCard where Accessory == EmptyView {
 }
 
 extension String {
-  @MainActor var taskBoardReviewDisplayTimestamp: String {
+  @MainActor var taskBoardDisplayTimestamp: String {
     let date =
       reviewFractionalFormatter.date(from: self)
       ?? reviewTimestampFormatter.date(from: self)

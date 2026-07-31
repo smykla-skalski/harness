@@ -274,6 +274,29 @@ struct TaskBoardSwiftUXCorrectnessTests {
     #expect(empty.detailsWebURL == nil)
   }
 
+  @Test("Workflow check details URLs are limited to web links")
+  func workflowCheckDetailsURLsAreLimitedToWebLinks() {
+    let web = TaskBoardDependencyCheck(
+      name: "ci",
+      state: .passed,
+      detailsUrl: " https://github.com/acme/api/actions/runs/1 "
+    )
+    let file = TaskBoardDependencyCheck(
+      name: "local",
+      state: .failed,
+      detailsUrl: "file:///tmp/check.log"
+    )
+    let script = TaskBoardDependencyCheck(
+      name: "script",
+      state: .pending,
+      detailsUrl: "javascript:alert(1)"
+    )
+
+    #expect(web.detailsWebURL?.absoluteString == "https://github.com/acme/api/actions/runs/1")
+    #expect(file.detailsWebURL == nil)
+    #expect(script.detailsWebURL == nil)
+  }
+
   @Test("Review rerun unavailable reason distinguishes missing check suites")
   func reviewRerunUnavailableReasonDistinguishesMissingCheckSuites() {
     let noSuite = sampleReview(
