@@ -347,14 +347,18 @@ extension WebSocketTransport {
 extension WebSocketTransport {
   // MARK: - Streams
 
+  /// Termination reason for the global and session stream continuations, in
+  /// a local alias so the onTermination callbacks below stay readable.
+  typealias StreamTermination = AsyncThrowingStream<DaemonPushEvent, Error>.Continuation.Termination
+
   public func globalStream() async -> DaemonPushEventStream {
     let (stream, continuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
     globalStreamContinuation = continuation
     globalSubscriptionActive = true
 
-    continuation.onTermination = { [weak self] _ in
+    continuation.onTermination = { [weak self] termination in
       guard let self else { return }
-      Task { await self.cleanupGlobalSubscription() }
+      Task { await self.cleanupGlobalSubscription(termination: termination) }
     }
 
     Task {
@@ -371,16 +375,18 @@ extension WebSocketTransport {
     return stream
   }
 
-  func cleanupGlobalSubscription() {
-    // Drop the local continuation reference in both cases; only the
-    // desired-subscription flag and the daemon-side unsubscribe survive
-    // a consumer-initiated stop. A transport-initiated teardown (see
-    // `WebSocketTransportInternal+Receive.swift`) sets
-    // `reconnectingStreams` first so this closure sees it true and
-    // leaves `globalSubscriptionActive` set, letting `resubscribe()`
-    // re-establish the global subscription on the new socket.
+  func cleanupGlobalSubscription(
+    termination: StreamTermination
+  ) {
+    // Only the transport's `terminateAllStreams()` calls `continuation.finish()`
+    // (which produces `.finished`) while `reconnectingStreams` is true. A
+    // consumer-driven termination (Task cancellation, app lifecycle) reports
+    // `.cancelled` here instead, and the desired-subscription flag must drop
+    // so the in-flight receive loop's `resubscribe()` does not re-issue
+    // `streamSubscribe` for a stream the consumer no longer wants.
+    let isTransportReconnect = reconnectingStreams && termination == .finished
     globalStreamContinuation = nil
-    if reconnectingStreams {
+    if isTransportReconnect {
       HarnessMonitorLogger.websocket.debug(
         "skipping global unsubscribe: transport reconnect in progress"
       )
@@ -400,9 +406,9 @@ extension WebSocketTransport {
     sessionStreamContinuations[sessionID] = continuation
     activeSubscriptions.insert(sessionID)
 
-    continuation.onTermination = { [weak self] _ in
+    continuation.onTermination = { [weak self] termination in
       guard let self else { return }
-      Task { await self.cleanupSessionSubscription(sessionID: sessionID) }
+      Task { await self.cleanupSessionSubscription(sessionID: sessionID, termination: termination) }
     }
 
     Task {
@@ -419,12 +425,18 @@ extension WebSocketTransport {
     return stream
   }
 
-  func cleanupSessionSubscription(sessionID: String) {
-    // Mirror `cleanupGlobalSubscription`: a transport reconnect leaves
-    // the desired-subscription set intact so `resubscribe()` re-issues
-    // `session.subscribe` on the new socket.
+  func cleanupSessionSubscription(
+    sessionID: String,
+    termination: StreamTermination
+  ) {
+    // Mirror `cleanupGlobalSubscription`: a transport reconnect leaves the
+    // desired-subscription set intact so `resubscribe()` re-issues
+    // `session.subscribe` on the new socket, but a consumer cancellation
+    // still drops the session from `activeSubscriptions` to stop the same
+    // reconnect from re-subscribing to it.
+    let isTransportReconnect = reconnectingStreams && termination == .finished
     sessionStreamContinuations[sessionID] = nil
-    if reconnectingStreams {
+    if isTransportReconnect {
       HarnessMonitorLogger.websocket.debug(
         "skipping session unsubscribe for \(sessionID, privacy: .public): transport reconnect in progress"
       )
