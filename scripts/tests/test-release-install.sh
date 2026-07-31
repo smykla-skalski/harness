@@ -1091,13 +1091,18 @@ scenario_legacy_binaries_are_normalized_before_activation() {
 }
 
 scenario_repo_wrapper_is_normalized_before_activation() {
-  start_test "repo-aware wrapper is normalized before activation"
-  local sandbox="$SANDBOX/repo-wrapper"
-  write_fake_release_set "$sandbox/target" 48.0.0
-  command mkdir -p "$sandbox/bin"
-  command cat >"$sandbox/bin/harness" <<'EOF'
+  start_test "repo-aware wrappers are normalized without execution"
+  local kind sandbox executed_file
+  local ok=1
+  for kind in legacy marked; do
+    sandbox="$SANDBOX/repo-wrapper-$kind"
+    executed_file="$sandbox/wrapper-executed"
+    write_fake_release_set "$sandbox/target" 48.0.0
+    command mkdir -p "$sandbox/bin"
+    command cat >"$sandbox/bin/harness" <<'EOF'
 #!/bin/sh
 set -eu
+: >"${HARNESS_INSTALL_TEST_REPO_WRAPPER_EXECUTED:?}"
 is_repo_root() {
   return 1
 }
@@ -1109,16 +1114,24 @@ echo "harness: unable to resolve a current harness binary for ${repo_root}" >&2
 echo "harness: unable to resolve a harness repo from \$CLAUDE_PROJECT_DIR or \$PWD" >&2
 exit 1
 EOF
-  command chmod +x "$sandbox/bin/harness"
+    if [[ "$kind" == marked ]]; then
+      printf '%s\n' '# harness-repo-wrapper-v1' >>"$sandbox/bin/harness"
+    fi
+    command chmod +x "$sandbox/bin/harness"
 
-  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+    HARNESS_INSTALL_TEST_REPO_WRAPPER_EXECUTED="$executed_file" \
+      run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
 
-  local ok=1
-  [[ -L "$sandbox/bin/harness" ]] || {
-    fail "repo-aware wrapper was not converted to a managed link"
-    ok=0
-  }
-  assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
+    [[ -L "$sandbox/bin/harness" ]] || {
+      fail "$kind repo-aware wrapper was not converted to a managed link"
+      ok=0
+    }
+    [[ ! -e "$executed_file" ]] || {
+      fail "$kind repo-aware wrapper was executed during normalization"
+      ok=0
+    }
+    assert_contains "harness 48.0.0" "$("$sandbox/bin/harness" --version)" || ok=0
+  done
   if (( ok )); then pass; fi
 }
 
