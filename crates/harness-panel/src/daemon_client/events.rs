@@ -250,10 +250,6 @@ impl DaemonEventStream {
     /// one no account here has ever signed in under — falls back to a resync
     /// every watcher acts on. Resolving decides only who is asked to re-read, so
     /// a lookup that fails is answered by asking more watchers, never fewer.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-    )]
     async fn resync_for(&self, minted_for: Option<&MintedFor>) -> PanelChange {
         let Some(identity) = minted_for else {
             return PanelChange::Resynced;
@@ -266,11 +262,22 @@ impl DaemonEventStream {
             Ok(Some(account_id)) => PanelChange::ResyncAccount(account_id),
             Ok(None) => PanelChange::Resynced,
             Err(error) => {
-                tracing::warn!(%error, "could not resolve who an unattributed daemon event was minted for; asking every watcher to re-read");
+                record_unresolved_minted_for(&error);
                 PanelChange::Resynced
             }
         }
     }
+}
+
+/// The lookup for who an unattributed event was minted for failed, so it falls
+/// back to a full resync. Split out because the tracing macro expansion alone
+/// trips the cognitive-complexity lint.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn record_unresolved_minted_for(error: &sqlx::Error) {
+    tracing::warn!(%error, "could not resolve who an unattributed daemon event was minted for; asking every watcher to re-read");
 }
 
 /// The daemon socket, however it had to be reached.
