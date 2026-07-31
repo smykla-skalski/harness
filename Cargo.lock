@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "aff"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -3496,7 +3496,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "agent-client-protocol",
  "agent-client-protocol-http",
@@ -3600,7 +3600,7 @@ dependencies = [
 
 [[package]]
 name = "harness-acme-dns"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "async-trait",
  "base64 0.23.0",
@@ -3621,7 +3621,7 @@ dependencies = [
 
 [[package]]
 name = "harness-agents"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "agent-client-protocol",
  "async-trait",
@@ -3645,11 +3645,11 @@ dependencies = [
 
 [[package]]
 name = "harness-architecture-tests"
-version = "55.0.0"
+version = "55.0.1"
 
 [[package]]
 name = "harness-bridge"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "agent-client-protocol",
  "async-trait",
@@ -3696,7 +3696,7 @@ dependencies = [
 
 [[package]]
 name = "harness-command"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "rustix",
  "tempfile",
@@ -3705,7 +3705,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "agent-client-protocol",
  "agent-client-protocol-http",
@@ -3821,7 +3821,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-acp-probe"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-agents",
  "harness-workspace",
@@ -3830,7 +3830,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-bin"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -3849,7 +3849,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-cli"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "clap",
  "harness-daemon",
@@ -3866,7 +3866,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-client"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs2",
  "reqwest",
@@ -3882,7 +3882,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-codex"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -3894,7 +3894,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-discovery"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs2",
  "harness-daemon-client",
@@ -3906,7 +3906,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-launchd"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs-err",
  "harness-daemon-root",
@@ -3921,7 +3921,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-provider-credentials"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-daemon-state",
  "harness-task-board",
@@ -3934,7 +3934,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-remote-cli"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -3957,7 +3957,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-root"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs-err",
  "fs2",
@@ -3976,7 +3976,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-session-service"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-agents",
  "harness-daemon-root",
@@ -3990,7 +3990,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-snapshot"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs-err",
  "harness-agents",
@@ -4008,7 +4008,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-state"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs-err",
  "harness-daemon-root",
@@ -4028,7 +4028,7 @@ dependencies = [
 
 [[package]]
 name = "harness-daemon-watch"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "async-trait",
  "fs-err",
@@ -4053,7 +4053,7 @@ dependencies = [
 
 [[package]]
 name = "harness-db-schema"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-daemon",
  "harness-kernel",
@@ -4072,7 +4072,7 @@ dependencies = [
 
 [[package]]
 name = "harness-feature-flags"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-task-board",
  "harness-workspace",
@@ -4081,7 +4081,7 @@ dependencies = [
 
 [[package]]
 name = "harness-github-api"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "axum",
  "chrono",
@@ -4101,7 +4101,7 @@ dependencies = [
 
 [[package]]
 name = "harness-hook"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "clap",
@@ -4139,7 +4139,7 @@ dependencies = [
 
 [[package]]
 name = "harness-hooks"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "clap",
  "fs-err",
@@ -4163,7 +4163,7 @@ dependencies = [
 
 [[package]]
 name = "harness-infra"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "fs2",
@@ -4180,7 +4180,7 @@ dependencies = [
 
 [[package]]
 name = "harness-kernel"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs-err",
  "gray_matter",
@@ -4195,7 +4195,7 @@ dependencies = [
 
 [[package]]
 name = "harness-mcp"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -4218,7 +4218,7 @@ dependencies = [
 
 [[package]]
 name = "harness-observe"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "clap",
@@ -4280,7 +4280,7 @@ dependencies = [
 
 [[package]]
 name = "harness-policy-graph-store"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "harness-kernel",
@@ -4296,7 +4296,7 @@ dependencies = [
 
 [[package]]
 name = "harness-protocol"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "base64 0.23.0",
  "chrono",
@@ -4312,7 +4312,7 @@ dependencies = [
 
 [[package]]
 name = "harness-remote-trust"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "base64 0.23.0",
  "harness-protocol",
@@ -4327,7 +4327,7 @@ dependencies = [
 
 [[package]]
 name = "harness-reviews"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -4353,7 +4353,7 @@ dependencies = [
 
 [[package]]
 name = "harness-run"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "clap",
@@ -4371,7 +4371,7 @@ dependencies = [
 
 [[package]]
 name = "harness-session"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "clap",
@@ -4399,7 +4399,7 @@ dependencies = [
 
 [[package]]
 name = "harness-sybra"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "axum",
  "bytes",
@@ -4420,7 +4420,7 @@ dependencies = [
 
 [[package]]
 name = "harness-systemd"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "assert_cmd",
  "chrono",
@@ -4446,7 +4446,7 @@ dependencies = [
 
 [[package]]
 name = "harness-systemd-protocol"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "nix 0.31.3",
  "temp-env",
@@ -4456,7 +4456,7 @@ dependencies = [
 
 [[package]]
 name = "harness-task-board"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -4497,7 +4497,7 @@ dependencies = [
 
 [[package]]
 name = "harness-task-board-codex-requests"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-kernel",
  "harness-protocol",
@@ -4507,7 +4507,7 @@ dependencies = [
 
 [[package]]
 name = "harness-task-board-git-runtime"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-daemon-state",
  "harness-kernel",
@@ -4516,7 +4516,7 @@ dependencies = [
 
 [[package]]
 name = "harness-task-board-provider-sync"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "harness-kernel",
@@ -4531,7 +4531,7 @@ dependencies = [
 
 [[package]]
 name = "harness-task-board-remote-viewer"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-kernel",
  "harness-task-board",
@@ -4542,7 +4542,7 @@ dependencies = [
 
 [[package]]
 name = "harness-task-board-workflow-execution"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "chrono",
  "harness-kernel",
@@ -4551,7 +4551,7 @@ dependencies = [
 
 [[package]]
 name = "harness-telemetry"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "axum",
  "chrono",
@@ -4577,7 +4577,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "temp-env",
  "tempfile",
@@ -4585,7 +4585,7 @@ dependencies = [
 
 [[package]]
 name = "harness-timeline"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "fs-err",
  "harness-agents",
@@ -4602,7 +4602,7 @@ dependencies = [
 
 [[package]]
 name = "harness-voice"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "base64 0.23.0",
  "chrono",
@@ -4622,7 +4622,7 @@ dependencies = [
 
 [[package]]
 name = "harness-workspace"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "base64 0.23.0",
  "chrono",
@@ -5996,7 +5996,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openapi-codegen"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "harness-daemon",
 ]
@@ -6435,7 +6435,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "policy-codegen"
-version = "55.0.0"
+version = "55.0.1"
 dependencies = [
  "syn 3.0.3",
 ]

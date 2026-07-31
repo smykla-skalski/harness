@@ -16,6 +16,12 @@ MISSING_VERSION="<missing>"
 WORKSPACE_MANIFESTS=()
 WORKSPACE_NAMES=()
 WORKSPACE_VERSIONS=()
+# These packages own separate workspaces and version independently, but any
+# versioned path dependency back into the root workspace follows the root.
+STANDALONE_WORKSPACE_MANIFESTS=(
+  "$ROOT/crates/harness-codex-acp/Cargo.toml"
+  "$ROOT/crates/harness-openrouter-agent/Cargo.toml"
+)
 # Members that ship on their own cadence and keep the version in their own
 # manifest. This one names crates to leave alone, so a crate nobody remembered
 # to list moves with the root and says so, rather than going stale in silence.
@@ -330,13 +336,14 @@ set_manifest_dependency_version() {
 }
 
 set_lock_package_version() {
-  local package_name="$1"
-  local version="$2"
+  local lockfile="$1"
+  local package_name="$2"
+  local version="$3"
 
   PACKAGE_NAME="$package_name" NEW_VERSION="$version" perl -0pi -e '
     my $count = s/(\[\[package\]\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = ")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/se;
     die "failed to update $ENV{PACKAGE_NAME} version in $ARGV\n" unless $count;
-  ' "$CARGO_LOCK"
+  ' "$lockfile"
 }
 
 set_build_settings_marketing_version() {
@@ -420,7 +427,7 @@ check_sync() {
   local -a generated_marketing_versions=()
   local -a generated_current_versions=()
   local -a errors=()
-  local index manifest package_name package_version target_version lock_version
+  local index manifest lockfile package_name package_version target_version lock_version
   local kind dependency_name detail
 
   version="$(canonical_version)"
@@ -445,7 +452,10 @@ check_sync() {
     [ "$package_version" = "$target_version" ] || errors+=("${manifest#"$ROOT/"} $package_name version $package_version != expected version $target_version")
     [ "$lock_version" = "$target_version" ] || errors+=("Cargo.lock $package_name version $lock_version != expected version $target_version")
   done
-  for manifest in "${WORKSPACE_MANIFESTS[@]}"; do
+  for manifest in "${STANDALONE_WORKSPACE_MANIFESTS[@]}"; do
+    [ -f "$manifest" ] || die "standalone workspace manifest is missing: $manifest"
+  done
+  for manifest in "${WORKSPACE_MANIFESTS[@]}" "${STANDALONE_WORKSPACE_MANIFESTS[@]}"; do
     while IFS=$'\t' read -r kind dependency_name detail; do
       is_workspace_package_name "$dependency_name" || continue
       target_version="$(package_target_version "$dependency_name" "$version")"
@@ -455,6 +465,16 @@ check_sync() {
         errors+=("${manifest#"$ROOT/"} $dependency_name dependency is $detail")
       fi
     done < <(manifest_dependency_declarations "$manifest")
+  done
+  for manifest in "${STANDALONE_WORKSPACE_MANIFESTS[@]}"; do
+    lockfile="${manifest%/Cargo.toml}/Cargo.lock"
+    [ -f "$lockfile" ] || die "standalone workspace lockfile is missing: $lockfile"
+    for package_name in "${WORKSPACE_NAMES[@]}"; do
+      lock_version="$(lock_package_version "$lockfile" "$package_name")"
+      [ "$lock_version" = "$MISSING_VERSION" ] && continue
+      target_version="$(package_target_version "$package_name" "$version")"
+      [ "$lock_version" = "$target_version" ] || errors+=("${lockfile#"$ROOT/"} $package_name version $lock_version != expected version $target_version")
+    done
   done
   [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
   [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
@@ -503,16 +523,19 @@ check_sync() {
 
 sync_all() {
   local version="$1"
-  local index manifest package_name target_version kind dependency_name detail
+  local index manifest lockfile package_name target_version kind dependency_name detail
 
   load_workspace_members
   for index in "${!WORKSPACE_MANIFESTS[@]}"; do
     package_name="${WORKSPACE_NAMES[$index]}"
     target_version="$(package_target_version "$package_name" "$version")"
     set_manifest_package_version "${WORKSPACE_MANIFESTS[$index]}" "$package_name" "$target_version"
-    set_lock_package_version "$package_name" "$target_version"
+    set_lock_package_version "$CARGO_LOCK" "$package_name" "$target_version"
   done
-  for manifest in "${WORKSPACE_MANIFESTS[@]}"; do
+  for manifest in "${STANDALONE_WORKSPACE_MANIFESTS[@]}"; do
+    [ -f "$manifest" ] || die "standalone workspace manifest is missing: $manifest"
+  done
+  for manifest in "${WORKSPACE_MANIFESTS[@]}" "${STANDALONE_WORKSPACE_MANIFESTS[@]}"; do
     while IFS=$'\t' read -r kind dependency_name detail; do
       is_workspace_package_name "$dependency_name" || continue
       [ "$kind" = "version" ] ||
@@ -520,6 +543,15 @@ sync_all() {
       target_version="$(package_target_version "$dependency_name" "$version")"
       set_manifest_dependency_version "$manifest" "$dependency_name" "$target_version"
     done < <(manifest_dependency_declarations "$manifest")
+  done
+  for manifest in "${STANDALONE_WORKSPACE_MANIFESTS[@]}"; do
+    lockfile="${manifest%/Cargo.toml}/Cargo.lock"
+    [ -f "$lockfile" ] || die "standalone workspace lockfile is missing: $lockfile"
+    for package_name in "${WORKSPACE_NAMES[@]}"; do
+      [ "$(lock_package_version "$lockfile" "$package_name")" = "$MISSING_VERSION" ] && continue
+      target_version="$(package_target_version "$package_name" "$version")"
+      set_lock_package_version "$lockfile" "$package_name" "$target_version"
+    done
   done
   sync_monitor "$version"
   set_openapi_document_version "$version"

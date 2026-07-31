@@ -13,6 +13,11 @@ fn wrapper_content_starts_with_shebang() {
 }
 
 #[test]
+fn wrapper_content_carries_install_ownership_marker() {
+    assert!(WRAPPER.contains("# harness-repo-wrapper-v1"));
+}
+
+#[test]
 fn wrapper_content_references_claude_project_dir() {
     assert!(WRAPPER.contains("CLAUDE_PROJECT_DIR"));
 }

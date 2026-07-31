@@ -66,6 +66,8 @@ seed_sandbox() {
     "$ROOT/docs/api/openapi.json"
     "$ROOT/crates/harness-observe/src/output.rs"
     "$ROOT"/crates/*/Cargo.toml
+    "$ROOT/crates/harness-codex-acp/Cargo.lock"
+    "$ROOT/crates/harness-openrouter-agent/Cargo.lock"
     "$ROOT"/tools/*/Cargo.toml
   )
   for source in "${sources[@]}"; do
@@ -296,6 +298,69 @@ scenario_check_rejects_a_stale_member_requirement() {
   check_rejects "harness-kernel"
 }
 
+scenario_check_rejects_a_stale_standalone_requirement() {
+  seed_sandbox
+  start_test "check fails when a standalone workspace requirement is stale"
+  perl -pi -e '
+    if (s/^(harness-protocol\s*=\s*\{[^}]*\bversion\s*=\s*")[^"]+(")/${1}0.0.1$2/) {
+      $ENV{STALED} = 1;
+    }
+    END { die "failed to stale the requirement\n" unless $ENV{STALED}; }
+  ' "$SANDBOX/crates/harness-openrouter-agent/Cargo.toml"
+
+  check_rejects "crates/harness-openrouter-agent/Cargo.toml"
+}
+
+scenario_check_rejects_a_stale_standalone_lock() {
+  seed_sandbox
+  start_test "check fails when a standalone workspace lock is stale"
+  PACKAGE_NAME=harness-protocol NEW_VERSION=0.0.1 perl -0pi -e '
+    my $count = s/(\[\[package\]\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = ")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/se;
+    die "failed to stale $ENV{PACKAGE_NAME} in $ARGV\n" unless $count;
+  ' "$SANDBOX/crates/harness-openrouter-agent/Cargo.lock"
+
+  check_rejects "crates/harness-openrouter-agent/Cargo.lock"
+}
+
+scenario_sync_repairs_a_stale_standalone_requirement() {
+  seed_sandbox
+  start_test "sync repairs a standalone workspace requirement and lock"
+  local manifest="$SANDBOX/crates/harness-openrouter-agent/Cargo.toml"
+  local lockfile="$SANDBOX/crates/harness-openrouter-agent/Cargo.lock"
+  local expected
+  expected="$(canonical_version)"
+  perl -pi -e '
+    if (s/^(harness-protocol\s*=\s*\{[^}]*\bversion\s*=\s*")[^"]+(")/${1}0.0.1$2/) {
+      $ENV{STALED} = 1;
+    }
+    END { die "failed to stale the requirement\n" unless $ENV{STALED}; }
+  ' "$manifest"
+  for package_name in harness-kernel harness-protocol; do
+    PACKAGE_NAME="$package_name" NEW_VERSION=0.0.1 perl -0pi -e '
+      my $count = s/(\[\[package\]\]\s*name = "\Q$ENV{PACKAGE_NAME}\E"\s*version = ")[^"]+(")/$1.$ENV{NEW_VERSION}.$2/se;
+      die "failed to stale $ENV{PACKAGE_NAME} in $ARGV\n" unless $count;
+    ' "$lockfile"
+  done
+
+  if ! "$SCRIPT" sync >/dev/null 2>&1; then
+    fail "version.sh sync exited non-zero"
+    return 1
+  fi
+  if ! grep -Fq "harness-protocol = { path = \"../harness-protocol\", version = \"$expected\" }" "$manifest"; then
+    fail "standalone requirement did not move to $expected"
+    return 1
+  fi
+  if PACKAGE_NAMES="harness-kernel harness-protocol" EXPECTED="$expected" perl -0ne '
+    for my $name (split " ", $ENV{PACKAGE_NAMES}) {
+      exit 1 unless /\[\[package\]\]\s*name = "\Q$name\E"\s*version = "\Q$ENV{EXPECTED}\E"/s;
+    }
+  ' "$lockfile"; then
+    pass
+  else
+    fail "standalone lock requirements did not move to $expected"
+  fi
+}
+
 # A requirement version.sh cannot rewrite has to be reported, not skipped:
 # skipping is exactly how the fixed crate list lost crates without anyone
 # noticing. The version here is the canonical one, so the scenario proves the
@@ -419,6 +484,9 @@ scenarios=(
   scenario_check_rejects_a_stale_member_crate
   scenario_check_rejects_a_member_added_after_the_tooling
   scenario_check_rejects_a_stale_member_requirement
+  scenario_check_rejects_a_stale_standalone_requirement
+  scenario_check_rejects_a_stale_standalone_lock
+  scenario_sync_repairs_a_stale_standalone_requirement
   scenario_check_rejects_an_unreadable_member_requirement
   scenario_check_accepts_a_path_only_member_requirement
   scenario_set_moves_every_shared_workspace_member
