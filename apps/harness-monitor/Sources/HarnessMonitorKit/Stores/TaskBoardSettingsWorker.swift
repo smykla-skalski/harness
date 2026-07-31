@@ -219,4 +219,59 @@ actor TaskBoardSettingsWorker {
   }
 
   func waitForIdle() {}
+
+  func migrateStoredSecrets(
+    from oldInstanceID: String,
+    to newInstanceID: String
+  ) throws {
+    let oldScope = TaskBoardCredentialScope.database(oldInstanceID)
+    let newScope = TaskBoardCredentialScope.database(newInstanceID)
+
+    let oldGithub = try credentialPersistence.github.load(scope: oldScope)
+    if !oldGithub.isEmpty {
+      let newGithub = try credentialPersistence.github.load(scope: newScope)
+      if newGithub.isEmpty {
+        try credentialPersistence.github.save(oldGithub, scope: newScope)
+      }
+    }
+
+    let oldOpenRouter = try credentialPersistence.openRouter.load(scope: oldScope)
+    if !oldOpenRouter.isEmpty {
+      let newOpenRouter = try credentialPersistence.openRouter.load(scope: newScope)
+      if newOpenRouter.isEmpty {
+        try credentialPersistence.openRouter.save(oldOpenRouter, scope: newScope)
+      }
+    }
+
+    try migrateKeyMaterial(
+      from: .databaseGlobal(oldInstanceID),
+      to: .databaseGlobal(newInstanceID)
+    )
+
+    for repoToken in oldGithub.repositoryTokens {
+      let slug = repoToken.repository.lowercased()
+      try migrateKeyMaterial(
+        from: .databaseRepository(oldInstanceID, slug),
+        to: .databaseRepository(newInstanceID, slug)
+      )
+    }
+  }
+
+  private func migrateKeyMaterial(
+    from oldScope: TaskBoardKeyMaterialStore.Scope,
+    to newScope: TaskBoardKeyMaterialStore.Scope
+  ) throws {
+    let stores: [any TaskBoardKeyMaterialPersisting] = [
+      keyMaterialPersistence.ssh,
+      keyMaterialPersistence.signingSsh,
+      keyMaterialPersistence.gpg,
+    ]
+    for store in stores {
+      let oldMaterial = try store.load(scope: oldScope)
+      guard !oldMaterial.isEmpty else { continue }
+      let newMaterial = try store.load(scope: newScope)
+      guard newMaterial.isEmpty else { continue }
+      try store.save(oldMaterial, scope: newScope)
+    }
+  }
 }

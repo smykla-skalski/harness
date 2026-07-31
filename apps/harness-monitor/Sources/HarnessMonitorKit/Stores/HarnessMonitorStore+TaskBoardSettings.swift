@@ -10,13 +10,24 @@ struct TaskBoardCredentialSyncState: Sendable {
 
 struct TaskBoardConnectionState: Sendable {
   var databaseInstanceID: String?
+  var previousDatabaseInstanceID: String?
   var credentialSync: TaskBoardCredentialSyncState?
 }
 
 extension HarnessMonitorStore {
   var taskBoardDatabaseInstanceID: String? {
     get { taskBoardRuntimeState.connection.databaseInstanceID }
-    set { taskBoardRuntimeState.connection.databaseInstanceID = newValue }
+    set {
+      let oldValue = taskBoardRuntimeState.connection.databaseInstanceID
+      if let oldValue, oldValue != newValue {
+        taskBoardRuntimeState.connection.previousDatabaseInstanceID = oldValue
+      }
+      taskBoardRuntimeState.connection.databaseInstanceID = newValue
+    }
+  }
+
+  var taskBoardPreviousDatabaseInstanceID: String? {
+    taskBoardRuntimeState.connection.previousDatabaseInstanceID
   }
 
   var lastTaskBoardCredentialSync: TaskBoardCredentialSyncState? {
@@ -338,6 +349,22 @@ extension HarnessMonitorStore {
       )
       taskBoardDatabaseInstanceID = nil
       return false
+    }
+    if let previousID = taskBoardPreviousDatabaseInstanceID,
+      let currentID = taskBoardDatabaseInstanceID,
+      previousID != currentID
+    {
+      do {
+        try await taskBoardSettingsWorker.migrateStoredSecrets(
+          from: previousID,
+          to: currentID
+        )
+        taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
+      } catch {
+        HarnessMonitorLogger.store.error(
+          "task-board secret migration failed: \(error.localizedDescription, privacy: .public)"
+        )
+      }
     }
     lastTaskBoardCredentialSync = nil
     await syncStoredTaskBoardCredentials(using: client)

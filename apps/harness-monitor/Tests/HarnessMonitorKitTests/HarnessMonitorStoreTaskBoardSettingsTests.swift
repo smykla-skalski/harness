@@ -396,6 +396,68 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     )
   }
 
+  @Test("A replacement daemon with a different instance ID migrates stored secrets")
+  func replacementDaemonMigratesStoredSecrets() async throws {
+    let initialClient = RecordingHarnessClient()
+    initialClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 1,
+      instanceID: "daemon-A"
+    )
+    let credentialPersistence = InMemoryTaskBoardCredentialBundle()
+    let keychainBundle = InMemoryTaskBoardKeychainBundle()
+    try credentialPersistence.github.save(
+      TaskBoardGitHubCredentialSnapshot(globalToken: "gh-token-A"),
+      scope: .database("daemon-A")
+    )
+    try credentialPersistence.openRouter.save(
+      TaskBoardOpenRouterCredentialSnapshot(token: "or-token-A"),
+      scope: .database("daemon-A")
+    )
+    try keychainBundle.ssh.save(
+      TaskBoardKeyMaterialSnapshot(privateKey: "ssh-key-A"),
+      scope: .databaseGlobal("daemon-A")
+    )
+    try keychainBundle.gpg.save(
+      TaskBoardKeyMaterialSnapshot(privateKey: "gpg-key-A"),
+      scope: .databaseGlobal("daemon-A")
+    )
+    let store = await makeBootstrappedStore(
+      client: initialClient,
+      credentialPersistence: credentialPersistence,
+      keychainBundle: keychainBundle
+    )
+
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 2,
+      instanceID: "daemon-B"
+    )
+
+    _ = await store.syncStoredTaskBoardCredentialsForNewDaemon(using: replacementClient)
+
+    let migratedGithub = try credentialPersistence.github.load(scope: .database("daemon-B"))
+    #expect(migratedGithub.globalToken == "gh-token-A")
+    let migratedOpenRouter = try credentialPersistence.openRouter.load(scope: .database("daemon-B"))
+    #expect(migratedOpenRouter.token == "or-token-A")
+    let migratedSSH = try keychainBundle.ssh.load(scope: .databaseGlobal("daemon-B"))
+    #expect(migratedSSH.privateKey == "ssh-key-A")
+    let migratedGPG = try keychainBundle.gpg.load(scope: .databaseGlobal("daemon-B"))
+    #expect(migratedGPG.privateKey == "gpg-key-A")
+
+    let syncCalls = replacementClient.recordedCalls().filter { call in
+      switch call {
+      case .syncTaskBoardGitHubTokens, .syncTaskBoardOpenRouterToken,
+          .syncTaskBoardGitRuntimeKeyMaterial:
+        return true
+      default:
+        return false
+      }
+    }
+    #expect(syncCalls.count == 3)
+  }
+
   private func waitForTaskBoardBusy(
     _ expected: Bool,
     store: HarnessMonitorStore
