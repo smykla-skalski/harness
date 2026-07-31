@@ -71,8 +71,8 @@ harness-github-api = { path = "../harness-github-api", version = "55.0.3", featu
 # Unconditional, unlike root's optional `dep:nix` under `bridge-runtime`: the
 # only user is this crate's own `#[cfg(unix)]` github test-support helper,
 # with no unrelated feature to piggyback on for gating the dependency itself.
-nix = { version = "0.31", features = ["fs"] }
-tempfile = "3.27.0"
+nix = { version = "=0.31.3", features = ["fs"] }
+tempfile = "=3.27.0"
 temp-env = "=0.3.6"
 
 # Matches the root crate's lint set rather than the lighter one the facade

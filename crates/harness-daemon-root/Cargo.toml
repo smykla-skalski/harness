@@ -20,7 +20,7 @@ uuid = { version = "1.18.1", features = ["v4"] }
 [dev-dependencies]
 harness-testkit = { path = "../../testkit" }
 temp-env = "=0.3.6"
-tempfile = "3.27.0"
+tempfile = "=3.27.0"
 
 [features]
 # `install_fake_running_xdg_daemon` is also the only way

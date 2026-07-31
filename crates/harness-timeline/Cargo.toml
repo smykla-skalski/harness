@@ -15,7 +15,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 
 [dev-dependencies]
-fs-err = "3.3.0"
+fs-err = "=3.3.1"
 harness-testkit = { path = "../../testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 tempfile = "=3.27.0"

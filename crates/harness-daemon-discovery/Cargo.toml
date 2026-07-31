@@ -11,9 +11,9 @@ harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.3" }
 harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
 
 [dev-dependencies]
-fs2 = "0.4.3"
+fs2 = "=0.4.3"
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
-tempfile = "3.27.0"
+tempfile = "=3.27.0"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

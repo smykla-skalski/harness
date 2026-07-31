@@ -16,7 +16,7 @@ uzers = { version = "0.12.2", default-features = false }
 
 [dev-dependencies]
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
-tempfile = "3.27.0"
+tempfile = "=3.27.0"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
