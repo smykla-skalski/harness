@@ -15,8 +15,8 @@ use std::io::Error as IoError;
 use std::net::SocketAddr;
 
 use axum::body::Body;
-use axum::http::header::{CONNECTION, UPGRADE};
-use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode};
+use axum::http::header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE};
+use axum::http::{Extensions, HeaderMap, HeaderValue, Method, Request, StatusCode, Version};
 use axum::response::Response;
 use hyper::upgrade::{OnUpgrade, on};
 use hyper_util::client::legacy::Error as ClientError;
@@ -54,6 +54,25 @@ pub(super) fn requests_websocket_upgrade(method: &Method, headers: &HeaderMap) -
         && connection_names_upgrade(headers)
 }
 
+/// Whether this request asks to relay a websocket, in either spelling.
+///
+/// A browser reaching the daemon over HTTP/2 opens the socket as an RFC 8441
+/// extended `CONNECT` - method `CONNECT` carrying a `:protocol` of `websocket`,
+/// which hyper surfaces as a [`hyper::ext::Protocol`] extension - not the
+/// HTTP/1.1 `Upgrade` handshake. Both are the same request the relay carries;
+/// they differ only in how the wire framed it.
+pub(super) fn is_websocket_upgrade(request: &Request<Body>) -> bool {
+    requests_websocket_upgrade(request.method(), request.headers())
+        || requests_h2_websocket_connect(request.method(), request.extensions())
+}
+
+fn requests_h2_websocket_connect(method: &Method, extensions: &Extensions) -> bool {
+    method == Method::CONNECT
+        && extensions
+            .get::<hyper::ext::Protocol>()
+            .is_some_and(|protocol| protocol.as_str().eq_ignore_ascii_case("websocket"))
+}
+
 /// Hand one websocket connection over to the companion.
 ///
 /// `permit` bounds how many of these may be open at once and is held for the
@@ -67,6 +86,9 @@ pub(super) async fn relay_websocket(
     mut request: Request<Body>,
     permit: Option<OwnedSemaphorePermit>,
 ) -> Response {
+    // An h2 caller opened this as an extended `CONNECT`; the handshake it
+    // expects back is a `200`, not the `101` an h1 caller and the panel exchange.
+    let caller_is_h2 = requests_h2_websocket_connect(request.method(), request.extensions());
     // Taken before the request is rebuilt: the upgrade rides in its extensions,
     // and forwarding the request takes them with it.
     let caller = on(&mut request);
@@ -75,13 +97,7 @@ pub(super) async fn relay_websocket(
         Ok(request) => request,
         Err(response) => return *response,
     };
-    // Restored after the hop-by-hop strip removed them, and normalised rather
-    // than copied: whatever else the caller listed in `Connection` was dropped
-    // with the rest of that hop, and this is the only directive that belongs on
-    // the new one.
-    let headers = upstream_request.headers_mut();
-    headers.insert(CONNECTION, HeaderValue::from_static("upgrade"));
-    headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
+    set_upstream_handshake(&mut upstream_request, caller_is_h2);
 
     let deadline = Instant::now() + COMPANION_UPSTREAM_TIMEOUT;
     let mut response = match timeout_at(deadline, client.request(upstream_request)).await {
@@ -105,6 +121,13 @@ pub(super) async fn relay_websocket(
         pump(caller, upstream).await;
     });
 
+    if caller_is_h2 {
+        // The h1-only handshake headers the panel answered with mean nothing to
+        // an h2 caller and are illegal on an h2 response; a bare `200` is what
+        // completes its extended `CONNECT` and yields the upgraded stream.
+        return Response::new(Body::empty());
+    }
+
     // Passed through rather than filtered. The ordinary strip would take
     // `Connection` and `Upgrade`, which on a 101 are the handshake being agreed
     // rather than stale state from the hop before it, and what is left without
@@ -113,6 +136,41 @@ pub(super) async fn relay_websocket(
     // started, not an arbitrary upstream whose headers need policing.
     let (parts, _body) = response.into_parts();
     Response::from_parts(parts, Body::empty())
+}
+
+/// Any valid 16-byte base64 nonce. An h2 extended `CONNECT` carries no
+/// `Sec-WebSocket-Key`, so one is synthesised for the h1 hop; the daemon never
+/// checks the `Sec-WebSocket-Accept` the panel derives from it, so the value
+/// only has to be well formed, not unique.
+const H2_BRIDGE_WEBSOCKET_KEY: &str = "dGhlIHNhbXBsZSBub25jZQ==";
+
+/// Shape the upstream request into the h1 handshake the panel answers.
+///
+/// An h1 caller already arrived as a `GET` carrying its own `Sec-WebSocket-*`,
+/// so only the hop-by-hop directives stripped in [`build_upstream_request`] are
+/// restored. An h2 caller arrived as a bodyless extended `CONNECT` with none of
+/// that, so its method and the missing handshake headers are synthesised — the
+/// panel serves the socket as a `GET` upgrade and cannot answer a `CONNECT`.
+fn set_upstream_handshake(request: &mut Request<Body>, caller_is_h2: bool) {
+    // The panel speaks HTTP/1.1 websockets, and an h2 caller's request still
+    // carries its own version and method here.
+    *request.version_mut() = Version::HTTP_11;
+    if caller_is_h2 {
+        *request.method_mut() = Method::GET;
+    }
+    let headers = request.headers_mut();
+    // Normalised rather than copied: whatever else the caller listed in
+    // `Connection` was dropped with the rest of that hop, and this is the only
+    // directive that belongs on the new one.
+    headers.insert(CONNECTION, HeaderValue::from_static("upgrade"));
+    headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
+    if caller_is_h2 {
+        headers.insert(SEC_WEBSOCKET_VERSION, HeaderValue::from_static("13"));
+        headers.insert(
+            SEC_WEBSOCKET_KEY,
+            HeaderValue::from_static(H2_BRIDGE_WEBSOCKET_KEY),
+        );
+    }
 }
 
 async fn pump(caller: OnUpgrade, upstream: OnUpgrade) {
