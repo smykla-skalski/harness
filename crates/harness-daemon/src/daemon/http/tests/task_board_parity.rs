@@ -17,6 +17,7 @@ use super::task_board_review_report_support::{
 };
 
 mod review_freshness;
+mod workflow_progress;
 
 #[test]
 fn task_board_http_and_ws_item_payloads_and_errors_match() {
@@ -114,21 +115,7 @@ async fn run_task_board_transport_parity() {
     .await;
     assert_eq!(http_review, json!({ "status": "not_started" }));
     assert_eq!(http_review, ws_review);
-    let http_progress = get_json(
-        &client,
-        &base_url,
-        "/v1/task-board/items/parity-http/workflow-progress",
-    )
-    .await;
-    let ws_progress = ws_result(
-        &base_url,
-        "req-task-board-workflow-progress-not-started",
-        ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET,
-        json!({ "id": "parity-ws" }),
-    )
-    .await;
-    assert_eq!(http_progress, json!({}));
-    assert_eq!(http_progress, ws_progress);
+    workflow_progress::assert_not_started(&client, &base_url).await;
 
     let http_execution = seed_running_execution(&db, "parity-http").await;
     let ws_execution = seed_running_execution(&db, "parity-ws").await;
@@ -163,29 +150,7 @@ async fn run_task_board_transport_parity() {
         "0123456789abcdef0123456789abcdef01234567"
     );
     assert_eq!(http_review["started_at"], "2026-07-29T18:00:05Z");
-    let http_progress = get_json(
-        &client,
-        &base_url,
-        "/v1/task-board/items/parity-http/workflow-progress",
-    )
-    .await;
-    let ws_progress = ws_result(
-        &base_url,
-        "req-task-board-workflow-progress-running",
-        ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET,
-        json!({ "id": "parity-ws" }),
-    )
-    .await;
-    assert_eq!(
-        normalized_workflow_progress(&http_progress),
-        normalized_workflow_progress(&ws_progress)
-    );
-    assert_eq!(http_progress["progress"]["phase"], "review");
-    assert_eq!(http_progress["progress"]["state"], "running");
-    assert_eq!(
-        http_progress["progress"]["exact_head_revision"],
-        "0123456789abcdef0123456789abcdef01234567"
-    );
+    workflow_progress::assert_running(&client, &base_url).await;
     settle_active_review_attempt(&db, &http_execution).await;
     settle_active_review_attempt(&db, &ws_execution).await;
 
@@ -309,24 +274,7 @@ async fn run_task_board_transport_parity() {
     assert_eq!(ws_error["error"]["code"], http_error["error"]["code"]);
     assert_eq!(ws_error["error"]["message"], http_error["error"]["message"]);
 
-    let (http_status, http_error) = get_json_status(
-        &client,
-        &base_url,
-        "/v1/task-board/items/parity-missing/workflow-progress",
-    )
-    .await;
-    let ws_error = ws_rpc(
-        &base_url,
-        "req-task-board-workflow-progress-missing",
-        ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET,
-        json!({ "id": "parity-missing" }),
-    )
-    .await;
-    assert_eq!(http_status, StatusCode::BAD_REQUEST);
-    assert_eq!(ws_error["error"]["status_code"].as_u64(), Some(400));
-    assert_eq!(ws_error["error"]["code"], http_error["error"]["code"]);
-    assert_eq!(ws_error["error"]["message"], http_error["error"]["message"]);
-    assert_eq!(ws_error["error"]["data"], http_error);
+    workflow_progress::assert_missing_error(&client, &base_url).await;
 
     let (http_status, http_error) = get_json_status(
         &client,
@@ -411,12 +359,6 @@ fn normalized_running_review(value: &Value) -> Value {
     let mut normalized = value.clone();
     normalized["execution_id"] = json!("execution");
     normalized
-}
-
-fn normalized_workflow_progress(value: &Value) -> Value {
-    let mut value = value.clone();
-    value["progress"]["execution_id"] = json!("execution-normalized");
-    value
 }
 
 fn normalized_review(value: &Value) -> Value {
