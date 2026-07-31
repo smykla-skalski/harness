@@ -31,7 +31,7 @@ use tokio_tungstenite::tungstenite::{Bytes, Message};
 use tokio_tungstenite::{WebSocketStream, client_async};
 use url::Url;
 
-use super::pairings::DaemonPairing;
+use super::pairings::{DaemonPairing, MintedFor};
 use super::{CLIENT_ID_HEADER, DaemonClient, DaemonCredential};
 use crate::error::PanelError;
 use crate::events::{PairingChanged, PanelChange, PanelEvents};
@@ -217,24 +217,67 @@ impl DaemonEventStream {
             .pair_link_account(&event.pairing.pairing_id)
             .await
         {
-            Ok(account_id) => self.events.announce(PanelChange::Pairing(
+            Ok(Some(account_id)) => self.events.announce(PanelChange::Pairing(
                 PairingChanged {
                     change: event.change,
                     pairing: event.pairing,
-                    account_id,
+                    account_id: Some(account_id),
                 }
                 .into(),
             )),
-            // Without the account there is no telling whose row this is, and
-            // guessing would put one person's device on another's page. A
-            // resync sends every watcher back to the list route, which resolves
-            // attribution itself and answers honestly if it cannot.
+            // No row of the panel's own is keyed by this pairing yet, so there
+            // is nothing to attribute it from directly. Rather than render an
+            // attribution off the daemon's word — the one way a device could
+            // land on the wrong page — the watchers re-read the list, which
+            // resolves attribution from the panel's own table. If the daemon
+            // named who it was minted for, only that account and the owner are
+            // asked; otherwise everyone is.
+            Ok(None) => {
+                let resync = self.resync_for(event.pairing.minted_for.as_ref()).await;
+                self.events.announce(resync);
+            }
             Err(error) => {
                 tracing::warn!(%error, "could not attribute a daemon event; asking watchers to re-read");
                 self.events.announce(PanelChange::Resynced);
             }
         }
     }
+
+    /// The narrowest resync an unattributed event can be announced as.
+    ///
+    /// A `minted_for` the panel can resolve to a known account narrows the
+    /// re-read to that account and the owner; anything else — no identity, or
+    /// one no account here has ever signed in under — falls back to a resync
+    /// every watcher acts on. Resolving decides only who is asked to re-read, so
+    /// a lookup that fails is answered by asking more watchers, never fewer.
+    async fn resync_for(&self, minted_for: Option<&MintedFor>) -> PanelChange {
+        let Some(identity) = minted_for else {
+            return PanelChange::Resynced;
+        };
+        match self
+            .store
+            .account_id_for_identity(&identity.provider, &identity.subject_id)
+            .await
+        {
+            Ok(Some(account_id)) => PanelChange::ResyncAccount(account_id),
+            Ok(None) => PanelChange::Resynced,
+            Err(error) => {
+                record_unresolved_minted_for(&error);
+                PanelChange::Resynced
+            }
+        }
+    }
+}
+
+/// The lookup for who an unattributed event was minted for failed, so it falls
+/// back to a full resync. Split out because the tracing macro expansion alone
+/// trips the cognitive-complexity lint.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn record_unresolved_minted_for(error: &sqlx::Error) {
+    tracing::warn!(%error, "could not resolve who an unattributed daemon event was minted for; asking every watcher to re-read");
 }
 
 /// The daemon socket, however it had to be reached.
