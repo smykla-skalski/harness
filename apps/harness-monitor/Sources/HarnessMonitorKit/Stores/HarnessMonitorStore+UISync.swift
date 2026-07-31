@@ -270,6 +270,7 @@ extension HarnessMonitorStore {
       )
     )
     contentUI.dashboard.applyTaskBoardBusy(isTaskBoardBusy)
+    contentUI.dashboard.applyTaskBoardSyncPhase(taskBoardSyncPhase)
   }
 
   private func tuiStatusByAgent(for detail: SessionDetail?) -> [String: AgentTuiStatus] {

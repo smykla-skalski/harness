@@ -2,14 +2,12 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func refreshTaskBoardDashboard() async {
-    guard let client, !isTaskBoardBusy else {
+    guard let client, !isTaskBoardBusy, taskBoardSyncPhase == .idle else {
       return
     }
-    beginDaemonAction()
-    beginTaskBoardAction()
+    setTaskBoardSyncPhase(.syncing)
     defer {
-      endDaemonAction()
-      endTaskBoardAction()
+      setTaskBoardSyncPhase(.idle)
     }
     _ = await syncAndRefreshTaskBoardDashboard(
       using: client,
@@ -190,20 +188,35 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
-    guard let client else {
+    guard let client, taskBoardSyncPhase == .idle else {
       return false
     }
-    beginDaemonAction()
-    beginTaskBoardAction()
+    setTaskBoardSyncPhase(.syncing)
     defer {
-      endDaemonAction()
-      endTaskBoardAction()
+      setTaskBoardSyncPhase(.idle)
     }
     return await syncAndRefreshTaskBoardDashboard(
       using: client,
       request: request,
       successMessage: "Synced task board"
     )
+  }
+
+  @discardableResult
+  public func cancelTaskBoardSync() async -> Bool {
+    guard let client, taskBoardSyncPhase == .syncing else {
+      return false
+    }
+    setTaskBoardSyncPhase(.stopping)
+    do {
+      _ = try await client.cancelTaskBoardSync()
+      recordRequestSuccess()
+      return true
+    } catch {
+      setTaskBoardSyncPhase(.syncing)
+      presentFailureFeedback("Could not stop task board sync: \(error.localizedDescription)")
+      return false
+    }
   }
 
   @discardableResult

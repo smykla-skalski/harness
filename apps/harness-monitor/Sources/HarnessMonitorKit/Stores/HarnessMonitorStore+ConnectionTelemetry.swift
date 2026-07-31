@@ -168,6 +168,16 @@ extension HarnessMonitorStore {
       || !taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
   }
 
+  public var taskBoardSyncPhase: TaskBoardSyncPhase {
+    taskBoardRuntimeState.syncPhase
+  }
+
+  func setTaskBoardSyncPhase(_ phase: TaskBoardSyncPhase) {
+    guard taskBoardRuntimeState.syncPhase != phase else { return }
+    taskBoardRuntimeState.syncPhase = phase
+    scheduleUISync([.contentDashboard])
+  }
+
   /// Call before starting a task-board mutation, paired with
   /// `endTaskBoardAction()` in a `defer`. Reentrant: nested/concurrent
   /// task-board mutations only flip `isTaskBoardBusy` off once the last one

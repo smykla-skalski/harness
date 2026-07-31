@@ -159,17 +159,49 @@ extension TaskBoardOverviewView {
 
     if actions.canRefreshBoard {
       Button {
-        actions.refreshTaskBoard()
+        if taskBoardSyncPhase == .syncing {
+          actions.cancelTaskBoardSync()
+        } else if taskBoardSyncPhase == .idle {
+          actions.refreshTaskBoard()
+        }
       } label: {
-        Label("Sync", systemImage: "arrow.clockwise")
-          .font(captionSemibold)
+        switch taskBoardSyncPhase {
+        case .idle:
+          Label("Sync", systemImage: "arrow.clockwise")
+        case .syncing:
+          Label("Stop Refresh", systemImage: "stop.circle.fill")
+        case .stopping:
+          Label("Stopping…", systemImage: "hourglass")
+        }
       }
+      .font(captionSemibold)
       .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .harnessActionButtonStyle(
+        variant: .bordered,
+        tint: taskBoardSyncPhase == .syncing ? .red : .secondary
+      )
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Pull external sources and apply changes to the task board")
+      .disabled(
+        taskBoardSyncPhase == .stopping
+          || (taskBoardSyncPhase == .idle && isActionInFlight)
+      )
+      .help(taskBoardSyncHelp)
       .accessibilityIdentifier("harness.task-board.refresh")
+    }
+  }
+
+  private var taskBoardSyncPhase: TaskBoardSyncPhase {
+    store?.contentUI.dashboard.taskBoardSyncPhase ?? .idle
+  }
+
+  private var taskBoardSyncHelp: String {
+    switch taskBoardSyncPhase {
+    case .idle:
+      "Pull external sources and apply changes to the task board"
+    case .syncing:
+      "Stop the active task source refresh"
+    case .stopping:
+      "Waiting for the active task source refresh to stop"
     }
   }
 

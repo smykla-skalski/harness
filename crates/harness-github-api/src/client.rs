@@ -150,6 +150,39 @@ impl GitHubProtectedClient {
         })
     }
 
+    /// Run a GraphQL query and return its raw response envelope without
+    /// rejecting partial `data` accompanied by field-scoped `errors`.
+    ///
+    /// Callers must inspect both fields. This is for aliased batch reads where
+    /// one inaccessible resource must not discard successful sibling results.
+    ///
+    /// # Errors
+    /// Returns an error on transport failure or a non-success HTTP status.
+    pub async fn graphql_partial_envelope(
+        &self,
+        descriptor: GitHubRequestDescriptor,
+        body: Value,
+    ) -> Result<GitHubApiResponse<Value>, CliError> {
+        let operation = descriptor.operation.clone();
+        let priority = descriptor.priority;
+        let raw = self
+            .execute_json_with_mutation_boundary(Method::POST, "/graphql", Some(body), descriptor)
+            .await?;
+        let snapshot = self.observe_graphql_rate_limit(&raw).await;
+        self.record_network(
+            &operation,
+            priority,
+            &raw,
+            GitHubRateResource::Graphql,
+            snapshot.as_ref(),
+        );
+        Ok(GitHubApiResponse {
+            body: raw.body,
+            provenance: provenance_with_snapshot(raw.provenance, snapshot),
+            status_code: raw.status_code,
+        })
+    }
+
     /// Run a REST request and decode the JSON body into `T`.
     ///
     /// # Errors

@@ -193,10 +193,11 @@ async fn execute_provider_update(
     let update =
         ExternalTaskUpdate::new(supported.to_vec()).with_precondition_updated_at(precondition);
     super::scope::renew_scope_attempt(board, attempt).await?;
-    let outcome = client
-        .update_task(item, reference, update)
-        .await
-        .map_err(SyncClientError::Provider)?;
+    let outcome =
+        super::scope::await_provider_call(board, client.update_task(item, reference, update))
+            .await
+            .map_err(SyncClientError::Local)?
+            .map_err(SyncClientError::Provider)?;
     match outcome {
         ExternalUpdateOutcome::Applied {
             reference,

@@ -1,8 +1,11 @@
 use serde_json::json;
 
 use super::*;
+use crate::external::github::search_label_matches_filter;
+use crate::types::{TaskBoardStatus, TaskBoardWorkflowKind};
 use harness_github_api::acquire_global_budget_test_lock;
 
+mod batch;
 mod support;
 use support::{
     MockResponse, assigned_only_inbox_client, empty_search_response, inbox_client_with_base_uri,
@@ -17,23 +20,23 @@ fn github_inbox_search_queries_use_github_all_state_issue_form() {
 
     assert_eq!(
         assigned_query,
-        "repo:owner/repo is:issue assignee:octo-user state:open state:closed"
+        "repo:owner/repo is:issue assignee:octo-user state:open state:closed sort:updated-desc"
     );
     assert_eq!(
         review_request_query(&repository, "octo-user"),
-        "repo:owner/repo is:pr review-requested:octo-user state:open"
+        "repo:owner/repo is:pr review-requested:octo-user state:open sort:updated-desc"
     );
     assert_eq!(
         dependency_author_query(&repository, "renovate[bot]"),
-        "repo:owner/repo is:pr is:open author:renovate[bot]"
+        "repo:owner/repo is:pr is:open author:renovate[bot] sort:updated-desc"
     );
     assert_eq!(
         dependency_author_query(&repository, "dependabot[bot]"),
-        "repo:owner/repo is:pr is:open author:dependabot[bot]"
+        "repo:owner/repo is:pr is:open author:dependabot[bot] sort:updated-desc"
     );
     assert_eq!(
         dependency_label_query(&repository),
-        "repo:owner/repo is:pr is:open label:dependencies"
+        "repo:owner/repo is:pr is:open label:dependencies sort:updated-desc"
     );
 }
 

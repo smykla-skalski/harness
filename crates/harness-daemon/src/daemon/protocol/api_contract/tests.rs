@@ -150,6 +150,34 @@ fn manual_dispatch_steps_have_remote_surface_scopes() {
 }
 
 #[test]
+fn task_board_sync_control_has_remote_surface_scopes() {
+    let route_scope = |method, path| {
+        let route = HTTP_API_CONTRACT
+            .iter()
+            .find(|route| route.method == method && route.path == path)
+            .unwrap_or_else(|| panic!("missing task-board sync route {method:?} {path}"));
+        remote_http_scopes(route)
+    };
+
+    assert_eq!(
+        route_scope(HttpRouteMethod::Post, http_paths::TASK_BOARD_SYNC_CANCEL),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        route_scope(HttpRouteMethod::Get, http_paths::TASK_BOARD_SYNC_STATUS),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_SYNC_CANCEL),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_SYNC_STATUS),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+}
+
+#[test]
 fn policy_approval_grant_revoke_requires_remote_write_scope() {
     let route = HTTP_API_CONTRACT
         .iter()

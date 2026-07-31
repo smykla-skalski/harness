@@ -1,7 +1,12 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::task_board::external::TaskBoardSyncCoordinatorFence;
+use async_trait::async_trait;
+use harness_kernel::errors::{CliError, CliErrorKind};
+
+use crate::task_board::external::{
+    TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
+};
 
 use super::sync_audit::{SyncExecutionMetrics, TaskBoardSyncAuditTrigger};
 
@@ -48,12 +53,45 @@ impl TaskBoardSyncRunContext {
         self.coordinator_fence.clone()
     }
 
+    pub(super) fn with_cancellation(&self, cancellation: Arc<AtomicBool>) -> Self {
+        let coordinator_fence = Arc::new(CancellationFence {
+            cancellation,
+            upstream: self.coordinator_fence(),
+        });
+        Self {
+            trigger: self.trigger,
+            correlation_id: self.correlation_id.clone(),
+            coordinator_fence: Some(coordinator_fence),
+            sync_failed_scopes: self.sync_failed_scopes.clone(),
+        }
+    }
+
     pub(super) fn observe_sync_metrics(&self, metrics: &SyncExecutionMetrics) {
         if metrics.failed_scope_count() > 0
             && let Some(signal) = &self.sync_failed_scopes
         {
             signal.store(true, Ordering::SeqCst);
         }
+    }
+}
+
+struct CancellationFence {
+    cancellation: Arc<AtomicBool>,
+    upstream: Option<Arc<dyn TaskBoardSyncCoordinatorFence>>,
+}
+
+#[async_trait]
+impl TaskBoardSyncCoordinatorFence for CancellationFence {
+    async fn check(&self) -> Result<TaskBoardSyncCoordinatorFenceDecision, CliError> {
+        if self.cancellation.load(Ordering::SeqCst) {
+            return Ok(TaskBoardSyncCoordinatorFenceDecision::Cancelled(
+                CliErrorKind::workflow_io("task-board sync cancelled by user").into(),
+            ));
+        }
+        if let Some(upstream) = &self.upstream {
+            return upstream.check().await;
+        }
+        Ok(TaskBoardSyncCoordinatorFenceDecision::Current)
     }
 }
 

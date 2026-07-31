@@ -37,6 +37,7 @@ pub(in crate::external::sync) fn reconciliation_patch(
             .as_deref()
             .is_some_and(|url| url.contains("/pull/"));
     if item.body != task.body
+        && task.body_is_loaded()
         && !shared_review_without_body
         && should_apply_remote(
             sync_state.and_then(|state| state.body.as_ref()),
@@ -176,17 +177,23 @@ fn should_apply_remote<T: PartialEq>(
 fn reconciled_external_refs(item: &TaskBoardItem, task: &ExternalTask) -> Option<Vec<ExternalRef>> {
     let reference = &task.reference;
     let mut changed = false;
-    let next_sync_state = sync_state_from_task(task);
     let refs = item
         .external_refs
         .iter()
         .map(|candidate| {
+            let mut next_sync_state = sync_state_from_task(task);
+            if !task.body_is_loaded() {
+                next_sync_state.body = candidate
+                    .sync_state
+                    .as_ref()
+                    .and_then(|state| state.body.clone());
+            }
             if external_ref_matches(item, candidate, reference, task.project_id.as_deref())
                 && reference_changed(candidate, reference, &next_sync_state)
             {
                 changed = true;
                 let mut next = reference.clone().into_core_ref();
-                next.sync_state = Some(next_sync_state.clone());
+                next.sync_state = Some(next_sync_state);
                 return next;
             }
             candidate.clone()

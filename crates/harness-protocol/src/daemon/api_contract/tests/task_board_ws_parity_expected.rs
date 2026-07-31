@@ -108,6 +108,18 @@ fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static
     vec![
         (
             HttpRouteMethod::Post,
+            http_paths::TASK_BOARD_SYNC_CANCEL,
+            ws_methods::TASK_BOARD_SYNC_CANCEL,
+            true,
+        ),
+        (
+            HttpRouteMethod::Get,
+            http_paths::TASK_BOARD_SYNC_STATUS,
+            ws_methods::TASK_BOARD_SYNC_STATUS,
+            true,
+        ),
+        (
+            HttpRouteMethod::Post,
             http_paths::TASK_BOARD_EVALUATE,
             ws_methods::TASK_BOARD_EVALUATE,
             true,

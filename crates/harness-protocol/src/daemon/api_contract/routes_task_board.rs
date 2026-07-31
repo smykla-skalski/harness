@@ -1,3 +1,4 @@
+use super::routes_task_board_sync::{SYNC, SYNC_CANCEL, SYNC_STATUS};
 use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, ws_methods};
 
 mod workflow_progress;
@@ -92,14 +93,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: true,
     },
-    HttpApiRouteContract {
-        method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_SYNC,
-        parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_SYNC,
-        },
-        swift_client_exposed: true,
-    },
+    SYNC,
+    SYNC_CANCEL,
+    SYNC_STATUS,
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::TASK_BOARD_DISPATCH,

@@ -144,6 +144,20 @@ impl Default for TaskBoardSyncRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TaskBoardSyncCancelResponse {
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TaskBoardSyncStatusResponse {
+    pub active: bool,
+    pub cancellation_requested: bool,
+    pub cancelled: bool,
+    pub error: Option<String>,
+    pub summary: Option<TaskBoardSyncSummary>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardCatalogRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]

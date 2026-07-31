@@ -38,7 +38,10 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
         .syncTaskBoard(direction: .pull, dryRun: false, status: nil, provider: nil)
       )
     )
-    #expect(client.readCallCount(.taskBoardItems(nil)) == baselineCalls + 1)
+    #expect(
+      client.readCallCount(.taskBoardItems(nil)) == baselineCalls + 2,
+      "the board reloads after acknowledgement and after source refresh completion"
+    )
     #expect(store.globalTaskBoardItems.first?.id == "board-1")
     #expect(store.globalTaskBoardItems.first?.externalRefs.first?.provider == .gitHub)
     #expect(store.globalTaskBoardSyncSummary?.operations.first?.boardItemId == "board-1")

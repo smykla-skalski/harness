@@ -9,7 +9,8 @@ use crate::task_board::external::{
 };
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncDirection,
-    ExternalSyncOptions, configured_sync_clients_without_review_requests,
+    ExternalSyncOptions, configured_sync_clients_with_batched_review_requests,
+    configured_sync_clients_without_review_requests_with_fresh_reads,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -73,32 +74,43 @@ pub(super) async fn execute(
     // read this sync makes hits the API. Background reconciles skip this Requested
     // branch and keep their cache; only the reconcile right after a manual Sync
     // refetches once.
-    if requested_github_read(context, options, &config) {
+    let fresh_github_reads = requested_github_read(context, options, &config);
+    if fresh_github_reads {
         refresh_read_generation().await;
     }
-    let mut clients =
-        match configured_sync_clients_without_review_requests(&config, request.provider) {
-            Ok(clients) => clients,
-            Err(error) if prepared.is_empty() => return Err(error),
-            Err(error) => {
-                return finish_blocked(metrics, blocked_external_create_recovery(prepared, error));
-            }
-        };
+    let client_result = if fresh_github_reads {
+        configured_sync_clients_with_batched_review_requests(&config, request.provider)
+    } else {
+        configured_sync_clients_without_review_requests_with_fresh_reads(
+            &config,
+            request.provider,
+            false,
+        )
+    };
+    let mut clients = match client_result {
+        Ok(clients) => clients,
+        Err(error) if prepared.is_empty() => return Err(error),
+        Err(error) => {
+            return finish_blocked(metrics, blocked_external_create_recovery(prepared, error));
+        }
+    };
     let plan = match assign_external_create_recovery(prepared, &clients) {
         Ok(plan) => plan,
         Err(batch) => return finish_blocked(metrics, batch),
     };
     let has_recovery = plan.has_recovery();
-    let shared_clients = match super::shared_review_request_clients(db, request).await {
-        Ok(clients) => clients,
-        Err(error) if plan.is_empty() => return Err(error),
-        Err(error) => return finish_blocked(metrics, plan.into_blocked(error)),
-    };
-    clients.extend(
-        shared_clients
-            .into_iter()
-            .map(|client| Box::new(client) as Box<dyn ExternalSyncClient>),
-    );
+    if !fresh_github_reads {
+        let shared_clients = match super::shared_review_request_clients(db, request).await {
+            Ok(clients) => clients,
+            Err(error) if plan.is_empty() => return Err(error),
+            Err(error) => return finish_blocked(metrics, plan.into_blocked(error)),
+        };
+        clients.extend(
+            shared_clients
+                .into_iter()
+                .map(|client| Box::new(client) as Box<dyn ExternalSyncClient>),
+        );
+    }
     super::super::task_board::log_sync_request(request, &config, clients.len());
     if !has_recovery {
         super::super::task_board::ensure_sync_request_can_run(request, &config, &clients)?;

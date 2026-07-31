@@ -1,5 +1,13 @@
 import Foundation
 
+private struct TaskBoardSourceRefreshError: LocalizedError {
+  let errorDescription: String?
+
+  init(_ message: String) {
+    errorDescription = message
+  }
+}
+
 extension HarnessMonitorStore {
   func mutateTaskBoardPlanning(
     actionName: String,
@@ -155,6 +163,24 @@ extension HarnessMonitorStore {
       updateTaskBoardRefreshActivity(
         key: activityKey,
         title: activityTitle,
+        message: "Board ready · refreshing task sources",
+        position: feedbackPosition
+      )
+      await refreshTaskBoardDashboardSnapshot(using: client)
+      let completion = try await waitForTaskBoardSourceRefresh(using: client)
+      if taskBoardSyncPhase == .stopping || completion.cancelled {
+        await finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
+        return false
+      }
+      if let error = completion.error {
+        throw TaskBoardSourceRefreshError(error)
+      }
+      if let summary = completion.summary {
+        globalTaskBoardSyncSummary = summary
+      }
+      updateTaskBoardRefreshActivity(
+        key: activityKey,
+        title: activityTitle,
         message: "Loading refreshed tasks",
         position: feedbackPosition
       )
@@ -164,8 +190,15 @@ extension HarnessMonitorStore {
       }
       return true
     } catch is CancellationError {
+      if taskBoardSyncPhase == .stopping {
+        await finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
+      }
       return false
     } catch {
+      if taskBoardSyncPhase == .stopping {
+        await finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
+        return false
+      }
       updateTaskBoardRefreshActivity(
         key: activityKey,
         title: activityTitle,
@@ -182,6 +215,28 @@ extension HarnessMonitorStore {
       presentFailureFeedback(failureDescription, position: feedbackPosition)
       return false
     }
+  }
+
+  private func waitForTaskBoardSourceRefresh(
+    using client: any HarnessMonitorClientProtocol
+  ) async throws -> TaskBoardSyncStatusResponse {
+    while true {
+      let status = try await client.taskBoardSyncStatus()
+      guard status.active else { return status }
+      if taskBoardSyncPhase == .stopping, !status.cancellationRequested {
+        _ = try await client.cancelTaskBoardSync()
+      }
+      try Task.checkCancellation()
+      try await Task.sleep(for: .milliseconds(100))
+    }
+  }
+
+  private func finishStoppedTaskBoardSync(
+    using client: any HarnessMonitorClientProtocol,
+    position: ActionFeedback.Position
+  ) async {
+    await refreshTaskBoardDashboardSnapshot(using: client)
+    presentSuccessFeedback("Task source refresh stopped", position: position)
   }
 
   private func updateTaskBoardRefreshActivity(

@@ -12932,7 +12932,7 @@
         "tags": [
           "task-board"
         ],
-        "description": "Sync task-board items against configured external providers (GitHub) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
+        "description": "Preview task-board provider changes synchronously for dry runs. Applied requests acknowledge the current board immediately and schedule the newest provider refresh in the background",
         "operationId": "post_task_board_sync",
         "requestBody": {
           "content": {
@@ -12946,7 +12946,7 @@
         },
         "responses": {
           "200": {
-            "description": "Per-provider sync summary",
+            "description": "Dry-run result or current board summary after accepting an applied refresh",
             "content": {
               "application/json": {
                 "schema": {
@@ -12988,6 +12988,106 @@
           }
         },
         "x-websocket-method": "task_board.sync"
+      }
+    },
+    "/v1/task-board/sync/cancel": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "description": "Cancel the active task-board provider sync, if one is running",
+        "operationId": "post_task_board_sync_cancel",
+        "responses": {
+          "200": {
+            "description": "Whether an active sync received cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardSyncCancelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.sync.cancel"
+      }
+    },
+    "/v1/task-board/sync/status": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "description": "Report whether a task-board provider refresh is pending, active, or stopping",
+        "operationId": "get_task_board_sync_status",
+        "responses": {
+          "200": {
+            "description": "Current task-board provider refresh state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardSyncStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.sync.status"
       }
     },
     "/v1/task-board/triage/escalations/{escalation_id}/verdict": {
@@ -33639,6 +33739,17 @@
           }
         }
       },
+      "TaskBoardSyncCancelResponse": {
+        "type": "object",
+        "required": [
+          "cancelled"
+        ],
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          }
+        }
+      },
       "TaskBoardSyncRequest": {
         "type": "object",
         "properties": {
@@ -33668,6 +33779,41 @@
               },
               {
                 "$ref": "#/components/schemas/TaskBoardStatus"
+              }
+            ]
+          }
+        }
+      },
+      "TaskBoardSyncStatusResponse": {
+        "type": "object",
+        "required": [
+          "active",
+          "cancellation_requested",
+          "cancelled"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "cancellation_requested": {
+            "type": "boolean"
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardSyncSummary"
               }
             ]
           }

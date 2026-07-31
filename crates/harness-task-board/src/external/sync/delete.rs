@@ -44,9 +44,9 @@ pub(super) async fn delete_remote_tombstones(
             continue;
         }
         super::scope::renew_scope_attempt(board, attempt).await?;
-        client
-            .delete_task(&item, &reference)
+        super::scope::await_provider_call(board, client.delete_task(&item, &reference))
             .await
+            .map_err(SyncClientError::Local)?
             .map_err(SyncClientError::Provider)?;
         operations.push(operation(tombstone_draft(
             provider, &item, reference, options,

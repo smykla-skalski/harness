@@ -11,9 +11,9 @@ fn personal_issue_queries_use_github_all_state_form() {
     assert_eq!(
         queries,
         vec![
-            "repo:owner/repo is:issue assignee:octo-user state:open state:closed",
-            "repo:owner/repo is:issue author:octo-user state:open state:closed",
-            "repo:owner/repo is:issue author:renovate[bot] state:open state:closed",
+            "repo:owner/repo is:issue assignee:octo-user state:open state:closed sort:updated-desc",
+            "repo:owner/repo is:issue author:octo-user state:open state:closed sort:updated-desc",
+            "repo:owner/repo is:issue author:renovate[bot] state:open state:closed sort:updated-desc",
         ]
     );
 }

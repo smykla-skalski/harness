@@ -69,6 +69,14 @@ extension PreviewHarnessClient {
     return await state.syncTaskBoard()
   }
 
+  public func cancelTaskBoardSync() async throws -> TaskBoardSyncCancelResponse {
+    TaskBoardSyncCancelResponse(cancelled: false)
+  }
+
+  public func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
+    TaskBoardSyncStatusResponse(active: false, cancellationRequested: false)
+  }
+
   public func dispatchTaskBoard(
     request: TaskBoardDispatchRequest
   ) async throws -> TaskBoardDispatchSummary {

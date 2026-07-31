@@ -92,7 +92,7 @@ pub(super) fn replace_synced_ref(
 pub(super) fn sync_state_from_task(task: &ExternalTask) -> ExternalRefSyncState {
     ExternalRefSyncState {
         title: Some(task.title.clone()),
-        body: Some(task.body.clone()),
+        body: task.body_is_loaded().then(|| task.body.clone()),
         status: Some(canonical_external_status(task.status)),
         project_id: task.project_id.clone(),
         updated_at: task.updated_at.clone(),
@@ -102,11 +102,10 @@ pub(super) fn sync_state_from_task(task: &ExternalTask) -> ExternalRefSyncState 
 }
 
 pub(super) fn pull_create_fields(task: &ExternalTask) -> Vec<ExternalSyncField> {
-    let mut fields = vec![
-        ExternalSyncField::Title,
-        ExternalSyncField::Body,
-        ExternalSyncField::Status,
-    ];
+    let mut fields = vec![ExternalSyncField::Title, ExternalSyncField::Status];
+    if task.body_is_loaded() {
+        fields.insert(1, ExternalSyncField::Body);
+    }
     if task.reference.url.is_some() {
         fields.push(ExternalSyncField::Url);
     }
@@ -182,7 +181,11 @@ fn item_remote_diff_fields(item: &TaskBoardItem, task: &ExternalTask) -> Vec<Ext
         item.title != task.title,
         ExternalSyncField::Title,
     );
-    push_if(&mut fields, item.body != task.body, ExternalSyncField::Body);
+    push_if(
+        &mut fields,
+        task.body_is_loaded() && item.body != task.body,
+        ExternalSyncField::Body,
+    );
     push_if(
         &mut fields,
         local_status_differs_from_remote(item.status, task.status),
@@ -226,7 +229,7 @@ fn remote_fields_changed_since_sync(
     );
     push_if(
         &mut fields,
-        state.body.as_ref() != Some(&task.body),
+        task.body_is_loaded() && state.body.as_ref() != Some(&task.body),
         ExternalSyncField::Body,
     );
     push_if(

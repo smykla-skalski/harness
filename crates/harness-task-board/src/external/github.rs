@@ -438,21 +438,21 @@ fn github_external_id(repository: &GitHubRepository, issue_number: u64) -> Strin
 // so one query explicitly returns open and closed issues for remote closure reconciliation.
 fn assigned_issue_query(repository: &GitHubRepository, login: &str) -> String {
     format!(
-        "repo:{} is:issue assignee:{login} state:open state:closed",
+        "repo:{} is:issue assignee:{login} state:open state:closed sort:updated-desc",
         repository.slug()
     )
 }
 
 fn author_issue_query(repository: &GitHubRepository, login: &str) -> String {
     format!(
-        "repo:{} is:issue author:{login} state:open state:closed",
+        "repo:{} is:issue author:{login} state:open state:closed sort:updated-desc",
         repository.slug()
     )
 }
 
 fn review_request_query(repository: &GitHubRepository, login: &str) -> String {
     format!(
-        "repo:{} is:pr review-requested:{login} state:open",
+        "repo:{} is:pr review-requested:{login} state:open sort:updated-desc",
         repository.slug()
     )
 }
@@ -464,14 +464,17 @@ pub(super) const DEPENDENCY_BOT_AUTHORS: &[&str] = &["renovate[bot]", "dependabo
 /// issue search ANDs repeated `author:` qualifiers, so each bot is a separate
 /// query rather than one `author:a author:b` clause that could never match.
 fn dependency_author_query(repository: &GitHubRepository, author: &str) -> String {
-    format!("repo:{} is:pr is:open author:{author}", repository.slug())
+    format!(
+        "repo:{} is:pr is:open author:{author} sort:updated-desc",
+        repository.slug()
+    )
 }
 
 /// Open pull requests carrying the dependency label, covering dependency
 /// updates opened by a human or a bot other than Renovate/Dependabot.
 fn dependency_label_query(repository: &GitHubRepository) -> String {
     format!(
-        "repo:{} is:pr is:open label:dependencies",
+        "repo:{} is:pr is:open label:dependencies sort:updated-desc",
         repository.slug()
     )
 }

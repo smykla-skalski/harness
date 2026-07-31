@@ -251,9 +251,10 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(overviewSource.contains("if actions.canRefreshBoard {"))
     #expect(overviewSource.contains("actions.refreshTaskBoard()"))
     #expect(!overviewSource.contains("requestTaskBoardSync()"))
+    #expect(overviewSource.contains(".help(taskBoardSyncHelp)"))
     #expect(
       overviewSource.contains(
-        ".help(\"Pull external sources and apply changes to the task board\")"
+        "\"Pull external sources and apply changes to the task board\""
       )
     )
     #expect(

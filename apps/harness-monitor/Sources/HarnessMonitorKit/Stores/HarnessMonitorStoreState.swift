@@ -25,6 +25,7 @@ struct TaskBoardRuntimeState {
   var connection = TaskBoardConnectionState()
   var stepModeMutation = TaskBoardStepModeMutationState()
   var positionMutation = TaskBoardPositionMutationState()
+  var syncPhase = TaskBoardSyncPhase.idle
   var actionCount = 0
 }
 
