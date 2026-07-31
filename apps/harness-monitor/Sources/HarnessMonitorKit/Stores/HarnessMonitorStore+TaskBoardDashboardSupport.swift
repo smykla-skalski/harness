@@ -220,6 +220,7 @@ extension HarnessMonitorStore {
   private func waitForTaskBoardSourceRefresh(
     using client: any HarnessMonitorClientProtocol
   ) async throws -> TaskBoardSyncStatusResponse {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(300))
     while true {
       let status = try await client.taskBoardSyncStatus()
       guard status.active else { return status }
@@ -227,6 +228,9 @@ extension HarnessMonitorStore {
         _ = try await client.cancelTaskBoardSync()
       }
       try Task.checkCancellation()
+      if ContinuousClock.now > deadline {
+        throw TaskBoardSourceRefreshError("task source refresh timed out after 5 min")
+      }
       try await Task.sleep(for: .milliseconds(100))
     }
   }
