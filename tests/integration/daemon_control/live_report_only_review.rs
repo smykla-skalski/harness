@@ -8,7 +8,10 @@ use super::*;
 #[path = "live_report_only_review/support.rs"]
 mod support;
 
-use support::{GitHubClient, GitHubSnapshot, LiveReviewTarget, prepare_review_checkout};
+use support::{
+    GitHubClient, GitHubSnapshot, LiveReviewTarget, LocalRepositorySnapshot,
+    prepare_review_checkout,
+};
 
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
 const REVIEW_TIMEOUT: Duration = Duration::from_secs(360);
@@ -75,8 +78,8 @@ fn requested_review_reaches_a_durable_report_without_mutation() {
     let project = tmp.path().join("project");
     std::fs::create_dir_all(&home).expect("stage=fixture: create home");
     std::fs::create_dir_all(&xdg).expect("stage=fixture: create xdg");
-    prepare_review_checkout(&target, &project);
-    let initial_status = git_status(&project);
+    prepare_review_checkout(&target, &project, &github_token);
+    let initial_repository = LocalRepositorySnapshot::capture(&project);
 
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
@@ -89,7 +92,10 @@ fn requested_review_reaches_a_durable_report_without_mutation() {
     let report = poll_terminal_report(&http, &item_id);
 
     assert_completed_report(&report, &target);
-    assert_eq!(git_status(&project), initial_status);
+    assert_eq!(
+        LocalRepositorySnapshot::capture(&project),
+        initial_repository
+    );
     let after = GitHubSnapshot::capture(&target, &github);
     assert_eq!(after, before, "report-only review mutated GitHub state");
 
@@ -106,7 +112,10 @@ fn requested_review_reaches_a_durable_report_without_mutation() {
         None,
     );
     assert_eq!(retained, report, "restart changed the durable report");
-    assert_eq!(git_status(&project), initial_status);
+    assert_eq!(
+        LocalRepositorySnapshot::capture(&project),
+        initial_repository
+    );
     let final_snapshot = GitHubSnapshot::capture(&target, &github);
     assert_eq!(
         final_snapshot, before,
@@ -231,16 +240,6 @@ fn assert_completed_report(report: &Value, target: &LiveReviewTarget) {
             .is_some_and(|summary| !summary.trim().is_empty()),
         "completed report has no summary: {report}"
     );
-}
-
-fn git_status(project: &Path) -> String {
-    let output = Command::new("git")
-        .args(["status", "--porcelain=v1", "--untracked-files=all"])
-        .current_dir(project)
-        .output()
-        .expect("stage=mutation_check: read git status");
-    assert!(output.status.success(), "stage=mutation_check: {output:?}");
-    String::from_utf8(output.stdout).expect("stage=mutation_check: UTF-8 status")
 }
 
 fn stop_bridge(home: &Path, xdg: &Path, bridge: &mut ManagedChild) {

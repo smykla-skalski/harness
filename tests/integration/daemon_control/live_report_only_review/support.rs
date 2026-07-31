@@ -3,6 +3,8 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde_json::{Value, json};
 
@@ -135,7 +137,39 @@ impl GitHubSnapshot {
     }
 }
 
-pub(super) fn prepare_review_checkout(target: &LiveReviewTarget, project: &Path) {
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct LocalRepositorySnapshot {
+    status: String,
+    head: String,
+    refs: String,
+    fetch_head: String,
+}
+
+impl LocalRepositorySnapshot {
+    pub(super) fn capture(project: &Path) -> Self {
+        let fetch_head_path = git_output(project, &["rev-parse", "--git-path", "FETCH_HEAD"]);
+        let fetch_head_path = project.join(fetch_head_path);
+        Self {
+            status: git_output(
+                project,
+                &["status", "--porcelain=v1", "--untracked-files=all"],
+            ),
+            head: git_output(project, &["rev-parse", "HEAD"]),
+            refs: git_output(
+                project,
+                &["for-each-ref", "--format=%(refname) %(objectname)"],
+            ),
+            fetch_head: std::fs::read_to_string(fetch_head_path)
+                .expect("stage=mutation_check: read FETCH_HEAD"),
+        }
+    }
+}
+
+pub(super) fn prepare_review_checkout(
+    target: &LiveReviewTarget,
+    project: &Path,
+    github_token: &str,
+) {
     let source = std::env::var("HARNESS_LIVE_REVIEW_SOURCE_REPO")
         .expect("HARNESS_LIVE_REVIEW_SOURCE_REPO must identify the complete local repository");
     run_git(
@@ -152,9 +186,10 @@ pub(super) fn prepare_review_checkout(target: &LiveReviewTarget, project: &Path)
     let pull_ref = format!("refs/pull/{}/head", target.number);
     let remote_ref = "refs/remotes/origin/live-review-head";
     let fetch_refspec = format!("+{pull_ref}:{remote_ref}");
-    run_git(
+    run_authenticated_git(
         Some(project),
         &["fetch", "--no-tags", &github_url, &fetch_refspec],
+        github_token,
     );
     run_git(
         Some(project),
@@ -206,6 +241,29 @@ fn run_git(directory: Option<&Path>, args: &[&str]) {
     assert!(
         output.status.success(),
         "stage=fixture: git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn run_authenticated_git(directory: Option<&Path>, args: &[&str], token: &str) {
+    let credentials = BASE64_STANDARD.encode(format!("x-access-token:{token}"));
+    let mut command = git_command(args);
+    command
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "http.extraHeader")
+        .env(
+            "GIT_CONFIG_VALUE_0",
+            format!("Authorization: Basic {credentials}"),
+        );
+    if let Some(directory) = directory {
+        command.current_dir(directory);
+    }
+    let output = command
+        .output()
+        .expect("stage=fixture: run authenticated git");
+    assert!(
+        output.status.success(),
+        "stage=fixture: authenticated git {args:?}: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 }
