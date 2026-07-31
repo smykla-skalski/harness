@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 @MainActor
@@ -12,7 +13,9 @@ final class TaskBoardWorkflowProgressState {
   }
 
   private(set) var loadState: LoadState = .idle
+  @ObservationIgnored
   private var itemID: String?
+  @ObservationIgnored
   private var token = 0
 
   init(response: TaskBoardWorkflowProgressResponse? = nil) {
