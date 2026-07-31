@@ -16,6 +16,8 @@ use super::task_board_review_report_support::{
     seed_running_execution, settle_active_review_attempt,
 };
 
+mod review_freshness;
+
 #[test]
 fn task_board_http_and_ws_item_payloads_and_errors_match() {
     let sandbox = tempdir().expect("tempdir");
@@ -42,7 +44,8 @@ async fn run_task_board_transport_parity() {
         },
         "workflow": {
             "status": "running",
-            "branch": "feature/parity"
+            "branch": "feature/parity",
+            "pr_head_revision": "0123456789abcdef0123456789abcdef01234567"
         }
     });
 
@@ -170,22 +173,26 @@ async fn run_task_board_transport_parity() {
         http_review["report"]["head_revision"],
         "0123456789abcdef0123456789abcdef01234567"
     );
-    for (status, finished_at) in [
-        (
-            TaskBoardAiReviewReportStatus::Failed,
-            "2026-07-29T18:00:02Z",
-        ),
-        (
-            TaskBoardAiReviewReportStatus::Cancelled,
-            "2026-07-29T18:00:03Z",
-        ),
+    review_freshness::assert_live_head_advances_without_mutating_report(&client, &base_url).await;
+
+    for status in [
+        TaskBoardAiReviewReportStatus::Failed,
+        TaskBoardAiReviewReportStatus::Cancelled,
     ] {
-        db.append_task_board_ai_review_report(&terminal_report("parity-http", status, finished_at))
-            .await
-            .expect("append HTTP terminal report");
-        db.append_task_board_ai_review_report(&terminal_report("parity-ws", status, finished_at))
-            .await
-            .expect("append WebSocket terminal report");
+        db.append_task_board_ai_review_report(&terminal_report(
+            "parity-http",
+            status,
+            "2026-07-29T18:00:01Z",
+        ))
+        .await
+        .expect("append HTTP terminal report");
+        db.append_task_board_ai_review_report(&terminal_report(
+            "parity-ws",
+            status,
+            "2026-07-29T18:00:01Z",
+        ))
+        .await
+        .expect("append WebSocket terminal report");
         let http_review = get_json(
             &client,
             &base_url,

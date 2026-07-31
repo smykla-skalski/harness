@@ -14102,6 +14102,13 @@
               }
             ]
           },
+          "last_turn_partial_output": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Provider text observed before the most recent unsuccessful prompt turn ended."
+          },
           "last_turn_result": {
             "oneOf": [
               {

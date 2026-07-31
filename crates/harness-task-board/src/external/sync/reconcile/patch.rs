@@ -65,7 +65,7 @@ pub(in crate::external::sync) fn reconciliation_patch(
     {
         patch.execution_repository = OptionalFieldPatch::Set(repository);
     }
-    backfill_pull_request_identity(&mut patch, item, task);
+    reconcile_pull_request_identity(&mut patch, item, task);
     if let Some(refs) = reconciled_external_refs(item, task) {
         patch.external_refs = Some(refs);
     }
@@ -73,12 +73,10 @@ pub(in crate::external::sync) fn reconciliation_patch(
     patch
 }
 
-/// Backfills the discovered pull request head revision and author onto a ticket
-/// that predates them. Only fills a field the ticket is missing: a ticket
-/// imported through the create path already carries both, and a head that
-/// advances once work has bound to a revision is a launch-freeze concern, not a
-/// discovery one, so this never overwrites a value the ticket already holds.
-fn backfill_pull_request_identity(
+/// Refreshes the provider's live pull request head while preserving the
+/// separately frozen head held by each workflow execution and retained report.
+/// The author remains a backfill because its original identity is stable.
+fn reconcile_pull_request_identity(
     patch: &mut TaskBoardItemPatch,
     item: &TaskBoardItem,
     task: &ExternalTask,
@@ -86,7 +84,7 @@ fn backfill_pull_request_identity(
     let head = task
         .pr_head_revision
         .as_ref()
-        .filter(|_| item.workflow.pr_head_revision.is_none());
+        .filter(|head| item.workflow.pr_head_revision.as_ref() != Some(*head));
     let author = task
         .pr_author
         .as_ref()

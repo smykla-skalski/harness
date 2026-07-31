@@ -199,15 +199,19 @@ fn reconcile_backfills_missing_pull_request_head_and_author() {
 }
 
 #[test]
-fn reconcile_never_overwrites_a_head_the_ticket_already_holds() {
+fn reconcile_refreshes_an_advanced_pull_request_head() {
     let mut item = discovered_item();
     item.workflow.pr_head_revision = Some("frozen".into());
     item.workflow.pr_author = Some("renovate[bot]".into());
 
     let patch = reconciliation_patch(&item, &discovered_pull_request_task(), false, None);
 
-    assert!(
-        patch.workflow.is_none(),
-        "an advancing head is a launch-freeze concern, not a discovery one"
+    assert_eq!(
+        patch
+            .workflow
+            .expect("advanced provider head updates the live ticket")
+            .pr_head_revision
+            .as_deref(),
+        Some("abc123")
     );
 }

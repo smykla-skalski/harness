@@ -32,7 +32,11 @@ struct TaskBoardItemManagementPanel: View {
 
   private var reviewReportLoadKey: TaskBoardReviewReportLoadKey? {
     guard let item, item.showsReviewReport else { return nil }
-    return TaskBoardReviewReportLoadKey(itemID: item.id, updatedAt: item.updatedAt)
+    return TaskBoardReviewReportLoadKey(
+      itemID: item.id,
+      updatedAt: item.updatedAt,
+      taskBoardRevision: actions.store?.contentUI.dashboard.taskBoardRevision ?? 0
+    )
   }
 
   var headerTitleFont: Font {
