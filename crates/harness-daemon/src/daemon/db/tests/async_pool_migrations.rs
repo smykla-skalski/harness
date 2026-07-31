@@ -5,6 +5,8 @@ use tempfile::tempdir;
 use super::*;
 
 const ORIGINAL_V34_CHECKSUM: &str = "8FCF9F433E6EAC486506DB75C5618B21D7F8D9AD7AEBA2CB32ED7B4AF60042A3B9A36C8030A7FDB646224CC69FAB4D83";
+const ORIGINAL_V59_CHECKSUM: &str = "32C7957F15B114230D46E860DD49D02E676C4EF3B18144C06F261DBC753FA8AA8894502B7B91F77983BACC394C3702CA";
+const MODIFIED_V59_CHECKSUM: &str = "BB276C3EA875F30B7FE1BE84A078D14AE950E38D3B9F4489E6D8CACEF966056AFA96F74153221DF6070A8B38B561B82F";
 
 #[tokio::test]
 async fn connect_upgrades_applied_original_v34_migration() {
@@ -86,6 +88,36 @@ async fn connect_upgrades_applied_original_v34_migration() {
     .await
     .expect("inspect migrated dispatch schema");
     assert_eq!(has_grant_tracking, 1);
+}
+
+#[tokio::test]
+async fn connect_repairs_modified_v59_migration_checksum() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let initial = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open current async daemon db");
+    initial.pool().close().await;
+    drop(initial);
+
+    let conn = Connection::open(&db_path).expect("open sqlite");
+    conn.execute(
+        "UPDATE _sqlx_migrations SET checksum = ?1 WHERE version = 58",
+        [hex::decode(MODIFIED_V59_CHECKSUM).expect("decode modified v59 checksum")],
+    )
+    .expect("record modified v59 checksum");
+    drop(conn);
+
+    let repaired = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("repair modified v59 migration checksum");
+    let checksum =
+        query_scalar::<_, Vec<u8>>("SELECT checksum FROM _sqlx_migrations WHERE version = 58")
+            .fetch_one(repaired.pool())
+            .await
+            .expect("read repaired v59 checksum");
+
+    assert_eq!(hex::encode_upper(checksum), ORIGINAL_V59_CHECKSUM);
 }
 
 #[tokio::test]
@@ -243,6 +275,46 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
         "0017_daemon_v23_drop_policy_enforcement_snapshot.sql",
         "51CC1C253ED07B4482E6B7B2E91405CECDBE151AD36F87F86EA3698A581FA8A01456C1602659CE3E8B44422235B6B847",
     ),
+    (
+        "0018_daemon_v24_policy_decisions.sql",
+        "BD6A2668600A41D9F188EC5FBDAD3B79FC24BFCEB9BE4B02F5FD4201DBCF0E59023C00E1D9FA8B73AC600031CA1074FD",
+    ),
+    (
+        "0019_daemon_v25_policy_scenarios.sql",
+        "25A697BB337D4260728802D4698459DC3803828556BC1F2ABDE19BDB80050F851C327635CEBC5E822B5C8D6AE1BE8CA0",
+    ),
+    (
+        "0020_daemon_v26_policy_live_canvas.sql",
+        "3C85037B2821BF9E536E4FF3A65503285AE2D8EF74E89C9ACAEAA36D708BE2047EEA39B64D9F5FD2F73E2BADE63BFEF5",
+    ),
+    (
+        "0021_daemon_v27_remote_identity.sql",
+        "A6906764C7955CE074997D8F1BFB8641DC7B4F5B98A90F9DA422C83FBC1163FBF45F6A302BF6890B26172400CFBD2946",
+    ),
+    (
+        "0022_daemon_v28_remote_acme_config.sql",
+        "C00DB907DA12CE122B83664819E1AEAF0BD867BE778A68A6D5D06DF1B291A98EACF7A7ADC5B879C1941DB6BF669999A2",
+    ),
+    (
+        "0023_daemon_v29_remote_acme_account.sql",
+        "D27CD45DEB36EBC2A287B6C84CA5AC0DCB6553A40A9A780D77D9027B292C7824A181C39108CD3F39429567E266F2E7B7",
+    ),
+    (
+        "0024_daemon_v30_task_board.sql",
+        "45887A87ADDB22DF5EA8E9DC41ECE613A2EF2D0D861426489DDB2DC2BA997326F0C4C0EEBCD5699B3B3E6F5BA3E98579",
+    ),
+    (
+        "0025_daemon_v31_remote_client_activity.sql",
+        "80BF5D0212F4F10E68C940D8033EFCBC3B8B1760FE75BCE8FDECE55A7A0324A6B5A91AE613A17BE7ADBC9EA328C83BAB",
+    ),
+    (
+        "0026_daemon_v32_codex_task_binding.sql",
+        "DC4F754201D8AD8FA7B99CB8D953AD2BD87C822306ACC8A44AB5AF59780776C3B3E34D43DAC34355E67ADD99F3188439",
+    ),
+    (
+        "0027_daemon_v33_held_dispatch.sql",
+        "F3C7F0131AECC59E0F97D34DBCE2E1D478AFE87FAD426F4B13DE58CC32E1DE5749D7821B131CE5EDCA0D3C76D3136398",
+    ),
     ("0028_daemon_v34_spawn_policy.sql", ORIGINAL_V34_CHECKSUM),
     (
         "0029_daemon_v35_dispatch_grant_tracking.sql",
@@ -269,6 +341,14 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
         "FC06379A2C8BB18CD0EB3C6D20A5F83F6E0DA271B47891BB1BE1F3E7ADF9A431C664C6527D2BB7348CECDAA1BB96D4B0",
     ),
     (
+        "0035_daemon_v41_task_board_parent_link.sql",
+        "860E7F87141943E4ACB2F257CCC1A746F35775130EBCDA9BD146B9D0CD0575913EFC0D83990482EC7AA4F9942A8D7F45",
+    ),
+    (
+        "0036_daemon_v42_task_board_item_kind.sql",
+        "C6040E3BED0EA7BD92F8F40B2EF6ED63E0357844CAB7C76C26EBEAF654817947B58DBB54E165632CAD13163ECF45E248",
+    ),
+    (
         "0037_daemon_v43_task_board_remote_execution.sql",
         "F125288DF483846801C2E50E4B5313747ED4817A91E87675B1040CE2D661806957E44B8F3953530077670F0B2DCF4083",
     ),
@@ -280,6 +360,102 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
         "0039_daemon_v45_task_board_remote_execution_integrity.sql",
         "C17211A47907CB9706529CF213547DAF2EDD7192A94E61738E4749C8135CD78007E2932571135CFED10348B82F1FA949",
     ),
+    (
+        "0040_daemon_v46_task_board_triage.sql",
+        "B5639CC5D5E94D37DCE8E06B5FF7C634BD44DB9E35EAF8FF99A7F1A4D839AFDCA8C7DBDBBB9C6B3036D0F422549E9E85",
+    ),
+    (
+        "0041_daemon_v47_task_board_triage_override.sql",
+        "B92E0C9C21AFE30F6D5D585870A8D21444476B3B94A916C657F13455FB0881CCD98B63CC797E38235D2FD450A269B6B5",
+    ),
+    (
+        "0042_daemon_v48_task_board_triage_rules.sql",
+        "11FD00BC88D2E241021133DE1FFC58B9F79F767EAA37A63A451F9BFA9FD57F17689AEC9E170219F748E7355F07EF6296",
+    ),
+    (
+        "0043_daemon_v49_task_board_triage_escalation.sql",
+        "15D8B3E62EF7DA19BCBB51DD2C30449B57E4C3290466FC398D9206B809CAD82E65E295F0A8B737A68FFC0FFB5D04C772",
+    ),
+    (
+        "0044_daemon_v50_codex_runs_nullable_session.sql",
+        "E54E8B9DCF6A7336444B425D946B5EB909FF52DC7B1255124A4A15451FB6374218063A357253976A295FA907CCD4A626",
+    ),
+    (
+        "0045_daemon_v51_task_board_projects.sql",
+        "BD195145BAAC5B4FDE89F9B897B9BAEA8F057F36621803DAEF3BA6BF6ABC004A55D06C4167A64E55B534C8CD681ADCF5",
+    ),
+    (
+        "0046_daemon_v51_task_board_item_attribution.sql",
+        "A2E1AF3688A92D0808D40332656E95BC8F46AA4D4138157BEFAA0ABBDB821091C38D26B9FCFA08F7C6F7CEC4DC1C6AE5",
+    ),
+    (
+        "0047_daemon_v51_task_board_item_attribution_index.sql",
+        "7175D8DF5C301F18B570A4E40EF292ACCA7862425FCF7581028D896588F6A4291F41447FFC2CBBF3946CB09B51EB7998",
+    ),
+    (
+        "0048_daemon_v52_task_board_project_color.sql",
+        "4B331694F865B96C237A6E77CCC9F5927A1D3B2E3E36457130CFB28DABDC4FA42B6DF35838D5DDE41AC6F306D510EBDB",
+    ),
+    (
+        "0049_daemon_v52_task_board_project_color_backfill.sql",
+        "BE38C9D0E9980CDC9443F2E023E251EA345BC4733BC1569238F3510D162621E679CCCAF825761B58109DF5761F4BB1C2",
+    ),
+    (
+        "0050_daemon_v53_task_board_project_shape.sql",
+        "2430FCBAEF47484C8A556C5B0B5AAE7E14101EC416C913540E660CCD90FA4A9729A9F913356FFCAE341B635F3335B1AF",
+    ),
+    (
+        "0051_daemon_v53_task_board_project_shape_backfill.sql",
+        "85E08151E2CA7D314CADFB05A92AA3B219B9597CDB2E2BB79AB5FF3773FD58A908F714439D8B705E0B5BBC81F5D1B9DA",
+    ),
+    (
+        "0052_daemon_v54_task_board_remove_todoist.sql",
+        "3F01EF62A88D5F6B884FF150E7467B8E35A2DC33FE49D5C8BCF3D8248940DEFD453EED042C1C4020DB29597799D946DB",
+    ),
+    (
+        "0053_daemon_v54_task_board_projects_source.sql",
+        "B9FBC2212FF0A91895E623B8D4412527DB659886FCC07C56CEB016996403E963DCB62F975A3661502EBB076BCBB4F4BC",
+    ),
+    (
+        "0054_daemon_v55_pair_manage_backfill.sql",
+        "D7C865359FA378290024DBE18D81EA31628558FAD75D96622069DFA0F01BBA67B3E8BC0A582F15592E2E6D43C727BBAE",
+    ),
+    (
+        "0055_daemon_v56_task_board_inbox.sql",
+        "409E407A98B9D08BF77F541556A43278E750E2D70B8459B30D3DCE5348D2937ECA1565B4C0FB8F5DF07D379E556A6C20",
+    ),
+    (
+        "0056_daemon_v57_pull_request_actions.sql",
+        "4456D1F65AF7F699023B521A99D6128631D342FAF029902AD52F816C66A05A57AED2271ACEC8816304BA849C016C20F3",
+    ),
+    (
+        "0057_daemon_v58_ai_review_reports.sql",
+        "15C283640623C5A38626FA96495572D77EAE9E4F0C092212C2AAE498833EAC2AED0EE8A624A2650A68AAB4D57B6F64ED",
+    ),
+    (
+        "0058_daemon_v59_agent_turn_runs.sql",
+        ORIGINAL_V59_CHECKSUM,
+    ),
+    (
+        "0059_daemon_v60_agent_turn_runtime_id.sql",
+        "5FE91EEC5D5F76FEC24F53970F71289534DC0F89607563215108F518475C3EA919FEFFE2D40781DB6CE0017A8DBD2224",
+    ),
+    (
+        "0060_daemon_v61_ai_review_requested_runtime.sql",
+        "DD8A51FC31D1E1263BF1D880FB974FFA3C0F23EF43CA1463B2EDE10C4CF1A419FF7DBE9B135616CC397B3486D2D6995A",
+    ),
+    (
+        "0061_daemon_v61_ai_review_actual_runtime.sql",
+        "C7013E380C3836E8E5082DA731F05EC0935112FB3F2116CE980D226E5AA876E449C616DFD588B05B600759B8C47CBEDC",
+    ),
+    (
+        "0062_daemon_v61_ai_review_runtime_backfill.sql",
+        "97CE80230936E4E51563FF85B74901ECFCC472EA53F17658E12B30DA045BF50A397BDE2441067208B453AD50D60D71A9",
+    ),
+    (
+        "0063_daemon_v62_ai_review_report_order.sql",
+        "803177498C88216D41D542B9AA8760A385286C646CA334504A6E492439C71BFAF6AB56C739B73F6689A6DA7C48A03B00",
+    ),
 ];
 
 #[test]
@@ -287,6 +463,23 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
     // This test runs in harness-daemon's own `--lib` test target, so
     // `CARGO_MANIFEST_DIR` is this crate's own root (`crates/harness-daemon`).
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");
+    let mut migration_files = std::fs::read_dir(&migrations_dir)
+        .expect("read migrations directory")
+        .map(|entry| {
+            entry
+                .expect("read migration directory entry")
+                .file_name()
+                .into_string()
+                .expect("migration filename is utf-8")
+        })
+        .filter(|filename| filename.ends_with(".sql"))
+        .collect::<Vec<_>>();
+    migration_files.sort();
+    let expected_files = SHIPPED_MIGRATION_CHECKSUMS
+        .iter()
+        .map(|(filename, _)| (*filename).to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(migration_files, expected_files, "checksum manifest is incomplete");
 
     for &(filename, expected_checksum) in SHIPPED_MIGRATION_CHECKSUMS {
         let bytes = std::fs::read(migrations_dir.join(filename)).expect("read migration");

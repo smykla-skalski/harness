@@ -23,6 +23,8 @@ INSERT INTO _sqlx_migrations (version, description, success, checksum, execution
 VALUES (?1, ?2, TRUE, ?3, 0)";
 const UPDATE_SQLX_MIGRATION_METADATA_SQL: &str =
     "UPDATE _sqlx_migrations SET description = ?2, checksum = ?3 WHERE version = ?1";
+const AGENT_TURN_RUNS_MIGRATION_VERSION: i64 = 58;
+const MODIFIED_AGENT_TURN_RUNS_CHECKSUM: &str = "BB276C3EA875F30B7FE1BE84A078D14AE950E38D3B9F4489E6D8CACEF966056AFA96F74153221DF6070A8B38B561B82F";
 // `sqlx::migrate!` resolves relative to `CARGO_MANIFEST_DIR`, which differs
 // between harness-daemon's own build (`standalone-daemon` on by default) and
 // root's `daemon-runtime`-gated test-only mirror of this file (`standalone-daemon`
@@ -42,6 +44,7 @@ pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliErro
     ensure_baseline_migration_recorded(pool).await?;
     let version = read_async_schema_version(pool).await?;
     ensure_schema_meta_migrations_recorded(pool, &version).await?;
+    repair_modified_agent_turn_runs_checksum(pool).await?;
     run_daemon_migrator(pool).await
 }
 
@@ -230,6 +233,35 @@ async fn record_migration_if_missing(
         .execute(pool)
         .await
         .map_err(|error| db_error(format!("seed async migration ledger: {error}")))?;
+    Ok(())
+}
+
+async fn repair_modified_agent_turn_runs_checksum(pool: &SqlitePool) -> Result<(), CliError> {
+    let migration = DAEMON_DB_MIGRATOR
+        .iter()
+        .find(|migration| migration.version == AGENT_TURN_RUNS_MIGRATION_VERSION)
+        .ok_or_else(|| db_error("missing agent turn runs migration"))?;
+    let applied = query_as::<_, (String, Vec<u8>)>(SQLX_MIGRATION_METADATA_SQL)
+        .bind(migration.version)
+        .fetch_optional(pool)
+        .await
+        .map_err(|error| db_error(format!("load agent turn runs migration metadata: {error}")))?;
+    let Some((description, checksum)) = applied else {
+        return Ok(());
+    };
+    let modified_checksum = hex::decode(MODIFIED_AGENT_TURN_RUNS_CHECKSUM)
+        .map_err(|error| db_error(format!("decode agent turn runs migration checksum: {error}")))?;
+    if description != migration.description || checksum != modified_checksum {
+        return Ok(());
+    }
+
+    query(UPDATE_SQLX_MIGRATION_METADATA_SQL)
+        .bind(migration.version)
+        .bind(migration.description.to_string())
+        .bind(migration.checksum.as_ref().to_vec())
+        .execute(pool)
+        .await
+        .map_err(|error| db_error(format!("repair agent turn runs migration ledger: {error}")))?;
     Ok(())
 }
 

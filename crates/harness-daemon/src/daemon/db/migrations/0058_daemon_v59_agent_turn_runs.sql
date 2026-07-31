@@ -1,4 +1,4 @@
--- Durable record of an agent turn (a board report run), keyed by
+-- Durable record of a non-Codex agent turn (a board report run), keyed by
 -- `run_id` which doubles as the task-board `managed_worker_id`. Codex runs
 -- already persist through `codex_runs`; every other supported runtime
 -- (OpenRouter today) kept no durable row, so a restart could not tell whether
