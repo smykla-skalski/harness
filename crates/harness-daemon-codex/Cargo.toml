@@ -1,6 +1,6 @@
 [package]
 name = "harness-daemon-codex"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-trait = "0.1.83"
 futures-util = "0.3.31"
-harness-kernel = { path = "../harness-kernel", version = "55.0.2" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
 tokio = { version = "1.50.0", features = ["io-util", "net", "process", "rt", "sync"] }
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect"] }
 tracing = "0.1.44"

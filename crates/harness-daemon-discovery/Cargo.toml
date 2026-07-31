@@ -1,14 +1,14 @@
 [package]
 name = "harness-daemon-discovery"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.2" }
-harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.2" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.2" }
+harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.3" }
+harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.3" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
 
 [dev-dependencies]
 fs2 = "0.4.3"

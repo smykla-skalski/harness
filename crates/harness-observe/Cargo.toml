@@ -1,6 +1,6 @@
 [package]
 name = "harness-observe"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -23,11 +23,11 @@ standalone-daemon = []
 chrono = { version = "0.4.44", features = ["serde"], optional = true }
 clap = { version = "4.6.0", features = ["derive"], optional = true }
 fs-err = "3.3.0"
-harness-agents = { path = "../harness-agents", version = "55.0.2" }
-harness-infra = { path = "../harness-infra", version = "55.0.2" }
-harness-kernel = { path = "../harness-kernel", version = "55.0.2" }
-harness-protocol = { path = "../harness-protocol", version = "55.0.2" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.2" }
+harness-agents = { path = "../harness-agents", version = "55.0.3" }
+harness-infra = { path = "../harness-infra", version = "55.0.3" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.3" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
 hex = "0.4.3"
 notify = { version = "8.2.0", optional = true }
 regex = "1.11.1"

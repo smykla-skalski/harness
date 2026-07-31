@@ -1,18 +1,18 @@
 [package]
 name = "harness-hooks"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-agents = { path = "../harness-agents", version = "55.0.2" }
-harness-infra = { path = "../harness-infra", version = "55.0.2" }
-harness-kernel = { path = "../harness-kernel", version = "55.0.2" }
-harness-protocol = { path = "../harness-protocol", version = "55.0.2" }
-harness-session = { path = "../harness-session", version = "55.0.2" }
-harness-telemetry = { path = "../harness-telemetry", version = "55.0.2" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.2" }
+harness-agents = { path = "../harness-agents", version = "55.0.3" }
+harness-infra = { path = "../harness-infra", version = "55.0.3" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.3" }
+harness-session = { path = "../harness-session", version = "55.0.3" }
+harness-telemetry = { path = "../harness-telemetry", version = "55.0.3" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
 clap = { version = "4.6.0", features = ["derive"] }
 fs-err = "3.3.0"
 serde = { version = "1.0.228", features = ["derive"] }
