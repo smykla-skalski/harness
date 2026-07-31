@@ -218,6 +218,45 @@ struct HarnessMonitorStoreSecretMigrationTests {
     #expect(store.presentedSheet == nil)
   }
 
+  @Test("Cancelling the review carries nothing and does not prompt again")
+  func cancellingReviewCarriesNothing() async throws {
+    let initialClient = RecordingHarnessClient()
+    initialClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 1,
+      instanceID: "daemon-A"
+    )
+    let credentialPersistence = InMemoryTaskBoardCredentialBundle()
+    let keychainBundle = InMemoryTaskBoardKeychainBundle()
+    try credentialPersistence.github.save(
+      TaskBoardGitHubCredentialSnapshot(globalToken: "gh-token-A"),
+      scope: .database("daemon-A")
+    )
+    let store = await makeBootstrappedStore(
+      client: initialClient,
+      credentialPersistence: credentialPersistence,
+      keychainBundle: keychainBundle
+    )
+
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 2,
+      instanceID: "daemon-B"
+    )
+
+    async let connected: Void = store.connect(using: replacementClient)
+    #expect(await waitUntil { store.presentedSheet != nil })
+    store.resolveSecretMigrationConsent(nil)
+    await connected
+
+    let daemonB = try credentialPersistence.github.load(scope: .database("daemon-B"))
+    #expect(daemonB.globalToken == nil)
+    // Cleared, so a later reconnect to the same daemon does not prompt again.
+    #expect(store.taskBoardPreviousDatabaseInstanceID == nil)
+    #expect(store.presentedSheet == nil)
+  }
+
   @Test("Consent resolution resumes the parked review decision")
   func consentResolutionResumesDecision() async {
     let store = await makeBootstrappedStore()

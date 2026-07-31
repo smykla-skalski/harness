@@ -67,9 +67,13 @@ extension HarnessMonitorStore {
       return
     }
 
-    // Dismissing the sheet carries nothing rather than surprising the user by
-    // propagating private keys to the daemon they just connected to.
-    let selections = await presentSecretMigrationConsent(items) ?? [:]
+    // Dismissing the sheet carries nothing and still clears the source, so a
+    // deliberate cancel is honored without a Keychain write and is not
+    // re-prompted on the next reconnect.
+    guard let selections = await presentSecretMigrationConsent(items) else {
+      taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
+      return
+    }
 
     do {
       try await taskBoardSettingsWorker.migrateStoredSecrets(
