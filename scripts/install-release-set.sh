@@ -213,6 +213,28 @@ legacy_adapter_probe_is_owned() {
     >/dev/null 2>&1
 }
 
+repo_wrapper_is_owned() {
+  local name="$1"
+  local path="$2"
+
+  [[ "$name" == harness && -f "$path" && -x "$path" && ! -L "$path" ]] || return 1
+  if command grep -Fqx '# harness-repo-wrapper-v1' "$path"; then
+    return 0
+  fi
+
+  # setup:bootstrap installed the wrapper before it carried an ownership marker.
+  # Keep the compatibility check specific to that wrapper's dispatch structure.
+  [[ "$(command sed -n '1p' "$path")" == '#!/bin/sh' ]] \
+    && command grep -Fqx 'is_repo_root() {' "$path" \
+    && command grep -Fqx "repo_root=\"\$(resolve_repo_root || true)\"" "$path" \
+    && command grep -Fqx \
+      "if [ -n \"\${repo_root}\" ] && [ -x \"\${repo_root}/target/debug/harness\" ]; then" \
+      "$path" \
+    && command grep -Fq \
+      'harness: unable to resolve a current harness binary for' \
+      "$path"
+}
+
 binary_is_owned() {
   local name="$1"
   local path="$2"
@@ -246,7 +268,8 @@ binary_is_owned() {
 
 normalization_binary_is_owned() {
   binary_is_owned "$1" "$2" \
-    || legacy_adapter_probe_is_owned "$1" "$2"
+    || legacy_adapter_probe_is_owned "$1" "$2" \
+    || repo_wrapper_is_owned "$1" "$2"
 }
 
 codesign_is_skipped() {

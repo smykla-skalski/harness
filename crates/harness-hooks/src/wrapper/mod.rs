@@ -20,6 +20,7 @@ pub use registrations::process_agent_registrations;
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
 set -eu
+# harness-repo-wrapper-v1
 
 is_repo_root() {
   [ -f "$1/Cargo.toml" ] && [ -f "$1/scripts/cargo-local.sh" ]
