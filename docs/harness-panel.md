@@ -300,7 +300,7 @@ The example uses the default daemon unit name; substitute the installed name if 
 
 ## Upgrading
 
-`daemon:remote:deploy` does a binary-only panel deploy by default, and `--no-panel` skips it. That step stops the remote daemon, takes a consistent SQLite backup, swaps the panel binary, restarts the service over its still-active socket, and checks the loopback health route, restoring the binary and that backup if the check does not return the expected code. It never renders or installs units, so it does not carry a change to `harness-panel.service`, `harness-panel.socket`, or a `ListenStream=` value. The panel still has no transactional upgrade path through the `harness-systemd` controller, tracked in #604, so those unit changes are what the manual runbook below is for.
+`daemon:remote:deploy` does a binary-only panel deploy by default, and `--no-panel` skips it. That step stops the remote daemon, takes a consistent SQLite backup, swaps the panel binary, restarts the service over its still-active socket, and checks the loopback health route, restoring the binary and that backup if the restart fails or the check does not return the expected code. It never renders or installs units, so it does not carry a change to `harness-panel.service`, `harness-panel.socket`, or a `ListenStream=` value. The panel still has no transactional upgrade path through the `harness-systemd` controller, tracked in #604, so those unit changes are what the manual runbook below is for.
 
 The panel step reads its host specifics from the environment, defaulting to a standard install:
 

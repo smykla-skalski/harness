@@ -132,6 +132,15 @@ deploy_panel() {
     exit 1
   fi
 
+  # Confirm the database before stopping anything: a misconfigured path must cost
+  # no downtime, and the snapshot below cannot run without it. `priv test` in a
+  # condition also keeps `set -e` from aborting past this explicit message.
+  if ! priv test -f "$panel_db"; then
+    printf 'panel database not found at %s\n' "$panel_db" >&2
+    printf 'set HARNESS_REMOTE_PANEL_DB to the installed database path\n' >&2
+    exit 1
+  fi
+
   remote_was_active=0
   if systemctl is-active --quiet "$panel_daemon_unit"; then
     remote_was_active=1
@@ -144,17 +153,21 @@ deploy_panel() {
   # Quiesce the public route, then take a consistent snapshot: the checkpoint
   # folds the WAL back into the main file so the .backup image is whole.
   priv systemctl stop "$panel_daemon_unit"
-  priv test -f "$panel_db"
   priv sqlite3 "$panel_db" 'PRAGMA wal_checkpoint(TRUNCATE)'
   priv sqlite3 "$panel_db" ".backup '$backup_dir/panel.sqlite3'"
 
   priv install -m 0755 "$candidate" "$panel_binary"
-  priv systemctl restart "$panel_service"
-
-  status="$(curl --max-time 10 -sS -o /dev/null -w '%{http_code}' "$panel_health_url" || true)"
+  # A restart failure is as fatal as a bad health code and must roll back too, so
+  # run it in a condition: under `set -e` a bare failing restart would abort the
+  # script with the daemon stopped and the new binary already in place.
+  if priv systemctl restart "$panel_service"; then
+    status="$(curl --max-time 10 -sS -o /dev/null -w '%{http_code}' "$panel_health_url" || true)"
+  else
+    status="restart-failed"
+  fi
   if [[ "$status" != "$panel_health_expect" ]]; then
-    printf 'panel health %s returned %s (expected %s); rolling back from %s\n' \
-      "$panel_health_url" "$status" "$panel_health_expect" "$backup_dir" >&2
+    printf 'panel restart/health for %s returned %s (expected %s); rolling back from %s\n' \
+      "$panel_service" "$status" "$panel_health_expect" "$backup_dir" >&2
     rollback_panel "$backup_dir" "$remote_was_active"
     printf 'panel deploy failed; backup kept at %s\n' "$backup_dir" >&2
     exit 1

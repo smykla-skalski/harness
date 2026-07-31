@@ -70,6 +70,9 @@ printf '%s\n' "\$*" >>"$systemctl_log"
 if [[ "\${1:-}" == "is-active" ]]; then
   [[ "\${FAKE_DAEMON_ACTIVE:-1}" == "1" ]] && exit 0 || exit 3
 fi
+if [[ "\${1:-}" == "restart" && "\${FAKE_RESTART_FAIL:-0}" == "1" ]]; then
+  exit 1
+fi
 exit 0
 EOF
 cat >"$fakebin/sqlite3" <<EOF
@@ -234,5 +237,18 @@ set -e
 [[ "$health_rc" -ne 0 ]] || fail "a failed health check did not fail the deploy"
 [[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed health check did not restore the panel binary"
 grep -q 'rolling back' <<<"$health_out" || fail "a failed health check did not report a rollback"
+
+# A panel service that fails to restart is as fatal as a bad health code: it must
+# roll the binary back and fail, not abort under set -e with the new binary in
+# place and the daemon left stopped.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+restart_out="$(FAKE_RESTART_FAIL=1 deploy "$deploy_script" 2>&1)"
+restart_rc=$?
+set -e
+[[ "$restart_rc" -ne 0 ]] || fail "a failed panel restart did not fail the deploy"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed panel restart did not restore the panel binary"
+grep -q 'rolling back' <<<"$restart_out" || fail "a failed panel restart did not report a rollback"
 
 printf 'test-remote-daemon-deploy: ok\n'
