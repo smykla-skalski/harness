@@ -302,13 +302,18 @@ async fn an_unattributed_pairing_naming_no_known_account_resyncs_everyone() {
 /// never be theirs.
 #[tokio::test]
 async fn an_unattributed_mint_for_a_known_account_wakes_only_that_account() {
-    let (endpoint, _) =
-        stub_daemon(vec![frame_minted_for("pair-elsewhere", "minted", "github", "4242")]).await;
+    let (endpoint, _) = stub_daemon(vec![frame_minted_for(
+        "pair-elsewhere",
+        "minted",
+        "github:https://api.github.com",
+        "4242",
+    )])
+    .await;
     let store = paired_store().await;
     let account = store
         .upsert_account(
             &AccountIdentity {
-                provider: "github".to_owned(),
+                provider: "github:https://api.github.com".to_owned(),
                 subject_id: "4242".to_owned(),
                 login: "ada".to_owned(),
                 display_name: "Ada".to_owned(),
@@ -338,8 +343,13 @@ async fn an_unattributed_mint_for_a_known_account_wakes_only_that_account() {
 /// watchers, never fewer.
 #[tokio::test]
 async fn an_unattributed_mint_for_an_unknown_identity_resyncs_everyone() {
-    let (endpoint, _) =
-        stub_daemon(vec![frame_minted_for("pair-elsewhere", "minted", "github", "9999")]).await;
+    let (endpoint, _) = stub_daemon(vec![frame_minted_for(
+        "pair-elsewhere",
+        "minted",
+        "github:https://api.github.com",
+        "9999",
+    )])
+    .await;
     let events = PanelEvents::new();
     let mut watcher = events.watch();
 
