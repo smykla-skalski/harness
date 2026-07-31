@@ -23,20 +23,19 @@ private struct TaskBoardWorkflowBadgeChrome: ViewModifier {
 
   func body(content: Content) -> some View {
     content.background {
-      if reduceTransparency {
-        Capsule()
-          .fill(Color(nsColor: .windowBackgroundColor))
-          .overlay {
-            Capsule()
-              .strokeBorder(
-                tint,
-                lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
-              )
-          }
-      } else {
-        Capsule()
-          .fill(tint.opacity(fillOpacity))
-      }
+      Capsule()
+        .fill(
+          reduceTransparency
+            ? Color(nsColor: .windowBackgroundColor)
+            : tint.opacity(fillOpacity)
+        )
+        .overlay {
+          Capsule()
+            .strokeBorder(
+              reduceTransparency ? tint : .clear,
+              lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+            )
+        }
     }
   }
 }

@@ -4,7 +4,7 @@ import SwiftUI
 
 struct TaskBoardWorkflowStepSelection: Identifiable {
   let step: TaskBoardDependencyTriageStep
-  var id: Int { Int(step.order) }
+  var id: UInt32 { step.order }
 }
 
 struct TaskBoardWorkflowAttemptSelection: Identifiable {
