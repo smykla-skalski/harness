@@ -217,11 +217,11 @@ impl DaemonEventStream {
             .pair_link_account(&event.pairing.pairing_id)
             .await
         {
-            Ok(account_id) => self.events.announce(PanelChange::Pairing(
+            Ok(Some(account_id)) => self.events.announce(PanelChange::Pairing(
                 PairingChanged {
                     change: event.change,
                     pairing: event.pairing,
-                    account_id,
+                    account_id: Some(account_id),
                 }
                 .into(),
             )),
@@ -229,6 +229,9 @@ impl DaemonEventStream {
             // guessing would put one person's device on another's page. A
             // resync sends every watcher back to the list route, which resolves
             // attribution itself and answers honestly if it cannot.
+            Ok(None) => {
+                self.events.announce(PanelChange::Resynced);
+            }
             Err(error) => {
                 tracing::warn!(%error, "could not attribute a daemon event; asking watchers to re-read");
                 self.events.announce(PanelChange::Resynced);

@@ -250,9 +250,10 @@ async fn a_claim_reaches_the_watchers_attributed_to_the_account_it_was_minted_fo
     );
 }
 
-/// A pairing the panel has no record of still reaches the watchers, without an
-/// account. Only the owner is shown it, and inventing an attribution here would
-/// be the one way somebody else's device could land on a person's page.
+/// A pairing the panel has no record of still reaches the watchers, as a resync
+/// rather than attributed. Only the owner is shown the row, and inventing an
+/// attribution here would be the one way somebody else's device could land on a
+/// person's page.
 #[tokio::test]
 async fn a_pairing_the_panel_never_recorded_arrives_unattributed() {
     let (endpoint, _) = stub_daemon(vec![frame("pair-elsewhere", "minted")]).await;
@@ -263,10 +264,11 @@ async fn a_pairing_the_panel_never_recorded_arrives_unattributed() {
     stream.attempt().await.expect("one connection");
 
     assert_eq!(watcher.recv().await.expect("resync"), PanelChange::Resynced);
-    let PanelChange::Pairing(changed) = watcher.recv().await.expect("the mint") else {
-        panic!("expected the mint to arrive as a pairing change");
-    };
-    assert_eq!(changed.account_id, None);
+    assert_eq!(
+        watcher.recv().await.expect("the mint as resync"),
+        PanelChange::Resynced,
+        "an unattributable pairing announces a resync so every viewer re-reads the list, which resolves attribution itself"
+    );
 }
 
 /// A frame the panel cannot read is the daemon's business, not this socket's.
@@ -278,10 +280,34 @@ async fn an_unreadable_frame_does_not_cost_the_ones_after_it() {
         frame("pair-2", "revoked"),
     ])
     .await;
+    let store = paired_store().await;
+    store
+        .record_pair_link(&PairLinkRecord {
+            id: "pair-2".to_owned(),
+            account_id: store
+                .upsert_account(
+                    &AccountIdentity {
+                        provider: "github".to_owned(),
+                        subject_id: "42".to_owned(),
+                        login: "test".to_owned(),
+                        display_name: "Test".to_owned(),
+                        avatar_url: None,
+                    },
+                    Utc::now(),
+                )
+                .await
+                .expect("an account")
+                .id,
+            role: "operator".to_owned(),
+            created_at: Utc::now(),
+            expires_at: Utc::now(),
+        })
+        .await
+        .expect("record the link");
     let events = PanelEvents::new();
     let mut watcher = events.watch();
 
-    let stream = DaemonEventStream::new(client_for(&endpoint), paired_store().await, events);
+    let stream = DaemonEventStream::new(client_for(&endpoint), store, events);
     stream.attempt().await.expect("one connection");
 
     assert_eq!(watcher.recv().await.expect("resync"), PanelChange::Resynced);
