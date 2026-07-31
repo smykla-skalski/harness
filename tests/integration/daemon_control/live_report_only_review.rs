@@ -14,7 +14,7 @@ use support::{
 };
 
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
-const REVIEW_TIMEOUT: Duration = Duration::from_secs(360);
+const REVIEW_TIMEOUT: Duration = Duration::from_mins(6);
 
 fn required_env(name: &str, runtime: &str, model: &str) -> String {
     std::env::var(name)
@@ -191,7 +191,7 @@ fn create_and_dispatch(http: &DaemonClient, target: &LiveReviewTarget, project: 
     assert!(
         dispatch["failures"]
             .as_array()
-            .is_none_or(|failures| failures.is_empty()),
+            .is_none_or(std::vec::Vec::is_empty),
         "stage=dispatch: {dispatch}"
     );
     assert_eq!(

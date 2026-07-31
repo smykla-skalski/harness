@@ -26,6 +26,16 @@ extension WebSocketTransport {
           self.pending.failAll(error: error)
           await self.clearResponseBatchHandlers()
           await self.clearPartialFrames()
+          // Set `reconnectingStreams` BEFORE `terminateAllStreams()` so the
+          // per-stream `onTermination` closures this finishes see it true
+          // and skip clearing the desired-subscription state. Without this
+          // guard, `cleanupGlobalSubscription` races `reconnectInternal`
+          // and clears `globalSubscriptionActive` first, so `resubscribe()`
+          // never re-issues `streamSubscribe` and the daemon stops
+          // broadcasting `task_board_updated` (and every other global push)
+          // to this connection until the store's stream task backoff calls
+          // `globalStream()` again.
+          self.reconnectingStreams = true
           await self.terminateAllStreams()
           // The remote socket is dead. Drop the task reference so subsequent
           // `rpc()` / `sendPing()` calls fail-fast with `.connectionClosed`
@@ -39,12 +49,14 @@ extension WebSocketTransport {
             HarnessMonitorLogger.websocket.info(
               "WSock endpoint \(urlStr, privacy: .public) gone for \(logID, privacy: .public); yielding"
             )
+            self.reconnectingStreams = false
             break
           }
           if attempt >= Self.maxReconnectAttempts {
             HarnessMonitorLogger.websocket.warning(
               "WSock reconnect exhausted after \(attempt) attempts for \(logID, privacy: .public)"
             )
+            self.reconnectingStreams = false
             break
           }
           let delay = Self.reconnectDelays[
@@ -52,9 +64,31 @@ extension WebSocketTransport {
           ]
           attempt += 1
           try? await Task.sleep(for: delay)
-          if Task.isCancelled { return }
-          if await self.isShutDown { return }
-          try? await self.reconnectInternal()
+          if Task.isCancelled {
+            self.reconnectingStreams = false
+            return
+          }
+          if await self.isShutDown {
+            self.reconnectingStreams = false
+            return
+          }
+          do {
+            try await self.reconnectInternal()
+            self.reconnectingStreams = false
+          } catch {
+            // `reconnectInternal` only throws when the transport is shut
+            // down mid-reconnect. Leaving the flag set is wrong: the
+            // streams are gone, the socket is gone, and we are about to
+            // exit the loop. Clear it so a future `stopGlobalStream`
+            // after this loop ends can run the regular cleanup path.
+            self.reconnectingStreams = false
+            if !Task.isCancelled {
+              HarnessMonitorLogger.websocket.warning(
+                "WSock reconnect failure for \(logID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+              )
+            }
+            break
+          }
         }
       }
     }
@@ -106,12 +140,29 @@ extension WebSocketTransport {
 
   func resubscribe() async throws {
     if globalSubscriptionActive {
+      HarnessMonitorLogger.websocket.debug(
+        "resubscribing global stream after reconnect"
+      )
       _ = try await rpc(
         method: .streamSubscribe,
         params: .object(["scope": .string("global")])
       )
+    } else {
+      // Diagnostic for the previous race: the desired-subscription flag
+      // was cleared between `terminateAllStreams()` and this call, so
+      // the daemon stays silent on global pushes until the store's
+      // stream task backoff calls `globalStream()` again. With the
+      // `reconnectingStreams` guard in place this branch should only
+      // fire when the consumer actually unsubscribed, never after a
+      // transport-side reconnect.
+      HarnessMonitorLogger.websocket.debug(
+        "skipping global resubscribe: consumer unsubscribed"
+      )
     }
     for sessionID in activeSubscriptions {
+      HarnessMonitorLogger.websocket.debug(
+        "resubscribing session stream \(sessionID, privacy: .public) after reconnect"
+      )
       _ = try await rpc(
         method: .sessionSubscribe,
         params: .object(["session_id": .string(sessionID)])

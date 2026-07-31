@@ -27,6 +27,7 @@ mod live_report_only_review;
 pub(crate) mod process;
 mod restart_boundaries;
 mod task_board_admission;
+mod task_board_live_updates;
 mod tui;
 mod tui_attach;
 

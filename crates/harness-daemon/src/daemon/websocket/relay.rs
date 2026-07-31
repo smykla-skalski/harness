@@ -258,6 +258,22 @@ fn relay_prepared(
     {
         let mut state = connection.lock().expect("connection lock");
         if !state.should_relay_session(prepared.session_id.as_deref()) {
+            // A push that the subscription filter says this connection does
+            // not want: typically a global event (e.g. `task_board_updated`,
+            // `sessions_updated`) when `global_subscription` is false, or a
+            // session-scoped event for an unsubscribed session. Dropping it
+            // here is correct; logging the drop at debug makes a stale
+            // subscription diagnosable without spamming production logs
+            // (every push to a session-subscriber that is not also a global
+            // subscriber takes this path).
+            tracing::debug!(
+                event = %prepared.event_name,
+                session_id = prepared.session_id.as_deref().unwrap_or("-"),
+                seq = prepared.seq,
+                global_subscription = state.global_subscription,
+                session_subscriptions = ?state.session_subscriptions.len(),
+                "ws push skipped: subscription filter"
+            );
             return None;
         }
         state.last_relayed_seq = state.last_relayed_seq.max(prepared.seq);

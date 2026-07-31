@@ -56,7 +56,7 @@ impl FakeSyncClient {
     /// Overrides the repository scope this client owns, letting a test place a
     /// fixture ticket under the same slug the client reconciles.
     pub(super) fn with_scope(mut self, scope_id: &str) -> Self {
-        self.scope_id = scope_id.to_owned();
+        scope_id.clone_into(&mut self.scope_id);
         self
     }
 }

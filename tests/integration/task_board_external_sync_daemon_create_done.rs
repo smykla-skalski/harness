@@ -21,7 +21,7 @@ use harness::task_board::{
 
 #[tokio::test]
 async fn newly_created_done_item_is_linked_then_closed() {
-    let (_temp, board) = board_with_done_item().await;
+    let (_temp, board) = Box::pin(board_with_done_item()).await;
     let client = CreateDoneClient::with_status_updates();
     let pushes = client.pushes.clone();
     let updates = client.updates.clone();
@@ -53,7 +53,7 @@ async fn newly_created_done_item_is_linked_then_closed() {
 
 #[tokio::test]
 async fn failed_close_keeps_link_and_backoff_does_not_create_duplicate() {
-    let (_temp, board) = board_with_done_item().await;
+    let (_temp, board) = Box::pin(board_with_done_item()).await;
     let client = CreateDoneClient::with_status_updates().fail_next_update();
     let pushes = client.pushes.clone();
     let updates = client.updates.clone();
@@ -83,11 +83,13 @@ async fn failed_close_keeps_link_and_backoff_does_not_create_duplicate() {
 
     assert_eq!(pushes.lock().expect("push log").as_slice(), ["done-1"]);
     assert!(operations.is_empty());
-    let updates = updates.lock().expect("update log");
-    assert_eq!(updates.len(), 1);
-    assert!(updates.iter().all(|update| {
-        update.precondition_updated_at.as_deref() == Some("provider-revision-1")
-    }));
+    {
+        let updates = updates.lock().expect("update log");
+        assert_eq!(updates.len(), 1);
+        assert!(updates.iter().all(|update| {
+            update.precondition_updated_at.as_deref() == Some("provider-revision-1")
+        }));
+    }
     let state = stored_sync_state(&board).await;
     assert_eq!(state.status, Some(TaskBoardStatus::Inbox));
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
@@ -95,7 +97,7 @@ async fn failed_close_keeps_link_and_backoff_does_not_create_duplicate() {
 
 #[tokio::test]
 async fn create_only_provider_reports_done_status_as_unsupported() {
-    let (_temp, board) = board_with_done_item().await;
+    let (_temp, board) = Box::pin(board_with_done_item()).await;
 
     let operations = sync(&board, CreateDoneClient::creates_only())
         .await
@@ -120,7 +122,7 @@ async fn create_only_provider_reports_done_status_as_unsupported() {
 
 #[tokio::test]
 async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
-    let (_temp, board) = board_with_done_item().await;
+    let (_temp, board) = Box::pin(board_with_done_item()).await;
     let client = CreateDoneClient::with_status_updates().without_revisions();
     let scope_id = ExternalProviderScopeIdentity::for_client(&client)
         .scope_id()

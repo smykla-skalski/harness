@@ -158,9 +158,9 @@ pub fn make_hook_context(skill: &str, payload: HookEnvelopePayload) -> GuardCont
 ///
 /// # Panics
 /// Panics if the decision does not match the expected value.
-pub fn assert_decision(result: &HookResult, expected: &Decision) {
+pub fn assert_decision(result: &HookResult, expected: Decision) {
     assert_eq!(
-        &result.decision, expected,
+        &result.decision, &expected,
         "expected {expected:?}, got {:?} (code={}, message={})",
         result.decision, result.code, result.message
     );
@@ -168,15 +168,15 @@ pub fn assert_decision(result: &HookResult, expected: &Decision) {
 
 /// Assert the hook result is Allow.
 pub fn assert_allow(result: &HookResult) {
-    assert_decision(result, &Decision::Allow);
+    assert_decision(result, Decision::Allow);
 }
 
 /// Assert the hook result is Deny.
 pub fn assert_deny(result: &HookResult) {
-    assert_decision(result, &Decision::Deny);
+    assert_decision(result, Decision::Deny);
 }
 
 /// Assert the hook result is Warn.
 pub fn assert_warn(result: &HookResult) {
-    assert_decision(result, &Decision::Warn);
+    assert_decision(result, Decision::Warn);
 }

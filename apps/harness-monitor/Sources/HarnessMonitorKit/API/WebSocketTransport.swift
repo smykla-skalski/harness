@@ -29,6 +29,15 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   var acpEventAutoFlushEnabled = true
   var activeSubscriptions: Set<String> = []
   var globalSubscriptionActive = false
+  /// Set by the receive loop while it tears the live streams down and
+  /// rebuilds the socket, so the per-stream `onTermination` closures can
+  /// tell a transport-initiated teardown from a consumer-initiated stop.
+  /// Without this, `cleanupGlobalSubscription` and
+  /// `cleanupSessionSubscription` would race the receive loop and clear
+  /// the desired-subscription flags before `resubscribe()` ran, so the
+  /// new socket would never re-`streamSubscribe` and the daemon would
+  /// silently drop every global push.
+  var reconnectingStreams = false
   var isShutDown = false
   var cachedConfiguration: MonitorConfiguration?
   var configurationWaiters: [CheckedContinuation<MonitorConfiguration, Error>] = []
@@ -338,14 +347,18 @@ extension WebSocketTransport {
 extension WebSocketTransport {
   // MARK: - Streams
 
+  /// Termination reason for the global and session stream continuations, in
+  /// a local alias so the onTermination callbacks below stay readable.
+  typealias StreamTermination = AsyncThrowingStream<DaemonPushEvent, Error>.Continuation.Termination
+
   public func globalStream() async -> DaemonPushEventStream {
     let (stream, continuation) = AsyncThrowingStream<DaemonPushEvent, Error>.makeStream()
     globalStreamContinuation = continuation
     globalSubscriptionActive = true
 
-    continuation.onTermination = { [weak self] _ in
+    continuation.onTermination = { [weak self] termination in
       guard let self else { return }
-      Task { await self.cleanupGlobalSubscription() }
+      Task { await self.cleanupGlobalSubscription(termination: termination) }
     }
 
     Task {
@@ -362,8 +375,24 @@ extension WebSocketTransport {
     return stream
   }
 
-  func cleanupGlobalSubscription() {
+  func cleanupGlobalSubscription(
+    termination: StreamTermination
+  ) {
+    // Only the transport's `terminateAllStreams()` calls `continuation.finish()`
+    // (which produces `.finished`) while `reconnectingStreams` is true. A
+    // consumer-driven termination (Task cancellation, app lifecycle) reports
+    // `.cancelled` here instead, and the desired-subscription flag must drop
+    // so the in-flight receive loop's `resubscribe()` does not re-issue
+    // `streamSubscribe` for a stream the consumer no longer wants.
+    // `if case .finished` matches without relying on `Termination: Equatable`,
+    // which the standard library type does not promise.
     globalStreamContinuation = nil
+    if reconnectingStreams, case .finished = termination {
+      HarnessMonitorLogger.websocket.debug(
+        "skipping global unsubscribe: transport reconnect in progress"
+      )
+      return
+    }
     globalSubscriptionActive = false
     Task {
       try? await rpc(
@@ -378,9 +407,9 @@ extension WebSocketTransport {
     sessionStreamContinuations[sessionID] = continuation
     activeSubscriptions.insert(sessionID)
 
-    continuation.onTermination = { [weak self] _ in
+    continuation.onTermination = { [weak self] termination in
       guard let self else { return }
-      Task { await self.cleanupSessionSubscription(sessionID: sessionID) }
+      Task { await self.cleanupSessionSubscription(sessionID: sessionID, termination: termination) }
     }
 
     Task {
@@ -397,8 +426,22 @@ extension WebSocketTransport {
     return stream
   }
 
-  func cleanupSessionSubscription(sessionID: String) {
+  func cleanupSessionSubscription(
+    sessionID: String,
+    termination: StreamTermination
+  ) {
+    // Mirror `cleanupGlobalSubscription`: a transport reconnect leaves the
+    // desired-subscription set intact so `resubscribe()` re-issues
+    // `session.subscribe` on the new socket, but a consumer cancellation
+    // still drops the session from `activeSubscriptions` to stop the same
+    // reconnect from re-subscribing to it.
     sessionStreamContinuations[sessionID] = nil
+    if reconnectingStreams, case .finished = termination {
+      HarnessMonitorLogger.websocket.debug(
+        "skipping session unsubscribe for \(sessionID, privacy: .public): transport reconnect in progress"
+      )
+      return
+    }
     activeSubscriptions.remove(sessionID)
     Task {
       try? await rpc(

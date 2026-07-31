@@ -10,7 +10,7 @@ mod transcript;
 
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
 const CODEX_MODEL: &str = "gpt-5.3-codex-spark";
-const SMOKE_TIMEOUT: Duration = Duration::from_secs(180);
+const SMOKE_TIMEOUT: Duration = Duration::from_mins(3);
 const SMOKE_PROMPT: &str =
     "Return one short plain-text sentence confirming this headless report turn completed.";
 
@@ -141,7 +141,7 @@ fn openrouter_and_codex_complete_without_monitor() {
             "--codex-path",
             &codex_path,
         ],
-        codex_port,
+        &codex_port,
     );
     let _bridge_ready = wait_for_bridge_capabilities(&home, &xdg, &["codex", "acp"]);
     let (endpoint, token) = current_daemon_endpoint_and_token(&home, &xdg);
@@ -211,7 +211,7 @@ fn run_openrouter(
         "OpenRouter headless live smoke",
         SMOKE_PROMPT,
     );
-    let correlation_id = session.session_id.clone();
+    let correlation_id = session.session_id;
     let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/acp");
     let started = http
         .request_json(
@@ -366,7 +366,7 @@ fn run_codex(
         "Codex headless live smoke",
         SMOKE_PROMPT,
     );
-    let correlation_id = session.session_id.clone();
+    let correlation_id = session.session_id;
     let start_path = format!("/v1/sessions/{correlation_id}/managed-agents/codex");
     let started = http
         .request_json(

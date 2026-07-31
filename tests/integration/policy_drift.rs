@@ -34,8 +34,10 @@ struct DriftFixture {
     /// Whether the policy should allow or deny.
     expected_allow: bool,
     /// Extra setup (symlinks, etc.) if needed.
-    setup: Option<Box<dyn Fn(&Path, &Path) + Send + Sync>>,
+    setup: Option<DriftSetupFn>,
 }
+
+type DriftSetupFn = Box<dyn Fn(&Path, &Path) + Send + Sync>;
 
 fn denied_binary_names() -> BTreeSet<String> {
     ["kubectl", "kumactl", "helm", "docker", "k3d"]

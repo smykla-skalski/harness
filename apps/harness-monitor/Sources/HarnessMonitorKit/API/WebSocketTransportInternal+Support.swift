@@ -271,6 +271,30 @@ extension WebSocketTransport {
   }
 
   func deliverPushEvent(_ pushEvent: DaemonPushEvent) {
+    if globalStreamContinuation == nil,
+      let sessionId = pushEvent.sessionId,
+      let continuation = sessionStreamContinuations[sessionId]
+    {
+      continuation.yield(pushEvent)
+      return
+    }
+    if globalStreamContinuation == nil {
+      // Sessions-only pushes arrive here when their continuation is also
+      // gone (consumer stopped subscribing or transport is mid-reconnect).
+      // Tag them with the session id when they carry one and the global
+      // event name when they do not, so a regression report can locate
+      // where in the pipeline the push was dropped.
+      if let sessionId = pushEvent.sessionId {
+        HarnessMonitorLogger.websocket.debug(
+          "dropping push \(pushEvent.kind.debugLabel, privacy: .public) for session \(sessionId, privacy: .public): no continuation attached"
+        )
+      } else {
+        HarnessMonitorLogger.websocket.debug(
+          "dropping global push \(pushEvent.kind.debugLabel, privacy: .public): no continuation attached"
+        )
+      }
+      return
+    }
     globalStreamContinuation?.yield(pushEvent)
     if let sessionId = pushEvent.sessionId,
       let continuation = sessionStreamContinuations[sessionId]

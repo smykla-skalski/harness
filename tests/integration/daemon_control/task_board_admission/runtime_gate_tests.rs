@@ -48,7 +48,7 @@ fn an_unavailable_reviewer_runtime_fails_the_review_before_agent_work_and_stays_
     assert!(
         body["applied"]
             .as_array()
-            .is_none_or(|applied| applied.is_empty()),
+            .is_none_or(std::vec::Vec::is_empty),
         "a runtime that cannot run must not apply the dispatch: {body}"
     );
 

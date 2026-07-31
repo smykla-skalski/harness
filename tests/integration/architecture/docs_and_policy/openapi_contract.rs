@@ -1,4 +1,4 @@
-//! Keeps the generated OpenAPI document honest against the authoritative HTTP
+//! Keeps the generated `OpenAPI` document honest against the authoritative HTTP
 //! route contract.
 //!
 //! The daemon HTTP API is fully documented: every non-exempt route in
@@ -18,7 +18,7 @@ use harness::task_board::TASK_BOARD_LIST_MAX_TAGS;
 
 const HTTP_METHODS: [&str; 4] = ["get", "post", "put", "delete"];
 
-/// Routes served over plain HTTP that cannot be represented as an OpenAPI
+/// Routes served over plain HTTP that cannot be represented as an `OpenAPI`
 /// request/response operation: WebSocket upgrades and server-sent event streams
 /// carry no JSON body schema, so they are intentionally absent from the
 /// generated document. Every other non-exempt contract route must be documented.
