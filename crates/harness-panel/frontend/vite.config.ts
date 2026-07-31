@@ -1,6 +1,8 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vitest/config';
 
+import { mockServer } from './dev/mock-server';
+
 // The panel's mount point is a runtime flag (`--base-path`), but Vite bakes
 // `base` into the emitted asset URLs at build time. Building against a sentinel
 // and having the Rust asset handler substitute the configured prefix into
@@ -8,7 +10,9 @@ import { defineConfig } from 'vitest/config';
 // `index.html` is rewritten, so the sentinel must not appear in the bundles.
 export default defineConfig({
   base: '/__harness_panel_base__/',
-  plugins: [svelte()],
+  // The mock no-ops unless `HARNESS_PANEL_DEV_MOCK=1`, so the build and the
+  // default dev server are unaffected by it being listed here.
+  plugins: [svelte(), mockServer()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

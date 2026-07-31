@@ -25,7 +25,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.config.ts', '*.config.js', 'tests/**/*.ts'],
+    files: ['*.config.ts', '*.config.js', 'tests/**/*.ts', 'dev/**/*.ts'],
     languageOptions: {
       globals: { ...globals.node },
     },
