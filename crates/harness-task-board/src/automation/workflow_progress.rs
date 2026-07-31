@@ -227,7 +227,7 @@ mod tests {
         later_attempt.attempt = 2;
         later_attempt.idempotency_key = "run-2".into();
         execution.attempts.push(later_attempt);
-        let evidence = runtime_evidence_for_two_attempts();
+        let evidence = evidence_for_two_attempts();
 
         let progress = build_task_board_workflow_progress(&execution, &evidence);
 
@@ -241,7 +241,7 @@ mod tests {
         later_action.action_key = "review:zeta".into();
         later_action.idempotency_key = "run-2".into();
         execution.attempts.push(later_action);
-        let evidence = runtime_evidence_for_two_attempts();
+        let evidence = evidence_for_two_attempts();
 
         let progress = build_task_board_workflow_progress(&execution, &evidence);
 
@@ -257,15 +257,14 @@ mod tests {
         later_attempt.idempotency_key = "run-2".into();
         later_attempt.updated_at = "legacy-2".into();
         execution.attempts.push(later_attempt);
-        let evidence = runtime_evidence_for_two_attempts();
+        let evidence = evidence_for_two_attempts();
 
         let progress = build_task_board_workflow_progress(&execution, &evidence);
 
         assert_eq!(progress.current_runtime.as_deref(), Some("openrouter"));
     }
 
-    fn runtime_evidence_for_two_attempts()
-    -> BTreeMap<String, TaskBoardWorkflowAttemptRuntimeEvidence> {
+    fn evidence_for_two_attempts() -> BTreeMap<String, TaskBoardWorkflowAttemptRuntimeEvidence> {
         BTreeMap::from([
             (
                 "run-1".into(),
