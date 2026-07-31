@@ -26,6 +26,7 @@ impl GitHubClient {
             .bearer_auth(&self.token)
             .header(USER_AGENT, "harness-live-report-only-review")
             .header(ACCEPT, "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
             .timeout(Duration::from_secs(30))
             .send()
             .expect("stage=github: request");
@@ -197,8 +198,7 @@ fn viewer_activity(items: &Value, viewer: &str) -> BTreeSet<String> {
 }
 
 fn run_git(directory: Option<&Path>, args: &[&str]) {
-    let mut command = Command::new("git");
-    command.args(args);
+    let mut command = git_command(args);
     if let Some(directory) = directory {
         command.current_dir(directory);
     }
@@ -211,8 +211,7 @@ fn run_git(directory: Option<&Path>, args: &[&str]) {
 }
 
 fn git_output(directory: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .args(args)
+    let output = git_command(args)
         .current_dir(directory)
         .output()
         .expect("stage=fixture: run git");
@@ -221,6 +220,15 @@ fn git_output(directory: &Path, args: &[&str]) -> String {
         .expect("stage=fixture: UTF-8 git output")
         .trim()
         .to_owned()
+}
+
+fn git_command(args: &[&str]) -> Command {
+    let mut command = Command::new("git");
+    command
+        .args(args)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "true");
+    command
 }
 
 #[test]
