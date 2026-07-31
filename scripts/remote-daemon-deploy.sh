@@ -164,8 +164,9 @@ deploy_panel() {
   # Quiesce the public route, then take a consistent snapshot: the checkpoint
   # folds the WAL back into the main file so the .backup image is whole.
   # The daemon is down from here, so every step routes an explicit failure to
-  # rollback. An ERR trap would not help: `set -e` does not inherit into the
-  # `priv` function, so a failure inside it never reaches a caller-level trap.
+  # rollback. An ERR trap is avoided on purpose: it is not inherited into the
+  # `priv` function without `set -E`, so a failure inside `priv` would slip past
+  # a caller-level trap; an explicit `|| rollback` is unambiguous.
   priv systemctl stop "$panel_daemon_unit"
   priv sqlite3 "$panel_db" 'PRAGMA wal_checkpoint(TRUNCATE)' \
     || panel_rollback_and_fail "$backup_dir" "$remote_was_active" 'database checkpoint failed'
