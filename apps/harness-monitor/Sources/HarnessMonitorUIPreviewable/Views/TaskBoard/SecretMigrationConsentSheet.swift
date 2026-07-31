@@ -1,25 +1,29 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Shown when the Monitor connects to a different daemon that already holds a
-/// secret clashing with one carried from the previous daemon. Conflicts get a
-/// keep-or-replace choice; secrets the new daemon lacks get a carry-over switch
-/// that is on by default. Nothing is written until the user applies.
+/// Shown when the Monitor connects to a different daemon and secrets can carry
+/// over from the previous one. Conflicts (the new daemon already holds a
+/// differing value) get a keep-or-carry-over choice; the rest get a carry-over
+/// switch that is on by default. Nothing is written until the user applies.
 struct SecretMigrationConsentSheet: View {
   let store: HarnessMonitorStore
   let items: [TaskBoardSecretMigrationItem]
 
-  @State private var carry: [String: Bool]
+  @State private var carry: TaskBoardSecretMigrationSelections
+  private let conflictCount: Int
 
   init(store: HarnessMonitorStore, items: [TaskBoardSecretMigrationItem]) {
     self.store = store
     self.items = items
-    var initial: [String: Bool] = [:]
+    var initial: TaskBoardSecretMigrationSelections = [:]
     for item in items {
-      initial[item.id] = item.disposition == .carryOver
+      initial[item.kind] = item.disposition == .carryOver
     }
     _carry = State(initialValue: initial)
+    conflictCount = items.filter { $0.disposition == .conflict }.count
   }
+
+  private var hasConflict: Bool { conflictCount > 0 }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -86,8 +90,8 @@ struct SecretMigrationConsentSheet: View {
   @ViewBuilder
   private func control(for item: TaskBoardSecretMigrationItem) -> some View {
     let binding = Binding(
-      get: { carry[item.id] ?? (item.disposition == .carryOver) },
-      set: { carry[item.id] = $0 }
+      get: { carry[item.kind] ?? (item.disposition == .carryOver) },
+      set: { carry[item.kind] = $0 }
     )
     switch item.disposition {
     case .conflict:
@@ -122,14 +126,6 @@ struct SecretMigrationConsentSheet: View {
     }
   }
 
-  private var conflictCount: Int {
-    items.filter { $0.disposition == .conflict }.count
-  }
-
-  private var hasConflict: Bool {
-    conflictCount > 0
-  }
-
   private var summaryText: String {
     if conflictCount > 0 {
       return conflictCount == 1 ? "1 conflict" : "\(conflictCount) conflicts"
@@ -140,7 +136,7 @@ struct SecretMigrationConsentSheet: View {
   private var selections: TaskBoardSecretMigrationSelections {
     var map: TaskBoardSecretMigrationSelections = [:]
     for item in items {
-      map[item.kind] = carry[item.id] ?? (item.disposition == .carryOver)
+      map[item.kind] = carry[item.kind] ?? (item.disposition == .carryOver)
     }
     return map
   }
