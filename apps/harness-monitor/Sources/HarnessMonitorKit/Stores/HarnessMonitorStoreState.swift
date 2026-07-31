@@ -8,6 +8,9 @@ struct CacheWriteSyncState {
   var taskBoardRefreshDeferralDepth = 0
   var taskBoardRefreshCompletionWaiters: [UInt64: [CheckedContinuation<Void, Never>]] = [:]
   var pendingTaskBoardItemsRefresh = false
+  var lastTaskBoardItemsRefreshAt: Date?
+  /// Set when someone is awaiting the refresh, so push pacing is skipped.
+  var taskBoardRefreshRequiresImmediate = false
   var pendingTaskBoardOrchestratorRefresh = false
   var pendingTaskBoardPolicyPipelineRefresh = false
   var pendingTaskBoardFallbackStatus: TaskBoardOrchestratorStatus?

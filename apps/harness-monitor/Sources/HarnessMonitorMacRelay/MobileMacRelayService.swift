@@ -28,6 +28,7 @@ public actor MobileMacRelayService {
   private let executor: any MobileRelayCommandExecutor
   private let secretRedactor = MobileMirrorSecretRedactor()
   private var executedCommandIDs: Set<String> = []
+  private var publishGate = MobileMirrorSnapshotPublishGate()
 
   public init(
     stationID: String,
@@ -46,15 +47,23 @@ public actor MobileMacRelayService {
   @discardableResult
   public func publishSnapshot(now: Date = .now) async throws -> MobileMirrorSnapshot {
     let preparedSnapshot = try await makeMirroredSnapshot(now: now)
-    try await snapshotSink?.writeSnapshot(preparedSnapshot.mirroredSnapshot)
+    try await publishIfChanged(preparedSnapshot.mirroredSnapshot, now: now)
     return preparedSnapshot.mirroredSnapshot
+  }
+
+  private func publishIfChanged(_ snapshot: MobileMirrorSnapshot, now: Date) async throws {
+    guard let snapshotSink, publishGate.shouldPublish(snapshot, now: now) else {
+      return
+    }
+    try await snapshotSink.writeSnapshot(snapshot)
+    publishGate.recordPublished(snapshot, at: now)
   }
 
   @discardableResult
   public func executePendingCommands(now: Date = .now) async throws -> [MobileCommandReceipt] {
     let preparedSnapshot = try await makeMirroredSnapshot(now: now)
     do {
-      try await snapshotSink?.writeSnapshot(preparedSnapshot.mirroredSnapshot)
+      try await publishIfChanged(preparedSnapshot.mirroredSnapshot, now: now)
     } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
       return []
     }

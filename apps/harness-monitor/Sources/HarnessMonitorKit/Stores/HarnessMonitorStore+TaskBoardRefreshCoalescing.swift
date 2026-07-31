@@ -10,7 +10,8 @@ extension HarnessMonitorStore {
     cancelInitialTaskBoardConfirmationRefresh()
     let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,
-      fallbackStatus: fallbackStatus
+      fallbackStatus: fallbackStatus,
+      immediate: true
     )
     await waitForTaskBoardDashboardSnapshotRefresh(requestGeneration)
   }
@@ -40,7 +41,10 @@ extension HarnessMonitorStore {
     cacheWriteSync.taskBoardRefreshDeferralDepth -= 1
     guard cacheWriteSync.taskBoardRefreshDeferralDepth == 0 else { return }
 
-    let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(using: client)
+    let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(
+      using: client,
+      immediate: true
+    )
     await waitForTaskBoardDashboardSnapshotRefresh(requestGeneration)
   }
 
@@ -49,8 +53,12 @@ extension HarnessMonitorStore {
     includeItems: Bool = true,
     includeOrchestratorStatus: Bool = true,
     includePolicyPipeline: Bool = false,
-    fallbackStatus: TaskBoardOrchestratorStatus? = nil
+    fallbackStatus: TaskBoardOrchestratorStatus? = nil,
+    immediate: Bool = false
   ) -> UInt64 {
+    if immediate {
+      cacheWriteSync.taskBoardRefreshRequiresImmediate = true
+    }
     cacheWriteSync.taskBoardRefreshRequestGeneration &+= 1
     let requestGeneration = cacheWriteSync.taskBoardRefreshRequestGeneration
     cacheWriteSync.pendingTaskBoardItemsRefresh =
@@ -119,6 +127,30 @@ extension HarnessMonitorStore {
         return
       }
 
+      if self.cacheWriteSync.pendingTaskBoardItemsRefresh,
+        !self.cacheWriteSync.taskBoardRefreshRequiresImmediate
+      {
+        var remainingPacing = TaskBoardItemsRefreshPacing.delay(
+          lastRefreshAt: self.cacheWriteSync.lastTaskBoardItemsRefreshAt,
+          now: Date()
+        )
+        // Sliced rather than one sleep: an awaited refresh that arrives while
+        // this task is already pacing cannot restart it, so the wait itself has
+        // to notice the immediate flag and stop.
+        while remainingPacing > 0, !self.cacheWriteSync.taskBoardRefreshRequiresImmediate {
+          let slice = min(remainingPacing, TaskBoardItemsRefreshPacing.pollSlice)
+          do {
+            try await Task.sleep(for: .seconds(slice))
+          } catch {
+            return
+          }
+          guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else {
+            return
+          }
+          remainingPacing -= slice
+        }
+      }
+
       let includeItems = self.cacheWriteSync.pendingTaskBoardItemsRefresh
       let includeOrchestratorStatus =
         self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh
@@ -127,6 +159,7 @@ extension HarnessMonitorStore {
       let fallbackStatus = self.cacheWriteSync.pendingTaskBoardFallbackStatus
       let completedRequestGeneration =
         self.cacheWriteSync.taskBoardRefreshRequestGeneration
+      self.cacheWriteSync.taskBoardRefreshRequiresImmediate = false
       self.cacheWriteSync.pendingTaskBoardItemsRefresh = false
       self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
       self.cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh = false
@@ -143,6 +176,10 @@ extension HarnessMonitorStore {
         includeOrchestratorStatus: includeOrchestratorStatus
       )
       guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else { return }
+
+      if includeItems {
+        self.cacheWriteSync.lastTaskBoardItemsRefreshAt = Date()
+      }
 
       self.cancelInitialTaskBoardConfirmationRefresh()
       self.applyTaskBoardDashboardSnapshot(
