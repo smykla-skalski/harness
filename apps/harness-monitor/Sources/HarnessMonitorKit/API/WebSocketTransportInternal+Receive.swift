@@ -1,6 +1,12 @@
 import Foundation
 
 extension WebSocketTransport {
+  // The receive loop's `Task` is nonisolated, so the actor-isolated flag
+  // must be written through a method rather than assigned directly.
+  func setReconnectingStreams(_ value: Bool) {
+    reconnectingStreams = value
+  }
+
   func startReceiveLoop() {
     receiveTask?.cancel()
     receiveTask = Task { [weak self] in
@@ -35,7 +41,7 @@ extension WebSocketTransport {
           // broadcasting `task_board_updated` (and every other global push)
           // to this connection until the store's stream task backoff calls
           // `globalStream()` again.
-          self.reconnectingStreams = true
+          await self.setReconnectingStreams(true)
           await self.terminateAllStreams()
           // The remote socket is dead. Drop the task reference so subsequent
           // `rpc()` / `sendPing()` calls fail-fast with `.connectionClosed`
@@ -49,14 +55,14 @@ extension WebSocketTransport {
             HarnessMonitorLogger.websocket.info(
               "WSock endpoint \(urlStr, privacy: .public) gone for \(logID, privacy: .public); yielding"
             )
-            self.reconnectingStreams = false
+            await self.setReconnectingStreams(false)
             break
           }
           if attempt >= Self.maxReconnectAttempts {
             HarnessMonitorLogger.websocket.warning(
               "WSock reconnect exhausted after \(attempt) attempts for \(logID, privacy: .public)"
             )
-            self.reconnectingStreams = false
+            await self.setReconnectingStreams(false)
             break
           }
           let delay = Self.reconnectDelays[
@@ -65,23 +71,23 @@ extension WebSocketTransport {
           attempt += 1
           try? await Task.sleep(for: delay)
           if Task.isCancelled {
-            self.reconnectingStreams = false
+            await self.setReconnectingStreams(false)
             return
           }
           if await self.isShutDown {
-            self.reconnectingStreams = false
+            await self.setReconnectingStreams(false)
             return
           }
           do {
             try await self.reconnectInternal()
-            self.reconnectingStreams = false
+            await self.setReconnectingStreams(false)
           } catch {
             // `reconnectInternal` only throws when the transport is shut
             // down mid-reconnect. Leaving the flag set is wrong: the
             // streams are gone, the socket is gone, and we are about to
             // exit the loop. Clear it so a future `stopGlobalStream`
             // after this loop ends can run the regular cleanup path.
-            self.reconnectingStreams = false
+            await self.setReconnectingStreams(false)
             if !Task.isCancelled {
               HarnessMonitorLogger.websocket.warning(
                 "WSock reconnect failure for \(logID, privacy: .public): \(error.localizedDescription, privacy: .public)"
