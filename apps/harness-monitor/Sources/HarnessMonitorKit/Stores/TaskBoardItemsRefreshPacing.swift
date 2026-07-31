@@ -11,6 +11,10 @@ import Foundation
 enum TaskBoardItemsRefreshPacing {
   static let minimumInterval: TimeInterval = 1
 
+  /// The pacing wait is served in slices this long so a refresh someone is
+  /// awaiting can break out instead of sitting behind the whole floor.
+  static let pollSlice: TimeInterval = 0.05
+
   /// Seconds to wait before starting the next push-driven item refresh.
   static func delay(
     lastRefreshAt: Date?,

@@ -130,19 +130,24 @@ extension HarnessMonitorStore {
       if self.cacheWriteSync.pendingTaskBoardItemsRefresh,
         !self.cacheWriteSync.taskBoardRefreshRequiresImmediate
       {
-        let pacingDelay = TaskBoardItemsRefreshPacing.delay(
+        var remainingPacing = TaskBoardItemsRefreshPacing.delay(
           lastRefreshAt: self.cacheWriteSync.lastTaskBoardItemsRefreshAt,
           now: Date()
         )
-        if pacingDelay > 0 {
+        // Sliced rather than one sleep: an awaited refresh that arrives while
+        // this task is already pacing cannot restart it, so the wait itself has
+        // to notice the immediate flag and stop.
+        while remainingPacing > 0, !self.cacheWriteSync.taskBoardRefreshRequiresImmediate {
+          let slice = min(remainingPacing, TaskBoardItemsRefreshPacing.pollSlice)
           do {
-            try await Task.sleep(for: .seconds(pacingDelay))
+            try await Task.sleep(for: .seconds(slice))
           } catch {
             return
           }
           guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else {
             return
           }
+          remainingPacing -= slice
         }
       }
 

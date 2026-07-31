@@ -22,7 +22,10 @@ struct MobileMirrorSnapshotPublishGate {
     guard let lastPublishedContent, let lastPublishedAt else {
       return true
     }
-    guard now.timeIntervalSince(lastPublishedAt) < Self.heartbeat else {
+    // A clock that moved backwards would otherwise read as "still inside the
+    // heartbeat" and suppress writes until wall time caught up.
+    let elapsed = now.timeIntervalSince(lastPublishedAt)
+    guard elapsed >= 0, elapsed < Self.heartbeat else {
       return true
     }
     return Self.comparableContent(snapshot) != lastPublishedContent

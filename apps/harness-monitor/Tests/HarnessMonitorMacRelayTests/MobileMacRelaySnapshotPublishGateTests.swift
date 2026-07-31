@@ -112,6 +112,20 @@ final class MobileMacRelaySnapshotPublishGateTests: XCTestCase {
     XCTAssertEqual(published.count, 2)
   }
 
+  /// A clock that moved backwards must not read as "still inside the heartbeat"
+  /// and park the mirror until wall time catches up.
+  func testClockGoingBackwardsStillHeartbeats() async throws {
+    let source = RevisionBumpingSnapshotSource(base: MobileDemoFixtures.snapshot(now: start))
+    let sink = RecordingMobileMirrorSnapshotSink()
+    let relay = makeRelay(source: source, sink: sink)
+
+    _ = try await relay.publishSnapshot(now: start)
+    _ = try await relay.publishSnapshot(now: start.addingTimeInterval(-500))
+
+    let published = await sink.snapshots()
+    XCTAssertEqual(published.count, 2)
+  }
+
   /// A write that threw never reached the phone, so the gate must not treat that
   /// content as already published or the mirror silently stops updating.
   func testFailedWriteIsRetriedOnTheNextPublish() async throws {
