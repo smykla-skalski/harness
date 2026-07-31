@@ -1,5 +1,7 @@
 use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, ws_methods};
 
+mod workflow_progress;
+
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
@@ -41,6 +43,7 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: true,
     },
+    workflow_progress::ROUTE,
     HttpApiRouteContract {
         method: HttpRouteMethod::Put,
         path: http_paths::TASK_BOARD_ITEM,

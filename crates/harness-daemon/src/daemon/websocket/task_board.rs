@@ -63,6 +63,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_REVIEW_REPORT_GET => {
             Some(read::dispatch_task_board_review_report_get(request, state, connection).await)
         }
+        ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET => Some(
+            read::dispatch_task_board_workflow_progress_get(request, state, connection).await,
+        ),
         ws_methods::TASK_BOARD_POSITION_GET => {
             Some(read::dispatch_task_board_position_get(request, state, connection).await)
         }

@@ -12,6 +12,7 @@ Suites:
   task-board-lane-alignment
   task-board-inspector
   task-board-review-report
+  task-board-workflow-progress
   task-board-filters
 EOF
 }
@@ -22,6 +23,7 @@ if [[ "${1:-}" == "--list" ]]; then
     task-board-lane-alignment \
     task-board-inspector \
     task-board-review-report \
+    task-board-workflow-progress \
     task-board-filters
   exit 0
 fi
@@ -33,7 +35,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-filters) ;;
+  dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -92,6 +94,9 @@ case "$suite" in
     ;;
   task-board-review-report)
     HARNESS_TASK_BOARD_REVIEW_REPORT_PREVIEW_DUMP="$staging_directory" "$host"
+    ;;
+  task-board-workflow-progress)
+    HARNESS_TASK_BOARD_WORKFLOW_PROGRESS_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   task-board-filters)
     HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP="$staging_directory" "$host"

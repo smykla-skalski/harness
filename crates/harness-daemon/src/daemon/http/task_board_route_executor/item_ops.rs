@@ -14,7 +14,9 @@ use crate::daemon::protocol::{
     TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
-use crate::task_board::{TaskBoardAiReviewReportResponse, TaskBoardItem};
+use crate::task_board::{
+    TaskBoardAiReviewReportResponse, TaskBoardItem, TaskBoardWorkflowProgressResponse,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_remote_viewer::{TaskBoardReadListResponse, project_task_board_list};
 
@@ -76,6 +78,17 @@ pub(crate) async fn get_item_ai_review_report(
 ) -> Result<TaskBoardAiReviewReportResponse, CliError> {
     service::get_task_board_ai_review_report_db(
         require_async_db(state, "task board AI review report get")?,
+        request,
+    )
+    .await
+}
+
+pub(crate) async fn get_item_workflow_progress(
+    state: &DaemonHttpState,
+    request: &TaskBoardGetItemRequest,
+) -> Result<TaskBoardWorkflowProgressResponse, CliError> {
+    service::get_task_board_workflow_progress_db(
+        require_async_db(state, "task board workflow progress get")?,
         request,
     )
     .await

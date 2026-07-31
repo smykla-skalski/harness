@@ -345,6 +345,7 @@ pub(crate) use task_board_db::{
     get_task_board_item_position_snapshot_db, get_task_board_item_triage_current_db,
     get_task_board_item_triage_history_db, get_task_board_triage_rules_audit_db,
     get_task_board_triage_rules_draft_db, get_task_board_triage_rules_revisions_db,
+    get_task_board_workflow_progress_db,
     list_task_board_machines_db, list_task_board_projects_db, preview_task_board_triage_rules_db,
     read_task_board_items_db, reset_task_board_item_position_db, revoke_task_board_plan_db,
     save_task_board_triage_rules_draft_db, set_task_board_item_position_db,

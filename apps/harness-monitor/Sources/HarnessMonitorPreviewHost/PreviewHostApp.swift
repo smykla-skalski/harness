@@ -24,6 +24,12 @@ struct PreviewHostApp: App {
       NSApplication.shared.setActivationPolicy(.prohibited)
       exit(TaskBoardReviewReportPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
     }
+    if let dumpDirectory = ProcessInfo.processInfo.environment[
+      "HARNESS_TASK_BOARD_WORKFLOW_PROGRESS_PREVIEW_DUMP"
+    ] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      exit(TaskBoardWorkflowProgressPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
+    }
     // Headless render modes dump preview fixtures before any window or dock
     // presence appears, so verification never steals focus.
     if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_DIFF_LAB_DUMP"] {

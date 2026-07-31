@@ -23,6 +23,7 @@ actor PreviewHarnessClientState {
   var taskBoardItemsChangeSeq: Int64
   var taskBoardItemRevisions: [String: Int64]
   var taskBoardReviewReportsByItemID: [String: TaskBoardAiReviewReportResponse]
+  var taskBoardWorkflowProgressByItemID: [String: TaskBoardWorkflowProgressResponse]
   /// Ordered newest-first per item id; the first entry is the current decision.
   /// Empty by default -- preview fixtures carry no triage history until a
   /// preview or test explicitly seeds one via `seedTaskBoardTriageDecisions`.
@@ -86,6 +87,9 @@ actor PreviewHarnessClientState {
       uniqueKeysWithValues: fixtures.taskBoardItems.map { ($0.id, 1) }
     )
     self.taskBoardReviewReportsByItemID = Self.seededTaskBoardReviewReports(
+      items: fixtures.taskBoardItems
+    )
+    self.taskBoardWorkflowProgressByItemID = Self.seededTaskBoardWorkflowProgress(
       items: fixtures.taskBoardItems
     )
     self.taskBoardTriageDecisionsByItemID = [:]

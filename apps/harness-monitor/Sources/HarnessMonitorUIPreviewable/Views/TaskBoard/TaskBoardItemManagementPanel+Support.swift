@@ -22,6 +22,12 @@ struct TaskBoardReviewReportLoadKey: Hashable {
   let taskBoardRevision: UInt64
 }
 
+struct TaskBoardWorkflowProgressLoadKey: Hashable {
+  let itemID: String
+  let executionID: String?
+  let updatedAt: String
+}
+
 @MainActor private let taskBoardApprovedAtSubmissionFormatter: ISO8601DateFormatter = {
   let formatter = ISO8601DateFormatter()
   formatter.formatOptions = [.withInternetDateTime]

@@ -1,4 +1,4 @@
-use sqlx::{query, query_as, query_scalar};
+use sqlx::{QueryBuilder, Sqlite, query, query_as, query_scalar};
 
 use super::{
     AgentTuiLiveRefreshState, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, AsyncDaemonDb,
@@ -47,6 +47,15 @@ const CODEX_RUN_SQL: &str =
     created_at, updated_at, model, effort
  FROM codex_runs
  WHERE run_id = ?1";
+const CODEX_RUNS_BY_ID_SQL: &str =
+    "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
+    session_agent_id, display_name,
+    project_dir, thread_id, turn_id, mode,
+    status, prompt, latest_summary, final_message, error,
+    pending_approvals_json, resolved_approvals_json, events_json,
+    created_at, updated_at, model, effort
+ FROM codex_runs
+ WHERE run_id IN (";
 const LIST_CODEX_RUNS_SQL: &str =
     "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
     session_agent_id, display_name,
@@ -186,6 +195,35 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("load async codex run: {error}")))?
             .map(AsyncCodexRunRow::into_snapshot)
             .transpose()
+    }
+
+    /// Load Codex controller runs matching the supplied ids.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub(crate) async fn codex_runs_by_ids(
+        &self,
+        run_ids: &[&str],
+    ) -> Result<Vec<CodexRunSnapshot>, CliError> {
+        if run_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut builder = QueryBuilder::<Sqlite>::new(CODEX_RUNS_BY_ID_SQL);
+        {
+            let mut separated = builder.separated(", ");
+            for run_id in run_ids {
+                separated.push_bind(*run_id);
+            }
+        }
+        builder.push(')');
+        let rows = builder
+            .build_query_as::<AsyncCodexRunRow>()
+            .fetch_all(self.pool())
+            .await
+            .map_err(|error| db_error(format!("load async codex runs by ids: {error}")))?;
+        rows.into_iter()
+            .map(AsyncCodexRunRow::into_snapshot)
+            .collect()
     }
 
     /// List Codex controller runs for a session, newest first, from the canonical async DB.
