@@ -263,7 +263,7 @@ fn relay_prepared(
             // `sessions_updated`) when `global_subscription` is false, or a
             // session-scoped event for an unsubscribed session. Dropping it
             // here is correct; logging the drop at debug makes a stale
-            // subscription diagnoseable without spamming production logs
+            // subscription diagnosable without spamming production logs
             // (every push to a session-subscriber that is not also a global
             // subscriber takes this path).
             tracing::debug!(

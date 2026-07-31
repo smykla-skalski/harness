@@ -64,7 +64,10 @@ extension WebSocketTransport {
           ]
           attempt += 1
           try? await Task.sleep(for: delay)
-          if Task.isCancelled { return }
+          if Task.isCancelled {
+            self.reconnectingStreams = false
+            return
+          }
           if await self.isShutDown {
             self.reconnectingStreams = false
             return
@@ -74,7 +77,7 @@ extension WebSocketTransport {
             self.reconnectingStreams = false
           } catch {
             // `reconnectInternal` only throws when the transport is shut
-            // down mid-reconnect. Leave the flag set is wrong: the
+            // down mid-reconnect. Leaving the flag set is wrong: the
             // streams are gone, the socket is gone, and we are about to
             // exit the loop. Clear it so a future `stopGlobalStream`
             // after this loop ends can run the regular cleanup path.
