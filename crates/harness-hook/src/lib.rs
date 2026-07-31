@@ -11,6 +11,7 @@ pub mod hook_adapters {
 
 pub mod agents;
 pub mod app;
+pub mod cli;
 pub mod infra;
 pub mod session;
 pub mod setup;

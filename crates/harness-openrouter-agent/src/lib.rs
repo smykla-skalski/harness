@@ -7,4 +7,5 @@
 //!   stdio and OpenRouter HTTP/SSE.
 
 pub mod acp;
+pub mod cli;
 pub mod openrouter;

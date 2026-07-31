@@ -16,33 +16,12 @@
 //! a delivery channel — they leak to grand-children and show up in
 //! `/proc/<pid>/environ`.
 
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
+use harness_openrouter_agent::cli::Cli;
 
 const PROBE_IDENTITY: &str = "harness-openrouter-agent";
-
-/// Entry-point CLI surface. The harness daemon launches the binary with
-/// `--stdio --api-key-file PATH`; the catalog descriptor's doctor probe uses
-/// `--probe`.
-#[derive(Debug, Parser)]
-#[command(name = "harness-openrouter-agent", version)]
-struct Cli {
-    /// Speak ACP over stdin/stdout. The default mode used by the daemon.
-    #[arg(long, default_value_t = true)]
-    stdio: bool,
-
-    /// Print success and exit. Used by `harness doctor` to detect installation.
-    #[arg(long, conflicts_with = "stdio")]
-    probe: bool,
-
-    /// Path to a mode-0600 file containing the OpenRouter API key. The shim
-    /// reads the file then immediately unlinks it. The daemon prepares this
-    /// file from its in-memory token cache before each spawn.
-    #[arg(long, conflicts_with = "probe")]
-    api_key_file: Option<PathBuf>,
-}
 
 fn main() -> ExitCode {
     let cli = Cli::parse();

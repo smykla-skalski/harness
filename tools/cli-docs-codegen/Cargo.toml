@@ -1,0 +1,29 @@
+[package]
+name = "cli-docs-codegen"
+version = "55.0.3"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[[bin]]
+name = "cli-docs-codegen"
+path = "src/main.rs"
+
+[dependencies]
+aff = { path = "../../aff" }
+clap = { version = "4.6.0", features = ["derive"] }
+clap-markdown = "0.1.5"
+harness = { path = "../.." }
+harness-bridge = { path = "../../crates/harness-bridge" }
+harness-daemon-bin = { path = "../../crates/harness-daemon-bin" }
+harness-hook = { path = "../../crates/harness-hook" }
+harness-mcp = { path = "../../crates/harness-mcp" }
+harness-panel = { path = "../../crates/harness-panel" }
+harness-sybra = { path = "../../crates/harness-sybra" }
+harness-systemd = { path = "../../crates/harness-systemd" }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

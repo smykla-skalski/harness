@@ -3,70 +3,14 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
-use clap::{Args, Parser, Subcommand};
+use clap::Parser;
 use harness_hook::agents::service;
 use harness_hook::app::resolve_project_dir;
-use harness_hook::hooks::{
-    AuditTurnArgs, HookAgent, HookCommand, SessionStartHookOutput, run_hook_command,
-};
+use harness_hook::cli::{AgentSessionArgs, Cli, Command, HookInvocationArgs};
+use harness_hook::hooks::{AuditTurnArgs, HookCommand, SessionStartHookOutput, run_hook_command};
 use harness_hook::infra::exec::RUNTIME;
-use harness_hook::setup::PreCompactArgs;
 use harness_hook::telemetry::{RuntimeService, TelemetryGuard, init_tracing_subscriber_for};
 use harness_kernel::errors::{self, CliError, CliErrorKind};
-use harness_kernel::kernel::skills::SKILL_NAMES;
-
-#[derive(Debug, Parser)]
-#[command(name = "harness-hook", version, about = "Harness lifecycle hooks")]
-struct Cli {
-    /// Seconds to wait before executing the command.
-    #[arg(long, default_value = "0", global = true)]
-    delay: f64,
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Debug, Subcommand)]
-enum Command {
-    ToolGuard(HookInvocationArgs),
-    ToolResult(HookInvocationArgs),
-    AuditTurn(AuditTurnInvocationArgs),
-    SessionStart(AgentSessionArgs),
-    SessionStop(AgentSessionArgs),
-    PromptSubmit(AgentSessionArgs),
-    PreCompact(PreCompactArgs),
-}
-
-#[derive(Debug, Args)]
-struct HookInvocationArgs {
-    /// Hook transport/agent protocol.
-    #[arg(long, value_enum)]
-    agent: HookAgent,
-    /// Harness skill owning the hook.
-    #[arg(long, value_parser = clap::builder::PossibleValuesParser::new(SKILL_NAMES))]
-    skill: String,
-}
-
-#[derive(Debug, Args)]
-struct AuditTurnInvocationArgs {
-    #[command(flatten)]
-    hook: HookInvocationArgs,
-    /// Raw Codex notify payload passed as `argv[1]`.
-    #[arg(hide = true)]
-    payload: Option<String>,
-}
-
-#[derive(Debug, Clone, Args)]
-struct AgentSessionArgs {
-    /// Hook transport/agent protocol.
-    #[arg(long, value_enum)]
-    agent: HookAgent,
-    /// Project directory associated with the runtime session.
-    #[arg(long, env = "CLAUDE_PROJECT_DIR")]
-    project_dir: Option<String>,
-    /// Native runtime session identifier.
-    #[arg(long)]
-    session_id: Option<String>,
-}
 
 fn main() -> ExitCode {
     let telemetry_guard = match init_telemetry() {
