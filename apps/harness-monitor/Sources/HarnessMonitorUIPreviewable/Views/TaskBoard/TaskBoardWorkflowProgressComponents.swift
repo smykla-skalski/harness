@@ -258,7 +258,7 @@ struct TaskBoardWorkflowStepsCard: View {
   var body: some View {
     let sorted = steps.sorted(by: { $0.order < $1.order })
     VStack(spacing: 0) {
-      ForEach(Array(sorted.enumerated()), id: \.element.order) { index, step in
+      ForEach(Array(sorted.enumerated()), id: \.offset) { index, step in
         Button {
           selectedStep = TaskBoardWorkflowStepSelection(step: step)
         } label: {
