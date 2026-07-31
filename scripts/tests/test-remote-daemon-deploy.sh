@@ -59,10 +59,59 @@ chmod +x "$fakebin/sudo"
 candidate="$SANDBOX/harness-daemon"
 cp "$controller" "$candidate"
 
+# Panel stubs: the binary-only panel deploy drives systemd, sqlite3, and curl.
+# Each stub records its calls; curl prints a controllable health code and
+# systemctl reports the remote daemon active by default.
+systemctl_log="$SANDBOX/systemctl-calls"
+sqlite_log="$SANDBOX/sqlite-calls"
+cat >"$fakebin/systemctl" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$systemctl_log"
+if [[ "\${1:-}" == "is-active" ]]; then
+  [[ "\${FAKE_DAEMON_ACTIVE:-1}" == "1" ]] && exit 0 || exit 3
+fi
+if [[ "\${1:-}" == "restart" && "\${FAKE_RESTART_FAIL:-0}" == "1" ]]; then
+  exit 1
+fi
+exit 0
+EOF
+cat >"$fakebin/sqlite3" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$sqlite_log"
+[[ "\${FAKE_SQLITE_FAIL:-0}" == "1" ]] && exit 1
+exit 0
+EOF
+cat >"$fakebin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s' "${FAKE_HEALTH_CODE:-401}"
+EOF
+chmod +x "$fakebin/systemctl" "$fakebin/sqlite3" "$fakebin/curl"
+
+# Sandbox stand-ins for the host paths the panel step touches.
+panel_binary="$SANDBOX/usr-local-bin/harness-panel"
+panel_candidate="$SANDBOX/local-bin/harness-panel"
+panel_db="$SANDBOX/panel.sqlite3"
+panel_backup_root="$SANDBOX/backups"
+mkdir -p "$SANDBOX/usr-local-bin" "$SANDBOX/local-bin" "$panel_backup_root"
+printf 'new-panel' >"$panel_candidate"
+chmod +x "$panel_candidate"
+touch "$panel_db"
+
+reset_panel() {
+  printf 'old-panel' >"$panel_binary"
+  chmod +x "$panel_binary"
+  rm -f "$systemctl_log" "$sqlite_log"
+}
+reset_panel
+
 deploy() {
   PATH="$fakebin:$PATH" \
     HARNESS_REMOTE_SYSTEMD_CONTROLLER="$controller" \
     HARNESS_REMOTE_DAEMON_CANDIDATE="$candidate" \
+    HARNESS_REMOTE_PANEL_CANDIDATE="$panel_candidate" \
+    HARNESS_REMOTE_PANEL_BINARY="$panel_binary" \
+    HARNESS_REMOTE_PANEL_DB="$panel_db" \
+    HARNESS_REMOTE_PANEL_BACKUP_ROOT="$panel_backup_root" \
     "$@"
 }
 
@@ -112,10 +161,13 @@ rm -f "$build_marker" "$ctrl_args"
 link_candidate="$SANDBOX/link-daemon"
 ln -sf "$candidate" "$link_candidate"
 real_candidate="$(readlink -m -- "$candidate")"
+# --no-panel keeps this focused on the daemon candidate; the panel path has its
+# own coverage below and needs its stubbed host paths, which this inline run does
+# not set.
 PATH="$fakebin:$PATH" \
   HARNESS_REMOTE_SYSTEMD_CONTROLLER="$controller" \
   HARNESS_REMOTE_DAEMON_CANDIDATE="$link_candidate" \
-  "$deploy_script" >/dev/null
+  "$deploy_script" --no-panel >/dev/null
 forwarded_candidate="$(awk '/^--candidate-path$/{getline; print; exit}' "$ctrl_args")"
 [[ "$forwarded_candidate" == "$real_candidate" ]] \
   || fail "controller got '$forwarded_candidate', expected real path '$real_candidate'"
@@ -139,5 +191,101 @@ set -e
 grep -q 'must be an absolute path' <<<"$reject_out" \
   || fail "relative controller did not report the absolute-path requirement"
 [[ ! -e "$ctrl_args" ]] || fail "relative controller was executed"
+
+# A default real run builds the panel too and swaps its binary, restarting the
+# service and checking the health route.
+rm -f "$build_marker" "$ctrl_args"
+reset_panel
+deploy "$deploy_script" >/dev/null
+grep -qx -- 'daemon' "$build_marker" || fail "default run did not build the daemon"
+grep -qx -- 'panel' "$build_marker" || fail "default run did not build the panel"
+[[ "$(cat "$panel_binary")" == 'new-panel' ]] || fail "default run did not swap the panel binary"
+grep -qx -- 'restart harness-panel.service' "$systemctl_log" \
+  || fail "default run did not restart the panel service"
+
+# --no-panel restores the daemon-only behavior: no panel build, no panel steps,
+# and the flag is this wrapper's own, never forwarded to the controller.
+rm -f "$build_marker" "$ctrl_args"
+reset_panel
+deploy "$deploy_script" --no-panel >/dev/null
+grep -qx -- 'daemon' "$build_marker" || fail "--no-panel did not build the daemon"
+if grep -qx -- 'panel' "$build_marker"; then
+  fail "--no-panel still built the panel"
+fi
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "--no-panel swapped the panel binary"
+[[ ! -s "$systemctl_log" ]] || fail "--no-panel drove systemd"
+grep -qx -- 'upgrade' "$ctrl_args" || fail "--no-panel skipped the daemon upgrade"
+if grep -qx -- '--no-panel' "$ctrl_args"; then
+  fail "--no-panel leaked to the controller"
+fi
+
+# A --dry-run previews the panel without building or touching the host.
+rm -f "$build_marker" "$ctrl_args"
+reset_panel
+dry_out="$(deploy "$deploy_script" --dry-run)"
+[[ ! -e "$build_marker" ]] || fail "--dry-run built the release set"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "--dry-run swapped the panel binary"
+[[ ! -s "$systemctl_log" ]] || fail "--dry-run drove systemd"
+grep -q 'would deploy the panel' <<<"$dry_out" || fail "--dry-run did not preview the panel"
+
+# A health code other than the expected one rolls the binary back and fails.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+health_out="$(FAKE_HEALTH_CODE=500 deploy "$deploy_script" 2>&1)"
+health_rc=$?
+set -e
+[[ "$health_rc" -ne 0 ]] || fail "a failed health check did not fail the deploy"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed health check did not restore the panel binary"
+grep -q 'rolling back' <<<"$health_out" || fail "a failed health check did not report a rollback"
+
+# A panel service that fails to restart is as fatal as a bad health code: it must
+# roll the binary back and fail, not abort under set -e with the new binary in
+# place and the daemon left stopped.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+restart_out="$(FAKE_RESTART_FAIL=1 deploy "$deploy_script" 2>&1)"
+restart_rc=$?
+set -e
+[[ "$restart_rc" -ne 0 ]] || fail "a failed panel restart did not fail the deploy"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed panel restart did not restore the panel binary"
+grep -q 'rolling back' <<<"$restart_out" || fail "a failed panel restart did not report a rollback"
+
+# A snapshot failure fails the deploy without swapping the binary, and because
+# the restore cannot complete either, it leaves the remote daemon stopped and
+# says so rather than fronting an unknown-state panel.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+snap_out="$(FAKE_SQLITE_FAIL=1 deploy "$deploy_script" 2>&1)"
+snap_rc=$?
+set -e
+[[ "$snap_rc" -ne 0 ]] || fail "a failed snapshot did not fail the deploy"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed snapshot still swapped the panel binary"
+if grep -qx -- 'start harness-remote-daemon.service' "$systemctl_log"; then
+  fail "a failed restore still restarted the remote daemon over an unknown-state panel"
+fi
+grep -q 'left stopped' <<<"$snap_out" || fail "a failed restore did not report the daemon left stopped"
+
+# A relative panel path is refused before any privileged panel step, so a bad
+# override cannot make root read or write a CWD-relative path.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+rel_out="$(PATH="$fakebin:$PATH" \
+  HARNESS_REMOTE_SYSTEMD_CONTROLLER="$controller" \
+  HARNESS_REMOTE_DAEMON_CANDIDATE="$candidate" \
+  HARNESS_REMOTE_PANEL_CANDIDATE="$panel_candidate" \
+  HARNESS_REMOTE_PANEL_BINARY="$panel_binary" \
+  HARNESS_REMOTE_PANEL_DB="relative/panel.sqlite3" \
+  HARNESS_REMOTE_PANEL_BACKUP_ROOT="$panel_backup_root" \
+  "$deploy_script" 2>&1)"
+rel_rc=$?
+set -e
+[[ "$rel_rc" -ne 0 ]] || fail "a relative panel path was accepted"
+grep -q 'must be an absolute path' <<<"$rel_out" \
+  || fail "a relative panel path did not report the absolute-path requirement"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a relative panel path still swapped the binary"
 
 printf 'test-remote-daemon-deploy: ok\n'

@@ -301,7 +301,7 @@ run = [
 ]
 
 [tasks."daemon:remote:deploy"]
-description = "Build and activate the daemon release set, then upgrade the live remote systemd unit through the recorded harness-systemd controller (Linux; run as the install user, the controller step self-elevates with sudo; forward --dry-run or --unit NAME after --). Controller rotation stays manual per docs/remote-systemd-upgrades.md"
+description = "Build and activate the daemon release set, upgrade the live remote systemd unit through the recorded harness-systemd controller, then do a binary-only harness-panel deploy unless --no-panel (Linux; run as the install user, the mutating steps self-elevate with sudo; --no-panel is the wrapper's own flag, and --dry-run or --unit NAME after -- forward to the controller). Controller rotation and panel unit changes stay manual per docs/remote-systemd-upgrades.md and docs/harness-panel.md"
 run = "./scripts/run-linux-only.sh ./scripts/remote-daemon-deploy.sh"
 
 [tasks."systemd:check"]
