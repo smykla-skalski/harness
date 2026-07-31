@@ -65,6 +65,30 @@ impl Store {
         Ok(row.as_ref().map(account_from_row))
     }
 
+    /// The panel id of the account behind an external identity, if anyone has
+    /// ever signed in under it.
+    ///
+    /// `(provider, subject_id)` is unique, so this answers with at most one id.
+    /// It is how an unattributed daemon event finds the account it was minted
+    /// for: the daemon echoes back the identity the panel sent it at mint time,
+    /// which is this account's own `provider` and `subject_id`.
+    ///
+    /// # Errors
+    /// Returns [`sqlx::Error`] when the query fails.
+    pub async fn account_id_for_identity(
+        &self,
+        provider: &str,
+        subject_id: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let row = sqlx::query("SELECT id FROM accounts WHERE provider = ?1 AND subject_id = ?2")
+            .bind(provider)
+            .bind(subject_id)
+            .fetch_optional(self.pool())
+            .await?;
+
+        Ok(row.as_ref().map(|row| row.get("id")))
+    }
+
     /// Every account, most recently seen first.
     ///
     /// # Errors
@@ -305,6 +329,32 @@ mod tests {
                 .await
                 .expect("lookup")
                 .is_none()
+        );
+    }
+
+    /// How an unattributed daemon event finds the account it was minted for: by
+    /// the identity the daemon echoes back, which is this account's own. An
+    /// identity nobody has signed in under resolves to nothing, so the event
+    /// falls back to waking every watcher rather than a scope reaching no one.
+    #[tokio::test]
+    async fn an_account_is_found_by_the_identity_it_signed_in_with() {
+        let store = Store::open_in_memory().await.expect("store");
+        let created = store.upsert_account(&ada(), at(10)).await.expect("upsert");
+
+        assert_eq!(
+            store
+                .account_id_for_identity(&ada().provider, &ada().subject_id)
+                .await
+                .expect("lookup"),
+            Some(created.id)
+        );
+        assert!(
+            store
+                .account_id_for_identity("github:https://api.github.com", "9999")
+                .await
+                .expect("lookup")
+                .is_none(),
+            "an identity no account signed in under resolves to nobody"
         );
     }
 

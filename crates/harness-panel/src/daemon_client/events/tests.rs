@@ -193,6 +193,28 @@ fn frame(pairing_id: &str, change: &str) -> String {
     .to_string()
 }
 
+/// The same frame, carrying the identity the daemon minted the link for, spelled
+/// the way it echoes back what the panel sent at mint time.
+fn frame_minted_for(pairing_id: &str, change: &str, provider: &str, subject_id: &str) -> String {
+    serde_json::json!({
+        "change": change,
+        "pairing": {
+            "pairing_id": pairing_id,
+            "state": "active",
+            "role": "operator",
+            "created_at": "2026-07-26T10:00:00Z",
+            "expires_at": "2026-07-26T10:10:00Z",
+            "claimed_at": "2026-07-26T10:01:00Z",
+            "minted_for": {
+                "provider": provider,
+                "subject_id": subject_id,
+                "display_name": "Ada",
+            },
+        }
+    })
+    .to_string()
+}
+
 /// The whole of the panel's half: it presents its credential, announces that a
 /// watcher's picture may be stale the moment the socket is up, and attributes
 /// each change to the account it minted the link for.
@@ -250,12 +272,13 @@ async fn a_claim_reaches_the_watchers_attributed_to_the_account_it_was_minted_fo
     );
 }
 
-/// A pairing the panel has no record of still reaches the watchers, as a resync
-/// rather than attributed. Only the owner is shown the row, and inventing an
-/// attribution here would be the one way somebody else's device could land on a
-/// person's page.
+/// A pairing the panel cannot key to a row and that names no account it knows
+/// reaches every watcher as a resync. There is nobody to narrow to, so the safe
+/// answer is that anyone whose picture might have moved re-reads the list, which
+/// resolves attribution itself and inventing one here would be the one way
+/// somebody else's device could land on a person's page.
 #[tokio::test]
-async fn a_pairing_the_panel_never_recorded_arrives_unattributed() {
+async fn an_unattributed_pairing_naming_no_known_account_resyncs_everyone() {
     let (endpoint, _) = stub_daemon(vec![frame("pair-elsewhere", "minted")]).await;
     let events = PanelEvents::new();
     let mut watcher = events.watch();
@@ -267,7 +290,67 @@ async fn a_pairing_the_panel_never_recorded_arrives_unattributed() {
     assert_eq!(
         watcher.recv().await.expect("the mint as resync"),
         PanelChange::Resynced,
-        "an unattributable pairing announces a resync so every viewer re-reads the list, which resolves attribution itself"
+        "a pairing the panel cannot attribute or narrow announces a full resync so every viewer re-reads"
+    );
+}
+
+/// The mint-window case: the daemon's frame beats the write that keys the row by
+/// pairing id, so the pairing is unattributable, but the frame names who it was
+/// minted for. That account exists here — it is the one the panel minted for —
+/// so only it and the owner are asked to re-read, and their re-read finds the
+/// row once the write lands. No other watcher is woken for a change that could
+/// never be theirs.
+#[tokio::test]
+async fn an_unattributed_mint_for_a_known_account_wakes_only_that_account() {
+    let (endpoint, _) =
+        stub_daemon(vec![frame_minted_for("pair-elsewhere", "minted", "github", "4242")]).await;
+    let store = paired_store().await;
+    let account = store
+        .upsert_account(
+            &AccountIdentity {
+                provider: "github".to_owned(),
+                subject_id: "4242".to_owned(),
+                login: "ada".to_owned(),
+                display_name: "Ada".to_owned(),
+                avatar_url: None,
+            },
+            Utc::now(),
+        )
+        .await
+        .expect("the account the link was minted for");
+    let events = PanelEvents::new();
+    let mut watcher = events.watch();
+
+    let stream = DaemonEventStream::new(client_for(&endpoint), store, events);
+    stream.attempt().await.expect("one connection");
+
+    assert_eq!(watcher.recv().await.expect("resync"), PanelChange::Resynced);
+    assert_eq!(
+        watcher.recv().await.expect("the account-scoped resync"),
+        PanelChange::ResyncAccount(account.id),
+        "an unattributable mint the daemon named a known account for narrows the re-read to that account and the owner"
+    );
+}
+
+/// A named identity no account here has ever signed in under cannot be narrowed
+/// to anyone, so it falls back to the full resync rather than a scope that would
+/// reach nobody. Resolving decides who is asked to re-read, and a miss asks more
+/// watchers, never fewer.
+#[tokio::test]
+async fn an_unattributed_mint_for_an_unknown_identity_resyncs_everyone() {
+    let (endpoint, _) =
+        stub_daemon(vec![frame_minted_for("pair-elsewhere", "minted", "github", "9999")]).await;
+    let events = PanelEvents::new();
+    let mut watcher = events.watch();
+
+    let stream = DaemonEventStream::new(client_for(&endpoint), paired_store().await, events);
+    stream.attempt().await.expect("one connection");
+
+    assert_eq!(watcher.recv().await.expect("resync"), PanelChange::Resynced);
+    assert_eq!(
+        watcher.recv().await.expect("the mint as resync"),
+        PanelChange::Resynced,
+        "a minted-for identity no account matches cannot narrow the re-read, so every viewer re-reads"
     );
 }
 

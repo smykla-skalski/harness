@@ -47,6 +47,15 @@ pub enum PanelChange {
     /// it means re-reading the list, which is the request that answers what is
     /// true now.
     Resynced,
+    /// A resync for the owner and one account only.
+    ///
+    /// Announced for a change the panel could not key to a pairing it holds but
+    /// could name the account it was minted for — the mint-window case, where
+    /// the daemon's frame beats the write that keys the row by pairing id. Only
+    /// the people who could be entitled to it re-read: the owner, who sees every
+    /// row, and the named account. It narrows who is asked, never what they are
+    /// shown, because the re-read still resolves attribution from the list route.
+    ResyncAccount(String),
     Pairing(Arc<PairingChanged>),
 }
 
@@ -106,6 +115,7 @@ mod tests {
                 expires_at: "2026-07-26T10:10:00Z".to_owned(),
                 claimed_at: Some("2026-07-26T10:01:00Z".to_owned()),
                 revoked_at: None,
+                minted_for: None,
                 device: None,
             },
         }))

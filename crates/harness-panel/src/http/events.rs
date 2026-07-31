@@ -114,6 +114,13 @@ async fn relay(
 ) -> bool {
     match change {
         Ok(PanelChange::Resynced) => send(socket, &Frame::Resync).await,
+        // Scoped to the account it was minted for, so only that person and the
+        // owner re-read. Anyone else takes nothing, as they would for a pairing
+        // that was not theirs: same entitlement, reached without a row to apply
+        // it to.
+        Ok(PanelChange::ResyncAccount(account_id)) => {
+            send_account_resync(socket, viewer, &account_id).await
+        }
         // Not this person's, so there is nothing to send and nothing wrong: the
         // channel carries every change and each socket takes its own share.
         Ok(PanelChange::Pairing(update)) => match pairing_frame(viewer, &update) {
@@ -130,6 +137,30 @@ async fn relay(
         }
         Err(RecvError::Closed) => false,
     }
+}
+
+/// Send an account-scoped resync, if it reaches this viewer.
+///
+/// Split from [`relay`] so the entitlement guard is one small function rather
+/// than a branch inside the change-dispatch match. Returns whether the socket
+/// is still usable, unchanged when the viewer is not entitled and nothing is
+/// sent.
+async fn send_account_resync(socket: &mut WebSocket, viewer: &Viewer, account_id: &str) -> bool {
+    if resync_reaches(viewer, account_id) {
+        send(socket, &Frame::Resync).await
+    } else {
+        true
+    }
+}
+
+/// Whether an account-scoped resync should reach this viewer.
+///
+/// The same entitlement [`visible_to`] applies to a row this account owns: the
+/// owner re-reads for every change, and anyone else only for one carrying their
+/// own account. Kept as its own predicate because a resync has no pairing to
+/// build a [`PanelPairing`] from.
+fn resync_reaches(viewer: &Viewer, account_id: &str) -> bool {
+    viewer.is_owner || viewer.account.id == account_id
 }
 
 /// One change, if this viewer is entitled to it.
@@ -203,9 +234,30 @@ struct PushedPairing<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Frame, PushedPairing};
+    use chrono::Utc;
+
+    use super::{Frame, PushedPairing, resync_reaches};
     use crate::daemon_client::pairings::{DaemonPairing, DaemonPairingDevice};
     use crate::http::pairings::PanelPairing;
+    use crate::http::session::Viewer;
+    use crate::store::accounts::Account;
+
+    fn viewer(account_id: &str, is_owner: bool) -> Viewer {
+        Viewer {
+            is_owner,
+            account: Account {
+                id: account_id.to_owned(),
+                provider: "github".to_owned(),
+                subject_id: "1".to_owned(),
+                login: "ada".to_owned(),
+                display_name: "Ada".to_owned(),
+                avatar_url: None,
+                first_seen_at: Utc::now(),
+                last_seen_at: Utc::now(),
+                can_pair: false,
+            },
+        }
+    }
 
     fn claimed() -> PanelPairing {
         PanelPairing {
@@ -218,6 +270,7 @@ mod tests {
                 expires_at: "2026-07-26T10:10:00Z".to_owned(),
                 claimed_at: Some("2026-07-26T10:01:00Z".to_owned()),
                 revoked_at: None,
+                minted_for: None,
                 device: Some(DaemonPairingDevice {
                     client_id: "device-1".to_owned(),
                     display_name: "Ada's laptop".to_owned(),
@@ -256,5 +309,24 @@ mod tests {
         let encoded = serde_json::to_value(Frame::Resync).expect("serialize the frame");
 
         assert_eq!(encoded["type"], "resync");
+    }
+
+    /// An account-scoped resync reaches the owner for every account, since they
+    /// see every row, and everyone else only for their own. Wake anyone else and
+    /// it is no narrower than the full resync it was meant to replace.
+    #[test]
+    fn an_account_scoped_resync_reaches_the_owner_and_only_the_named_account() {
+        assert!(
+            resync_reaches(&viewer("acc_1", false), "acc_1"),
+            "the named account re-reads"
+        );
+        assert!(
+            !resync_reaches(&viewer("acc_2", false), "acc_1"),
+            "another person is not woken for a change that cannot be theirs"
+        );
+        assert!(
+            resync_reaches(&viewer("acc_2", true), "acc_1"),
+            "the owner re-reads for every account, as they see every row"
+        );
     }
 }

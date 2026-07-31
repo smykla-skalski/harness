@@ -34,8 +34,23 @@ pub struct DaemonPairing {
     pub claimed_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revoked_at: Option<String>,
+    /// The identity the daemon recorded this link as minted for, echoed back
+    /// from what the panel sent at mint time. Read to attribute an event the
+    /// panel cannot yet key to a row of its own, and never sent onward: the
+    /// browser renders the account, not the raw provider identity, so
+    /// serialising it would only widen what leaves the panel.
+    #[serde(default, skip_serializing)]
+    pub minted_for: Option<MintedFor>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device: Option<DaemonPairingDevice>,
+}
+
+/// The external identity a link was minted for, as much of it as the panel
+/// reads. The daemon also carries a display name here, which the panel ignores.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct MintedFor {
+    pub provider: String,
+    pub subject_id: String,
 }
 
 /// The device a claimed link became.
