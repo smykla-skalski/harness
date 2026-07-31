@@ -344,9 +344,8 @@ function handle(
   // redirects back to the app root.
   if (url.startsWith(route('/auth/github/start')) && method === 'GET') {
     const as = new URL(url, 'http://localhost').searchParams.get('as') ?? '';
-    const target =
-      as === '' ? route('/auth/github/callback') : `${route('/auth/github/callback')}?as=${as}`;
-    res.writeHead(302, { Location: target });
+    const query = as === '' ? '' : `?${new URLSearchParams({ as })}`;
+    res.writeHead(302, { Location: `${route('/auth/github/callback')}${query}` });
     res.end();
     return;
   }
@@ -483,7 +482,7 @@ function mint(state: MockState): PairLink {
     role: pairing.role,
     scopes: ['pair:device'],
     expires_at: expiresAt,
-    pairing_url: `harness://pair?id=${pairingId}`,
+    pairing_url: `harness://pair?payload=${pairingId}`,
   };
 }
 
