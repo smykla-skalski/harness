@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
@@ -101,7 +101,7 @@ pub fn build_task_board_workflow_progress(
         .collect::<Vec<_>>();
     let current = attempts
         .iter()
-        .max_by_key(|attempt| DateTime::parse_from_rfc3339(&attempt.updated_at).ok());
+        .max_by(|left, right| compare_attempt_recency(left, right));
 
     TaskBoardWorkflowProgress {
         execution_id: execution.execution_id.clone(),
@@ -119,6 +119,20 @@ pub fn build_task_board_workflow_progress(
         updated_at: execution.updated_at.clone(),
         completed_at: execution.completed_at.clone(),
     }
+}
+
+fn compare_attempt_recency(
+    left: &TaskBoardWorkflowAttemptProgress,
+    right: &TaskBoardWorkflowAttemptProgress,
+) -> Ordering {
+    let timestamp_order = match (
+        DateTime::parse_from_rfc3339(&left.updated_at),
+        DateTime::parse_from_rfc3339(&right.updated_at),
+    ) {
+        (Ok(left), Ok(right)) => left.cmp(&right),
+        _ => left.updated_at.cmp(&right.updated_at),
+    };
+    timestamp_order.then_with(|| left.attempt.cmp(&right.attempt))
 }
 
 fn render_artifact(artifact: &super::TaskBoardAttemptResultArtifact) -> Option<String> {
@@ -202,6 +216,60 @@ mod tests {
             progress.current_model.as_deref(),
             Some("gpt-5.3-codex-spark")
         );
+    }
+
+    #[test]
+    fn current_runtime_breaks_timestamp_ties_by_attempt() {
+        let mut execution = execution();
+        let mut later_attempt = execution.attempts[0].clone();
+        later_attempt.attempt = 2;
+        later_attempt.idempotency_key = "run-2".into();
+        execution.attempts.push(later_attempt);
+        let evidence = runtime_evidence_for_two_attempts();
+
+        let progress = build_task_board_workflow_progress(&execution, &evidence);
+
+        assert_eq!(progress.current_runtime.as_deref(), Some("openrouter"));
+    }
+
+    #[test]
+    fn current_runtime_orders_legacy_timestamps_deterministically() {
+        let mut execution = execution();
+        execution.attempts[0].updated_at = "legacy-1".into();
+        let mut later_attempt = execution.attempts[0].clone();
+        later_attempt.attempt = 2;
+        later_attempt.idempotency_key = "run-2".into();
+        later_attempt.updated_at = "legacy-2".into();
+        execution.attempts.push(later_attempt);
+        let evidence = runtime_evidence_for_two_attempts();
+
+        let progress = build_task_board_workflow_progress(&execution, &evidence);
+
+        assert_eq!(progress.current_runtime.as_deref(), Some("openrouter"));
+    }
+
+    fn runtime_evidence_for_two_attempts()
+    -> BTreeMap<String, TaskBoardWorkflowAttemptRuntimeEvidence> {
+        BTreeMap::from([
+            (
+                "run-1".into(),
+                TaskBoardWorkflowAttemptRuntimeEvidence {
+                    runtime: "codex".into(),
+                    model: None,
+                    report: None,
+                    terminal_reason: None,
+                },
+            ),
+            (
+                "run-2".into(),
+                TaskBoardWorkflowAttemptRuntimeEvidence {
+                    runtime: "openrouter".into(),
+                    model: None,
+                    report: None,
+                    terminal_reason: None,
+                },
+            ),
+        ])
     }
 
     fn execution() -> TaskBoardWorkflowExecutionRecord {
