@@ -1,6 +1,6 @@
 [package]
 name = "harness-daemon-remote-cli"
-version = "55.0.1"
+version = "55.0.2"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -9,10 +9,10 @@ publish = false
 async-trait = "0.1.83"
 axum = "0.8.7"
 clap = { version = "4.6.0", features = ["derive", "env"] }
-harness-daemon = { path = "../harness-daemon", version = "55.0.1", features = ["daemon-runtime"] }
-harness-kernel = { path = "../harness-kernel", version = "55.0.1" }
-harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.1" }
-harness-reviews = { path = "../harness-reviews", version = "55.0.1" }
+harness-daemon = { path = "../harness-daemon", version = "55.0.2", features = ["daemon-runtime"] }
+harness-kernel = { path = "../harness-kernel", version = "55.0.2" }
+harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.2" }
+harness-reviews = { path = "../harness-reviews", version = "55.0.2" }
 libc = "0.2"
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.50.0", features = ["rt-multi-thread", "time", "sync", "macros"] }
@@ -21,8 +21,8 @@ uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
 base64 = "0.23.0"
-harness-daemon = { path = "../harness-daemon", version = "55.0.1", features = ["test-support"] }
-harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.1", features = ["test-support"] }
+harness-daemon = { path = "../harness-daemon", version = "55.0.2", features = ["test-support"] }
+harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.2", features = ["test-support"] }
 harness-testkit = { path = "../../testkit" }
 rcgen = { version = "0.14.8", default-features = false, features = ["pem", "ring", "x509-parser"] }
 serde_json = "1.0.149"

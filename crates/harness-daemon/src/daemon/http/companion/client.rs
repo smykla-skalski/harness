@@ -29,4 +29,11 @@ impl CompanionClients {
             &self.http1
         }
     }
+
+    /// The panel speaks HTTP/1.1 websockets, and the h2 client strips the
+    /// `Connection`/`Upgrade` handshake headers, so a relay always takes this
+    /// client regardless of the caller's version.
+    pub(super) fn http1(&self) -> &CompanionClient {
+        &self.http1
+    }
 }

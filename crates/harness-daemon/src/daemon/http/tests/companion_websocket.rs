@@ -5,9 +5,13 @@
 //! drive the real `daemon_http_router`, so they prove what a handshake carries
 //! across the hop and what the daemon still declines to carry at all.
 
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::http::{Method, Request, StatusCode};
 use futures_util::StreamExt as _;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use serde_json::Value;
+use tokio::io::AsyncReadExt as _;
+use tokio::net::TcpStream;
 use tokio::time::{Duration, timeout};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
@@ -45,6 +49,68 @@ async fn a_websocket_under_the_prefix_reaches_the_companion() {
         presented.as_str(),
         format!("Bearer {COMPANION_TOKEN}"),
         "the handshake must arrive wearing the daemon's companion credential"
+    );
+
+    server.abort();
+    upstream_server.abort();
+}
+
+/// The remote listener advertises `h2`, so a browser opens the panel's live
+/// socket as an RFC 8441 extended `CONNECT` rather than an HTTP/1.1 `Upgrade`.
+/// That form used to fall through to the daemon's 501, which is why the panel
+/// never received push events; the relay now bridges it to the panel over h1.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_websocket_over_http2_reaches_the_companion() {
+    let (upstream, upstream_server) = spawn_companion_websocket_upstream().await;
+    let (base_url, server) = serve_remote(state_with_companion(&upstream)).await;
+    let authority = base_url
+        .strip_prefix("http://")
+        .expect("test base url is http");
+
+    let tcp = TcpStream::connect(authority)
+        .await
+        .expect("connect to the daemon over cleartext");
+    let (mut sender, connection) =
+        hyper::client::conn::http2::handshake(TokioExecutor::new(), TokioIo::new(tcp))
+            .await
+            .expect("h2 handshake with the daemon");
+    tokio::spawn(async move {
+        let _ = connection.await;
+    });
+
+    let mut request = Request::builder()
+        .method(Method::CONNECT)
+        .uri(format!("{base_url}/panel/socket"))
+        .body(Body::empty())
+        .expect("extended connect request");
+    request
+        .extensions_mut()
+        .insert(hyper::ext::Protocol::from_static("websocket"));
+
+    let mut response = sender
+        .send_request(request)
+        .await
+        .expect("the daemon must relay the extended connect");
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "an h2 caller's handshake completes with 200, not the h1 101"
+    );
+
+    let upgraded = hyper::upgrade::on(&mut response)
+        .await
+        .expect("the extended connect must yield the upgraded stream");
+    let mut stream = TokioIo::new(upgraded);
+    let mut buffer = vec![0_u8; 128];
+    let read = timeout(Duration::from_secs(5), stream.read(&mut buffer))
+        .await
+        .expect("the relayed socket must carry a frame rather than go silent")
+        .expect("read the companion's first frame");
+    let bytes = &buffer[..read];
+    let presented = String::from_utf8_lossy(bytes);
+    assert!(
+        presented.contains(&format!("Bearer {COMPANION_TOKEN}")),
+        "the bridged frame must carry the daemon's companion credential, got {presented:?}"
     );
 
     server.abort();

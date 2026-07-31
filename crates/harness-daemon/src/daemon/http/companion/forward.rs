@@ -79,7 +79,7 @@ pub(super) async fn forward_to_companion(
     websocket_permit: Option<OwnedSemaphorePermit>,
 ) -> Response {
     if requests_protocol_upgrade(request.method(), request.headers()) {
-        if !upgrade::requests_websocket_upgrade(request.method(), request.headers()) {
+        if !upgrade::is_websocket_upgrade(&request) {
             return upgrade_unsupported_response();
         }
         return upgrade::relay_websocket(config, client, peer_addr, request, websocket_permit)

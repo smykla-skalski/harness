@@ -122,16 +122,23 @@ async fn proxy_request(
     // socket ceiling refuses the upgrade instead of establishing one it has no
     // room for. The permit outlives this handler: the relay holds it for as long
     // as the connection is open.
-    let websocket_permit =
-        if upgrade::requests_websocket_upgrade(request.method(), request.headers()) {
-            match super::super::remote_limits::take_remote_websocket_permit(&state) {
-                Ok(permit) => permit,
-                Err(response) => return *response,
-            }
-        } else {
-            None
-        };
-    let client = companion.inner.clients.for_version(request.version());
+    let is_websocket = upgrade::is_websocket_upgrade(&request);
+    let websocket_permit = if is_websocket {
+        match super::super::remote_limits::take_remote_websocket_permit(&state) {
+            Ok(permit) => permit,
+            Err(response) => return *response,
+        }
+    } else {
+        None
+    };
+    // A websocket always takes the h1 client: the panel speaks h1 websockets and
+    // the h2 client strips the handshake headers the relay depends on, so an h2
+    // caller is bridged h2<->h1 rather than forwarded as-is.
+    let client = if is_websocket {
+        companion.inner.clients.http1()
+    } else {
+        companion.inner.clients.for_version(request.version())
+    };
     forward::forward_to_companion(
         &companion.inner.config,
         client,
