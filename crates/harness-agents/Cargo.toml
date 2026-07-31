@@ -1,6 +1,6 @@
 [package]
 name = "harness-agents"
-version = "55.0.0"
+version = "55.0.1"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -20,10 +20,10 @@ test-support = ["bridge-runtime"]
 
 [dependencies]
 async-trait = "0.1.83"
-harness-infra = { path = "../harness-infra", version = "55.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "55.0.0" }
-harness-protocol = { path = "../harness-protocol", version = "55.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.0" }
+harness-infra = { path = "../harness-infra", version = "55.0.1" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.1" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.1" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.1" }
 agent-client-protocol = { version = "=2.0.0", optional = true }
 chrono = { version = "0.4.44", features = ["serde"] }
 fs-err = "3.3.0"
