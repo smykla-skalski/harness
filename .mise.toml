@@ -226,6 +226,10 @@ run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml -
 description = "Run live OpenRouter and Codex report turns through an isolated daemon and bridge without Harness Monitor"
 run = "./scripts/live-agent-smoke.sh"
 
+[tasks."test:runtime:live-review"]
+description = "Review HARNESS_LIVE_REVIEW_PR_URL through the report-only OpenRouter delivery path"
+run = "./scripts/live-report-only-review.sh"
+
 [tasks."test:architecture"]
 description = "Run dependency-light architecture checks (Task Board storage rules) with native libtest (e.g. -- task_board_storage::task_board_orchestrator_has_one_runner -- --exact)"
 run = "./scripts/cargo-local.sh test -p harness-architecture-tests --lib"

@@ -23,6 +23,7 @@ mod daemon_api;
 mod headless_readiness;
 mod lifecycle;
 mod live_agents_headless;
+mod live_report_only_review;
 pub(crate) mod process;
 mod restart_boundaries;
 mod task_board_admission;
