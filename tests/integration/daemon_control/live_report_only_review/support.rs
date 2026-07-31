@@ -85,8 +85,9 @@ impl LiveReviewTarget {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct GitHubSnapshot {
     core: String,
-    viewer_comments: BTreeSet<u64>,
-    viewer_reviews: BTreeSet<u64>,
+    viewer_issue_comments: BTreeSet<String>,
+    viewer_reviews: BTreeSet<String>,
+    viewer_review_comments: BTreeSet<String>,
 }
 
 impl GitHubSnapshot {
@@ -120,10 +121,15 @@ impl GitHubSnapshot {
             "/repos/{}/pulls/{}/reviews",
             target.repository, target.number
         ));
+        let review_comments = github.get_pages(&format!(
+            "/repos/{}/pulls/{}/comments",
+            target.repository, target.number
+        ));
         Self {
             core,
-            viewer_comments: viewer_ids(&comments, &viewer),
-            viewer_reviews: viewer_ids(&reviews, &viewer),
+            viewer_issue_comments: viewer_activity(&comments, &viewer),
+            viewer_reviews: viewer_activity(&reviews, &viewer),
+            viewer_review_comments: viewer_activity(&review_comments, &viewer),
         }
     }
 }
@@ -176,7 +182,7 @@ fn parse_pr_url(url: &str) -> (String, u64) {
     (format!("{}/{}", components[0], components[1]), number)
 }
 
-fn viewer_ids(items: &Value, viewer: &str) -> BTreeSet<u64> {
+fn viewer_activity(items: &Value, viewer: &str) -> BTreeSet<String> {
     items
         .as_array()
         .expect("stage=github: expected array")
@@ -186,7 +192,7 @@ fn viewer_ids(items: &Value, viewer: &str) -> BTreeSet<u64> {
                 .and_then(Value::as_str)
                 .is_some_and(|login| login.eq_ignore_ascii_case(viewer))
         })
-        .map(|item| item["id"].as_u64().expect("stage=github: item id"))
+        .map(|item| serde_json::to_string(item).expect("stage=github: encode viewer activity"))
         .collect()
 }
 
@@ -223,4 +229,25 @@ fn pr_url_parser_ignores_query_and_fragment() {
         let url = format!("https://github.com/acme/widgets/pull/17{suffix}");
         assert_eq!(parse_pr_url(&url), ("acme/widgets".into(), 17));
     }
+}
+
+#[test]
+fn viewer_activity_preserves_mutable_content() {
+    let original = json!([{
+        "id": 1,
+        "body": "before",
+        "updated_at": "2026-07-31T00:00:00Z",
+        "user": { "login": "reviewer" }
+    }]);
+    let edited = json!([{
+        "id": 1,
+        "body": "after",
+        "updated_at": "2026-07-31T00:01:00Z",
+        "user": { "login": "reviewer" }
+    }]);
+
+    assert_ne!(
+        viewer_activity(&original, "reviewer"),
+        viewer_activity(&edited, "reviewer")
+    );
 }
