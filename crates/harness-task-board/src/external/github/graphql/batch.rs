@@ -83,19 +83,10 @@ async fn search_issue_pull_requests_batch_at_revision(
         .collect::<serde_json::Map<_, _>>();
     let expected_cost = u32::try_from(queries.len())
         .unwrap_or(u32::MAX)
-        .saturating_add(1);
+        .saturating_mul(20);
     let response = client
         .graphql_partial_envelope(
-            GitHubRequestDescriptor::graphql(
-                "task_board.github.search_issues_batch",
-                if fresh {
-                    GitHubPriority::FreshRead
-                } else {
-                    GitHubPriority::Background
-                },
-                GitHubCachePolicy::read_through(GITHUB_GRAPHQL_CACHE_TTL, Duration::from_hours(1)),
-            )
-            .with_expected_cost(expected_cost),
+            batch_search_request_descriptor(fresh, expected_cost),
             json!({ "query": query, "variables": variables }),
         )
         .await?
@@ -142,6 +133,23 @@ async fn search_issue_pull_requests_batch_at_revision(
             .map(|field| async move { resolve_field(client, field, fresh).await }),
     )
     .await)
+}
+
+fn batch_search_request_descriptor(fresh: bool, expected_cost: u32) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        "task_board.github.search_issues_batch",
+        if fresh {
+            GitHubPriority::FreshRead
+        } else {
+            GitHubPriority::Background
+        },
+        if fresh {
+            GitHubCachePolicy::no_store()
+        } else {
+            GitHubCachePolicy::read_through(GITHUB_GRAPHQL_CACHE_TTL, Duration::from_hours(1))
+        },
+    )
+    .with_expected_cost(expected_cost)
 }
 
 async fn resolve_field(
