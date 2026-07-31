@@ -21,6 +21,14 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+#[cfg(test)]
+#[path = "read_only_workflow_launch/test_override.rs"]
+mod test_override;
+#[cfg(test)]
+pub(in crate::daemon) use test_override::with_read_only_launch_test_override;
+#[cfg(test)]
+use test_override::{read_only_launch_test_override, read_only_launch_test_serial};
+
 pub(super) async fn prepare_read_only_workflow_launch(
     db: &AsyncDaemonDb,
     item_id: &str,
@@ -163,6 +171,14 @@ pub(crate) async fn validate_read_only_workflow_launch(
 pub(crate) async fn resolve_pr_review_head(
     identity: &TaskBoardPullRequestIdentity,
 ) -> Result<String, CliError> {
+    #[cfg(test)]
+    if let Some(test_override) = read_only_launch_test_override()
+        .lock()
+        .expect("read-only launch override lock")
+        .clone()
+    {
+        return Ok(test_override.exact_head);
+    }
     let review = super::super::reviews_source_port::resolve_exact_pull_request(
         &identity.repository,
         identity.number,
@@ -293,6 +309,14 @@ pub(super) fn ensure_supported_read_only_runtimes(
 async fn ensure_reviewer_runtimes_available(
     reviewers: &TaskBoardResolvedReviewer,
 ) -> Result<(), CliError> {
+    #[cfg(test)]
+    if read_only_launch_test_override()
+        .lock()
+        .expect("read-only launch override lock")
+        .is_some()
+    {
+        return Ok(());
+    }
     for profile in &reviewers.profiles {
         let runtime = profile.runtime.as_str();
         if !runtime_requires_provider_credential(runtime) {
@@ -414,6 +438,7 @@ mod tests {
 
     #[tokio::test]
     async fn availability_gate_blocks_openrouter_without_a_credential() {
+        let _serial = read_only_launch_test_serial().lock().await;
         // No token is configured in this isolated test process, so the supported
         // openrouter runtime cannot run. The block must name the runtime and the
         // specific unmet prerequisite rather than refusing the runtime by name.

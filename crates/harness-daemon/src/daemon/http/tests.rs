@@ -65,6 +65,7 @@ mod remote_viewer_task_board;
 mod remote_viewer_task_board_paging;
 mod remote_viewer_task_board_review_report;
 mod remote_viewer_task_board_triage;
+mod report_only_delivery_acceptance;
 mod reviews_policy_writes;
 mod session_archive_tests;
 mod shutdown;
