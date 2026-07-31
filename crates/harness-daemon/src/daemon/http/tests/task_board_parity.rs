@@ -273,6 +273,7 @@ async fn run_task_board_transport_parity() {
     assert_eq!(ws_error["error"]["status_code"].as_u64(), Some(400));
     assert_eq!(ws_error["error"]["code"], http_error["error"]["code"]);
     assert_eq!(ws_error["error"]["message"], http_error["error"]["message"]);
+    assert_eq!(ws_error["error"]["data"], http_error);
 
     workflow_progress::assert_missing_error(&client, &base_url).await;
 
