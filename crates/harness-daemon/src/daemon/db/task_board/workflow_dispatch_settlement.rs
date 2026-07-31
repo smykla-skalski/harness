@@ -251,6 +251,9 @@ async fn local_start_is_durable(
         "SELECT EXISTS(
              SELECT 1 FROM codex_runs
              WHERE run_id = ?1 AND workflow_execution_id = ?2 AND board_item_id = ?3
+             UNION ALL
+             SELECT 1 FROM agent_turn_runs
+             WHERE run_id = ?1 AND workflow_execution_id = ?2 AND board_item_id = ?3
          )",
     )
     .bind(&attempt.idempotency_key)
