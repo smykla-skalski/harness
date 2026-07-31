@@ -124,8 +124,14 @@ file_stat_signature() {
 
 app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
 # Resolved before the stamp so a build that had to defer the reseal cannot be
-# short-circuited by a later one that could have done it.
-unsealable_plugin="$(first_unsealable_plugin "$app_bundle" || true)"
+# short-circuited by a later one that could have done it. Skipped under the
+# Xcode user-script sandbox: PlugIns is not a declared input, so the glob read
+# would be denied and logged, and the reseal that consumes the value is skipped
+# there anyway.
+unsealable_plugin=""
+if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
+  unsealable_plugin="$(first_unsealable_plugin "$app_bundle" || true)"
+fi
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness-daemon"
