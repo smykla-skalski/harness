@@ -24,10 +24,10 @@ tokio = { version = "1.50.0", default-features = false, features = ["rt"] }
 # one. The tests that need a real `DaemonDb` live in `harness-daemon`'s own
 # `daemon::db::tests::snapshot_integration` instead, which has no such cycle.
 harness-testkit = { path = "../../testkit" }
-fs-err = "3.3.0"
-serde = "1.0.228"
+fs-err = "=3.3.1"
+serde = "=1.0.229"
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
-tempfile = "3.27.0"
+tempfile = "=3.27.0"
 
 # Matches the root crate's lint set rather than the lighter one the facade
 # crates carry: this code was extracted from harness-daemon's own `daemon`

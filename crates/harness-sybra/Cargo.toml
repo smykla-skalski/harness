@@ -25,7 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"
-tokio-stream = "0.1"
+tokio-stream = "=0.1.19"
 tower = { version = "=0.5.3", features = ["util"] }
 
 [lints.clippy]

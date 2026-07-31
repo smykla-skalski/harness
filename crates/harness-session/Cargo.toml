@@ -41,7 +41,7 @@ daemon-runtime = []
 [dev-dependencies]
 harness-testkit = { path = "../../testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
-tempfile = "3.27.0"
+tempfile = "=3.27.0"
 
 # Matches the root crate's lint set rather than the lighter one the facade
 # crates carry, for the same reason harness-kernel, harness-workspace,
