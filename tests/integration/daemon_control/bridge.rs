@@ -79,7 +79,7 @@ fn sandboxed_codex_run_succeeds_immediately_after_bridge_start_with_codex() {
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
-        codex_port_lease,
+        &codex_port_lease,
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
@@ -157,7 +157,7 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
-        codex_port_lease,
+        &codex_port_lease,
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
@@ -232,7 +232,7 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
-        codex_port_lease,
+        &codex_port_lease,
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);

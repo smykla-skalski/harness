@@ -2,7 +2,7 @@ use tempfile::tempdir;
 
 use harness::daemon::db::DaemonDb;
 use harness::daemon::service;
-use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
+use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
 use harness::session::service as session_service;
 use harness::session::types::{SessionRole, TaskSeverity};
 use harness::workspace::utc_now;
@@ -26,7 +26,7 @@ fn seed_workspace(tmp: &std::path::Path) {
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
-        ownership: Default::default(),
+        ownership: DaemonOwnership::default(),
     };
     state::write_manifest(&manifest).expect("write manifest");
     state::append_event("info", "comparison test started").expect("event");

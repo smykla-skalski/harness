@@ -75,9 +75,9 @@ pub(super) fn spawn_bridge_with_port_lease(
     home: &Path,
     xdg: &Path,
     extra_args: &[&str],
-    port_lease: TcpPortLease,
+    port_lease: &TcpPortLease,
 ) -> ManagedChild {
-    spawn_bridge_inner(home, xdg, extra_args, Some(&port_lease), None)
+    spawn_bridge_inner(home, xdg, extra_args, Some(port_lease), None)
 }
 
 fn spawn_bridge_inner(

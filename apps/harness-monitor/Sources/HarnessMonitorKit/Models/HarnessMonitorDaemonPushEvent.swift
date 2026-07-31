@@ -81,6 +81,37 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case taskBoardWorkingCopyProgress(TaskBoardWorkingCopyProgress)
     case auditEvent(HarnessMonitorAuditEvent)
     case unknown(eventName: String, payload: JSONValue)
+
+    /// Short, non-PHI label used in diagnostic logs where the full payload
+    /// would be too verbose or carry session content. Each case returns a
+    /// stable identifier so log greps stay reliable across releases.
+    public var debugLabel: String {
+      switch self {
+      case .ready: "ready"
+      case .sessionsUpdated: "sessions_updated"
+      case .sessionsUpdatedDelta: "sessions_updated_delta"
+      case .sessionUpdated: "session_updated"
+      case .sessionExtensions: "session_extensions"
+      case .logLevelChanged: "log_level_changed"
+      case .codexRunUpdated: "codex_run_updated"
+      case .codexApprovalRequested: "codex_approval_requested"
+      case .agentTuiUpdated: "agent_tui_updated"
+      case .acpAgentUpdated: "acp_agent_updated"
+      case .acpInspect: "acp_inspect"
+      case .acpAgentsReconciled: "acp_agents_reconciled"
+      case .acpEvents: "acp_events"
+      case .acpProcessIncident: "acp_process_incident"
+      case .acpBridgeResyncIncident: "acp_bridge_resync_incident"
+      case .acpPermissionBatch: "acp_permission_batch"
+      case .acpPermissionBatchRemoved: "acp_permission_batch_removed"
+      case .githubDataChanged: "github_data_changed"
+      case .taskBoardUpdated: "task_board_updated"
+      case .reviewsLocalCloneProgress: "reviews_local_clone_progress"
+      case .taskBoardWorkingCopyProgress: "task_board_working_copy_progress"
+      case .auditEvent: "audit_event"
+      case .unknown(let eventName, _): "unknown:\(eventName)"
+      }
+    }
   }
 
   public let recordedAt: String

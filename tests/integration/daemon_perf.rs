@@ -15,7 +15,7 @@ use harness::daemon::http::{
 };
 use harness::daemon::protocol::StreamEvent;
 use harness::daemon::service;
-use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
+use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
 use harness::daemon::websocket::ReplayBuffer;
 use harness::session::service as session_service;
 use harness::session::types::{SessionRole, TaskSeverity};
@@ -82,7 +82,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         revision: 0,
         updated_at: String::new(),
         binary_stamp: None,
-        ownership: Default::default(),
+        ownership: DaemonOwnership::default(),
     };
 
     let db_slot = Arc::new(OnceLock::new());
@@ -120,7 +120,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         agent_tui_manager,
         managed_agent_mutation_locks: harness::daemon::http::ManagedAgentMutationLocks::default(),
         prepared_sender: broadcast::channel(8).0,
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     };
 
     tokio::spawn(async move {

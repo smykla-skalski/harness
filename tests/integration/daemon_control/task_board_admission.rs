@@ -103,7 +103,7 @@ fn select_openrouter_reviewer(endpoint: &str, token: &str) {
         endpoint,
         token,
         "/v1/task-board/orchestrator/settings",
-        json!({
+        &json!({
             "reviewers": {
                 "reviewer_count": 1,
                 "required_approvals": 1,
@@ -127,7 +127,7 @@ fn store_openrouter_token(endpoint: &str, token: &str, value: &str) {
         endpoint,
         token,
         "/v1/task-board/orchestrator/openrouter-token",
-        json!({ "token": value }),
+        &json!({ "token": value }),
     );
     assert_eq!(code, 200, "store openrouter token: {body}");
     assert_eq!(body["token_configured"], json!(true), "{body}");
@@ -180,7 +180,7 @@ fn request_json(
     endpoint: &str,
     token: &str,
     path: &str,
-    body: Value,
+    body: &Value,
 ) -> (u16, Value) {
     let url = format!(
         "{}/{}",
@@ -192,7 +192,7 @@ fn request_json(
     let runtime = Runtime::new().expect("runtime");
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
-        let request_body = body.clone();
+        let request_body = (*body).clone();
         let client = reqwest::Client::new();
         let mut builder = match method.as_str() {
             "PUT" => client.put(&url),
@@ -229,7 +229,7 @@ fn move_to_status(endpoint: &str, token: &str, id: &str, status: &str) -> Value 
         endpoint,
         token,
         &format!("/v1/task-board/items/{id}"),
-        json!({ "status": status }),
+        &json!({ "status": status }),
     );
     assert_eq!(code, 200, "move {id} to {status}: {body}");
     body
@@ -241,7 +241,7 @@ fn get_item(endpoint: &str, token: &str, id: &str) -> Value {
         endpoint,
         token,
         &format!("/v1/task-board/items/{id}"),
-        Value::Null,
+        &Value::Null,
     );
     assert_eq!(code, 200, "get {id}: {body}");
     body
@@ -436,7 +436,7 @@ fn a_failed_preparation_does_not_strand_the_ticket_admitting() {
     assert!(
         body["applied"]
             .as_array()
-            .is_none_or(|applied| applied.is_empty()),
+            .is_none_or(std::vec::Vec::is_empty),
         "a failed preparation must not apply the dispatch: {body}"
     );
 

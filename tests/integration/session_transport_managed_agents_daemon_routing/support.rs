@@ -166,9 +166,8 @@ fn spawn_daemon_server(
     let captured_inner = Arc::clone(&captured);
     let handle = thread::spawn(move || {
         loop {
-            let (mut stream, _) = match listener.accept() {
-                Ok(value) => value,
-                Err(_) => return,
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
             };
             let request = read_request(&mut stream);
             let first_line = request.lines().next().unwrap_or("").to_string();

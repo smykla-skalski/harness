@@ -61,9 +61,11 @@ pub(super) struct UpdateFakeSyncClient {
     provider: ExternalProvider,
     capabilities: ExternalProviderCapabilities,
     tasks: Vec<ExternalTask>,
-    pub(super) updates: Arc<Mutex<Vec<(String, Vec<ExternalSyncField>)>>>,
+    pub(super) updates: CapturedUpdates,
     precondition_failure: Option<ExternalTask>,
 }
+
+type CapturedUpdates = Arc<Mutex<Vec<(String, Vec<ExternalSyncField>)>>>;
 
 impl UpdateFakeSyncClient {
     pub(super) fn new(
