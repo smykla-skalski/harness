@@ -28,10 +28,13 @@ pub(super) async fn create_started(
         .await
         .map_err(SyncClientError::Local)?;
     lease.begin_provider_call();
-    let task = capability
-        .create_started(&request_from_intent(&current), lease)
-        .await
-        .map_err(|error| lease.classify_provider_call(error).into_sync_client_error())?;
+    let task = super::super::scope::await_provider_call(
+        board,
+        capability.create_started(&request_from_intent(&current), lease),
+    )
+    .await
+    .map_err(SyncClientError::Local)?
+    .map_err(|error| lease.classify_provider_call(error).into_sync_client_error())?;
     persist_exact_task(board, &current, task, operations, follow_ups)
         .await
         .map_err(SyncClientError::Local)
@@ -56,10 +59,13 @@ pub(super) async fn recover_existing(
         .await
         .map_err(SyncClientError::Local)?;
     lease.begin_provider_call();
-    let probe = capability
-        .recover_existing(&request_from_intent(&current), lease)
-        .await
-        .map_err(|error| lease.classify_provider_call(error).into_sync_client_error())?;
+    let probe = super::super::scope::await_provider_call(
+        board,
+        capability.recover_existing(&request_from_intent(&current), lease),
+    )
+    .await
+    .map_err(SyncClientError::Local)?
+    .map_err(|error| lease.classify_provider_call(error).into_sync_client_error())?;
     let ExternalCreateProbe::Found(task) = probe else {
         return Err(SyncClientError::Provider(
             CliErrorKind::workflow_io(format!(

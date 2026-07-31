@@ -155,6 +155,10 @@ extension RecordingHarnessClient {
         provider: request.provider
       )
     )
+    let delay = lock.withLock { taskBoardSyncDelay }
+    if let delay {
+      try await Task.sleep(for: delay)
+    }
     let result: (summary: TaskBoardSyncSummary, error: (any Error)?) = lock.withLock {
       let error = taskBoardSyncStub.error
       if error == nil, let importedItems = taskBoardSyncStub.importedItems {
@@ -166,6 +170,21 @@ extension RecordingHarnessClient {
       throw error
     }
     return result.summary
+  }
+
+  func cancelTaskBoardSync() async throws -> TaskBoardSyncCancelResponse {
+    record(.cancelTaskBoardSync)
+    return lock.withLock { taskBoardSyncCancelResponse }
+  }
+
+  func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
+    record(.taskBoardSyncStatus)
+    return lock.withLock {
+      if !queuedTaskBoardSyncStatusResponses.isEmpty {
+        return queuedTaskBoardSyncStatusResponses.removeFirst()
+      }
+      return taskBoardSyncStatusResponse
+    }
   }
 
   func dispatchTaskBoard(

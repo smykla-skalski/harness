@@ -10,12 +10,12 @@ use harness_workspace::workspace::utc_now;
 use super::create_recovery::{
     ExternalCreateRecoveryPlan, ExternalCreateScopeRecovery, recover_scope_intents,
 };
-use super::delete::delete_remote_tombstones;
 use super::lookup::provider_is_allowed;
-use super::{
-    ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions, SyncClientError,
-    TaskBoardSyncStore, pull_provider_tasks, push_board_tasks,
-};
+use super::{ExternalSyncOperation, ExternalSyncOptions, SyncClientError, TaskBoardSyncStore};
+
+mod client;
+mod concurrent;
+use client::{SyncClientResult, sync_client};
 
 /// Pull and/or push task-board items through configured provider clients.
 ///
@@ -60,16 +60,20 @@ pub async fn sync_external_tasks_scoped_with_recovery(
         external_create_follow_ups: recovery.take_follow_ups(),
         ..BatchAccumulator::default()
     };
-    for client in clients {
-        if provider_is_allowed(client.provider(), options.provider) {
+    let work = clients
+        .iter()
+        .enumerate()
+        .filter(|(_, client)| provider_is_allowed(client.provider(), options.provider))
+        .map(|(index, client)| {
             let scope = ExternalProviderScopeIdentity::for_client(client.as_ref());
-            let recovery_scope = recovery.take_scope(scope.provider(), scope.scope_id());
-            sync_scope(board, options, client.as_ref(), &recovery_scope, &mut batch).await?;
-            if batch.terminal_error.is_some() {
-                break;
+            concurrent::ScopeWork {
+                index,
+                client: client.as_ref(),
+                recovery: recovery.take_scope(scope.provider(), scope.scope_id()),
             }
-        }
-    }
+        })
+        .collect();
+    batch = concurrent::sync_scopes(board, options, work, batch).await?;
     if batch.terminal_error.is_none() && recovery.has_recovery() {
         let blocked = recovery.into_blocked(
             CliErrorKind::workflow_io(
@@ -91,16 +95,16 @@ pub async fn sync_external_tasks_scoped_with_recovery(
 }
 
 #[derive(Default)]
-struct BatchAccumulator {
-    ambiguous_references: Vec<String>,
-    operations: Vec<ExternalSyncOperation>,
-    external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
-    scope_outcomes: Vec<ExternalSyncScopeOutcome>,
-    first_provider_failure: Option<CliError>,
-    terminal_error: Option<CliError>,
+pub(super) struct BatchAccumulator {
+    pub(super) ambiguous_references: Vec<String>,
+    pub(super) operations: Vec<ExternalSyncOperation>,
+    pub(super) external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
+    pub(super) scope_outcomes: Vec<ExternalSyncScopeOutcome>,
+    pub(super) first_provider_failure: Option<CliError>,
+    pub(super) terminal_error: Option<CliError>,
 }
 
-async fn sync_scope(
+pub(super) async fn sync_scope(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
@@ -408,113 +412,4 @@ async fn admit_scope(
             ExternalProviderScopeAttemptDecision::BackingOff => ScopeAdmission::BackingOff,
             ExternalProviderScopeAttemptDecision::Fenced => ScopeAdmission::Fenced,
         })
-}
-
-async fn sync_client(
-    board: &dyn TaskBoardSyncStore,
-    options: ExternalSyncOptions,
-    client: &dyn ExternalSyncClient,
-    attempt: Option<&ExternalProviderScopeAttempt>,
-    operations: &mut Vec<ExternalSyncOperation>,
-    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
-) -> Result<SyncClientResult, SyncClientError> {
-    let pull = pull_client_tasks(board, options, client, attempt, operations, follow_ups).await?;
-    let pushed_create =
-        push_client_tasks(board, options, client, attempt, operations, follow_ups).await?;
-    Ok(SyncClientResult {
-        base_revision: pull.base_revision,
-        durable_create: pull.recovered_create || pushed_create,
-        ambiguous_references: pull.ambiguous_references,
-    })
-}
-
-struct SyncClientResult {
-    base_revision: Option<String>,
-    durable_create: bool,
-    ambiguous_references: Vec<String>,
-}
-
-struct PullClientResult {
-    base_revision: Option<String>,
-    recovered_create: bool,
-    /// References this scope left alone because more than one board item
-    /// claims them. Carried up so the run reports them instead of losing them
-    /// with the scope that skipped them.
-    ambiguous_references: Vec<String>,
-}
-
-async fn pull_client_tasks(
-    board: &dyn TaskBoardSyncStore,
-    options: ExternalSyncOptions,
-    client: &dyn ExternalSyncClient,
-    attempt: Option<&ExternalProviderScopeAttempt>,
-    operations: &mut Vec<ExternalSyncOperation>,
-    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
-) -> Result<PullClientResult, SyncClientError> {
-    if !direction_allows_pull(options.direction) || !client.allows_pull() {
-        return Ok(PullClientResult {
-            base_revision: None,
-            recovered_create: false,
-            ambiguous_references: Vec::new(),
-        });
-    }
-    super::scope::renew_scope_attempt(board, attempt).await?;
-    let tasks = client
-        .pull_tasks()
-        .await
-        .map_err(SyncClientError::Provider)?;
-    super::scope::renew_scope_attempt(board, attempt).await?;
-    let base_revision = tasks
-        .iter()
-        .filter_map(|task| task.updated_at.as_ref())
-        .max()
-        .cloned();
-    let mut ambiguous_references = Vec::new();
-    let recovered_create = pull_provider_tasks(
-        board,
-        options,
-        client,
-        tasks,
-        operations,
-        follow_ups,
-        &mut ambiguous_references,
-    )
-    .await
-    .map_err(SyncClientError::Local)?;
-    Ok(PullClientResult {
-        base_revision,
-        recovered_create,
-        ambiguous_references,
-    })
-}
-
-async fn push_client_tasks(
-    board: &dyn TaskBoardSyncStore,
-    options: ExternalSyncOptions,
-    client: &dyn ExternalSyncClient,
-    attempt: Option<&ExternalProviderScopeAttempt>,
-    operations: &mut Vec<ExternalSyncOperation>,
-    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
-) -> Result<bool, SyncClientError> {
-    if direction_allows_push(options.direction) && client.allows_push() {
-        let created =
-            push_board_tasks(board, options, client, attempt, operations, follow_ups).await?;
-        delete_remote_tombstones(board, options, client, attempt, operations).await?;
-        return Ok(created);
-    }
-    Ok(false)
-}
-
-fn direction_allows_pull(direction: ExternalSyncDirection) -> bool {
-    matches!(
-        direction,
-        ExternalSyncDirection::Pull | ExternalSyncDirection::Both
-    )
-}
-
-fn direction_allows_push(direction: ExternalSyncDirection) -> bool {
-    matches!(
-        direction,
-        ExternalSyncDirection::Push | ExternalSyncDirection::Both
-    )
 }

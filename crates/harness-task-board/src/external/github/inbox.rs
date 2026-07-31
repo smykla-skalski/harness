@@ -1,4 +1,3 @@
-use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,16 +10,18 @@ use crate::external::{
     normalize_token,
 };
 use crate::normalize_repository_slug;
-use crate::types::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowKind};
+use crate::types::TaskBoardItem;
 use harness_github_api::GitHubProtectedClient;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
-    DEPENDENCY_BOT_AUTHORS, GitHubRepository, assigned_issue_query, body_lists_child_issues,
-    dependency_author_query, dependency_label_query, github_external_id, github_inbox_issue_status,
-    graphql, parent_reference_in_body, parse_github_repository, review_request_query,
-    search_label_matches_filter, warn_github_message,
+    DEPENDENCY_BOT_AUTHORS, GitHubRepository, assigned_issue_query, dependency_author_query,
+    dependency_label_query, graphql, parse_github_repository, review_request_query,
+    warn_github_message,
 };
+
+mod batch;
+mod mapping;
 
 #[derive(Clone)]
 pub struct GitHubInboxSyncClient {
@@ -36,6 +37,7 @@ pub struct GitHubInboxSyncClient {
     /// before the pull) always reflects the `true` default while the close path
     /// reads this instance's own post-pull value.
     last_pull_complete: Arc<AtomicBool>,
+    batch: Option<Arc<batch::InboxBatch>>,
 }
 
 impl GitHubInboxSyncClient {
@@ -72,6 +74,7 @@ impl GitHubInboxSyncClient {
             import_labels: import_labels.to_vec(),
             include_review_requests: true,
             last_pull_complete: Arc::new(AtomicBool::new(true)),
+            batch: None,
         })
     }
 
@@ -95,6 +98,60 @@ impl GitHubInboxSyncClient {
         let mut client = Self::from_config(config)?;
         client.include_review_requests = false;
         Ok(client)
+    }
+
+    /// Build one pull-only client per configured repository while sharing one
+    /// aliased GraphQL batch across the whole set.
+    ///
+    /// # Errors
+    /// Returns an error when no GitHub token is configured or a repository is invalid.
+    pub fn assigned_only_scoped_from_config(
+        config: &ExternalSyncConfig,
+        fresh: bool,
+    ) -> Result<Vec<Self>, CliError> {
+        Self::scoped_from_config(config, fresh, false)
+    }
+
+    /// Build one pull-only client per configured repository while sharing one
+    /// aliased GraphQL batch across assigned, dependency, and optional review
+    /// searches.
+    ///
+    /// # Errors
+    /// Returns an error when no GitHub token is configured or a repository is invalid.
+    pub fn scoped_from_config(
+        config: &ExternalSyncConfig,
+        fresh: bool,
+        include_review_requests: bool,
+    ) -> Result<Vec<Self>, CliError> {
+        let token = normalize_token(
+            ExternalProvider::GitHub,
+            config.require_token(ExternalProvider::GitHub)?,
+        )?;
+        let client = GitHubProtectedClient::new(&token)?;
+        let repositories = config
+            .github_inbox_repositories()
+            .iter()
+            .map(String::as_str)
+            .map(parse_github_repository)
+            .collect::<Result<Vec<_>, _>>()?;
+        let batch = Arc::new(batch::InboxBatch::new(
+            client.clone(),
+            repositories.clone(),
+            config.github_import_labels().to_vec(),
+            fresh,
+            include_review_requests,
+        ));
+        Ok(repositories
+            .into_iter()
+            .map(|repository| Self {
+                client: client.clone(),
+                repositories: vec![repository],
+                import_labels: config.github_import_labels().to_vec(),
+                include_review_requests,
+                last_pull_complete: Arc::new(AtomicBool::new(true)),
+                batch: Some(Arc::clone(&batch)),
+            })
+            .collect())
     }
 
     fn mark_pull_complete(&self, complete: bool) {
@@ -160,6 +217,19 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
             self.mark_pull_complete(true);
             return Ok(Vec::new());
         }
+        if let Some(batch) = &self.batch {
+            let result = batch.pull_repository(&self.repositories[0]).await;
+            match result {
+                Ok((tasks, complete)) => {
+                    self.mark_pull_complete(complete);
+                    return Ok(tasks);
+                }
+                Err(error) => {
+                    self.mark_pull_complete(false);
+                    return Err(error);
+                }
+            }
+        }
         let login = self.current_user_login().await?;
         let mut tasks = Vec::new();
         let mut failures = Vec::new();
@@ -212,7 +282,7 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
         self.mark_pull_complete(failures.is_empty());
         // A pull request can match both the review-request and a dependency
         // search, so fold those into one ticket that carries both intents.
-        Ok(union_pull_request_intents(tasks))
+        Ok(mapping::union_pull_request_intents(tasks))
     }
 
     async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
@@ -229,32 +299,15 @@ impl GitHubInboxSyncClient {
         repository: &GitHubRepository,
         login: &str,
     ) -> Result<Vec<ExternalTask>, CliError> {
-        let project_id = repository.slug();
         let items = self
             .search(repository, GitHubInboxSearchKind::AssignedIssues, login)
             .await?;
-        Ok(items
-            .into_iter()
-            .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
-            .map(|item| {
-                let labels = item.label_names();
-                let body = item.body.unwrap_or_default();
-                let parent_reference = parent_reference_in_body(repository, &body);
-                let tracks_children = body_lists_child_issues(&body);
-                ExternalTask {
-                    reference: github_task_ref(repository, item.number, item.url),
-                    title: item.title,
-                    body,
-                    status: github_inbox_issue_status(item.state.as_str()),
-                    project_id: Some(project_id.clone()),
-                    updated_at: Some(item.updated_at),
-                    labels,
-                    parent_reference,
-                    tracks_children,
-                    ..ExternalTask::default()
-                }
-            })
-            .collect())
+        Ok(mapping::assigned_issue_tasks(
+            repository,
+            &self.import_labels,
+            items,
+            true,
+        ))
     }
 
     async fn review_request_tasks(
@@ -262,38 +315,15 @@ impl GitHubInboxSyncClient {
         repository: &GitHubRepository,
         login: &str,
     ) -> Result<Vec<ExternalTask>, CliError> {
-        let project_id = repository.slug();
         let items = self
             .search(repository, GitHubInboxSearchKind::ReviewRequests, login)
             .await?;
-        Ok(items
-            .into_iter()
-            .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
-            .map(|item| {
-                let labels = item.label_names();
-                let pr_author = item.author_login().map(str::to_owned);
-                // A review-requested PR names its tracking issue the same
-                // way an issue does ("Part of #N"), so it participates in
-                // the same hierarchy rather than always importing as a leaf.
-                let body = item.body.unwrap_or_default();
-                let parent_reference = parent_reference_in_body(repository, &body);
-                let tracks_children = body_lists_child_issues(&body);
-                ExternalTask {
-                    reference: github_task_ref(repository, item.number, item.url),
-                    title: item.title,
-                    body,
-                    status: TaskBoardStatus::Inbox,
-                    project_id: Some(project_id.clone()),
-                    updated_at: Some(item.updated_at),
-                    labels,
-                    parent_reference,
-                    tracks_children,
-                    workflow_kind: TaskBoardWorkflowKind::PrReview,
-                    pr_head_revision: item.head_ref_oid,
-                    pr_author,
-                }
-            })
-            .collect())
+        Ok(mapping::review_request_tasks(
+            repository,
+            &self.import_labels,
+            items,
+            true,
+        ))
     }
 
     async fn dependency_update_tasks(
@@ -318,64 +348,13 @@ impl GitHubInboxSyncClient {
             )
             .await?,
         );
-        // A Renovate/Dependabot pull request is usually also labelled, and the
-        // bots are queried separately, so keep the first hit per PR number.
-        let mut seen = BTreeSet::new();
-        Ok(items
-            .into_iter()
-            .filter(|item| seen.insert(item.number))
-            .filter(|item| search_label_matches_filter(&item.label_names(), &self.import_labels))
-            .map(|item| {
-                let labels = item.label_names();
-                let pr_author = item.author_login().map(str::to_owned);
-                let body = item.body.unwrap_or_default();
-                let parent_reference = parent_reference_in_body(repository, &body);
-                let tracks_children = body_lists_child_issues(&body);
-                ExternalTask {
-                    reference: github_task_ref(repository, item.number, item.url),
-                    title: item.title,
-                    body,
-                    status: TaskBoardStatus::Inbox,
-                    project_id: Some(project_id.clone()),
-                    updated_at: Some(item.updated_at),
-                    labels,
-                    parent_reference,
-                    tracks_children,
-                    workflow_kind: TaskBoardWorkflowKind::PrFix,
-                    pr_head_revision: item.head_ref_oid,
-                    pr_author,
-                }
-            })
-            .collect())
+        Ok(mapping::dependency_update_tasks(
+            repository,
+            &self.import_labels,
+            items,
+            true,
+        ))
     }
-}
-
-/// Merge tasks that share an external id so a pull request discovered as both a
-/// dependency update and a review request becomes one ticket carrying both
-/// intents (`PrFixReview`). Order follows first appearance, and the first
-/// recorded head revision and author win.
-fn union_pull_request_intents(tasks: Vec<ExternalTask>) -> Vec<ExternalTask> {
-    let mut order: Vec<String> = Vec::new();
-    let mut by_id: HashMap<String, ExternalTask> = HashMap::new();
-    for task in tasks {
-        let id = task.reference.external_id.clone();
-        if let Some(existing) = by_id.get_mut(&id) {
-            existing.workflow_kind = existing.workflow_kind.union(task.workflow_kind);
-            if existing.pr_head_revision.is_none() {
-                existing.pr_head_revision = task.pr_head_revision;
-            }
-            if existing.pr_author.is_none() {
-                existing.pr_author = task.pr_author;
-            }
-        } else {
-            order.push(id.clone());
-            by_id.insert(id, task);
-        }
-    }
-    order
-        .into_iter()
-        .filter_map(|id| by_id.remove(&id))
-        .collect()
 }
 
 fn record_repository_failure(
@@ -401,18 +380,6 @@ fn all_inbox_repositories_failed(failures: Vec<String>) -> CliError {
         .join("\n");
     CliErrorKind::workflow_io("task-board github inbox sync failed for all configured repositories")
         .with_details(details)
-}
-
-fn github_task_ref(
-    repository: &GitHubRepository,
-    number: u64,
-    html_url: String,
-) -> ExternalTaskRef {
-    ExternalTaskRef::new(
-        ExternalProvider::GitHub,
-        github_external_id(repository, number),
-    )
-    .with_url(html_url)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

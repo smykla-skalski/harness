@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
@@ -28,6 +28,7 @@ pub(super) struct DurableCreateStore {
     completion_error: Option<&'static str>,
     conflict_error: Option<&'static str>,
     coordinator_cancel_error: Option<&'static str>,
+    pub(super) coordinator_cancel_signal: Option<Arc<AtomicBool>>,
     status_on_finalize: Option<TaskBoardStatus>,
     coordinator_cancelled: AtomicBool,
     pub(super) failure_completions: AtomicUsize,
@@ -111,6 +112,7 @@ impl DurableCreateStore {
             completion_error,
             conflict_error,
             coordinator_cancel_error: None,
+            coordinator_cancel_signal: None,
             status_on_finalize,
             coordinator_cancelled: AtomicBool::new(false),
             failure_completions: AtomicUsize::new(0),
@@ -437,7 +439,13 @@ impl TaskBoardSyncStore for DurableCreateStore {
             .lock()
             .expect("fence order")
             .push("coordinator");
-        self.coordinator_cancel_error.map_or_else(
+        let cancellation = self.coordinator_cancel_error.or_else(|| {
+            self.coordinator_cancel_signal
+                .as_ref()
+                .is_some_and(|signal| signal.load(Ordering::SeqCst))
+                .then_some("coordinator run was cancelled")
+        });
+        cancellation.map_or_else(
             || Ok(TaskBoardSyncCoordinatorFenceDecision::Current),
             |message| {
                 self.coordinator_cancelled.store(true, Ordering::SeqCst);

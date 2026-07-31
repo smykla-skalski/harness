@@ -10,14 +10,14 @@ use crate::daemon::protocol::{
     TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
     TaskBoardPlanningResponse, TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardUpdateItemRequest,
+    TaskBoardProjectsResponse, TaskBoardSyncCancelResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardSyncStatusResponse, TaskBoardUpdateItemRequest,
 };
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalSyncConfig, Machine, SpawnGateSwitches, TaskBoardItem, approve_plan, begin_planning,
-    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries, revoke_plan,
-    submit_plan,
+    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
+    build_sync_summary, revoke_plan, submit_plan,
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -38,13 +38,13 @@ mod provider_sync_execution;
 mod provider_sync_store;
 mod request_validation;
 mod review_report;
-mod workflow_progress;
 mod reviews_sync;
 mod sync_audit;
 mod sync_run_context;
 mod triage_reads;
 mod triage_rules_reads;
 mod update_request;
+mod workflow_progress;
 
 pub(crate) use list_items::read_task_board_items_db;
 pub(crate) use positions::{
@@ -53,7 +53,6 @@ pub(crate) use positions::{
 };
 use request_validation::{validate_create_title, validate_estimate, validate_update_estimates};
 pub(crate) use review_report::get_task_board_ai_review_report_db;
-pub(crate) use workflow_progress::get_task_board_workflow_progress_db;
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
@@ -72,6 +71,7 @@ pub(crate) use triage_rules_reads::{
     preview_task_board_triage_rules_db, save_task_board_triage_rules_draft_db,
 };
 use update_request::{apply_update_request, replacement_external_refs};
+pub(crate) use workflow_progress::get_task_board_workflow_progress_db;
 
 pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,
@@ -304,7 +304,49 @@ pub(crate) async fn sync_task_board_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    sync_task_board_db_with_context(db, request, &TaskBoardSyncRunContext::requested()).await
+    if request.dry_run {
+        return sync_task_board_db_with_context(db, request, &TaskBoardSyncRunContext::requested())
+            .await;
+    }
+    let config = active_external_sync_config_db(db).await?;
+    let items = db.list_task_board_items(request.status).await?;
+    let response = build_sync_summary(&items, &config);
+    let db = db.clone();
+    let request = request.clone();
+    let generation = db.schedule_requested_task_board_sync();
+    tokio::spawn(async move {
+        let Some(permit) = db.begin_scheduled_task_board_sync(generation).await else {
+            return;
+        };
+        if let Err(error) = sync_task_board_db_with_permit(
+            &db,
+            &request,
+            &TaskBoardSyncRunContext::requested(),
+            permit,
+        )
+        .await
+        {
+            tracing::warn!(%error, "requested task-board source refresh failed");
+        }
+    });
+    Ok(response)
+}
+
+pub(crate) fn cancel_task_board_sync_db(db: &AsyncDaemonDb) -> TaskBoardSyncCancelResponse {
+    TaskBoardSyncCancelResponse {
+        cancelled: db.cancel_active_task_board_sync(),
+    }
+}
+
+pub(crate) fn task_board_sync_status_db(db: &AsyncDaemonDb) -> TaskBoardSyncStatusResponse {
+    let status = db.task_board_sync_status();
+    TaskBoardSyncStatusResponse {
+        active: status.active,
+        cancellation_requested: status.cancellation_requested,
+        cancelled: status.cancelled,
+        error: status.error,
+        summary: status.summary,
+    }
 }
 
 pub(crate) async fn sync_task_board_for_orchestrator_db(
@@ -332,8 +374,19 @@ async fn sync_task_board_db_with_context(
     request: &TaskBoardSyncRequest,
     context: &TaskBoardSyncRunContext,
 ) -> Result<TaskBoardSyncResponse, CliError> {
+    let permit = db.begin_task_board_sync().await;
+    sync_task_board_db_with_permit(db, request, context, permit).await
+}
+
+async fn sync_task_board_db_with_permit(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+    context: &TaskBoardSyncRunContext,
+    mut permit: crate::daemon::db::TaskBoardSyncPermit,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    let context = context.with_cancellation(permit.cancellation());
     let mut metrics = SyncExecutionMetrics::default();
-    let result = provider_sync_execution::execute(db, request, context, &mut metrics).await;
+    let result = provider_sync_execution::execute(db, request, &context, &mut metrics).await;
     context.observe_sync_metrics(&metrics);
     let audit = sync_audit::record_request_result_with_correlation(
         db,
@@ -344,7 +397,12 @@ async fn sync_task_board_db_with_context(
         &metrics,
     )
     .await;
-    combine_sync_and_audit_results(result, audit)
+    let result = combine_sync_and_audit_results(result, audit);
+    permit.record_completion(
+        result.as_ref().ok().cloned(),
+        result.as_ref().err().map(ToString::to_string),
+    );
+    result
 }
 
 fn combine_sync_and_audit_results(

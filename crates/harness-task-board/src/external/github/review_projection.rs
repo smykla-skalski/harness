@@ -189,6 +189,8 @@ fn is_github_pull_request(reference: &ExternalRef) -> bool {
 fn is_imported_review(item: &TaskBoardItem) -> bool {
     item.imported_from_provider == Some(ExternalRefProvider::GitHub)
         && item.external_refs.iter().any(is_github_pull_request)
+        && (!item.workflow_kind.has_dependency_update_intent()
+            || item.workflow_kind.has_review_request_intent())
 }
 
 fn observed_review_status(snapshot: &GitHubPullRequestSnapshot) -> Option<TaskBoardStatus> {

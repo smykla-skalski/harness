@@ -20,11 +20,11 @@ pub(super) use patch::reconciliation_patch;
 /// `CliErrorKind::ConcurrentModification`'s wire code, the only failure a
 /// reconciliation write can lose to another writer with.
 const CONCURRENT_MODIFICATION_CODE: &str = "WORKFLOW_CONCURRENT";
+const MAX_RECONCILIATION_ATTEMPTS: usize = 4;
 
 #[expect(
-    clippy::cognitive_complexity,
     clippy::too_many_arguments,
-    reason = "reconciliation keeps conflict policy, CAS state, hierarchy, and operation output explicit"
+    reason = "reconciliation needs the store, policy, item, task, hierarchy, and output"
 )]
 pub(super) async fn reconcile_existing_item(
     board: &dyn TaskBoardSyncStore,
@@ -35,6 +35,35 @@ pub(super) async fn reconcile_existing_item(
     task: ExternalTask,
     resolved_parent_item_id: Option<&str>,
     operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<(), CliError> {
+    reconcile_existing_item_attempt(
+        board,
+        options,
+        provider,
+        item,
+        expected_revision,
+        task,
+        resolved_parent_item_id,
+        operations,
+        MAX_RECONCILIATION_ATTEMPTS,
+    )
+    .await
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "reconciliation keeps conflict policy, CAS state, hierarchy, and operation output explicit"
+)]
+async fn reconcile_existing_item_attempt(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    provider: ExternalProvider,
+    item: &TaskBoardItem,
+    expected_revision: i64,
+    task: ExternalTask,
+    resolved_parent_item_id: Option<&str>,
+    operations: &mut Vec<ExternalSyncOperation>,
+    attempts_remaining: usize,
 ) -> Result<(), CliError> {
     if let Some(matched_label) = matched_exclusion_label(&task.labels) {
         return hide_existing_item_for_exclusion(
@@ -64,11 +93,7 @@ pub(super) async fn reconcile_existing_item(
     {
         return Ok(());
     }
-    let prefer_remote = matches!(
-        options.conflict_policy,
-        ExternalSyncConflictPolicy::PreferRemote
-    ) || matches!(options.direction, ExternalSyncDirection::Pull)
-        && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
+    let prefer_remote = should_prefer_remote(options);
     let patch = reconciliation_patch(item, &task, prefer_remote, resolved_parent_item_id);
     if !has_reconciliation_change(&patch) {
         supersede_resolved_conflicts(
@@ -102,21 +127,22 @@ pub(super) async fn reconcile_existing_item(
     let applied_revision = match apply_reconciliation(board, item, expected_revision, patch).await {
         Ok(revision) => revision,
         Err(error) => {
-            // The writer that won the race may have applied this very pull.
-            // Only a stored item that still needs the patch actually lost
-            // something; one that already carries it has converged, and
-            // failing the pass would report a conflict that no longer exists.
-            if error.code() == CONCURRENT_MODIFICATION_CODE
-                && pull_already_converged(
+            if error.code() == CONCURRENT_MODIFICATION_CODE && attempts_remaining > 1 {
+                let Ok(latest) = board.item_snapshot(&item.id).await else {
+                    return Err(error);
+                };
+                return Box::pin(reconcile_existing_item_attempt(
                     board,
-                    item,
-                    &task,
-                    prefer_remote,
+                    options,
+                    provider,
+                    &latest.item,
+                    latest.item_revision,
+                    task,
                     resolved_parent_item_id,
-                )
-                .await
-            {
-                return Ok(());
+                    operations,
+                    attempts_remaining - 1,
+                ))
+                .await;
             }
             return Err(error);
         }
@@ -135,6 +161,14 @@ pub(super) async fn reconcile_existing_item(
         operations,
     )
     .await
+}
+
+fn should_prefer_remote(options: ExternalSyncOptions) -> bool {
+    matches!(
+        options.conflict_policy,
+        ExternalSyncConflictPolicy::PreferRemote
+    ) || matches!(options.direction, ExternalSyncDirection::Pull)
+        && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report)
 }
 
 #[expect(
@@ -234,30 +268,8 @@ async fn record_reconciliation_write(
     .await
 }
 
-/// Whether the stored item already carries everything this pull would have
-/// written. A failed point read answers "no": without evidence that the race
-/// was harmless, the caller keeps failing closed.
-async fn pull_already_converged(
-    board: &dyn TaskBoardSyncStore,
-    item: &TaskBoardItem,
-    task: &ExternalTask,
-    prefer_remote: bool,
-    resolved_parent_item_id: Option<&str>,
-) -> bool {
-    let Ok(latest) = board.item_snapshot(&item.id).await else {
-        return false;
-    };
-    !has_reconciliation_change(&reconciliation_patch(
-        &latest.item,
-        task,
-        prefer_remote,
-        resolved_parent_item_id,
-    ))
-}
-
 /// Returns the resulting revision without a point read. A concurrent writer
-/// makes this sync pass fail closed unless the winning write already converged
-/// the item; the next batch snapshot retries anything genuinely lost.
+/// is retried by the caller against a fresh item snapshot.
 async fn apply_reconciliation(
     board: &dyn TaskBoardSyncStore,
     item: &TaskBoardItem,
@@ -314,7 +326,7 @@ fn converged_pull_fields(item: &TaskBoardItem, task: &ExternalTask) -> Vec<Exter
         .into_iter()
         .filter(|field| match field {
             ExternalSyncField::Title => item.title == task.title,
-            ExternalSyncField::Body => item.body == task.body,
+            ExternalSyncField::Body => !task.body_is_loaded() || item.body == task.body,
             ExternalSyncField::Status => {
                 canonical_external_status(item.status) == canonical_external_status(task.status)
             }

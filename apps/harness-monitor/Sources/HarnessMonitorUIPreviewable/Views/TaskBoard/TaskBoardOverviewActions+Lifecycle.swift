@@ -146,6 +146,15 @@ extension TaskBoardOverviewActions {
     )
   }
 
+  func cancelTaskBoardSync() {
+    guard canRefreshBoard, let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Stopping task board sync") {
+        await store.cancelTaskBoardSync()
+      }
+    )
+  }
+
   func startTaskBoardOrchestrator() {
     guard canStartOrchestrator, let store else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(

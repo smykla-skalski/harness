@@ -11,6 +11,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{GitHubRepository, assigned_issue_query, author_issue_query, warn_github_message};
 
+mod batch;
+
+pub(super) use batch::{GitHubBatchSearchResult, search_issue_pull_requests_batch};
+
 pub(super) const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
 
 const GITHUB_SEARCH_PAGE_SIZE: u32 = 100;
@@ -32,6 +36,9 @@ query TaskBoardGitHubSearch($query: String!, $after: String) {
         url
         state
         updatedAt
+        repository {
+          nameWithOwner
+        }
         labels(first: 20) {
           nodes {
             name
@@ -46,6 +53,9 @@ query TaskBoardGitHubSearch($query: String!, $after: String) {
         state
         updatedAt
         headRefOid
+        repository {
+          nameWithOwner
+        }
         author {
           login
         }
@@ -138,40 +148,85 @@ async fn search_issue_pull_requests_at_revision(
     query: &str,
     context: &str,
 ) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
-    let mut cursor = None;
+    let response: GitHubSearchIssuePullRequestResponse = client
+        .graphql(
+            search_request_descriptor(false),
+            json!({
+            "query": ISSUE_SEARCH_QUERY,
+            "variables": {
+                "query": query,
+                "after": null,
+            },
+            }),
+        )
+        .await
+        .map(|response| response.body)?;
+    continue_search_issue_pull_requests(client, query, context, response.search, false).await
+}
+
+async fn search_issue_pull_requests_from_connection(
+    client: &GitHubProtectedClient,
+    query: &str,
+    context: &str,
+    connection: GitHubSearchConnection,
+    fresh: bool,
+) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
+    retry_stable_read("task_board.github.search_issues", |_| {
+        continue_search_issue_pull_requests(client, query, context, connection.clone(), fresh)
+    })
+    .await
+    .map(|(items, _)| items)
+}
+
+async fn continue_search_issue_pull_requests(
+    client: &GitHubProtectedClient,
+    query: &str,
+    context: &str,
+    first: GitHubSearchConnection,
+    fresh: bool,
+) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
+    let mut page_info = first.page_info;
     let mut page = 1_u32;
-    let mut items = Vec::new();
+    let mut items = first.nodes.into_iter().flatten().collect::<Vec<_>>();
     loop {
+        let Some(next_cursor) = next_search_cursor(page, context, page_info)? else {
+            break;
+        };
+        page += 1;
         let response: GitHubSearchIssuePullRequestResponse = client
             .graphql(
-                GitHubRequestDescriptor::graphql(
-                    "task_board.github.search_issues",
-                    GitHubPriority::Background,
-                    GitHubCachePolicy::read_through(
-                        GITHUB_GRAPHQL_CACHE_TTL,
-                        Duration::from_hours(1),
-                    ),
-                )
-                .with_expected_cost(20),
+                search_request_descriptor(fresh),
                 json!({
                 "query": ISSUE_SEARCH_QUERY,
                 "variables": {
                     "query": query,
-                    "after": cursor.as_deref(),
+                    "after": next_cursor,
                 },
                 }),
             )
             .await
             .map(|response| response.body)?;
-        let page_info = response.search.page_info;
+        page_info = response.search.page_info;
         items.extend(response.search.nodes.into_iter().flatten());
-        let Some(next_cursor) = next_search_cursor(page, context, page_info)? else {
-            break;
-        };
-        page += 1;
-        cursor = Some(next_cursor);
     }
     Ok(items)
+}
+
+fn search_request_descriptor(fresh: bool) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        "task_board.github.search_issues",
+        if fresh {
+            GitHubPriority::FreshRead
+        } else {
+            GitHubPriority::Background
+        },
+        if fresh {
+            GitHubCachePolicy::no_store()
+        } else {
+            GitHubCachePolicy::read_through(GITHUB_GRAPHQL_CACHE_TTL, Duration::from_hours(1))
+        },
+    )
+    .with_expected_cost(20)
 }
 
 fn next_search_cursor(
@@ -222,15 +277,15 @@ struct GitHubSearchIssuePullRequestResponse {
     search: GitHubSearchConnection,
 }
 
-#[derive(Debug, Deserialize)]
-struct GitHubSearchConnection {
+#[derive(Debug, Clone, Deserialize)]
+pub(super) struct GitHubSearchConnection {
     #[serde(rename = "pageInfo")]
     page_info: GitHubSearchPageInfo,
     nodes: Vec<Option<GitHubSearchIssuePullRequestItem>>,
 }
 
-#[derive(Debug, Deserialize)]
-struct GitHubSearchPageInfo {
+#[derive(Debug, Clone, Deserialize)]
+pub(super) struct GitHubSearchPageInfo {
     #[serde(rename = "hasNextPage")]
     has_next_page: bool,
     #[serde(rename = "endCursor")]
@@ -252,6 +307,8 @@ pub(super) struct GitHubSearchIssuePullRequestItem {
     #[serde(default, rename = "headRefOid")]
     pub(super) head_ref_oid: Option<String>,
     #[serde(default)]
+    repository: Option<GitHubSearchRepository>,
+    #[serde(default)]
     author: Option<GitHubSearchAuthor>,
     #[serde(default)]
     labels: GitHubSearchLabelConnection,
@@ -269,6 +326,18 @@ impl GitHubSearchIssuePullRequestItem {
     pub(super) fn author_login(&self) -> Option<&str> {
         self.author.as_ref().map(|author| author.login.as_str())
     }
+
+    pub(super) fn repository_slug(&self) -> Option<&str> {
+        self.repository
+            .as_ref()
+            .map(|repository| repository.name_with_owner.as_str())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GitHubSearchRepository {
+    #[serde(rename = "nameWithOwner")]
+    name_with_owner: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

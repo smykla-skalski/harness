@@ -1,5 +1,3 @@
-use std::slice;
-
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
@@ -118,7 +116,7 @@ pub fn configured_sync_clients(
     config: &ExternalSyncConfig,
     provider: Option<ExternalProvider>,
 ) -> Result<Vec<Box<dyn ExternalSyncClient>>, CliError> {
-    configured_sync_clients_with_review_source(config, provider, true)
+    configured_sync_clients_with_review_source(config, provider, true, false)
 }
 
 /// # Errors
@@ -127,13 +125,39 @@ pub fn configured_sync_clients_without_review_requests(
     config: &ExternalSyncConfig,
     provider: Option<ExternalProvider>,
 ) -> Result<Vec<Box<dyn ExternalSyncClient>>, CliError> {
-    configured_sync_clients_with_review_source(config, provider, false)
+    configured_sync_clients_without_review_requests_with_fresh_reads(config, provider, false)
+}
+
+/// Build provider clients without review-request discovery, selecting the
+/// interactive GitHub read lane when a user-requested sync invalidated cache.
+///
+/// # Errors
+/// See [`configured_sync_clients`].
+pub fn configured_sync_clients_without_review_requests_with_fresh_reads(
+    config: &ExternalSyncConfig,
+    provider: Option<ExternalProvider>,
+    fresh_github_reads: bool,
+) -> Result<Vec<Box<dyn ExternalSyncClient>>, CliError> {
+    configured_sync_clients_with_review_source(config, provider, false, fresh_github_reads)
+}
+
+/// Build provider clients whose GitHub inbox scopes share fresh, bounded
+/// per-repository queries including review requests.
+///
+/// # Errors
+/// See [`configured_sync_clients`].
+pub fn configured_sync_clients_with_batched_review_requests(
+    config: &ExternalSyncConfig,
+    provider: Option<ExternalProvider>,
+) -> Result<Vec<Box<dyn ExternalSyncClient>>, CliError> {
+    configured_sync_clients_with_review_source(config, provider, true, true)
 }
 
 fn configured_sync_clients_with_review_source(
     config: &ExternalSyncConfig,
     provider: Option<ExternalProvider>,
     include_review_requests: bool,
+    fresh_github_reads: bool,
 ) -> Result<Vec<Box<dyn ExternalSyncClient>>, CliError> {
     let provider_was_requested = provider.is_some();
     let providers = requested_providers(provider);
@@ -141,7 +165,12 @@ fn configured_sync_clients_with_review_source(
     for provider in providers {
         match provider {
             ExternalProvider::GitHub if config.token_for(provider).is_some() => {
-                add_github_clients(config, &mut clients, include_review_requests)?;
+                add_github_clients(
+                    config,
+                    &mut clients,
+                    include_review_requests,
+                    fresh_github_reads,
+                )?;
             }
             _ if provider_was_requested => {
                 config.require_token(provider)?;
@@ -163,6 +192,7 @@ fn add_github_clients(
     config: &ExternalSyncConfig,
     clients: &mut Vec<Box<dyn ExternalSyncClient>>,
     include_review_requests: bool,
+    fresh_github_reads: bool,
 ) -> Result<(), CliError> {
     let pull_enabled = config.github_repository().is_some_and(|repository| {
         !config
@@ -174,17 +204,15 @@ fn add_github_clients(
         config,
         pull_enabled,
     )?));
-    for repository in config.github_inbox_repositories() {
-        let scoped_config = config
-            .clone()
-            .with_github_inbox_repositories_override(slice::from_ref(repository));
-        let inbox = if include_review_requests {
-            GitHubInboxSyncClient::from_config(&scoped_config)?
-        } else {
-            GitHubInboxSyncClient::from_config_assigned_only(&scoped_config)?
-        };
-        clients.push(Box::new(inbox));
-    }
+    clients.extend(
+        GitHubInboxSyncClient::scoped_from_config(
+            config,
+            fresh_github_reads,
+            include_review_requests,
+        )?
+        .into_iter()
+        .map(|client| Box::new(client) as Box<dyn ExternalSyncClient>),
+    );
     Ok(())
 }
 
@@ -433,7 +461,7 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         external_item_id(&task.reference),
         task.title.clone(),
-        task.body.clone(),
+        task.body_for_import().to_owned(),
         now,
     );
     item.status = canonical_external_status(task.status);

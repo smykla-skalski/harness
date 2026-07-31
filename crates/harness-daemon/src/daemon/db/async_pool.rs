@@ -6,6 +6,9 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
 use super::summary_rows::AsyncSessionSummaryRow;
+use super::task_board_sync_coordinator::{
+    TaskBoardSyncCoordinator, TaskBoardSyncPermit, TaskBoardSyncStatus,
+};
 use super::{
     BTreeMap, CliError, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
     SCHEMA_VERSION, SessionState, async_bootstrap, daemon_index, daemon_protocol, db_error,
@@ -110,6 +113,7 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
 pub struct AsyncDaemonDb {
     pool: SqlitePool,
     pub(super) path: PathBuf,
+    task_board_sync_coordinator: Arc<TaskBoardSyncCoordinator>,
     /// `Arc<OnceLock<_>>`, not a plain field: daemon startup resolves this
     /// from env vars and sets it once, but by then `connect()` has already
     /// returned and this handle has typically already been cloned into
@@ -148,6 +152,7 @@ impl AsyncDaemonDb {
             let db = Self {
                 pool,
                 path: path.to_path_buf(),
+                task_board_sync_coordinator: Arc::new(TaskBoardSyncCoordinator::default()),
                 triage_escalation_config: Arc::new(OnceLock::new()),
             };
             async_bootstrap::ensure_async_schema(db.pool()).await?;
@@ -179,6 +184,31 @@ impl AsyncDaemonDb {
     #[must_use]
     pub(crate) fn storage_path(&self) -> &Path {
         &self.path
+    }
+
+    pub(crate) async fn begin_task_board_sync(&self) -> TaskBoardSyncPermit {
+        self.task_board_sync_coordinator.begin().await
+    }
+
+    pub(crate) fn schedule_requested_task_board_sync(&self) -> u64 {
+        self.task_board_sync_coordinator.schedule_requested()
+    }
+
+    pub(crate) async fn begin_scheduled_task_board_sync(
+        &self,
+        generation: u64,
+    ) -> Option<TaskBoardSyncPermit> {
+        self.task_board_sync_coordinator
+            .begin_scheduled(generation)
+            .await
+    }
+
+    pub(crate) fn cancel_active_task_board_sync(&self) -> bool {
+        self.task_board_sync_coordinator.cancel_active()
+    }
+
+    pub(crate) fn task_board_sync_status(&self) -> TaskBoardSyncStatus {
+        self.task_board_sync_coordinator.status()
     }
 
     /// Set once at daemon startup from the resolved feature flag and env

@@ -1,7 +1,9 @@
 use tempfile::tempdir;
 
 use super::*;
-use crate::types::{ExternalRefSyncState, PlanningState, TaskBoardItem};
+use crate::types::{
+    ExternalRefSyncState, PlanningState, TaskBoardItem, TaskBoardWorkflowKind,
+};
 
 mod status_tests;
 
@@ -105,6 +107,58 @@ fn shared_review_snapshot_does_not_touch_manual_task() {
     assert_eq!(
         board.get("manual-review").expect("manual item").title,
         "Manual task"
+    );
+}
+
+#[test]
+fn shared_review_snapshot_does_not_complete_dependency_update() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let mut item = TaskBoardItem::new(
+        "github-example-repo-42".into(),
+        "Dependency update".into(),
+        "Body".into(),
+        "2026-07-11T10:00:00Z".into(),
+    );
+    item.status = TaskBoardStatus::Todo;
+    item.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    item.imported_from_provider = Some(ExternalRefProvider::GitHub);
+    item.external_refs = vec![ExternalRef {
+        provider: ExternalRefProvider::GitHub,
+        external_id: "example/repo#42".into(),
+        url: Some("https://github.com/example/repo/pull/42".into()),
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Inbox,
+            "2026-07-11T10:00:00Z",
+        )),
+    }];
+    board
+        .create("Dependency update", "Body", item)
+        .expect("create");
+    let snapshot = GitHubPullRequestSnapshot {
+        repository: "example/repo".into(),
+        number: 42,
+        is_open: Some(true),
+        viewer_review_requested: Some(false),
+        updated_at: "2026-07-11T11:00:00Z".into(),
+    };
+
+    assert!(
+        imported_review_pull_request_references(&board)
+            .expect("references")
+            .is_empty()
+    );
+    assert!(!reconcile_pull_request_snapshots(&board, &[snapshot]).expect("reconcile"));
+    let unchanged = board
+        .get("github-example-repo-42")
+        .expect("dependency item");
+    assert_eq!(unchanged.status, TaskBoardStatus::Todo);
+    assert_eq!(
+        unchanged.external_refs[0]
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.status),
+        Some(TaskBoardStatus::Inbox)
     );
 }
 

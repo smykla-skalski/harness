@@ -45,8 +45,10 @@ pub(crate) use harness_task_board::external::{
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use harness_task_board::external::{
     TaskBoardExternalCreateStore, TaskBoardSyncStore,
-    configured_sync_clients_without_review_requests, imported_review_references_from_items,
-    reconcile_review_item_from_snapshots, sync_external_tasks,
+    configured_sync_clients_with_batched_review_requests,
+    configured_sync_clients_without_review_requests_with_fresh_reads,
+    imported_review_references_from_items, reconcile_review_item_from_snapshots,
+    sync_external_tasks,
 };
 // Shadows the wider glob re-export above for the same reason root's own
 // `src/task_board/mod.rs` shadows it: `build_audit_summary_with_policy` was

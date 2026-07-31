@@ -11,6 +11,8 @@ const TASK_BOARD_WS_METHOD_CATALOG: &[&str] = &[
     ws_methods::TASK_BOARD_PLAN_SUBMIT,
     ws_methods::TASK_BOARD_PLAN_APPROVE,
     ws_methods::TASK_BOARD_SYNC,
+    ws_methods::TASK_BOARD_SYNC_CANCEL,
+    ws_methods::TASK_BOARD_SYNC_STATUS,
     ws_methods::TASK_BOARD_DISPATCH,
     ws_methods::TASK_BOARD_EVALUATE,
     ws_methods::TASK_BOARD_AUDIT,

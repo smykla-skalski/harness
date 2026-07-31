@@ -85,6 +85,7 @@ mod schema_migrations;
 mod schema_sql;
 #[allow(dead_code)]
 mod task_board;
+mod task_board_sync_coordinator;
 #[cfg(test)]
 pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{
     detached_terminal_assignment, restore_parent_to_targetless_preparing,
@@ -145,6 +146,7 @@ pub(crate) use task_board::{
     ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
     parent_points_to_assignment,
 };
+pub(crate) use task_board_sync_coordinator::TaskBoardSyncPermit;
 // `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 controller-operation
 // migration test builds these trust-fence values directly to exercise the
 // paired lifecycle-trust columns the v43 migration adds.

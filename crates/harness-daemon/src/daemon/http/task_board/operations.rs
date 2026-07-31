@@ -6,7 +6,8 @@ use axum::response::Response;
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardDispatchDeliverRequest,
     TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardProjectUpdateRequest, TaskBoardSyncRequest, http_paths,
+    TaskBoardProjectUpdateRequest, TaskBoardSyncCancelResponse, TaskBoardSyncRequest,
+    TaskBoardSyncStatusResponse, http_paths,
 };
 use crate::task_board::{
     DispatchExecutionSummary, Machine, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
@@ -25,10 +26,10 @@ use crate::daemon::protocol::{TaskBoardDispatchDeliverResponse, TaskBoardDispatc
     post,
     path = "/v1/task-board/sync",
     tag = "task-board",
-    description = "Sync task-board items against configured external providers (GitHub) in the requested direction. Runs as a dry-run preview unless the request explicitly disables it",
+    description = "Preview task-board provider changes synchronously for dry runs. Applied requests acknowledge the current board immediately and schedule the newest provider refresh in the background",
     request_body = TaskBoardSyncRequest,
     responses(
-        (status = 200, description = "Per-provider sync summary", body = TaskBoardSyncSummary),
+        (status = 200, description = "Dry-run result or current board summary after accepting an applied refresh", body = TaskBoardSyncSummary),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -47,6 +48,60 @@ pub(super) async fn post_task_board_sync(
         &request_id,
         start,
         task_board_route_executor::sync(&state, &request).await,
+    )
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/task-board/sync/cancel",
+    tag = "task-board",
+    description = "Cancel the active task-board provider sync, if one is running",
+    responses(
+        (status = 200, description = "Whether an active sync received cancellation", body = TaskBoardSyncCancelResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn post_task_board_sync_cancel(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_SYNC_CANCEL,
+        &request_id,
+        start,
+        task_board_route_executor::cancel_sync(&state),
+    )
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/task-board/sync/status",
+    tag = "task-board",
+    description = "Report whether a task-board provider refresh is pending, active, or stopping",
+    responses(
+        (status = 200, description = "Current task-board provider refresh state", body = TaskBoardSyncStatusResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn get_task_board_sync_status(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_SYNC_STATUS,
+        &request_id,
+        start,
+        task_board_route_executor::sync_status(&state),
     )
 }
 

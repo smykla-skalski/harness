@@ -74,9 +74,11 @@ pub use sync::{
     TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
     assign_external_create_recovery, blocked_external_create_follow_ups,
     blocked_external_create_recovery, configured_sync_clients,
-    configured_sync_clients_without_review_requests, load_external_create_recovery_work,
-    prepare_external_create_recovery, sync_external_tasks, sync_external_tasks_scoped,
-    sync_external_tasks_scoped_with_recovery,
+    configured_sync_clients_with_batched_review_requests,
+    configured_sync_clients_without_review_requests,
+    configured_sync_clients_without_review_requests_with_fresh_reads,
+    load_external_create_recovery_work, prepare_external_create_recovery, sync_external_tasks,
+    sync_external_tasks_scoped, sync_external_tasks_scoped_with_recovery,
 };
 pub use targeting::execution_repository_for_task;
 
@@ -201,6 +203,26 @@ pub struct ExternalTask {
     /// The discovered pull request author (e.g. `renovate[bot]`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pr_author: Option<String>,
+}
+
+const UNLOADED_EXTERNAL_TASK_BODY: &str = "\0harness:unloaded-external-body\0";
+
+impl ExternalTask {
+    pub(crate) fn mark_body_unloaded(&mut self) {
+        self.body = UNLOADED_EXTERNAL_TASK_BODY.into();
+    }
+
+    pub(crate) fn body_is_loaded(&self) -> bool {
+        self.body != UNLOADED_EXTERNAL_TASK_BODY
+    }
+
+    pub(crate) fn body_for_import(&self) -> &str {
+        if self.body_is_loaded() {
+            &self.body
+        } else {
+            ""
+        }
+    }
 }
 
 impl Default for ExternalTask {

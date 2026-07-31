@@ -114,6 +114,12 @@ public enum TaskBoardExternalSyncDirection: String, Codable, CaseIterable, Senda
   case both
 }
 
+public enum TaskBoardSyncPhase: Equatable, Sendable {
+  case idle
+  case syncing
+  case stopping
+}
+
 public struct TaskBoardSyncRequest: Codable, Equatable, Sendable {
   public let status: TaskBoardStatus?
   public let provider: TaskBoardExternalProvider?
@@ -130,6 +136,44 @@ public struct TaskBoardSyncRequest: Codable, Equatable, Sendable {
     self.provider = provider
     self.direction = direction
     self.dryRun = dryRun
+  }
+}
+
+public struct TaskBoardSyncCancelResponse: Codable, Equatable, Sendable {
+  public let cancelled: Bool
+
+  public init(cancelled: Bool) {
+    self.cancelled = cancelled
+  }
+}
+
+public struct TaskBoardSyncStatusResponse: Codable, Equatable, Sendable {
+  public let active: Bool
+  public let cancellationRequested: Bool
+  public let cancelled: Bool
+  public let error: String?
+  public let summary: TaskBoardSyncSummary?
+
+  public init(
+    active: Bool,
+    cancellationRequested: Bool,
+    cancelled: Bool = false,
+    error: String? = nil,
+    summary: TaskBoardSyncSummary? = nil
+  ) {
+    self.active = active
+    self.cancellationRequested = cancellationRequested
+    self.cancelled = cancelled
+    self.error = error
+    self.summary = summary
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case active
+    case cancellationRequested = "cancellation_requested"
+    case cancelled
+    case error
+    case summary
   }
 }
 

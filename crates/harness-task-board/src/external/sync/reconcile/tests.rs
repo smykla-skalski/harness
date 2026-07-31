@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::super::merge::sync_state_from_task;
 use super::*;
@@ -8,20 +10,23 @@ use crate::external::{
     ExternalSyncDirection, ExternalTaskRef, TaskBoardExternalCreateStore,
     TaskBoardSyncItemSnapshot,
 };
-use crate::types::{ExternalRefSyncState, TaskBoardStatus};
+use crate::types::{ExternalRefSyncState, TaskBoardPriority, TaskBoardStatus};
 use harness_kernel::errors::CliErrorKind;
 
 #[tokio::test]
-async fn prefer_remote_concurrent_edit_never_claims_unapplied_remote_intent() {
+async fn prefer_remote_retries_against_a_concurrent_unrelated_edit() {
     let task = remote_task();
     let expected = locally_edited_item();
     let mut latest = expected.clone();
-    latest.title = "Concurrent edit".into();
+    latest.priority = TaskBoardPriority::High;
     latest.external_refs[0].sync_state = Some(sync_state_from_task(&task));
-    let store = ConcurrentEditStore { latest };
+    let store = ConcurrentEditStore {
+        latest: Mutex::new(latest),
+        update_calls: AtomicUsize::new(0),
+    };
     let mut operations = Vec::new();
 
-    let error = reconcile_existing_item(
+    reconcile_existing_item(
         &store,
         ExternalSyncOptions {
             status: None,
@@ -38,14 +43,19 @@ async fn prefer_remote_concurrent_edit_never_claims_unapplied_remote_intent() {
         &mut operations,
     )
     .await
-    .expect_err("concurrent edit still missing remote title must fail");
+    .expect("remote pull retries against the latest local item");
 
-    assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
-    assert!(operations.is_empty());
+    let latest = store.latest.lock().expect("latest");
+    assert_eq!(latest.title, "Remote edit");
+    assert_eq!(latest.priority, TaskBoardPriority::High);
+    assert_eq!(store.update_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(operations.len(), 1);
+    assert!(operations[0].applied);
 }
 
 struct ConcurrentEditStore {
-    latest: TaskBoardItem,
+    latest: Mutex<TaskBoardItem>,
+    update_calls: AtomicUsize,
 }
 
 impl TaskBoardExternalCreateStore for ConcurrentEditStore {}
@@ -56,11 +66,11 @@ impl TaskBoardSyncStore for ConcurrentEditStore {
         &self,
         _status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        Ok(vec![self.latest.clone()])
+        Ok(vec![self.latest.lock().expect("latest").clone()])
     }
 
     async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-        Ok(vec![self.latest.clone()])
+        Ok(vec![self.latest.lock().expect("latest").clone()])
     }
 
     async fn create_item(&self, _item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
@@ -69,14 +79,23 @@ impl TaskBoardSyncStore for ConcurrentEditStore {
 
     async fn update_item(
         &self,
-        _expected_item: &TaskBoardItem,
-        _patch: TaskBoardItemPatch,
+        expected_item: &TaskBoardItem,
+        patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError> {
-        Err(CliErrorKind::concurrent_modification("concurrent test edit").into())
+        if self.update_calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            return Err(CliErrorKind::concurrent_modification("concurrent test edit").into());
+        }
+        let mut latest = self.latest.lock().expect("latest");
+        assert_eq!(expected_item, &*latest);
+        apply_patch(&mut latest, patch);
+        Ok(latest.clone())
     }
 
     async fn item_snapshot(&self, _item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
-        Ok(TaskBoardSyncItemSnapshot::new(self.latest.clone(), 0))
+        Ok(TaskBoardSyncItemSnapshot::new(
+            self.latest.lock().expect("latest").clone(),
+            1,
+        ))
     }
 
     async fn provider_scope_state(
@@ -131,6 +150,17 @@ impl TaskBoardSyncStore for ConcurrentEditStore {
     ) -> Result<(), CliError> {
         Ok(())
     }
+
+    async fn supersede_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _item_revision: i64,
+        _resolved_fields: &[ExternalSyncField],
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
 }
 
 fn locally_edited_item() -> TaskBoardItem {
@@ -164,6 +194,27 @@ fn remote_task() -> ExternalTask {
         updated_at: Some("2026-07-15T10:05:00Z".into()),
         ..ExternalTask::default()
     }
+}
+
+#[test]
+fn fast_refresh_preserves_local_and_last_synced_bodies() {
+    let item = locally_edited_item();
+    let mut task = remote_task();
+    task.mark_body_unloaded();
+
+    let patch = reconciliation_patch(&item, &task, true, None);
+
+    assert!(patch.body.is_none());
+    let refs = patch
+        .external_refs
+        .expect("provider revision still refreshes the reference");
+    assert_eq!(
+        refs[0]
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.body.as_deref()),
+        Some("Body")
+    );
 }
 
 fn discovered_item() -> TaskBoardItem {

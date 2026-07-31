@@ -4466,6 +4466,7 @@ dependencies = [
  "chrono-tz",
  "clap",
  "fs-err",
+ "futures-util",
  "gix",
  "harness-github-api",
  "harness-infra",

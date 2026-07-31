@@ -1,7 +1,10 @@
+use std::future::pending;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use async_trait::async_trait;
+use tokio::sync::Notify;
+use tokio::time::{Duration, timeout};
 
 use super::support::DurableCreateStore;
 use super::*;
@@ -16,6 +19,38 @@ struct ProviderCalls {
 
 struct FenceClient {
     calls: Arc<ProviderCalls>,
+}
+
+struct BlockingPullClient {
+    started: Arc<Notify>,
+}
+
+impl DurableCreateStore {
+    fn coordinator_cancelled_by_signal(item: TaskBoardItem, signal: Arc<AtomicBool>) -> Self {
+        let mut store = Self::new(item, None, None, None, None, None);
+        store.coordinator_cancel_signal = Some(signal);
+        store
+    }
+}
+
+#[async_trait]
+impl ExternalSyncClient for BlockingPullClient {
+    fn provider(&self) -> ExternalProvider {
+        ExternalProvider::GitHub
+    }
+
+    fn scope_id(&self) -> String {
+        "acme/blocking".into()
+    }
+
+    async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
+        self.started.notify_one();
+        pending().await
+    }
+
+    async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
+        unreachable!("pull-only cancellation test")
+    }
 }
 
 #[async_trait]
@@ -82,6 +117,36 @@ async fn coordinator_cancellation_stops_pull_before_provider_call() {
 
     assert_cancelled_scope(&store, &batch, 1);
     assert_eq!(calls.pulls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn coordinator_cancellation_interrupts_an_active_provider_call() {
+    let cancellation = Arc::new(AtomicBool::new(false));
+    let store = DurableCreateStore::coordinator_cancelled_by_signal(
+        unlinked_item("task-active-pull-fence"),
+        Arc::clone(&cancellation),
+    );
+    let started = Arc::new(Notify::new());
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(BlockingPullClient {
+        started: Arc::clone(&started),
+    })];
+    let cancel = tokio::spawn(async move {
+        started.notified().await;
+        cancellation.store(true, Ordering::SeqCst);
+    });
+
+    let batch = timeout(
+        Duration::from_millis(250),
+        sync_external_tasks_scoped(&store, pull_options(ExternalProvider::GitHub), &clients),
+    )
+    .await
+    .expect("active provider call should stop promptly")
+    .expect("cancellation retains terminal evidence");
+    cancel.await.expect("canceller should finish");
+
+    assert!(batch.terminal_error.is_some());
+    assert_eq!(store.neutral_releases.load(Ordering::SeqCst), 1);
+    assert!(store.coordinator_checks.load(Ordering::SeqCst) >= 2);
 }
 
 #[tokio::test]

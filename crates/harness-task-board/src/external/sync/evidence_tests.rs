@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
+use tokio::sync::Barrier;
+use tokio::time::{Duration, timeout};
 
 use super::*;
 use crate::types::{ExternalRefProvider, ExternalRefSyncState};
@@ -10,7 +12,27 @@ mod store;
 use store::{EvidenceStore, UpdateBehavior};
 
 #[tokio::test]
-async fn local_failure_preserves_partial_batch_and_stops_later_scopes() {
+async fn independent_provider_scopes_pull_concurrently() {
+    let store = EvidenceStore::with_create_limit(usize::MAX);
+    let barrier = Arc::new(Barrier::new(2));
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![
+        Box::new(BarrierPullClient::new("scope/first", Arc::clone(&barrier))),
+        Box::new(BarrierPullClient::new("scope/second", Arc::clone(&barrier))),
+    ];
+
+    let batch = timeout(
+        Duration::from_millis(250),
+        sync_external_tasks_scoped(&store, pull_options(), &clients),
+    )
+    .await
+    .expect("independent provider pulls must not wait for each other")
+    .expect("parallel provider pull");
+
+    assert_eq!(batch.succeeded_scope_count(), 2);
+}
+
+#[tokio::test]
+async fn local_failure_preserves_evidence_from_every_started_scope() {
     let store = EvidenceStore::with_create_limit(1);
     let first_calls = Arc::new(AtomicUsize::new(0));
     let later_calls = Arc::new(AtomicUsize::new(0));
@@ -35,14 +57,18 @@ async fn local_failure_preserves_partial_batch_and_stops_later_scopes() {
         .expect("local failure should return batch evidence");
 
     assert_eq!(first_calls.load(Ordering::SeqCst), 1);
-    assert_eq!(later_calls.load(Ordering::SeqCst), 0);
-    assert_eq!(store.failure_completions.load(Ordering::SeqCst), 1);
+    assert_eq!(later_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(store.failure_completions.load(Ordering::SeqCst), 2);
     assert_eq!(batch.operations.len(), 1);
     assert!(batch.operations[0].applied);
-    assert_eq!(batch.scope_outcomes.len(), 1);
-    assert_eq!(
-        batch.scope_outcomes[0].error_code.as_deref(),
-        Some("WORKFLOW_IO")
+    assert_eq!(batch.scope_outcomes.len(), 2);
+    assert_eq!(batch.failed_scope_count(), 2);
+    assert_eq!(batch.succeeded_scope_count(), 0);
+    assert!(
+        batch
+            .scope_outcomes
+            .iter()
+            .any(|outcome| { outcome.error_code.as_deref() == Some("WORKFLOW_IO") })
     );
     let error = batch
         .into_completed()
@@ -188,6 +214,41 @@ struct PullClient {
     scope_id: &'static str,
     tasks: Vec<ExternalTask>,
     calls: Arc<AtomicUsize>,
+}
+
+struct BarrierPullClient {
+    scope_id: &'static str,
+    barrier: Arc<Barrier>,
+}
+
+impl BarrierPullClient {
+    fn new(scope_id: &'static str, barrier: Arc<Barrier>) -> Self {
+        Self { scope_id, barrier }
+    }
+}
+
+#[async_trait]
+impl ExternalSyncClient for BarrierPullClient {
+    fn provider(&self) -> ExternalProvider {
+        ExternalProvider::GitHub
+    }
+
+    fn scope_id(&self) -> String {
+        self.scope_id.into()
+    }
+
+    fn allows_push(&self) -> bool {
+        false
+    }
+
+    async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
+        self.barrier.wait().await;
+        Ok(Vec::new())
+    }
+
+    async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
+        unreachable!("barrier client is pull-only")
+    }
 }
 
 impl PullClient {

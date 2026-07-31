@@ -97,6 +97,14 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPlanSubmit: .object(sampleTaskBoardPlanningResponseJSON),
   .taskBoardPlanApprove: .object(sampleTaskBoardPlanningResponseJSON),
   .taskBoardSync: .object(sampleTaskBoardSyncSummaryJSON),
+  .taskBoardSyncCancel: .object(["cancelled": .bool(true)]),
+  .taskBoardSyncStatus: .object([
+    "active": .bool(true),
+    "cancellation_requested": .bool(false),
+    "cancelled": .bool(false),
+    "error": .null,
+    "summary": .null,
+  ]),
   .taskBoardDispatch: .object(sampleTaskBoardDispatchSummaryJSON),
   .taskBoardEvaluate: .object(sampleTaskBoardEvaluationSummaryJSON),
   .taskBoardAudit: .object([

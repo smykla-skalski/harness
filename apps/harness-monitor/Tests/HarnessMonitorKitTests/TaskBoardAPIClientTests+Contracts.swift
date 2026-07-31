@@ -33,6 +33,70 @@ extension TaskBoardAPIClientTests {
     assertWebSocketResults(result)
   }
 
+  @Test("Task-board sync cancellation has matching HTTP and WebSocket contracts")
+  func taskBoardSyncCancellationContractsMatch() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeClient()
+    let httpResponse = try await client.cancelTaskBoardSync()
+    let records = TaskBoardURLProtocol.records
+
+    let probe = RPCProbe()
+    let transport = WebSocketTransport(
+      connection: HarnessMonitorConnection(
+        endpoint: try #require(URL(string: "http://127.0.0.1:1")),
+        token: "token"
+      ),
+      session: URLSession(configuration: .ephemeral),
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        return try taskBoardRPCResponse(for: method)
+      }
+    )
+    let websocketResponse = try await transport.cancelTaskBoardSync()
+    let calls = await probe.calls
+
+    #expect(httpResponse.cancelled)
+    #expect(records.count == 1)
+    #expect(records.first?.method == "POST")
+    #expect(records.first?.path == "/v1/task-board/sync/cancel")
+    #expect(websocketResponse.cancelled)
+    #expect(calls.count == 1)
+    #expect(calls.first?.method == .taskBoardSyncCancel)
+    #expect(calls.first?.params == .object([:]))
+  }
+
+  @Test("Task-board sync status has matching HTTP and WebSocket contracts")
+  func taskBoardSyncStatusContractsMatch() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeClient()
+    let httpResponse = try await client.taskBoardSyncStatus()
+    let records = TaskBoardURLProtocol.records
+
+    let probe = RPCProbe()
+    let transport = WebSocketTransport(
+      connection: HarnessMonitorConnection(
+        endpoint: try #require(URL(string: "http://127.0.0.1:1")),
+        token: "token"
+      ),
+      session: URLSession(configuration: .ephemeral),
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        return try taskBoardRPCResponse(for: method)
+      }
+    )
+    let websocketResponse = try await transport.taskBoardSyncStatus()
+    let calls = await probe.calls
+
+    #expect(httpResponse == TaskBoardSyncStatusResponse(active: true, cancellationRequested: false))
+    #expect(records.count == 1)
+    #expect(records.first?.method == "GET")
+    #expect(records.first?.path == "/v1/task-board/sync/status")
+    #expect(websocketResponse == httpResponse)
+    #expect(calls.count == 1)
+    #expect(calls.first?.method == .taskBoardSyncStatus)
+    #expect(calls.first?.params == .object([:]))
+  }
+
   @Test("HTTP client uses task-board position snapshot and mutation routes")
   func httpClientUsesTaskBoardPositionRoutes() async throws {
     TaskBoardURLProtocol.reset()

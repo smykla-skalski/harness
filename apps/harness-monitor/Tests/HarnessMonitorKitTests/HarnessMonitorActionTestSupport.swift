@@ -55,6 +55,13 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   let taskBoardItemsReadGate = RecordingTaskBoardItemsReadGate()
   var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []
   var taskBoardSyncStub = RecordingTaskBoardSyncStub()
+  var taskBoardSyncDelay: Duration?
+  var taskBoardSyncCancelResponse = TaskBoardSyncCancelResponse(cancelled: true)
+  var taskBoardSyncStatusResponse = TaskBoardSyncStatusResponse(
+    active: false,
+    cancellationRequested: false
+  )
+  var queuedTaskBoardSyncStatusResponses: [TaskBoardSyncStatusResponse] = []
   var taskBoardAuditSummaryStorage: TaskBoardAuditSummary?
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?

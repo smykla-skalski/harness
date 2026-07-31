@@ -205,6 +205,8 @@ extension RecordingHarnessClient {
       status: TaskBoardStatus?,
       provider: TaskBoardExternalProvider?
     )
+    case cancelTaskBoardSync
+    case taskBoardSyncStatus
     case auditTaskBoard(status: TaskBoardStatus?)
     case taskBoardProjects(status: TaskBoardStatus?)
     case taskBoardMachines(status: TaskBoardStatus?)

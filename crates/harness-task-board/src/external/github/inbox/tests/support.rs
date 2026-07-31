@@ -25,6 +25,7 @@ pub(super) fn inbox_client_with_base_uri(
         import_labels: Vec::new(),
         include_review_requests: true,
         last_pull_complete: Arc::new(AtomicBool::new(true)),
+        batch: None,
     }
 }
 
@@ -35,6 +36,98 @@ pub(super) fn assigned_only_inbox_client(
     let mut client = inbox_client_with_base_uri(base_uri, repositories);
     client.include_review_requests = false;
     client
+}
+
+pub(super) fn assigned_only_batched_clients(
+    base_uri: &str,
+    repositories: &[&str],
+) -> Vec<GitHubInboxSyncClient> {
+    assigned_only_batched_clients_with_fresh(base_uri, repositories, true)
+}
+
+pub(super) fn assigned_only_background_batched_clients(
+    base_uri: &str,
+    repositories: &[&str],
+) -> Vec<GitHubInboxSyncClient> {
+    assigned_only_batched_clients_with_fresh(base_uri, repositories, false)
+}
+
+fn assigned_only_batched_clients_with_fresh(
+    base_uri: &str,
+    repositories: &[&str],
+    fresh: bool,
+) -> Vec<GitHubInboxSyncClient> {
+    let client = harness_github_api::GitHubProtectedClient::with_base_url("token", base_uri)
+        .expect("protected client");
+    let repositories = repositories
+        .iter()
+        .map(|repository| parse_github_repository(repository))
+        .collect::<Result<Vec<_>, _>>()
+        .expect("repositories");
+    let batch = Arc::new(batch::InboxBatch::new(
+        client.clone(),
+        repositories.clone(),
+        Vec::new(),
+        fresh,
+        false,
+    ));
+    repositories
+        .into_iter()
+        .map(|repository| GitHubInboxSyncClient {
+            client: client.clone(),
+            repositories: vec![repository],
+            import_labels: Vec::new(),
+            include_review_requests: false,
+            last_pull_complete: Arc::new(AtomicBool::new(true)),
+            batch: Some(Arc::clone(&batch)),
+        })
+        .collect()
+}
+
+pub(super) fn batched_clients_with_reviews(
+    base_uri: &str,
+    repositories: &[&str],
+) -> Vec<GitHubInboxSyncClient> {
+    let client = harness_github_api::GitHubProtectedClient::with_base_url("token", base_uri)
+        .expect("protected client");
+    let repositories = repositories
+        .iter()
+        .map(|repository| parse_github_repository(repository))
+        .collect::<Result<Vec<_>, _>>()
+        .expect("repositories");
+    let batch = Arc::new(batch::InboxBatch::new(
+        client.clone(),
+        repositories.clone(),
+        Vec::new(),
+        true,
+        true,
+    ));
+    repositories
+        .into_iter()
+        .map(|repository| GitHubInboxSyncClient {
+            client: client.clone(),
+            repositories: vec![repository],
+            import_labels: Vec::new(),
+            include_review_requests: true,
+            last_pull_complete: Arc::new(AtomicBool::new(true)),
+            batch: Some(Arc::clone(&batch)),
+        })
+        .collect()
+}
+
+pub(super) fn empty_batch_search_response(query_count: usize) -> serde_json::Value {
+    let data = (0..query_count)
+        .map(|index| {
+            (
+                format!("q{index}"),
+                json!({
+                    "pageInfo": { "hasNextPage": false, "endCursor": null },
+                    "nodes": []
+                }),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+    json!({ "data": data })
 }
 
 pub(super) fn search_response_with_issue(url: &str) -> serde_json::Value {

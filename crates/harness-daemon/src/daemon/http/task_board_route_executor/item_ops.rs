@@ -9,9 +9,10 @@ use crate::daemon::protocol::{
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
     TaskBoardPlanningResponse, TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse,
     TaskBoardProjectsResponse, TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSetTriageOverrideRequest, TaskBoardSyncRequest, TaskBoardSyncResponse,
-    TaskBoardTriageCurrentResponse, TaskBoardTriageHistoryResponse,
-    TaskBoardTriageOverrideMutationResponse, TaskBoardUpdateItemRequest,
+    TaskBoardSetTriageOverrideRequest, TaskBoardSyncCancelResponse, TaskBoardSyncRequest,
+    TaskBoardSyncResponse, TaskBoardSyncStatusResponse, TaskBoardTriageCurrentResponse,
+    TaskBoardTriageHistoryResponse, TaskBoardTriageOverrideMutationResponse,
+    TaskBoardUpdateItemRequest,
 };
 use crate::daemon::service;
 use crate::task_board::{
@@ -242,6 +243,24 @@ pub(crate) async fn sync(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     service::sync_task_board_db(require_async_db(state, "task board sync")?, request).await
+}
+
+pub(crate) fn cancel_sync(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardSyncCancelResponse, CliError> {
+    Ok(service::cancel_task_board_sync_db(require_async_db(
+        state,
+        "task board sync cancel",
+    )?))
+}
+
+pub(crate) fn sync_status(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardSyncStatusResponse, CliError> {
+    Ok(service::task_board_sync_status_db(require_async_db(
+        state,
+        "task board sync status",
+    )?))
 }
 
 pub(crate) async fn audit(
