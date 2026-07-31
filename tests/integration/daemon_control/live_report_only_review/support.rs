@@ -165,7 +165,11 @@ impl LocalRepositorySnapshot {
 fn stable_ref_fingerprint(project: &Path) -> u64 {
     let refs = git_output(
         project,
-        &["for-each-ref", "--format=%(refname) %(objectname)"],
+        &[
+            "for-each-ref",
+            "--sort=refname",
+            "--format=%(refname) %(objectname)",
+        ],
     );
     stable_ref_fingerprint_from(&refs)
 }
