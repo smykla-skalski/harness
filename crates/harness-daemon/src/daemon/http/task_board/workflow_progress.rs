@@ -20,7 +20,7 @@ use super::items::authenticated_task_board_read;
     params(("item_id" = String, Path, description = "Task-board item identifier")),
     responses(
         (status = 200, description = "Current durable workflow progress or an empty response when no workflow has started", body = TaskBoardWorkflowProgressResponse),
-        (status = 400, description = "Malformed or missing task-board item identifier", body = DaemonErrorBody),
+        (status = 400, description = "Invalid task-board request or unavailable workflow state", body = DaemonErrorBody),
     ),
 )]
 pub(super) async fn get_task_board_item_workflow_progress(

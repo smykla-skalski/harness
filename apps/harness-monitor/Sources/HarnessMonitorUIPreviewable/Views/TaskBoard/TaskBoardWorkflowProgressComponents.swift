@@ -18,16 +18,25 @@ private struct TaskBoardWorkflowBadgeChrome: ViewModifier {
   private var colorSchemeContrast
 
   private var fillOpacity: Double {
-    if reduceTransparency {
-      return colorSchemeContrast == .increased ? 0.34 : 0.26
-    }
     return colorSchemeContrast == .increased ? 0.24 : 0.16
   }
 
   func body(content: Content) -> some View {
     content.background {
-      Capsule()
-        .fill(tint.opacity(fillOpacity))
+      if reduceTransparency {
+        Capsule()
+          .fill(Color(nsColor: .windowBackgroundColor))
+          .overlay {
+            Capsule()
+              .strokeBorder(
+                tint,
+                lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+              )
+          }
+      } else {
+        Capsule()
+          .fill(tint.opacity(fillOpacity))
+      }
     }
   }
 }

@@ -11902,7 +11902,7 @@
             }
           },
           "400": {
-            "description": "Malformed or missing task-board item identifier",
+            "description": "Invalid task-board request or unavailable workflow state",
             "content": {
               "application/json": {
                 "schema": {
