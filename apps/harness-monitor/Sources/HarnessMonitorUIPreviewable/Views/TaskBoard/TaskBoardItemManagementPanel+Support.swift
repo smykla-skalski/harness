@@ -19,6 +19,7 @@ struct TaskBoardTriageInspectorLoadKey: Hashable {
 struct TaskBoardReviewReportLoadKey: Hashable {
   let itemID: String
   let updatedAt: String
+  let taskBoardRevision: UInt64
 }
 
 @MainActor private let taskBoardApprovedAtSubmissionFormatter: ISO8601DateFormatter = {

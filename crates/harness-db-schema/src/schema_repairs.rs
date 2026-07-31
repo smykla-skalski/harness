@@ -236,6 +236,7 @@ fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliE
         "task_board_reconciliation_cursors",
         "task_board_projects",
         "task_board_ai_review_reports",
+        "task_board_ai_review_report_order",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);
@@ -343,6 +344,7 @@ pub fn repair_current_schema_shape(
     super::schema_v59::run(conn)?;
     super::schema_v60::run(conn)?;
     super::schema_v61::run(conn)?;
+    super::schema_v62::run(conn)?;
     super::schema_repairs_external_creates::require_complete_shape(conn)?;
     super::schema_repairs_wake_events::require_complete_shape(conn)?;
     super::schema_repairs_admission::require_complete_shape(conn)?;

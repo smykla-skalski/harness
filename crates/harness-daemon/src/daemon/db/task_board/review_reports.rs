@@ -1,6 +1,8 @@
 use chrono::DateTime;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
+use super::ORCHESTRATOR_CHANGE_SCOPE;
+use super::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardReportOnlyReviewFinding,
@@ -54,6 +56,8 @@ impl AsyncDaemonDb {
             )));
         }
         insert_report(&mut transaction, report).await?;
+        insert_report_order(&mut transaction, &report.report_id).await?;
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         transaction
             .commit()
             .await
@@ -66,13 +70,17 @@ impl AsyncDaemonDb {
         item_id: &str,
     ) -> Result<Vec<TaskBoardAiReviewReportRecord>, CliError> {
         let rows = query_as::<_, AiReviewReportRow>(
-            "SELECT report_id, item_id, correlation_id, repository, pull_request_number,
-                    head_revision, runtime, requested_runtime, actual_runtime, requested_model,
-                    effective_model, status, summary,
-                    findings_json, partial_output, terminal_reason, started_at, finished_at
-             FROM task_board_ai_review_reports
-             WHERE item_id = ?1
-             ORDER BY finished_at_unix_millis DESC, report_id DESC",
+            "SELECT report.report_id, report.item_id, report.correlation_id, report.repository,
+                    report.pull_request_number, report.head_revision, report.runtime,
+                    report.requested_runtime, report.actual_runtime, report.requested_model,
+                    report.effective_model, report.status, report.summary, report.findings_json,
+                    report.partial_output, report.terminal_reason, report.started_at,
+                    report.finished_at
+             FROM task_board_ai_review_reports AS report
+             JOIN task_board_ai_review_report_order AS report_order
+               ON report_order.report_id = report.report_id
+             WHERE report.item_id = ?1
+             ORDER BY report_order.sequence DESC",
         )
         .bind(item_id)
         .fetch_all(self.pool())
@@ -88,13 +96,17 @@ impl AsyncDaemonDb {
         item_id: &str,
     ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
         query_as::<_, AiReviewReportRow>(
-            "SELECT report_id, item_id, correlation_id, repository, pull_request_number,
-                    head_revision, runtime, requested_runtime, actual_runtime, requested_model,
-                    effective_model, status, summary,
-                    findings_json, partial_output, terminal_reason, started_at, finished_at
-             FROM task_board_ai_review_reports
-             WHERE item_id = ?1
-             ORDER BY finished_at_unix_millis DESC, report_id DESC
+            "SELECT report.report_id, report.item_id, report.correlation_id, report.repository,
+                    report.pull_request_number, report.head_revision, report.runtime,
+                    report.requested_runtime, report.actual_runtime, report.requested_model,
+                    report.effective_model, report.status, report.summary, report.findings_json,
+                    report.partial_output, report.terminal_reason, report.started_at,
+                    report.finished_at
+             FROM task_board_ai_review_reports AS report
+             JOIN task_board_ai_review_report_order AS report_order
+               ON report_order.report_id = report.report_id
+             WHERE report.item_id = ?1
+             ORDER BY report_order.sequence DESC
              LIMIT 1",
         )
         .bind(item_id)
@@ -182,6 +194,22 @@ async fn insert_report(
     Ok(())
 }
 
+async fn insert_report_order(
+    transaction: &mut Transaction<'_, Sqlite>,
+    report_id: &str,
+) -> Result<(), CliError> {
+    query("INSERT INTO task_board_ai_review_report_order (report_id) VALUES (?1)")
+        .bind(report_id)
+        .execute(transaction.as_mut())
+        .await
+        .map(|_| ())
+        .map_err(|error| {
+            db_error(format!(
+                "insert AI review report order for '{report_id}': {error}"
+            ))
+        })
+}
+
 impl AiReviewReportRow {
     fn into_record(self) -> Result<TaskBoardAiReviewReportRecord, CliError> {
         let pull_request_number = u64::try_from(self.pull_request_number)
@@ -242,10 +270,20 @@ mod tests {
                 .await
                 .expect("append")
         );
+        let sequence_after_append = db
+            .current_change_sequence()
+            .await
+            .expect("change sequence after append");
         assert!(
             !db.append_task_board_ai_review_report(&completed)
                 .await
                 .expect("repeat")
+        );
+        assert_eq!(
+            db.current_change_sequence()
+                .await
+                .expect("change sequence after replay"),
+            sequence_after_append
         );
         drop(db);
 
@@ -279,7 +317,7 @@ mod tests {
                 .task_board_ai_review_reports("ticket-899")
                 .await
                 .expect("history"),
-            vec![failed, completed, cancelled]
+            vec![failed, cancelled, completed]
         );
     }
 
@@ -304,6 +342,39 @@ mod tests {
                 .await
                 .expect("history"),
             vec![original]
+        );
+    }
+
+    #[tokio::test]
+    async fn latest_uses_append_order_when_reports_finish_at_the_same_time() {
+        let directory = tempdir().expect("tempdir");
+        let path = directory.path().join("harness.db");
+        let db = AsyncDaemonDb::connect(&path).await.expect("connect");
+        let first = report("report-z", "turn-1", "2026-07-29T16:00:01Z");
+        let second = report("report-a", "turn-2", "2026-07-29T16:00:01Z");
+
+        db.append_task_board_ai_review_report(&first)
+            .await
+            .expect("append first");
+        db.append_task_board_ai_review_report(&second)
+            .await
+            .expect("append second");
+        drop(db);
+
+        let reopened = AsyncDaemonDb::connect(&path).await.expect("reopen");
+        assert_eq!(
+            reopened
+                .task_board_latest_ai_review_report("ticket-899")
+                .await
+                .expect("latest"),
+            Some(second.clone())
+        );
+        assert_eq!(
+            reopened
+                .task_board_ai_review_reports("ticket-899")
+                .await
+                .expect("history"),
+            vec![second, first]
         );
     }
 

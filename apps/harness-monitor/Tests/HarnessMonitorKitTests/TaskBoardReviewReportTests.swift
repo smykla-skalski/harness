@@ -133,6 +133,22 @@ struct TaskBoardReviewReportTests {
         == "Review was cancelled before producing findings"
     )
   }
+
+  @Test("Report reload key advances within one item timestamp tick")
+  func reloadKeyUsesTaskBoardRevision() {
+    let initial = TaskBoardReviewReportLoadKey(
+      itemID: "item-1",
+      updatedAt: "2026-07-29T19:40:00Z",
+      taskBoardRevision: 41
+    )
+    let terminal = TaskBoardReviewReportLoadKey(
+      itemID: initial.itemID,
+      updatedAt: initial.updatedAt,
+      taskBoardRevision: 42
+    )
+
+    #expect(initial != terminal)
+  }
 }
 
 extension TaskBoardAPIClientTests {
