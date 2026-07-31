@@ -74,8 +74,8 @@ private struct TaskBoardCredentialLoadContext: Sendable {
 }
 
 actor TaskBoardSettingsWorker {
-  private let credentialPersistence: TaskBoardCredentialPersistence
-  private let keyMaterialPersistence: TaskBoardKeyMaterialPersistence
+  let credentialPersistence: TaskBoardCredentialPersistence
+  let keyMaterialPersistence: TaskBoardKeyMaterialPersistence
   private var secretHandoffOperation: TaskBoardSecretHandoffOperation?
 
   init(

@@ -10,13 +10,27 @@ struct TaskBoardCredentialSyncState: Sendable {
 
 struct TaskBoardConnectionState: Sendable {
   var databaseInstanceID: String?
+  var previousDatabaseInstanceID: String?
+  /// Last non-nil instance id ever connected this session. Unlike
+  /// `databaseInstanceID` it survives disconnects, so a switch to a different
+  /// daemon can still identify the scope to migrate from.
+  var lastConnectedDatabaseInstanceID: String?
+  /// Repository override slugs last seen in each daemon's runtime config,
+  /// keyed by instance id. Per-repo key material is Keychain-hashed and cannot
+  /// be enumerated, so this remembers which repos carry it for migration.
+  var databaseRepositoryOverrideSlugs: [String: Set<String>] = [:]
   var credentialSync: TaskBoardCredentialSyncState?
+  var secretMigrationConsent: TaskBoardSecretMigrationConsentState?
 }
 
 extension HarnessMonitorStore {
   var taskBoardDatabaseInstanceID: String? {
     get { taskBoardRuntimeState.connection.databaseInstanceID }
     set { taskBoardRuntimeState.connection.databaseInstanceID = newValue }
+  }
+
+  var taskBoardPreviousDatabaseInstanceID: String? {
+    taskBoardRuntimeState.connection.previousDatabaseInstanceID
   }
 
   var lastTaskBoardCredentialSync: TaskBoardCredentialSyncState? {
@@ -45,6 +59,7 @@ extension HarnessMonitorStore {
     )
 
     let baseRuntime = try await runtimeConfig
+    recordTaskBoardRepositoryOverrides(instanceID: instanceID, runtime: baseRuntime)
     let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
       into: baseRuntime,
       instanceID: instanceID,
@@ -290,8 +305,10 @@ extension HarnessMonitorStore {
         ownership: daemonOwnership
       )
       async let runtimeConfig = client.taskBoardGitRuntimeConfig()
+      let baseRuntime = try await runtimeConfig
+      recordTaskBoardRepositoryOverrides(instanceID: instanceID, runtime: baseRuntime)
       let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
-        into: try await runtimeConfig,
+        into: baseRuntime,
         instanceID: instanceID,
         ownership: daemonOwnership
       )
@@ -338,6 +355,12 @@ extension HarnessMonitorStore {
       )
       taskBoardDatabaseInstanceID = nil
       return false
+    }
+    if let previousID = taskBoardPreviousDatabaseInstanceID,
+      let currentID = taskBoardDatabaseInstanceID,
+      previousID != currentID
+    {
+      await migrateStoredTaskBoardSecrets(from: previousID, to: currentID)
     }
     lastTaskBoardCredentialSync = nil
     await syncStoredTaskBoardCredentials(using: client)
