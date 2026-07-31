@@ -227,7 +227,7 @@ description = "Run live OpenRouter and Codex report turns through an isolated da
 run = "./scripts/live-agent-smoke.sh"
 
 [tasks."test:runtime:live-review"]
-description = "Review a real GitHub pull request through the report-only OpenRouter delivery path"
+description = "Review HARNESS_LIVE_REVIEW_PR_URL through the report-only OpenRouter delivery path"
 run = "./scripts/live-report-only-review.sh"
 
 [tasks."test:architecture"]

@@ -8,6 +8,10 @@ if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
   printf 'live review stopped before network: stage=credential runtime=openrouter requested_model=%s: OPENROUTER_API_KEY is missing or empty\n' "$OPENROUTER_MODEL" >&2
   exit 1
 fi
+if [[ -z "${HARNESS_LIVE_REVIEW_PR_URL:-}" ]]; then
+  printf 'live review stopped before network: stage=target: HARNESS_LIVE_REVIEW_PR_URL is missing or empty\n' >&2
+  exit 1
+fi
 if ! command -v gh >/dev/null 2>&1; then
   printf 'live review stopped before network: stage=credential runtime=github: gh is not on PATH\n' >&2
   exit 1

@@ -6,8 +6,6 @@ use std::time::Duration;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde_json::{Value, json};
 
-const DEFAULT_PR_URL: &str = "https://github.com/smykla-skalski/harness/pull/1295";
-
 #[derive(Debug)]
 pub(super) struct LiveReviewTarget {
     pub(super) repository: String,
@@ -19,7 +17,7 @@ pub(super) struct LiveReviewTarget {
 impl LiveReviewTarget {
     pub(super) fn from_env(token: &str) -> Self {
         let url = std::env::var("HARNESS_LIVE_REVIEW_PR_URL")
-            .unwrap_or_else(|_| DEFAULT_PR_URL.to_owned());
+            .expect("HARNESS_LIVE_REVIEW_PR_URL must identify the open pull request to review");
         let (repository, number) = parse_pr_url(&url);
         let pull = github_get(token, &format!("/repos/{repository}/pulls/{number}"));
         assert_eq!(pull["state"], "open", "stage=github: PR must be open");
