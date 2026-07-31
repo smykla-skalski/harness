@@ -110,6 +110,17 @@ rollback_panel() {
   fi
 }
 
+# Roll the panel back to its backed-up state and fail the deploy, reporting why.
+# Every panel mutation routes its failure here so the remote daemon never stays
+# stopped behind an aborted deploy.
+panel_rollback_and_fail() {
+  local backup_dir="$1" was_active="$2" reason="$3"
+  printf 'panel deploy failed: %s; rolling back from %s\n' "$reason" "$backup_dir" >&2
+  rollback_panel "$backup_dir" "$was_active"
+  printf 'panel deploy failed; backup kept at %s\n' "$backup_dir" >&2
+  exit 1
+}
+
 # Binary-only panel deploy: back up, swap, restart, verify, and restore on
 # failure. The socket keeps owning the listener across the service restart, and
 # the remote daemon is stopped for the database snapshot so the backup is taken
@@ -152,25 +163,27 @@ deploy_panel() {
 
   # Quiesce the public route, then take a consistent snapshot: the checkpoint
   # folds the WAL back into the main file so the .backup image is whole.
+  # The daemon is down from here, so every step routes an explicit failure to
+  # rollback. An ERR trap would not help: `set -e` does not inherit into the
+  # `priv` function, so a failure inside it never reaches a caller-level trap.
   priv systemctl stop "$panel_daemon_unit"
-  priv sqlite3 "$panel_db" 'PRAGMA wal_checkpoint(TRUNCATE)'
-  priv sqlite3 "$panel_db" ".backup '$backup_dir/panel.sqlite3'"
+  priv sqlite3 "$panel_db" 'PRAGMA wal_checkpoint(TRUNCATE)' \
+    || panel_rollback_and_fail "$backup_dir" "$remote_was_active" 'database checkpoint failed'
+  priv sqlite3 "$panel_db" ".backup '$backup_dir/panel.sqlite3'" \
+    || panel_rollback_and_fail "$backup_dir" "$remote_was_active" 'database backup failed'
+  priv install -m 0755 "$candidate" "$panel_binary" \
+    || panel_rollback_and_fail "$backup_dir" "$remote_was_active" 'panel binary swap failed'
 
-  priv install -m 0755 "$candidate" "$panel_binary"
-  # A restart failure is as fatal as a bad health code and must roll back too, so
-  # run it in a condition: under `set -e` a bare failing restart would abort the
-  # script with the daemon stopped and the new binary already in place.
+  # A restart failure is as fatal as a bad health code; capture it rather than
+  # letting `set -e` abort with the daemon stopped and the new binary in place.
   if priv systemctl restart "$panel_service"; then
     status="$(curl --max-time 10 -sS -o /dev/null -w '%{http_code}' "$panel_health_url" || true)"
   else
     status="restart-failed"
   fi
   if [[ "$status" != "$panel_health_expect" ]]; then
-    printf 'panel restart/health for %s returned %s (expected %s); rolling back from %s\n' \
-      "$panel_service" "$status" "$panel_health_expect" "$backup_dir" >&2
-    rollback_panel "$backup_dir" "$remote_was_active"
-    printf 'panel deploy failed; backup kept at %s\n' "$backup_dir" >&2
-    exit 1
+    panel_rollback_and_fail "$backup_dir" "$remote_was_active" \
+      "restart/health for $panel_service returned $status (expected $panel_health_expect)"
   fi
 
   if (( remote_was_active == 1 )); then

@@ -78,6 +78,7 @@ EOF
 cat >"$fakebin/sqlite3" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$sqlite_log"
+[[ "\${FAKE_SQLITE_FAIL:-0}" == "1" ]] && exit 1
 exit 0
 EOF
 cat >"$fakebin/curl" <<'EOF'
@@ -250,5 +251,19 @@ set -e
 [[ "$restart_rc" -ne 0 ]] || fail "a failed panel restart did not fail the deploy"
 [[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed panel restart did not restore the panel binary"
 grep -q 'rolling back' <<<"$restart_out" || fail "a failed panel restart did not report a rollback"
+
+# A snapshot failure after the daemon is stopped must roll back and bring the
+# daemon back up, not abort under set -e with the daemon left stopped.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+snap_out="$(FAKE_SQLITE_FAIL=1 deploy "$deploy_script" 2>&1)"
+snap_rc=$?
+set -e
+[[ "$snap_rc" -ne 0 ]] || fail "a failed snapshot did not fail the deploy"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed snapshot still swapped the panel binary"
+grep -qx -- 'start harness-remote-daemon.service' "$systemctl_log" \
+  || fail "a failed snapshot left the remote daemon stopped"
+grep -q 'rolling back' <<<"$snap_out" || fail "a failed snapshot did not report a rollback"
 
 printf 'test-remote-daemon-deploy: ok\n'
