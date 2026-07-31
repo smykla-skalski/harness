@@ -391,6 +391,12 @@ run = [
   "npm test",
 ]
 
+[tasks."harness:panel:dev"]
+description = "Serve the panel dev server with the local mock backend and open it in the browser"
+depends = ["panel:frontend:install"]
+dir = "crates/harness-panel/frontend"
+run = "npm run dev:mock"
+
 [tasks."harness:check:stale-state"]
 hide = true
 run = "./scripts/check-no-stale-state.sh"
