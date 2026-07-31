@@ -93,20 +93,23 @@ run_controller() {
 # panel answers. A restore that itself cannot answer leaves the daemon stopped
 # rather than fronting a panel in an unknown state.
 rollback_panel() {
-  local backup_dir="$1" was_active="$2" status
+  local backup_dir="$1" was_active="$2" status restore_ok=1
   priv systemctl stop "$panel_service" "$panel_socket" || true
-  priv install -m 0755 "$backup_dir/harness-panel" "$panel_binary" || true
+  # The binary and database restore are what "restore succeeded" means; the
+  # checkpoints around them are best-effort housekeeping. A failed restore must
+  # not then front an unknown-state panel with the remote daemon.
+  priv install -m 0755 "$backup_dir/harness-panel" "$panel_binary" || restore_ok=0
   priv sqlite3 "$panel_db" 'PRAGMA wal_checkpoint(TRUNCATE)' || true
-  priv sqlite3 "$panel_db" ".restore '$backup_dir/panel.sqlite3'" || true
+  priv sqlite3 "$panel_db" ".restore '$backup_dir/panel.sqlite3'" || restore_ok=0
   priv sqlite3 "$panel_db" 'PRAGMA wal_checkpoint(TRUNCATE)' || true
   priv systemctl start "$panel_socket" || true
   priv systemctl start "$panel_service" || true
   status="$(curl --max-time 10 -sS -o /dev/null -w '%{http_code}' "$panel_health_url" || true)"
-  if [[ "$status" == "$panel_health_expect" && "$was_active" -eq 1 ]]; then
+  if [[ "$restore_ok" -eq 1 && "$status" == "$panel_health_expect" && "$was_active" -eq 1 ]]; then
     priv systemctl start "$panel_daemon_unit" || true
   else
-    printf 'restored panel health %s returned %s; the remote daemon %s was left stopped\n' \
-      "$panel_health_url" "$status" "$panel_daemon_unit" >&2
+    printf 'panel restore incomplete (restore_ok=%s, health %s returned %s); the remote daemon %s was left stopped\n' \
+      "$restore_ok" "$panel_health_url" "$status" "$panel_daemon_unit" >&2
   fi
 }
 
@@ -127,6 +130,19 @@ panel_rollback_and_fail() {
 # with no writer attached.
 deploy_panel() {
   local candidate remote_was_active backup_dir status
+  # These feed privileged install/sqlite3/mktemp, so a relative override would
+  # read or write CWD-relative paths as root. Require absolute paths, as the
+  # controller path already does for its own candidate and binary.
+  local pair label path
+  for pair in "panel binary:$panel_binary" "panel database:$panel_db" \
+    "panel backup root:$panel_backup_root"; do
+    label="${pair%%:*}"
+    path="${pair#*:}"
+    if [[ "$path" != /* ]]; then
+      printf '%s must be an absolute path, got %s\n' "$label" "$path" >&2
+      exit 1
+    fi
+  done
   # The release set publishes entrypoints as symlinks and a swap needs the real
   # file, so dereference to an absolute real path as the daemon candidate is.
   candidate="$(readlink -m -- "$panel_candidate")"

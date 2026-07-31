@@ -252,8 +252,9 @@ set -e
 [[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed panel restart did not restore the panel binary"
 grep -q 'rolling back' <<<"$restart_out" || fail "a failed panel restart did not report a rollback"
 
-# A snapshot failure after the daemon is stopped must roll back and bring the
-# daemon back up, not abort under set -e with the daemon left stopped.
+# A snapshot failure fails the deploy without swapping the binary, and because
+# the restore cannot complete either, it leaves the remote daemon stopped and
+# says so rather than fronting an unknown-state panel.
 rm -f "$ctrl_args"
 reset_panel
 set +e
@@ -262,8 +263,29 @@ snap_rc=$?
 set -e
 [[ "$snap_rc" -ne 0 ]] || fail "a failed snapshot did not fail the deploy"
 [[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a failed snapshot still swapped the panel binary"
-grep -qx -- 'start harness-remote-daemon.service' "$systemctl_log" \
-  || fail "a failed snapshot left the remote daemon stopped"
-grep -q 'rolling back' <<<"$snap_out" || fail "a failed snapshot did not report a rollback"
+if grep -qx -- 'start harness-remote-daemon.service' "$systemctl_log"; then
+  fail "a failed restore still restarted the remote daemon over an unknown-state panel"
+fi
+grep -q 'left stopped' <<<"$snap_out" || fail "a failed restore did not report the daemon left stopped"
+
+# A relative panel path is refused before any privileged panel step, so a bad
+# override cannot make root read or write a CWD-relative path.
+rm -f "$ctrl_args"
+reset_panel
+set +e
+rel_out="$(PATH="$fakebin:$PATH" \
+  HARNESS_REMOTE_SYSTEMD_CONTROLLER="$controller" \
+  HARNESS_REMOTE_DAEMON_CANDIDATE="$candidate" \
+  HARNESS_REMOTE_PANEL_CANDIDATE="$panel_candidate" \
+  HARNESS_REMOTE_PANEL_BINARY="$panel_binary" \
+  HARNESS_REMOTE_PANEL_DB="relative/panel.sqlite3" \
+  HARNESS_REMOTE_PANEL_BACKUP_ROOT="$panel_backup_root" \
+  "$deploy_script" 2>&1)"
+rel_rc=$?
+set -e
+[[ "$rel_rc" -ne 0 ]] || fail "a relative panel path was accepted"
+grep -q 'must be an absolute path' <<<"$rel_out" \
+  || fail "a relative panel path did not report the absolute-path requirement"
+[[ "$(cat "$panel_binary")" == 'old-panel' ]] || fail "a relative panel path still swapped the binary"
 
 printf 'test-remote-daemon-deploy: ok\n'
