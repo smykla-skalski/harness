@@ -205,7 +205,7 @@ async fn invalid_dependency_triage_fails_closed_without_workspace_write() {
     assert_eq!(runtime.start_count(), 0);
 }
 
-fn safe_triage_result() -> TaskBoardDependencyTriageResult {
+pub(super) fn safe_triage_result() -> TaskBoardDependencyTriageResult {
     TaskBoardDependencyTriageResult {
         schema_version: TASK_BOARD_DEPENDENCY_TRIAGE_SCHEMA_VERSION,
         repository: "example/compass".into(),
@@ -249,7 +249,7 @@ fn safe_triage_result() -> TaskBoardDependencyTriageResult {
     }
 }
 
-fn fix_required_triage_result() -> TaskBoardDependencyTriageResult {
+pub(super) fn fix_required_triage_result() -> TaskBoardDependencyTriageResult {
     let mut result = safe_triage_result();
     result.disposition = TaskBoardDependencyTriageDisposition::FixRequired;
     result.required_tools = vec!["task_board.audit".into(), "codex.dispatch".into()];

@@ -90,10 +90,14 @@ async fn dependency_update_review_resumes_every_stage_after_restart() {
         PlannedRun::review(1, FIRST_HEAD, TaskBoardPhaseVerdict::Pass),
         PlannedRun::evaluation(1, FIRST_HEAD),
     ]);
+    // PrFixReview always triages the dependency update before any workspace
+    // write; the fix-required route is what lets the planned implementation run.
+    runtime.plan_triage(dependency_triage::fix_required_triage_result());
 
     drive_to_terminal(&fixture, &runtime).await;
 
     let execution = load_execution(&fixture).await;
+    assert_eq!(runtime.triage_start_count(), 1);
     assert_eq!(
         execution.transition.phase,
         Some(TaskBoardExecutionPhase::Terminal)
