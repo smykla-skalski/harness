@@ -458,6 +458,66 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(syncCalls.count == 3)
   }
 
+  @Test("Migration merges per-field GitHub credentials instead of skipping them")
+  func migrationMergesPerFieldGithubCredentials() async throws {
+    let credentialPersistence = InMemoryTaskBoardCredentialBundle()
+    let keychainBundle = InMemoryTaskBoardKeychainBundle()
+    let oldRepoToken = TaskBoardGitHubRepositoryToken(repository: "org/repo-A", token: "token-A")
+    let newRepoToken = TaskBoardGitHubRepositoryToken(repository: "org/repo-B", token: "token-B")
+    try credentialPersistence.github.save(
+      TaskBoardGitHubCredentialSnapshot(
+        globalToken: "old-global",
+        repositoryTokens: [oldRepoToken]
+      ),
+      scope: .database("daemon-A")
+    )
+    try credentialPersistence.github.save(
+      TaskBoardGitHubCredentialSnapshot(
+        globalToken: "new-global",
+        repositoryTokens: [newRepoToken]
+      ),
+      scope: .database("daemon-B")
+    )
+    let worker = TaskBoardSettingsWorker(
+      credentialPersistence: credentialPersistence.persistence,
+      keyMaterialPersistence: keychainBundle.persistence
+    )
+
+    try await worker.migrateStoredSecrets(from: "daemon-A", to: "daemon-B")
+
+    let migrated = try credentialPersistence.github.load(scope: .database("daemon-B"))
+    #expect(migrated.globalToken == "new-global")
+    let migratedRepos = Dictionary(
+      migrated.repositoryTokens.map { ($0.repository, $0.token) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    #expect(migratedRepos["org/repo-A"] == "token-A")
+    #expect(migratedRepos["org/repo-B"] == "token-B")
+  }
+
+  @Test("Migration merges per-field key material instead of skipping it")
+  func migrationMergesPerFieldKeyMaterial() async throws {
+    let keychainBundle = InMemoryTaskBoardKeychainBundle()
+    try keychainBundle.ssh.save(
+      TaskBoardKeyMaterialSnapshot(privateKey: "old-key", passphrase: "old-pass"),
+      scope: .databaseGlobal("daemon-A")
+    )
+    try keychainBundle.ssh.save(
+      TaskBoardKeyMaterialSnapshot(privateKey: "new-key"),
+      scope: .databaseGlobal("daemon-B")
+    )
+    let worker = TaskBoardSettingsWorker(
+      credentialPersistence: InMemoryTaskBoardCredentialBundle().persistence,
+      keyMaterialPersistence: keychainBundle.persistence
+    )
+
+    try await worker.migrateStoredSecrets(from: "daemon-A", to: "daemon-B")
+
+    let migrated = try keychainBundle.ssh.load(scope: .databaseGlobal("daemon-B"))
+    #expect(migrated.privateKey == "new-key")
+    #expect(migrated.passphrase == "old-pass")
+  }
+
   private func waitForTaskBoardBusy(
     _ expected: Bool,
     store: HarnessMonitorStore
