@@ -59,7 +59,7 @@ public enum TaskBoardSecretKind: Hashable, Sendable {
 
 /// One secret offered in the connection-time migration review.
 public struct TaskBoardSecretMigrationItem: Identifiable, Equatable, Sendable {
-  public enum Disposition: Equatable, Sendable {
+  public enum Disposition: String, Equatable, Sendable {
     /// The new daemon has no value for this secret; carrying it over is safe
     /// and offered on by default.
     case carryOver
@@ -76,7 +76,9 @@ public struct TaskBoardSecretMigrationItem: Identifiable, Equatable, Sendable {
     self.disposition = disposition
   }
 
-  public var id: String { kind.id }
+  /// Identity includes the disposition so a row is recreated (Toggle vs
+  /// segmented control) if the same secret's meaning ever changes.
+  public var id: String { "\(kind.id):\(disposition.rawValue)" }
   public var title: String { kind.title }
   public var scopeLabel: String { kind.scopeLabel }
 }
