@@ -26,6 +26,10 @@ private struct HarnessMonitorSheetMetrics {
       Self(minWidth: 460, idealWidth: 540, minHeight: 420)
     case .resolveRepositoryDirectories:
       Self(minWidth: 520, idealWidth: 620, minHeight: 400)
+    case .resolveSecretMigration:
+      // Low minHeight so the sheet hugs its rows instead of padding empty space
+      // below the last one; the list caps and scrolls when it grows tall.
+      Self(minWidth: 520, idealWidth: 600, minHeight: 160)
     }
   }
 }
@@ -79,6 +83,8 @@ struct HarnessMonitorSheetRouter: View {
       LeaderTransferSheet(store: store, sessionID: sessionID)
     case .resolveRepositoryDirectories(let repositories):
       ResolveRepositoryDirectoriesSheet(store: store, repositories: repositories)
+    case .resolveSecretMigration(let items):
+      SecretMigrationConsentSheet(store: store, items: items)
     }
   }
 

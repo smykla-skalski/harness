@@ -74,8 +74,8 @@ private struct TaskBoardCredentialLoadContext: Sendable {
 }
 
 actor TaskBoardSettingsWorker {
-  private let credentialPersistence: TaskBoardCredentialPersistence
-  private let keyMaterialPersistence: TaskBoardKeyMaterialPersistence
+  let credentialPersistence: TaskBoardCredentialPersistence
+  let keyMaterialPersistence: TaskBoardKeyMaterialPersistence
   private var secretHandoffOperation: TaskBoardSecretHandoffOperation?
 
   init(
@@ -219,90 +219,4 @@ actor TaskBoardSettingsWorker {
   }
 
   func waitForIdle() {}
-
-  func migrateStoredSecrets(
-    from oldInstanceID: String,
-    to newInstanceID: String
-  ) throws {
-    let oldScope = TaskBoardCredentialScope.database(oldInstanceID)
-    let newScope = TaskBoardCredentialScope.database(newInstanceID)
-
-    let oldGithub = try credentialPersistence.github.load(scope: oldScope)
-    let newGithub = try credentialPersistence.github.load(scope: newScope)
-    let mergedGithub = mergeGithubCredential(old: oldGithub, new: newGithub)
-    if mergedGithub != newGithub, !mergedGithub.isEmpty {
-      try credentialPersistence.github.save(mergedGithub, scope: newScope)
-    }
-
-    let oldOpenRouter = try credentialPersistence.openRouter.load(scope: oldScope)
-    let newOpenRouter = try credentialPersistence.openRouter.load(scope: newScope)
-    let mergedOpenRouter = TaskBoardOpenRouterCredentialSnapshot(
-      token: newOpenRouter.token ?? oldOpenRouter.token
-    )
-    if mergedOpenRouter != newOpenRouter, !mergedOpenRouter.isEmpty {
-      try credentialPersistence.openRouter.save(mergedOpenRouter, scope: newScope)
-    }
-
-    try migrateKeyMaterial(
-      from: .databaseGlobal(oldInstanceID),
-      to: .databaseGlobal(newInstanceID)
-    )
-
-    let migratedRepos = Set(
-      oldGithub.repositoryTokens.map { $0.repository.lowercased() }
-        + newGithub.repositoryTokens.map { $0.repository.lowercased() }
-    )
-    for slug in migratedRepos {
-      try migrateKeyMaterial(
-        from: .databaseRepository(oldInstanceID, slug),
-        to: .databaseRepository(newInstanceID, slug)
-      )
-    }
-  }
-
-  private func mergeGithubCredential(
-    old: TaskBoardGitHubCredentialSnapshot,
-    new: TaskBoardGitHubCredentialSnapshot
-  ) -> TaskBoardGitHubCredentialSnapshot {
-    var tokensByRepo = Dictionary(
-      new.repositoryTokens.map { ($0.repository.lowercased(), $0) },
-      uniquingKeysWith: { first, _ in first }
-    )
-    for oldToken in old.repositoryTokens {
-      let slug = oldToken.repository.lowercased()
-      if tokensByRepo[slug] == nil {
-        tokensByRepo[slug] = oldToken
-      }
-    }
-    let mergedTokens = tokensByRepo.values.sorted { $0.repository < $1.repository }
-    return TaskBoardGitHubCredentialSnapshot(
-      globalToken: new.globalToken ?? old.globalToken,
-      repositoryTokens: mergedTokens
-    )
-  }
-
-  private func migrateKeyMaterial(
-    from oldScope: TaskBoardKeyMaterialStore.Scope,
-    to newScope: TaskBoardKeyMaterialStore.Scope
-  ) throws {
-    let stores: [any TaskBoardKeyMaterialPersisting] = [
-      keyMaterialPersistence.ssh,
-      keyMaterialPersistence.signingSsh,
-      keyMaterialPersistence.gpg,
-    ]
-    for store in stores {
-      let oldMaterial = try store.load(scope: oldScope)
-      guard !oldMaterial.isEmpty else { continue }
-      let newMaterial = try store.load(scope: newScope)
-      let merged = TaskBoardKeyMaterialSnapshot(
-        privateKey: newMaterial.privateKey ?? oldMaterial.privateKey,
-        passphrase: newMaterial.passphrase ?? oldMaterial.passphrase,
-        keyPath: newMaterial.keyPath ?? oldMaterial.keyPath,
-        keyId: newMaterial.keyId ?? oldMaterial.keyId
-      )
-      if merged != newMaterial, !merged.isEmpty {
-        try store.save(merged, scope: newScope)
-      }
-    }
-  }
 }

@@ -189,6 +189,7 @@ struct HarnessMonitorStoreSheetTests {
     case .leaderTransfer: break
     case .newCodexAgent: break
     case .resolveRepositoryDirectories: break
+    case .resolveSecretMigration: break
     }
   }
 

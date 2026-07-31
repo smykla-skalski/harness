@@ -106,6 +106,7 @@ extension HarnessMonitorStore {
   }
 
   public func dismissSheet() {
+    cancelSecretMigrationConsentIfPending()
     presentedSheet = nil
   }
 

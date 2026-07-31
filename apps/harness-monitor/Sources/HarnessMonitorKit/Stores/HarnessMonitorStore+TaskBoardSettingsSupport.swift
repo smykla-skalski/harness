@@ -24,6 +24,7 @@ extension HarnessMonitorStore {
         message: "Database-backed Task Board did not provide an instance identity"
       )
     }
+    noteConnectedDatabaseInstance(capabilities.instanceID)
     taskBoardDatabaseInstanceID = capabilities.instanceID
     contentUI.dashboard.taskBoardRevision = capabilities.revision
     return capabilities

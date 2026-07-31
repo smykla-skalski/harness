@@ -14,6 +14,7 @@ Suites:
   task-board-review-report
   task-board-workflow-progress
   task-board-filters
+  secret-migration-consent
 EOF
 }
 
@@ -24,7 +25,8 @@ if [[ "${1:-}" == "--list" ]]; then
     task-board-inspector \
     task-board-review-report \
     task-board-workflow-progress \
-    task-board-filters
+    task-board-filters \
+    secret-migration-consent
   exit 0
 fi
 
@@ -35,7 +37,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters) ;;
+  dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|secret-migration-consent) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -100,6 +102,9 @@ case "$suite" in
     ;;
   task-board-filters)
     HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP="$staging_directory" "$host"
+    ;;
+  secret-migration-consent)
+    HARNESS_SECRET_MIGRATION_CONSENT_DUMP="$staging_directory" "$host"
     ;;
 esac
 

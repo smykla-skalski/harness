@@ -112,6 +112,7 @@ extension HarnessMonitorStore {
     case taskActions(sessionID: String, taskID: String)
     case leaderTransfer(sessionID: String)
     case resolveRepositoryDirectories(repositories: [String])
+    case resolveSecretMigration(items: [TaskBoardSecretMigrationItem])
 
     public var id: String {
       switch self {
@@ -125,6 +126,8 @@ extension HarnessMonitorStore {
       case .leaderTransfer(let sessionID): "leaderTransfer:\(sessionID)"
       case .resolveRepositoryDirectories(let repositories):
         "resolveRepositoryDirectories:\(repositories.joined(separator: ","))"
+      case .resolveSecretMigration(let items):
+        "resolveSecretMigration:\(items.map(\.id).joined(separator: ","))"
       }
     }
   }

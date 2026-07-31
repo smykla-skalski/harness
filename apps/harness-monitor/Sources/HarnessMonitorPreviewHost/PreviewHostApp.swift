@@ -5,66 +5,55 @@ import SwiftUI
 
 @main
 struct PreviewHostApp: App {
+  // Headless render modes dump preview fixtures before any window or dock
+  // presence appears, so verification never steals focus.
   init() {
-    if let dumpDirectory = ProcessInfo.processInfo.environment[
-      "HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP"
-    ] {
+    let renderers: [(env: String, render: @MainActor (String) -> Bool)] = [
+      (
+        "HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP",
+        TaskBoardLaneAlignmentPreviewRenderer.dump
+      ),
+      ("HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP", TaskBoardInspectorPreviewRenderer.dump),
+      ("HARNESS_TASK_BOARD_REVIEW_REPORT_PREVIEW_DUMP", TaskBoardReviewReportPreviewRenderer.dump),
+      (
+        "HARNESS_TASK_BOARD_WORKFLOW_PROGRESS_PREVIEW_DUMP",
+        TaskBoardWorkflowProgressPreviewRenderer.dump
+      ),
+      ("HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP", TaskBoardFilterPreviewRenderer.dump),
+      ("HARNESS_TASK_BOARD_QUICK_ADD_DUMP", TaskBoardLaneQuickAddPreviewRenderer.dump),
+      ("HARNESS_SECRET_MIGRATION_CONSENT_DUMP", SecretMigrationConsentPreviewRenderer.dump),
+      ("HARNESS_DIFF_LAB_DUMP", Self.dumpDiffLab),
+      ("HARNESS_LANE_COLOR_PICKER_DUMP", Self.dumpLaneColorPicker),
+    ]
+    let environment = ProcessInfo.processInfo.environment
+    for renderer in renderers {
+      guard let dumpDirectory = environment[renderer.env] else { continue }
       NSApplication.shared.setActivationPolicy(.prohibited)
-      exit(TaskBoardLaneAlignmentPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
-    }
-    if let dumpDirectory = ProcessInfo.processInfo.environment[
-      "HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP"
-    ] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      exit(TaskBoardInspectorPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
-    }
-    if let dumpDirectory = ProcessInfo.processInfo.environment[
-      "HARNESS_TASK_BOARD_REVIEW_REPORT_PREVIEW_DUMP"
-    ] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      exit(TaskBoardReviewReportPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
-    }
-    if let dumpDirectory = ProcessInfo.processInfo.environment[
-      "HARNESS_TASK_BOARD_WORKFLOW_PROGRESS_PREVIEW_DUMP"
-    ] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      exit(TaskBoardWorkflowProgressPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
-    }
-    // Headless render modes dump preview fixtures before any window or dock
-    // presence appears, so verification never steals focus.
-    if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_DIFF_LAB_DUMP"] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      do {
-        try DashboardReviewFileDiffLabRenderer.dumpFixtures(toDirectory: dumpDirectory)
-      } catch {
-        FileHandle.standardError.write(Data("diff lab render failed: \(error)\n".utf8))
-        exit(1)
-      }
-      exit(0)
-    }
-    if let dumpDirectory = ProcessInfo.processInfo.environment[
-      "HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP"
-    ] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      exit(TaskBoardFilterPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
-    }
-    if let dumpDirectory = ProcessInfo.processInfo.environment[
-      "HARNESS_TASK_BOARD_QUICK_ADD_DUMP"
-    ] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      exit(TaskBoardLaneQuickAddPreviewRenderer.dump(toDirectory: dumpDirectory) ? 0 : 1)
-    }
-    if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_LANE_COLOR_PICKER_DUMP"] {
-      NSApplication.shared.setActivationPolicy(.prohibited)
-      do {
-        try SettingsTaskBoardLaneColorPickerRenderer.dumpFixtures(toDirectory: dumpDirectory)
-      } catch {
-        FileHandle.standardError.write(Data("lane color picker render failed: \(error)\n".utf8))
-        exit(1)
-      }
-      exit(0)
+      exit(renderer.render(dumpDirectory) ? 0 : 1)
     }
     for _ in Self.forceLoadedSymbolReferences {}
+  }
+
+  @MainActor
+  private static func dumpDiffLab(toDirectory directory: String) -> Bool {
+    do {
+      try DashboardReviewFileDiffLabRenderer.dumpFixtures(toDirectory: directory)
+      return true
+    } catch {
+      FileHandle.standardError.write(Data("diff lab render failed: \(error)\n".utf8))
+      return false
+    }
+  }
+
+  @MainActor
+  private static func dumpLaneColorPicker(toDirectory directory: String) -> Bool {
+    do {
+      try SettingsTaskBoardLaneColorPickerRenderer.dumpFixtures(toDirectory: directory)
+      return true
+    } catch {
+      FileHandle.standardError.write(Data("lane color picker render failed: \(error)\n".utf8))
+      return false
+    }
   }
 
   var body: some Scene {
