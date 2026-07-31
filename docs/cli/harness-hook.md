@@ -77,7 +77,6 @@ Harness lifecycle hooks
 
 ###### **Arguments:**
 
-* `<PAYLOAD>` — Raw Codex notify payload passed as `argv[1]`
 
 ###### **Options:**
 

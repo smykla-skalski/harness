@@ -5,6 +5,7 @@
 //! Each reference renders from the owning binary's top-level clap parser, so
 //! the document shares its source of truth with the runtime `--help` output.
 
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -69,12 +70,58 @@ fn binaries() -> Vec<BinaryDocs> {
     ]
 }
 
+fn hidden_positionals(command: &clap::Command) -> Vec<String> {
+    command
+        .get_arguments()
+        .filter(|arg| arg.is_positional() && arg.is_hide_set())
+        .map(|arg| match arg.get_value_names() {
+            Some([name, ..]) => name.to_string(),
+            _ => arg.get_id().to_string().to_ascii_uppercase(),
+        })
+        .collect()
+}
+
+fn collect_hidden_by_path(
+    command: &clap::Command,
+    path: &str,
+    hidden_by_path: &mut HashMap<String, Vec<String>>,
+) {
+    hidden_by_path.insert(path.to_owned(), hidden_positionals(command));
+    for subcommand in command.get_subcommands() {
+        collect_hidden_by_path(
+            subcommand,
+            &format!("{path} {}", subcommand.get_name()),
+            hidden_by_path,
+        );
+    }
+}
+
 fn render(command: &clap::Command) -> String {
+    let mut hidden_by_path = HashMap::new();
+    collect_hidden_by_path(command, command.get_name(), &mut hidden_by_path);
     let markdown = clap_markdown::help_markdown_command(command);
-    // `clap-markdown` pads empty subcommand descriptions with a trailing
-    // space and closes the document with a blank line; both fail
-    // `git diff --check`, so normalize before committing.
-    format!("{}\n", markdown.lines().map(str::trim_end).collect::<Vec<_>>().join("\n"))
+    // `clap-markdown` renders hidden positionals despite `hide = true` (it
+    // filters hidden flags, not hidden positionals), so drop those entries
+    // per command section to keep the reference equal to `--help`. The crate
+    // also pads empty descriptions with a trailing space and closes the
+    // document with a blank line, both of which fail `git diff --check`, so
+    // normalize the line endings here too.
+    let mut current_hidden: &[String] = &[];
+    let mut rendered = Vec::new();
+    for line in markdown.lines() {
+        if let Some(rest) = line.strip_prefix("## `").and_then(|rest| rest.strip_suffix('`')) {
+            current_hidden = hidden_by_path.get(rest).map_or(&[], Vec::as_slice);
+        }
+        let hidden_entry = line.strip_prefix("* `<").is_some_and(|rest| {
+            rest.split('>')
+                .next()
+                .is_some_and(|name| current_hidden.iter().any(|hidden| hidden == name))
+        });
+        if !hidden_entry {
+            rendered.push(line.trim_end());
+        }
+    }
+    format!("{}\n", rendered.join("\n"))
 }
 
 fn parse_args(mut args: impl Iterator<Item = String>) -> Result<bool, String> {
@@ -138,4 +185,21 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Command;
+
+    use super::*;
+
+    #[test]
+    fn hidden_positionals_are_omitted_but_visible_positionals_survive() {
+        let command = Command::new("probe")
+            .arg(clap::Arg::new("visible").value_name("VISIBLE"))
+            .arg(clap::Arg::new("secret").value_name("SECRET").hide(true));
+        let rendered = render(&command);
+        assert!(rendered.contains("<VISIBLE>"));
+        assert!(!rendered.contains("<SECRET>"));
+    }
 }
