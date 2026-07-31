@@ -8,7 +8,7 @@ use super::*;
 #[path = "live_report_only_review/support.rs"]
 mod support;
 
-use support::{GitHubSnapshot, LiveReviewTarget, prepare_review_checkout};
+use support::{GitHubClient, GitHubSnapshot, LiveReviewTarget, prepare_review_checkout};
 
 const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4-flash";
 const REVIEW_TIMEOUT: Duration = Duration::from_secs(360);
@@ -66,8 +66,9 @@ impl DaemonClient {
 fn requested_review_reaches_a_durable_report_without_mutation() {
     let openrouter_token = required_env("OPENROUTER_API_KEY", "openrouter", OPENROUTER_MODEL);
     let github_token = required_env("HARNESS_LIVE_GITHUB_TOKEN", "github", "read-only");
-    let target = LiveReviewTarget::from_env(&github_token);
-    let before = GitHubSnapshot::capture(&target, &github_token);
+    let github = GitHubClient::new(&github_token);
+    let target = LiveReviewTarget::from_env(&github);
+    let before = GitHubSnapshot::capture(&target, &github);
     let tmp = tempdir().expect("stage=fixture: create tempdir");
     let home = tmp.path().join("home");
     let xdg = tmp.path().join("xdg");
@@ -89,7 +90,7 @@ fn requested_review_reaches_a_durable_report_without_mutation() {
 
     assert_completed_report(&report, &target);
     assert_eq!(git_status(&project), initial_status);
-    let after = GitHubSnapshot::capture(&target, &github_token);
+    let after = GitHubSnapshot::capture(&target, &github);
     assert_eq!(after, before, "report-only review mutated GitHub state");
 
     stop_bridge(&home, &xdg, &mut bridge);
@@ -106,7 +107,7 @@ fn requested_review_reaches_a_durable_report_without_mutation() {
     );
     assert_eq!(retained, report, "restart changed the durable report");
     assert_eq!(git_status(&project), initial_status);
-    let final_snapshot = GitHubSnapshot::capture(&target, &github_token);
+    let final_snapshot = GitHubSnapshot::capture(&target, &github);
     assert_eq!(
         final_snapshot, before,
         "restart reconciliation mutated GitHub"

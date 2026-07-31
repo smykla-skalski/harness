@@ -6,6 +6,53 @@ use std::time::Duration;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde_json::{Value, json};
 
+pub(super) struct GitHubClient {
+    client: reqwest::blocking::Client,
+    token: String,
+}
+
+impl GitHubClient {
+    pub(super) fn new(token: &str) -> Self {
+        Self {
+            client: reqwest::blocking::Client::new(),
+            token: token.to_owned(),
+        }
+    }
+
+    fn get(&self, path: &str) -> Value {
+        let response = self
+            .client
+            .get(format!("https://api.github.com{path}"))
+            .bearer_auth(&self.token)
+            .header(USER_AGENT, "harness-live-report-only-review")
+            .header(ACCEPT, "application/vnd.github+json")
+            .timeout(Duration::from_secs(30))
+            .send()
+            .expect("stage=github: request");
+        let status = response.status();
+        let text = response.text().expect("stage=github: response");
+        assert!(status.is_success(), "stage=github: HTTP {status}: {text}");
+        serde_json::from_str(&text).expect("stage=github: decode response")
+    }
+
+    fn get_pages(&self, path: &str) -> Value {
+        let mut items = Vec::new();
+        for page in 1.. {
+            let response = self.get(&format!("{path}?per_page=100&page={page}"));
+            let mut page_items = response
+                .as_array()
+                .expect("stage=github: expected paginated array")
+                .clone();
+            let complete = page_items.len() < 100;
+            items.append(&mut page_items);
+            if complete {
+                break;
+            }
+        }
+        Value::Array(items)
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct LiveReviewTarget {
     pub(super) repository: String,
@@ -15,11 +62,11 @@ pub(super) struct LiveReviewTarget {
 }
 
 impl LiveReviewTarget {
-    pub(super) fn from_env(token: &str) -> Self {
-        let url = std::env::var("HARNESS_LIVE_REVIEW_PR_URL")
+    pub(super) fn from_env(github: &GitHubClient) -> Self {
+        let input_url = std::env::var("HARNESS_LIVE_REVIEW_PR_URL")
             .expect("HARNESS_LIVE_REVIEW_PR_URL must identify the open pull request to review");
-        let (repository, number) = parse_pr_url(&url);
-        let pull = github_get(token, &format!("/repos/{repository}/pulls/{number}"));
+        let (repository, number) = parse_pr_url(&input_url);
+        let pull = github.get(&format!("/repos/{repository}/pulls/{number}"));
         assert_eq!(pull["state"], "open", "stage=github: PR must be open");
         let head = pull
             .pointer("/head/sha")
@@ -27,9 +74,9 @@ impl LiveReviewTarget {
             .expect("stage=github: PR head SHA")
             .to_owned();
         Self {
+            url: format!("https://github.com/{repository}/pull/{number}"),
             repository,
             number,
-            url,
             head,
         }
     }
@@ -43,15 +90,15 @@ pub(super) struct GitHubSnapshot {
 }
 
 impl GitHubSnapshot {
-    pub(super) fn capture(target: &LiveReviewTarget, token: &str) -> Self {
-        let viewer = github_get(token, "/user")["login"]
+    pub(super) fn capture(target: &LiveReviewTarget, github: &GitHubClient) -> Self {
+        let viewer = github.get("/user")["login"]
             .as_str()
             .expect("stage=github: authenticated viewer login")
             .to_owned();
-        let pull = github_get(
-            token,
-            &format!("/repos/{}/pulls/{}", target.repository, target.number),
-        );
+        let pull = github.get(&format!(
+            "/repos/{}/pulls/{}",
+            target.repository, target.number
+        ));
         let core = serde_json::to_string(&json!({
             "head": pull.pointer("/head/sha"),
             "state": pull["state"],
@@ -65,20 +112,14 @@ impl GitHubSnapshot {
             Some(target.head.as_str()),
             "stage=github: PR head changed during live review"
         );
-        let comments = github_get_pages(
-            token,
-            &format!(
-                "/repos/{}/issues/{}/comments",
-                target.repository, target.number
-            ),
-        );
-        let reviews = github_get_pages(
-            token,
-            &format!(
-                "/repos/{}/pulls/{}/reviews",
-                target.repository, target.number
-            ),
-        );
+        let comments = github.get_pages(&format!(
+            "/repos/{}/issues/{}/comments",
+            target.repository, target.number
+        ));
+        let reviews = github.get_pages(&format!(
+            "/repos/{}/pulls/{}/reviews",
+            target.repository, target.number
+        ));
         Self {
             core,
             viewer_comments: viewer_ids(&comments, &viewer),
@@ -121,6 +162,7 @@ fn parse_pr_url(url: &str) -> (String, u64) {
     let path = url
         .strip_prefix("https://github.com/")
         .expect("HARNESS_LIVE_REVIEW_PR_URL must use https://github.com/");
+    let path = path.split(['?', '#']).next().expect("nonempty PR URL");
     let components: Vec<&str> = path.trim_end_matches('/').split('/').collect();
     assert_eq!(
         components.len(),
@@ -132,42 +174,6 @@ fn parse_pr_url(url: &str) -> (String, u64) {
         .parse()
         .expect("HARNESS_LIVE_REVIEW_PR_URL pull number");
     (format!("{}/{}", components[0], components[1]), number)
-}
-
-fn github_get(token: &str, path: &str) -> Value {
-    let runtime = tokio::runtime::Runtime::new().expect("stage=github: runtime");
-    runtime.block_on(async {
-        let response = reqwest::Client::new()
-            .get(format!("https://api.github.com{path}"))
-            .bearer_auth(token)
-            .header(USER_AGENT, "harness-live-report-only-review")
-            .header(ACCEPT, "application/vnd.github+json")
-            .timeout(Duration::from_secs(30))
-            .send()
-            .await
-            .expect("stage=github: request");
-        let status = response.status();
-        let text = response.text().await.expect("stage=github: response");
-        assert!(status.is_success(), "stage=github: HTTP {status}: {text}");
-        serde_json::from_str(&text).expect("stage=github: decode response")
-    })
-}
-
-fn github_get_pages(token: &str, path: &str) -> Value {
-    let mut items = Vec::new();
-    for page in 1.. {
-        let response = github_get(token, &format!("{path}?per_page=100&page={page}"));
-        let mut page_items = response
-            .as_array()
-            .expect("stage=github: expected paginated array")
-            .clone();
-        let complete = page_items.len() < 100;
-        items.append(&mut page_items);
-        if complete {
-            break;
-        }
-    }
-    Value::Array(items)
 }
 
 fn viewer_ids(items: &Value, viewer: &str) -> BTreeSet<u64> {
@@ -209,4 +215,12 @@ fn git_output(directory: &Path, args: &[&str]) -> String {
         .expect("stage=fixture: UTF-8 git output")
         .trim()
         .to_owned()
+}
+
+#[test]
+fn pr_url_parser_ignores_query_and_fragment() {
+    for suffix in ["?diff=split", "#files_bucket"] {
+        let url = format!("https://github.com/acme/widgets/pull/17{suffix}");
+        assert_eq!(parse_pr_url(&url), ("acme/widgets".into(), 17));
+    }
 }
