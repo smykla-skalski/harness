@@ -229,9 +229,8 @@ fn parse_pr_url(url: &str) -> (String, u64) {
         .expect("HARNESS_LIVE_REVIEW_PR_URL must use https://github.com/");
     let path = path.split(['?', '#']).next().expect("nonempty PR URL");
     let components: Vec<&str> = path.trim_end_matches('/').split('/').collect();
-    assert_eq!(
-        components.len(),
-        4,
+    assert!(
+        components.len() >= 4,
         "HARNESS_LIVE_REVIEW_PR_URL must identify one pull request"
     );
     assert_eq!(components[2], "pull");
@@ -251,7 +250,23 @@ fn viewer_activity(items: &Value, viewer: &str) -> BTreeSet<String> {
                 .and_then(Value::as_str)
                 .is_some_and(|login| login.eq_ignore_ascii_case(viewer))
         })
-        .map(|item| serde_json::to_string(item).expect("stage=github: encode viewer activity"))
+        .map(|item| {
+            serde_json::to_string(&json!({
+                "id": item["id"],
+                "body": item["body"],
+                "updated_at": item["updated_at"],
+                "submitted_at": item["submitted_at"],
+                "state": item["state"],
+                "commit_id": item["commit_id"],
+                "dismissed_at": item["dismissed_at"],
+                "pull_request_review_id": item["pull_request_review_id"],
+                "in_reply_to_id": item["in_reply_to_id"],
+                "path": item["path"],
+                "line": item["line"],
+                "original_line": item["original_line"],
+            }))
+            .expect("stage=github: encode viewer activity")
+        })
         .collect()
 }
 
@@ -314,7 +329,7 @@ fn git_command(args: &[&str]) -> Command {
 
 #[test]
 fn pr_url_parser_ignores_query_and_fragment() {
-    for suffix in ["?diff=split", "#files_bucket"] {
+    for suffix in ["?diff=split", "#files_bucket", "/files", "/commits/42d799e"] {
         let url = format!("https://github.com/acme/widgets/pull/17{suffix}");
         assert_eq!(parse_pr_url(&url), ("acme/widgets".into(), 17));
     }
@@ -338,6 +353,29 @@ fn viewer_activity_preserves_mutable_content() {
     assert_ne!(
         viewer_activity(&original, "reviewer"),
         viewer_activity(&edited, "reviewer")
+    );
+}
+
+#[test]
+fn viewer_activity_ignores_unrelated_response_fields() {
+    let before = json!([{
+        "id": 1,
+        "body": "unchanged",
+        "updated_at": "2026-07-31T00:00:00Z",
+        "reactions": { "total_count": 0 },
+        "user": { "login": "reviewer" }
+    }]);
+    let after = json!([{
+        "id": 1,
+        "body": "unchanged",
+        "updated_at": "2026-07-31T00:00:00Z",
+        "reactions": { "total_count": 1 },
+        "user": { "login": "reviewer" }
+    }]);
+
+    assert_eq!(
+        viewer_activity(&before, "reviewer"),
+        viewer_activity(&after, "reviewer")
     );
 }
 
