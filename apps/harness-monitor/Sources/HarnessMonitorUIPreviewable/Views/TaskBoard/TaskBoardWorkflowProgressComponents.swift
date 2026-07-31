@@ -122,7 +122,10 @@ struct TaskBoardWorkflowMetadataCard: View {
         .init(
           label: "Pull request",
           value: "\(repository)#\(pullRequestNumber)",
-          destination: githubURL(path: "/\(repository)/pull/\(pullRequestNumber)")
+          destination: TaskBoardReviewGitHubLinks.pullRequest(
+            repository: repository,
+            number: pullRequestNumber
+          )
         )
       )
     }
@@ -141,9 +144,10 @@ struct TaskBoardWorkflowMetadataCard: View {
           label: "Revision",
           value: revision,
           monospaced: true,
-          destination: provenance.repository.flatMap {
-            githubURL(path: "/\($0)/commit/\(revision)")
-          }
+          destination: TaskBoardReviewGitHubLinks.revision(
+            repository: provenance.repository,
+            revision: revision
+          )
         )
       )
     }
@@ -438,14 +442,6 @@ extension View {
           .strokeBorder(HarnessMonitorTheme.ink.opacity(0.1))
       }
   }
-}
-
-private func githubURL(path: String) -> URL? {
-  var components = URLComponents()
-  components.scheme = "https"
-  components.host = "github.com"
-  components.path = path
-  return components.url
 }
 
 extension String {
