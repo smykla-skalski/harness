@@ -3,7 +3,7 @@ import Foundation
 extension WebSocketTransport {
   // The receive loop's `Task` is nonisolated, so the actor-isolated flag
   // must be written through a method rather than assigned directly.
-  func setReconnectingStreams(_ value: Bool) {
+  private func setReconnectingStreams(_ value: Bool) {
     reconnectingStreams = value
   }
 
