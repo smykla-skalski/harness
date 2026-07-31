@@ -384,9 +384,10 @@ extension WebSocketTransport {
     // `.cancelled` here instead, and the desired-subscription flag must drop
     // so the in-flight receive loop's `resubscribe()` does not re-issue
     // `streamSubscribe` for a stream the consumer no longer wants.
-    let isTransportReconnect = reconnectingStreams && termination == .finished
+    // `if case .finished` matches without relying on `Termination: Equatable`,
+    // which the standard library type does not promise.
     globalStreamContinuation = nil
-    if isTransportReconnect {
+    if reconnectingStreams, case .finished = termination {
       HarnessMonitorLogger.websocket.debug(
         "skipping global unsubscribe: transport reconnect in progress"
       )
@@ -434,9 +435,8 @@ extension WebSocketTransport {
     // `session.subscribe` on the new socket, but a consumer cancellation
     // still drops the session from `activeSubscriptions` to stop the same
     // reconnect from re-subscribing to it.
-    let isTransportReconnect = reconnectingStreams && termination == .finished
     sessionStreamContinuations[sessionID] = nil
-    if isTransportReconnect {
+    if reconnectingStreams, case .finished = termination {
       HarnessMonitorLogger.websocket.debug(
         "skipping session unsubscribe for \(sessionID, privacy: .public): transport reconnect in progress"
       )
