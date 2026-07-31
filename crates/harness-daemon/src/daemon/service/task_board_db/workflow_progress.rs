@@ -27,24 +27,41 @@ pub(crate) async fn get_task_board_workflow_progress_db(
                 request.id
             )))
         })?;
+    let run_ids = execution
+        .attempts
+        .iter()
+        .map(|attempt| attempt.idempotency_key.as_str())
+        .collect::<Vec<_>>();
+    let codex_runs = db
+        .codex_runs_by_ids(&run_ids)
+        .await?
+        .into_iter()
+        .map(|run| (run.run_id.clone(), run))
+        .collect::<BTreeMap<_, _>>();
+    let agent_turn_runs = db
+        .agent_turn_runs_by_ids(&run_ids)
+        .await?
+        .into_iter()
+        .map(|run| (run.run_id.clone(), run))
+        .collect::<BTreeMap<_, _>>();
     let mut evidence = BTreeMap::new();
     for attempt in &execution.attempts {
-        if let Some(run) = db.codex_run(&attempt.idempotency_key).await? {
+        if let Some(run) = codex_runs.get(&attempt.idempotency_key) {
             if matching_run_binding(
                 run.workflow_execution_id.as_deref(),
                 execution_id,
                 &attempt.idempotency_key,
             )? {
-                evidence.insert(attempt.idempotency_key.clone(), codex_evidence(&run));
+                evidence.insert(attempt.idempotency_key.clone(), codex_evidence(run));
             }
-        } else if let Some(run) = db.agent_turn_run(&attempt.idempotency_key).await?
+        } else if let Some(run) = agent_turn_runs.get(&attempt.idempotency_key)
             && matching_run_binding(
                 run.workflow_execution_id.as_deref(),
                 execution_id,
                 &attempt.idempotency_key,
             )?
         {
-            evidence.insert(attempt.idempotency_key.clone(), agent_turn_evidence(&run));
+            evidence.insert(attempt.idempotency_key.clone(), agent_turn_evidence(run));
         }
     }
     Ok(TaskBoardWorkflowProgressResponse {

@@ -8,7 +8,7 @@
 //! one terminal outcome without manual intervention.
 
 use harness_workspace::workspace::utc_now;
-use sqlx::{query, query_as, query_scalar};
+use sqlx::{QueryBuilder, Sqlite, query, query_as, query_scalar};
 
 use super::task_board::release_managed_worker_admission_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -116,6 +116,10 @@ const SELECT_BY_ID_SQL: &str = "SELECT run_id, session_id, task_id, board_item_i
      workflow_execution_id, project_dir, requested_runtime, actual_runtime, runtime_turn_id, \
      requested_model, actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at \
      FROM agent_turn_runs WHERE run_id = ?1";
+const SELECT_BY_IDS_SQL: &str = "SELECT run_id, session_id, task_id, board_item_id, \
+     workflow_execution_id, project_dir, requested_runtime, actual_runtime, runtime_turn_id, \
+     requested_model, actual_model, status, source_revision, report, stop_reason, error, created_at, updated_at \
+     FROM agent_turn_runs WHERE run_id IN (";
 
 // A later save carries only the columns it learned. `requested_runtime` is
 // immutable and simply omitted from the update, so it keeps its first-insert
@@ -207,6 +211,35 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("load agent turn run: {error}")))?
             .map(AgentTurnRunRow::into_snapshot)
             .transpose()
+    }
+
+    /// Load agent turn runs matching the supplied ids.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    pub(crate) async fn agent_turn_runs_by_ids(
+        &self,
+        run_ids: &[&str],
+    ) -> Result<Vec<AgentTurnRunSnapshot>, CliError> {
+        if run_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut builder = QueryBuilder::<Sqlite>::new(SELECT_BY_IDS_SQL);
+        {
+            let mut separated = builder.separated(", ");
+            for run_id in run_ids {
+                separated.push_bind(*run_id);
+            }
+        }
+        builder.push(')');
+        let rows = builder
+            .build_query_as::<AgentTurnRunRow>()
+            .fetch_all(self.pool())
+            .await
+            .map_err(|error| db_error(format!("load agent turn runs by ids: {error}")))?;
+        rows.into_iter()
+            .map(AgentTurnRunRow::into_snapshot)
+            .collect()
     }
 
     pub(crate) async fn cancel_agent_turn_run(&self, run_id: &str) -> Result<(), CliError> {
