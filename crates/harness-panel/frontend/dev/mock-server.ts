@@ -18,7 +18,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Server as HttpServer, IncomingMessage, ServerResponse } from 'node:http';
-import { WebSocketServer, type WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import type { Connect, Plugin } from 'vite';
 
 /**
@@ -69,6 +69,8 @@ class MockApiError extends Error {
 /** The in-memory state one server process owns. Restarting drops all of it. */
 interface MockState {
   signedIn: boolean;
+  /** Which account the current session is signed in as. Drives `/api/me`. */
+  viewerId: string;
   accounts: Account[];
   pairings: Pairing[];
   sockets: Set<WebSocket>;
@@ -198,26 +200,27 @@ function seed(): MockState {
   ];
   return {
     signedIn: true,
+    viewerId: OWNER_ID,
     accounts: [owner, approvedPeer, pendingPeer],
     pairings,
     sockets: new Set(),
   };
 }
 
-/** The owner, packaged as the viewer the app expects. */
+/** The signed-in viewer, packaged as the app expects. */
 function viewer(state: MockState): { account: Account; is_owner: boolean } {
-  const account = state.accounts.find((entry) => entry.id === OWNER_ID);
+  const account = state.accounts.find((entry) => entry.id === state.viewerId);
   if (account === undefined) {
-    throw new Error('mock owner account is missing from the seed');
+    throw new Error(`mock viewer account ${state.viewerId} is missing from the seed`);
   }
-  return { account, is_owner: true };
+  return { account, is_owner: state.viewerId === OWNER_ID };
 }
 
 /** Send a pairing change to every connected socket, matching the frame `events.ts` reads. */
 function broadcast(state: MockState, change: string, pairing: Pairing): void {
   const frame = JSON.stringify({ type: 'pairing', change, pairing });
   for (const socket of state.sockets) {
-    if (socket.readyState === socket.OPEN) {
+    if (socket.readyState === WebSocket.OPEN) {
       socket.send(frame);
     }
   }
@@ -335,14 +338,22 @@ function handle(
     return;
   }
 
-  // Auth: the mock pretends GitHub already said yes. The start route redirects
-  // straight to the callback, which redirects back to the app root.
-  if (url === route('/auth/github/start') && method === 'GET') {
-    res.writeHead(302, { Location: route('/auth/github/callback') });
+  // Auth: the mock pretends GitHub already said yes. The start route accepts an
+  // optional `?as=<login>` so a developer can sign in as a non-owner to exercise
+  // the awaiting-approval state, and redirects straight to the callback, which
+  // redirects back to the app root.
+  if (url.startsWith(route('/auth/github/start')) && method === 'GET') {
+    const as = new URL(url, 'http://localhost').searchParams.get('as') ?? '';
+    const target =
+      as === '' ? route('/auth/github/callback') : `${route('/auth/github/callback')}?as=${as}`;
+    res.writeHead(302, { Location: target });
     res.end();
     return;
   }
-  if (url === route('/auth/github/callback') && method === 'GET') {
+  if (url.startsWith(route('/auth/github/callback')) && method === 'GET') {
+    const as = new URL(url, 'http://localhost').searchParams.get('as') ?? '';
+    const account = as === '' ? undefined : state.accounts.find((entry) => entry.login === as);
+    state.viewerId = account?.id ?? OWNER_ID;
     state.signedIn = true;
     res.writeHead(302, { Location: `${BASE}/` });
     res.end();
@@ -364,38 +375,45 @@ function handle(
     return;
   }
 
-  if (url === route('/api/me') && method === 'GET') {
-    respond(res, 200, viewer(state));
-    return;
-  }
-  if (url === route('/api/accounts') && method === 'GET') {
-    respond(res, 200, { accounts: state.accounts });
-    return;
-  }
-  if (url === route('/api/pairings') && method === 'GET') {
-    respond(res, 200, { pairings: state.pairings, daemon_version: 'harness-daemon dev-mock' });
-    return;
-  }
-  if (url === route('/api/pair-links') && method === 'POST') {
-    const link = mint(state);
-    respond(res, 200, link);
-    return;
-  }
-
-  const approve = url.match(paramRoute('/api/accounts', 'approve'));
-  const revokeAccount = url.match(paramRoute('/api/accounts', 'revoke'));
-  const revokePairing = url.match(paramRoute('/api/pairings', 'revoke'));
-  // These three take an id from the path and look a record up by it, so they are
-  // the only routes that can miss. A miss answers with the same envelope the
-  // real backend would - `not_found` for an account, `forbidden` for a pairing -
-  // rather than letting the throw reach Vite as an HTML 500.
+  // Every authenticated route below can throw `MockApiError` - a missing
+  // record, a non-owner reaching an owner-only route, or an account that
+  // cannot pair. The real backend answers each with a JSON envelope, so the
+  // throw is caught here rather than let loose on Vite as an HTML 500.
   try {
+    if (url === route('/api/me') && method === 'GET') {
+      respond(res, 200, viewer(state));
+      return;
+    }
+    if (url === route('/api/accounts') && method === 'GET') {
+      requireOwner(state);
+      respond(res, 200, { accounts: state.accounts });
+      return;
+    }
+    if (url === route('/api/pairings') && method === 'GET') {
+      const current = viewer(state);
+      const visible = state.pairings.filter(
+        (pairing) => current.is_owner || pairing.account_id === current.account.id,
+      );
+      respond(res, 200, { pairings: visible, daemon_version: 'harness-daemon dev-mock' });
+      return;
+    }
+    if (url === route('/api/pair-links') && method === 'POST') {
+      const link = mint(state);
+      respond(res, 200, link);
+      return;
+    }
+
+    const approve = url.match(paramRoute('/api/accounts', 'approve'));
+    const revokeAccount = url.match(paramRoute('/api/accounts', 'revoke'));
+    const revokePairing = url.match(paramRoute('/api/pairings', 'revoke'));
     if (approve && method === 'POST') {
+      requireOwner(state);
       const account = setCanPair(state, approve.groups?.id ?? '', true);
       respond(res, 200, account);
       return;
     }
     if (revokeAccount && method === 'POST') {
+      requireOwner(state);
       const account = setCanPair(state, revokeAccount.groups?.id ?? '', false);
       respond(res, 200, account);
       return;
@@ -437,8 +455,16 @@ function paramRoute(path: string, action: string): RegExp {
   return new RegExp(`^${escaped}/(?<id>[^/]+)/${action}$`);
 }
 
-/** Mint a link, record the pending row, and announce it to every watcher. */
+/** Mint a link for the signed-in account and announce it to every watcher. */
 function mint(state: MockState): PairLink {
+  const current = viewer(state);
+  if (!current.account.can_pair) {
+    throw new MockApiError(
+      403,
+      'forbidden',
+      'the panel owner has not allowed this account to generate pairing links',
+    );
+  }
   const now = Date.now();
   const pairingId = `pair_${randomUUID()}`;
   const expiresAt = new Date(now + LINK_TTL_MS).toISOString();
@@ -448,7 +474,7 @@ function mint(state: MockState): PairLink {
     role: 'operator',
     created_at: new Date(now).toISOString(),
     expires_at: expiresAt,
-    account_id: OWNER_ID,
+    account_id: current.account.id,
   };
   state.pairings.push(pairing);
   broadcast(state, 'minted', pairing);
@@ -461,6 +487,13 @@ function mint(state: MockState): PairLink {
   };
 }
 
+/** Refuse the call when the viewer is not the owner, matching the real backend. */
+function requireOwner(state: MockState): void {
+  if (state.viewerId !== OWNER_ID) {
+    throw new MockApiError(403, 'forbidden', 'only the panel owner can do that');
+  }
+}
+
 /** Toggle an account's ability to pair and return the updated record. */
 function setCanPair(state: MockState, id: string, granted: boolean): Account {
   const account = state.accounts.find((entry) => entry.id === id);
@@ -471,16 +504,21 @@ function setCanPair(state: MockState, id: string, granted: boolean): Account {
   return account;
 }
 
-/** Mark a pairing revoked and announce it. */
+/** Mark a pairing revoked and announce it. Non-owners may only revoke their own. */
 function revoke(
   state: MockState,
   id: string,
 ): { pairing_id: string; outcome: string; revoked_at: string } {
+  const current = viewer(state);
   const pairing = state.pairings.find((entry) => entry.pairing_id === id);
   if (pairing === undefined) {
-    // The owner may revoke anything, so a missing id reads as the same refusal
-    // the daemon gives a credential that cannot reach it - `forbidden`, not
-    // `not_found` - which is what the real backend returns here.
+    throw new MockApiError(
+      403,
+      'forbidden',
+      'no pairing with that id is available to this account',
+    );
+  }
+  if (!current.is_owner && pairing.account_id !== current.account.id) {
     throw new MockApiError(
       403,
       'forbidden',
