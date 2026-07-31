@@ -43,4 +43,3 @@ Run the MCP server on stdio. Reads JSON-RPC 2.0 requests from stdin, writes resp
     This document was generated automatically by
     <a href="https://crates.io/crates/clap-markdown"><code>clap-markdown</code></a>.
 </i></small>
-

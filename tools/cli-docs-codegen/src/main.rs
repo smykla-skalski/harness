@@ -70,7 +70,11 @@ fn binaries() -> Vec<BinaryDocs> {
 }
 
 fn render(command: &clap::Command) -> String {
-    format!("{}\n", clap_markdown::help_markdown_command(command))
+    let markdown = clap_markdown::help_markdown_command(command);
+    // `clap-markdown` pads empty subcommand descriptions with a trailing
+    // space and closes the document with a blank line; both fail
+    // `git diff --check`, so normalize before committing.
+    format!("{}\n", markdown.lines().map(str::trim_end).collect::<Vec<_>>().join("\n"))
 }
 
 fn main() -> ExitCode {

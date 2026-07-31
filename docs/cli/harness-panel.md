@@ -186,4 +186,3 @@ Print the systemd socket that reserves the panel listener across service restart
     This document was generated automatically by
     <a href="https://crates.io/crates/clap-markdown"><code>clap-markdown</code></a>.
 </i></small>
-

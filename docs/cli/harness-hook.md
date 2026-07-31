@@ -21,13 +21,13 @@ Harness lifecycle hooks
 
 ###### **Subcommands:**
 
-* `tool-guard` — 
-* `tool-result` — 
-* `audit-turn` — 
-* `session-start` — 
-* `session-stop` — 
-* `prompt-submit` — 
-* `pre-compact` — 
+* `tool-guard` —
+* `tool-result` —
+* `audit-turn` —
+* `session-start` —
+* `session-stop` —
+* `prompt-submit` —
+* `pre-compact` —
 
 ###### **Options:**
 
@@ -153,4 +153,3 @@ Harness lifecycle hooks
     This document was generated automatically by
     <a href="https://crates.io/crates/clap-markdown"><code>clap-markdown</code></a>.
 </i></small>
-
