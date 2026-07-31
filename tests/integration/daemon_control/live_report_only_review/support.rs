@@ -1,4 +1,5 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
@@ -141,28 +142,50 @@ impl GitHubSnapshot {
 pub(super) struct LocalRepositorySnapshot {
     status: String,
     head: String,
-    refs: String,
+    head_state: String,
+    refs_fingerprint: u64,
     fetch_head: String,
 }
 
 impl LocalRepositorySnapshot {
     pub(super) fn capture(project: &Path) -> Self {
-        let fetch_head_path = git_output(project, &["rev-parse", "--git-path", "FETCH_HEAD"]);
-        let fetch_head_path = project.join(fetch_head_path);
         Self {
             status: git_output(
                 project,
                 &["status", "--porcelain=v1", "--untracked-files=all"],
             ),
             head: git_output(project, &["rev-parse", "HEAD"]),
-            refs: git_output(
-                project,
-                &["for-each-ref", "--format=%(refname) %(objectname)"],
-            ),
-            fetch_head: std::fs::read_to_string(fetch_head_path)
-                .expect("stage=mutation_check: read FETCH_HEAD"),
+            head_state: git_metadata(project, "HEAD"),
+            refs_fingerprint: stable_ref_fingerprint(project),
+            fetch_head: git_metadata(project, "FETCH_HEAD"),
         }
     }
+}
+
+fn stable_ref_fingerprint(project: &Path) -> u64 {
+    let refs = git_output(
+        project,
+        &["for-each-ref", "--format=%(refname) %(objectname)"],
+    );
+    stable_ref_fingerprint_from(&refs)
+}
+
+fn stable_ref_fingerprint_from(refs: &str) -> u64 {
+    let stable_refs = refs
+        .lines()
+        // Session startup owns this isolated worktree namespace; report-only
+        // guarantees apply to the supplied checkout and all other refs.
+        .filter(|line| !line.starts_with("refs/heads/harness/"))
+        .collect::<Vec<_>>();
+    let mut hasher = DefaultHasher::new();
+    stable_refs.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn git_metadata(project: &Path, name: &str) -> String {
+    let path = git_output(project, &["rev-parse", "--git-path", name]);
+    std::fs::read_to_string(project.join(path))
+        .unwrap_or_else(|error| panic!("stage=mutation_check: read {name}: {error}"))
 }
 
 pub(super) fn prepare_review_checkout(
@@ -315,5 +338,21 @@ fn viewer_activity_preserves_mutable_content() {
     assert_ne!(
         viewer_activity(&original, "reviewer"),
         viewer_activity(&edited, "reviewer")
+    );
+}
+
+#[test]
+fn ref_fingerprint_excludes_only_harness_session_branches() {
+    let base = "refs/heads/main aaaaa\nrefs/remotes/origin/main aaaaa";
+    let with_session = format!("{base}\nrefs/heads/harness/session-1 aaaaa");
+    let with_user_branch = format!("{base}\nrefs/heads/feature/user-change aaaaa");
+
+    assert_eq!(
+        stable_ref_fingerprint_from(base),
+        stable_ref_fingerprint_from(&with_session)
+    );
+    assert_ne!(
+        stable_ref_fingerprint_from(base),
+        stable_ref_fingerprint_from(&with_user_branch)
     );
 }
