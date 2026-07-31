@@ -151,9 +151,6 @@ async fn open_global_subscriber(endpoint: &str, token: &str) -> SubscriberStream
     drain_until_response(&mut socket, request_id, Duration::from_secs(2))
         .await
         .expect("expected stream.subscribe response");
-    drain_until_event(&mut socket, "sessions_updated", Duration::from_secs(2))
-        .await
-        .expect("expected sessions_updated push after subscribing");
 
     socket
 }
