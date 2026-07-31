@@ -77,8 +77,28 @@ fn render(command: &clap::Command) -> String {
     format!("{}\n", markdown.lines().map(str::trim_end).collect::<Vec<_>>().join("\n"))
 }
 
+fn parse_args(mut args: impl Iterator<Item = String>) -> Result<bool, String> {
+    let check = match args.next().as_deref() {
+        Some("--check") => true,
+        Some(other) => return Err(format!("unexpected argument `{other}`")),
+        None => false,
+    };
+    if let Some(other) = args.next() {
+        return Err(format!("unexpected argument `{other}`"));
+    }
+    Ok(check)
+}
+
 fn main() -> ExitCode {
-    let check = env::args().any(|arg| arg == "--check");
+    let check = match parse_args(env::args().skip(1)) {
+        Ok(check) => check,
+        Err(message) => {
+            eprintln!(
+                "cli-docs-codegen: {message}; pass `--check` to drift-check instead of rewriting"
+            );
+            return ExitCode::FAILURE;
+        }
+    };
     let output_dir = repository_root().join(OUTPUT_DIR);
     let mut drifted = false;
 
