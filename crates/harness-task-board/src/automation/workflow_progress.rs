@@ -132,7 +132,9 @@ fn compare_attempt_recency(
         (Ok(left), Ok(right)) => left.cmp(&right),
         _ => left.updated_at.cmp(&right.updated_at),
     };
-    timestamp_order.then_with(|| left.attempt.cmp(&right.attempt))
+    timestamp_order
+        .then_with(|| left.attempt.cmp(&right.attempt))
+        .then_with(|| left.action_key.cmp(&right.action_key))
 }
 
 fn render_artifact(artifact: &super::TaskBoardAttemptResultArtifact) -> Option<String> {
@@ -143,9 +145,9 @@ fn render_artifact(artifact: &super::TaskBoardAttemptResultArtifact) -> Option<S
 mod tests {
     use super::*;
     use crate::{
-        TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership,
-        TaskBoardResolvedReviewer, TaskBoardReviewerProfile, TaskBoardWorkflowExecutionArtifacts,
-        TaskBoardWorkflowSnapshot, TaskBoardWorkflowTransitionState,
+        TaskBoardExecutionAttemptRecord, TaskBoardExecutionOwnership, TaskBoardResolvedReviewer,
+        TaskBoardReviewerProfile, TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowSnapshot,
+        TaskBoardWorkflowTransitionState,
     };
 
     #[test]
@@ -233,6 +235,20 @@ mod tests {
     }
 
     #[test]
+    fn current_runtime_breaks_attempt_ties_by_action_key() {
+        let mut execution = execution();
+        let mut later_action = execution.attempts[0].clone();
+        later_action.action_key = "review:zeta".into();
+        later_action.idempotency_key = "run-2".into();
+        execution.attempts.push(later_action);
+        let evidence = runtime_evidence_for_two_attempts();
+
+        let progress = build_task_board_workflow_progress(&execution, &evidence);
+
+        assert_eq!(progress.current_runtime.as_deref(), Some("openrouter"));
+    }
+
+    #[test]
     fn current_runtime_orders_legacy_timestamps_deterministically() {
         let mut execution = execution();
         execution.attempts[0].updated_at = "legacy-1".into();
@@ -302,9 +318,7 @@ mod tests {
                 phase: Some(TaskBoardExecutionPhase::Review),
                 execution_state: TaskBoardExecutionState::Running,
                 pull_request: None,
-                exact_head_revision: Some(
-                    "0123456789abcdef0123456789abcdef01234567".into(),
-                ),
+                exact_head_revision: Some("0123456789abcdef0123456789abcdef01234567".into()),
             },
             artifacts: TaskBoardWorkflowExecutionArtifacts::default(),
             ownership: TaskBoardExecutionOwnership::default(),
