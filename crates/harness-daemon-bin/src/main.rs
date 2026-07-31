@@ -5,20 +5,10 @@ use std::time::Duration;
 use clap::Parser;
 use harness_daemon::app::{AppContext, Execute};
 use harness_daemon::daemon::state;
-use harness_daemon_cli::DaemonCommand;
+use harness_daemon_bin::cli::Cli;
 use harness_kernel::errors;
 use harness_telemetry::init_daemon_tracing_subscriber;
 use tracing_subscriber::EnvFilter;
-
-#[derive(Debug, Parser)]
-#[command(name = "harness-daemon", version, about = "Harness daemon")]
-struct Cli {
-    /// Seconds to wait before executing the command.
-    #[arg(long, default_value = "0", global = true)]
-    delay: f64,
-    #[command(subcommand)]
-    command: DaemonCommand,
-}
 
 fn main() -> ExitCode {
     if let Some(result) = delegate_systemd_lifecycle() {

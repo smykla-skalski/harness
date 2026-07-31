@@ -52,6 +52,7 @@ members = [
   "crates/harness-workspace",
   "testkit",
   "tools/architecture-tests",
+  "tools/cli-docs-codegen",
   "tools/openapi-codegen",
   "tools/policy-codegen",
 ]

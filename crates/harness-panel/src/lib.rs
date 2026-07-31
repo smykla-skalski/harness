@@ -6,6 +6,7 @@
 //! it is a standalone package with no dependency on the `harness` crate.
 
 pub mod assets;
+pub mod cli;
 pub mod config;
 pub mod crypto;
 pub mod daemon_client;

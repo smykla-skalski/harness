@@ -10,6 +10,8 @@ use std::path::Path;
 
 use axum::http::{HeaderValue, Uri};
 
+pub mod cli;
+
 mod client;
 mod credential;
 mod forward;

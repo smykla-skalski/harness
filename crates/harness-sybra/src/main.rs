@@ -1,28 +1,10 @@
-use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
+use harness_sybra::cli::Cli;
 use harness_sybra::{SybraBrowserToken, SybraGateway, SybraGatewayConfig, sybra_routes};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
-
-#[derive(Debug, Parser)]
-#[command(name = "harness-sybra", version, about = "Local Harness Sybra gateway")]
-struct Cli {
-    /// Numeric loopback listener. Port zero selects an ephemeral port.
-    #[arg(long, default_value = "127.0.0.1:0")]
-    listen: SocketAddr,
-    /// Numeric loopback HTTP origin of the private Sybra backend.
-    #[arg(long)]
-    upstream: String,
-    /// Private bearer token presented only to the Sybra backend.
-    #[arg(long)]
-    upstream_token_file: PathBuf,
-    /// Private bearer token accepted from the local browser.
-    #[arg(long)]
-    browser_token_file: PathBuf,
-}
 
 #[tokio::main]
 async fn main() -> ExitCode {

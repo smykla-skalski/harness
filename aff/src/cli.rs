@@ -7,7 +7,7 @@ use crate::{hook_render, repo_policy, setup};
 
 #[derive(Debug, Parser)]
 #[command(name = "aff", version)]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     command: Command,
 }

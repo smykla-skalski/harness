@@ -5,6 +5,7 @@
 
 pub mod agents;
 pub mod app;
+pub mod cli;
 pub mod daemon;
 pub mod feature_flags;
 pub mod hooks;

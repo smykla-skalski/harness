@@ -3,20 +3,10 @@ use std::thread;
 use std::time::Duration;
 
 use clap::Parser;
-use harness_mcp::McpCommand;
 use harness_mcp::app::{AppContext, Execute};
+use harness_mcp::cli::Cli;
 use harness_mcp::errors;
 use harness_mcp::runtime::init_tracing;
-
-#[derive(Debug, Parser)]
-#[command(name = "harness-mcp", version, about = "Harness MCP server")]
-struct Cli {
-    /// Seconds to wait before executing the command.
-    #[arg(long, default_value = "0", global = true)]
-    delay: f64,
-    #[command(subcommand)]
-    command: McpCommand,
-}
 
 fn main() -> ExitCode {
     let telemetry_guard = match init_tracing() {

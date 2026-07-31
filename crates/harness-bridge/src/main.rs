@@ -10,21 +10,11 @@ use clap::Parser;
 // the wrong trait compiles clean but leaves `execute()` unresolved.
 #[cfg(not(feature = "daemon-runtime"))]
 use harness_bridge::app::{AppContext, Execute};
-use harness_bridge::daemon::bridge::BridgeCommand;
+use harness_bridge::cli::Cli;
 #[cfg(feature = "daemon-runtime")]
 use harness_daemon::app::{AppContext, Execute};
 use harness_kernel::errors;
 use harness_telemetry::{RuntimeService, init_tracing_subscriber_for};
-
-#[derive(Debug, Parser)]
-#[command(name = "harness-bridge", version, about = "Harness host bridge")]
-struct Cli {
-    /// Seconds to wait before executing the command.
-    #[arg(long, default_value = "0", global = true)]
-    delay: f64,
-    #[command(subcommand)]
-    command: BridgeCommand,
-}
 
 fn main() -> ExitCode {
     let telemetry_guard = match init_tracing_subscriber_for(RuntimeService::Bridge) {

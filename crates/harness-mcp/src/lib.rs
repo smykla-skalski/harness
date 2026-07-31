@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 
 pub mod app;
+pub mod cli;
 pub mod daemon;
 pub mod errors;
 pub mod runtime;
