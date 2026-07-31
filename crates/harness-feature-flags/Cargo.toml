@@ -1,13 +1,13 @@
 [package]
 name = "harness-feature-flags"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-task-board = { path = "../harness-task-board", version = "55.0.2" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.2" }
+harness-task-board = { path = "../harness-task-board", version = "55.0.3" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
 
 [dev-dependencies]
 temp-env = "=0.3.6"

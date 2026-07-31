@@ -1,6 +1,6 @@
 [package]
 name = "harness-github-api"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -12,8 +12,8 @@ publish = false
 test-support = []
 
 [dependencies]
-harness-kernel = { path = "../harness-kernel", version = "55.0.2" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.2" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
+harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
 chrono = "0.4.44"
 fs-err = "3.3.0"
 hex = "0.4.3"

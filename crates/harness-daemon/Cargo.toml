@@ -1,6 +1,6 @@
 [package]
 name = "harness-daemon"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 
@@ -23,43 +23,43 @@ fs-err = "3.3.0"
 futures-util = "0.3.31"
 gix = { version = "0.86.0", features = ["progress-tree", "status", "worktree-mutation", "index", "blocking-http-transport-reqwest-rust-tls"] }
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
-harness-acme-dns = { path = "../harness-acme-dns", version = "55.0.2", optional = true }
-harness-agents = { path = "../harness-agents", version = "55.0.2", features = ["bridge-runtime"] }
-harness-command = { path = "../harness-command", version = "55.0.2" }
-harness-daemon-acp-probe = { path = "../harness-daemon-acp-probe", version = "55.0.2" }
-harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.2" }
-harness-daemon-codex = { path = "../harness-daemon-codex", version = "55.0.2" }
-harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "55.0.2" }
-harness-daemon-launchd = { path = "../harness-daemon-launchd", version = "55.0.2" }
-harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.2" }
-harness-daemon-session-service = { path = "../harness-daemon-session-service", version = "55.0.2" }
-harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "55.0.2" }
-harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.2" }
-harness-daemon-watch = { path = "../harness-daemon-watch", version = "55.0.2" }
-harness-db-schema = { path = "../harness-db-schema", version = "55.0.2" }
-harness-feature-flags = { path = "../harness-feature-flags", version = "55.0.2" }
-harness-github-api = { path = "../harness-github-api", version = "55.0.2" }
-harness-hook = { path = "../harness-hook", version = "55.0.2" }
-harness-hooks = { path = "../harness-hooks", version = "55.0.2" }
-harness-infra = { path = "../harness-infra", version = "55.0.2" }
-harness-kernel = { path = "../harness-kernel", version = "55.0.2" }
-harness-observe = { path = "../harness-observe", version = "55.0.2", default-features = false }
-harness-workspace = { path = "../harness-workspace", version = "55.0.2" }
-harness-policy-graph-store = { path = "../harness-policy-graph-store", version = "55.0.2" }
-harness-protocol = { path = "../harness-protocol", version = "55.0.2" }
-harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.2", features = ["openapi"] }
-harness-reviews = { path = "../harness-reviews", version = "55.0.2" }
-harness-session = { path = "../harness-session", version = "55.0.2" }
-harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "55.0.2", optional = true }
-harness-task-board = { path = "../harness-task-board", version = "55.0.2" }
-harness-task-board-codex-requests = { path = "../harness-task-board-codex-requests", version = "55.0.2" }
-harness-task-board-git-runtime = { path = "../harness-task-board-git-runtime", version = "55.0.2" }
-harness-task-board-provider-sync = { path = "../harness-task-board-provider-sync", version = "55.0.2" }
-harness-task-board-workflow-execution = { path = "../harness-task-board-workflow-execution", version = "55.0.2" }
-harness-task-board-remote-viewer = { path = "../harness-task-board-remote-viewer", version = "55.0.2" }
-harness-telemetry = { path = "../harness-telemetry", version = "55.0.2" }
-harness-timeline = { path = "../harness-timeline", version = "55.0.2", optional = true }
-harness-voice = { path = "../harness-voice", version = "55.0.2", optional = true }
+harness-acme-dns = { path = "../harness-acme-dns", version = "55.0.3", optional = true }
+harness-agents = { path = "../harness-agents", version = "55.0.3", features = ["bridge-runtime"] }
+harness-command = { path = "../harness-command", version = "55.0.3" }
+harness-daemon-acp-probe = { path = "../harness-daemon-acp-probe", version = "55.0.3" }
+harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.3" }
+harness-daemon-codex = { path = "../harness-daemon-codex", version = "55.0.3" }
+harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "55.0.3" }
+harness-daemon-launchd = { path = "../harness-daemon-launchd", version = "55.0.3" }
+harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.3" }
+harness-daemon-session-service = { path = "../harness-daemon-session-service", version = "55.0.3" }
+harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "55.0.3" }
+harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.3" }
+harness-daemon-watch = { path = "../harness-daemon-watch", version = "55.0.3" }
+harness-db-schema = { path = "../harness-db-schema", version = "55.0.3" }
+harness-feature-flags = { path = "../harness-feature-flags", version = "55.0.3" }
+harness-github-api = { path = "../harness-github-api", version = "55.0.3" }
+harness-hook = { path = "../harness-hook", version = "55.0.3" }
+harness-hooks = { path = "../harness-hooks", version = "55.0.3" }
+harness-infra = { path = "../harness-infra", version = "55.0.3" }
+harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
+harness-observe = { path = "../harness-observe", version = "55.0.3", default-features = false }
+harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
+harness-policy-graph-store = { path = "../harness-policy-graph-store", version = "55.0.3" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.3" }
+harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.3", features = ["openapi"] }
+harness-reviews = { path = "../harness-reviews", version = "55.0.3" }
+harness-session = { path = "../harness-session", version = "55.0.3" }
+harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "55.0.3", optional = true }
+harness-task-board = { path = "../harness-task-board", version = "55.0.3" }
+harness-task-board-codex-requests = { path = "../harness-task-board-codex-requests", version = "55.0.3" }
+harness-task-board-git-runtime = { path = "../harness-task-board-git-runtime", version = "55.0.3" }
+harness-task-board-provider-sync = { path = "../harness-task-board-provider-sync", version = "55.0.3" }
+harness-task-board-workflow-execution = { path = "../harness-task-board-workflow-execution", version = "55.0.3" }
+harness-task-board-remote-viewer = { path = "../harness-task-board-remote-viewer", version = "55.0.3" }
+harness-telemetry = { path = "../harness-telemetry", version = "55.0.3" }
+harness-timeline = { path = "../harness-timeline", version = "55.0.3", optional = true }
+harness-voice = { path = "../harness-voice", version = "55.0.3", optional = true }
 hex = "0.4.3"
 hickory-resolver = "0.26.1"
 hmac = "0.13.0"
@@ -118,16 +118,16 @@ security-framework = "3"
 # dev-dependency override of the same crate.
 agent-client-protocol-http = { version = "=2.0.0", default-features = false, features = ["client", "server"] }
 assert_cmd = "=2.2.2"
-harness-agents = { path = "../harness-agents", version = "55.0.2", features = ["test-support"] }
-harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.2", features = ["test-support"] }
-harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.2", features = ["test-support"] }
-harness-db-schema = { path = "../harness-db-schema", version = "55.0.2", features = ["test-support"] }
-harness-github-api = { path = "../harness-github-api", version = "55.0.2", features = ["test-support"] }
-harness-policy-graph-store = { path = "../harness-policy-graph-store", version = "55.0.2", features = ["test-support"] }
-harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.2", features = ["test-support"] }
-harness-reviews = { path = "../harness-reviews", version = "55.0.2", features = ["test-support"] }
-harness-task-board = { path = "../harness-task-board", version = "55.0.2", features = ["test-support"] }
-harness-task-board-git-runtime = { path = "../harness-task-board-git-runtime", version = "55.0.2", features = ["test-support"] }
+harness-agents = { path = "../harness-agents", version = "55.0.3", features = ["test-support"] }
+harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "55.0.3", features = ["test-support"] }
+harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.3", features = ["test-support"] }
+harness-db-schema = { path = "../harness-db-schema", version = "55.0.3", features = ["test-support"] }
+harness-github-api = { path = "../harness-github-api", version = "55.0.3", features = ["test-support"] }
+harness-policy-graph-store = { path = "../harness-policy-graph-store", version = "55.0.3", features = ["test-support"] }
+harness-remote-trust = { path = "../harness-remote-trust", version = "55.0.3", features = ["test-support"] }
+harness-reviews = { path = "../harness-reviews", version = "55.0.3", features = ["test-support"] }
+harness-task-board = { path = "../harness-task-board", version = "55.0.3", features = ["test-support"] }
+harness-task-board-git-runtime = { path = "../harness-task-board-git-runtime", version = "55.0.3", features = ["test-support"] }
 harness-testkit = { path = "../../testkit" }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
 opentelemetry_sdk = { version = "=0.32.1", default-features = false, features = ["trace", "metrics", "logs", "rt-tokio"] }

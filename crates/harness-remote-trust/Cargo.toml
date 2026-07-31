@@ -1,12 +1,12 @@
 [package]
 name = "harness-remote-trust"
-version = "55.0.2"
+version = "55.0.3"
 edition = "2024"
 rust-version = "1.95"
 
 [dependencies]
 base64 = "0.23.0"
-harness-protocol = { path = "../harness-protocol", version = "55.0.2" }
+harness-protocol = { path = "../harness-protocol", version = "55.0.3" }
 hex = "0.4.3"
 http = "1.4.2"
 rand_core06 = { package = "rand_core", version = "0.6.4", features = ["std"] }

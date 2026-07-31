@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardAttemptState,
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardReviewRoundDecision,
@@ -120,28 +119,12 @@ async fn malformed_codex_completion_retains_output_and_rejection_reason() {
         1,
     ))
     .await;
-    let runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()])
-        .with_durable_db(fixture.test.db.clone());
+    let runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()]);
 
-    super::tick(&fixture, &runtime, NOW).await;
-    super::tick(&fixture, &runtime, NOW).await;
-    let execution = super::load_execution(&fixture).await;
-    let run_id = execution.attempts[0].idempotency_key.clone();
-    let mut run = fixture
-        .test
-        .db
-        .codex_run(&run_id)
-        .await
-        .expect("load Codex run")
-        .expect("Codex run exists");
-    run.status = CodexRunStatus::Completed;
-    run.final_message = Some("not valid workflow evidence".into());
-    fixture
-        .test
-        .db
-        .save_codex_run(&run)
-        .await
-        .expect("save malformed completion");
+    // Start the review run, then finish it with output that is not valid
+    // workflow evidence so the coordinator reconciles a malformed completion.
+    drive_until_report_run_started(&fixture, &runtime).await;
+    runtime.complete_all_runs_with_message("not valid workflow evidence");
 
     let report = drive_until_report(&fixture, &runtime).await;
 
@@ -162,6 +145,18 @@ async fn malformed_codex_completion_retains_output_and_rejection_reason() {
         TaskBoardExecutionState::HumanRequired
     );
     assert_eq!(execution.attempts[0].state, TaskBoardAttemptState::Failed);
+}
+
+/// Reconcile until the review attempt has actually started its report run, so a
+/// test can then drive the run to a chosen terminal outcome.
+async fn drive_until_report_run_started(fixture: &Fixture, runtime: &FakeReadOnlyRuntime) {
+    for _ in 0..8 {
+        super::tick(fixture, runtime, NOW).await;
+        if runtime.start_count() >= 1 {
+            return;
+        }
+    }
+    panic!("review run never started its report attempt");
 }
 
 async fn drive_until_report(

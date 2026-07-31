@@ -160,6 +160,16 @@ impl FakeReadOnlyRuntime {
         }
     }
 
+    /// Force every started run to finish `Completed` with a raw final message
+    /// that is not valid workflow evidence, so the coordinator has to reconcile
+    /// a malformed completion.
+    pub(super) fn complete_all_runs_with_message(&self, message: &str) {
+        for run in self.runs.lock().expect("runs lock").values_mut() {
+            run.status = CodexRunStatus::Completed;
+            run.final_message = Some(message.into());
+        }
+    }
+
     pub(super) fn set_load_error(&self, detail: &str) {
         *self.load_error.lock().expect("load error lock") = Some(detail.into());
     }
