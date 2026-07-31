@@ -300,7 +300,19 @@ The example uses the default daemon unit name; substitute the installed name if 
 
 ## Upgrading
 
-The panel has no transactional upgrade path through the `harness-systemd` controller; that is tracked in #604. Do not assume `daemon:remote:deploy` touches it. Render both candidate units before changing the host, then save the installed binary and unit pair in a root-owned backup directory. Each update block quiesces the public route and takes a consistent SQLite backup before starting the candidate; the database is the panel StateDirectory's only persistent payload, and SQLite's backup command folds any WAL state into that image.
+`daemon:remote:deploy` does a binary-only panel deploy by default, and `--no-panel` skips it. That step stops the remote daemon, takes a consistent SQLite backup, swaps the panel binary, restarts the service over its still-active socket, and checks the loopback health route, restoring the binary and that backup if the check does not return the expected code. It never renders or installs units, so it does not carry a change to `harness-panel.service`, `harness-panel.socket`, or a `ListenStream=` value. The panel still has no transactional upgrade path through the `harness-systemd` controller, tracked in #604, so those unit changes are what the manual runbook below is for.
+
+The panel step reads its host specifics from the environment, defaulting to a standard install:
+
+- `HARNESS_REMOTE_PANEL_CANDIDATE` the freshly built binary to install, default `$HOME/.local/bin/harness-panel` (under `HARNESS_INSTALL_BINARY_DIR` when set)
+- `HARNESS_REMOTE_PANEL_BINARY` the installed path it replaces, default `/usr/local/bin/harness-panel`
+- `HARNESS_REMOTE_PANEL_DB` the SQLite database to snapshot, default `/var/lib/harness-panel/panel.sqlite3`
+- `HARNESS_REMOTE_PANEL_SERVICE` and `HARNESS_REMOTE_PANEL_SOCKET` the panel units, defaults `harness-panel.service` and `harness-panel.socket`
+- `HARNESS_REMOTE_PANEL_DAEMON_UNIT` the remote daemon stopped for the snapshot, default `harness-remote-daemon.service`
+- `HARNESS_REMOTE_PANEL_HEALTH_URL` and `HARNESS_REMOTE_PANEL_HEALTH_EXPECT` the loopback check and the code that means the panel is up and demanding auth, defaults `http://127.0.0.1:8787/panel/healthz` and `401`
+- `HARNESS_REMOTE_PANEL_BACKUP_ROOT` where the rollback copy of the binary and database snapshot is written, default `/var/tmp`
+
+Use the manual steps below for a unit, socket, or `ListenStream=` change the binary-only deploy leaves alone. Render both candidate units before changing the host, then save the installed binary and unit pair in a root-owned backup directory. Each update block quiesces the public route and takes a consistent SQLite backup before starting the candidate; the database is the panel StateDirectory's only persistent payload, and SQLite's backup command folds any WAL state into that image.
 
 ```bash
 mise run install:harness:panel || exit 1
