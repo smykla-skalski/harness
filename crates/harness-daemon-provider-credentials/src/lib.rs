@@ -26,7 +26,7 @@ use harness_task_board::{
 #[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 use security_framework::base::Error as SecError;
 #[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
-use security_framework::passwords::get_generic_password;
+use security_framework::item::{ItemClass, ItemSearchOptions, SearchResult};
 use sha1::{Digest, Sha1};
 
 #[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
@@ -220,8 +220,21 @@ fn unavailable_status(error: Option<String>) -> ProviderCredentialStatus {
 
 #[cfg(all(target_os = "macos", not(any(test, feature = "test-support"))))]
 fn read_keychain(service: &str, account: &str) -> Result<Option<Vec<u8>>, String> {
-    match get_generic_password(service, account) {
-        Ok(bytes) => Ok(Some(bytes)),
+    let result = ItemSearchOptions::new()
+        .class(ItemClass::generic_password())
+        .service(service)
+        .account(account)
+        .load_data(true)
+        .skip_authenticated_items(true)
+        .search();
+    match result {
+        Ok(mut matches) => match matches.pop() {
+            Some(SearchResult::Data(bytes)) => Ok(Some(bytes)),
+            Some(_) => Err(format!(
+                "read Keychain credential for {service} ({account}): unexpected result"
+            )),
+            None => Ok(None),
+        },
         Err(error) if is_not_found(error) => Ok(None),
         Err(error) => Err(format!(
             "read Keychain credential for {service} ({account}): {error}"
