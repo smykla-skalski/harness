@@ -179,27 +179,33 @@ extension TaskBoardOverviewBehaviorTests {
       phase: "entering",
       location: CGPoint(x: 210, y: 80),
       destinationSize: CGSize(width: 420, height: 704),
-      elapsedMilliseconds: 40,
-      itemsCount: 1,
-      suggestedOperationsRawValue: 3
+      metrics: TaskBoardDropSessionTrace.Metrics(
+        elapsedMilliseconds: 40,
+        itemsCount: 1,
+        suggestedOperationsRawValue: 3
+      )
     )
     trace.record(
       sessionID: "abc",
       phase: "active",
       location: CGPoint(x: 190, y: 120),
       destinationSize: CGSize(width: 420, height: 704),
-      elapsedMilliseconds: 55,
-      itemsCount: 1,
-      suggestedOperationsRawValue: 3
+      metrics: TaskBoardDropSessionTrace.Metrics(
+        elapsedMilliseconds: 55,
+        itemsCount: 1,
+        suggestedOperationsRawValue: 3
+      )
     )
     trace.record(
       sessionID: "abc",
       phase: "active",
       location: CGPoint(x: 230, y: 100),
       destinationSize: CGSize(width: 420, height: 704),
-      elapsedMilliseconds: 72,
-      itemsCount: 1,
-      suggestedOperationsRawValue: 3
+      metrics: TaskBoardDropSessionTrace.Metrics(
+        elapsedMilliseconds: 72,
+        itemsCount: 1,
+        suggestedOperationsRawValue: 3
+      )
     )
 
     #expect(trace.phaseCounts == ["active": 2, "entering": 1])
