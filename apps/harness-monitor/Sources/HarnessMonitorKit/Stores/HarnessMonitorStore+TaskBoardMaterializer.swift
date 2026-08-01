@@ -38,6 +38,10 @@ extension HarnessMonitorStore {
       // named a sandbox location needing a bookmark resolved, and it is gone.
       githubProject: settings.githubProject,
       githubInbox: settings.githubInbox,
+      scheduling: settings.scheduling,
+      retry: settings.retry,
+      reviewers: settings.reviewers,
+      repositories: settings.repositories,
       policyVersion: settings.policyVersion
     )
   }

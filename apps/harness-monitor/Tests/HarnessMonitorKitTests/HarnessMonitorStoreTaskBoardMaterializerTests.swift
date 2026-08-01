@@ -17,7 +17,7 @@ struct HarnessMonitorStoreTaskBoardMaterializerTests {
       preservingPathsFrom: baseline
     )
 
-    #expect(materialized.orchestratorSettings.projectDir == "/Users/example/Projects/harness")
+    #expect(materialized.orchestratorSettings == snapshot.orchestratorSettings)
     #expect(await store.bookmarkStore?.all().count == initialBookmarkCount)
   }
 
@@ -27,6 +27,13 @@ struct HarnessMonitorStoreTaskBoardMaterializerTests {
         enabledWorkflows: [.defaultTask],
         dryRunDefault: true,
         projectDir: projectDir,
+        repositories: [
+          TaskBoardRepositoryAutomationConfig(
+            repository: "smykla-skalski/harness",
+            workflows: [.prFix],
+            executionCheckoutPath: projectDir
+          )
+        ],
         policyVersion: "task-board-policy-v1"
       ),
       runtimeConfig: TaskBoardGitRuntimeConfig(),
