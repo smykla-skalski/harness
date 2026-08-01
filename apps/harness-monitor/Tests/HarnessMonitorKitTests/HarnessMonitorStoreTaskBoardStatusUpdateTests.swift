@@ -134,8 +134,8 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
-  @Test("Moving a terminal workflow back to Todo starts a fresh automation run")
-  func terminalWorkflowTodoMoveClearsAutomationBindings() async {
+  @Test("Moving a terminal workflow back to Todo starts fresh at the pinned PR head")
+  func terminalWorkflowTodoMovePreservesPinnedPullRequest() async {
     let client = RecordingHarnessClient()
     client.configureTaskBoardItems([
       taskBoardItem(
@@ -144,7 +144,16 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
         workflow: TaskBoardWorkflowState(
           executionId: "workflow-1",
           status: .paused,
-          currentStepId: "implementation"
+          currentStepId: "implementation",
+          attempts: 2,
+          branch: "harness/old-session",
+          worktree: "/tmp/old-worktree",
+          prNumber: 1332,
+          prUrl: "https://github.com/smykla-skalski/harness/pull/1332",
+          prHeadRevision: "90d9de24",
+          prAuthor: "renovate[bot]",
+          lastError: "report attempts exhausted",
+          policyTraceIds: ["policy-old"]
         ),
         sessionId: "session-1",
         workItemId: "task-1"
@@ -163,7 +172,12 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
           id: "board-1",
           request: TaskBoardUpdateItemRequest(
             status: .todo,
-            clearWorkflow: true,
+            workflow: TaskBoardWorkflowState(
+              prNumber: 1332,
+              prUrl: "https://github.com/smykla-skalski/harness/pull/1332",
+              prHeadRevision: "90d9de24",
+              prAuthor: "renovate[bot]"
+            ),
             clearSessionId: true,
             clearWorkItemId: true
           )
@@ -172,7 +186,15 @@ struct HarnessMonitorStoreTaskBoardStatusUpdateTests {
     )
     let item = store.globalTaskBoardItems.first
     #expect(item?.status == .todo)
-    #expect(item?.workflow == nil)
+    #expect(
+      item?.workflow
+        == TaskBoardWorkflowState(
+          prNumber: 1332,
+          prUrl: "https://github.com/smykla-skalski/harness/pull/1332",
+          prHeadRevision: "90d9de24",
+          prAuthor: "renovate[bot]"
+        )
+    )
     #expect(item?.sessionId == nil)
     #expect(item?.workItemId == nil)
   }

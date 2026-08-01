@@ -139,7 +139,7 @@ extension TaskBoardItem {
     let startsFreshAutomation = status == .todo && workflow?.status.requiresFreshRun == true
     return TaskBoardUpdateItemRequest(
       status: status,
-      clearWorkflow: startsFreshAutomation,
+      workflow: startsFreshAutomation ? workflow?.requeued : nil,
       clearSessionId: startsFreshAutomation,
       clearWorkItemId: startsFreshAutomation
     )
@@ -179,6 +179,17 @@ extension TaskBoardItem {
       createdAt: createdAt,
       updatedAt: updatedAt,
       deletedAt: deletedAt
+    )
+  }
+}
+
+extension TaskBoardWorkflowState {
+  fileprivate var requeued: TaskBoardWorkflowState {
+    TaskBoardWorkflowState(
+      prNumber: prNumber,
+      prUrl: prUrl,
+      prHeadRevision: prHeadRevision,
+      prAuthor: prAuthor
     )
   }
 }
