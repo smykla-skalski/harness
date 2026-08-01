@@ -4,7 +4,7 @@ use std::time::Duration;
 use harness_agents::runtime::signal::Signal;
 use harness_kernel::errors::CliError;
 use harness_protocol::timeline::{TimelineEntry, TimelineWindowRequest, TimelineWindowResponse};
-use harness_session::index::ResolvedSession;
+use harness_session::index::{DiscoveredProject, ResolvedSession};
 use harness_session::types::{SessionLogEntry, SessionSignalRecord, SessionState};
 use harness_session::wire::{
     AgentToolActivitySummary, ProjectSummary, SessionDetail, SessionSummary,
@@ -101,6 +101,19 @@ pub trait SignalStorage {
     /// # Errors
     /// Returns an error on session discovery failures.
     fn list_session_summaries_full(&self) -> Result<Vec<SessionSummary>, CliError>;
+
+    /// # Errors
+    /// Returns an error on SQL failures.
+    fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns an error on SQL failures.
+    fn create_session_record(&self, project_id: &str, state: &SessionState)
+    -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns an error on SQL failures.
+    fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError>;
 }
 
 /// Asynchronous persistence needed by signal delivery.
@@ -197,6 +210,22 @@ pub trait AsyncSignalStorage: Send + Sync {
     fn list_liveness_candidate_ids(
         &self,
     ) -> impl Future<Output = Result<Vec<String>, CliError>> + Send;
+
+    fn sync_project(
+        &self,
+        project: &DiscoveredProject,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
+
+    fn create_session_record(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
+
+    fn delete_session_row(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<bool, CliError>> + Send;
 }
 
 /// Active wake transport used for best-effort signal delivery.

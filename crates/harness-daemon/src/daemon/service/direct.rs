@@ -1,11 +1,4 @@
-use tokio::task::spawn_blocking;
-
-use super::session_setup::{
-    PreparedSession, prepare_session, rollback_session_artifacts, rollback_session_artifacts_async,
-};
-use super::session_teardown::destroy_session_artifacts;
-use super::{CliError, Path, SessionState, agents_service, build_log_entry, session_service};
-use harness_kernel::errors::CliErrorKind;
+use super::{CliError, Path, SessionState, agents_service};
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 /// Creates a per-session linked checkout and records the state file under the
@@ -17,49 +10,7 @@ pub fn start_session_direct(
     request: &super::protocol::SessionStartRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
-    let Some(db) = db else {
-        // No local DB: route through start_session_with_policy. That helper
-        // first tries to forward to a running harness daemon over HTTP - the
-        // receiving daemon (which always has its own DB) creates the worktree
-        // via start_session_direct_async. When no daemon is reachable, the
-        // helper falls back to the legacy file-based path which intentionally
-        // does NOT create a worktree, since per the workspace-layout spec the
-        // daemon owns worktree lifecycle and a file-only fallback session
-        // never gains one.
-        return session_service::start_session_with_policy(
-            &request.context,
-            &request.title,
-            Path::new(&request.project_dir),
-            request.session_id.as_deref(),
-            request.policy_preset.as_deref(),
-        );
-    };
-    let prepared = prepare_session(request)?;
-    let PreparedSession {
-        layout,
-        canonical_origin,
-        project,
-        state,
-    } = prepared;
-
-    let project_id = project.project_id.clone();
-    if let Err(error) = db.sync_project(&project) {
-        rollback_session_artifacts(&canonical_origin, &layout);
-        return Err(error);
-    }
-    if let Err(error) = db.create_session_record(&project_id, &state) {
-        rollback_session_artifacts(&canonical_origin, &layout);
-        return Err(error);
-    }
-    db.append_log_entry(&build_log_entry(
-        &state.session_id,
-        session_service::log_session_started(&request.title, &request.context),
-        None,
-        None,
-    ))?;
-    db.bump_change(&state.session_id)?;
-    db.bump_change("global")?;
-    Ok(state)
+    harness_daemon_session_service::start_session(request, db)
 }
 
 /// Start a new session through the canonical async daemon DB.
@@ -67,47 +18,11 @@ pub fn start_session_direct(
 ///
 /// # Errors
 /// Returns `CliError` when the worktree cannot be created or async DB operations fail.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "session creation must pair each database failure with asynchronous artifact rollback"
-)]
 pub(crate) async fn start_session_direct_async(
     request: &super::protocol::SessionStartRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    let request_for_worker = request.clone();
-    let prepared = spawn_blocking(move || prepare_session(&request_for_worker))
-        .await
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("join session preparation worker: {error}"))
-        })??;
-    let PreparedSession {
-        layout,
-        canonical_origin,
-        project,
-        state,
-    } = prepared;
-
-    let project_id = project.project_id.clone();
-    if let Err(error) = async_db.sync_project(&project).await {
-        rollback_session_artifacts_async(canonical_origin, layout).await;
-        return Err(error);
-    }
-    if let Err(error) = async_db.create_session_record(&project_id, &state).await {
-        rollback_session_artifacts_async(canonical_origin, layout).await;
-        return Err(error);
-    }
-    async_db
-        .append_log_entry(&build_log_entry(
-            &state.session_id,
-            session_service::log_session_started(&request.title, &request.context),
-            None,
-            None,
-        ))
-        .await?;
-    async_db.bump_change(&state.session_id).await?;
-    async_db.bump_change("global").await?;
-    Ok(state)
+    harness_daemon_session_service::start_session_async(request, async_db).await
 }
 
 /// Join an existing session, writing directly to `SQLite` when a DB is available.
@@ -263,17 +178,7 @@ pub fn delete_session_direct(
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<bool, CliError> {
-    let Some(db) = db else {
-        return Err(CliErrorKind::workflow_io("delete requires a daemon DB").into());
-    };
-    let Some(state) = db.load_session_state_for_mutation(session_id)? else {
-        return Ok(false);
-    };
-    destroy_session_artifacts(&state);
-    db.delete_session_row(session_id)?;
-    db.bump_change(session_id)?;
-    db.bump_change("global")?;
-    Ok(true)
+    harness_daemon_session_service::delete_session(session_id, db)
 }
 
 /// Async variant of [`delete_session_direct`].
@@ -284,12 +189,5 @@ pub(crate) async fn delete_session_direct_async(
     session_id: &str,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<bool, CliError> {
-    let Some(resolved) = async_db.resolve_session(session_id).await? else {
-        return Ok(false);
-    };
-    destroy_session_artifacts(&resolved.state);
-    async_db.delete_session_row(session_id).await?;
-    async_db.bump_change(session_id).await?;
-    async_db.bump_change("global").await?;
-    Ok(true)
+    harness_daemon_session_service::delete_session_async(session_id, async_db).await
 }

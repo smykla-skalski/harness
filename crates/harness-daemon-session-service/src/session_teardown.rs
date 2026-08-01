@@ -1,8 +1,10 @@
-use crate::session::storage as session_storage;
-use crate::session::types::SessionState;
-use crate::workspace::harness_data_root;
-use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
-use crate::workspace::worktree::WorktreeController;
+use harness_session::storage as session_storage;
+use harness_session::types::SessionState;
+use harness_workspace::workspace::harness_data_root;
+use harness_workspace::workspace::layout::{
+    SessionLayout, sessions_root as workspace_sessions_root,
+};
+use harness_workspace::workspace::worktree::WorktreeController;
 
 /// Destroy the on-disk artifacts for a session: deregister the active-session
 /// marker and tear down its linked checkout. Failures are logged and swallowed so
@@ -15,7 +17,7 @@ use crate::workspace::worktree::WorktreeController;
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-pub(super) fn destroy_session_artifacts(state: &SessionState) {
+pub fn destroy_session_artifacts(state: &SessionState) {
     let layout = build_layout(state);
     if let Err(error) = session_storage::deregister_active(&layout) {
         tracing::warn!(%error, session_id = %state.session_id, "deregister active failed");
@@ -53,15 +55,16 @@ fn build_layout(state: &SessionState) -> SessionLayout {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 
-    use crate::session::types::{SessionMetrics, SessionState, SessionStatus};
+    use harness_session::types::{SessionMetrics, SessionPolicy, SessionStatus};
+
+    use super::*;
 
     fn state_with_external_origin(origin: PathBuf) -> SessionState {
         SessionState {
-            schema_version: crate::session::types::CURRENT_VERSION,
+            schema_version: harness_session::types::CURRENT_VERSION,
             state_version: 0,
             session_id: "72026b9c-9f8f-5a76-a6cf-a05cbb5741ed".into(),
             project_name: "demo".into(),
@@ -72,7 +75,7 @@ mod tests {
             title: String::new(),
             context: String::new(),
             status: SessionStatus::Active,
-            policy: crate::session::types::SessionPolicy::default(),
+            policy: SessionPolicy::default(),
             created_at: "2026-04-20T00:00:00Z".into(),
             updated_at: "2026-04-20T00:00:00Z".into(),
             agents: BTreeMap::new(),

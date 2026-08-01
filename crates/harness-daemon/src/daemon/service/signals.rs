@@ -111,6 +111,25 @@ impl SignalStorage for DaemonDb {
     ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
         DaemonDb::list_session_summaries_full(self)
     }
+
+    fn sync_project(
+        &self,
+        project: &harness_session::index::DiscoveredProject,
+    ) -> Result<(), CliError> {
+        DaemonDb::sync_project(self, project)
+    }
+
+    fn create_session_record(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError> {
+        DaemonDb::create_session_record(self, project_id, state)
+    }
+
+    fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+        DaemonDb::delete_session_row(self, session_id)
+    }
 }
 
 impl SignalWake for AgentTuiManagerHandle {

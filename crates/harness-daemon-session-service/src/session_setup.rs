@@ -8,31 +8,33 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_session::index::{self, DiscoveredProject};
+use harness_session::service as session_service;
+use harness_session::storage as session_storage;
+use harness_session::types::SessionState;
+use harness_session::wire::SessionStartRequest;
+use harness_workspace::sandbox;
+use harness_workspace::workspace::layout::{
+    SessionLayout, sessions_root as workspace_sessions_root,
+};
+use harness_workspace::workspace::worktree::WorktreeController;
+use harness_workspace::workspace::{
+    ensure_non_indexable, harness_data_root, ids, project_context_dir, project_resolver, utc_now,
+};
 use tokio::task::spawn_blocking;
 
-use crate::daemon::index::{self, DiscoveredProject};
-use crate::sandbox;
-use crate::session::types::SessionState;
-use crate::workspace::ids;
-use crate::workspace::layout::{SessionLayout, sessions_root as workspace_sessions_root};
-use crate::workspace::project_resolver;
-use crate::workspace::worktree::WorktreeController;
-use crate::workspace::{ensure_non_indexable, harness_data_root, project_context_dir, utc_now};
-use harness_kernel::errors::{CliError, CliErrorKind};
-
-use super::session_service;
-use super::session_storage;
-
-pub(super) struct PreparedSession {
-    pub(super) layout: SessionLayout,
-    pub(super) canonical_origin: PathBuf,
-    pub(super) project: DiscoveredProject,
-    pub(super) state: SessionState,
+pub struct PreparedSession {
+    pub layout: SessionLayout,
+    pub canonical_origin: PathBuf,
+    pub project: DiscoveredProject,
+    pub state: SessionState,
 }
 
-pub(super) fn prepare_session(
-    request: &super::protocol::SessionStartRequest,
-) -> Result<PreparedSession, CliError> {
+/// # Errors
+/// Returns an error when project or session preparation, worktree creation, or
+/// state persistence fails.
+pub fn prepare_session(request: &SessionStartRequest) -> Result<PreparedSession, CliError> {
     session_service::validate_policy_preset(request.policy_preset.as_deref())?;
 
     // Sandboxed callers may pass a bookmark id; the scope guard MUST stay
@@ -156,14 +158,64 @@ fn record_project_origin_for_session(canonical_origin: &Path) -> Result<(), CliE
     session_storage::record_project_origin(canonical_origin)
 }
 
-pub(super) fn rollback_session_artifacts(origin: &Path, layout: &SessionLayout) {
+pub fn rollback_session_artifacts(origin: &Path, layout: &SessionLayout) {
     let _ = session_storage::deregister_active(layout);
     let _ = WorktreeController::destroy(origin, layout);
 }
 
-pub(super) async fn rollback_session_artifacts_async(origin: PathBuf, layout: SessionLayout) {
+pub async fn rollback_session_artifacts_async(origin: PathBuf, layout: SessionLayout) {
     let _ = spawn_blocking(move || {
         rollback_session_artifacts(&origin, &layout);
     })
     .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use harness_testkit::with_isolated_harness_env;
+    use tempfile::tempdir;
+
+    use super::*;
+
+    fn with_temp_worktree_project<F: FnOnce(&Path, &Path)>(test_fn: F) {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            temp_env::with_var(
+                "CLAUDE_SESSION_ID",
+                Some("77d13b08-1651-541b-a3fc-26cab59e0aea"),
+                || {
+                    let repository = tmp.path().join("repository");
+                    harness_testkit::init_git_repo_with_seed(&repository);
+                    let worktree = tmp.path().join("feature-worktree");
+                    harness_testkit::add_git_worktree(&repository, &worktree, "feature");
+                    test_fn(&repository, &worktree);
+                },
+            );
+        });
+    }
+
+    /// A sandboxed daemon may reach the origin only while a folder grant is
+    /// held, and the grant is gone once preparation returns. The identity the
+    /// caller registers has to be captured before then.
+    #[test]
+    fn prepare_session_captures_project_identity_before_the_grant_drops() {
+        with_temp_worktree_project(|repository, worktree| {
+            let prepared = prepare_session(&SessionStartRequest {
+                title: "worktree identity".into(),
+                context: "capture identity under the grant".into(),
+                session_id: Some("00000000-0000-4000-8000-000000000104".into()),
+                project_dir: worktree.to_string_lossy().into_owned(),
+                policy_preset: None,
+                base_ref: None,
+            })
+            .expect("prepare session in a linked worktree");
+
+            assert_eq!(prepared.project.name, "repository");
+            assert_eq!(
+                prepared.project.repository_root.as_deref(),
+                Some(repository.canonicalize().expect("canonicalize").as_path())
+            );
+            assert!(prepared.project.is_worktree, "worktree status must survive");
+        });
+    }
 }

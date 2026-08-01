@@ -121,6 +121,25 @@ impl AsyncSignalStorage for AsyncDaemonDb {
     async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
         AsyncDaemonDb::list_liveness_candidate_ids(self).await
     }
+
+    async fn sync_project(
+        &self,
+        project: &harness_session::index::DiscoveredProject,
+    ) -> Result<(), CliError> {
+        AsyncDaemonDb::sync_project(self, project).await
+    }
+
+    async fn create_session_record(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError> {
+        AsyncDaemonDb::create_session_record(self, project_id, state).await
+    }
+
+    async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+        AsyncDaemonDb::delete_session_row(self, session_id).await
+    }
 }
 
 pub(crate) async fn cancel_signal_async(

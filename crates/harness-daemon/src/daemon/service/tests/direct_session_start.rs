@@ -269,33 +269,6 @@ fn session_start_honors_custom_base_ref() {
     });
 }
 
-/// A sandboxed daemon may reach the origin only while a folder grant is held,
-/// and the grant is gone once preparation returns. The identity the caller
-/// registers has to be captured before then.
-#[test]
-fn prepare_session_captures_project_identity_before_the_grant_drops() {
-    with_temp_worktree_project(|repository, worktree| {
-        let prepared = crate::daemon::service::session_setup::prepare_session(
-            &crate::daemon::protocol::SessionStartRequest {
-                title: "worktree identity".into(),
-                context: "capture identity under the grant".into(),
-                session_id: Some("00000000-0000-4000-8000-000000000104".into()),
-                project_dir: worktree.to_string_lossy().into_owned(),
-                policy_preset: None,
-                base_ref: None,
-            },
-        )
-        .expect("prepare session in a linked worktree");
-
-        assert_eq!(prepared.project.name, "repository");
-        assert_eq!(
-            prepared.project.repository_root.as_deref(),
-            Some(repository.canonicalize().expect("canonicalize").as_path())
-        );
-        assert!(prepared.project.is_worktree, "worktree status must survive");
-    });
-}
-
 #[test]
 fn start_session_direct_registers_worktree_under_its_repository() {
     with_temp_worktree_project(|_repository, worktree| {

@@ -4010,8 +4010,11 @@ dependencies = [
  "harness-kernel",
  "harness-protocol",
  "harness-session",
+ "harness-testkit",
  "harness-timeline",
  "harness-workspace",
+ "temp-env",
+ "tempfile",
  "tokio",
  "tracing",
 ]

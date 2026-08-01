@@ -5,6 +5,7 @@
 //! never depends on the daemon crate that wires it into HTTP, WebSocket, and
 //! managed-agent runtimes.
 
+mod adopt;
 mod async_ops;
 mod async_send;
 mod direct;
@@ -15,16 +16,20 @@ mod observe;
 mod persistence;
 mod ports;
 mod reconcile;
+mod session_setup;
+mod session_teardown;
 mod sessions;
 mod sync;
 mod timeout;
 mod tui_identity;
 
+pub use adopt::{adopt_session_record, adopt_session_record_async};
 pub use async_ops::{cancel_signal_async, record_signal_ack_direct_async};
 pub use async_send::send_signal_async;
 pub use direct::{
-    disconnect_agent, disconnect_agent_async, join_session, join_session_async, persist_disconnect,
-    register_agent_runtime_session, register_agent_runtime_session_async, update_session_title,
+    delete_session, delete_session_async, disconnect_agent, disconnect_agent_async, join_session,
+    join_session_async, persist_disconnect, register_agent_runtime_session,
+    register_agent_runtime_session_async, start_session, start_session_async, update_session_title,
     update_session_title_async,
 };
 pub use leave::{leave_session, leave_session_async};

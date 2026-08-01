@@ -12,12 +12,12 @@ use std::time::Instant;
 use crate::agents::runtime as agents_runtime;
 use crate::agents::runtime::signal::AckResult;
 use crate::agents::service as agents_service;
+#[cfg(test)]
+use crate::session::storage as session_storage;
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionState, SessionTransition, TaskSource,
 };
-use crate::session::{
-    observe as session_observe, service as session_service, storage as session_storage,
-};
+use crate::session::{observe as session_observe, service as session_service};
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
@@ -195,8 +195,6 @@ mod reviews_github_policy;
 pub(crate) mod reviews_source_port;
 mod reviews_thread_resolve;
 mod reviews_timeline;
-mod session_setup;
-mod session_teardown;
 mod sessions;
 mod signals;
 mod signals_async;

@@ -17,6 +17,11 @@ harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
 tokio = { version = "1.50.0", features = ["rt", "time"] }
 tracing = "0.1.44"
 
+[dev-dependencies]
+harness-testkit = { path = "../../testkit" }
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "=3.27.0"
+
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
 
