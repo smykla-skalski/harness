@@ -104,7 +104,8 @@ extension HarnessMonitorStore {
   @discardableResult
   public func updateTaskBoardGitSettings(
     snapshot: TaskBoardGitSettingsSnapshot,
-    origin: TaskBoardSettingsSaveOrigin
+    origin: TaskBoardSettingsSaveOrigin,
+    preservingPathsFrom pathBaseline: TaskBoardGitSettingsPathBaseline? = nil
   ) async -> Bool {
     await acquireTaskBoardOrchestratorSettingsMutationLock()
     beginDaemonAction()
@@ -120,7 +121,10 @@ extension HarnessMonitorStore {
       guard let instanceID = taskBoardDatabaseInstanceID else {
         throw HarnessMonitorAPIError.server(code: 503, message: "Task Board database unavailable")
       }
-      let materializedSnapshot = try await materializeTaskBoardGitSettings(snapshot)
+      let materializedSnapshot = try await materializeTaskBoardGitSettings(
+        snapshot,
+        preservingPathsFrom: pathBaseline
+      )
 
       let orchestratorSettings: TaskBoardOrchestratorSettings
       do {

@@ -93,6 +93,7 @@ extension SettingsRepositoriesSection {
     defer { taskBoardFormState.isLoading = false }
     let snapshot = try await store.taskBoardGitSettingsSnapshot()
     taskBoardFormState.draft = TaskBoardGitSettingsDraft(snapshot: snapshot)
+    taskBoardFormState.pathBaseline = TaskBoardGitSettingsPathBaseline(snapshot: snapshot)
     taskBoardFormState.loadError = nil
     taskBoardFormState.hasLoadedSettings = true
   }
@@ -150,7 +151,8 @@ extension SettingsRepositoriesSection {
 
     let succeeded = await store.updateTaskBoardGitSettings(
       snapshot: taskBoardDraft.snapshot,
-      origin: .settingsRepositoriesSaveButton
+      origin: .settingsRepositoriesSaveButton,
+      preservingPathsFrom: taskBoardFormState.pathBaseline
     )
     guard succeeded else { return }
 
@@ -166,6 +168,7 @@ extension SettingsRepositoriesSection {
     do {
       let snapshot = try await store.taskBoardGitSettingsSnapshot()
       taskBoardFormState.draft = TaskBoardGitSettingsDraft(snapshot: snapshot)
+      taskBoardFormState.pathBaseline = TaskBoardGitSettingsPathBaseline(snapshot: snapshot)
       taskBoardFormState.loadError = nil
       taskBoardFormState.hasLoadedSettings = true
       draft = SettingsSharedRepositoriesDraft(

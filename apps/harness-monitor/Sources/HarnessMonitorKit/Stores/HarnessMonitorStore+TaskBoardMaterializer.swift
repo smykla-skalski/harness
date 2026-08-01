@@ -2,20 +2,26 @@ import Foundation
 
 extension HarnessMonitorStore {
   func materializeTaskBoardGitSettings(
-    _ snapshot: TaskBoardGitSettingsSnapshot
+    _ snapshot: TaskBoardGitSettingsSnapshot,
+    preservingPathsFrom baseline: TaskBoardGitSettingsPathBaseline? = nil
   ) async throws -> TaskBoardGitSettingsSnapshot {
     TaskBoardGitSettingsSnapshot(
       orchestratorSettings: try await materializeTaskBoardOrchestratorSettings(
-        snapshot.orchestratorSettings
+        snapshot.orchestratorSettings,
+        preservingProjectDir: baseline?.projectDir
       ),
-      runtimeConfig: try await materializeTaskBoardGitRuntimeConfig(snapshot.runtimeConfig),
+      runtimeConfig: try await materializeTaskBoardGitRuntimeConfig(
+        snapshot.runtimeConfig,
+        preservingPathsFrom: baseline
+      ),
       githubCredentials: snapshot.githubCredentials,
       openRouterCredentials: snapshot.openRouterCredentials
     )
   }
 
   private func materializeTaskBoardOrchestratorSettings(
-    _ settings: TaskBoardOrchestratorSettings
+    _ settings: TaskBoardOrchestratorSettings,
+    preservingProjectDir projectDirBaseline: String?
   ) async throws -> TaskBoardOrchestratorSettings {
     return TaskBoardOrchestratorSettings(
       stepMode: settings.stepMode,
@@ -24,6 +30,7 @@ extension HarnessMonitorStore {
       dispatchStatusFilter: settings.dispatchStatusFilter,
       projectDir: try await materializeTaskBoardPath(
         settings.projectDir,
+        preserving: projectDirBaseline,
         kind: .taskBoardDirectory,
         isDirectory: true
       ),
@@ -36,7 +43,8 @@ extension HarnessMonitorStore {
   }
 
   private func materializeTaskBoardGitRuntimeConfig(
-    _ config: TaskBoardGitRuntimeConfig
+    _ config: TaskBoardGitRuntimeConfig,
+    preservingPathsFrom baseline: TaskBoardGitSettingsPathBaseline?
   ) async throws -> TaskBoardGitRuntimeConfig {
     var repositoryOverrides: [TaskBoardGitRepositoryOverride] = []
     repositoryOverrides.reserveCapacity(config.repositoryOverrides.count)
@@ -44,24 +52,32 @@ extension HarnessMonitorStore {
       repositoryOverrides.append(
         TaskBoardGitRepositoryOverride(
           repository: override.repository,
-          profile: try await materializeTaskBoardGitRuntimeProfile(override.profile)
+          profile: try await materializeTaskBoardGitRuntimeProfile(
+            override.profile,
+            preservingPathsFrom: baseline?.profile(for: override.repository)
+          )
         )
       )
     }
     return TaskBoardGitRuntimeConfig(
-      global: try await materializeTaskBoardGitRuntimeProfile(config.global),
+      global: try await materializeTaskBoardGitRuntimeProfile(
+        config.global,
+        preservingPathsFrom: baseline?.global
+      ),
       repositoryOverrides: repositoryOverrides
     )
   }
 
   private func materializeTaskBoardGitRuntimeProfile(
-    _ profile: TaskBoardGitRuntimeProfile
+    _ profile: TaskBoardGitRuntimeProfile,
+    preservingPathsFrom baseline: TaskBoardGitSettingsPathBaseline.RuntimeProfile?
   ) async throws -> TaskBoardGitRuntimeProfile {
     let signing = profile.signing
     let signingSSHKeyPath: String? =
       if signing.mode == .ssh {
         try await materializeTaskBoardPath(
           signing.sshKeyPath,
+          preserving: baseline?.signingSSHKeyPath,
           kind: .taskBoardKeyFile,
           isDirectory: false
         )
@@ -72,6 +88,7 @@ extension HarnessMonitorStore {
       if signing.mode == .gpg {
         try await materializeTaskBoardPath(
           signing.gpgPrivateKeyPath,
+          preserving: baseline?.gpgPrivateKeyPath,
           kind: .taskBoardKeyFile,
           isDirectory: false
         )
@@ -84,6 +101,7 @@ extension HarnessMonitorStore {
       authorEmail: profile.authorEmail,
       sshKeyPath: try await materializeTaskBoardPath(
         profile.sshKeyPath,
+        preserving: baseline?.sshKeyPath,
         kind: .taskBoardKeyFile,
         isDirectory: false
       ),
@@ -104,12 +122,16 @@ extension HarnessMonitorStore {
 
   private func materializeTaskBoardPath(
     _ rawPath: String?,
+    preserving baselinePath: String?,
     kind: BookmarkStore.Record.Kind,
     isDirectory: Bool
   ) async throws -> String? {
     guard let rawPath else { return nil }
     let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.isEmpty == false else { return nil }
+    if baselinePath?.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed {
+      return trimmed
+    }
     return try await authorizeTaskBoardPath(
       URL(fileURLWithPath: trimmed, isDirectory: isDirectory),
       kind: kind

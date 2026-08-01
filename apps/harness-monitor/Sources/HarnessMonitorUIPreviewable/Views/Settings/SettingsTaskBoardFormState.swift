@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TaskBoardSettingsFormState {
   var draft = TaskBoardGitSettingsDraft()
+  var pathBaseline: TaskBoardGitSettingsPathBaseline?
   var isLoading = false
   var isSaving = false
   var loadError: String?
@@ -85,6 +86,7 @@ extension SettingsTaskBoardEditingSurface {
     do {
       let snapshot = try await store.taskBoardGitSettingsSnapshot()
       draftBinding.wrappedValue = TaskBoardGitSettingsDraft(snapshot: snapshot)
+      formState.wrappedValue.pathBaseline = TaskBoardGitSettingsPathBaseline(snapshot: snapshot)
       loadErrorBinding.wrappedValue = nil
       hasLoadedSettingsBinding.wrappedValue = true
     } catch {
@@ -100,7 +102,8 @@ extension SettingsTaskBoardEditingSurface {
 
     let succeeded = await store.updateTaskBoardGitSettings(
       snapshot: draftBinding.wrappedValue.snapshot,
-      origin: .settingsSecretsSaveButton
+      origin: .settingsSecretsSaveButton,
+      preservingPathsFrom: formState.wrappedValue.pathBaseline
     )
     if succeeded {
       loadErrorBinding.wrappedValue = nil
