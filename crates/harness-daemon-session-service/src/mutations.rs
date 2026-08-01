@@ -323,7 +323,7 @@ async fn bump_session_async<A: AsyncSignalStorage>(
     storage.bump_change("global").await
 }
 
-async fn sync_file_state_from_storage_async<A: AsyncSignalStorage>(
+pub(crate) async fn sync_file_state_from_storage_async<A: AsyncSignalStorage>(
     storage: &A,
     session_id: &str,
 ) -> Result<(), CliError> {

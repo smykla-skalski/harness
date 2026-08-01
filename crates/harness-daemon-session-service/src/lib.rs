@@ -7,6 +7,7 @@
 
 mod async_ops;
 mod async_send;
+mod leave;
 mod mutations;
 mod observe;
 mod persistence;
@@ -17,6 +18,7 @@ mod tui_identity;
 
 pub use async_ops::{cancel_signal_async, record_signal_ack_direct_async};
 pub use async_send::send_signal_async;
+pub use leave::{leave_session, leave_session_async};
 pub use mutations::{
     archive_session, archive_session_async, end_session, end_session_async, transfer_leader,
     transfer_leader_async,
