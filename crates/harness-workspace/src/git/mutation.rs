@@ -40,8 +40,8 @@ pub fn pin_github_pull_request_worktree(
     pull_request: u64,
     expected_head: &str,
 ) -> GitResult<()> {
-    require_pin_target(worktree, repository, pull_request, expected_head)?;
     let _origin_grant = hold_worktree_origin_grant(worktree);
+    require_pin_target(worktree, repository, pull_request, expected_head)?;
     let remote = matching_remote(worktree, repository)?;
     fetch_pull_request_head(worktree, &remote, pull_request, expected_head)?;
     require_clean_session_worktree(worktree)?;
