@@ -341,7 +341,7 @@ extension TaskBoardItem {
       kind: kind,
       externalRefs: request.externalRefs ?? externalRefs,
       planning: request.planning ?? planning,
-      workflow: request.workflow ?? workflow,
+      workflow: request.clearWorkflow ? nil : request.workflow ?? workflow,
       sessionId: request.clearSessionId ? nil : request.sessionId ?? sessionId,
       workItemId: request.clearWorkItemId ? nil : request.workItemId ?? workItemId,
       usage: usage,

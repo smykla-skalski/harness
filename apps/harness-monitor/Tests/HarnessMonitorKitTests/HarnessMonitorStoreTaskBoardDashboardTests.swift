@@ -341,7 +341,10 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(success)
     #expect(
       client.recordedCalls().contains(
-        .updateTaskBoardItem(id: "board-1", status: .inProgress)
+        .updateTaskBoardItem(
+          id: "board-1",
+          request: TaskBoardUpdateItemRequest(status: .inProgress)
+        )
       )
     )
     #expect(store.globalTaskBoardItems.first?.status == .inProgress)

@@ -38,7 +38,10 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
     laneOrigin: TaskBoardLaneOrigin? = nil,
     laneSetAt: String? = nil,
     sourceProjectId: String? = nil,
-    executionRepository: String? = nil
+    executionRepository: String? = nil,
+    workflow: TaskBoardWorkflowState? = nil,
+    sessionId: String? = nil,
+    workItemId: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -55,9 +58,9 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
       kind: kind,
       externalRefs: [],
       planning: TaskBoardPlanningState(),
-      workflow: nil,
-      sessionId: nil,
-      workItemId: nil,
+      workflow: workflow,
+      sessionId: sessionId,
+      workItemId: workItemId,
       usage: TaskBoardUsage(),
       lanePosition: lanePosition,
       laneOrigin: laneOrigin,

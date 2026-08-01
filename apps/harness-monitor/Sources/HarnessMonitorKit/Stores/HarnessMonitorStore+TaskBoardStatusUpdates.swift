@@ -87,7 +87,8 @@ extension HarnessMonitorStore {
         let measuredItem = try await Self.measureOperation {
           try await client.updateTaskBoardItem(
             id: update.id,
-            request: TaskBoardUpdateItemRequest(status: update.status)
+            request: priorItemsByID[update.id]?.statusUpdateRequest(update.status)
+              ?? TaskBoardUpdateItemRequest(status: update.status)
           )
         }
         recordRequestSuccess()
@@ -134,6 +135,16 @@ extension HarnessMonitorStore {
 }
 
 extension TaskBoardItem {
+  fileprivate func statusUpdateRequest(_ status: TaskBoardStatus) -> TaskBoardUpdateItemRequest {
+    let startsFreshAutomation = status == .todo && workflow?.status.requiresFreshRun == true
+    return TaskBoardUpdateItemRequest(
+      status: status,
+      clearWorkflow: startsFreshAutomation,
+      clearSessionId: startsFreshAutomation,
+      clearWorkItemId: startsFreshAutomation
+    )
+  }
+
   /// Locally-applied status used for optimistic UI feedback before the
   /// server confirms the move. Deliberately keeps `updatedAt` untouched:
   /// the real timestamp arrives with the server response, or the prior
@@ -169,5 +180,16 @@ extension TaskBoardItem {
       updatedAt: updatedAt,
       deletedAt: deletedAt
     )
+  }
+}
+
+extension TaskBoardWorkflowStatus {
+  fileprivate var requiresFreshRun: Bool {
+    switch self {
+    case .paused, .completed, .failed, .cancelled:
+      true
+    case .idle, .running:
+      false
+    }
   }
 }

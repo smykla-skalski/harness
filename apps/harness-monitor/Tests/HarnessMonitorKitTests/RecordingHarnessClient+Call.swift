@@ -171,10 +171,7 @@ extension RecordingHarnessClient {
       priority: TaskBoardPriority,
       status: TaskBoardStatus?
     )
-    case updateTaskBoardItem(
-      id: String,
-      status: TaskBoardStatus?
-    )
+    case updateTaskBoardItem(id: String, request: TaskBoardUpdateItemRequest)
     case setTaskBoardItemPosition(id: String, status: TaskBoardStatus, lanePosition: UInt32)
     case resetTaskBoardItemPosition(id: String)
     case deleteTaskBoardItem(id: String)

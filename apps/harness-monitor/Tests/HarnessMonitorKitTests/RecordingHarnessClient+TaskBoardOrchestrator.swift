@@ -65,7 +65,7 @@ extension RecordingHarnessClient {
     request: TaskBoardUpdateItemRequest
   ) async throws -> TaskBoardItem {
     try await sleepIfNeeded(configuredMutationDelay())
-    record(.updateTaskBoardItem(id: id, status: request.status))
+    record(.updateTaskBoardItem(id: id, request: request))
     return try lock.withLock {
       if let error = taskBoardUpdateError {
         throw error
