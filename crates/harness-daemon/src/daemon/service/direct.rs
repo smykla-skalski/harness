@@ -4,11 +4,7 @@ use super::session_setup::{
     PreparedSession, prepare_session, rollback_session_artifacts, rollback_session_artifacts_async,
 };
 use super::session_teardown::destroy_session_artifacts;
-use super::{
-    CliError, Path, SessionState, agents_service, build_log_entry, record_signal_ack,
-    resolve_hook_agent, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
-};
-use crate::session::types::ManagedAgentRef;
+use super::{CliError, Path, SessionState, agents_service, build_log_entry, session_service};
 use harness_kernel::errors::CliErrorKind;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
@@ -123,58 +119,12 @@ pub fn join_session_direct(
     request: &super::protocol::SessionJoinRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<SessionState, CliError> {
-    let display_name = request
-        .name
-        .clone()
-        .unwrap_or_else(|| format!("{} {:?}", request.runtime, request.role).to_lowercase());
-
-    let project_dir = Path::new(&request.project_dir);
-    let agent_session_id = resolve_hook_agent(&request.runtime)
-        .and_then(|rt| agents_service::resolve_known_session_id(rt, project_dir, None).ok())
-        .flatten();
-
-    if let Some(db) = db
-        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
-    {
-        let now = utc_now();
-        let joined_role =
-            session_service::resolve_join_role(&state, request.role, request.fallback_role)?;
-        let agent_id = session_service::apply_join_session(
-            &mut state,
-            &display_name,
-            &request.runtime,
-            joined_role,
-            &request.capabilities,
-            agent_session_id.as_deref(),
-            &now,
-            request.persona.as_deref(),
-            None,
-        )?;
-        let project_id = db
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| session_not_found(session_id))?;
-        db.save_session_state(&project_id, &state)?;
-        db.append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_agent_joined(&agent_id, joined_role, &request.runtime),
-            None,
-            None,
-        ))?;
-        db.bump_change(session_id)?;
-        db.bump_change("global")?;
-        return Ok(state);
-    }
-
-    // File-based fallback
-    session_service::join_session_with_fallback(
+    let agent_session_id = resolve_agent_session_id(request);
+    harness_daemon_session_service::join_session(
         session_id,
-        request.role,
-        request.fallback_role,
-        &request.runtime,
-        &request.capabilities,
-        request.name.as_deref(),
-        project_dir,
-        request.persona.as_deref(),
+        request,
+        agent_session_id.as_deref(),
+        db,
     )
 }
 
@@ -188,47 +138,21 @@ pub(crate) async fn join_session_direct_async(
     request: &super::protocol::SessionJoinRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    let display_name = request
-        .name
-        .clone()
-        .unwrap_or_else(|| format!("{} {:?}", request.runtime, request.role).to_lowercase());
+    let agent_session_id = resolve_agent_session_id(request);
+    harness_daemon_session_service::join_session_async(
+        session_id,
+        request,
+        agent_session_id.as_deref(),
+        async_db,
+    )
+    .await
+}
 
+fn resolve_agent_session_id(request: &super::protocol::SessionJoinRequest) -> Option<String> {
     let project_dir = Path::new(&request.project_dir);
-    let agent_session_id = resolve_hook_agent(&request.runtime)
+    super::resolve_hook_agent(&request.runtime)
         .and_then(|rt| agents_service::resolve_known_session_id(rt, project_dir, None).ok())
-        .flatten();
-
-    let now = utc_now();
-    let (agent_id, joined_role, state) = async_db
-        .update_session_state_immediate(session_id, |state| {
-            let joined_role =
-                session_service::resolve_join_role(state, request.role, request.fallback_role)?;
-            let agent_id = session_service::apply_join_session(
-                state,
-                &display_name,
-                &request.runtime,
-                joined_role,
-                &request.capabilities,
-                agent_session_id.as_deref(),
-                &now,
-                request.persona.as_deref(),
-                None,
-            )?;
-            Ok((agent_id, joined_role, state.clone()))
-        })
-        .await?;
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    async_db
-        .append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_agent_joined(&agent_id, joined_role, &request.runtime),
-            None,
-            None,
-        ))
-        .await?;
-    async_db.bump_change(session_id).await?;
-    async_db.bump_change("global").await?;
-    Ok(state)
+        .flatten()
 }
 
 /// Register a managed agent's runtime session ID through the daemon mutation path.
@@ -240,36 +164,7 @@ pub fn register_agent_runtime_session_direct(
     request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<bool, CliError> {
-    if let Some(db) = db
-        && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
-    {
-        let now = utc_now();
-        let registered = session_service::apply_register_agent_runtime_session(
-            &mut state,
-            &request.runtime,
-            &ManagedAgentRef::tui(request.managed_agent_id.as_str()),
-            &request.runtime_session_id,
-            &now,
-        )?;
-        if !registered {
-            return Ok(false);
-        }
-        let project_id = db
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| session_not_found(session_id))?;
-        db.save_session_state(&project_id, &state)?;
-        db.bump_change(session_id)?;
-        db.bump_change("global")?;
-        return Ok(true);
-    }
-
-    session_service::register_agent_runtime_session(
-        session_id,
-        &request.runtime,
-        &request.managed_agent_id,
-        &request.runtime_session_id,
-        Path::new(&request.project_dir),
-    )
+    harness_daemon_session_service::register_agent_runtime_session(session_id, request, db)
 }
 
 pub(crate) async fn register_agent_runtime_session_direct_async(
@@ -277,25 +172,10 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
     request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<bool, CliError> {
-    let now = utc_now();
-    let registered = async_db
-        .update_session_state_immediate(session_id, |state| {
-            session_service::apply_register_agent_runtime_session(
-                state,
-                &request.runtime,
-                &ManagedAgentRef::tui(request.managed_agent_id.as_str()),
-                &request.runtime_session_id,
-                &now,
-            )
-        })
-        .await?;
-    if !registered {
-        return Ok(false);
-    }
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    async_db.bump_change(session_id).await?;
-    async_db.bump_change("global").await?;
-    Ok(true)
+    harness_daemon_session_service::register_agent_runtime_session_async(
+        session_id, request, async_db,
+    )
+    .await
 }
 
 /// Update a session title, writing directly to `SQLite`.
@@ -307,19 +187,7 @@ pub fn update_session_title_direct(
     request: &super::protocol::SessionTitleRequest,
     db: &super::db::DaemonDb,
 ) -> Result<SessionState, CliError> {
-    let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
-        return Err(session_not_found(session_id));
-    };
-
-    state.state_version += 1;
-    session_service::apply_update_session_title(&mut state, &request.title, &utc_now())?;
-    let project_id = db
-        .project_id_for_session(session_id)?
-        .ok_or_else(|| session_not_found(session_id))?;
-    db.save_session_state(&project_id, &state)?;
-    db.bump_change(session_id)?;
-    db.bump_change("global")?;
-    Ok(state)
+    harness_daemon_session_service::update_session_title(session_id, request, db)
 }
 
 /// Update a session title through the canonical async daemon DB.
@@ -331,18 +199,7 @@ pub(crate) async fn update_session_title_direct_async(
     request: &super::protocol::SessionTitleRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    let now = utc_now();
-    let state = async_db
-        .update_session_state_immediate(session_id, |state| {
-            state.state_version += 1;
-            session_service::apply_update_session_title(state, &request.title, &now)?;
-            Ok(state.clone())
-        })
-        .await?;
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    async_db.bump_change(session_id).await?;
-    async_db.bump_change("global").await?;
-    Ok(state)
+    harness_daemon_session_service::update_session_title_async(session_id, request, async_db).await
 }
 
 /// Mark a session agent as disconnected, writing directly to `SQLite` when a
@@ -358,20 +215,7 @@ pub fn disconnect_agent_direct(
     reason: &str,
     db: Option<&super::db::DaemonDb>,
 ) -> Result<bool, CliError> {
-    let Some(db) = db else {
-        return Ok(false);
-    };
-    let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
-        return Ok(false);
-    };
-
-    let now = utc_now();
-    if !session_service::apply_agent_disconnected(&mut state, agent_id, &now) {
-        return Ok(false);
-    }
-
-    persist_disconnect(db, session_id, agent_id, reason, &state)?;
-    Ok(true)
+    harness_daemon_session_service::disconnect_agent(session_id, agent_id, reason, db)
 }
 
 /// Mark a session agent as disconnected through the canonical async daemon DB.
@@ -385,52 +229,8 @@ pub(crate) async fn disconnect_agent_direct_async(
     reason: &str,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<bool, CliError> {
-    let now = utc_now();
-    let disconnected = async_db
-        .update_session_state_immediate(session_id, |state| {
-            Ok(session_service::apply_agent_disconnected(
-                state, agent_id, &now,
-            ))
-        })
-        .await?;
-    if !disconnected {
-        return Ok(false);
-    }
-
-    sync_file_state_from_async_db(async_db, session_id).await?;
-    async_db
-        .append_log_entry(&build_log_entry(
-            session_id,
-            session_service::log_agent_disconnected(agent_id, reason),
-            None,
-            None,
-        ))
-        .await?;
-    async_db.bump_change(session_id).await?;
-    async_db.bump_change("global").await?;
-    Ok(true)
-}
-
-pub(crate) fn persist_disconnect(
-    db: &super::db::DaemonDb,
-    session_id: &str,
-    agent_id: &str,
-    reason: &str,
-    state: &SessionState,
-) -> Result<(), CliError> {
-    let project_id = db
-        .project_id_for_session(session_id)?
-        .ok_or_else(|| session_not_found(session_id))?;
-    db.save_session_state(&project_id, state)?;
-    db.append_log_entry(&build_log_entry(
-        session_id,
-        session_service::log_agent_disconnected(agent_id, reason),
-        None,
-        None,
-    ))?;
-    db.bump_change(session_id)?;
-    db.bump_change("global")?;
-    Ok(())
+    harness_daemon_session_service::disconnect_agent_async(session_id, agent_id, reason, async_db)
+        .await
 }
 
 /// Record a signal acknowledgment, delegating to the session service.
@@ -443,7 +243,7 @@ pub fn record_signal_ack_direct(
     db: Option<&super::db::DaemonDb>,
 ) -> Result<(), CliError> {
     let project_dir = Path::new(&request.project_dir);
-    record_signal_ack(
+    super::record_signal_ack(
         session_id,
         &request.agent_id,
         &request.signal_id,
