@@ -43,7 +43,7 @@ resolve_local_harness_binary() {
   local checkout_root="$1"
   local override_env_name="$2"
   local binary_name="${3:-harness}"
-  local target_dir binary_path
+  local package_name target_dir binary_path
 
   binary_path="${!override_env_name:-}"
   if [[ -n "$binary_path" ]]; then
@@ -59,9 +59,13 @@ resolve_local_harness_binary() {
   if [[ "$binary_name" == "harness-daemon" || "$binary_name" == "harness-bridge" ]]; then
     build_local_acp_adapters "$checkout_root"
   fi
+  package_name="$binary_name"
+  if [[ "$binary_name" == "harness-daemon" ]]; then
+    package_name="harness-daemon-bin"
+  fi
   "$checkout_root/scripts/cargo-local.sh" build \
     --quiet \
-    --package "$binary_name" \
+    --package "$package_name" \
     --bin "$binary_name" \
     >/dev/null
   binary_path="$target_dir/debug/$binary_name"

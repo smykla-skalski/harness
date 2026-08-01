@@ -104,6 +104,11 @@ chmod +x "$FAKE_TARGET_DIR/debug/$binary"
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(result.stdout.strip(), str(target / "debug" / runtime_binary))
                 commands = build_log.read_text(encoding="utf-8").splitlines()
+                package = (
+                    "harness-daemon-bin"
+                    if runtime_binary == "harness-daemon"
+                    else runtime_binary
+                )
                 self.assertEqual(
                     commands,
                     [
@@ -113,7 +118,7 @@ chmod +x "$FAKE_TARGET_DIR/debug/$binary"
                         "build --quiet --manifest-path "
                         f"{checkout}/crates/harness-openrouter-agent/Cargo.toml "
                         "--bin harness-openrouter-agent",
-                        f"build --quiet --package {runtime_binary} --bin {runtime_binary}",
+                        f"build --quiet --package {package} --bin {runtime_binary}",
                     ],
                 )
                 for binary in (
