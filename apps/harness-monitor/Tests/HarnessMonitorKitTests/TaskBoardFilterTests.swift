@@ -94,7 +94,7 @@ struct TaskBoardFilterTests {
     )
 
     #expect(inventory.tags.map(\.id) == ["backend", "retired"])
-    #expect(inventory.tags.first { $0.id == "retired" }?.count == 0)
+    #expect(inventory.tags.first { $0.id == "retired" }?.count == .zero)
   }
 
   @Test("An empty result names the one filter that caused it")

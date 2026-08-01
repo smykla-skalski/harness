@@ -61,17 +61,18 @@ extension HarnessMonitorPerfTests {
         identifier: "harness.task-board.orchestrator.start"
       )
     )
-    ["inbox", "todo", "planning"].forEach {
-      XCTAssertTrue(taskBoardLane($0, in: app).waitForExistence(timeout: Self.uiTimeout))
+    for lane in ["inbox", "todo", "planning"] {
+      XCTAssertTrue(taskBoardLane(lane, in: app).waitForExistence(timeout: Self.uiTimeout))
     }
-    [
+    let requiredElements = [
       context.backlogOrder,
       context.todoOrder,
       context.planningOrder,
       context.optimisticSettle,
       context.orchestratorStart,
-    ].forEach {
-      XCTAssertTrue($0.waitForExistence(timeout: Self.uiTimeout))
+    ]
+    for requiredElement in requiredElements {
+      XCTAssertTrue(requiredElement.waitForExistence(timeout: Self.uiTimeout))
     }
     return context
   }
@@ -116,19 +117,21 @@ extension HarnessMonitorPerfTests {
       1_500,
       "The dropped card must settle optimistically before daemon reconciliation"
     )
-    XCTAssertTrue(waitForTaskBoardOrder(
-      [
-        "perf-drag-backlog-00",
-        "perf-drag-backlog-01",
-        "perf-drag-backlog-02",
-        "perf-drag-backlog-03",
-      ],
-      in: context.backlogOrder
-    ))
-    XCTAssertTrue(waitForTaskBoardOrder(
-      ["perf-drag-todo-02", "perf-drag-todo-03", "perf-drag-todo-04"],
-      in: context.todoOrder
-    ))
+    XCTAssertTrue(
+      waitForTaskBoardOrder(
+        [
+          "perf-drag-backlog-00",
+          "perf-drag-backlog-01",
+          "perf-drag-backlog-02",
+          "perf-drag-backlog-03",
+        ],
+        in: context.backlogOrder
+      ))
+    XCTAssertTrue(
+      waitForTaskBoardOrder(
+        ["perf-drag-todo-02", "perf-drag-todo-03", "perf-drag-todo-04"],
+        in: context.todoOrder
+      ))
     XCTAssertTrue(
       waitUntil(timeout: Self.actionTimeout) { context.orchestratorStart.isEnabled },
       "The cross-lane move must finish before the same-lane move begins"
@@ -266,7 +269,8 @@ extension HarnessMonitorPerfTests {
   }
 
   private func taskBoardDragApplication() -> XCUIApplication? {
-    let productRoots = ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"]
+    let productRoots =
+      ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"]
       .map { $0.split(separator: ":").map(String.init) }
       ?? []
     for root in productRoots {
@@ -356,9 +360,12 @@ extension HarnessMonitorPerfTests {
     XCTAssertTrue(waitForElement(lane, timeout: Self.actionTimeout))
     let dropY = min(target.frame.maxY + 24, lane.frame.maxY - 24)
     XCTAssertGreaterThan(dropY, target.frame.maxY)
+    let dragFrames =
+      "task-board-drag frames window=\(app.windows.firstMatch.frame) "
+      + "lane=\(lane.frame) target=\(target.frame) "
+      + "endpoint=(\(lane.frame.midX), \(dropY))"
     XCTContext.runActivity(
-      named:
-        "task-board-drag frames window=\(app.windows.firstMatch.frame) lane=\(lane.frame) target=\(target.frame) endpoint=(\(lane.frame.midX), \(dropY))"
+      named: dragFrames
     ) { _ in }
     let normalizedY = (dropY - lane.frame.minY) / lane.frame.height
     dragTaskBoardCard(
@@ -388,53 +395,4 @@ extension HarnessMonitorPerfTests {
     )
   }
 
-  private func waitForTaskBoardOrder(
-    _ itemIDs: [String],
-    in orderMarker: XCUIElement,
-    timeout: TimeInterval = HarnessMonitorPerfTests.actionTimeout
-  ) -> Bool {
-    return waitUntil(timeout: timeout, pollInterval: Self.fastPollInterval) {
-      self.markerText(orderMarker)
-        .split(separator: ",")
-        .map(String.init)
-        .starts(with: itemIDs)
-    }
-  }
-
-  private func waitForTaskBoardOrderEnding(
-    _ itemIDs: [String],
-    in orderMarker: XCUIElement,
-    timeout: TimeInterval = HarnessMonitorPerfTests.actionTimeout
-  ) -> Bool {
-    waitUntil(timeout: timeout, pollInterval: Self.fastPollInterval) {
-      self.markerText(orderMarker)
-        .split(separator: ",")
-        .map(String.init)
-        .suffix(itemIDs.count)
-        .elementsEqual(itemIDs)
-    }
-  }
-
-  private func taskBoardCard(_ itemID: String, in app: XCUIApplication) -> XCUIElement {
-    app.buttons
-      .matching(identifier: "harness.task-board.api-item.\(itemID)")
-      .firstMatch
-  }
-
-  private func taskBoardLane(_ lane: String, in app: XCUIApplication) -> XCUIElement {
-    element(in: app, identifier: "harness.task-board.column.\(lane)")
-  }
-
-  private func taskBoardLaneOrder(_ lane: String, in app: XCUIApplication) -> XCUIElement {
-    element(in: app, identifier: "harness.task-board.column.\(lane).order")
-  }
-}
-
-@MainActor
-private struct TaskBoardDragContext {
-  let backlogOrder: XCUIElement
-  let todoOrder: XCUIElement
-  let planningOrder: XCUIElement
-  let optimisticSettle: XCUIElement
-  let orchestratorStart: XCUIElement
 }
