@@ -9,6 +9,8 @@ use crate::task_board::{
     validate_task_board_read_only_run_context,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::git::mutation::pin_github_pull_request_worktree;
+use tokio::task::spawn_blocking;
 
 /// Reviewer runtimes a local write workflow can dispatch. Only Codex has a
 /// durable write execution path; the provider runtimes accepted by the
@@ -68,6 +70,7 @@ pub(super) async fn prepare_write_workflow_launch(
         requested_pull_request.as_ref(),
     )
     .await?;
+    pin_dependency_worktree(&item, worktree, pull_request.as_ref()).await?;
     let (pull_request, base_head_revision) =
         resolve_write_identity(&item, worktree, pull_request).await?;
     let (approved_by, approved_at) = approved_plan(&item)?;
@@ -237,7 +240,40 @@ async fn resolve_write_identity(
         .ok_or_else(|| {
             invalid_transition("dependency workflow launch has no frozen pull request head")
         })?;
+    let local_head = super::read_only_workflow_launch::resolve_worktree_head(worktree).await?;
+    if local_head != remote_head {
+        return Err(invalid_transition(format!(
+            "dependency worktree head does not match frozen pull request head: expected \
+             '{remote_head}', found '{local_head}'"
+        )));
+    }
     Ok((Some(identity), remote_head))
+}
+
+async fn pin_dependency_worktree(
+    item: &TaskBoardItem,
+    worktree: &str,
+    pull_request: Option<&TaskBoardPullRequestIdentity>,
+) -> Result<(), CliError> {
+    if !item.workflow_kind.has_dependency_update_intent() {
+        return Ok(());
+    }
+    let identity = pull_request.ok_or_else(|| {
+        invalid_transition("dependency workflow launch has no frozen pull request head")
+    })?;
+    let head = identity.head.as_ref().ok_or_else(|| {
+        invalid_transition("dependency workflow launch has no frozen pull request head")
+    })?;
+    let worktree = std::path::PathBuf::from(worktree);
+    let repository = identity.repository.clone();
+    let pull_request = identity.number;
+    let expected_head = head.revision.clone();
+    spawn_blocking(move || {
+        pin_github_pull_request_worktree(&worktree, &repository, pull_request, &expected_head)
+    })
+    .await
+    .map_err(|error| invalid_transition(format!("join pull request worktree pin: {error}")))?
+    .map_err(|error| invalid_transition(error.to_string()))
 }
 
 /// Stop a dependency launch whose live pull request no longer matches the frozen one, before any

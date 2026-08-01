@@ -28,27 +28,50 @@ fn frozen_identity(revision: &str) -> TaskBoardPullRequestIdentity {
     }
 }
 
-/// The frozen pull request head, not the session worktree HEAD, is the dependency base. The
-/// worktree starts on the default branch, so demanding they match rejected every real launch.
 #[test]
-fn dependency_identity_freezes_the_pull_request_head_over_the_worktree() {
+fn dependency_identity_requires_the_worktree_at_the_frozen_pull_request_head() {
+    let temp = tempdir().expect("tempdir");
+    let worktree = init_worktree(temp.path());
+    let head = git_output(&worktree, &["rev-parse", "HEAD"]);
     let runtime = tokio::runtime::Runtime::new().expect("runtime");
     runtime.block_on(async {
         let item = dependency_item();
         let (pull_request, base_head_revision) = resolve_write_identity(
             &item,
-            "/nonexistent/worktree",
-            Some(frozen_identity("cafef00d")),
+            worktree.to_string_lossy().as_ref(),
+            Some(frozen_identity(&head)),
         )
         .await
-        .expect("dependency identity resolves without a worktree checkout");
+        .expect("dependency identity resolves at its frozen checkout");
 
-        assert_eq!(base_head_revision, "cafef00d");
+        assert_eq!(base_head_revision, head);
         assert_eq!(
             pull_request
                 .and_then(|identity| identity.head)
                 .map(|head| head.revision),
-            Some("cafef00d".to_string())
+            Some(head)
+        );
+    });
+}
+
+#[test]
+fn dependency_identity_rejects_a_worktree_on_another_head() {
+    let temp = tempdir().expect("tempdir");
+    let worktree = init_worktree(temp.path());
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    runtime.block_on(async {
+        let error = resolve_write_identity(
+            &dependency_item(),
+            worktree.to_string_lossy().as_ref(),
+            Some(frozen_identity("0123456789abcdef0123456789abcdef01234567")),
+        )
+        .await
+        .expect_err("a mismatched dependency checkout must fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("does not match frozen pull request head")
         );
     });
 }
@@ -125,6 +148,20 @@ fn run_git(path: &std::path::Path, args: &[&str]) {
         "git {args:?}: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+fn git_output(path: &std::path::Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(output.status.success(), "git {args:?}");
+    String::from_utf8(output.stdout)
+        .expect("git output")
+        .trim()
+        .to_string()
 }
 
 fn init_worktree(root: &std::path::Path) -> std::path::PathBuf {

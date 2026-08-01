@@ -67,7 +67,7 @@ pub(super) fn require_no_git_operation(repository: &Path) -> GitResult<()> {
     Ok(())
 }
 
-fn require_canonical_slug(path: &Path, repository: &str) -> GitResult<()> {
+pub(super) fn require_canonical_slug(path: &Path, repository: &str) -> GitResult<()> {
     if repository.len() <= 2_048
         && normalize_repository_slug(Some(repository)).as_deref() == Some(repository)
     {
@@ -118,7 +118,7 @@ fn require_canonical_origin(worktree: &Path, repository: &str) -> GitResult<()> 
     }
 }
 
-fn canonical_remote_slug(origin: &str) -> Option<String> {
+pub(super) fn canonical_remote_slug(origin: &str) -> Option<String> {
     let value = origin.trim();
     let path = if let Some((scheme, remainder)) = value.split_once("://") {
         let (authority, path) = remainder.split_once('/')?;
