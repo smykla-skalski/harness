@@ -10,6 +10,7 @@ use tracing::{info, warn};
 
 use crate::git::GitRepository;
 use crate::git::mutation::{create_linked_worktree, delete_local_branch, remove_linked_worktree};
+use crate::sandbox::hold_worktree_origin_grant;
 
 use super::layout::SessionLayout;
 
@@ -86,6 +87,7 @@ impl WorktreeController {
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
     pub fn destroy(origin: &Path, layout: &SessionLayout) -> Result<(), WorktreeError> {
+        let _origin_grant = hold_worktree_origin_grant(&layout.workspace());
         let repository = GitRepository::discover(origin)
             .map_err(|error| WorktreeError::RemoveFailed(error.to_string()))?;
         run_worktree_remove(repository.path(), layout)?;
