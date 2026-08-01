@@ -1,6 +1,8 @@
 use std::env;
 use std::ffi::OsString;
 use std::fmt;
+#[cfg(target_os = "macos")]
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -33,6 +35,7 @@ const GIT_ROUTING_ENVIRONMENT: [&str; 17] = [
     "GIT_REPLACE_REF_BASE",
     "GIT_NO_REPLACE_OBJECTS",
 ];
+const HARNESS_GIT_EXECUTABLE_ENV: &str = "HARNESS_GIT_EXECUTABLE";
 
 pub(super) struct GitCommandRunner<'a> {
     worktree: &'a Path,
@@ -314,7 +317,7 @@ impl<'a> GitCommandRunner<'a> {
     }
 
     fn command<const N: usize>(&self, args: [&str; N]) -> Command {
-        let mut command = Command::new("git");
+        let mut command = Command::new(git_executable());
         command
             .arg("-C")
             .arg(self.worktree)
@@ -349,6 +352,38 @@ impl<'a> GitCommandRunner<'a> {
         command.env("GIT_NO_REPLACE_OBJECTS", "1");
         command
     }
+}
+
+fn git_executable() -> OsString {
+    if let Some(executable) = env::var_os(HARNESS_GIT_EXECUTABLE_ENV) {
+        return executable;
+    }
+    #[cfg(target_os = "macos")]
+    if env::var_os("HARNESS_SANDBOXED").is_some()
+        && let Some(executable) = sandboxed_macos_git_executable()
+    {
+        return executable.into_os_string();
+    }
+    OsString::from("git")
+}
+
+#[cfg(target_os = "macos")]
+fn sandboxed_macos_git_executable() -> Option<PathBuf> {
+    let mut developer_dirs = Vec::new();
+    if let Some(path) = env::var_os("DEVELOPER_DIR") {
+        developer_dirs.push(PathBuf::from(path));
+    }
+    if let Ok(path) = fs::read_link("/var/db/xcode_select_link") {
+        developer_dirs.push(path);
+    }
+    developer_dirs.extend([
+        PathBuf::from("/Applications/Xcode.app/Contents/Developer"),
+        PathBuf::from("/Library/Developer/CommandLineTools"),
+    ]);
+    developer_dirs
+        .into_iter()
+        .map(|directory| directory.join("usr/bin/git"))
+        .find(|candidate| candidate.is_file())
 }
 
 #[allow(unsafe_code)]

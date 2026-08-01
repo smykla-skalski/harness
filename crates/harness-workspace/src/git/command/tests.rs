@@ -5,6 +5,34 @@ use std::time::Duration;
 use super::*;
 
 #[test]
+fn configured_git_executable_overrides_path_lookup() {
+    temp_env::with_var(
+        HARNESS_GIT_EXECUTABLE_ENV,
+        Some("/opt/harness/bin/git"),
+        || {
+            assert_eq!(git_executable(), OsStr::new("/opt/harness/bin/git"));
+        },
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn sandboxed_git_avoids_the_xcrun_backed_system_shim() {
+    temp_env::with_vars(
+        [
+            (HARNESS_GIT_EXECUTABLE_ENV, None::<&str>),
+            ("HARNESS_SANDBOXED", Some("1")),
+        ],
+        || {
+            let executable = PathBuf::from(git_executable());
+            assert!(executable.is_absolute());
+            assert!(executable.is_file());
+            assert_ne!(executable, Path::new("/usr/bin/git"));
+        },
+    );
+}
+
+#[test]
 fn every_git_command_scrubs_repository_routing_environment() {
     let command = GitCommandRunner::new(Path::new("/tmp/frozen-worktree")).command(["status"]);
     let args = command
