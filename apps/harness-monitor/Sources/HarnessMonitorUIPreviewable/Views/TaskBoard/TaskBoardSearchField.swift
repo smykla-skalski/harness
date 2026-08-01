@@ -209,14 +209,10 @@ private struct TaskBoardSearchSuggestionList: View {
     // concentric inside the container's curve instead of squaring off over it.
     .padding(Self.rowInset)
     .frame(width: width, alignment: .leading)
-    .background(
-      .regularMaterial,
-      in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+    .harnessFloatingControlGlass(
+      cornerRadius: HarnessMonitorTheme.cornerRadiusSM,
+      tint: nil
     )
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-        .strokeBorder(HarnessMonitorTheme.controlBorder, lineWidth: 1)
-    }
     .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.search.suggestions")
@@ -235,6 +231,7 @@ private struct TaskBoardSearchSuggestionRow: View {
         highlights: suggestion.titleHighlights
       )
       .scaledFont(.caption)
+      .foregroundStyle(HarnessMonitorTheme.ink)
       .lineLimit(1)
       .truncationMode(.tail)
       if !suggestion.subtitle.isEmpty {
