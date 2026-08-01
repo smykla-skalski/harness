@@ -106,6 +106,12 @@ pub trait AsyncSignalStorage: Send + Sync {
         entry: &SessionLogEntry,
     ) -> impl Future<Output = Result<(), CliError>> + Send;
 
+    fn save_session_state(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
+
     fn merge_signal_records(
         &self,
         session_id: &str,

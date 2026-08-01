@@ -1,11 +1,13 @@
 //! Daemon session lifecycle services.
 //!
-//! Signal delivery is the first extracted slice. Persistence is reached
-//! through caller-owned ports so this crate never depends on the daemon
-//! crate that wires it into HTTP, WebSocket, and managed-agent runtimes.
+//! Signal delivery and session observation are the first two extracted
+//! slices. Persistence is reached through caller-owned ports so this crate
+//! never depends on the daemon crate that wires it into HTTP, WebSocket, and
+//! managed-agent runtimes.
 
 mod async_ops;
 mod async_send;
+mod observe;
 mod persistence;
 mod ports;
 mod sync;
@@ -14,6 +16,10 @@ mod tui_identity;
 
 pub use async_ops::{cancel_signal_async, record_signal_ack_direct_async};
 pub use async_send::send_signal_async;
+pub use observe::{
+    apply_heuristic_gap_tasks_async, apply_issue_tasks, apply_issue_tasks_async, observe_actor_id,
+    task_severity_for_issue,
+};
 pub use persistence::{
     acknowledged_signal_record, build_signal_ack, pending_signal_record, record_signal_ack,
 };

@@ -4008,6 +4008,7 @@ dependencies = [
  "harness-daemon-root",
  "harness-daemon-snapshot",
  "harness-kernel",
+ "harness-protocol",
  "harness-session",
  "harness-workspace",
  "tokio",

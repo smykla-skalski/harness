@@ -44,6 +44,14 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         AsyncDaemonDb::append_log_entry(self, entry).await
     }
 
+    async fn save_session_state(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError> {
+        AsyncDaemonDb::save_session_state(self, project_id, state).await
+    }
+
     async fn merge_signal_records(
         &self,
         session_id: &str,
