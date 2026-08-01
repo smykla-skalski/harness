@@ -307,7 +307,7 @@ pub(super) fn load_session_state_for_project(
     load_session_state_from_context_root(&project.context_root, session_id)
 }
 
-fn list_session_ids_legacy(context_root: &Path) -> Result<Vec<String>, CliError> {
+pub(super) fn list_session_ids_legacy(context_root: &Path) -> Result<Vec<String>, CliError> {
     let legacy_root = context_root.join("orchestration").join("sessions");
     if !legacy_root.is_dir() {
         return Ok(Vec::new());

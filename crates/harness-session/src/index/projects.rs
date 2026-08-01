@@ -11,6 +11,7 @@ use harness_workspace::workspace::{
 };
 
 use super::contexts::{infer_checkout_identity, repair_context_root};
+use super::sessions::list_session_ids_legacy;
 use super::{DiscoveredProject, project_context_dir_name};
 
 #[must_use]
@@ -105,6 +106,23 @@ fn new_layout_fast_counts() -> (usize, usize) {
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
+    discover_projects_internal(false)
+}
+
+/// Discover only projects that currently contain file-backed sessions.
+///
+/// This avoids resolving Git identity for agent-only project contexts when a
+/// caller only needs session import candidates.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures.
+pub fn discover_session_projects() -> Result<Vec<DiscoveredProject>, CliError> {
+    discover_projects_internal(true)
+}
+
+fn discover_projects_internal(
+    require_file_backed_session: bool,
+) -> Result<Vec<DiscoveredProject>, CliError> {
     let root = projects_root();
     if !root.is_dir() {
         return Ok(Vec::new());
@@ -120,6 +138,9 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
     let mut projects = Vec::new();
     let mut seen_context_roots = BTreeSet::new();
     for raw_context_root in raw_context_roots {
+        if require_file_backed_session && !context_has_file_backed_session(&raw_context_root)? {
+            continue;
+        }
         let Some(context_root) = repair_context_root(&raw_context_root)? else {
             continue;
         };
@@ -137,6 +158,13 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
             .then(left.checkout_name.cmp(&right.checkout_name))
     });
     Ok(projects)
+}
+
+fn context_has_file_backed_session(context_root: &Path) -> Result<bool, CliError> {
+    if !list_session_ids_legacy(context_root)?.is_empty() {
+        return Ok(true);
+    }
+    Ok(!storage::list_known_session_ids_from_context_root(context_root)?.is_empty())
 }
 
 /// Build a `DiscoveredProject` from an existing `context_root` directory.

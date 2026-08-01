@@ -54,7 +54,7 @@ pub(crate) fn run_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
 
 pub(crate) fn discover_background_reconciliation_inputs()
 -> Result<(Vec<index::DiscoveredProject>, Vec<index::ResolvedSession>), CliError> {
-    let projects = index::discover_projects()?;
+    let projects = index::discover_session_projects()?;
     let mut sessions = index::discover_sessions_for(&projects, true)?;
     sessions.sort_by(|left, right| {
         let left_active = left.state.status == SessionStatus::Active;

@@ -25,8 +25,8 @@ mod tests;
 
 pub use paths::{agent_transcript_path, observe_snapshot_path, signals_root};
 pub use projects::{
-    discover_projects, discovered_project_for_checkout, discovered_project_for_context_root,
-    fast_counts, projects_root,
+    discover_projects, discover_session_projects, discovered_project_for_checkout,
+    discovered_project_for_context_root, fast_counts, projects_root,
 };
 pub use reviews::load_task_reviews;
 pub use runtime_sessions::resolve_session_id_for_runtime_session;

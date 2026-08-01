@@ -179,6 +179,19 @@ fn session_import_required_detects_newer_file_versions() {
     });
 }
 
+#[test]
+fn background_reconciliation_ignores_agent_only_projects() {
+    with_temp_project(|project| {
+        append_project_ledger_entry(project);
+
+        let (projects, sessions) = serve::discover_background_reconciliation_inputs()
+            .expect("discover reconciliation inputs");
+
+        assert!(projects.is_empty(), "agent-only projects need no DB import");
+        assert!(sessions.is_empty(), "agent-only projects have no sessions");
+    });
+}
+
 /// A poisoned db lock used to return `Ok`, so reconciliation skipped its work
 /// and still logged the normal completion line - a silent no-op that looked
 /// exactly like a clean run.
@@ -187,6 +200,14 @@ fn background_project_sync_surfaces_a_poisoned_db_lock() {
     use std::sync::{Arc, Mutex, OnceLock};
 
     with_temp_project(|project| {
+        start_active_file_session(
+            "poisoned background project sync",
+            "",
+            project,
+            Some("claude"),
+            Some("e7908756-3b6f-501e-bca2-434ee4ff0c4c"),
+        )
+        .expect("start session");
         append_project_ledger_entry(project);
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
 
@@ -228,6 +249,14 @@ fn poisoned_db_lock_never_reports_a_clean_reconciliation() {
     use std::sync::{Arc, Mutex, OnceLock};
 
     with_temp_project(|project| {
+        start_active_file_session(
+            "poisoned background reconciliation",
+            "",
+            project,
+            Some("claude"),
+            Some("925b227f-bbd1-5e1b-81b6-13337f6beb94"),
+        )
+        .expect("start session");
         append_project_ledger_entry(project);
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
 
