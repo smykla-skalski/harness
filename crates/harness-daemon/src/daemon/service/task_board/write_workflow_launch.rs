@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
@@ -10,7 +12,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::git::mutation::pin_github_pull_request_worktree;
-use tokio::task::spawn_blocking;
+use tokio::task::{spawn, spawn_blocking};
 
 /// Reviewer runtimes a local write workflow can dispatch. Only Codex has a
 /// durable write execution path; the provider runtimes accepted by the
@@ -62,15 +64,23 @@ pub(super) async fn prepare_write_workflow_launch(
         "write",
     )?;
     let requested_pull_request = requested_pull_request(&item)?;
-    let pull_request = super::super::task_board_github::validate_write_workflow_launch_publication(
-        db,
-        &settings.settings,
-        item.workflow_kind,
-        execution_repository.as_deref(),
-        requested_pull_request.as_ref(),
-    )
+    pin_dependency_worktree(&item, worktree, requested_pull_request.as_ref()).await?;
+    let validation_db = db.clone();
+    let validation_settings = settings.settings.clone();
+    let validation_repository = execution_repository.clone();
+    let validation_pull_request = requested_pull_request.clone();
+    let workflow_kind = item.workflow_kind;
+    let pull_request = run_write_launch_task(async move {
+        super::super::task_board_github::validate_write_workflow_launch_publication(
+            &validation_db,
+            &validation_settings,
+            workflow_kind,
+            validation_repository.as_deref(),
+            validation_pull_request.as_ref(),
+        )
+        .await
+    })
     .await?;
-    pin_dependency_worktree(&item, worktree, pull_request.as_ref()).await?;
     let (pull_request, base_head_revision) =
         resolve_write_identity(&item, worktree, pull_request).await?;
     let (approved_by, approved_at) = approved_plan(&item)?;
@@ -115,6 +125,17 @@ pub(super) async fn prepare_write_workflow_launch(
         planning_result: result,
         plan_approval: approval,
     })))
+}
+
+async fn run_write_launch_task<T>(
+    task: impl Future<Output = Result<T, CliError>> + Send + 'static,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+{
+    spawn(task).await.map_err(|error| {
+        CliErrorKind::workflow_io(format!("write workflow launch task failed: {error}"))
+    })?
 }
 
 pub(crate) async fn validate_write_workflow_launch(
@@ -226,10 +247,8 @@ async fn resolve_write_identity(
         let local_head = super::read_only_workflow_launch::resolve_worktree_head(worktree).await?;
         return Ok((None, local_head));
     }
-    // A dependency update freezes the pull request's own head, not the session
-    // worktree HEAD. The worktree starts on the repository default branch and the
-    // worker checks out this frozen revision before implementing, so the base
-    // revision is the pull request head and the two need not match at launch.
+    // A dependency update freezes the pull request's own head. The launch path
+    // pins the session worktree to that revision before this contract is built.
     let identity = pull_request.ok_or_else(|| {
         invalid_transition("dependency workflow launch has no frozen pull request head")
     })?;

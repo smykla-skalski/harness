@@ -1,7 +1,11 @@
+use std::env;
 use std::process::Command;
+use std::thread;
 
 use harness_testkit::with_isolated_harness_env;
+use regex::Regex;
 use tempfile::tempdir;
+use tokio::runtime::Builder as RuntimeBuilder;
 
 use super::*;
 use crate::daemon::service::sync_task_board_github_tokens;
@@ -9,6 +13,72 @@ use crate::task_board::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardOrchestratorSettings,
     TaskBoardPullRequestHeadIdentity, TaskBoardWorkflowKind,
 };
+
+const WRITE_LAUNCH_STACK_CHILD_ENV: &str = "HARNESS_TEST_WRITE_LAUNCH_STACK_CHILD";
+const WRITE_LAUNCH_STACK_TEST: &str = "daemon::service::task_board::write_workflow_launch::tests::write_publication_validation_runs_on_fresh_task_stack";
+const CONSTRAINED_WRITE_LAUNCH_STACK: usize = 128 * 1024;
+
+#[test]
+fn write_publication_validation_runs_on_fresh_task_stack() {
+    if env::var_os(WRITE_LAUNCH_STACK_CHILD_ENV).is_none() {
+        let inline = run_write_launch_stack_child("inline");
+        assert!(
+            !inline.status.success()
+                && String::from_utf8_lossy(&inline.stderr).contains("stack overflow"),
+            "inline validation did not reproduce the stack overflow: stdout={} stderr={}",
+            String::from_utf8_lossy(&inline.stdout),
+            String::from_utf8_lossy(&inline.stderr),
+        );
+        let isolated = run_write_launch_stack_child("isolated");
+        assert!(
+            isolated.status.success(),
+            "isolated validation failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&isolated.stdout),
+            String::from_utf8_lossy(&isolated.stderr),
+        );
+        return;
+    }
+
+    let mode = env::var(WRITE_LAUNCH_STACK_CHILD_ENV).expect("write launch stack child mode");
+    let worker = thread::Builder::new()
+        .name("constrained-write-launch".into())
+        .stack_size(CONSTRAINED_WRITE_LAUNCH_STACK)
+        .spawn(move || {
+            if mode == "inline" {
+                return compile_pull_request_tracking_regex();
+            }
+            let runtime = RuntimeBuilder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .expect("write launch runtime");
+            runtime.block_on(run_write_launch_task(async {
+                compile_pull_request_tracking_regex()
+            }))
+        })
+        .expect("spawn constrained write launch");
+    worker
+        .join()
+        .expect("constrained write launch thread")
+        .expect("pull request validation");
+}
+
+fn compile_pull_request_tracking_regex() -> Result<(), CliError> {
+    Regex::new(r"(?i)part of\s+(?:([\w.-]+/[\w.-]+))?#(\d+)")
+        .map(|_| ())
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("compile pull request tracking regex: {error}"))
+                .into()
+        })
+}
+
+fn run_write_launch_stack_child(mode: &str) -> std::process::Output {
+    Command::new(env::current_exe().expect("current test executable"))
+        .args(["--exact", WRITE_LAUNCH_STACK_TEST, "--nocapture"])
+        .env(WRITE_LAUNCH_STACK_CHILD_ENV, mode)
+        .output()
+        .expect("run isolated write launch stack test")
+}
 
 fn dependency_item() -> TaskBoardItem {
     let mut item = approved_item("dep-item", Some("acme/widgets"));
