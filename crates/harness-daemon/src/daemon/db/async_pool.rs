@@ -6,19 +6,18 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
 use super::summary_rows::AsyncSessionSummaryRow;
+use super::async_resolved_session::AsyncResolvedSessionRow;
 use super::task_board_sync_coordinator::{
     TaskBoardSyncCoordinator, TaskBoardSyncPermit, TaskBoardSyncStatus,
 };
 use super::{
     BTreeMap, CliError, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
-    SCHEMA_VERSION, SessionState, async_bootstrap, daemon_index, daemon_protocol, db_error,
+    SCHEMA_VERSION, async_bootstrap, daemon_index, daemon_protocol, db_error,
     trace_async_db_operation, usize_from_i64,
 };
-use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::task_board::TaskBoardTriageEscalationConfig;
 use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
-use crate::workspace::utc_now;
 
 const ASYNC_DB_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
 const ASYNC_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -474,44 +473,5 @@ impl AsyncProjectSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name.clone(),
         }
-    }
-}
-
-#[derive(sqlx::FromRow)]
-struct AsyncResolvedSessionRow {
-    state_json: String,
-    project_id: String,
-    project_name: String,
-    project_dir: Option<String>,
-    repository_root: Option<String>,
-    checkout_id: String,
-    checkout_name: String,
-    context_root: String,
-    is_worktree: bool,
-    worktree_name: Option<String>,
-}
-
-impl AsyncResolvedSessionRow {
-    async fn into_resolved_session(
-        self,
-        db: &AsyncDaemonDb,
-    ) -> Result<daemon_index::ResolvedSession, CliError> {
-        let mut state: SessionState = serde_json::from_str(&self.state_json)
-            .map_err(|error| db_error(format!("parse session state: {error}")))?;
-        let project = DiscoveredProject {
-            project_id: self.project_id,
-            name: self.project_name,
-            project_dir: self.project_dir.as_deref().map(PathBuf::from),
-            repository_root: self.repository_root.as_deref().map(PathBuf::from),
-            checkout_id: self.checkout_id,
-            checkout_name: self.checkout_name,
-            context_root: PathBuf::from(self.context_root),
-            is_worktree: self.is_worktree,
-            worktree_name: self.worktree_name,
-        };
-        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
-            db.save_session_state(&project.project_id, &state).await?;
-        }
-        Ok(daemon_index::ResolvedSession { project, state })
     }
 }

@@ -53,6 +53,7 @@ mod async_detail;
 mod async_diagnostics;
 mod async_pool;
 mod async_reads;
+mod async_resolved_session;
 mod async_runtime;
 mod async_session_state;
 mod async_signal_writes;
