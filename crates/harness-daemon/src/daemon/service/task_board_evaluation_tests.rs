@@ -1,5 +1,6 @@
 use tempfile::tempdir;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::session::types::{TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus};
 use crate::task_board::{TaskBoardEvaluationOutcome, TaskBoardWorkflowStatus};
 use harness_kernel::errors::CliErrorKind;
@@ -56,6 +57,90 @@ fn work_item(status: TaskStatus) -> WorkItem {
         suggested_persona: None,
         deleted_at: None,
     }
+}
+
+async fn seed_active_dispatch_reservation(db: &AsyncDaemonDb, item_id: &str) {
+    sqlx::query(
+        "INSERT INTO task_board_dispatch_intents (
+             intent_id, item_id, session_id, work_item_id, workflow_execution_id,
+             payload_json, status, attempts, available_at, claim_token, claimed_at,
+             created_at, updated_at
+         ) VALUES ('intent-1', ?1, 'session-1', 'work-1', 'workflow-1', '{}',
+                   'pending', 0, ?2, NULL, NULL, ?2, ?2)",
+    )
+    .bind(item_id)
+    .bind(NOW)
+    .execute(db.pool())
+    .await
+    .expect("seed dispatch reservation");
+}
+
+#[tokio::test]
+async fn async_evaluation_preserves_an_item_until_its_dispatch_claims() {
+    let temp = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("open database");
+    let mut item = TaskBoardItem::new(
+        "board-reserved".to_string(),
+        "Board item".to_string(),
+        "Body".to_string(),
+        NOW.to_string(),
+    );
+    item.status = TaskBoardStatus::InProgress;
+    item.session_id = Some("session-1".to_string());
+    item.work_item_id = Some("work-1".to_string());
+    item.workflow.execution_id = Some("workflow-1".to_string());
+    item.workflow.status = TaskBoardWorkflowStatus::Running;
+    item.workflow.current_step_id = Some("dispatch".to_string());
+    db.create_task_board_item(item)
+        .await
+        .expect("create linked item");
+    let before = db
+        .task_board_item_snapshot("board-reserved")
+        .await
+        .expect("load item before evaluation");
+    seed_active_dispatch_reservation(&db, "board-reserved").await;
+
+    let record = evaluate_linked_item_async(&db, &before.item, &work_item(TaskStatus::Open), false)
+        .await
+        .expect("evaluate reserved item");
+
+    assert!(!record.updated, "evaluation must defer its item write");
+    let reserved = db
+        .task_board_item_snapshot("board-reserved")
+        .await
+        .expect("reload reserved item");
+    assert_eq!(reserved.item_revision, before.item_revision);
+    assert_eq!(reserved.item, before.item);
+
+    sqlx::query(
+        "UPDATE task_board_dispatch_intents
+         SET status = 'completed', completed_at = ?1
+         WHERE intent_id = 'intent-1'",
+    )
+    .bind(NOW)
+    .execute(db.pool())
+    .await
+    .expect("complete dispatch reservation");
+    let record =
+        evaluate_linked_item_async(&db, &reserved.item, &work_item(TaskStatus::Open), false)
+            .await
+            .expect("evaluate claimed item");
+
+    assert!(
+        record.updated,
+        "evaluation resumes after the claim fence clears"
+    );
+    let evaluated = db
+        .task_board_item_snapshot("board-reserved")
+        .await
+        .expect("reload evaluated item");
+    assert_eq!(evaluated.item_revision, before.item_revision + 1);
+    assert_eq!(
+        evaluated.item.workflow.current_step_id.as_deref(),
+        Some("worker_pending")
+    );
 }
 
 #[test]

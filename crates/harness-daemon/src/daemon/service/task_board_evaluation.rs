@@ -276,15 +276,17 @@ async fn evaluate_linked_item_async(
     if dry_run || !changed {
         return Ok(record_from_decision(item, &decision, false, None));
     }
-    let updated_item = db
-        .update_task_board_item(&item.id, |current| {
+    let Some(updated_item) = db
+        .update_task_board_item_for_evaluation(&item.id, |current| {
             current.status = decision.status;
             current.workflow.clone_from(&decision.workflow);
             Ok(true)
         })
         .await?
-        .expect("task-board evaluation always mutates")
-        .item;
+        .map(|mutation| mutation.item)
+    else {
+        return Ok(record_from_decision(item, &decision, false, None));
+    };
     Ok(record_from_decision(
         item,
         &decision,
@@ -473,15 +475,17 @@ async fn failure_record_async(
     if item.status == TaskBoardStatus::Failed && item.workflow == workflow {
         return Ok(record);
     }
-    let updated_item = db
-        .update_task_board_item(&item.id, |current| {
+    let Some(updated_item) = db
+        .update_task_board_item_for_evaluation(&item.id, |current| {
             current.status = TaskBoardStatus::Failed;
             current.workflow.clone_from(&workflow);
             Ok(true)
         })
         .await?
-        .expect("task-board evaluation failure always mutates")
-        .item;
+        .map(|mutation| mutation.item)
+    else {
+        return Ok(record);
+    };
     record.updated = true;
     record.item = Some(updated_item);
     Ok(record)

@@ -4,6 +4,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageOverride}
 use harness_kernel::errors::CliErrorKind;
 
 use super::super::ITEMS_CHANGE_SCOPE;
+use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::projects::resolve_item_project_in_tx;
@@ -14,6 +15,12 @@ use super::{
     TriageOutcome, bump_change_in_tx, record_triage_or_lane_audit_in_tx,
     resolve_parent_update_in_tx, validate_item,
 };
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DispatchReservationPolicy {
+    Allow,
+    Skip,
+}
 
 impl AsyncDaemonDb {
     /// Atomically load and conditionally mutate one Task Board item. Never
@@ -31,8 +38,33 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::None)
-            .await
+        self.update_task_board_item_impl(
+            item_id,
+            mutate,
+            TaskBoardTriageIngress::None,
+            DispatchReservationPolicy::Allow,
+        )
+        .await
+    }
+
+    /// Evaluation follows session state, but it must not advance an item while
+    /// dispatch admission still owns the item's exact revision. The worker
+    /// claim clears that reservation before later evaluations may resume.
+    pub(crate) async fn update_task_board_item_for_evaluation<F>(
+        &self,
+        item_id: &str,
+        mutate: F,
+    ) -> Result<Option<TaskBoardMutation>, CliError>
+    where
+        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+    {
+        self.update_task_board_item_impl(
+            item_id,
+            mutate,
+            TaskBoardTriageIngress::None,
+            DispatchReservationPolicy::Skip,
+        )
+        .await
     }
 
     /// Like [`update_task_board_item`], but also evaluates `BuiltInV1` in the
@@ -47,8 +79,13 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::HumanUpdate)
-            .await
+        self.update_task_board_item_impl(
+            item_id,
+            mutate,
+            TaskBoardTriageIngress::HumanUpdate,
+            DispatchReservationPolicy::Allow,
+        )
+        .await
     }
 
     /// Like [`update_task_board_item_with_triage`], but for provider
@@ -64,8 +101,13 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(item_id, mutate, TaskBoardTriageIngress::ProviderReconcile)
-            .await
+        self.update_task_board_item_impl(
+            item_id,
+            mutate,
+            TaskBoardTriageIngress::ProviderReconcile,
+            DispatchReservationPolicy::Allow,
+        )
+        .await
     }
 
     #[expect(
@@ -77,6 +119,7 @@ impl AsyncDaemonDb {
         item_id: &str,
         mutate: F,
         ingress: TaskBoardTriageIngress,
+        reservation_policy: DispatchReservationPolicy,
     ) -> Result<Option<TaskBoardMutation>, CliError>
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
@@ -89,6 +132,16 @@ impl AsyncDaemonDb {
             .load_item_with_triage_override_in_tx(item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+        if reservation_policy == DispatchReservationPolicy::Skip
+            && transaction
+                .has_active_dispatch_reservation_in_tx(item_id)
+                .await?
+        {
+            transaction.commit().await.map_err(|error| {
+                db_error(format!("commit reserved task board item no-op: {error}"))
+            })?;
+            return Ok(None);
+        }
         let before = item.clone();
         let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
         if !mutate(&mut item)? {
