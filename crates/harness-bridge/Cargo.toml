@@ -1,6 +1,6 @@
 [package]
 name = "harness-bridge"
-version = "55.0.3"
+version = "56.0.0"
 edition = "2024"
 rust-version = "1.95"
 
@@ -21,7 +21,7 @@ clap = { version = "4.6.0", features = ["derive", "env"] }
 crossterm = "0.29.0"
 fs2 = "0.4.3"
 fs-err = "3.3.0"
-harness-agents = { path = "../harness-agents", version = "55.0.3", features = ["bridge-runtime"] }
+harness-agents = { path = "../harness-agents", version = "56.0.0", features = ["bridge-runtime"] }
 # Optional and gated behind `daemon-runtime`, never this crate's own default
 # (`bridge-runtime`) feature set: only `agent_acp`, `agent_tui`, and `bridge`
 # swap from the `#[path]`-mirrored tree to the real crate (see
@@ -30,20 +30,20 @@ harness-agents = { path = "../harness-agents", version = "55.0.3", features = ["
 # `daemon-runtime`/`standalone-daemon`/`standalone-worker` trio the real
 # `harness-daemon` binary itself always builds with, matching root's own
 # `harness-daemon` dependency.
-harness-daemon = { path = "../harness-daemon", version = "55.0.3", optional = true }
-harness-daemon-client = { path = "../harness-daemon-client", version = "55.0.3" }
-harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "55.0.3" }
-harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.3" }
+harness-daemon = { path = "../harness-daemon", version = "56.0.0", optional = true }
+harness-daemon-client = { path = "../harness-daemon-client", version = "56.0.0" }
+harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "56.0.0" }
+harness-daemon-root = { path = "../harness-daemon-root", version = "56.0.0" }
 # Optional: only the `daemon-runtime` build mode needs the task-board runtime
 # config surface (e.g. `agent_acp`'s OpenRouter token lookup); the default
 # `bridge-runtime` build has no reason to depend on `harness-task-board`.
-harness-daemon-state = { path = "../harness-daemon-state", version = "55.0.3", optional = true }
-harness-hook = { path = "../harness-hook", version = "55.0.3" }
-harness-infra = { path = "../harness-infra", version = "55.0.3" }
-harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
-harness-protocol = { path = "../harness-protocol", version = "55.0.3" }
-harness-telemetry = { path = "../harness-telemetry", version = "55.0.3" }
+harness-daemon-state = { path = "../harness-daemon-state", version = "56.0.0", optional = true }
+harness-hook = { path = "../harness-hook", version = "56.0.0" }
+harness-infra = { path = "../harness-infra", version = "56.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "56.0.0" }
 hex = "0.4.3"
 nix = { version = "0.31", features = ["signal"] }
 notify = "8.2.0"

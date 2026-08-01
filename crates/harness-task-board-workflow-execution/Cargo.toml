@@ -1,14 +1,14 @@
 [package]
 name = "harness-task-board-workflow-execution"
-version = "55.0.3"
+version = "56.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
 chrono = "0.4.44"
-harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
-harness-task-board = { path = "../harness-task-board", version = "55.0.3" }
+harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "56.0.0" }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

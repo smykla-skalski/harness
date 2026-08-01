@@ -1,17 +1,17 @@
 [package]
 name = "harness-daemon-state"
-version = "55.0.3"
+version = "56.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
 fs-err = "3.3.0"
-harness-daemon-root = { path = "../harness-daemon-root", version = "55.0.3" }
-harness-infra = { path = "../harness-infra", version = "55.0.3" }
-harness-kernel = { path = "../harness-kernel", version = "55.0.3" }
-harness-task-board = { path = "../harness-task-board", version = "55.0.3" }
-harness-workspace = { path = "../harness-workspace", version = "55.0.3" }
+harness-daemon-root = { path = "../harness-daemon-root", version = "56.0.0" }
+harness-infra = { path = "../harness-infra", version = "56.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "56.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
 hex = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
