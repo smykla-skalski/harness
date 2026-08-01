@@ -42,4 +42,35 @@ struct TaskBoardSyncSummaryWireDecodingTests {
     #expect(summary.operations.first?.boardItemId == "b1")
     #expect(summary.operations.first?.dryRun == true)
   }
+
+  @Test("completed sync status decodes the embedded summary")
+  func completedSyncStatusMapping() throws {
+    let payload = #"""
+      {
+        "active": false,
+        "cancellation_requested": false,
+        "cancelled": false,
+        "error": null,
+        "summary": {
+          "total": 5,
+          "providers": [
+            {"provider": "github", "configured": true, "linked": 3, "pushable": 1,
+             "blocked": 0, "token_env": ["GH_TOKEN"]}
+          ],
+          "operations": [
+            {"provider": "github", "action": "pull", "board_item_id": "b1",
+             "external_id": "e1", "url": "https://example.com/1", "dry_run": false,
+             "applied": true}
+          ]
+        }
+      }
+      """#
+    let data = try #require(payload.data(using: .utf8))
+    let wire = try decoder.decode(TaskBoardSyncStatusResponseWire.self, from: data)
+    let status = TaskBoardSyncStatusResponse(wire: wire)
+
+    #expect(status.active == false)
+    #expect(status.summary?.providers.first?.tokenEnv == ["GH_TOKEN"])
+    #expect(status.summary?.operations.first?.boardItemId == "b1")
+  }
 }

@@ -101,7 +101,8 @@ extension WebSocketTransport {
 
   public func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
     let value = try await rpc(method: .taskBoardSyncStatus, params: .object([:]))
-    return try decodePolicyWire(value)
+    let wire: TaskBoardSyncStatusResponseWire = try decodePolicyWire(value)
+    return TaskBoardSyncStatusResponse(wire: wire)
   }
 
   public func syncTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardSyncSummary {

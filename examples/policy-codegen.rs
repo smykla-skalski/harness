@@ -1324,10 +1324,12 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // host-bridge reconfigure response (bridge/types.rs): nests the daemon-state capability wire.
     "BridgeStatusReport",
     // task_board sync summary (summary.rs + external/sync.rs): the syncTaskBoard return + orchestrator
-    // run-summary member. ExternalSyncOperation maps to the hand TaskBoardExternalSyncOperation.
+    // run-summary member, plus the status response that embeds it. ExternalSyncOperation maps to
+    // the hand TaskBoardExternalSyncOperation.
     "TaskBoardSyncSummary",
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
+    "TaskBoardSyncStatusResponse",
     // GitHubAutomationSettings sub-tree (github/config.rs) nested in the orchestrator settings.
     // GitHubProjectConfig shares it but is never sent: it is built per publication.
     "GitHubAutomationSettings",
@@ -3185,7 +3187,8 @@ const SYNC_SUMMARY_SOURCE: &str =
 const EXTERNAL_SYNC_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/daemon/task_board/external.rs");
 const SYNC_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSyncSummaryWireTypes.generated.swift";
-// The task_board sync summary (syncTaskBoard endpoint + nested in the orchestrator run summary).
+// The task_board sync summary (syncTaskBoard endpoint + nested in the orchestrator run summary)
+// and the status response that embeds it.
 // ExternalProvider/ExternalSyncAction are decoder-agnostic hand enums (TaskBoardExternalProvider/
 // TaskBoardExternalSyncAction) referenced bare via TYPE_RENAMES; ExternalSyncOperation's
 // changed_fields/unsupported_fields (Vec<ExternalSyncField> - the genuine no-Swift-mirror type) are
@@ -3194,6 +3197,7 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardSyncSummary",
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
+    "TaskBoardSyncStatusResponse",
 ];
 // GitHubAutomationSettings/GitHubProjectConfig and the rest of this file's
 // tree relocated to `harness-protocol` (issue #1145): pure data plus pure
@@ -3769,9 +3773,13 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: SYNC_SUMMARY_OUTPUT,
-            description: "the Rust task-board sync summary and external operations",
+            description: "the Rust task-board sync summary, status and external operations",
             defaults: &[],
-            sources: &[SYNC_SUMMARY_SOURCE, EXTERNAL_SYNC_SOURCE],
+            sources: &[
+                SYNC_SUMMARY_SOURCE,
+                EXTERNAL_SYNC_SOURCE,
+                TASK_BOARD_PROTOCOL_SOURCE,
+            ],
         },
         GeneratedModule {
             output: GITHUB_CONFIG_OUTPUT,

@@ -87,7 +87,12 @@ extension TaskBoardAPIClientTests {
     let websocketResponse = try await transport.taskBoardSyncStatus()
     let calls = await probe.calls
 
-    #expect(httpResponse == TaskBoardSyncStatusResponse(active: true, cancellationRequested: false))
+    #expect(httpResponse.active == false)
+    #expect(
+      httpResponse.summary?.providers.first?.tokenEnv
+        == ["HARNESS_GITHUB_TOKEN", "GH_TOKEN"]
+    )
+    #expect(httpResponse.summary?.operations.first?.boardItemId == "board-1")
     #expect(records.count == 1)
     #expect(records.first?.method == "GET")
     #expect(records.first?.path == "/v1/task-board/sync/status")

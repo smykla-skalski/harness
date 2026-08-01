@@ -85,3 +85,15 @@ extension TaskBoardSyncSummary {
     )
   }
 }
+
+extension TaskBoardSyncStatusResponse {
+  init(wire: TaskBoardSyncStatusResponseWire) {
+    self.init(
+      active: wire.active,
+      cancellationRequested: wire.cancellationRequested,
+      cancelled: wire.cancelled,
+      error: wire.error,
+      summary: wire.summary.map(TaskBoardSyncSummary.init(wire:))
+    )
+  }
+}

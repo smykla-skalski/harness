@@ -51,7 +51,8 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/sync"): sampleTaskBoardSyncSummaryText,
     Route("/v1/task-board/sync/cancel"): #"{"cancelled":true}"#,
     Route("/v1/task-board/sync/status", method: "GET"):
-      #"{"active":true,"cancellation_requested":false,"cancelled":false,"error":null,"summary":null}"#,
+      #"{"active":false,"cancellation_requested":false,"cancelled":false,"error":null,"summary":"#
+      + sampleTaskBoardSyncSummaryText + "}",
     Route("/v1/task-board/dispatch"): sampleTaskBoardDispatchSummaryJSONString,
     Route("/v1/task-board/evaluate"): sampleTaskBoardEvaluationSummaryText,
     Route("/v1/task-board/audit"): #"{"total":1,"ready":1,"blocked":0,"deleted":0,"by_status":[]}"#,
