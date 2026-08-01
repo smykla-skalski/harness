@@ -82,28 +82,37 @@ extension HarnessMonitorStore {
     }
 
     applyPreparedSessionIndexSnapshot(filteredSnapshot)
-
-    if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
-      let requestID = beginSessionLoad()
-      startSessionLoad(using: client, sessionID: selectedSessionID, requestID: requestID)
-    } else {
-      synchronizeActionActor()
-      if allowPreviewReadySelection,
-        let previewReadySessionID = previewReadySessionID(
-          client: client,
-          sessions: filteredSnapshot.sessions
-        )
-      {
-        Task { @MainActor [weak self] in
-          await self?.selectSession(previewReadySessionID)
-        }
-      }
-    }
+    restoreSelectionAfterRefresh(
+      using: client,
+      sessions: filteredSnapshot.sessions,
+      preserveSelection: preserveSelection,
+      allowPreviewReadySelection: allowPreviewReadySelection
+    )
 
     schedulePersistedSnapshotHydration(
       using: client,
       sessions: filteredSnapshot.sessions
     )
+  }
+
+  private func restoreSelectionAfterRefresh(
+    using client: any HarnessMonitorClientProtocol,
+    sessions: [SessionSummary],
+    preserveSelection: Bool,
+    allowPreviewReadySelection: Bool
+  ) {
+    if preserveSelection, let selectedSessionID, selectedSessionSummary != nil {
+      let requestID = beginSessionLoad()
+      startSessionLoad(using: client, sessionID: selectedSessionID, requestID: requestID)
+      return
+    }
+    synchronizeActionActor()
+    guard allowPreviewReadySelection,
+      let previewReadySessionID = previewReadySessionID(client: client, sessions: sessions)
+    else { return }
+    Task { @MainActor [weak self] in
+      await self?.selectSession(previewReadySessionID)
+    }
   }
 
   struct ResolvedTaskBoardRefreshSnapshot {

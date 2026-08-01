@@ -286,7 +286,8 @@ extension WebSocketTransport {
       // where in the pipeline the push was dropped.
       if let sessionId = pushEvent.sessionId {
         HarnessMonitorLogger.websocket.debug(
-          "dropping push \(pushEvent.kind.debugLabel, privacy: .public) for session \(sessionId, privacy: .public): no continuation attached"
+          "dropping push \(pushEvent.kind.debugLabel, privacy: .public) for session "
+            + "\(sessionId, privacy: .public): no continuation attached"
         )
       } else {
         HarnessMonitorLogger.websocket.debug(
@@ -416,5 +417,4 @@ extension WebSocketTransport {
   func setAcpEventAutoFlushEnabledForTests(_ enabled: Bool) {
     acpEventAutoFlushEnabled = enabled
   }
-
 }

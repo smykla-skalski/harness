@@ -265,10 +265,12 @@ extension HarnessMonitorStore {
     let request = try taskBoardPositionRequest(
       snapshot: snapshot,
       id: id,
-      sourceStatus: sourceStatus,
-      destinationStatus: destinationStatus,
-      placement: target.placement,
-      actor: target.actor
+      target: PositionPlacement(
+        sourceStatus: sourceStatus,
+        destinationStatus: destinationStatus,
+        placement: target.placement,
+        actor: target.actor
+      )
     )
     do {
       return try await client.setTaskBoardItemPosition(id: id, request: request)
@@ -293,28 +295,25 @@ extension HarnessMonitorStore {
   nonisolated private static func taskBoardPositionRequest(
     snapshot: TaskBoardListItemsSnapshot,
     id: String,
-    sourceStatus: TaskBoardStatus,
-    destinationStatus: TaskBoardStatus,
-    placement: TaskBoardLanePlacement,
-    actor: String
+    target: PositionPlacement
   ) throws -> TaskBoardSetItemPositionRequest {
     let liveItems = snapshot.items.filter { $0.deletedAt == nil }
     let destinationItems = liveItems.filter { item in
-      item.status.canonicalPersistedStatus == destinationStatus
+      item.status.canonicalPersistedStatus == target.destinationStatus
     }
     guard
       let item = liveItems.first(where: { $0.id == id }),
-      item.status.canonicalPersistedStatus == sourceStatus,
+      item.status.canonicalPersistedStatus == target.sourceStatus,
       item.kind != .umbrella,
       let itemRevision = snapshot.itemRevisions[id],
-      let lanePosition = placement.resolvePosition(
+      let lanePosition = target.placement.resolvePosition(
         itemID: id,
         orderedItemIDs: destinationItems.map(\.id)
       )
     else {
       throw TaskBoardPositionActionError.boardChanged
     }
-    if case .relative(let relativePlacement) = placement {
+    if case .relative(let relativePlacement) = target.placement {
       guard
         let anchor = destinationItems.first(where: {
           $0.id == relativePlacement.anchorItemID
@@ -325,11 +324,11 @@ extension HarnessMonitorStore {
       }
     }
     return TaskBoardSetItemPositionRequest(
-      status: destinationStatus,
+      status: target.destinationStatus,
       lanePosition: lanePosition,
       expectedItemRevision: itemRevision,
       expectedItemsChangeSeq: snapshot.itemsChangeSeq,
-      actor: actor
+      actor: target.actor
     )
   }
 

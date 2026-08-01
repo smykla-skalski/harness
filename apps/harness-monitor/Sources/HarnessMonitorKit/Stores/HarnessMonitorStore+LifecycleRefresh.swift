@@ -269,37 +269,13 @@ extension HarnessMonitorStore {
       returning: RefreshSnapshot.self
     ) { group in
       group.addTask {
-        do {
-          return .diagnostics(
-            try await Self.measureOperation {
-              try await client.diagnostics()
-            }
-          )
-        } catch {
-          throw Self.refreshSnapshotLoadError(source: .diagnostics, underlying: error)
-        }
+        try await Self.loadDiagnosticsSnapshotPiece(using: client)
       }
       group.addTask {
-        do {
-          return .projects(
-            try await Self.measureOperation {
-              try await client.projects()
-            }
-          )
-        } catch {
-          throw Self.refreshSnapshotLoadError(source: .projects, underlying: error)
-        }
+        try await Self.loadProjectsSnapshotPiece(using: client)
       }
       group.addTask {
-        do {
-          return .sessions(
-            try await Self.measureOperation {
-              try await client.sessions()
-            }
-          )
-        } catch {
-          throw Self.refreshSnapshotLoadError(source: .sessions, underlying: error)
-        }
+        try await Self.loadSessionsSnapshotPiece(using: client)
       }
       group.addTask {
         RefreshSnapshotPiece.taskBoardItems(
@@ -365,6 +341,36 @@ extension HarnessMonitorStore {
     }
   }
 
+  nonisolated private static func loadDiagnosticsSnapshotPiece(
+    using client: any HarnessMonitorClientProtocol
+  ) async throws -> RefreshSnapshotPiece {
+    do {
+      return .diagnostics(try await measureOperation { try await client.diagnostics() })
+    } catch {
+      throw refreshSnapshotLoadError(source: .diagnostics, underlying: error)
+    }
+  }
+
+  nonisolated private static func loadProjectsSnapshotPiece(
+    using client: any HarnessMonitorClientProtocol
+  ) async throws -> RefreshSnapshotPiece {
+    do {
+      return .projects(try await measureOperation { try await client.projects() })
+    } catch {
+      throw refreshSnapshotLoadError(source: .projects, underlying: error)
+    }
+  }
+
+  nonisolated private static func loadSessionsSnapshotPiece(
+    using client: any HarnessMonitorClientProtocol
+  ) async throws -> RefreshSnapshotPiece {
+    do {
+      return .sessions(try await measureOperation { try await client.sessions() })
+    } catch {
+      throw refreshSnapshotLoadError(source: .sessions, underlying: error)
+    }
+  }
+
   nonisolated private static func refreshSnapshotLoadError(
     source: RefreshSnapshotSource,
     underlying error: any Error
@@ -404,7 +410,6 @@ struct RefreshApplyOptions {
   let isInitialConnect: Bool
   let adoptsLocalManifest: Bool
 }
-
 struct TaskBoardConfirmationTick {
   var resolvedItems: [TaskBoardItem]
   var resolvedStatus: TaskBoardOrchestratorStatus?

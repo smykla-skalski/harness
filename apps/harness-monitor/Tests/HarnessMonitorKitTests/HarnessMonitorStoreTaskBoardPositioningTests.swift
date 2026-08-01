@@ -33,7 +33,8 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
     #expect(success)
     #expect(store.currentSuccessFeedbackMessage == nil)
     #expect(destination.items.map(\.id) == ["umbrella", "anchor", "moving", "trailing"])
-    #expect(destination.items.first(where: { $0.id == "moving" })?.sourceProjectId == "project-source")
+    #expect(
+      destination.items.first(where: { $0.id == "moving" })?.sourceProjectId == "project-source")
     #expect(
       destination.items.first(where: { $0.id == "moving" })?.executionRepository == "acme/widget"
     )
@@ -335,43 +336,7 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
     #expect(setCalls == [1, 2])
   }
 
-  @Test("A cross-lane retry fails closed when the source card moved")
-  func crossLaneMoveRejectsConcurrentSourceLaneChange() async {
-    let client = RecordingHarnessClient()
-    let moving = taskBoardItem(id: "moving", status: .todo)
-    let anchor = taskBoardItem(id: "anchor", status: .planning)
-    client.configureTaskBoardItems([moving, anchor])
-    client.taskBoardPositionError = concurrentModificationError
-    client.taskBoardPositionErrorRemainingUses = 1
-    client.taskBoardPositionItemsAfterError = [
-      taskBoardItem(id: "moving", status: .inProgress),
-      anchor,
-    ]
-    let store = await makeBootstrappedStore(client: client)
-
-    let success = await store.positionTaskBoardItem(
-      id: "moving",
-      sourceStatus: .todo,
-      destinationStatus: .planning,
-      placement: .relative(relative(after: "anchor"))
-    )
-
-    #expect(success == false)
-    let setCalls = client.recordedCalls().filter {
-      if case .setTaskBoardItemPosition = $0 { return true }
-      return false
-    }
-    #expect(setCalls.count == 1)
-    #expect(
-      store.globalTaskBoardItems.first(where: { $0.id == "moving" })?.status == .inProgress
-    )
-    #expect(
-      store.currentFailureFeedbackMessage
-        == "Cannot update task board position: the board changed before the action completed"
-    )
-  }
-
-  private var concurrentModificationError: HarnessMonitorAPIError {
+  var concurrentModificationError: HarnessMonitorAPIError {
     .semanticServer(
       code: 409,
       semanticCode: "WORKFLOW_CONCURRENT",
@@ -379,15 +344,15 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
     )
   }
 
-  private func relative(after itemID: String) -> TaskBoardRelativeLanePlacement {
+  func relative(after itemID: String) -> TaskBoardRelativeLanePlacement {
     TaskBoardRelativeLanePlacement(anchorItemID: itemID, edge: .after)
   }
 
-  private func relative(before itemID: String) -> TaskBoardRelativeLanePlacement {
+  func relative(before itemID: String) -> TaskBoardRelativeLanePlacement {
     TaskBoardRelativeLanePlacement(anchorItemID: itemID, edge: .before)
   }
 
-  private func taskBoardItem(
+  func taskBoardItem(
     id: String,
     status: TaskBoardStatus,
     kind: TaskBoardItemKind = .task,

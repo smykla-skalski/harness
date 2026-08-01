@@ -70,11 +70,7 @@ extension WebSocketTransport {
           ]
           attempt += 1
           try? await Task.sleep(for: delay)
-          if Task.isCancelled {
-            await self.setReconnectingStreams(false)
-            return
-          }
-          if await self.isShutDown {
+          if await self.shouldStopReconnect() {
             await self.setReconnectingStreams(false)
             return
           }
@@ -90,7 +86,8 @@ extension WebSocketTransport {
             await self.setReconnectingStreams(false)
             if !Task.isCancelled {
               HarnessMonitorLogger.websocket.warning(
-                "WSock reconnect failure for \(logID, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                "WSock reconnect failure for \(logID, privacy: .public): "
+                  + "\(error.localizedDescription, privacy: .public)"
               )
             }
             break
@@ -98,6 +95,10 @@ extension WebSocketTransport {
         }
       }
     }
+  }
+
+  private func shouldStopReconnect() -> Bool {
+    Task.isCancelled || isShutDown
   }
 
   func reconnectInternal() async throws {

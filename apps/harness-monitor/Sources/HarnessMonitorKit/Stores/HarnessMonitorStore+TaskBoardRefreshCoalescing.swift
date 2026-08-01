@@ -130,25 +130,7 @@ extension HarnessMonitorStore {
       if self.cacheWriteSync.pendingTaskBoardItemsRefresh,
         !self.cacheWriteSync.taskBoardRefreshRequiresImmediate
       {
-        var remainingPacing = TaskBoardItemsRefreshPacing.delay(
-          lastRefreshAt: self.cacheWriteSync.lastTaskBoardItemsRefreshAt,
-          now: Date()
-        )
-        // Sliced rather than one sleep: an awaited refresh that arrives while
-        // this task is already pacing cannot restart it, so the wait itself has
-        // to notice the immediate flag and stop.
-        while remainingPacing > 0, !self.cacheWriteSync.taskBoardRefreshRequiresImmediate {
-          let slice = min(remainingPacing, TaskBoardItemsRefreshPacing.pollSlice)
-          do {
-            try await Task.sleep(for: .seconds(slice))
-          } catch {
-            return
-          }
-          guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else {
-            return
-          }
-          remainingPacing -= slice
-        }
+        guard await self.waitForTaskBoardRefreshPacing(generation: generation) else { return }
       }
 
       let includeItems = self.cacheWriteSync.pendingTaskBoardItemsRefresh
@@ -203,5 +185,28 @@ extension HarnessMonitorStore {
         self.startTaskBoardDashboardSnapshotRefreshIfNeeded(using: client)
       }
     }
+  }
+
+  private func waitForTaskBoardRefreshPacing(generation: UInt64) async -> Bool {
+    var remainingPacing = TaskBoardItemsRefreshPacing.delay(
+      lastRefreshAt: cacheWriteSync.lastTaskBoardItemsRefreshAt,
+      now: Date()
+    )
+    // Sliced rather than one sleep: an awaited refresh that arrives while
+    // this task is already pacing cannot restart it, so the wait itself has
+    // to notice the immediate flag and stop.
+    while remainingPacing > 0, !cacheWriteSync.taskBoardRefreshRequiresImmediate {
+      let slice = min(remainingPacing, TaskBoardItemsRefreshPacing.pollSlice)
+      do {
+        try await Task.sleep(for: .seconds(slice))
+      } catch {
+        return false
+      }
+      guard cacheWriteSync.taskBoardRefreshGeneration == generation else {
+        return false
+      }
+      remainingPacing -= slice
+    }
+    return true
   }
 }
