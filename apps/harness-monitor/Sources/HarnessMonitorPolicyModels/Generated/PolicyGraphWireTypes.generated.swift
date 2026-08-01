@@ -151,7 +151,22 @@ public struct PolicyApprovalGrant: Codable, Equatable, Sendable {
   public var createdAt: String
   public var updatedAt: String
 
-  public init(id: String, boardItemId: String, action: PolicyAction, canvasId: String? = nil, canvasRevision: UInt64, nodeId: String, reasonCode: PolicyReasonCode, state: PolicyApprovalState, resolvedBy: String? = nil, resolvedAt: String? = nil, consumedAt: String? = nil, expirySeconds: UInt64? = nil, createdAt: String, updatedAt: String) {
+  public init(
+    id: String,
+    boardItemId: String,
+    action: PolicyAction,
+    canvasId: String? = nil,
+    canvasRevision: UInt64,
+    nodeId: String,
+    reasonCode: PolicyReasonCode,
+    state: PolicyApprovalState,
+    resolvedBy: String? = nil,
+    resolvedAt: String? = nil,
+    consumedAt: String? = nil,
+    expirySeconds: UInt64? = nil,
+    createdAt: String,
+    updatedAt: String
+  ) {
     self.id = id
     self.boardItemId = boardItemId
     self.action = action
@@ -220,7 +235,25 @@ public struct PolicyEvidence: Codable, Equatable, Sendable {
   public var reviewAutoMergeEnabled: Bool?
   public var reviewRequiredApprovalsSatisfiedAfterViewerApproval: Bool?
 
-  public init(checksGreen: Bool? = nil, branchProtectionAllowsMerge: Bool? = nil, reviewerVerdictApproved: Bool? = nil, unresolvedRequestedChanges: UInt32? = nil, protectedPathTouched: Bool? = nil, riskScore: UInt8? = nil, reviewIsOpen: Bool? = nil, reviewIsDraft: Bool? = nil, reviewReviewRequired: Bool? = nil, reviewHasNoDecision: Bool? = nil, reviewHasMergeConflicts: Bool? = nil, reviewPolicyBlocked: Bool? = nil, reviewViewerCanUpdate: Bool? = nil, reviewHasConflictMarkers: Bool? = nil, reviewViewerHasActiveApproval: Bool? = nil, reviewAutoMergeEnabled: Bool? = nil, reviewRequiredApprovalsSatisfiedAfterViewerApproval: Bool? = nil) {
+  public init(
+    checksGreen: Bool? = nil,
+    branchProtectionAllowsMerge: Bool? = nil,
+    reviewerVerdictApproved: Bool? = nil,
+    unresolvedRequestedChanges: UInt32? = nil,
+    protectedPathTouched: Bool? = nil,
+    riskScore: UInt8? = nil,
+    reviewIsOpen: Bool? = nil,
+    reviewIsDraft: Bool? = nil,
+    reviewReviewRequired: Bool? = nil,
+    reviewHasNoDecision: Bool? = nil,
+    reviewHasMergeConflicts: Bool? = nil,
+    reviewPolicyBlocked: Bool? = nil,
+    reviewViewerCanUpdate: Bool? = nil,
+    reviewHasConflictMarkers: Bool? = nil,
+    reviewViewerHasActiveApproval: Bool? = nil,
+    reviewAutoMergeEnabled: Bool? = nil,
+    reviewRequiredApprovalsSatisfiedAfterViewerApproval: Bool? = nil
+  ) {
     self.checksGreen = checksGreen
     self.branchProtectionAllowsMerge = branchProtectionAllowsMerge
     self.reviewerVerdictApproved = reviewerVerdictApproved
@@ -274,7 +307,19 @@ public struct PolicySubject: Codable, Equatable, Sendable {
   public var agentMode: TaskBoardAgentMode?
   public var targetProjectTypes: [String]
 
-  public init(taskBoardItemId: String? = nil, sessionId: String? = nil, agentId: String? = nil, repository: String? = nil, branch: String? = nil, pullRequest: String? = nil, paths: [String] = [], tags: [String] = [], priority: TaskBoardPriority? = nil, agentMode: TaskBoardAgentMode? = nil, targetProjectTypes: [String] = []) {
+  public init(
+    taskBoardItemId: String? = nil,
+    sessionId: String? = nil,
+    agentId: String? = nil,
+    repository: String? = nil,
+    branch: String? = nil,
+    pullRequest: String? = nil,
+    paths: [String] = [],
+    tags: [String] = [],
+    priority: TaskBoardPriority? = nil,
+    agentMode: TaskBoardAgentMode? = nil,
+    targetProjectTypes: [String] = []
+  ) {
     self.taskBoardItemId = taskBoardItemId
     self.sessionId = sessionId
     self.agentId = agentId
@@ -326,7 +371,14 @@ public struct PolicyInput: Codable, Equatable, Sendable {
   public var evaluatedAt: String?
   public var approvals: [PolicyApprovalGrantState]
 
-  public init(workflow: String? = nil, action: PolicyAction, subject: PolicySubject = PolicySubject(), evidence: PolicyEvidence = PolicyEvidence(), evaluatedAt: String? = nil, approvals: [PolicyApprovalGrantState] = []) {
+  public init(
+    workflow: String? = nil,
+    action: PolicyAction,
+    subject: PolicySubject = PolicySubject(),
+    evidence: PolicyEvidence = PolicyEvidence(),
+    evaluatedAt: String? = nil,
+    approvals: [PolicyApprovalGrantState] = []
+  ) {
     self.workflow = workflow
     self.action = action
     self.subject = subject
@@ -562,7 +614,16 @@ public struct PolicyGraph: Codable, Equatable, Sendable {
   public var layout: PolicyGraphLayout
   public var policyTraceIds: [String]
 
-  public init(schemaVersion: UInt16, revision: UInt64, mode: PolicyGraphMode, nodes: [PolicyGraphNode], edges: [PolicyGraphEdge], groups: [PolicyGraphGroup], layout: PolicyGraphLayout, policyTraceIds: [String] = []) {
+  public init(
+    schemaVersion: UInt16,
+    revision: UInt64,
+    mode: PolicyGraphMode,
+    nodes: [PolicyGraphNode],
+    edges: [PolicyGraphEdge],
+    groups: [PolicyGraphGroup],
+    layout: PolicyGraphLayout,
+    policyTraceIds: [String] = []
+  ) {
     self.schemaVersion = schemaVersion
     self.revision = revision
     self.mode = mode
@@ -614,7 +675,15 @@ public struct PolicyGraphNode: Codable, Equatable, Sendable {
   public var outputPorts: [PolicyGraphPortId]
   public var groupId: PolicyGraphGroupId?
 
-  public init(id: PolicyGraphNodeId, label: String, kind: PolicyGraphNodeKind, automation: PolicyGraphAutomationBinding? = nil, inputPorts: [PolicyGraphPortId] = [], outputPorts: [PolicyGraphPortId] = [], groupId: PolicyGraphGroupId? = nil) {
+  public init(
+    id: PolicyGraphNodeId,
+    label: String,
+    kind: PolicyGraphNodeKind,
+    automation: PolicyGraphAutomationBinding? = nil,
+    inputPorts: [PolicyGraphPortId] = [],
+    outputPorts: [PolicyGraphPortId] = [],
+    groupId: PolicyGraphGroupId? = nil
+  ) {
     self.id = id
     self.label = label
     self.kind = kind
@@ -896,7 +965,12 @@ public struct PolicyEvidenceCheck: Codable, Equatable, Sendable {
   public var failReasonCode: PolicyReasonCode
   public var missingReasonCode: PolicyReasonCode
 
-  public init(field: PolicyEvidenceField, pass: PolicyEvidencePredicate, failReasonCode: PolicyReasonCode, missingReasonCode: PolicyReasonCode) {
+  public init(
+    field: PolicyEvidenceField,
+    pass: PolicyEvidencePredicate,
+    failReasonCode: PolicyReasonCode,
+    missingReasonCode: PolicyReasonCode
+  ) {
     self.field = field
     self.pass = pass
     self.failReasonCode = failReasonCode
@@ -965,7 +1039,15 @@ public struct PolicyGraphEdge: Codable, Equatable, Sendable {
   public var label: String?
   public var condition: PolicyGraphEdgeCondition
 
-  public init(id: PolicyGraphEdgeId, fromNode: PolicyGraphNodeId, fromPort: PolicyGraphPortId, toNode: PolicyGraphNodeId, toPort: PolicyGraphPortId, label: String? = nil, condition: PolicyGraphEdgeCondition = .always) {
+  public init(
+    id: PolicyGraphEdgeId,
+    fromNode: PolicyGraphNodeId,
+    fromPort: PolicyGraphPortId,
+    toNode: PolicyGraphNodeId,
+    toPort: PolicyGraphPortId,
+    label: String? = nil,
+    condition: PolicyGraphEdgeCondition = .always
+  ) {
     self.id = id
     self.fromNode = fromNode
     self.fromPort = fromPort
@@ -1086,7 +1168,13 @@ public struct PolicyGraphGroup: Codable, Equatable, Sendable {
   public var frame: PolicyCanvasRect
   public var nodeIds: [PolicyGraphNodeId]
 
-  public init(id: PolicyGraphGroupId, label: String, color: String? = nil, frame: PolicyCanvasRect = PolicyCanvasRect(), nodeIds: [PolicyGraphNodeId] = []) {
+  public init(
+    id: PolicyGraphGroupId,
+    label: String,
+    color: String? = nil,
+    frame: PolicyCanvasRect = PolicyCanvasRect(),
+    nodeIds: [PolicyGraphNodeId] = []
+  ) {
     self.id = id
     self.label = label
     self.color = color
@@ -1117,7 +1205,11 @@ public struct PolicyGraphLayout: Codable, Equatable, Sendable {
   public var offset: PolicyCanvasPoint
   public var nodes: [PolicyGraphNodeLayout]
 
-  public init(zoom: Double = 1.0, offset: PolicyCanvasPoint = PolicyCanvasPoint(), nodes: [PolicyGraphNodeLayout] = []) {
+  public init(
+    zoom: Double = 1.0,
+    offset: PolicyCanvasPoint = PolicyCanvasPoint(),
+    nodes: [PolicyGraphNodeLayout] = []
+  ) {
     self.zoom = zoom
     self.offset = offset
     self.nodes = nodes
@@ -1288,7 +1380,15 @@ public struct PolicyGraphSimulation: Codable, Equatable, Sendable {
   public var boundaries: [PolicyRuntimeBoundary]
   public var approvalRequests: [PolicyApprovalRequest]
 
-  public init(mode: PolicyGraphMode, decision: PolicyDecision, trace: PolicySimulationTrace = PolicySimulationTrace(), visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = [], approvalRequests: [PolicyApprovalRequest] = []) {
+  public init(
+    mode: PolicyGraphMode,
+    decision: PolicyDecision,
+    trace: PolicySimulationTrace = PolicySimulationTrace(),
+    visitedNodeIds: [String] = [],
+    policyTraceIds: [String] = [],
+    boundaries: [PolicyRuntimeBoundary] = [],
+    approvalRequests: [PolicyApprovalRequest] = []
+  ) {
     self.mode = mode
     self.decision = decision
     self.trace = trace
@@ -1406,7 +1506,20 @@ public struct PolicyGraphAutomationBinding: Codable, Equatable, Sendable {
   public var ocrConfiguration: PolicyGraphOCRConfiguration?
   public var reviewPullRequestExtraction: PolicyGraphReviewPullRequestExtraction?
 
-  public init(isEnabled: Bool = true, eventSource: String, priority: Int32? = nil, contentKinds: [String] = [], preprocessors: [String] = [], actions: [String] = [], postprocessors: [String] = [], sourceAppMode: String = "allExceptDenied", allowedBundleIdentifiers: [String] = [], deniedBundleIdentifiers: [String] = [], ocrConfiguration: PolicyGraphOCRConfiguration? = nil, reviewPullRequestExtraction: PolicyGraphReviewPullRequestExtraction? = nil) {
+  public init(
+    isEnabled: Bool = true,
+    eventSource: String,
+    priority: Int32? = nil,
+    contentKinds: [String] = [],
+    preprocessors: [String] = [],
+    actions: [String] = [],
+    postprocessors: [String] = [],
+    sourceAppMode: String = "allExceptDenied",
+    allowedBundleIdentifiers: [String] = [],
+    deniedBundleIdentifiers: [String] = [],
+    ocrConfiguration: PolicyGraphOCRConfiguration? = nil,
+    reviewPullRequestExtraction: PolicyGraphReviewPullRequestExtraction? = nil
+  ) {
     self.isEnabled = isEnabled
     self.eventSource = eventSource
     self.priority = priority
@@ -1458,7 +1571,11 @@ public struct PolicyGraphOCRConfiguration: Codable, Equatable, Sendable {
   public var automaticallyDetectsLanguage: Bool
   public var usesLanguageCorrection: Bool
 
-  public init(recognitionLevel: String = "accurate", automaticallyDetectsLanguage: Bool = true, usesLanguageCorrection: Bool = true) {
+  public init(
+    recognitionLevel: String = "accurate",
+    automaticallyDetectsLanguage: Bool = true,
+    usesLanguageCorrection: Bool = true
+  ) {
     self.recognitionLevel = recognitionLevel
     self.automaticallyDetectsLanguage = automaticallyDetectsLanguage
     self.usesLanguageCorrection = usesLanguageCorrection
@@ -1488,7 +1605,16 @@ public struct PolicyGraphReviewPullRequestExtraction: Codable, Equatable, Sendab
   public var autoCopy: Bool
   public var showSheet: Bool
 
-  public init(repositoryMode: String = "allConfiguredRepos", policyRepositories: [String] = [], numberMemoryEnabled: Bool = true, resultScope: String = "all", failureSignalMode: String = "liveOrVisual", outputFormat: String = "newlineGitHubURLs", autoCopy: Bool = true, showSheet: Bool = true) {
+  public init(
+    repositoryMode: String = "allConfiguredRepos",
+    policyRepositories: [String] = [],
+    numberMemoryEnabled: Bool = true,
+    resultScope: String = "all",
+    failureSignalMode: String = "liveOrVisual",
+    outputFormat: String = "newlineGitHubURLs",
+    autoCopy: Bool = true,
+    showSheet: Bool = true
+  ) {
     self.repositoryMode = repositoryMode
     self.policyRepositories = policyRepositories
     self.numberMemoryEnabled = numberMemoryEnabled
@@ -1696,7 +1822,14 @@ public struct PolicyPipelineGoLiveDiffEntry: Codable, Equatable, Sendable {
   public var draftDecision: PolicyDecision
   public var changed: Bool
 
-  public init(scenarioId: String, scenarioName: String, action: PolicyAction, liveDecision: PolicyDecision? = nil, draftDecision: PolicyDecision, changed: Bool) {
+  public init(
+    scenarioId: String,
+    scenarioName: String,
+    action: PolicyAction,
+    liveDecision: PolicyDecision? = nil,
+    draftDecision: PolicyDecision,
+    changed: Bool
+  ) {
     self.scenarioId = scenarioId
     self.scenarioName = scenarioName
     self.action = action
@@ -1749,7 +1882,15 @@ public struct PolicyPipelineSimulatedDecisionWire: Codable, Equatable, Sendable 
   public var policyTraceIds: [String]
   public var boundaries: [PolicyRuntimeBoundary]
 
-  public init(scenarioId: String = "", scenarioName: String = "", action: PolicyAction, decision: PolicyDecision, visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = []) {
+  public init(
+    scenarioId: String = "",
+    scenarioName: String = "",
+    action: PolicyAction,
+    decision: PolicyDecision,
+    visitedNodeIds: [String] = [],
+    policyTraceIds: [String] = [],
+    boundaries: [PolicyRuntimeBoundary] = []
+  ) {
     self.scenarioId = scenarioId
     self.scenarioName = scenarioName
     self.action = action
@@ -1791,7 +1932,16 @@ public struct PolicyPipelineSimulationResultWire: Codable, Equatable, Sendable {
   public var policyTraceIds: [String]
   public var hasRuntimeBoundaries: Bool
 
-  public init(revision: UInt64, traceId: String, simulatedAt: String, succeeded: Bool, validation: PolicyGraphValidationReport, decisions: [PolicyPipelineSimulatedDecisionWire] = [], policyTraceIds: [String] = [], hasRuntimeBoundaries: Bool = false) {
+  public init(
+    revision: UInt64,
+    traceId: String,
+    simulatedAt: String,
+    succeeded: Bool,
+    validation: PolicyGraphValidationReport,
+    decisions: [PolicyPipelineSimulatedDecisionWire] = [],
+    policyTraceIds: [String] = [],
+    hasRuntimeBoundaries: Bool = false
+  ) {
     self.revision = revision
     self.traceId = traceId
     self.simulatedAt = simulatedAt
@@ -1837,7 +1987,17 @@ public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
   public var spawnKillSwitch: Bool
   public var pendingApprovalGrantCount: UInt
 
-  public init(activeRevision: UInt64, mode: PolicyGraphMode, globalPolicyEnforcementEnabled: Bool = true, latestTraceId: String? = nil, latestSimulation: PolicyPipelineSimulationResultWire? = nil, validation: PolicyGraphValidationReport, spawnRequiresLivePolicy: Bool = false, spawnKillSwitch: Bool = false, pendingApprovalGrantCount: UInt = 0) {
+  public init(
+    activeRevision: UInt64,
+    mode: PolicyGraphMode,
+    globalPolicyEnforcementEnabled: Bool = true,
+    latestTraceId: String? = nil,
+    latestSimulation: PolicyPipelineSimulationResultWire? = nil,
+    validation: PolicyGraphValidationReport,
+    spawnRequiresLivePolicy: Bool = false,
+    spawnKillSwitch: Bool = false,
+    pendingApprovalGrantCount: UInt = 0
+  ) {
     self.activeRevision = activeRevision
     self.mode = mode
     self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
@@ -1929,7 +2089,16 @@ public struct PolicyPipelineReplayDecision: Codable, Equatable, Sendable {
   public var changed: Bool
   public var insufficientEvidence: Bool
 
-  public init(id: String, recordedAt: String, action: PolicyAction, historicalDecision: PolicyDecision, draftDecision: PolicyDecision, visitedNodeIds: [String] = [], changed: Bool, insufficientEvidence: Bool) {
+  public init(
+    id: String,
+    recordedAt: String,
+    action: PolicyAction,
+    historicalDecision: PolicyDecision,
+    draftDecision: PolicyDecision,
+    visitedNodeIds: [String] = [],
+    changed: Bool,
+    insufficientEvidence: Bool
+  ) {
     self.id = id
     self.recordedAt = recordedAt
     self.action = action

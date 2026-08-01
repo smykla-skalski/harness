@@ -20,7 +20,22 @@ public struct PolicyCanvasSummaryWire: Codable, Equatable, Sendable {
   public var latestSimulationAt: String?
   public var updatedAt: String
 
-  public init(canvasId: String, title: String, revision: UInt64, mode: PolicyGraphMode, document: PolicyPipelineDocument, liveDocument: PolicyPipelineDocument? = nil, liveUpdatedAt: String? = nil, nodeCount: UInt, edgeCount: UInt, groupCount: UInt, latestSimulationTraceId: String? = nil, latestSimulationSucceeded: Bool? = nil, latestSimulationAt: String? = nil, updatedAt: String) {
+  public init(
+    canvasId: String,
+    title: String,
+    revision: UInt64,
+    mode: PolicyGraphMode,
+    document: PolicyPipelineDocument,
+    liveDocument: PolicyPipelineDocument? = nil,
+    liveUpdatedAt: String? = nil,
+    nodeCount: UInt,
+    edgeCount: UInt,
+    groupCount: UInt,
+    latestSimulationTraceId: String? = nil,
+    latestSimulationSucceeded: Bool? = nil,
+    latestSimulationAt: String? = nil,
+    updatedAt: String
+  ) {
     self.canvasId = canvasId
     self.title = title
     self.revision = revision
@@ -64,7 +79,15 @@ public struct PolicyCanvasWorkspaceResponseWire: Codable, Equatable, Sendable {
   public var spawnKillSwitch: Bool
   public var scenarios: [PolicyScenario]
 
-  public init(schemaVersion: UInt32, activeCanvasId: String, canvases: [PolicyCanvasSummaryWire] = [], globalPolicyEnforcementEnabled: Bool = true, spawnRequiresLivePolicy: Bool = false, spawnKillSwitch: Bool = false, scenarios: [PolicyScenario] = []) {
+  public init(
+    schemaVersion: UInt32,
+    activeCanvasId: String,
+    canvases: [PolicyCanvasSummaryWire] = [],
+    globalPolicyEnforcementEnabled: Bool = true,
+    spawnRequiresLivePolicy: Bool = false,
+    spawnKillSwitch: Bool = false,
+    scenarios: [PolicyScenario] = []
+  ) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases

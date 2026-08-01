@@ -33,7 +33,11 @@ public struct TaskBoardReportOnlyReviewFinding: Codable, Equatable, Sendable {
   public var location: TaskBoardReviewFindingLocation
   public var evidence: String
 
-  public init(severity: TaskBoardReviewFindingSeverity, location: TaskBoardReviewFindingLocation, evidence: String) {
+  public init(
+    severity: TaskBoardReviewFindingSeverity,
+    location: TaskBoardReviewFindingLocation,
+    evidence: String
+  ) {
     self.severity = severity
     self.location = location
     self.evidence = evidence
@@ -74,7 +78,26 @@ public struct TaskBoardAiReviewReportRecord: Codable, Equatable, Sendable {
   public var startedAt: String
   public var finishedAt: String
 
-  public init(reportId: String, itemId: String, correlationId: String, repository: String, pullRequestNumber: UInt64, headRevision: String, runtime: String, requestedRuntime: String, actualRuntime: String? = nil, requestedModel: String, effectiveModel: String? = nil, status: TaskBoardAiReviewReportStatus, summary: String? = nil, findings: [TaskBoardReportOnlyReviewFinding] = [], partialOutput: String? = nil, terminalReason: String? = nil, startedAt: String, finishedAt: String) {
+  public init(
+    reportId: String,
+    itemId: String,
+    correlationId: String,
+    repository: String,
+    pullRequestNumber: UInt64,
+    headRevision: String,
+    runtime: String,
+    requestedRuntime: String,
+    actualRuntime: String? = nil,
+    requestedModel: String,
+    effectiveModel: String? = nil,
+    status: TaskBoardAiReviewReportStatus,
+    summary: String? = nil,
+    findings: [TaskBoardReportOnlyReviewFinding] = [],
+    partialOutput: String? = nil,
+    terminalReason: String? = nil,
+    startedAt: String,
+    finishedAt: String
+  ) {
     self.reportId = reportId
     self.itemId = itemId
     self.correlationId = correlationId
@@ -150,7 +173,17 @@ public struct TaskBoardAiReviewUnavailableExecution: Codable, Equatable, Sendabl
   public var startedAt: String
   public var finishedAt: String
 
-  public init(executionId: String, executionState: TaskBoardExecutionState, runtime: String, requestedRuntime: String, actualRuntime: String? = nil, requestedModel: String? = nil, headRevision: String? = nil, startedAt: String, finishedAt: String) {
+  public init(
+    executionId: String,
+    executionState: TaskBoardExecutionState,
+    runtime: String,
+    requestedRuntime: String,
+    actualRuntime: String? = nil,
+    requestedModel: String? = nil,
+    headRevision: String? = nil,
+    startedAt: String,
+    finishedAt: String
+  ) {
     self.executionId = executionId
     self.executionState = executionState
     self.runtime = runtime

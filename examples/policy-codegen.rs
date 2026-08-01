@@ -71,6 +71,9 @@ struct SwiftStruct {
     fields: Vec<SwiftField>,
 }
 
+// Keep generated declarations within the shared SwiftLint warning threshold.
+const SWIFT_LINE_LENGTH_WARNING_LIMIT: usize = 110;
+
 /// The payload shape of an internally-tagged enum variant.
 enum VariantPayload {
     Unit,
@@ -307,24 +310,60 @@ fn push_type(out: &mut String, field: &SwiftField) {
 /// Emit the public memberwise initializer, defaulting optionals to `nil` and
 /// collection fields to their wire default.
 fn emit_memberwise_init(out: &mut String, spec: &SwiftStruct) {
-    out.push_str("  public init(");
-    for (index, field) in spec.fields.iter().enumerate() {
-        if index != 0 {
-            out.push_str(", ");
+    if memberwise_init_line_length(spec) <= SWIFT_LINE_LENGTH_WARNING_LIMIT {
+        out.push_str("  public init(");
+        for (index, field) in spec.fields.iter().enumerate() {
+            if index != 0 {
+                out.push_str(", ");
+            }
+            emit_parameter(out, field);
         }
-        out.push_str(&field.property);
-        out.push_str(": ");
-        push_type(out, field);
-        if let Some(default) = &field.init_default {
-            out.push_str(" = ");
-            out.push_str(default);
+        out.push_str(") {\n");
+    } else {
+        out.push_str("  public init(\n");
+        for (index, field) in spec.fields.iter().enumerate() {
+            out.push_str("    ");
+            emit_parameter(out, field);
+            if index + 1 != spec.fields.len() {
+                out.push(',');
+            }
+            out.push('\n');
         }
+        out.push_str("  ) {\n");
     }
-    out.push_str(") {\n");
     for field in &spec.fields {
         writeln!(out, "    self.{0} = {0}", field.property).unwrap();
     }
     out.push_str("  }\n");
+}
+
+fn emit_parameter(out: &mut String, field: &SwiftField) {
+    out.push_str(&field.property);
+    out.push_str(": ");
+    push_type(out, field);
+    if let Some(default) = &field.init_default {
+        out.push_str(" = ");
+        out.push_str(default);
+    }
+}
+
+fn memberwise_init_line_length(spec: &SwiftStruct) -> usize {
+    let parameter_length = spec
+        .fields
+        .iter()
+        .map(|field| {
+            field.property.len()
+                + 2
+                + field.type_name.len()
+                + usize::from(field.optional)
+                + field
+                    .init_default
+                    .as_ref()
+                    .map_or(0, |default| default.len() + 3)
+        })
+        .sum::<usize>();
+    let separators = spec.fields.len().saturating_sub(1) * 2;
+    "  public init(".len() + parameter_length + separators + ") {".len()
 }
 
 /// The default value for a field in the memberwise initializer: `nil` for
@@ -4743,6 +4782,61 @@ public struct Sample: Codable, Equatable, Sendable {
     case id
     case groupId = \"group_id\"
     case inputPorts = \"input_ports\"
+  }
+}
+";
+        let mut out = String::new();
+        emit_struct(&mut out, &spec);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn wraps_memberwise_initializer_when_declaration_exceeds_line_limit() {
+        let fields = [
+            ("configOptions", "[AcpSessionConfigOptionState]"),
+            ("currentModeId", "String?"),
+            ("availableCommands", "[String]"),
+            ("lastTurnResult", "AcpAgentTurnResult?"),
+        ]
+        .into_iter()
+        .map(|(property, type_name)| SwiftField {
+            property: property.to_string(),
+            coding_key: property.to_string(),
+            type_name: type_name.trim_end_matches('?').to_string(),
+            optional: type_name.ends_with('?'),
+            decode_default: None,
+            init_default: None,
+        })
+        .collect();
+        let spec = SwiftStruct {
+            name: "LongSample".to_string(),
+            fields,
+        };
+
+        let expected = "\
+public struct LongSample: Codable, Equatable, Sendable {
+  public var configOptions: [AcpSessionConfigOptionState]
+  public var currentModeId: String?
+  public var availableCommands: [String]
+  public var lastTurnResult: AcpAgentTurnResult?
+
+  public init(
+    configOptions: [AcpSessionConfigOptionState],
+    currentModeId: String?,
+    availableCommands: [String],
+    lastTurnResult: AcpAgentTurnResult?
+  ) {
+    self.configOptions = configOptions
+    self.currentModeId = currentModeId
+    self.availableCommands = availableCommands
+    self.lastTurnResult = lastTurnResult
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case configOptions
+    case currentModeId
+    case availableCommands
+    case lastTurnResult
   }
 }
 ";

@@ -61,7 +61,20 @@ public struct ReviewsFilesListResponseWire: Codable, Equatable, Sendable {
   public var paginationComplete: Bool
   public var rateLimitSnapshot: ReviewsRateLimitSnapshotWire?
 
-  public init(pullRequestId: String, number: UInt64? = nil, headRefOid: String, headRefName: String? = nil, baseRefOid: String? = nil, baseRefName: String? = nil, repositoryFullName: String? = nil, viewerCanMarkViewed: Bool, files: [ReviewFileWire], fetchedAt: String, paginationComplete: Bool = true, rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil) {
+  public init(
+    pullRequestId: String,
+    number: UInt64? = nil,
+    headRefOid: String,
+    headRefName: String? = nil,
+    baseRefOid: String? = nil,
+    baseRefName: String? = nil,
+    repositoryFullName: String? = nil,
+    viewerCanMarkViewed: Bool,
+    files: [ReviewFileWire],
+    fetchedAt: String,
+    paginationComplete: Bool = true,
+    rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.number = number
     self.headRefOid = headRefOid
@@ -119,7 +132,17 @@ public struct ReviewFileWire: Codable, Equatable, Sendable {
   public var languageHint: HarnessReviewFileLanguage
   public var modeChange: String?
 
-  public init(path: String, previousPath: String? = nil, changeType: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, viewerViewedState: ReviewFileViewedStateWire, isBinary: Bool = false, languageHint: HarnessReviewFileLanguage, modeChange: String? = nil) {
+  public init(
+    path: String,
+    previousPath: String? = nil,
+    changeType: ReviewFileChangeTypeWire,
+    additions: UInt32,
+    deletions: UInt32,
+    viewerViewedState: ReviewFileViewedStateWire,
+    isBinary: Bool = false,
+    languageHint: HarnessReviewFileLanguage,
+    modeChange: String? = nil
+  ) {
     self.path = path
     self.previousPath = previousPath
     self.changeType = changeType
@@ -209,7 +232,17 @@ public struct ReviewsFilesPatchRequestWire: Codable, Equatable, Sendable {
   public var baseRefName: String?
   public var largeDiffStrategy: FilesLargeDiffStrategyWire?
 
-  public init(pullRequestId: String, headRefOidExpected: String, paths: [String], number: UInt64? = nil, repositoryFullName: String? = nil, baseRefOidExpected: String? = nil, headRefName: String? = nil, baseRefName: String? = nil, largeDiffStrategy: FilesLargeDiffStrategyWire? = nil) {
+  public init(
+    pullRequestId: String,
+    headRefOidExpected: String,
+    paths: [String],
+    number: UInt64? = nil,
+    repositoryFullName: String? = nil,
+    baseRefOidExpected: String? = nil,
+    headRefName: String? = nil,
+    baseRefName: String? = nil,
+    largeDiffStrategy: FilesLargeDiffStrategyWire? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.headRefOidExpected = headRefOidExpected
     self.paths = paths
@@ -242,7 +275,14 @@ public struct ReviewsFilesPatchResponseWire: Codable, Equatable, Sendable {
   public var fetchedAt: String
   public var rateLimitSnapshot: ReviewsRateLimitSnapshotWire?
 
-  public init(pullRequestId: String, patches: [ReviewFilePatchWire], drifted: Bool, currentHeadRefOid: String, fetchedAt: String, rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil) {
+  public init(
+    pullRequestId: String,
+    patches: [ReviewFilePatchWire],
+    drifted: Bool,
+    currentHeadRefOid: String,
+    fetchedAt: String,
+    rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.patches = patches
     self.drifted = drifted
@@ -273,7 +313,18 @@ public struct ReviewsFilesPreviewRequestWire: Codable, Equatable, Sendable {
   public var largeDiffStrategy: FilesLargeDiffStrategyWire?
   public var lineLimit: UInt32
 
-  public init(pullRequestId: String, headRefOidExpected: String, paths: [String], number: UInt64? = nil, repositoryFullName: String? = nil, baseRefOidExpected: String? = nil, headRefName: String? = nil, baseRefName: String? = nil, largeDiffStrategy: FilesLargeDiffStrategyWire? = nil, lineLimit: UInt32 = 1000) {
+  public init(
+    pullRequestId: String,
+    headRefOidExpected: String,
+    paths: [String],
+    number: UInt64? = nil,
+    repositoryFullName: String? = nil,
+    baseRefOidExpected: String? = nil,
+    headRefName: String? = nil,
+    baseRefName: String? = nil,
+    largeDiffStrategy: FilesLargeDiffStrategyWire? = nil,
+    lineLimit: UInt32 = 1000
+  ) {
     self.pullRequestId = pullRequestId
     self.headRefOidExpected = headRefOidExpected
     self.paths = paths
@@ -329,7 +380,21 @@ public struct ReviewFilePreviewWire: Codable, Equatable, Sendable {
   public var lineLimit: UInt32
   public var hasMore: Bool
 
-  public init(path: String, patch: String, status: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, truncated: Bool = false, etag: String? = nil, servedBy: ReviewFileServedByWire = .githubRest, fetchedAt: String = "", headRefOid: String = "", lineCount: UInt32, lineLimit: UInt32, hasMore: Bool) {
+  public init(
+    path: String,
+    patch: String,
+    status: ReviewFileChangeTypeWire,
+    additions: UInt32,
+    deletions: UInt32,
+    truncated: Bool = false,
+    etag: String? = nil,
+    servedBy: ReviewFileServedByWire = .githubRest,
+    fetchedAt: String = "",
+    headRefOid: String = "",
+    lineCount: UInt32,
+    lineLimit: UInt32,
+    hasMore: Bool
+  ) {
     self.path = path
     self.patch = patch
     self.status = status
@@ -387,7 +452,14 @@ public struct ReviewsFilesPreviewResponseWire: Codable, Equatable, Sendable {
   public var fetchedAt: String
   public var rateLimitSnapshot: ReviewsRateLimitSnapshotWire?
 
-  public init(pullRequestId: String, previews: [ReviewFilePreviewWire], drifted: Bool, currentHeadRefOid: String, fetchedAt: String, rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil) {
+  public init(
+    pullRequestId: String,
+    previews: [ReviewFilePreviewWire],
+    drifted: Bool,
+    currentHeadRefOid: String,
+    fetchedAt: String,
+    rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.previews = previews
     self.drifted = drifted
@@ -426,7 +498,18 @@ public struct ReviewFilePatchWire: Codable, Equatable, Sendable {
   public var fetchedAt: String
   public var headRefOid: String
 
-  public init(path: String, patch: String, status: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, truncated: Bool = false, etag: String? = nil, servedBy: ReviewFileServedByWire = .githubRest, fetchedAt: String = "", headRefOid: String = "") {
+  public init(
+    path: String,
+    patch: String,
+    status: ReviewFileChangeTypeWire,
+    additions: UInt32,
+    deletions: UInt32,
+    truncated: Bool = false,
+    etag: String? = nil,
+    servedBy: ReviewFileServedByWire = .githubRest,
+    fetchedAt: String = "",
+    headRefOid: String = ""
+  ) {
     self.path = path
     self.patch = patch
     self.status = status
@@ -505,7 +588,17 @@ public struct ReviewsFilesBlobResponseWire: Codable, Equatable, Sendable {
   public var fetchedAt: String
   public var rateLimitSnapshot: ReviewsRateLimitSnapshotWire?
 
-  public init(path: String, oid: String, mime: ReviewImageMimeWire, contentBase64: String, byteSize: UInt64, isTruncated: Bool = false, isTooLarge: Bool = false, fetchedAt: String, rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil) {
+  public init(
+    path: String,
+    oid: String,
+    mime: ReviewImageMimeWire,
+    contentBase64: String,
+    byteSize: UInt64,
+    isTruncated: Bool = false,
+    isTooLarge: Bool = false,
+    fetchedAt: String,
+    rateLimitSnapshot: ReviewsRateLimitSnapshotWire? = nil
+  ) {
     self.path = path
     self.oid = oid
     self.mime = mime
@@ -589,7 +682,11 @@ public struct ReviewFilesViewedResultWire: Codable, Equatable, Sendable {
   public var outcome: ReviewFileViewedOutcomeWire
   public var viewerViewedState: ReviewFileViewedStateWire
 
-  public init(path: String, outcome: ReviewFileViewedOutcomeWire, viewerViewedState: ReviewFileViewedStateWire) {
+  public init(
+    path: String,
+    outcome: ReviewFileViewedOutcomeWire,
+    viewerViewedState: ReviewFileViewedStateWire
+  ) {
     self.path = path
     self.outcome = outcome
     self.viewerViewedState = viewerViewedState
@@ -628,7 +725,14 @@ public struct LocalCloneListEntryWire: Codable, Equatable, Sendable {
   public var lastUsedAt: String
   public var lastFetchedAt: String
 
-  public init(repoFullName: String, repoKeySegment: String, sizeBytes: UInt64, createdAt: String, lastUsedAt: String, lastFetchedAt: String) {
+  public init(
+    repoFullName: String,
+    repoKeySegment: String,
+    sizeBytes: UInt64,
+    createdAt: String,
+    lastUsedAt: String,
+    lastFetchedAt: String
+  ) {
     self.repoFullName = repoFullName
     self.repoKeySegment = repoKeySegment
     self.sizeBytes = sizeBytes

@@ -364,7 +364,15 @@ public struct TriageRuleSetRevisionSummary: Codable, Equatable, Sendable {
   public var activatedAt: String
   public var supersededAt: String?
 
-  public init(revision: Int64, schemaVersion: UInt16, ruleCount: UInt, status: TriageRuleSetRevisionStatus, actor: String, activatedAt: String, supersededAt: String? = nil) {
+  public init(
+    revision: Int64,
+    schemaVersion: UInt16,
+    ruleCount: UInt,
+    status: TriageRuleSetRevisionStatus,
+    actor: String,
+    activatedAt: String,
+    supersededAt: String? = nil
+  ) {
     self.revision = revision
     self.schemaVersion = schemaVersion
     self.ruleCount = ruleCount
@@ -401,7 +409,15 @@ public struct TriageRuleSetAuditEntry: Codable, Equatable, Sendable {
   public var reevaluatedItemCount: Int64?
   public var recordedAt: String
 
-  public init(auditId: String, kind: TriageRuleSetAuditKind, revision: Int64? = nil, actor: String, reason: String? = nil, reevaluatedItemCount: Int64? = nil, recordedAt: String) {
+  public init(
+    auditId: String,
+    kind: TriageRuleSetAuditKind,
+    revision: Int64? = nil,
+    actor: String,
+    reason: String? = nil,
+    reevaluatedItemCount: Int64? = nil,
+    recordedAt: String
+  ) {
     self.auditId = auditId
     self.kind = kind
     self.revision = revision
@@ -436,7 +452,12 @@ public struct TriageRuleSetActivationResult: Codable, Equatable, Sendable {
   public var revision: Int64?
   public var reevaluatedItemCount: UInt
 
-  public init(validation: TriageRuleSetValidationReport, activated: Bool, revision: Int64? = nil, reevaluatedItemCount: UInt) {
+  public init(
+    validation: TriageRuleSetValidationReport,
+    activated: Bool,
+    revision: Int64? = nil,
+    reevaluatedItemCount: UInt
+  ) {
     self.validation = validation
     self.activated = activated
     self.revision = revision
@@ -480,7 +501,14 @@ public struct TriageRuleSetPreviewDiffEntry: Codable, Equatable, Sendable {
   public var candidateMatchedRuleId: String?
   public var governsPlacementChange: Bool
 
-  public init(itemId: String, liveEffectiveVerdict: TriageVerdict? = nil, liveEffectiveSource: TaskBoardTriageEffectiveSource? = nil, candidateVerdict: TriageVerdict, candidateMatchedRuleId: String? = nil, governsPlacementChange: Bool) {
+  public init(
+    itemId: String,
+    liveEffectiveVerdict: TriageVerdict? = nil,
+    liveEffectiveSource: TaskBoardTriageEffectiveSource? = nil,
+    candidateVerdict: TriageVerdict,
+    candidateMatchedRuleId: String? = nil,
+    governsPlacementChange: Bool
+  ) {
     self.itemId = itemId
     self.liveEffectiveVerdict = liveEffectiveVerdict
     self.liveEffectiveSource = liveEffectiveSource

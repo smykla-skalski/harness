@@ -17,7 +17,19 @@ public struct TaskBoardEvaluationSummaryWire: Codable, Equatable, Sendable {
   public var records: [TaskBoardEvaluationRecordWire]
   public var signalFailures: [EvaluationSignalFailureWire]
 
-  public init(total: UInt = 0, evaluated: UInt = 0, updated: UInt = 0, skipped: UInt = 0, completed: UInt = 0, running: UInt = 0, reviewing: UInt = 0, blocked: UInt = 0, failed: UInt = 0, records: [TaskBoardEvaluationRecordWire] = [], signalFailures: [EvaluationSignalFailureWire] = []) {
+  public init(
+    total: UInt = 0,
+    evaluated: UInt = 0,
+    updated: UInt = 0,
+    skipped: UInt = 0,
+    completed: UInt = 0,
+    running: UInt = 0,
+    reviewing: UInt = 0,
+    blocked: UInt = 0,
+    failed: UInt = 0,
+    records: [TaskBoardEvaluationRecordWire] = [],
+    signalFailures: [EvaluationSignalFailureWire] = []
+  ) {
     self.total = total
     self.evaluated = evaluated
     self.updated = updated
@@ -73,7 +85,18 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
   public var reason: String?
   public var item: TaskBoardItemWire?
 
-  public init(boardItemId: String, sessionId: String? = nil, workItemId: String? = nil, outcome: TaskBoardEvaluationOutcomeWire, taskStatus: TaskStatus? = nil, boardStatus: TaskBoardStatus? = nil, workflowStatus: TaskBoardWorkflowStatusWire? = nil, updated: Bool = false, reason: String? = nil, item: TaskBoardItemWire? = nil) {
+  public init(
+    boardItemId: String,
+    sessionId: String? = nil,
+    workItemId: String? = nil,
+    outcome: TaskBoardEvaluationOutcomeWire,
+    taskStatus: TaskStatus? = nil,
+    boardStatus: TaskBoardStatus? = nil,
+    workflowStatus: TaskBoardWorkflowStatusWire? = nil,
+    updated: Bool = false,
+    reason: String? = nil,
+    item: TaskBoardItemWire? = nil
+  ) {
     self.boardItemId = boardItemId
     self.sessionId = sessionId
     self.workItemId = workItemId

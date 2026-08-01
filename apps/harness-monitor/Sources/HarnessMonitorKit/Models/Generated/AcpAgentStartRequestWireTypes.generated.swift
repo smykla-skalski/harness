@@ -26,7 +26,28 @@ public struct AcpAgentStartRequestWire: Codable, Equatable, Sendable {
   public var resumeDisabled: Bool
   public var endpoint: AcpEndpoint?
 
-  public init(descriptorId: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false, recordPermissions: Bool = false, mcpServers: [AcpMcpServer] = [], additionalDirectories: [String] = [], resumeSessionId: String? = nil, resumeDisabled: Bool = false, endpoint: AcpEndpoint? = nil) {
+  public init(
+    descriptorId: String,
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String] = [],
+    name: String? = nil,
+    prompt: String? = nil,
+    projectDir: String? = nil,
+    persona: String? = nil,
+    taskId: String? = nil,
+    boardItemId: String? = nil,
+    workflowExecutionId: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false,
+    recordPermissions: Bool = false,
+    mcpServers: [AcpMcpServer] = [],
+    additionalDirectories: [String] = [],
+    resumeSessionId: String? = nil,
+    resumeDisabled: Bool = false,
+    endpoint: AcpEndpoint? = nil
+  ) {
     self.descriptorId = descriptorId
     self.role = role
     self.fallbackRole = fallbackRole

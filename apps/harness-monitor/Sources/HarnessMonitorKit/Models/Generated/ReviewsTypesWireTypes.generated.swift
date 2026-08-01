@@ -14,7 +14,16 @@ public struct ReviewsQueryRequestWire: Codable, Equatable, Sendable {
   public var backportDetectionEnabled: Bool
   public var backportPatterns: [String]
 
-  public init(authors: [String] = [], organizations: [String] = [], repositories: [String] = [], excludeRepositories: [String] = [], forceRefresh: Bool = false, cacheMaxAgeSeconds: UInt64 = 600, backportDetectionEnabled: Bool = true, backportPatterns: [String] = []) {
+  public init(
+    authors: [String] = [],
+    organizations: [String] = [],
+    repositories: [String] = [],
+    excludeRepositories: [String] = [],
+    forceRefresh: Bool = false,
+    cacheMaxAgeSeconds: UInt64 = 600,
+    backportDetectionEnabled: Bool = true,
+    backportPatterns: [String] = []
+  ) {
     self.authors = authors
     self.organizations = organizations
     self.repositories = repositories
@@ -102,7 +111,11 @@ public struct ReviewsPullRequestResolveRequestWire: Codable, Equatable, Sendable
   public var backportDetectionEnabled: Bool
   public var backportPatterns: [String]
 
-  public init(references: [ReviewsPullRequestReferenceWire] = [], backportDetectionEnabled: Bool = true, backportPatterns: [String] = []) {
+  public init(
+    references: [ReviewsPullRequestReferenceWire] = [],
+    backportDetectionEnabled: Bool = true,
+    backportPatterns: [String] = []
+  ) {
     self.references = references
     self.backportDetectionEnabled = backportDetectionEnabled
     self.backportPatterns = backportPatterns
@@ -127,7 +140,11 @@ public struct ReviewsPullRequestResolveResponseWire: Codable, Equatable, Sendabl
   public var items: [ReviewItemWire]
   public var missingReferences: [ReviewsPullRequestReferenceWire]
 
-  public init(fetchedAt: String, items: [ReviewItemWire] = [], missingReferences: [ReviewsPullRequestReferenceWire] = []) {
+  public init(
+    fetchedAt: String,
+    items: [ReviewItemWire] = [],
+    missingReferences: [ReviewsPullRequestReferenceWire] = []
+  ) {
     self.fetchedAt = fetchedAt
     self.items = items
     self.missingReferences = missingReferences
@@ -155,7 +172,14 @@ public struct ReviewsQueryResponseWire: Codable, Equatable, Sendable {
   public var repositoryLabels: [String: [ReviewRepositoryLabelWire]]
   public var viewerLogin: String?
 
-  public init(fetchedAt: String, fromCache: Bool, summary: ReviewsSummaryWire, items: [ReviewItemWire], repositoryLabels: [String: [ReviewRepositoryLabelWire]] = [:], viewerLogin: String? = nil) {
+  public init(
+    fetchedAt: String,
+    fromCache: Bool,
+    summary: ReviewsSummaryWire,
+    items: [ReviewItemWire],
+    repositoryLabels: [String: [ReviewRepositoryLabelWire]] = [:],
+    viewerLogin: String? = nil
+  ) {
     self.fetchedAt = fetchedAt
     self.fromCache = fromCache
     self.summary = summary
@@ -210,7 +234,14 @@ public struct ReviewsSummaryWire: Codable, Equatable, Sendable {
   public var waitingOnChecks: UInt
   public var blocked: UInt
 
-  public init(total: UInt, reviewRequired: UInt, readyToMerge: UInt, autoApprovable: UInt, waitingOnChecks: UInt, blocked: UInt) {
+  public init(
+    total: UInt,
+    reviewRequired: UInt,
+    readyToMerge: UInt,
+    autoApprovable: UInt,
+    waitingOnChecks: UInt,
+    blocked: UInt
+  ) {
     self.total = total
     self.reviewRequired = reviewRequired
     self.readyToMerge = readyToMerge
@@ -235,7 +266,12 @@ public struct ReviewItemFlagsWire: Codable, Equatable, Sendable {
   public var viewerCanUpdate: Bool
   public var viewerIsRequestedReviewer: Bool
 
-  public init(isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false) {
+  public init(
+    isDraft: Bool = false,
+    policyBlocked: Bool = false,
+    viewerCanUpdate: Bool = true,
+    viewerIsRequestedReviewer: Bool = false
+  ) {
     self.isDraft = isDraft
     self.policyBlocked = policyBlocked
     self.viewerCanUpdate = viewerCanUpdate
@@ -295,7 +331,43 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
   public var autoMergeEnabled: Bool?
   public var approvalRequirementSatisfiedAfterViewerApproval: Bool?
 
-  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, baseRefName: String? = nil, defaultBranchName: String? = nil, backportSource: ReviewBackportSource? = nil, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = [], requiredApprovingReviewCount: UInt32? = nil, hasConflictMarkers: Bool? = nil, viewerHasActiveApproval: Bool? = nil, autoMergeEnabled: Bool? = nil, approvalRequirementSatisfiedAfterViewerApproval: Bool? = nil) {
+  public init(
+    pullRequestId: String,
+    repositoryId: String,
+    repository: String,
+    number: UInt64,
+    title: String,
+    url: String,
+    baseRefName: String? = nil,
+    defaultBranchName: String? = nil,
+    backportSource: ReviewBackportSource? = nil,
+    authorLogin: String,
+    authorAvatarUrl: String? = nil,
+    authorAssociation: ReviewAuthorAssociation,
+    state: ReviewPullRequestState,
+    mergeable: ReviewMergeableState,
+    reviewStatus: ReviewReviewStatus,
+    checkStatus: ReviewCheckStatus,
+    isDraft: Bool = false,
+    policyBlocked: Bool = false,
+    viewerCanUpdate: Bool = true,
+    viewerIsRequestedReviewer: Bool = false,
+    viewerCanMergeAsAdmin: Bool = false,
+    headSha: String,
+    labels: [String] = [],
+    checks: [ReviewCheckWire] = [],
+    reviews: [PullRequestReviewWire] = [],
+    additions: UInt64,
+    deletions: UInt64,
+    createdAt: String,
+    updatedAt: String,
+    requiredFailedCheckNames: [String] = [],
+    requiredApprovingReviewCount: UInt32? = nil,
+    hasConflictMarkers: Bool? = nil,
+    viewerHasActiveApproval: Bool? = nil,
+    autoMergeEnabled: Bool? = nil,
+    approvalRequirementSatisfiedAfterViewerApproval: Bool? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.repositoryId = repositoryId
     self.repository = repository
@@ -436,7 +508,13 @@ public struct ReviewCheckWire: Codable, Equatable, Sendable {
   public var checkSuiteId: String?
   public var detailsUrl: String?
 
-  public init(name: String, status: ReviewCheckRunStatus, conclusion: ReviewCheckConclusion, checkSuiteId: String? = nil, detailsUrl: String? = nil) {
+  public init(
+    name: String,
+    status: ReviewCheckRunStatus,
+    conclusion: ReviewCheckConclusion,
+    checkSuiteId: String? = nil,
+    detailsUrl: String? = nil
+  ) {
     self.name = name
     self.status = status
     self.conclusion = conclusion
@@ -585,7 +663,11 @@ public struct ReviewsActionCapabilitiesWire: Codable, Equatable, Sendable {
   public var supportsCheckRunLinks: Bool
   public var supportsRepositorySyncHealth: Bool
 
-  public init(supportsActionPreview: Bool = false, supportsCheckRunLinks: Bool = false, supportsRepositorySyncHealth: Bool = false) {
+  public init(
+    supportsActionPreview: Bool = false,
+    supportsCheckRunLinks: Bool = false,
+    supportsRepositorySyncHealth: Bool = false
+  ) {
     self.supportsActionPreview = supportsActionPreview
     self.supportsCheckRunLinks = supportsCheckRunLinks
     self.supportsRepositorySyncHealth = supportsRepositorySyncHealth
@@ -612,7 +694,13 @@ public struct ReviewsCapabilitiesResponseWire: Codable, Equatable, Sendable {
   public var supportsRepositorySyncHealth: Bool
   public var supportsPersistentActionDiagnostics: Bool
 
-  public init(schemaVersion: UInt32, supportsActionPreview: Bool = false, supportsCheckRunLinks: Bool = false, supportsRepositorySyncHealth: Bool = false, supportsPersistentActionDiagnostics: Bool = false) {
+  public init(
+    schemaVersion: UInt32,
+    supportsActionPreview: Bool = false,
+    supportsCheckRunLinks: Bool = false,
+    supportsRepositorySyncHealth: Bool = false,
+    supportsPersistentActionDiagnostics: Bool = false
+  ) {
     self.schemaVersion = schemaVersion
     self.supportsActionPreview = supportsActionPreview
     self.supportsCheckRunLinks = supportsCheckRunLinks
@@ -643,7 +731,11 @@ public struct ReviewsActionPreviewRequestWire: Codable, Equatable, Sendable {
   public var targets: [ReviewTargetWire]
   public var method: TaskBoardGitHubMergeMethod
 
-  public init(action: ReviewActionPreviewKind, targets: [ReviewTargetWire], method: TaskBoardGitHubMergeMethod) {
+  public init(
+    action: ReviewActionPreviewKind,
+    targets: [ReviewTargetWire],
+    method: TaskBoardGitHubMergeMethod
+  ) {
     self.action = action
     self.targets = targets
     self.method = method
@@ -665,7 +757,15 @@ public struct ReviewsActionPreviewResponseWire: Codable, Equatable, Sendable {
   public var warnings: [String]
   public var targets: [ReviewActionPreviewTargetWire]
 
-  public init(action: ReviewActionPreviewKind, capabilities: ReviewsCapabilitiesResponseWire, totalCount: UInt, actionableCount: UInt, skippedCount: UInt, warnings: [String] = [], targets: [ReviewActionPreviewTargetWire] = []) {
+  public init(
+    action: ReviewActionPreviewKind,
+    capabilities: ReviewsCapabilitiesResponseWire,
+    totalCount: UInt,
+    actionableCount: UInt,
+    skippedCount: UInt,
+    warnings: [String] = [],
+    targets: [ReviewActionPreviewTargetWire] = []
+  ) {
     self.action = action
     self.capabilities = capabilities
     self.totalCount = totalCount
@@ -705,7 +805,14 @@ public struct ReviewActionPreviewTargetWire: Codable, Equatable, Sendable {
   public var reason: String?
   public var warnings: [String]
 
-  public init(pullRequestId: String, repository: String, number: UInt64, eligible: Bool, reason: String? = nil, warnings: [String] = []) {
+  public init(
+    pullRequestId: String,
+    repository: String,
+    number: UInt64,
+    eligible: Bool,
+    reason: String? = nil,
+    warnings: [String] = []
+  ) {
     self.pullRequestId = pullRequestId
     self.repository = repository
     self.number = number
@@ -772,7 +879,11 @@ public struct ReviewsRefreshRequestWire: Codable, Equatable, Sendable {
   public var backportDetectionEnabled: Bool
   public var backportPatterns: [String]
 
-  public init(targets: [ReviewTargetWire] = [], backportDetectionEnabled: Bool = true, backportPatterns: [String] = []) {
+  public init(
+    targets: [ReviewTargetWire] = [],
+    backportDetectionEnabled: Bool = true,
+    backportPatterns: [String] = []
+  ) {
     self.targets = targets
     self.backportDetectionEnabled = backportDetectionEnabled
     self.backportPatterns = backportPatterns
@@ -913,7 +1024,28 @@ public struct ReviewTargetWire: Codable, Equatable, Sendable {
   public var autoMergeEnabled: Bool?
   public var approvalRequirementSatisfiedAfterViewerApproval: Bool?
 
-  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, url: String, state: ReviewPullRequestState = .`open`, headSha: String, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerCanMergeAsAdmin: Bool = false, requiredFailedCheckNames: [String] = [], checkSuiteIds: [String] = [], hasConflictMarkers: Bool? = nil, viewerHasActiveApproval: Bool? = nil, autoMergeEnabled: Bool? = nil, approvalRequirementSatisfiedAfterViewerApproval: Bool? = nil) {
+  public init(
+    pullRequestId: String,
+    repositoryId: String,
+    repository: String,
+    number: UInt64,
+    url: String,
+    state: ReviewPullRequestState = .`open`,
+    headSha: String,
+    mergeable: ReviewMergeableState,
+    reviewStatus: ReviewReviewStatus,
+    checkStatus: ReviewCheckStatus,
+    isDraft: Bool = false,
+    policyBlocked: Bool = false,
+    viewerCanUpdate: Bool = true,
+    viewerCanMergeAsAdmin: Bool = false,
+    requiredFailedCheckNames: [String] = [],
+    checkSuiteIds: [String] = [],
+    hasConflictMarkers: Bool? = nil,
+    viewerHasActiveApproval: Bool? = nil,
+    autoMergeEnabled: Bool? = nil,
+    approvalRequirementSatisfiedAfterViewerApproval: Bool? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.repositoryId = repositoryId
     self.repository = repository
@@ -992,7 +1124,14 @@ public struct ReviewActionResultWire: Codable, Equatable, Sendable {
   public var message: String?
   public var timelineEntry: ReviewTimelineEntryWire?
 
-  public init(repository: String, number: UInt64, action: ReviewActionKind, outcome: ReviewActionOutcome, message: String? = nil, timelineEntry: ReviewTimelineEntryWire? = nil) {
+  public init(
+    repository: String,
+    number: UInt64,
+    action: ReviewActionKind,
+    outcome: ReviewActionOutcome,
+    message: String? = nil,
+    timelineEntry: ReviewTimelineEntryWire? = nil
+  ) {
     self.repository = repository
     self.number = number
     self.action = action
@@ -1073,7 +1212,11 @@ public struct ReviewsPolicyPreviewStepWire: Codable, Equatable, Sendable {
   public var actionKey: String?
   public var waitingOn: ReviewsPolicyWaitWire?
 
-  public init(stepType: ReviewsPolicyStepTypeWire, actionKey: String? = nil, waitingOn: ReviewsPolicyWaitWire? = nil) {
+  public init(
+    stepType: ReviewsPolicyStepTypeWire,
+    actionKey: String? = nil,
+    waitingOn: ReviewsPolicyWaitWire? = nil
+  ) {
     self.stepType = stepType
     self.actionKey = actionKey
     self.waitingOn = waitingOn
@@ -1091,7 +1234,11 @@ public struct ReviewsPolicyPreviewRequestWire: Codable, Equatable, Sendable {
   public var target: ReviewTargetWire
   public var method: TaskBoardGitHubMergeMethod
 
-  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod) {
+  public init(
+    workflowId: String = "reviews_auto",
+    target: ReviewTargetWire,
+    method: TaskBoardGitHubMergeMethod
+  ) {
     self.workflowId = workflowId
     self.target = target
     self.method = method
@@ -1119,7 +1266,14 @@ public struct ReviewsPolicyPreviewResponseWire: Codable, Equatable, Sendable {
   public var warnings: [String]
   public var steps: [ReviewsPolicyPreviewStepWire]
 
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, eligible: Bool, reason: String? = nil, warnings: [String] = [], steps: [ReviewsPolicyPreviewStepWire] = []) {
+  public init(
+    workflowId: String,
+    subject: ReviewsPolicySubjectWire,
+    eligible: Bool,
+    reason: String? = nil,
+    warnings: [String] = [],
+    steps: [ReviewsPolicyPreviewStepWire] = []
+  ) {
     self.workflowId = workflowId
     self.subject = subject
     self.eligible = eligible
@@ -1154,7 +1308,12 @@ public struct ReviewsPolicyRunStartRequestWire: Codable, Equatable, Sendable {
   public var method: TaskBoardGitHubMergeMethod
   public var trigger: ReviewsPolicyTriggerWire
 
-  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod, trigger: ReviewsPolicyTriggerWire = .manual) {
+  public init(
+    workflowId: String = "reviews_auto",
+    target: ReviewTargetWire,
+    method: TaskBoardGitHubMergeMethod,
+    trigger: ReviewsPolicyTriggerWire = .manual
+  ) {
     self.workflowId = workflowId
     self.target = target
     self.method = method
@@ -1183,7 +1342,12 @@ public struct ReviewsPolicyRunStepWire: Codable, Equatable, Sendable {
   public var waitingOn: ReviewsPolicyWaitWire?
   public var recordedAt: String
 
-  public init(stepType: ReviewsPolicyStepTypeWire, actionKey: String? = nil, waitingOn: ReviewsPolicyWaitWire? = nil, recordedAt: String) {
+  public init(
+    stepType: ReviewsPolicyStepTypeWire,
+    actionKey: String? = nil,
+    waitingOn: ReviewsPolicyWaitWire? = nil,
+    recordedAt: String
+  ) {
     self.stepType = stepType
     self.actionKey = actionKey
     self.waitingOn = waitingOn
@@ -1211,7 +1375,19 @@ public struct ReviewsPolicyRunResponseWire: Codable, Equatable, Sendable {
   public var errorMessage: String?
   public var steps: [ReviewsPolicyRunStepWire]
 
-  public init(workflowId: String, runId: String, subject: ReviewsPolicySubjectWire, trigger: ReviewsPolicyTriggerWire, status: ReviewsPolicyRunStatusWire, startedAt: String, updatedAt: String, waitingOn: ReviewsPolicyWaitWire? = nil, completedAt: String? = nil, errorMessage: String? = nil, steps: [ReviewsPolicyRunStepWire] = []) {
+  public init(
+    workflowId: String,
+    runId: String,
+    subject: ReviewsPolicySubjectWire,
+    trigger: ReviewsPolicyTriggerWire,
+    status: ReviewsPolicyRunStatusWire,
+    startedAt: String,
+    updatedAt: String,
+    waitingOn: ReviewsPolicyWaitWire? = nil,
+    completedAt: String? = nil,
+    errorMessage: String? = nil,
+    steps: [ReviewsPolicyRunStepWire] = []
+  ) {
     self.workflowId = workflowId
     self.runId = runId
     self.subject = subject
@@ -1282,7 +1458,12 @@ public struct ReviewsPolicyStatusResponseWire: Codable, Equatable, Sendable {
   public var activeRun: ReviewsPolicyRunResponseWire?
   public var recentRuns: [ReviewsPolicyRunResponseWire]
 
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, activeRun: ReviewsPolicyRunResponseWire? = nil, recentRuns: [ReviewsPolicyRunResponseWire] = []) {
+  public init(
+    workflowId: String,
+    subject: ReviewsPolicySubjectWire,
+    activeRun: ReviewsPolicyRunResponseWire? = nil,
+    recentRuns: [ReviewsPolicyRunResponseWire] = []
+  ) {
     self.workflowId = workflowId
     self.subject = subject
     self.activeRun = activeRun
@@ -1335,7 +1516,15 @@ public struct ReviewsPolicyRunMetricsWire: Codable, Equatable, Sendable {
   public var cancelled: UInt
   public var byTrigger: [String: UInt]
 
-  public init(total: UInt = 0, running: UInt = 0, waiting: UInt = 0, completed: UInt = 0, failed: UInt = 0, cancelled: UInt = 0, byTrigger: [String: UInt] = [:]) {
+  public init(
+    total: UInt = 0,
+    running: UInt = 0,
+    waiting: UInt = 0,
+    completed: UInt = 0,
+    failed: UInt = 0,
+    cancelled: UInt = 0,
+    byTrigger: [String: UInt] = [:]
+  ) {
     self.total = total
     self.running = running
     self.waiting = waiting
@@ -1392,7 +1581,13 @@ public struct ReviewsPolicyHistoryResponseWire: Codable, Equatable, Sendable {
   public var metrics: ReviewsPolicyRunMetricsWire
   public var timeline: [ReviewsPolicyTimelineEntryWire]
 
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, runs: [ReviewsPolicyRunResponseWire] = [], metrics: ReviewsPolicyRunMetricsWire = ReviewsPolicyRunMetricsWire(), timeline: [ReviewsPolicyTimelineEntryWire] = []) {
+  public init(
+    workflowId: String,
+    subject: ReviewsPolicySubjectWire,
+    runs: [ReviewsPolicyRunResponseWire] = [],
+    metrics: ReviewsPolicyRunMetricsWire = ReviewsPolicyRunMetricsWire(),
+    timeline: [ReviewsPolicyTimelineEntryWire] = []
+  ) {
     self.workflowId = workflowId
     self.subject = subject
     self.runs = runs

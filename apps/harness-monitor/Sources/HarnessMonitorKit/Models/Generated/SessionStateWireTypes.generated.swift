@@ -27,7 +27,19 @@ public struct SessionMetricsWire: Codable, Equatable, Sendable {
   public var blockedTaskCount: UInt32
   public var completedTaskCount: UInt32
 
-  public init(agentCount: UInt32 = 0, activeAgentCount: UInt32 = 0, idleAgentCount: UInt32 = 0, awaitingReviewAgentCount: UInt32 = 0, openTaskCount: UInt32 = 0, inProgressTaskCount: UInt32 = 0, awaitingReviewTaskCount: UInt32 = 0, inReviewTaskCount: UInt32 = 0, arbitrationTaskCount: UInt32 = 0, blockedTaskCount: UInt32 = 0, completedTaskCount: UInt32 = 0) {
+  public init(
+    agentCount: UInt32 = 0,
+    activeAgentCount: UInt32 = 0,
+    idleAgentCount: UInt32 = 0,
+    awaitingReviewAgentCount: UInt32 = 0,
+    openTaskCount: UInt32 = 0,
+    inProgressTaskCount: UInt32 = 0,
+    awaitingReviewTaskCount: UInt32 = 0,
+    inReviewTaskCount: UInt32 = 0,
+    arbitrationTaskCount: UInt32 = 0,
+    blockedTaskCount: UInt32 = 0,
+    completedTaskCount: UInt32 = 0
+  ) {
     self.agentCount = agentCount
     self.activeAgentCount = activeAgentCount
     self.idleAgentCount = idleAgentCount
@@ -78,7 +90,13 @@ public struct PendingLeaderTransferWire: Codable, Equatable, Sendable {
   public var requestedAt: String
   public var reason: String?
 
-  public init(requestedBy: String, currentLeaderId: String, newLeaderId: String, requestedAt: String, reason: String? = nil) {
+  public init(
+    requestedBy: String,
+    currentLeaderId: String,
+    newLeaderId: String,
+    requestedAt: String,
+    reason: String? = nil
+  ) {
     self.requestedBy = requestedBy
     self.currentLeaderId = currentLeaderId
     self.newLeaderId = newLeaderId

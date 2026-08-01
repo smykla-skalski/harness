@@ -66,7 +66,13 @@ public struct TaskBoardAutomationScope: Codable, Equatable, Sendable {
   public var repository: String?
   public var status: TaskBoardStatus?
 
-  public init(itemId: String? = nil, provider: ExternalRefProviderWire? = nil, providerScope: String? = nil, repository: String? = nil, status: TaskBoardStatus? = nil) {
+  public init(
+    itemId: String? = nil,
+    provider: ExternalRefProviderWire? = nil,
+    providerScope: String? = nil,
+    repository: String? = nil,
+    status: TaskBoardStatus? = nil
+  ) {
     self.itemId = itemId
     self.provider = provider
     self.providerScope = providerScope
@@ -94,7 +100,17 @@ public struct TaskBoardAutomationQueueSummary: Codable, Equatable, Sendable {
   public var draining: UInt
   public var cleanupRequired: UInt
 
-  public init(ready: UInt = 0, awaitingApproval: UInt = 0, policyBlocked: UInt = 0, preparing: UInt = 0, retrying: UInt = 0, starting: UInt = 0, active: UInt = 0, draining: UInt = 0, cleanupRequired: UInt = 0) {
+  public init(
+    ready: UInt = 0,
+    awaitingApproval: UInt = 0,
+    policyBlocked: UInt = 0,
+    preparing: UInt = 0,
+    retrying: UInt = 0,
+    starting: UInt = 0,
+    active: UInt = 0,
+    draining: UInt = 0,
+    cleanupRequired: UInt = 0
+  ) {
     self.ready = ready
     self.awaitingApproval = awaitingApproval
     self.policyBlocked = policyBlocked
@@ -130,7 +146,17 @@ public struct TaskBoardAutomationRunInfo: Codable, Equatable, Sendable {
   public var heartbeatAt: String
   public var completedAt: String?
 
-  public init(runId: String, trigger: TaskBoardAutomationRunTrigger, state: TaskBoardAutomationRunState, outcome: TaskBoardAutomationRunOutcome? = nil, dryRun: Bool, scope: TaskBoardAutomationScope, startedAt: String, heartbeatAt: String, completedAt: String? = nil) {
+  public init(
+    runId: String,
+    trigger: TaskBoardAutomationRunTrigger,
+    state: TaskBoardAutomationRunState,
+    outcome: TaskBoardAutomationRunOutcome? = nil,
+    dryRun: Bool,
+    scope: TaskBoardAutomationScope,
+    startedAt: String,
+    heartbeatAt: String,
+    completedAt: String? = nil
+  ) {
     self.runId = runId
     self.trigger = trigger
     self.state = state
@@ -196,7 +222,14 @@ public struct TaskBoardAutomationRunStage: Codable, Equatable, Sendable {
   public var summary: String?
   public var payload: JSONValue?
 
-  public init(sequence: UInt64, stage: String, state: String, recordedAt: String, summary: String? = nil, payload: JSONValue? = nil) {
+  public init(
+    sequence: UInt64,
+    stage: String,
+    state: String,
+    recordedAt: String,
+    summary: String? = nil,
+    payload: JSONValue? = nil
+  ) {
     self.sequence = sequence
     self.stage = stage
     self.state = state
@@ -221,7 +254,12 @@ public struct TaskBoardAutomationRunDetail: Codable, Equatable, Sendable {
   public var errorKind: String?
   public var error: String?
 
-  public init(run: TaskBoardAutomationRunInfo, stages: [TaskBoardAutomationRunStage] = [], errorKind: String? = nil, error: String? = nil) {
+  public init(
+    run: TaskBoardAutomationRunInfo,
+    stages: [TaskBoardAutomationRunStage] = [],
+    errorKind: String? = nil,
+    error: String? = nil
+  ) {
     self.run = run
     self.stages = stages
     self.errorKind = errorKind
@@ -255,7 +293,17 @@ public struct TaskBoardAutomationMetrics: Codable, Equatable, Sendable {
   public var openConflicts: UInt64
   public var capturedAt: String
 
-  public init(runsTotal: UInt64 = 0, runsRunning: UInt64 = 0, runsCompleted: UInt64 = 0, runsNoop: UInt64 = 0, runsPartial: UInt64 = 0, runsFailed: UInt64 = 0, runsCancelled: UInt64 = 0, openConflicts: UInt64 = 0, capturedAt: String = "") {
+  public init(
+    runsTotal: UInt64 = 0,
+    runsRunning: UInt64 = 0,
+    runsCompleted: UInt64 = 0,
+    runsNoop: UInt64 = 0,
+    runsPartial: UInt64 = 0,
+    runsFailed: UInt64 = 0,
+    runsCancelled: UInt64 = 0,
+    openConflicts: UInt64 = 0,
+    capturedAt: String = ""
+  ) {
     self.runsTotal = runsTotal
     self.runsRunning = runsRunning
     self.runsCompleted = runsCompleted
@@ -294,7 +342,20 @@ public struct TaskBoardAutomationCancelTarget: Codable, Equatable, Sendable {
   public var expectedRecordSha256: String
   public var cancelPending: Bool
 
-  public init(executionId: String, itemId: String, workflowKind: TaskBoardWorkflowKind, assignmentId: String, hostId: String, fencingEpoch: UInt64, actionKey: String, attempt: UInt32, idempotencyKey: String, assignmentState: String, expectedRecordSha256: String, cancelPending: Bool) {
+  public init(
+    executionId: String,
+    itemId: String,
+    workflowKind: TaskBoardWorkflowKind,
+    assignmentId: String,
+    hostId: String,
+    fencingEpoch: UInt64,
+    actionKey: String,
+    attempt: UInt32,
+    idempotencyKey: String,
+    assignmentState: String,
+    expectedRecordSha256: String,
+    cancelPending: Bool
+  ) {
     self.executionId = executionId
     self.itemId = itemId
     self.workflowKind = workflowKind
@@ -346,7 +407,27 @@ public struct TaskBoardAutomationSnapshot: Codable, Equatable, Sendable {
   public var cancelableTargetsTruncated: Bool
   public var blockedReason: String?
 
-  public init(schemaVersion: UInt32 = 1, revision: UInt64, desiredMode: TaskBoardAutomationDesiredMode, admissionState: TaskBoardAutomationAdmissionState, effectiveState: TaskBoardAutomationEffectiveState, observedAt: String, heartbeatAt: String, heartbeatAgeSeconds: UInt64? = nil, nextRunAt: String? = nil, nextRetryAt: String? = nil, lastSuccessAt: String? = nil, lastReconciliationAt: String? = nil, settingsRevision: UInt64, policyRevision: UInt64, queue: TaskBoardAutomationQueueSummary, activeRun: TaskBoardAutomationRunInfo? = nil, cancelableTargets: [TaskBoardAutomationCancelTarget] = [], cancelableTargetsTruncated: Bool = false, blockedReason: String? = nil) {
+  public init(
+    schemaVersion: UInt32 = 1,
+    revision: UInt64,
+    desiredMode: TaskBoardAutomationDesiredMode,
+    admissionState: TaskBoardAutomationAdmissionState,
+    effectiveState: TaskBoardAutomationEffectiveState,
+    observedAt: String,
+    heartbeatAt: String,
+    heartbeatAgeSeconds: UInt64? = nil,
+    nextRunAt: String? = nil,
+    nextRetryAt: String? = nil,
+    lastSuccessAt: String? = nil,
+    lastReconciliationAt: String? = nil,
+    settingsRevision: UInt64,
+    policyRevision: UInt64,
+    queue: TaskBoardAutomationQueueSummary,
+    activeRun: TaskBoardAutomationRunInfo? = nil,
+    cancelableTargets: [TaskBoardAutomationCancelTarget] = [],
+    cancelableTargetsTruncated: Bool = false,
+    blockedReason: String? = nil
+  ) {
     self.schemaVersion = schemaVersion
     self.revision = revision
     self.desiredMode = desiredMode
@@ -439,7 +520,13 @@ public struct TaskBoardAutomationRetrySettings: Codable, Equatable, Sendable {
   public var maxDelaySeconds: UInt64
   public var deterministicJitterPercent: UInt8
 
-  public init(maxAttempts: UInt32, baseDelaySeconds: UInt64, multiplier: UInt32, maxDelaySeconds: UInt64, deterministicJitterPercent: UInt8) {
+  public init(
+    maxAttempts: UInt32,
+    baseDelaySeconds: UInt64,
+    multiplier: UInt32,
+    maxDelaySeconds: UInt64,
+    deterministicJitterPercent: UInt8
+  ) {
     self.maxAttempts = maxAttempts
     self.baseDelaySeconds = baseDelaySeconds
     self.multiplier = multiplier
@@ -464,7 +551,14 @@ public struct TaskBoardReviewerProfile: Codable, Equatable, Sendable {
   public var model: String?
   public var effort: String?
 
-  public init(id: String, runtime: String, persona: String, agentMode: TaskBoardAgentMode, model: String? = nil, effort: String? = nil) {
+  public init(
+    id: String,
+    runtime: String,
+    persona: String,
+    agentMode: TaskBoardAgentMode,
+    model: String? = nil,
+    effort: String? = nil
+  ) {
     self.id = id
     self.runtime = runtime
     self.persona = persona
@@ -490,7 +584,13 @@ public struct TaskBoardReviewerRule: Codable, Equatable, Sendable {
   public var requiredApprovals: UInt32
   public var profiles: [TaskBoardReviewerProfile]
 
-  public init(workflow: TaskBoardOrchestratorWorkflow, repository: String? = nil, reviewerCount: UInt32, requiredApprovals: UInt32, profiles: [TaskBoardReviewerProfile]) {
+  public init(
+    workflow: TaskBoardOrchestratorWorkflow,
+    repository: String? = nil,
+    reviewerCount: UInt32,
+    requiredApprovals: UInt32,
+    profiles: [TaskBoardReviewerProfile]
+  ) {
     self.workflow = workflow
     self.repository = repository
     self.reviewerCount = reviewerCount
@@ -514,7 +614,13 @@ public struct TaskBoardReviewerSettings: Codable, Equatable, Sendable {
   public var profiles: [TaskBoardReviewerProfile]
   public var overrides: [TaskBoardReviewerRule]
 
-  public init(reviewerCount: UInt32, requiredApprovals: UInt32, maxRevisionCycles: UInt32, profiles: [TaskBoardReviewerProfile], overrides: [TaskBoardReviewerRule] = []) {
+  public init(
+    reviewerCount: UInt32,
+    requiredApprovals: UInt32,
+    maxRevisionCycles: UInt32,
+    profiles: [TaskBoardReviewerProfile],
+    overrides: [TaskBoardReviewerRule] = []
+  ) {
     self.reviewerCount = reviewerCount
     self.requiredApprovals = requiredApprovals
     self.maxRevisionCycles = maxRevisionCycles

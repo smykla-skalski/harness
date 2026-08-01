@@ -32,7 +32,34 @@ public struct WorkItemWire: Codable, Equatable, Sendable {
   public var suggestedPersona: String?
   public var deletedAt: String?
 
-  public init(taskId: String, title: String, context: String? = nil, severity: TaskSeverity, status: TaskStatus, assignedTo: String? = nil, queuePolicy: TaskQueuePolicy = .locked, queuedAt: String? = nil, createdAt: String, updatedAt: String, createdBy: String? = nil, notes: [TaskNoteWire] = [], suggestedFix: String? = nil, source: TaskSource = .manual, observeIssueId: String? = nil, blockedReason: String? = nil, completedAt: String? = nil, checkpointSummary: TaskCheckpointSummaryWire? = nil, awaitingReview: AwaitingReviewWire? = nil, reviewClaim: ReviewClaimWire? = nil, consensus: ReviewConsensusWire? = nil, reviewHistory: [ReviewConsensusWire] = [], reviewRound: UInt8 = 0, arbitration: ArbitrationOutcomeWire? = nil, suggestedPersona: String? = nil, deletedAt: String? = nil) {
+  public init(
+    taskId: String,
+    title: String,
+    context: String? = nil,
+    severity: TaskSeverity,
+    status: TaskStatus,
+    assignedTo: String? = nil,
+    queuePolicy: TaskQueuePolicy = .locked,
+    queuedAt: String? = nil,
+    createdAt: String,
+    updatedAt: String,
+    createdBy: String? = nil,
+    notes: [TaskNoteWire] = [],
+    suggestedFix: String? = nil,
+    source: TaskSource = .manual,
+    observeIssueId: String? = nil,
+    blockedReason: String? = nil,
+    completedAt: String? = nil,
+    checkpointSummary: TaskCheckpointSummaryWire? = nil,
+    awaitingReview: AwaitingReviewWire? = nil,
+    reviewClaim: ReviewClaimWire? = nil,
+    consensus: ReviewConsensusWire? = nil,
+    reviewHistory: [ReviewConsensusWire] = [],
+    reviewRound: UInt8 = 0,
+    arbitration: ArbitrationOutcomeWire? = nil,
+    suggestedPersona: String? = nil,
+    deletedAt: String? = nil
+  ) {
     self.taskId = taskId
     self.title = title
     self.context = context
@@ -166,7 +193,14 @@ public struct TaskCheckpointWire: Codable, Equatable, Sendable {
   public var summary: String
   public var progress: UInt8
 
-  public init(checkpointId: String, taskId: String, recordedAt: String, actorId: String? = nil, summary: String, progress: UInt8) {
+  public init(
+    checkpointId: String,
+    taskId: String,
+    recordedAt: String,
+    actorId: String? = nil,
+    summary: String,
+    progress: UInt8
+  ) {
     self.checkpointId = checkpointId
     self.taskId = taskId
     self.recordedAt = recordedAt
@@ -192,7 +226,13 @@ public struct TaskCheckpointSummaryWire: Codable, Equatable, Sendable {
   public var summary: String
   public var progress: UInt8
 
-  public init(checkpointId: String, recordedAt: String, actorId: String? = nil, summary: String, progress: UInt8) {
+  public init(
+    checkpointId: String,
+    recordedAt: String,
+    actorId: String? = nil,
+    summary: String,
+    progress: UInt8
+  ) {
     self.checkpointId = checkpointId
     self.recordedAt = recordedAt
     self.actorId = actorId
@@ -215,7 +255,12 @@ public struct AwaitingReviewWire: Codable, Equatable, Sendable {
   public var summary: String?
   public var requiredConsensus: UInt8
 
-  public init(queuedAt: String, submitterAgentId: String, summary: String? = nil, requiredConsensus: UInt8 = 2) {
+  public init(
+    queuedAt: String,
+    submitterAgentId: String,
+    summary: String? = nil,
+    requiredConsensus: UInt8 = 2
+  ) {
     self.queuedAt = queuedAt
     self.submitterAgentId = submitterAgentId
     self.summary = summary
@@ -244,7 +289,12 @@ public struct ReviewerEntryWire: Codable, Equatable, Sendable {
   public var claimedAt: String
   public var submittedAt: String?
 
-  public init(reviewerAgentId: String, reviewerRuntime: String, claimedAt: String, submittedAt: String? = nil) {
+  public init(
+    reviewerAgentId: String,
+    reviewerRuntime: String,
+    claimedAt: String,
+    submittedAt: String? = nil
+  ) {
     self.reviewerAgentId = reviewerAgentId
     self.reviewerRuntime = reviewerRuntime
     self.claimedAt = claimedAt
@@ -286,7 +336,16 @@ public struct ReviewWire: Codable, Equatable, Sendable {
   public var points: [ReviewPoint]
   public var recordedAt: String
 
-  public init(reviewId: String, round: UInt8, reviewerAgentId: String, reviewerRuntime: String, verdict: ReviewVerdict, summary: String, points: [ReviewPoint] = [], recordedAt: String) {
+  public init(
+    reviewId: String,
+    round: UInt8,
+    reviewerAgentId: String,
+    reviewerRuntime: String,
+    verdict: ReviewVerdict,
+    summary: String,
+    points: [ReviewPoint] = [],
+    recordedAt: String
+  ) {
     self.reviewId = reviewId
     self.round = round
     self.reviewerAgentId = reviewerAgentId
@@ -337,7 +396,13 @@ public struct ReviewConsensusWire: Codable, Equatable, Sendable {
   public var closedAt: String
   public var reviewerAgentIds: [String]
 
-  public init(verdict: ReviewVerdict, summary: String, points: [ReviewPoint] = [], closedAt: String, reviewerAgentIds: [String] = []) {
+  public init(
+    verdict: ReviewVerdict,
+    summary: String,
+    points: [ReviewPoint] = [],
+    closedAt: String,
+    reviewerAgentIds: [String] = []
+  ) {
     self.verdict = verdict
     self.summary = summary
     self.points = points

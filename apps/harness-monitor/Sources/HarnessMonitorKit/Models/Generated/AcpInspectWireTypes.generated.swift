@@ -20,7 +20,22 @@ public struct AcpAgentHandshake: Codable, Equatable, Sendable {
   public var supportsMcpSse: Bool
   public var supportsLogout: Bool
 
-  public init(protocolVersion: UInt16 = 0, agentName: String? = nil, agentVersion: String? = nil, agentTitle: String? = nil, authMethodIds: [String] = [], supportsLoadSession: Bool = false, supportsSessionList: Bool = false, supportsSessionResume: Bool = false, supportsSessionClose: Bool = false, supportsSessionDelete: Bool = false, supportsAdditionalDirectories: Bool = false, supportsMcpHttp: Bool = false, supportsMcpSse: Bool = false, supportsLogout: Bool = false) {
+  public init(
+    protocolVersion: UInt16 = 0,
+    agentName: String? = nil,
+    agentVersion: String? = nil,
+    agentTitle: String? = nil,
+    authMethodIds: [String] = [],
+    supportsLoadSession: Bool = false,
+    supportsSessionList: Bool = false,
+    supportsSessionResume: Bool = false,
+    supportsSessionClose: Bool = false,
+    supportsSessionDelete: Bool = false,
+    supportsAdditionalDirectories: Bool = false,
+    supportsMcpHttp: Bool = false,
+    supportsMcpSse: Bool = false,
+    supportsLogout: Bool = false
+  ) {
     self.protocolVersion = protocolVersion
     self.agentName = agentName
     self.agentVersion = agentVersion
@@ -97,8 +112,19 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
   public var lastStopReason: String?
   public var lastTurnResult: AcpAgentTurnResult?
   public var lastTurnFailure: AgentTurnFailure?
+  public var lastTurnPartialOutput: String?
 
-  public init(configOptions: [AcpSessionConfigOptionState] = [], currentModeId: String? = nil, availableCommands: [String] = [], title: String? = nil, updatedAt: String? = nil, lastStopReason: String? = nil, lastTurnResult: AcpAgentTurnResult? = nil, lastTurnFailure: AgentTurnFailure? = nil) {
+  public init(
+    configOptions: [AcpSessionConfigOptionState] = [],
+    currentModeId: String? = nil,
+    availableCommands: [String] = [],
+    title: String? = nil,
+    updatedAt: String? = nil,
+    lastStopReason: String? = nil,
+    lastTurnResult: AcpAgentTurnResult? = nil,
+    lastTurnFailure: AgentTurnFailure? = nil,
+    lastTurnPartialOutput: String? = nil
+  ) {
     self.configOptions = configOptions
     self.currentModeId = currentModeId
     self.availableCommands = availableCommands
@@ -107,6 +133,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     self.lastStopReason = lastStopReason
     self.lastTurnResult = lastTurnResult
     self.lastTurnFailure = lastTurnFailure
+    self.lastTurnPartialOutput = lastTurnPartialOutput
   }
 
   public init(from decoder: Decoder) throws {
@@ -119,6 +146,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     lastStopReason = try container.decodeIfPresent(String.self, forKey: .lastStopReason)
     lastTurnResult = try container.decodeIfPresent(AcpAgentTurnResult.self, forKey: .lastTurnResult)
     lastTurnFailure = try container.decodeIfPresent(AgentTurnFailure.self, forKey: .lastTurnFailure)
+    lastTurnPartialOutput = try container.decodeIfPresent(String.self, forKey: .lastTurnPartialOutput)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -130,6 +158,7 @@ public struct AcpAgentSessionState: Codable, Equatable, Sendable {
     case lastStopReason = "last_stop_reason"
     case lastTurnResult = "last_turn_result"
     case lastTurnFailure = "last_turn_failure"
+    case lastTurnPartialOutput = "last_turn_partial_output"
   }
 }
 
@@ -160,7 +189,12 @@ public struct AcpAgentInspectResponseWire: Codable, Equatable, Sendable {
   public var available: Bool
   public var issueMessage: String?
 
-  public init(agents: [AcpAgentInspectSnapshotWire], daemonPerceivedNow: String? = nil, available: Bool = true, issueMessage: String? = nil) {
+  public init(
+    agents: [AcpAgentInspectSnapshotWire],
+    daemonPerceivedNow: String? = nil,
+    available: Bool = true,
+    issueMessage: String? = nil
+  ) {
     self.agents = agents
     self.daemonPerceivedNow = daemonPerceivedNow
     self.available = available
@@ -204,7 +238,27 @@ public struct AcpAgentInspectSnapshotWire: Codable, Equatable, Sendable {
   public var handshake: AcpAgentHandshake?
   public var sessionState: AcpAgentSessionState?
 
-  public init(managedAgentId: String, sessionId: String, sessionAgentId: String, displayName: String, pid: UInt32, pgid: Int32, processKey: String = "", uptimeMs: UInt64, lastUpdateAt: String, lastClientCallAt: String? = nil, watchdogState: String, permissionMode: String = "", permissionLogPath: String? = nil, pendingPermissions: UInt, permissionQueueDepth: UInt = 0, terminalCount: UInt, promptDeadlineRemainingMs: UInt64, handshake: AcpAgentHandshake? = nil, sessionState: AcpAgentSessionState? = nil) {
+  public init(
+    managedAgentId: String,
+    sessionId: String,
+    sessionAgentId: String,
+    displayName: String,
+    pid: UInt32,
+    pgid: Int32,
+    processKey: String = "",
+    uptimeMs: UInt64,
+    lastUpdateAt: String,
+    lastClientCallAt: String? = nil,
+    watchdogState: String,
+    permissionMode: String = "",
+    permissionLogPath: String? = nil,
+    pendingPermissions: UInt,
+    permissionQueueDepth: UInt = 0,
+    terminalCount: UInt,
+    promptDeadlineRemainingMs: UInt64,
+    handshake: AcpAgentHandshake? = nil,
+    sessionState: AcpAgentSessionState? = nil
+  ) {
     self.managedAgentId = managedAgentId
     self.sessionId = sessionId
     self.sessionAgentId = sessionAgentId
@@ -298,7 +352,12 @@ public struct AgentTurnFailure: Codable, Equatable, Sendable {
   public var automaticRetrySafe: Bool
   public var detail: String
 
-  public init(category: AgentTurnFailureCategory, stage: AgentTurnFailureStage, automaticRetrySafe: Bool, detail: String) {
+  public init(
+    category: AgentTurnFailureCategory,
+    stage: AgentTurnFailureStage,
+    automaticRetrySafe: Bool,
+    detail: String
+  ) {
     self.category = category
     self.stage = stage
     self.automaticRetrySafe = automaticRetrySafe

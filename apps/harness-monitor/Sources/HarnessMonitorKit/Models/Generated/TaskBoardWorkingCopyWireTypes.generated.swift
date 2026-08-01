@@ -12,7 +12,14 @@ public struct WorkingCopyListEntry: Codable, Equatable, Sendable {
   public var createdAt: String
   public var lastUsedAt: String
 
-  public init(repoFullName: String, repoKeySegment: String, path: String, sizeBytes: UInt64, createdAt: String, lastUsedAt: String) {
+  public init(
+    repoFullName: String,
+    repoKeySegment: String,
+    path: String,
+    sizeBytes: UInt64,
+    createdAt: String,
+    lastUsedAt: String
+  ) {
     self.repoFullName = repoFullName
     self.repoKeySegment = repoKeySegment
     self.path = path

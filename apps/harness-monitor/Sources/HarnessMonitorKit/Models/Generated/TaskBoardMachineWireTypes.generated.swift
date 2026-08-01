@@ -11,7 +11,13 @@ public struct MachineWire: Codable, Equatable, Sendable {
   public var agentModes: [TaskBoardAgentMode]
   public var lastSeen: String
 
-  public init(id: String, label: String, projectTypes: [String] = [], agentModes: [TaskBoardAgentMode] = [], lastSeen: String) {
+  public init(
+    id: String,
+    label: String,
+    projectTypes: [String] = [],
+    agentModes: [TaskBoardAgentMode] = [],
+    lastSeen: String
+  ) {
     self.id = id
     self.label = label
     self.projectTypes = projectTypes

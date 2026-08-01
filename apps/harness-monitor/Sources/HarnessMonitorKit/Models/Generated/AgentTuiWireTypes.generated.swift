@@ -72,7 +72,25 @@ public struct AgentTuiStartRequestWire: Codable, Equatable, Sendable {
   public var effort: String?
   public var allowCustomModel: Bool
 
-  public init(runtime: String, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, prompt: String? = nil, projectDir: String? = nil, argv: [String] = [], rows: UInt16 = 30, cols: UInt16 = 120, persona: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false) {
+  public init(
+    runtime: String,
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String] = [],
+    name: String? = nil,
+    prompt: String? = nil,
+    projectDir: String? = nil,
+    argv: [String] = [],
+    rows: UInt16 = 30,
+    cols: UInt16 = 120,
+    persona: String? = nil,
+    taskId: String? = nil,
+    boardItemId: String? = nil,
+    workflowExecutionId: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false
+  ) {
     self.runtime = runtime
     self.role = role
     self.fallbackRole = fallbackRole
@@ -178,7 +196,23 @@ public struct AgentTuiSnapshotWire: Codable, Equatable, Sendable {
   public var createdAt: String
   public var updatedAt: String
 
-  public init(tuiId: String, sessionId: String, agentId: String, runtime: String, status: AgentTuiStatusWire, argv: [String], projectDir: String, size: AgentTuiSizeWire, screen: TerminalScreenSnapshotWire, transcriptPath: String, exitCode: UInt32? = nil, signal: String? = nil, error: String? = nil, createdAt: String, updatedAt: String) {
+  public init(
+    tuiId: String,
+    sessionId: String,
+    agentId: String,
+    runtime: String,
+    status: AgentTuiStatusWire,
+    argv: [String],
+    projectDir: String,
+    size: AgentTuiSizeWire,
+    screen: TerminalScreenSnapshotWire,
+    transcriptPath: String,
+    exitCode: UInt32? = nil,
+    signal: String? = nil,
+    error: String? = nil,
+    createdAt: String,
+    updatedAt: String
+  ) {
     self.tuiId = tuiId
     self.sessionId = sessionId
     self.agentId = agentId

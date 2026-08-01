@@ -10,7 +10,12 @@ public struct PlanningTransitionWire: Codable, Equatable, Sendable {
   public var toStatus: TaskBoardStatus
   public var planning: PlanningStateWire
 
-  public init(boardItemId: String, fromStatus: TaskBoardStatus, toStatus: TaskBoardStatus, planning: PlanningStateWire) {
+  public init(
+    boardItemId: String,
+    fromStatus: TaskBoardStatus,
+    toStatus: TaskBoardStatus,
+    planning: PlanningStateWire
+  ) {
     self.boardItemId = boardItemId
     self.fromStatus = fromStatus
     self.toStatus = toStatus

@@ -89,7 +89,14 @@ public struct ReviewsBodyUpdateResponseWire: Codable, Equatable, Sendable {
   public var prUpdatedAt: String
   public var fetchedAt: String
 
-  public init(pullRequestId: String, outcome: ReviewsBodyUpdateOutcomeWire, currentBody: String, currentBodySha256: String, prUpdatedAt: String, fetchedAt: String) {
+  public init(
+    pullRequestId: String,
+    outcome: ReviewsBodyUpdateOutcomeWire,
+    currentBody: String,
+    currentBodySha256: String,
+    prUpdatedAt: String,
+    fetchedAt: String
+  ) {
     self.pullRequestId = pullRequestId
     self.outcome = outcome
     self.currentBody = currentBody
@@ -125,7 +132,16 @@ public struct ReviewsFileCommentRequestWire: Codable, Equatable, Sendable {
   public var side: String?
   public var threadId: String?
 
-  public init(pullRequestId: String, repository: String? = nil, kind: ReviewsFileCommentKindWire, body: String, path: String? = nil, line: UInt32? = nil, side: String? = nil, threadId: String? = nil) {
+  public init(
+    pullRequestId: String,
+    repository: String? = nil,
+    kind: ReviewsFileCommentKindWire,
+    body: String,
+    path: String? = nil,
+    line: UInt32? = nil,
+    side: String? = nil,
+    threadId: String? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.repository = repository
     self.kind = kind
@@ -155,7 +171,13 @@ public struct ReviewsFileCommentResponseWire: Codable, Equatable, Sendable {
   public var url: String?
   public var fetchedAt: String
 
-  public init(pullRequestId: String, threadId: String? = nil, commentId: String? = nil, url: String? = nil, fetchedAt: String) {
+  public init(
+    pullRequestId: String,
+    threadId: String? = nil,
+    commentId: String? = nil,
+    url: String? = nil,
+    fetchedAt: String
+  ) {
     self.pullRequestId = pullRequestId
     self.threadId = threadId
     self.commentId = commentId

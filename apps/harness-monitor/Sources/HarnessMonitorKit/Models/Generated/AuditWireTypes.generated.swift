@@ -31,7 +31,18 @@ public struct HarnessMonitorAuditEventsRequestWire: Codable, Equatable, Sendable
   public var subject: String?
   public var searchText: String?
 
-  public init(limit: UInt32? = nil, before: String? = nil, dateRange: HarnessMonitorAuditDateRangeWire? = nil, sources: [String] = [], categories: [String] = [], severities: [String] = [], outcomes: [String] = [], actionKeys: [String] = [], subject: String? = nil, searchText: String? = nil) {
+  public init(
+    limit: UInt32? = nil,
+    before: String? = nil,
+    dateRange: HarnessMonitorAuditDateRangeWire? = nil,
+    sources: [String] = [],
+    categories: [String] = [],
+    severities: [String] = [],
+    outcomes: [String] = [],
+    actionKeys: [String] = [],
+    subject: String? = nil,
+    searchText: String? = nil
+  ) {
     self.limit = limit
     self.before = before
     self.dateRange = dateRange
@@ -90,7 +101,24 @@ public struct HarnessMonitorAuditEventWire: Codable, Equatable, Sendable {
   public var legacyMessage: String?
   public var relatedUrls: [String]
 
-  public init(id: String, recordedAt: String, source: String, category: String, kind: String, severity: String, outcome: String, title: String, summary: String, subject: String? = nil, actor: String? = nil, correlationId: String? = nil, actionKey: String? = nil, payloadJson: JSONValue? = nil, legacyMessage: String? = nil, relatedUrls: [String] = []) {
+  public init(
+    id: String,
+    recordedAt: String,
+    source: String,
+    category: String,
+    kind: String,
+    severity: String,
+    outcome: String,
+    title: String,
+    summary: String,
+    subject: String? = nil,
+    actor: String? = nil,
+    correlationId: String? = nil,
+    actionKey: String? = nil,
+    payloadJson: JSONValue? = nil,
+    legacyMessage: String? = nil,
+    relatedUrls: [String] = []
+  ) {
     self.id = id
     self.recordedAt = recordedAt
     self.source = source

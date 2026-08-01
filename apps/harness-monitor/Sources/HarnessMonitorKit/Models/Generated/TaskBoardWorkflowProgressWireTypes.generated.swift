@@ -104,7 +104,13 @@ public struct TaskBoardDependencyIdentity: Codable, Equatable, Sendable {
   public var targetVersion: String
   public var updateClass: TaskBoardDependencyUpdateClass
 
-  public init(name: String, ecosystem: String, currentVersion: String, targetVersion: String, updateClass: TaskBoardDependencyUpdateClass) {
+  public init(
+    name: String,
+    ecosystem: String,
+    currentVersion: String,
+    targetVersion: String,
+    updateClass: TaskBoardDependencyUpdateClass
+  ) {
     self.name = name
     self.ecosystem = ecosystem
     self.currentVersion = currentVersion
@@ -201,7 +207,20 @@ public struct TaskBoardDependencyTriageResult: Codable, Equatable, Sendable {
   public var requiredTools: [String]
   public var nextSteps: [TaskBoardDependencyTriageStep]
 
-  public init(schemaVersion: UInt32, repository: String, pullRequestNumber: UInt64, exactHeadRevision: String, dependency: TaskBoardDependencyIdentity, checks: [TaskBoardDependencyCheck], conflicts: TaskBoardDependencyConflictEvidence, approvals: TaskBoardDependencyApprovalEvidence, safetyAssumption: String, disposition: TaskBoardDependencyTriageDisposition, requiredTools: [String], nextSteps: [TaskBoardDependencyTriageStep]) {
+  public init(
+    schemaVersion: UInt32,
+    repository: String,
+    pullRequestNumber: UInt64,
+    exactHeadRevision: String,
+    dependency: TaskBoardDependencyIdentity,
+    checks: [TaskBoardDependencyCheck],
+    conflicts: TaskBoardDependencyConflictEvidence,
+    approvals: TaskBoardDependencyApprovalEvidence,
+    safetyAssumption: String,
+    disposition: TaskBoardDependencyTriageDisposition,
+    requiredTools: [String],
+    nextSteps: [TaskBoardDependencyTriageStep]
+  ) {
     self.schemaVersion = schemaVersion
     self.repository = repository
     self.pullRequestNumber = pullRequestNumber
@@ -292,7 +311,15 @@ public struct TaskBoardDependencyRouteRecord: Codable, Equatable, Sendable {
   public var reason: String
   public var sourceResult: TaskBoardDependencyTriageResult
 
-  public init(routeId: String, repository: String, pullRequestNumber: UInt64, exactHeadRevision: String, status: TaskBoardDependencyRouteStatus, reason: String, sourceResult: TaskBoardDependencyTriageResult) {
+  public init(
+    routeId: String,
+    repository: String,
+    pullRequestNumber: UInt64,
+    exactHeadRevision: String,
+    status: TaskBoardDependencyRouteStatus,
+    reason: String,
+    sourceResult: TaskBoardDependencyTriageResult
+  ) {
     self.routeId = routeId
     self.repository = repository
     self.pullRequestNumber = pullRequestNumber
@@ -325,7 +352,18 @@ public struct TaskBoardWorkflowAttemptProgress: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var completedAt: String?
 
-  public init(actionKey: String, attempt: UInt32, state: TaskBoardAttemptState, runtime: String? = nil, model: String? = nil, report: String? = nil, terminalReason: String? = nil, startedAt: String, updatedAt: String, completedAt: String? = nil) {
+  public init(
+    actionKey: String,
+    attempt: UInt32,
+    state: TaskBoardAttemptState,
+    runtime: String? = nil,
+    model: String? = nil,
+    report: String? = nil,
+    terminalReason: String? = nil,
+    startedAt: String,
+    updatedAt: String,
+    completedAt: String? = nil
+  ) {
     self.actionKey = actionKey
     self.attempt = attempt
     self.state = state
@@ -368,7 +406,22 @@ public struct TaskBoardWorkflowProgress: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var completedAt: String?
 
-  public init(executionId: String, workflowKind: TaskBoardWorkflowKind, phase: TaskBoardExecutionPhase? = nil, state: TaskBoardExecutionState, exactHeadRevision: String? = nil, currentRuntime: String? = nil, currentModel: String? = nil, blockedReason: String? = nil, triage: TaskBoardDependencyRouteRecord? = nil, terminalOutcome: TaskBoardTerminalOutcome? = nil, attempts: [TaskBoardWorkflowAttemptProgress], createdAt: String, updatedAt: String, completedAt: String? = nil) {
+  public init(
+    executionId: String,
+    workflowKind: TaskBoardWorkflowKind,
+    phase: TaskBoardExecutionPhase? = nil,
+    state: TaskBoardExecutionState,
+    exactHeadRevision: String? = nil,
+    currentRuntime: String? = nil,
+    currentModel: String? = nil,
+    blockedReason: String? = nil,
+    triage: TaskBoardDependencyRouteRecord? = nil,
+    terminalOutcome: TaskBoardTerminalOutcome? = nil,
+    attempts: [TaskBoardWorkflowAttemptProgress],
+    createdAt: String,
+    updatedAt: String,
+    completedAt: String? = nil
+  ) {
     self.executionId = executionId
     self.workflowKind = workflowKind
     self.phase = phase

@@ -14,7 +14,16 @@ public struct TaskBoardProjectSummaryWire: Codable, Equatable, Sendable {
   public var itemCount: UInt
   public var readyCount: UInt
 
-  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, color: TaskBoardProjectColor, shape: TaskBoardProjectShape, itemCount: UInt, readyCount: UInt) {
+  public init(
+    projectId: String,
+    source: TaskBoardProjectSource,
+    slug: String,
+    displayName: String? = nil,
+    color: TaskBoardProjectColor,
+    shape: TaskBoardProjectShape,
+    itemCount: UInt,
+    readyCount: UInt
+  ) {
     self.projectId = projectId
     self.source = source
     self.slug = slug
@@ -111,7 +120,16 @@ public struct TaskBoardProject: Codable, Equatable, Sendable {
   public var createdAt: String
   public var updatedAt: String
 
-  public init(projectId: String, source: TaskBoardProjectSource, slug: String, displayName: String? = nil, color: TaskBoardProjectColor, shape: TaskBoardProjectShape, createdAt: String, updatedAt: String) {
+  public init(
+    projectId: String,
+    source: TaskBoardProjectSource,
+    slug: String,
+    displayName: String? = nil,
+    color: TaskBoardProjectColor,
+    shape: TaskBoardProjectShape,
+    createdAt: String,
+    updatedAt: String
+  ) {
     self.projectId = projectId
     self.source = source
     self.slug = slug
@@ -182,7 +200,14 @@ public struct TaskBoardProjectUpdateRequest: Codable, Equatable, Sendable {
   public var color: TaskBoardProjectColor?
   public var resetColor: Bool
 
-  public init(projectId: String = "", slug: String? = nil, displayName: String? = nil, clearDisplayName: Bool = false, color: TaskBoardProjectColor? = nil, resetColor: Bool = false) {
+  public init(
+    projectId: String = "",
+    slug: String? = nil,
+    displayName: String? = nil,
+    clearDisplayName: Bool = false,
+    color: TaskBoardProjectColor? = nil,
+    resetColor: Bool = false
+  ) {
     self.projectId = projectId
     self.slug = slug
     self.displayName = displayName

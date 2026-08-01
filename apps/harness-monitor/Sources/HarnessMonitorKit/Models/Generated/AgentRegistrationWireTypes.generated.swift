@@ -23,7 +23,25 @@ public struct AgentRegistrationWire: Codable, Equatable, Sendable {
   public var persona: AgentPersonaWire?
   public var runtimeSessionTitle: String?
 
-  public init(sessionAgentId: String, name: String, runtime: JSONValue, descriptorId: String? = nil, role: SessionRole, capabilities: [String] = [], joinedAt: String, updatedAt: String, status: AgentStatus, runtimeSessionId: String? = nil, managedAgentId: String? = nil, managedAgentFamily: ManagedAgentKind? = nil, lastActivityAt: String? = nil, currentTaskId: String? = nil, runtimeCapabilities: RuntimeCapabilitiesWire = RuntimeCapabilitiesWire(), persona: AgentPersonaWire? = nil, runtimeSessionTitle: String? = nil) {
+  public init(
+    sessionAgentId: String,
+    name: String,
+    runtime: JSONValue,
+    descriptorId: String? = nil,
+    role: SessionRole,
+    capabilities: [String] = [],
+    joinedAt: String,
+    updatedAt: String,
+    status: AgentStatus,
+    runtimeSessionId: String? = nil,
+    managedAgentId: String? = nil,
+    managedAgentFamily: ManagedAgentKind? = nil,
+    lastActivityAt: String? = nil,
+    currentTaskId: String? = nil,
+    runtimeCapabilities: RuntimeCapabilitiesWire = RuntimeCapabilitiesWire(),
+    persona: AgentPersonaWire? = nil,
+    runtimeSessionTitle: String? = nil
+  ) {
     self.sessionAgentId = sessionAgentId
     self.name = name
     self.runtime = runtime
@@ -94,7 +112,15 @@ public struct RuntimeCapabilitiesWire: Codable, Equatable, Sendable {
   public var supportsReadinessSignal: Bool
   public var hookPoints: [HookIntegrationDescriptorWire]
 
-  public init(runtime: String = "", supportsNativeTranscript: Bool = false, supportsSignalDelivery: Bool = false, supportsContextInjection: Bool = false, typicalSignalLatencySeconds: UInt64 = 0, supportsReadinessSignal: Bool = false, hookPoints: [HookIntegrationDescriptorWire] = []) {
+  public init(
+    runtime: String = "",
+    supportsNativeTranscript: Bool = false,
+    supportsSignalDelivery: Bool = false,
+    supportsContextInjection: Bool = false,
+    typicalSignalLatencySeconds: UInt64 = 0,
+    supportsReadinessSignal: Bool = false,
+    hookPoints: [HookIntegrationDescriptorWire] = []
+  ) {
     self.runtime = runtime
     self.supportsNativeTranscript = supportsNativeTranscript
     self.supportsSignalDelivery = supportsSignalDelivery

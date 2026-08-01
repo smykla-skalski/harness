@@ -12,7 +12,14 @@ public struct BridgeStatusReportWire: Codable, Equatable, Sendable {
   public var uptimeSeconds: UInt64?
   public var capabilities: [String: HostBridgeCapabilityManifestWire]
 
-  public init(running: Bool, socketPath: String? = nil, pid: UInt32? = nil, startedAt: String? = nil, uptimeSeconds: UInt64? = nil, capabilities: [String: HostBridgeCapabilityManifestWire] = [:]) {
+  public init(
+    running: Bool,
+    socketPath: String? = nil,
+    pid: UInt32? = nil,
+    startedAt: String? = nil,
+    uptimeSeconds: UInt64? = nil,
+    capabilities: [String: HostBridgeCapabilityManifestWire] = [:]
+  ) {
     self.running = running
     self.socketPath = socketPath
     self.pid = pid

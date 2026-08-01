@@ -8,7 +8,10 @@ public struct TaskBoardGitRuntimeConfigWire: Codable, Equatable, Sendable {
   public var global: TaskBoardGitRuntimeProfileWire
   public var repositoryOverrides: [TaskBoardGitRepositoryOverrideWire]
 
-  public init(global: TaskBoardGitRuntimeProfileWire = TaskBoardGitRuntimeProfileWire(), repositoryOverrides: [TaskBoardGitRepositoryOverrideWire] = []) {
+  public init(
+    global: TaskBoardGitRuntimeProfileWire = TaskBoardGitRuntimeProfileWire(),
+    repositoryOverrides: [TaskBoardGitRepositoryOverrideWire] = []
+  ) {
     self.global = global
     self.repositoryOverrides = repositoryOverrides
   }
@@ -35,7 +38,16 @@ public struct TaskBoardGitRuntimeProfileWire: Codable, Equatable, Sendable {
   public var sshPrivateKeyPassphraseConfigured: Bool
   public var signing: TaskBoardGitSigningConfigWire
 
-  public init(authorName: String? = nil, authorEmail: String? = nil, sshKeyPath: String? = nil, sshPrivateKey: String? = nil, sshPrivateKeyPassphrase: String? = nil, sshPrivateKeyConfigured: Bool = false, sshPrivateKeyPassphraseConfigured: Bool = false, signing: TaskBoardGitSigningConfigWire = TaskBoardGitSigningConfigWire()) {
+  public init(
+    authorName: String? = nil,
+    authorEmail: String? = nil,
+    sshKeyPath: String? = nil,
+    sshPrivateKey: String? = nil,
+    sshPrivateKeyPassphrase: String? = nil,
+    sshPrivateKeyConfigured: Bool = false,
+    sshPrivateKeyPassphraseConfigured: Bool = false,
+    signing: TaskBoardGitSigningConfigWire = TaskBoardGitSigningConfigWire()
+  ) {
     self.authorName = authorName
     self.authorEmail = authorEmail
     self.sshKeyPath = sshKeyPath
@@ -84,7 +96,20 @@ public struct TaskBoardGitSigningConfigWire: Codable, Equatable, Sendable {
   public var gpgPrivateKeyConfigured: Bool
   public var gpgPrivateKeyPassphraseConfigured: Bool
 
-  public init(mode: TaskBoardGitSigningMode = .none, sshKeyPath: String? = nil, sshPrivateKey: String? = nil, sshPrivateKeyPassphrase: String? = nil, gpgKeyId: String? = nil, gpgPrivateKeyPath: String? = nil, gpgPrivateKey: String? = nil, gpgPrivateKeyPassphrase: String? = nil, sshPrivateKeyConfigured: Bool = false, sshPrivateKeyPassphraseConfigured: Bool = false, gpgPrivateKeyConfigured: Bool = false, gpgPrivateKeyPassphraseConfigured: Bool = false) {
+  public init(
+    mode: TaskBoardGitSigningMode = .none,
+    sshKeyPath: String? = nil,
+    sshPrivateKey: String? = nil,
+    sshPrivateKeyPassphrase: String? = nil,
+    gpgKeyId: String? = nil,
+    gpgPrivateKeyPath: String? = nil,
+    gpgPrivateKey: String? = nil,
+    gpgPrivateKeyPassphrase: String? = nil,
+    sshPrivateKeyConfigured: Bool = false,
+    sshPrivateKeyPassphraseConfigured: Bool = false,
+    gpgPrivateKeyConfigured: Bool = false,
+    gpgPrivateKeyPassphraseConfigured: Bool = false
+  ) {
     self.mode = mode
     self.sshKeyPath = sshKeyPath
     self.sshPrivateKey = sshPrivateKey
@@ -135,7 +160,10 @@ public struct TaskBoardGitRepositoryOverrideWire: Codable, Equatable, Sendable {
   public var repository: String
   public var profile: TaskBoardGitRuntimeProfileWire
 
-  public init(repository: String, profile: TaskBoardGitRuntimeProfileWire = TaskBoardGitRuntimeProfileWire()) {
+  public init(
+    repository: String,
+    profile: TaskBoardGitRuntimeProfileWire = TaskBoardGitRuntimeProfileWire()
+  ) {
     self.repository = repository
     self.profile = profile
   }
@@ -158,7 +186,12 @@ public struct TaskBoardGitRuntimeSecretHandoffPrepareResponseWire: Codable, Equa
   public var digest: String?
   public var runtime: TaskBoardGitRuntimeConfigWire
 
-  public init(prepared: Bool, migrationId: String? = nil, digest: String? = nil, runtime: TaskBoardGitRuntimeConfigWire) {
+  public init(
+    prepared: Bool,
+    migrationId: String? = nil,
+    digest: String? = nil,
+    runtime: TaskBoardGitRuntimeConfigWire
+  ) {
     self.prepared = prepared
     self.migrationId = migrationId
     self.digest = digest

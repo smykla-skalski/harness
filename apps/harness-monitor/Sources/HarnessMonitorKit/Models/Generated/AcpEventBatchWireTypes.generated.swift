@@ -11,7 +11,13 @@ public struct AcpEventBatchPayloadWire: Codable, Equatable, Sendable {
   public var rawCount: UInt
   public var events: [ConversationEventWire]
 
-  public init(managedAgentId: String, managedAgentFamily: ManagedAgentKind, sessionId: String, rawCount: UInt, events: [ConversationEventWire]) {
+  public init(
+    managedAgentId: String,
+    managedAgentFamily: ManagedAgentKind,
+    sessionId: String,
+    rawCount: UInt,
+    events: [ConversationEventWire]
+  ) {
     self.managedAgentId = managedAgentId
     self.managedAgentFamily = managedAgentFamily
     self.sessionId = sessionId

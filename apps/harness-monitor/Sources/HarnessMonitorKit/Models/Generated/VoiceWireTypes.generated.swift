@@ -28,7 +28,13 @@ public struct VoiceRouteTarget: Codable, Equatable, Sendable {
   public var command: String?
   public var actionHint: String?
 
-  public init(kind: VoiceRouteTargetKind, runId: String? = nil, agentId: String? = nil, command: String? = nil, actionHint: String? = nil) {
+  public init(
+    kind: VoiceRouteTargetKind,
+    runId: String? = nil,
+    agentId: String? = nil,
+    command: String? = nil,
+    actionHint: String? = nil
+  ) {
     self.kind = kind
     self.runId = runId
     self.agentId = agentId
@@ -74,7 +80,14 @@ public struct VoiceTranscriptSegment: Codable, Equatable, Sendable {
   public var durationSeconds: Double
   public var confidence: Double?
 
-  public init(sequence: UInt64, text: String, isFinal: Bool, startedAtSeconds: Double, durationSeconds: Double, confidence: Double? = nil) {
+  public init(
+    sequence: UInt64,
+    text: String,
+    isFinal: Bool,
+    startedAtSeconds: Double,
+    durationSeconds: Double,
+    confidence: Double? = nil
+  ) {
     self.sequence = sequence
     self.text = text
     self.isFinal = isFinal
@@ -101,7 +114,14 @@ public struct VoiceSessionStartRequest: Codable, Equatable, Sendable {
   public var requiresConfirmation: Bool
   public var remoteProcessorUrl: String?
 
-  public init(actor: String, localeIdentifier: String, requestedSinks: [VoiceProcessingSink], routeTarget: VoiceRouteTarget, requiresConfirmation: Bool, remoteProcessorUrl: String? = nil) {
+  public init(
+    actor: String,
+    localeIdentifier: String,
+    requestedSinks: [VoiceProcessingSink],
+    routeTarget: VoiceRouteTarget,
+    requiresConfirmation: Bool,
+    remoteProcessorUrl: String? = nil
+  ) {
     self.actor = actor
     self.localeIdentifier = localeIdentifier
     self.requestedSinks = requestedSinks
@@ -147,7 +167,15 @@ public struct VoiceAudioChunkRequest: Codable, Equatable, Sendable {
   public var durationSeconds: Double
   public var audioBase64: String
 
-  public init(actor: String, sequence: UInt64, format: VoiceAudioFormatDescriptor, frameCount: UInt, startedAtSeconds: Double, durationSeconds: Double, audioBase64: String) {
+  public init(
+    actor: String,
+    sequence: UInt64,
+    format: VoiceAudioFormatDescriptor,
+    frameCount: UInt,
+    startedAtSeconds: Double,
+    durationSeconds: Double,
+    audioBase64: String
+  ) {
     self.actor = actor
     self.sequence = sequence
     self.format = format

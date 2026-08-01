@@ -12,7 +12,14 @@ public struct GitHubAutomationSettingsWire: Codable, Equatable, Sendable {
   public var requestedReviewers: GitHubRequestedReviewersWire
   public var enabledAutomations: GitHubAutomationTogglesWire
 
-  public init(branchPrefix: String = "c/", mergeMethod: TaskBoardGitHubMergeMethod = .squash, labels: GitHubAutomationLabelsWire, protectedPaths: [ProtectedPathRuleWire] = [], requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(), enabledAutomations: GitHubAutomationTogglesWire) {
+  public init(
+    branchPrefix: String = "c/",
+    mergeMethod: TaskBoardGitHubMergeMethod = .squash,
+    labels: GitHubAutomationLabelsWire,
+    protectedPaths: [ProtectedPathRuleWire] = [],
+    requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(),
+    enabledAutomations: GitHubAutomationTogglesWire
+  ) {
     self.branchPrefix = branchPrefix
     self.mergeMethod = mergeMethod
     self.labels = labels
@@ -52,7 +59,17 @@ public struct GitHubProjectConfigWire: Codable, Equatable, Sendable {
   public var requestedReviewers: GitHubRequestedReviewersWire
   public var enabledAutomations: GitHubAutomationTogglesWire
 
-  public init(owner: String = "", repo: String = "", defaultBranch: String = "main", branchPrefix: String = "c/", mergeMethod: TaskBoardGitHubMergeMethod = .squash, labels: GitHubAutomationLabelsWire, protectedPaths: [ProtectedPathRuleWire] = [], requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(), enabledAutomations: GitHubAutomationTogglesWire) {
+  public init(
+    owner: String = "",
+    repo: String = "",
+    defaultBranch: String = "main",
+    branchPrefix: String = "c/",
+    mergeMethod: TaskBoardGitHubMergeMethod = .squash,
+    labels: GitHubAutomationLabelsWire,
+    protectedPaths: [ProtectedPathRuleWire] = [],
+    requestedReviewers: GitHubRequestedReviewersWire = GitHubRequestedReviewersWire(),
+    enabledAutomations: GitHubAutomationTogglesWire
+  ) {
     self.owner = owner
     self.repo = repo
     self.defaultBranch = defaultBranch

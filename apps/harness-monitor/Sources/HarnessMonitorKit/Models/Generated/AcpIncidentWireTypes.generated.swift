@@ -15,7 +15,17 @@ public struct AcpProcessIncidentPayloadWire: Codable, Equatable, Sendable {
   public var stderrTail: String?
   public var affectedLogicalSessionIds: [String]
 
-  public init(kind: String, reasonKind: String, processKey: String, pid: UInt32, pgid: Int32, exitCode: Int32? = nil, exitSignal: Int32? = nil, stderrTail: String? = nil, affectedLogicalSessionIds: [String]) {
+  public init(
+    kind: String,
+    reasonKind: String,
+    processKey: String,
+    pid: UInt32,
+    pgid: Int32,
+    exitCode: Int32? = nil,
+    exitSignal: Int32? = nil,
+    stderrTail: String? = nil,
+    affectedLogicalSessionIds: [String]
+  ) {
     self.kind = kind
     self.reasonKind = reasonKind
     self.processKey = processKey
@@ -48,7 +58,14 @@ public struct AcpBridgeResyncIncidentPayloadWire: Codable, Equatable, Sendable {
   public var truncated: Bool
   public var affectedLogicalSessionIds: [String]
 
-  public init(kind: String, bridgeEpoch: String, continuity: UInt64, nextSeq: UInt64, truncated: Bool, affectedLogicalSessionIds: [String]) {
+  public init(
+    kind: String,
+    bridgeEpoch: String,
+    continuity: UInt64,
+    nextSeq: UInt64,
+    truncated: Bool,
+    affectedLogicalSessionIds: [String]
+  ) {
     self.kind = kind
     self.bridgeEpoch = bridgeEpoch
     self.continuity = continuity
@@ -72,7 +89,11 @@ public struct AcpAgentsReconciledPayloadWire: Codable, Equatable, Sendable {
   public var agents: [AcpAgentSnapshotWire]
   public var inspect: AcpAgentInspectResponseWire?
 
-  public init(sessionId: String, agents: [AcpAgentSnapshotWire], inspect: AcpAgentInspectResponseWire? = nil) {
+  public init(
+    sessionId: String,
+    agents: [AcpAgentSnapshotWire],
+    inspect: AcpAgentInspectResponseWire? = nil
+  ) {
     self.sessionId = sessionId
     self.agents = agents
     self.inspect = inspect

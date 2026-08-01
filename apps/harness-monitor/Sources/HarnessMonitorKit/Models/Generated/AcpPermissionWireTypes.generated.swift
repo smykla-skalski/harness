@@ -72,7 +72,14 @@ public struct AcpPermissionBatchWire: Codable, Equatable, Sendable {
   public var createdAt: String
   public var expiresAt: String
 
-  public init(batchId: String, managedAgentId: String, sessionId: String, requests: [AcpPermissionItemWire], createdAt: String, expiresAt: String) {
+  public init(
+    batchId: String,
+    managedAgentId: String,
+    sessionId: String,
+    requests: [AcpPermissionItemWire],
+    createdAt: String,
+    expiresAt: String
+  ) {
     self.batchId = batchId
     self.managedAgentId = managedAgentId
     self.sessionId = sessionId

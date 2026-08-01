@@ -38,7 +38,40 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var deletedAt: String?
   public var tombstoneCause: TaskBoardTombstoneCause?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, sourceProjectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, workflowKind: TaskBoardWorkflowKind = .defaultTask, kind: TaskBoardItemKind = .task, executionRepository: String? = nil, estimatedTokens: UInt64? = nil, estimatedCostMicrousd: UInt64? = nil, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), parentItemId: String? = nil, childOrder: UInt32 = 0, lanePosition: UInt32? = nil, laneOrigin: TaskBoardLaneOriginWire? = nil, laneSetAt: String? = nil, createdAt: String, updatedAt: String, deletedAt: String? = nil, tombstoneCause: TaskBoardTombstoneCause? = nil) {
+  public init(
+    schemaVersion: UInt32,
+    id: String,
+    title: String,
+    body: String = "",
+    status: TaskBoardStatus = .todo,
+    priority: TaskBoardPriority = .medium,
+    tags: [String] = [],
+    projectId: String? = nil,
+    sourceProjectId: String? = nil,
+    targetProjectTypes: [String] = [],
+    agentMode: TaskBoardAgentMode = .headless,
+    workflowKind: TaskBoardWorkflowKind = .defaultTask,
+    kind: TaskBoardItemKind = .task,
+    executionRepository: String? = nil,
+    estimatedTokens: UInt64? = nil,
+    estimatedCostMicrousd: UInt64? = nil,
+    externalRefs: [ExternalRefWire] = [],
+    importedFromProvider: ExternalRefProviderWire? = nil,
+    planning: PlanningStateWire = PlanningStateWire(),
+    workflow: TaskBoardWorkflowStateWire? = nil,
+    sessionId: String? = nil,
+    workItemId: String? = nil,
+    usage: TaskUsageWire = TaskUsageWire(),
+    parentItemId: String? = nil,
+    childOrder: UInt32 = 0,
+    lanePosition: UInt32? = nil,
+    laneOrigin: TaskBoardLaneOriginWire? = nil,
+    laneSetAt: String? = nil,
+    createdAt: String,
+    updatedAt: String,
+    deletedAt: String? = nil,
+    tombstoneCause: TaskBoardTombstoneCause? = nil
+  ) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -166,7 +199,20 @@ public struct TaskBoardWorkflowStateWire: Codable, Equatable, Sendable {
   public var lastError: String?
   public var policyTraceIds: [String]
 
-  public init(executionId: String? = nil, status: TaskBoardWorkflowStatusWire = .idle, currentStepId: String? = nil, attempts: UInt32 = 0, branch: String? = nil, worktree: String? = nil, prNumber: UInt64? = nil, prUrl: String? = nil, prHeadRevision: String? = nil, prAuthor: String? = nil, lastError: String? = nil, policyTraceIds: [String] = []) {
+  public init(
+    executionId: String? = nil,
+    status: TaskBoardWorkflowStatusWire = .idle,
+    currentStepId: String? = nil,
+    attempts: UInt32 = 0,
+    branch: String? = nil,
+    worktree: String? = nil,
+    prNumber: UInt64? = nil,
+    prUrl: String? = nil,
+    prHeadRevision: String? = nil,
+    prAuthor: String? = nil,
+    lastError: String? = nil,
+    policyTraceIds: [String] = []
+  ) {
     self.executionId = executionId
     self.status = status
     self.currentStepId = currentStepId
@@ -231,7 +277,12 @@ public struct ExternalRefWire: Codable, Equatable, Sendable {
   public var url: String?
   public var syncState: ExternalRefSyncStateWire?
 
-  public init(provider: ExternalRefProviderWire, externalId: String, url: String? = nil, syncState: ExternalRefSyncStateWire? = nil) {
+  public init(
+    provider: ExternalRefProviderWire,
+    externalId: String,
+    url: String? = nil,
+    syncState: ExternalRefSyncStateWire? = nil
+  ) {
     self.provider = provider
     self.externalId = externalId
     self.url = url
@@ -275,7 +326,15 @@ public struct ExternalRefSyncStateWire: Codable, Equatable, Sendable {
   public var syncedAt: String?
   public var labels: [String]
 
-  public init(title: String? = nil, body: String? = nil, status: TaskBoardStatus? = nil, projectId: String? = nil, updatedAt: String? = nil, syncedAt: String? = nil, labels: [String] = []) {
+  public init(
+    title: String? = nil,
+    body: String? = nil,
+    status: TaskBoardStatus? = nil,
+    projectId: String? = nil,
+    updatedAt: String? = nil,
+    syncedAt: String? = nil,
+    labels: [String] = []
+  ) {
     self.title = title
     self.body = body
     self.status = status
@@ -387,7 +446,14 @@ public struct TaskBoardListItemsResponseWire: Codable, Equatable, Sendable {
   public var totalMatched: UInt
   public var nextCursor: String?
 
-  public init(items: [TaskBoardItemWire], itemsChangeSeq: Int64 = 0, itemRevisions: [String: Int64] = [:], progressRollups: [String: TaskBoardProgressRollupWire] = [:], totalMatched: UInt = 0, nextCursor: String? = nil) {
+  public init(
+    items: [TaskBoardItemWire],
+    itemsChangeSeq: Int64 = 0,
+    itemRevisions: [String: Int64] = [:],
+    progressRollups: [String: TaskBoardProgressRollupWire] = [:],
+    totalMatched: UInt = 0,
+    nextCursor: String? = nil
+  ) {
     self.items = items
     self.itemsChangeSeq = itemsChangeSeq
     self.itemRevisions = itemRevisions
@@ -478,7 +544,14 @@ public struct TaskBoardProgressRollupWire: Codable, Equatable, Sendable {
   public var waitingOnHuman: UInt
   public var isEmpty: Bool
 
-  public init(total: UInt = 0, done: UInt = 0, remaining: UInt = 0, blocked: UInt = 0, waitingOnHuman: UInt = 0, isEmpty: Bool = false) {
+  public init(
+    total: UInt = 0,
+    done: UInt = 0,
+    remaining: UInt = 0,
+    blocked: UInt = 0,
+    waitingOnHuman: UInt = 0,
+    isEmpty: Bool = false
+  ) {
     self.total = total
     self.done = done
     self.remaining = remaining

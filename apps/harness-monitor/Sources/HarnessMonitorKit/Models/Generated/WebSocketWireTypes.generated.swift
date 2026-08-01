@@ -10,7 +10,12 @@ public struct WsRequestWire: Codable, Equatable, Sendable {
   public var params: JSONValue
   public var traceContext: [String: String]?
 
-  public init(id: String, method: String, params: JSONValue = JSONValue.null, traceContext: [String: String]? = nil) {
+  public init(
+    id: String,
+    method: String,
+    params: JSONValue = JSONValue.null,
+    traceContext: [String: String]? = nil
+  ) {
     self.id = id
     self.method = method
     self.params = params
@@ -40,7 +45,13 @@ public struct WsResponseWire: Codable, Equatable, Sendable {
   public var batchIndex: UInt?
   public var batchCount: UInt?
 
-  public init(id: String, result: JSONValue? = nil, error: WsErrorPayloadWire? = nil, batchIndex: UInt? = nil, batchCount: UInt? = nil) {
+  public init(
+    id: String,
+    result: JSONValue? = nil,
+    error: WsErrorPayloadWire? = nil,
+    batchIndex: UInt? = nil,
+    batchCount: UInt? = nil
+  ) {
     self.id = id
     self.result = result
     self.error = error
@@ -64,7 +75,13 @@ public struct WsErrorPayloadWire: Codable, Equatable, Sendable {
   public var statusCode: UInt16?
   public var data: JSONValue?
 
-  public init(code: String, message: String, details: [String] = [], statusCode: UInt16? = nil, data: JSONValue? = nil) {
+  public init(
+    code: String,
+    message: String,
+    details: [String] = [],
+    statusCode: UInt16? = nil,
+    data: JSONValue? = nil
+  ) {
     self.code = code
     self.message = message
     self.details = details
@@ -141,7 +158,12 @@ public struct WsConfigPayloadWire: Codable, Equatable, Sendable {
   public var acpAgents: [AcpAgentDescriptorWire]
   public var runtimeProbe: AcpRuntimeProbeResponseWire?
 
-  public init(personas: [AgentPersonaWire], runtimeModels: [RuntimeModelCatalogWire], acpAgents: [AcpAgentDescriptorWire] = [], runtimeProbe: AcpRuntimeProbeResponseWire? = nil) {
+  public init(
+    personas: [AgentPersonaWire],
+    runtimeModels: [RuntimeModelCatalogWire],
+    acpAgents: [AcpAgentDescriptorWire] = [],
+    runtimeProbe: AcpRuntimeProbeResponseWire? = nil
+  ) {
     self.personas = personas
     self.runtimeModels = runtimeModels
     self.acpAgents = acpAgents

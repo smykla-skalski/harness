@@ -15,7 +15,17 @@ public struct SignalWire: Codable, Equatable, Sendable {
   public var payload: SignalPayloadWire
   public var delivery: DeliveryConfigWire
 
-  public init(signalId: String, version: UInt32, createdAt: String, expiresAt: String, sourceAgent: String, command: String, priority: SignalPriority, payload: SignalPayloadWire, delivery: DeliveryConfigWire) {
+  public init(
+    signalId: String,
+    version: UInt32,
+    createdAt: String,
+    expiresAt: String,
+    sourceAgent: String,
+    command: String,
+    priority: SignalPriority,
+    payload: SignalPayloadWire,
+    delivery: DeliveryConfigWire
+  ) {
     self.signalId = signalId
     self.version = version
     self.createdAt = createdAt
@@ -46,7 +56,12 @@ public struct SignalPayloadWire: Codable, Equatable, Sendable {
   public var relatedFiles: [String]
   public var metadata: JSONValue
 
-  public init(message: String, actionHint: String? = nil, relatedFiles: [String] = [], metadata: JSONValue = JSONValue.null) {
+  public init(
+    message: String,
+    actionHint: String? = nil,
+    relatedFiles: [String] = [],
+    metadata: JSONValue = JSONValue.null
+  ) {
     self.message = message
     self.actionHint = actionHint
     self.relatedFiles = relatedFiles
@@ -102,7 +117,14 @@ public struct SignalAckWire: Codable, Equatable, Sendable {
   public var sessionId: String
   public var details: String?
 
-  public init(signalId: String, acknowledgedAt: String, result: AckResult, agent: String, sessionId: String, details: String? = nil) {
+  public init(
+    signalId: String,
+    acknowledgedAt: String,
+    result: AckResult,
+    agent: String,
+    sessionId: String,
+    details: String? = nil
+  ) {
     self.signalId = signalId
     self.acknowledgedAt = acknowledgedAt
     self.result = result
@@ -129,7 +151,14 @@ public struct SessionSignalRecordWire: Codable, Equatable, Sendable {
   public var signal: SignalWire
   public var acknowledgment: SignalAckWire?
 
-  public init(runtime: String, agentId: String, sessionId: String, status: SessionSignalStatus, signal: SignalWire, acknowledgment: SignalAckWire? = nil) {
+  public init(
+    runtime: String,
+    agentId: String,
+    sessionId: String,
+    status: SessionSignalStatus,
+    signal: SignalWire,
+    acknowledgment: SignalAckWire? = nil
+  ) {
     self.runtime = runtime
     self.agentId = agentId
     self.sessionId = sessionId

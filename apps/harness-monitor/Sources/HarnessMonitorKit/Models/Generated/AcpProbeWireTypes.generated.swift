@@ -27,7 +27,14 @@ public struct AcpRuntimeProbeWire: Codable, Equatable, Sendable {
   public var version: String?
   public var installHint: String?
 
-  public init(agentId: String, displayName: String, binaryPresent: Bool, authState: AcpAuthState, version: String? = nil, installHint: String? = nil) {
+  public init(
+    agentId: String,
+    displayName: String,
+    binaryPresent: Bool,
+    authState: AcpAuthState,
+    version: String? = nil,
+    installHint: String? = nil
+  ) {
     self.agentId = agentId
     self.displayName = displayName
     self.binaryPresent = binaryPresent

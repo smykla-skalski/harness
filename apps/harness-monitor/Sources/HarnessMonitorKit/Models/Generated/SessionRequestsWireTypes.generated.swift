@@ -67,7 +67,13 @@ public struct TaskCreateRequestWire: Codable, Equatable, Sendable {
   public var severity: TaskSeverity
   public var suggestedFix: String?
 
-  public init(actor: String, title: String, context: String? = nil, severity: TaskSeverity, suggestedFix: String? = nil) {
+  public init(
+    actor: String,
+    title: String,
+    context: String? = nil,
+    severity: TaskSeverity,
+    suggestedFix: String? = nil
+  ) {
     self.actor = actor
     self.title = title
     self.context = context
@@ -117,7 +123,12 @@ public struct TaskDropRequestWire: Codable, Equatable, Sendable {
   public var queuePolicy: TaskQueuePolicy
   public var reason: String?
 
-  public init(actor: String, target: TaskDropTargetWire, queuePolicy: TaskQueuePolicy, reason: String? = nil) {
+  public init(
+    actor: String,
+    target: TaskDropTargetWire,
+    queuePolicy: TaskQueuePolicy,
+    reason: String? = nil
+  ) {
     self.actor = actor
     self.target = target
     self.queuePolicy = queuePolicy
@@ -280,7 +291,14 @@ public struct SessionStartRequestWire: Codable, Equatable, Sendable {
   public var policyPreset: String?
   public var baseRef: String?
 
-  public init(title: String = "", context: String, sessionId: String? = nil, projectDir: String, policyPreset: String? = nil, baseRef: String? = nil) {
+  public init(
+    title: String = "",
+    context: String,
+    sessionId: String? = nil,
+    projectDir: String,
+    policyPreset: String? = nil,
+    baseRef: String? = nil
+  ) {
     self.title = title
     self.context = context
     self.sessionId = sessionId
@@ -442,7 +460,15 @@ public struct ImproverApplyRequestWire: Codable, Equatable, Sendable {
   public var projectDir: String
   public var dryRun: Bool
 
-  public init(actor: String, issueId: String, target: ImproverTarget, relPath: String, newContents: String, projectDir: String, dryRun: Bool = false) {
+  public init(
+    actor: String,
+    issueId: String,
+    target: ImproverTarget,
+    relPath: String,
+    newContents: String,
+    projectDir: String,
+    dryRun: Bool = false
+  ) {
     self.actor = actor
     self.issueId = issueId
     self.target = target

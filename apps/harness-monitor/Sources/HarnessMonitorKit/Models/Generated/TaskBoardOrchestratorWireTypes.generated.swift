@@ -39,7 +39,20 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var repositories: [TaskBoardRepositoryAutomationConfig]
   public var policyVersion: String
 
-  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubAutomationSettingsWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), scheduling: TaskBoardAutomationSchedulingSettings? = nil, retry: TaskBoardAutomationRetrySettings? = nil, reviewers: TaskBoardReviewerSettings? = nil, repositories: [TaskBoardRepositoryAutomationConfig] = [], policyVersion: String = "task-board-policy-v1") {
+  public init(
+    stepMode: Bool = false,
+    enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [],
+    dryRunDefault: Bool = true,
+    dispatchStatusFilter: TaskBoardStatus? = nil,
+    projectDir: String? = nil,
+    githubProject: GitHubAutomationSettingsWire,
+    githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(),
+    scheduling: TaskBoardAutomationSchedulingSettings? = nil,
+    retry: TaskBoardAutomationRetrySettings? = nil,
+    reviewers: TaskBoardReviewerSettings? = nil,
+    repositories: [TaskBoardRepositoryAutomationConfig] = [],
+    policyVersion: String = "task-board-policy-v1"
+  ) {
     self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
@@ -135,7 +148,13 @@ public struct TaskBoardOrchestratorTickInfoWire: Codable, Equatable, Sendable {
   public var completedAt: String?
   public var dryRun: Bool
 
-  public init(runId: String, phase: TaskBoardOrchestratorTickPhase, startedAt: String, completedAt: String? = nil, dryRun: Bool) {
+  public init(
+    runId: String,
+    phase: TaskBoardOrchestratorTickPhase,
+    startedAt: String,
+    completedAt: String? = nil,
+    dryRun: Bool
+  ) {
     self.runId = runId
     self.phase = phase
     self.startedAt = startedAt
@@ -178,7 +197,17 @@ public struct TaskBoardOrchestratorStatusWire: Codable, Equatable, Sendable {
   public var automation: TaskBoardAutomationSnapshot?
   public var settings: TaskBoardOrchestratorSettingsWire
 
-  public init(enabled: Bool, running: Bool, stepMode: Bool = false, heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary(), currentTick: TaskBoardOrchestratorTickInfoWire? = nil, lastRun: TaskBoardOrchestratorRunOutcomeWire? = nil, workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire], automation: TaskBoardAutomationSnapshot? = nil, settings: TaskBoardOrchestratorSettingsWire) {
+  public init(
+    enabled: Bool,
+    running: Bool,
+    stepMode: Bool = false,
+    heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary(),
+    currentTick: TaskBoardOrchestratorTickInfoWire? = nil,
+    lastRun: TaskBoardOrchestratorRunOutcomeWire? = nil,
+    workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire],
+    automation: TaskBoardAutomationSnapshot? = nil,
+    settings: TaskBoardOrchestratorSettingsWire
+  ) {
     self.enabled = enabled
     self.running = running
     self.stepMode = stepMode
@@ -229,7 +258,19 @@ public struct TaskBoardOrchestratorRunOutcomeWire: Codable, Equatable, Sendable 
   public var error: String?
   public var policyTraceIds: [String]
 
-  public init(runId: String, startedAt: String, completedAt: String, status: TaskBoardOrchestratorRunStatus, dryRun: Bool, sync: TaskBoardSyncSummaryWire, audit: TaskBoardAuditSummaryWire, dispatch: TaskBoardOrchestratorDispatchOutcomeWire? = nil, evaluation: TaskBoardOrchestratorEvaluationOutcomeWire? = nil, error: String? = nil, policyTraceIds: [String] = []) {
+  public init(
+    runId: String,
+    startedAt: String,
+    completedAt: String,
+    status: TaskBoardOrchestratorRunStatus,
+    dryRun: Bool,
+    sync: TaskBoardSyncSummaryWire,
+    audit: TaskBoardAuditSummaryWire,
+    dispatch: TaskBoardOrchestratorDispatchOutcomeWire? = nil,
+    evaluation: TaskBoardOrchestratorEvaluationOutcomeWire? = nil,
+    error: String? = nil,
+    policyTraceIds: [String] = []
+  ) {
     self.runId = runId
     self.startedAt = startedAt
     self.completedAt = completedAt
@@ -278,7 +319,11 @@ public struct TaskBoardOrchestratorDispatchOutcomeWire: Codable, Equatable, Send
   public var applied: [TaskBoardOrchestratorAppliedTaskWire]
   public var failures: [DispatchFailureWire]
 
-  public init(plans: [DispatchPlanWire] = [], applied: [TaskBoardOrchestratorAppliedTaskWire], failures: [DispatchFailureWire] = []) {
+  public init(
+    plans: [DispatchPlanWire] = [],
+    applied: [TaskBoardOrchestratorAppliedTaskWire],
+    failures: [DispatchFailureWire] = []
+  ) {
     self.plans = plans
     self.applied = applied
     self.failures = failures
@@ -332,7 +377,19 @@ public struct TaskBoardOrchestratorEvaluationOutcomeWire: Codable, Equatable, Se
   public var records: [TaskBoardOrchestratorEvaluationRecordWire]
   public var signalFailures: [EvaluationSignalFailureWire]
 
-  public init(total: UInt, evaluated: UInt, updated: UInt, skipped: UInt, completed: UInt, running: UInt, reviewing: UInt, blocked: UInt, failed: UInt, records: [TaskBoardOrchestratorEvaluationRecordWire], signalFailures: [EvaluationSignalFailureWire] = []) {
+  public init(
+    total: UInt,
+    evaluated: UInt,
+    updated: UInt,
+    skipped: UInt,
+    completed: UInt,
+    running: UInt,
+    reviewing: UInt,
+    blocked: UInt,
+    failed: UInt,
+    records: [TaskBoardOrchestratorEvaluationRecordWire],
+    signalFailures: [EvaluationSignalFailureWire] = []
+  ) {
     self.total = total
     self.evaluated = evaluated
     self.updated = updated
@@ -388,7 +445,18 @@ public struct TaskBoardOrchestratorEvaluationRecordWire: Codable, Equatable, Sen
   public var reason: String?
   public var itemTitle: String?
 
-  public init(boardItemId: String, sessionId: String? = nil, workItemId: String? = nil, outcome: TaskBoardEvaluationOutcomeWire, taskStatus: TaskStatus? = nil, boardStatus: TaskBoardStatus? = nil, workflowStatus: TaskBoardWorkflowStatusWire? = nil, updated: Bool = false, reason: String? = nil, itemTitle: String? = nil) {
+  public init(
+    boardItemId: String,
+    sessionId: String? = nil,
+    workItemId: String? = nil,
+    outcome: TaskBoardEvaluationOutcomeWire,
+    taskStatus: TaskStatus? = nil,
+    boardStatus: TaskBoardStatus? = nil,
+    workflowStatus: TaskBoardWorkflowStatusWire? = nil,
+    updated: Bool = false,
+    reason: String? = nil,
+    itemTitle: String? = nil
+  ) {
     self.boardItemId = boardItemId
     self.sessionId = sessionId
     self.workItemId = workItemId
@@ -440,7 +508,17 @@ public struct TaskBoardRepositoryAutomationConfig: Codable, Equatable, Sendable 
   public var labels: GitHubAutomationLabelsWire?
   public var enabledAutomations: GitHubAutomationTogglesWire?
 
-  public init(repository: String, enabled: Bool = true, workflows: [TaskBoardOrchestratorWorkflow] = [], preferredHostId: String? = nil, executionCheckoutPath: String? = nil, requestedReviewers: GitHubRequestedReviewersWire? = nil, protectedPaths: [ProtectedPathRuleWire]? = nil, labels: GitHubAutomationLabelsWire? = nil, enabledAutomations: GitHubAutomationTogglesWire? = nil) {
+  public init(
+    repository: String,
+    enabled: Bool = true,
+    workflows: [TaskBoardOrchestratorWorkflow] = [],
+    preferredHostId: String? = nil,
+    executionCheckoutPath: String? = nil,
+    requestedReviewers: GitHubRequestedReviewersWire? = nil,
+    protectedPaths: [ProtectedPathRuleWire]? = nil,
+    labels: GitHubAutomationLabelsWire? = nil,
+    enabledAutomations: GitHubAutomationTogglesWire? = nil
+  ) {
     self.repository = repository
     self.enabled = enabled
     self.workflows = workflows

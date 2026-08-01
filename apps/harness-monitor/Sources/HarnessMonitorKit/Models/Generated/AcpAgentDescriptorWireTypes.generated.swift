@@ -33,7 +33,20 @@ public struct AcpAgentDescriptorWire: Codable, Equatable, Sendable {
   public var excludedFromInitialDefault: Bool
   public var bundledWithHarness: Bool
 
-  public init(id: String, displayName: String, capabilities: [String], launchCommand: String, launchArgs: [String], envPassthrough: [String], modelCatalog: RuntimeModelCatalogWire? = nil, installHint: String? = nil, doctorProbe: DoctorProbeWire, promptTimeoutSeconds: UInt64? = nil, excludedFromInitialDefault: Bool = false, bundledWithHarness: Bool = false) {
+  public init(
+    id: String,
+    displayName: String,
+    capabilities: [String],
+    launchCommand: String,
+    launchArgs: [String],
+    envPassthrough: [String],
+    modelCatalog: RuntimeModelCatalogWire? = nil,
+    installHint: String? = nil,
+    doctorProbe: DoctorProbeWire,
+    promptTimeoutSeconds: UInt64? = nil,
+    excludedFromInitialDefault: Bool = false,
+    bundledWithHarness: Bool = false
+  ) {
     self.id = id
     self.displayName = displayName
     self.capabilities = capabilities

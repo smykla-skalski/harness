@@ -9,7 +9,11 @@ public struct TaskBoardSyncSummaryWire: Codable, Equatable, Sendable {
   public var providers: [TaskBoardProviderSyncSummaryWire]
   public var operations: [ExternalSyncOperationWire]
 
-  public init(total: UInt, providers: [TaskBoardProviderSyncSummaryWire], operations: [ExternalSyncOperationWire] = []) {
+  public init(
+    total: UInt,
+    providers: [TaskBoardProviderSyncSummaryWire],
+    operations: [ExternalSyncOperationWire] = []
+  ) {
     self.total = total
     self.providers = providers
     self.operations = operations
@@ -37,7 +41,14 @@ public struct TaskBoardProviderSyncSummaryWire: Codable, Equatable, Sendable {
   public var blocked: UInt
   public var tokenEnv: [String]
 
-  public init(provider: TaskBoardExternalProvider, configured: Bool, linked: UInt, pushable: UInt, blocked: UInt, tokenEnv: [String]) {
+  public init(
+    provider: TaskBoardExternalProvider,
+    configured: Bool,
+    linked: UInt,
+    pushable: UInt,
+    blocked: UInt,
+    tokenEnv: [String]
+  ) {
     self.provider = provider
     self.configured = configured
     self.linked = linked
@@ -65,7 +76,15 @@ public struct ExternalSyncOperationWire: Codable, Equatable, Sendable {
   public var dryRun: Bool
   public var applied: Bool
 
-  public init(provider: TaskBoardExternalProvider, action: TaskBoardExternalSyncAction, boardItemId: String? = nil, externalId: String? = nil, url: String? = nil, dryRun: Bool, applied: Bool) {
+  public init(
+    provider: TaskBoardExternalProvider,
+    action: TaskBoardExternalSyncAction,
+    boardItemId: String? = nil,
+    externalId: String? = nil,
+    url: String? = nil,
+    dryRun: Bool,
+    applied: Bool
+  ) {
     self.provider = provider
     self.action = action
     self.boardItemId = boardItemId
@@ -93,7 +112,13 @@ public struct TaskBoardSyncStatusResponseWire: Codable, Equatable, Sendable {
   public var error: String?
   public var summary: TaskBoardSyncSummaryWire?
 
-  public init(active: Bool, cancellationRequested: Bool, cancelled: Bool, error: String? = nil, summary: TaskBoardSyncSummaryWire? = nil) {
+  public init(
+    active: Bool,
+    cancellationRequested: Bool,
+    cancelled: Bool,
+    error: String? = nil,
+    summary: TaskBoardSyncSummaryWire? = nil
+  ) {
     self.active = active
     self.cancellationRequested = cancellationRequested
     self.cancelled = cancelled

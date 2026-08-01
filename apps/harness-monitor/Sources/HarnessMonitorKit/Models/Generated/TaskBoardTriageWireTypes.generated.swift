@@ -44,7 +44,20 @@ public struct TaskBoardTriageDecisionRecord: Codable, Equatable, Sendable {
   public var decidedAt: String
   public var supersededAt: String?
 
-  public init(decisionId: String, itemId: String, generation: UInt64, verdict: TriageVerdict, reasonCode: TriageReasonCode, reasonDetail: String? = nil, evaluatorIdentity: String, evaluatorVersion: UInt32, evidenceFingerprint: String? = nil, cause: TriageCause, decidedAt: String, supersededAt: String? = nil) {
+  public init(
+    decisionId: String,
+    itemId: String,
+    generation: UInt64,
+    verdict: TriageVerdict,
+    reasonCode: TriageReasonCode,
+    reasonDetail: String? = nil,
+    evaluatorIdentity: String,
+    evaluatorVersion: UInt32,
+    evidenceFingerprint: String? = nil,
+    cause: TriageCause,
+    decidedAt: String,
+    supersededAt: String? = nil
+  ) {
     self.decisionId = decisionId
     self.itemId = itemId
     self.generation = generation
@@ -131,7 +144,12 @@ public struct TaskBoardTriageCurrentResponse: Codable, Equatable, Sendable {
   public var effective: TaskBoardTriageEffectiveOutcome?
   public var pendingEscalationStatus: TaskBoardTriageEscalationStatus?
 
-  public init(current: TaskBoardTriageDecisionRecord? = nil, triageOverride: TaskBoardTriageOverride? = nil, effective: TaskBoardTriageEffectiveOutcome? = nil, pendingEscalationStatus: TaskBoardTriageEscalationStatus? = nil) {
+  public init(
+    current: TaskBoardTriageDecisionRecord? = nil,
+    triageOverride: TaskBoardTriageOverride? = nil,
+    effective: TaskBoardTriageEffectiveOutcome? = nil,
+    pendingEscalationStatus: TaskBoardTriageEscalationStatus? = nil
+  ) {
     self.current = current
     self.triageOverride = triageOverride
     self.effective = effective
@@ -153,7 +171,13 @@ public struct TaskBoardSetTriageOverrideRequest: Codable, Equatable, Sendable {
   public var expectedItemsChangeSeq: Int64
   public var actor: String
 
-  public init(verdict: TriageVerdict, reason: String? = nil, expectedItemRevision: Int64, expectedItemsChangeSeq: Int64, actor: String = "") {
+  public init(
+    verdict: TriageVerdict,
+    reason: String? = nil,
+    expectedItemRevision: Int64,
+    expectedItemsChangeSeq: Int64,
+    actor: String = ""
+  ) {
     self.verdict = verdict
     self.reason = reason
     self.expectedItemRevision = expectedItemRevision
@@ -210,7 +234,12 @@ public struct TaskBoardTriageOverrideMutationResponseWire: Codable, Equatable, S
   public var triageOverride: TaskBoardTriageOverride?
   public var effective: TaskBoardTriageEffectiveOutcome?
 
-  public init(snapshot: TaskBoardItemPositionSnapshotWire, shifted: [TaskBoardShiftedItemRevisionWire] = [], triageOverride: TaskBoardTriageOverride? = nil, effective: TaskBoardTriageEffectiveOutcome? = nil) {
+  public init(
+    snapshot: TaskBoardItemPositionSnapshotWire,
+    shifted: [TaskBoardShiftedItemRevisionWire] = [],
+    triageOverride: TaskBoardTriageOverride? = nil,
+    effective: TaskBoardTriageEffectiveOutcome? = nil
+  ) {
     self.snapshot = snapshot
     self.shifted = shifted
     self.triageOverride = triageOverride

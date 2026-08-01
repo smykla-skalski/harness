@@ -10,7 +10,12 @@ public struct TaskBoardGitIdentityDefaults: Codable, Equatable, Sendable {
   public var discoveredSshKeys: [TaskBoardSshKeyDiscovery]
   public var envOverrides: TaskBoardEnvDefaults
 
-  public init(gitConfig: TaskBoardGitConfigDefaults = TaskBoardGitConfigDefaults(), ghCli: TaskBoardGhCliDefaults = TaskBoardGhCliDefaults(), discoveredSshKeys: [TaskBoardSshKeyDiscovery] = [], envOverrides: TaskBoardEnvDefaults = TaskBoardEnvDefaults()) {
+  public init(
+    gitConfig: TaskBoardGitConfigDefaults = TaskBoardGitConfigDefaults(),
+    ghCli: TaskBoardGhCliDefaults = TaskBoardGhCliDefaults(),
+    discoveredSshKeys: [TaskBoardSshKeyDiscovery] = [],
+    envOverrides: TaskBoardEnvDefaults = TaskBoardEnvDefaults()
+  ) {
     self.gitConfig = gitConfig
     self.ghCli = ghCli
     self.discoveredSshKeys = discoveredSshKeys
@@ -33,7 +38,14 @@ public struct TaskBoardGitConfigDefaults: Codable, Equatable, Sendable {
   public var commitGpgsign: Bool?
   public var coreSshCommand: String?
 
-  public init(userName: String? = nil, userEmail: String? = nil, userSigningkey: String? = nil, gpgFormat: String? = nil, commitGpgsign: Bool? = nil, coreSshCommand: String? = nil) {
+  public init(
+    userName: String? = nil,
+    userEmail: String? = nil,
+    userSigningkey: String? = nil,
+    gpgFormat: String? = nil,
+    commitGpgsign: Bool? = nil,
+    coreSshCommand: String? = nil
+  ) {
     self.userName = userName
     self.userEmail = userEmail
     self.userSigningkey = userSigningkey

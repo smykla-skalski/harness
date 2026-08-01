@@ -10,7 +10,11 @@ public struct DispatchExecutionSummaryWire: Codable, Equatable, Sendable {
   public var applied: [DispatchAppliedTaskWire]
   public var failures: [DispatchFailureWire]
 
-  public init(plans: [DispatchPlanWire], applied: [DispatchAppliedTaskWire], failures: [DispatchFailureWire] = []) {
+  public init(
+    plans: [DispatchPlanWire],
+    applied: [DispatchAppliedTaskWire],
+    failures: [DispatchFailureWire] = []
+  ) {
     self.plans = plans
     self.applied = applied
     self.failures = failures
@@ -64,7 +68,19 @@ public struct DispatchPlanWire: Codable, Equatable, Sendable {
   public var policyDecisionId: String?
   public var consumedApprovalGrantId: String?
 
-  public init(boardItemId: String, renderedPrompt: String = "", readiness: DispatchReadinessWire, session: SessionIntentWire, task: TaskCreationIntentWire, worker: WorkerIntentWire, reviewer: ReviewerIntentWire, evaluator: EvaluatorIntentWire, policy: PolicyDecision, policyDecisionId: String? = nil, consumedApprovalGrantId: String? = nil) {
+  public init(
+    boardItemId: String,
+    renderedPrompt: String = "",
+    readiness: DispatchReadinessWire,
+    session: SessionIntentWire,
+    task: TaskCreationIntentWire,
+    worker: WorkerIntentWire,
+    reviewer: ReviewerIntentWire,
+    evaluator: EvaluatorIntentWire,
+    policy: PolicyDecision,
+    policyDecisionId: String? = nil,
+    consumedApprovalGrantId: String? = nil
+  ) {
     self.boardItemId = boardItemId
     self.renderedPrompt = renderedPrompt
     self.readiness = readiness
@@ -277,7 +293,15 @@ public struct TaskCreationIntentWire: Codable, Equatable, Sendable {
   public var tags: [String]
   public var externalRefs: [ExternalRefWire]
 
-  public init(title: String, context: String? = nil, severity: TaskSeverity, suggestedFix: String? = nil, source: TaskSource, tags: [String], externalRefs: [ExternalRefWire]) {
+  public init(
+    title: String,
+    context: String? = nil,
+    severity: TaskSeverity,
+    suggestedFix: String? = nil,
+    source: TaskSource,
+    tags: [String],
+    externalRefs: [ExternalRefWire]
+  ) {
     self.title = title
     self.context = context
     self.severity = severity
@@ -385,7 +409,12 @@ public struct TaskBoardDispatchDeliverResponse: Codable, Equatable, Sendable {
   public var renderedPrompt: String
   public var startedAgent: ManagedAgentSnapshotWire?
 
-  public init(intentId: String, applied: DispatchAppliedTaskWire, renderedPrompt: String, startedAgent: ManagedAgentSnapshotWire? = nil) {
+  public init(
+    intentId: String,
+    applied: DispatchAppliedTaskWire,
+    renderedPrompt: String,
+    startedAgent: ManagedAgentSnapshotWire? = nil
+  ) {
     self.intentId = intentId
     self.applied = applied
     self.renderedPrompt = renderedPrompt

@@ -10,7 +10,12 @@ public struct OpenRouterModelEntry: Codable, Equatable, Sendable {
   public var contextLength: UInt64?
   public var supportedParameters: [String]
 
-  public init(id: String, name: String? = nil, contextLength: UInt64? = nil, supportedParameters: [String] = []) {
+  public init(
+    id: String,
+    name: String? = nil,
+    contextLength: UInt64? = nil,
+    supportedParameters: [String] = []
+  ) {
     self.id = id
     self.name = name
     self.contextLength = contextLength

@@ -49,7 +49,23 @@ public struct CodexRunRequestWire: Codable, Equatable, Sendable {
   public var effort: String?
   public var allowCustomModel: Bool
 
-  public init(actor: String? = nil, prompt: String, mode: CodexRunModeWire, role: SessionRole = .worker, fallbackRole: SessionRole? = nil, capabilities: [String] = [], name: String? = nil, persona: String? = nil, resumeThreadId: String? = nil, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, model: String? = nil, effort: String? = nil, allowCustomModel: Bool = false) {
+  public init(
+    actor: String? = nil,
+    prompt: String,
+    mode: CodexRunModeWire,
+    role: SessionRole = .worker,
+    fallbackRole: SessionRole? = nil,
+    capabilities: [String] = [],
+    name: String? = nil,
+    persona: String? = nil,
+    resumeThreadId: String? = nil,
+    taskId: String? = nil,
+    boardItemId: String? = nil,
+    workflowExecutionId: String? = nil,
+    model: String? = nil,
+    effort: String? = nil,
+    allowCustomModel: Bool = false
+  ) {
     self.actor = actor
     self.prompt = prompt
     self.mode = mode
@@ -147,7 +163,12 @@ public struct CodexAgentInspectResponseWire: Codable, Equatable, Sendable {
   public var available: Bool
   public var issueMessage: String?
 
-  public init(agents: [CodexAgentInspectSnapshotWire], daemonPerceivedNow: String, available: Bool, issueMessage: String? = nil) {
+  public init(
+    agents: [CodexAgentInspectSnapshotWire],
+    daemonPerceivedNow: String,
+    available: Bool,
+    issueMessage: String? = nil
+  ) {
     self.agents = agents
     self.daemonPerceivedNow = daemonPerceivedNow
     self.available = available
@@ -182,7 +203,26 @@ public struct CodexAgentInspectSnapshotWire: Codable, Equatable, Sendable {
   public var latestSummary: String?
   public var error: String?
 
-  public init(runId: String, sessionId: String, agentId: String? = nil, displayName: String, status: CodexRunStatusWire, projectDir: String, threadId: String? = nil, turnId: String? = nil, active: Bool, attached: Bool, pendingApprovals: UInt, resolvedApprovals: UInt, eventCount: UInt, lastUpdateAt: String, model: String? = nil, effort: String? = nil, latestSummary: String? = nil, error: String? = nil) {
+  public init(
+    runId: String,
+    sessionId: String,
+    agentId: String? = nil,
+    displayName: String,
+    status: CodexRunStatusWire,
+    projectDir: String,
+    threadId: String? = nil,
+    turnId: String? = nil,
+    active: Bool,
+    attached: Bool,
+    pendingApprovals: UInt,
+    resolvedApprovals: UInt,
+    eventCount: UInt,
+    lastUpdateAt: String,
+    model: String? = nil,
+    effort: String? = nil,
+    latestSummary: String? = nil,
+    error: String? = nil
+  ) {
     self.runId = runId
     self.sessionId = sessionId
     self.agentId = agentId
@@ -250,7 +290,19 @@ public struct CodexApprovalRequestWire: Codable, Equatable, Sendable {
   public var command: String?
   public var filePath: String?
 
-  public init(approvalId: String, requestId: String, kind: String, title: String, detail: String, threadId: String? = nil, turnId: String? = nil, itemId: String? = nil, cwd: String? = nil, command: String? = nil, filePath: String? = nil) {
+  public init(
+    approvalId: String,
+    requestId: String,
+    kind: String,
+    title: String,
+    detail: String,
+    threadId: String? = nil,
+    turnId: String? = nil,
+    itemId: String? = nil,
+    cwd: String? = nil,
+    command: String? = nil,
+    filePath: String? = nil
+  ) {
     self.approvalId = approvalId
     self.requestId = requestId
     self.kind = kind
@@ -308,7 +360,17 @@ public struct CodexRunEventWire: Codable, Equatable, Sendable {
   public var itemId: String?
   public var payload: JSONValue
 
-  public init(eventId: String, sequence: UInt64, recordedAt: String, kind: String, summary: String, threadId: String? = nil, turnId: String? = nil, itemId: String? = nil, payload: JSONValue) {
+  public init(
+    eventId: String,
+    sequence: UInt64,
+    recordedAt: String,
+    kind: String,
+    summary: String,
+    threadId: String? = nil,
+    turnId: String? = nil,
+    itemId: String? = nil,
+    payload: JSONValue
+  ) {
     self.eventId = eventId
     self.sequence = sequence
     self.recordedAt = recordedAt
@@ -358,7 +420,31 @@ public struct CodexRunSnapshotWire: Codable, Equatable, Sendable {
   public var model: String?
   public var effort: String?
 
-  public init(runId: String, sessionId: String, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, sessionAgentId: String? = nil, displayName: String? = nil, projectDir: String, threadId: String? = nil, turnId: String? = nil, mode: CodexRunModeWire, status: CodexRunStatusWire, prompt: String, latestSummary: String? = nil, finalMessage: String? = nil, error: String? = nil, pendingApprovals: [CodexApprovalRequestWire], resolvedApprovals: [CodexResolvedApprovalWire] = [], events: [CodexRunEventWire] = [], createdAt: String, updatedAt: String, model: String? = nil, effort: String? = nil) {
+  public init(
+    runId: String,
+    sessionId: String,
+    taskId: String? = nil,
+    boardItemId: String? = nil,
+    workflowExecutionId: String? = nil,
+    sessionAgentId: String? = nil,
+    displayName: String? = nil,
+    projectDir: String,
+    threadId: String? = nil,
+    turnId: String? = nil,
+    mode: CodexRunModeWire,
+    status: CodexRunStatusWire,
+    prompt: String,
+    latestSummary: String? = nil,
+    finalMessage: String? = nil,
+    error: String? = nil,
+    pendingApprovals: [CodexApprovalRequestWire],
+    resolvedApprovals: [CodexResolvedApprovalWire] = [],
+    events: [CodexRunEventWire] = [],
+    createdAt: String,
+    updatedAt: String,
+    model: String? = nil,
+    effort: String? = nil
+  ) {
     self.runId = runId
     self.sessionId = sessionId
     self.taskId = taskId

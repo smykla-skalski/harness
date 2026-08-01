@@ -20,7 +20,22 @@ public struct AcpAgentSnapshotWire: Codable, Equatable, Sendable {
   public var createdAt: String
   public var updatedAt: String
 
-  public init(managedAgentId: String, sessionId: String, sessionAgentId: String, displayName: String, status: JSONValue, pid: UInt32, pgid: Int32, projectDir: String, pendingPermissions: UInt, permissionQueueDepth: UInt, pendingPermissionBatches: [AcpPermissionBatchWire], terminalCount: UInt, createdAt: String, updatedAt: String) {
+  public init(
+    managedAgentId: String,
+    sessionId: String,
+    sessionAgentId: String,
+    displayName: String,
+    status: JSONValue,
+    pid: UInt32,
+    pgid: Int32,
+    projectDir: String,
+    pendingPermissions: UInt,
+    permissionQueueDepth: UInt,
+    pendingPermissionBatches: [AcpPermissionBatchWire],
+    terminalCount: UInt,
+    createdAt: String,
+    updatedAt: String
+  ) {
     self.managedAgentId = managedAgentId
     self.sessionId = sessionId
     self.sessionAgentId = sessionAgentId

@@ -97,7 +97,20 @@ public struct IssueCommentEntryWire: Codable, Equatable, Sendable {
   public var viewerCanEdit: Bool
   public var url: String?
 
-  public init(id: String, createdAt: String, updatedAt: String? = nil, actor: ActorWire? = nil, body: String, bodyText: String? = nil, isMinimized: Bool = false, minimizedReason: String? = nil, reactionsTotal: UInt32 = 0, viewerDidAuthor: Bool = false, viewerCanEdit: Bool = false, url: String? = nil) {
+  public init(
+    id: String,
+    createdAt: String,
+    updatedAt: String? = nil,
+    actor: ActorWire? = nil,
+    body: String,
+    bodyText: String? = nil,
+    isMinimized: Bool = false,
+    minimizedReason: String? = nil,
+    reactionsTotal: UInt32 = 0,
+    viewerDidAuthor: Bool = false,
+    viewerCanEdit: Bool = false,
+    url: String? = nil
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.updatedAt = updatedAt
@@ -154,7 +167,16 @@ public struct ReviewEntryWire: Codable, Equatable, Sendable {
   public var inlineComments: [ReviewInlineCommentEntryWire]
   public var commentsTruncated: Bool
 
-  public init(id: String, createdAt: String, actor: ActorWire? = nil, state: ReviewStateWire, body: String? = nil, url: String? = nil, inlineComments: [ReviewInlineCommentEntryWire] = [], commentsTruncated: Bool = false) {
+  public init(
+    id: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    state: ReviewStateWire,
+    body: String? = nil,
+    url: String? = nil,
+    inlineComments: [ReviewInlineCommentEntryWire] = [],
+    commentsTruncated: Bool = false
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.actor = actor
@@ -213,7 +235,20 @@ public struct ReviewInlineCommentEntryWire: Codable, Equatable, Sendable {
   public var outdated: Bool
   public var url: String?
 
-  public init(id: String, path: String, position: Int32? = nil, line: Int32? = nil, originalLine: Int32? = nil, diffHunk: String? = nil, body: String, createdAt: String, actor: ActorWire? = nil, replyToId: String? = nil, outdated: Bool = false, url: String? = nil) {
+  public init(
+    id: String,
+    path: String,
+    position: Int32? = nil,
+    line: Int32? = nil,
+    originalLine: Int32? = nil,
+    diffHunk: String? = nil,
+    body: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    replyToId: String? = nil,
+    outdated: Bool = false,
+    url: String? = nil
+  ) {
     self.id = id
     self.path = path
     self.position = position
@@ -275,7 +310,21 @@ public struct ReviewThreadEntryWire: Codable, Equatable, Sendable {
   public var comments: [ReviewThreadCommentEntryWire]
   public var commentsTruncated: Bool
 
-  public init(id: String, createdAt: String, actor: ActorWire? = nil, isResolved: Bool = false, isCollapsed: Bool = false, outdated: Bool = false, path: String, line: Int32? = nil, originalLine: Int32? = nil, diffSide: String? = nil, diffHunk: String? = nil, comments: [ReviewThreadCommentEntryWire] = [], commentsTruncated: Bool = false) {
+  public init(
+    id: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    isResolved: Bool = false,
+    isCollapsed: Bool = false,
+    outdated: Bool = false,
+    path: String,
+    line: Int32? = nil,
+    originalLine: Int32? = nil,
+    diffSide: String? = nil,
+    diffHunk: String? = nil,
+    comments: [ReviewThreadCommentEntryWire] = [],
+    commentsTruncated: Bool = false
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.actor = actor
@@ -361,7 +410,18 @@ public struct CommitEntryWire: Codable, Equatable, Sendable {
   public var authorLogin: String?
   public var url: String?
 
-  public init(id: String, createdAt: String, actor: ActorWire? = nil, oid: String, abbreviatedOid: String, messageHeadline: String, committedDate: String? = nil, authorName: String? = nil, authorLogin: String? = nil, url: String? = nil) {
+  public init(
+    id: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    oid: String,
+    abbreviatedOid: String,
+    messageHeadline: String,
+    committedDate: String? = nil,
+    authorName: String? = nil,
+    authorLogin: String? = nil,
+    url: String? = nil
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.actor = actor
@@ -398,7 +458,16 @@ public struct HeadRefForcePushedEntryWire: Codable, Equatable, Sendable {
   public var afterAbbreviatedOid: String
   public var refName: String?
 
-  public init(id: String, createdAt: String, actor: ActorWire? = nil, beforeOid: String, beforeAbbreviatedOid: String, afterOid: String, afterAbbreviatedOid: String, refName: String? = nil) {
+  public init(
+    id: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    beforeOid: String,
+    beforeAbbreviatedOid: String,
+    afterOid: String,
+    afterAbbreviatedOid: String,
+    refName: String? = nil
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.actor = actor
@@ -445,7 +514,30 @@ public struct SimpleActorEventEntryWire: Codable, Equatable, Sendable {
   public var sourceRepository: String?
   public var destinationRepository: String?
 
-  public init(id: String, createdAt: String, actor: ActorWire? = nil, eventKind: SimpleActorEventKindWire, label: String? = nil, labelColor: String? = nil, milestoneTitle: String? = nil, oldTitle: String? = nil, newTitle: String? = nil, sourceUrl: String? = nil, sourceTitle: String? = nil, sourceNumber: Int64? = nil, branchName: String? = nil, beforeOid: String? = nil, afterOid: String? = nil, lockReason: String? = nil, dismissalMessage: String? = nil, requestedReviewerLogin: String? = nil, requestedReviewerTeamSlug: String? = nil, assigneeLogin: String? = nil, sourceRepository: String? = nil, destinationRepository: String? = nil) {
+  public init(
+    id: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    eventKind: SimpleActorEventKindWire,
+    label: String? = nil,
+    labelColor: String? = nil,
+    milestoneTitle: String? = nil,
+    oldTitle: String? = nil,
+    newTitle: String? = nil,
+    sourceUrl: String? = nil,
+    sourceTitle: String? = nil,
+    sourceNumber: Int64? = nil,
+    branchName: String? = nil,
+    beforeOid: String? = nil,
+    afterOid: String? = nil,
+    lockReason: String? = nil,
+    dismissalMessage: String? = nil,
+    requestedReviewerLogin: String? = nil,
+    requestedReviewerTeamSlug: String? = nil,
+    assigneeLogin: String? = nil,
+    sourceRepository: String? = nil,
+    destinationRepository: String? = nil
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.actor = actor
@@ -547,7 +639,13 @@ public struct UnknownEntryWire: Codable, Equatable, Sendable {
   public var typename: String
   public var rawPayload: JSONValue
 
-  public init(id: String, createdAt: String, actor: ActorWire? = nil, typename: String, rawPayload: JSONValue = JSONValue.null) {
+  public init(
+    id: String,
+    createdAt: String,
+    actor: ActorWire? = nil,
+    typename: String,
+    rawPayload: JSONValue = JSONValue.null
+  ) {
     self.id = id
     self.createdAt = createdAt
     self.actor = actor
@@ -581,7 +679,14 @@ public struct ReviewsTimelineRequestWire: Codable, Equatable, Sendable {
   public var forceRefresh: Bool
   public var pullRequestUpdatedAt: String?
 
-  public init(pullRequestId: String, cursor: String? = nil, pageSize: UInt32, direction: TimelinePageDirectionWire, forceRefresh: Bool = false, pullRequestUpdatedAt: String? = nil) {
+  public init(
+    pullRequestId: String,
+    cursor: String? = nil,
+    pageSize: UInt32,
+    direction: TimelinePageDirectionWire,
+    forceRefresh: Bool = false,
+    pullRequestUpdatedAt: String? = nil
+  ) {
     self.pullRequestId = pullRequestId
     self.cursor = cursor
     self.pageSize = pageSize
@@ -624,7 +729,13 @@ public struct ReviewsTimelineResponseWire: Codable, Equatable, Sendable {
   public var viewerCanComment: Bool
   public var fetchedAt: String
 
-  public init(pullRequestId: String, entries: [ReviewTimelineEntryWire], pageInfo: TimelinePageInfoWire, viewerCanComment: Bool, fetchedAt: String) {
+  public init(
+    pullRequestId: String,
+    entries: [ReviewTimelineEntryWire],
+    pageInfo: TimelinePageInfoWire,
+    viewerCanComment: Bool,
+    fetchedAt: String
+  ) {
     self.pullRequestId = pullRequestId
     self.entries = entries
     self.pageInfo = pageInfo

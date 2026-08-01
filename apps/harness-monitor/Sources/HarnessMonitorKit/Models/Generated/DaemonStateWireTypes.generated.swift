@@ -12,7 +12,14 @@ public struct DaemonDiagnosticsReportWire: Codable, Equatable, Sendable {
   public var workspace: DaemonDiagnosticsWire
   public var recentEvents: [DaemonAuditEventWire]
 
-  public init(health: HealthResponseWire? = nil, manifest: DaemonManifestWire? = nil, launchAgent: LaunchAgentStatusWire, githubApi: GitHubApiDiagnosticsWire? = nil, workspace: DaemonDiagnosticsWire, recentEvents: [DaemonAuditEventWire]) {
+  public init(
+    health: HealthResponseWire? = nil,
+    manifest: DaemonManifestWire? = nil,
+    launchAgent: LaunchAgentStatusWire,
+    githubApi: GitHubApiDiagnosticsWire? = nil,
+    workspace: DaemonDiagnosticsWire,
+    recentEvents: [DaemonAuditEventWire]
+  ) {
     self.health = health
     self.manifest = manifest
     self.launchAgent = launchAgent
@@ -43,7 +50,18 @@ public struct LaunchAgentStatusWire: Codable, Equatable, Sendable {
   public var lastExitStatus: Int32?
   public var statusError: String?
 
-  public init(installed: Bool, loaded: Bool, label: String, path: String, domainTarget: String, serviceTarget: String, state: String? = nil, pid: Int32? = nil, lastExitStatus: Int32? = nil, statusError: String? = nil) {
+  public init(
+    installed: Bool,
+    loaded: Bool,
+    label: String,
+    path: String,
+    domainTarget: String,
+    serviceTarget: String,
+    state: String? = nil,
+    pid: Int32? = nil,
+    lastExitStatus: Int32? = nil,
+    statusError: String? = nil
+  ) {
     self.installed = installed
     self.loaded = loaded
     self.label = label
@@ -77,7 +95,13 @@ public struct HostBridgeCapabilityManifestWire: Codable, Equatable, Sendable {
   public var endpoint: String?
   public var metadata: [String: String]
 
-  public init(enabled: Bool = true, healthy: Bool = false, transport: String = "", endpoint: String? = nil, metadata: [String: String] = [:]) {
+  public init(
+    enabled: Bool = true,
+    healthy: Bool = false,
+    transport: String = "",
+    endpoint: String? = nil,
+    metadata: [String: String] = [:]
+  ) {
     self.enabled = enabled
     self.healthy = healthy
     self.transport = transport
@@ -108,7 +132,11 @@ public struct HostBridgeManifestWire: Codable, Equatable, Sendable {
   public var socketPath: String?
   public var capabilities: [String: HostBridgeCapabilityManifestWire]
 
-  public init(running: Bool = false, socketPath: String? = nil, capabilities: [String: HostBridgeCapabilityManifestWire] = [:]) {
+  public init(
+    running: Bool = false,
+    socketPath: String? = nil,
+    capabilities: [String: HostBridgeCapabilityManifestWire] = [:]
+  ) {
     self.running = running
     self.socketPath = socketPath
     self.capabilities = capabilities
@@ -135,7 +163,13 @@ public struct DaemonBinaryStampWire: Codable, Equatable, Sendable {
   public var fileSize: UInt64
   public var modificationTimeIntervalSince1970: Double
 
-  public init(helperPath: String, deviceIdentifier: UInt64, inode: UInt64, fileSize: UInt64, modificationTimeIntervalSince1970: Double) {
+  public init(
+    helperPath: String,
+    deviceIdentifier: UInt64,
+    inode: UInt64,
+    fileSize: UInt64,
+    modificationTimeIntervalSince1970: Double
+  ) {
     self.helperPath = helperPath
     self.deviceIdentifier = deviceIdentifier
     self.inode = inode
@@ -164,7 +198,18 @@ public struct DaemonManifestWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var binaryStamp: DaemonBinaryStampWire?
 
-  public init(version: String, pid: UInt32, endpoint: String, startedAt: String, tokenPath: String, sandboxed: Bool = false, hostBridge: HostBridgeManifestWire = HostBridgeManifestWire(), revision: UInt64 = 0, updatedAt: String = "", binaryStamp: DaemonBinaryStampWire? = nil) {
+  public init(
+    version: String,
+    pid: UInt32,
+    endpoint: String,
+    startedAt: String,
+    tokenPath: String,
+    sandboxed: Bool = false,
+    hostBridge: HostBridgeManifestWire = HostBridgeManifestWire(),
+    revision: UInt64 = 0,
+    updatedAt: String = "",
+    binaryStamp: DaemonBinaryStampWire? = nil
+  ) {
     self.version = version
     self.pid = pid
     self.endpoint = endpoint
@@ -233,7 +278,16 @@ public struct DaemonDiagnosticsWire: Codable, Equatable, Sendable {
   public var databaseSizeBytes: UInt64
   public var lastEvent: DaemonAuditEventWire?
 
-  public init(daemonRoot: String, manifestPath: String, authTokenPath: String, authTokenPresent: Bool, eventsPath: String, databasePath: String, databaseSizeBytes: UInt64, lastEvent: DaemonAuditEventWire? = nil) {
+  public init(
+    daemonRoot: String,
+    manifestPath: String,
+    authTokenPath: String,
+    authTokenPresent: Bool,
+    eventsPath: String,
+    databasePath: String,
+    databaseSizeBytes: UInt64,
+    lastEvent: DaemonAuditEventWire? = nil
+  ) {
     self.daemonRoot = daemonRoot
     self.manifestPath = manifestPath
     self.authTokenPath = authTokenPath

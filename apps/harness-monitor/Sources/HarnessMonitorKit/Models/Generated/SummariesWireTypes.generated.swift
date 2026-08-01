@@ -16,7 +16,18 @@ public struct GitHubApiDiagnosticsWire: Codable, Equatable, Sendable {
   public var deferredBudget: UInt64
   public var topOperations: [GitHubOperationSpendDiagnosticsWire]
 
-  public init(dataRevision: UInt64? = nil, buckets: [GitHubRateBucketDiagnosticsWire], cooling: [GitHubCooldownDiagnosticsWire], lastHourNetworkRequests: UInt64, lastHourGraphqlPoints: UInt64, cacheHits: UInt64, cacheStaleHits: UInt64, cacheDeferredHits: UInt64, deferredBudget: UInt64, topOperations: [GitHubOperationSpendDiagnosticsWire]) {
+  public init(
+    dataRevision: UInt64? = nil,
+    buckets: [GitHubRateBucketDiagnosticsWire],
+    cooling: [GitHubCooldownDiagnosticsWire],
+    lastHourNetworkRequests: UInt64,
+    lastHourGraphqlPoints: UInt64,
+    cacheHits: UInt64,
+    cacheStaleHits: UInt64,
+    cacheDeferredHits: UInt64,
+    deferredBudget: UInt64,
+    topOperations: [GitHubOperationSpendDiagnosticsWire]
+  ) {
     self.dataRevision = dataRevision
     self.buckets = buckets
     self.cooling = cooling
@@ -111,7 +122,14 @@ public struct WorktreeSummaryWire: Codable, Equatable, Sendable {
   public var activeSessionCount: UInt
   public var totalSessionCount: UInt
 
-  public init(checkoutId: String, name: String, checkoutRoot: String, contextRoot: String, activeSessionCount: UInt, totalSessionCount: UInt) {
+  public init(
+    checkoutId: String,
+    name: String,
+    checkoutRoot: String,
+    contextRoot: String,
+    activeSessionCount: UInt,
+    totalSessionCount: UInt
+  ) {
     self.checkoutId = checkoutId
     self.name = name
     self.checkoutRoot = checkoutRoot
@@ -139,7 +157,15 @@ public struct ProjectSummaryWire: Codable, Equatable, Sendable {
   public var totalSessionCount: UInt
   public var worktrees: [WorktreeSummaryWire]
 
-  public init(projectId: String, name: String, projectDir: String? = nil, contextRoot: String, activeSessionCount: UInt, totalSessionCount: UInt, worktrees: [WorktreeSummaryWire]) {
+  public init(
+    projectId: String,
+    name: String,
+    projectDir: String? = nil,
+    contextRoot: String,
+    activeSessionCount: UInt,
+    totalSessionCount: UInt,
+    worktrees: [WorktreeSummaryWire]
+  ) {
     self.projectId = projectId
     self.name = name
     self.projectDir = projectDir
@@ -183,7 +209,29 @@ public struct SessionSummaryWire: Codable, Equatable, Sendable {
   public var adoptedAt: String?
   public var metrics: SessionMetricsWire
 
-  public init(projectId: String, projectName: String, projectDir: String? = nil, contextRoot: String, worktreePath: String, sharedPath: String, originPath: String, branchRef: String, sessionId: String, title: String, context: String, status: SessionStatus, createdAt: String, updatedAt: String, lastActivityAt: String? = nil, leaderId: String? = nil, observeId: String? = nil, pendingLeaderTransfer: PendingLeaderTransferWire? = nil, externalOrigin: String? = nil, adoptedAt: String? = nil, metrics: SessionMetricsWire) {
+  public init(
+    projectId: String,
+    projectName: String,
+    projectDir: String? = nil,
+    contextRoot: String,
+    worktreePath: String,
+    sharedPath: String,
+    originPath: String,
+    branchRef: String,
+    sessionId: String,
+    title: String,
+    context: String,
+    status: SessionStatus,
+    createdAt: String,
+    updatedAt: String,
+    lastActivityAt: String? = nil,
+    leaderId: String? = nil,
+    observeId: String? = nil,
+    pendingLeaderTransfer: PendingLeaderTransferWire? = nil,
+    externalOrigin: String? = nil,
+    adoptedAt: String? = nil,
+    metrics: SessionMetricsWire
+  ) {
     self.projectId = projectId
     self.projectName = projectName
     self.projectDir = projectDir
@@ -244,7 +292,18 @@ public struct ObserverSummaryWire: Codable, Equatable, Sendable {
   public var activeWorkers: [ObserverActiveWorkerWire]
   public var agentSessions: [ObserverAgentSessionSummaryWire]
 
-  public init(observeId: String, lastScanTime: String, openIssueCount: UInt, resolvedIssueCount: UInt, mutedCodeCount: UInt, activeWorkerCount: UInt, openIssues: [ObserverOpenIssueWire], mutedCodes: [IssueCode], activeWorkers: [ObserverActiveWorkerWire], agentSessions: [ObserverAgentSessionSummaryWire]) {
+  public init(
+    observeId: String,
+    lastScanTime: String,
+    openIssueCount: UInt,
+    resolvedIssueCount: UInt,
+    mutedCodeCount: UInt,
+    activeWorkerCount: UInt,
+    openIssues: [ObserverOpenIssueWire],
+    mutedCodes: [IssueCode],
+    activeWorkers: [ObserverActiveWorkerWire],
+    agentSessions: [ObserverAgentSessionSummaryWire]
+  ) {
     self.observeId = observeId
     self.lastScanTime = lastScanTime
     self.openIssueCount = openIssueCount
@@ -284,7 +343,19 @@ public struct ObserverOpenIssueWire: Codable, Equatable, Sendable {
   public var fixSafety: FixSafety
   public var evidenceExcerpt: String?
 
-  public init(issueId: String, code: IssueCode, severity: IssueSeverity, category: IssueCategory, summary: String, fingerprint: String, firstSeenLine: UInt, occurrenceCount: UInt, lastSeenLine: UInt, fixSafety: FixSafety, evidenceExcerpt: String? = nil) {
+  public init(
+    issueId: String,
+    code: IssueCode,
+    severity: IssueSeverity,
+    category: IssueCategory,
+    summary: String,
+    fingerprint: String,
+    firstSeenLine: UInt,
+    occurrenceCount: UInt,
+    lastSeenLine: UInt,
+    fixSafety: FixSafety,
+    evidenceExcerpt: String? = nil
+  ) {
     self.issueId = issueId
     self.code = code
     self.severity = severity
@@ -320,7 +391,13 @@ public struct ObserverActiveWorkerWire: Codable, Equatable, Sendable {
   public var agentId: String?
   public var runtime: String?
 
-  public init(issueId: String, targetFile: String, startedAt: String, agentId: String? = nil, runtime: String? = nil) {
+  public init(
+    issueId: String,
+    targetFile: String,
+    startedAt: String,
+    agentId: String? = nil,
+    runtime: String? = nil
+  ) {
     self.issueId = issueId
     self.targetFile = targetFile
     self.startedAt = startedAt
@@ -344,7 +421,13 @@ public struct ObserverAgentSessionSummaryWire: Codable, Equatable, Sendable {
   public var cursor: UInt
   public var lastActivity: String?
 
-  public init(agentId: String, runtime: String, logPath: String? = nil, cursor: UInt, lastActivity: String? = nil) {
+  public init(
+    agentId: String,
+    runtime: String,
+    logPath: String? = nil,
+    cursor: UInt,
+    lastActivity: String? = nil
+  ) {
     self.agentId = agentId
     self.runtime = runtime
     self.logPath = logPath
@@ -367,7 +450,12 @@ public struct AgentPendingUserPromptWire: Codable, Equatable, Sendable {
   public var questions: [AskUserQuestionPromptWire]
   public var message: String?
 
-  public init(toolName: String, waitingSince: String? = nil, questions: [AskUserQuestionPromptWire] = [], message: String? = nil) {
+  public init(
+    toolName: String,
+    waitingSince: String? = nil,
+    questions: [AskUserQuestionPromptWire] = [],
+    message: String? = nil
+  ) {
     self.toolName = toolName
     self.waitingSince = waitingSince
     self.questions = questions
@@ -401,7 +489,17 @@ public struct AgentToolActivitySummaryWire: Codable, Equatable, Sendable {
   public var recentTools: [String]
   public var pendingUserPrompt: AgentPendingUserPromptWire?
 
-  public init(agentId: String, runtime: String, toolInvocationCount: UInt, toolResultCount: UInt, toolErrorCount: UInt, latestToolName: String? = nil, latestEventAt: String? = nil, recentTools: [String], pendingUserPrompt: AgentPendingUserPromptWire? = nil) {
+  public init(
+    agentId: String,
+    runtime: String,
+    toolInvocationCount: UInt,
+    toolResultCount: UInt,
+    toolErrorCount: UInt,
+    latestToolName: String? = nil,
+    latestEventAt: String? = nil,
+    recentTools: [String],
+    pendingUserPrompt: AgentPendingUserPromptWire? = nil
+  ) {
     self.agentId = agentId
     self.runtime = runtime
     self.toolInvocationCount = toolInvocationCount
@@ -434,7 +532,14 @@ public struct SessionDetailWire: Codable, Equatable, Sendable {
   public var observer: ObserverSummaryWire?
   public var agentActivity: [AgentToolActivitySummaryWire]
 
-  public init(session: SessionSummaryWire, agents: [AgentRegistrationWire], tasks: [WorkItemWire], signals: [SessionSignalRecordWire], observer: ObserverSummaryWire? = nil, agentActivity: [AgentToolActivitySummaryWire]) {
+  public init(
+    session: SessionSummaryWire,
+    agents: [AgentRegistrationWire],
+    tasks: [WorkItemWire],
+    signals: [SessionSignalRecordWire],
+    observer: ObserverSummaryWire? = nil,
+    agentActivity: [AgentToolActivitySummaryWire]
+  ) {
     self.session = session
     self.agents = agents
     self.tasks = tasks
@@ -491,7 +596,11 @@ public struct SessionUpdatedPayloadWire: Codable, Equatable, Sendable {
   public var timeline: [TimelineEntryWire]?
   public var extensionsPending: Bool
 
-  public init(detail: SessionDetailWire, timeline: [TimelineEntryWire]? = nil, extensionsPending: Bool = false) {
+  public init(
+    detail: SessionDetailWire,
+    timeline: [TimelineEntryWire]? = nil,
+    extensionsPending: Bool = false
+  ) {
     self.detail = detail
     self.timeline = timeline
     self.extensionsPending = extensionsPending
@@ -517,7 +626,12 @@ public struct SessionExtensionsPayloadWire: Codable, Equatable, Sendable {
   public var observer: ObserverSummaryWire?
   public var agentActivity: [AgentToolActivitySummaryWire]?
 
-  public init(sessionId: String, signals: [SessionSignalRecordWire]? = nil, observer: ObserverSummaryWire? = nil, agentActivity: [AgentToolActivitySummaryWire]? = nil) {
+  public init(
+    sessionId: String,
+    signals: [SessionSignalRecordWire]? = nil,
+    observer: ObserverSummaryWire? = nil,
+    agentActivity: [AgentToolActivitySummaryWire]? = nil
+  ) {
     self.sessionId = sessionId
     self.signals = signals
     self.observer = observer
@@ -542,7 +656,16 @@ public struct TimelineEntryWire: Codable, Equatable, Sendable {
   public var summary: String
   public var payload: JSONValue
 
-  public init(entryId: String, recordedAt: String, kind: String, sessionId: String, agentId: String? = nil, taskId: String? = nil, summary: String, payload: JSONValue) {
+  public init(
+    entryId: String,
+    recordedAt: String,
+    kind: String,
+    sessionId: String,
+    agentId: String? = nil,
+    taskId: String? = nil,
+    summary: String,
+    payload: JSONValue
+  ) {
     self.entryId = entryId
     self.recordedAt = recordedAt
     self.kind = kind
@@ -587,7 +710,13 @@ public struct TimelineWindowRequestWire: Codable, Equatable, Sendable {
   public var after: TimelineCursorWire?
   public var knownRevision: Int64?
 
-  public init(scope: String? = nil, limit: UInt? = nil, before: TimelineCursorWire? = nil, after: TimelineCursorWire? = nil, knownRevision: Int64? = nil) {
+  public init(
+    scope: String? = nil,
+    limit: UInt? = nil,
+    before: TimelineCursorWire? = nil,
+    after: TimelineCursorWire? = nil,
+    knownRevision: Int64? = nil
+  ) {
     self.scope = scope
     self.limit = limit
     self.before = before
@@ -616,7 +745,18 @@ public struct TimelineWindowResponseWire: Codable, Equatable, Sendable {
   public var entries: [TimelineEntryWire]?
   public var unchanged: Bool
 
-  public init(revision: Int64, totalCount: UInt, windowStart: UInt, windowEnd: UInt, hasOlder: Bool, hasNewer: Bool, oldestCursor: TimelineCursorWire? = nil, newestCursor: TimelineCursorWire? = nil, entries: [TimelineEntryWire]? = nil, unchanged: Bool) {
+  public init(
+    revision: Int64,
+    totalCount: UInt,
+    windowStart: UInt,
+    windowEnd: UInt,
+    hasOlder: Bool,
+    hasNewer: Bool,
+    oldestCursor: TimelineCursorWire? = nil,
+    newestCursor: TimelineCursorWire? = nil,
+    entries: [TimelineEntryWire]? = nil,
+    unchanged: Bool
+  ) {
     self.revision = revision
     self.totalCount = totalCount
     self.windowStart = windowStart
@@ -678,7 +818,20 @@ public struct HealthResponseWire: Codable, Equatable, Sendable {
   public var daemonId: String
   public var daemonName: String
 
-  public init(status: String, version: String, pid: UInt32, endpoint: String, startedAt: String, logLevel: String, projectCount: UInt, worktreeCount: UInt, sessionCount: UInt, wireVersion: UInt32 = 1, daemonId: String = "", daemonName: String = "") {
+  public init(
+    status: String,
+    version: String,
+    pid: UInt32,
+    endpoint: String,
+    startedAt: String,
+    logLevel: String,
+    projectCount: UInt,
+    worktreeCount: UInt,
+    sessionCount: UInt,
+    wireVersion: UInt32 = 1,
+    daemonId: String = "",
+    daemonName: String = ""
+  ) {
     self.status = status
     self.version = version
     self.pid = pid
@@ -828,7 +981,12 @@ public struct AskUserQuestionPromptWire: Codable, Equatable, Sendable {
   public var options: [AskUserQuestionOptionWire]
   public var multiSelect: Bool
 
-  public init(question: String, header: String? = nil, options: [AskUserQuestionOptionWire] = [], multiSelect: Bool = false) {
+  public init(
+    question: String,
+    header: String? = nil,
+    options: [AskUserQuestionOptionWire] = [],
+    multiSelect: Bool = false
+  ) {
     self.question = question
     self.header = header
     self.options = options

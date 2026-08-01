@@ -11,7 +11,13 @@ public struct RuntimeModelWire: Codable, Equatable, Sendable {
   public var effortKind: EffortKind
   public var effortValues: [String]
 
-  public init(id: String, displayName: String, tier: RuntimeModelTier, effortKind: EffortKind = .none, effortValues: [String] = []) {
+  public init(
+    id: String,
+    displayName: String,
+    tier: RuntimeModelTier,
+    effortKind: EffortKind = .none,
+    effortValues: [String] = []
+  ) {
     self.id = id
     self.displayName = displayName
     self.tier = tier
