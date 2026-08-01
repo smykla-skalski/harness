@@ -87,6 +87,10 @@ impl SignalStorage for DaemonDb {
     fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
         sessions::session_detail_from_daemon_db(session_id, self)
     }
+
+    fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
+        DaemonDb::mark_session_inactive(self, session_id)
+    }
 }
 
 impl SignalWake for AgentTuiManagerHandle {

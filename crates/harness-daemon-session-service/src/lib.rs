@@ -7,6 +7,7 @@
 
 mod async_ops;
 mod async_send;
+mod mutations;
 mod observe;
 mod persistence;
 mod ports;
@@ -16,6 +17,10 @@ mod tui_identity;
 
 pub use async_ops::{cancel_signal_async, record_signal_ack_direct_async};
 pub use async_send::send_signal_async;
+pub use mutations::{
+    archive_session, archive_session_async, end_session, end_session_async, transfer_leader,
+    transfer_leader_async,
+};
 pub use observe::{
     apply_heuristic_gap_tasks_async, apply_issue_tasks, apply_issue_tasks_async, observe_actor_id,
     task_severity_for_issue,

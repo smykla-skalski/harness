@@ -70,6 +70,10 @@ pub trait SignalStorage {
     /// # Errors
     /// Returns an error when the session detail cannot be assembled.
     fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError>;
+
+    /// # Errors
+    /// Returns an error when the active flag cannot be cleared.
+    fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError>;
 }
 
 /// Asynchronous persistence needed by signal delivery.
