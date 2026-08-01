@@ -8,6 +8,10 @@ use super::super::protocol::{SessionDetail, SignalAckRequest, SignalCancelReques
 use super::{sessions, sync_file_state_from_async_db};
 
 impl AsyncSignalStorage for AsyncDaemonDb {
+    async fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
+        AsyncDaemonDb::load_session_state(self, session_id).await
+    }
+
     async fn resolve_session(&self, session_id: &str) -> Result<Option<ResolvedSession>, CliError> {
         AsyncDaemonDb::resolve_session(self, session_id).await
     }

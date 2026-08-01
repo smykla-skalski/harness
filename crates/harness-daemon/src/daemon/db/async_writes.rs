@@ -1,4 +1,4 @@
-use sqlx::{QueryBuilder, Sqlite, Transaction, query, query_as, query_scalar};
+use sqlx::{QueryBuilder, Sqlite, Transaction, query, query_scalar};
 
 mod persist;
 mod sql;
@@ -22,10 +22,6 @@ use super::{
 use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
 use crate::session::storage;
 use crate::session::types::ManagedAgentKind;
-use harness_kernel::errors::CliErrorKind;
-
-const LOAD_SESSION_FOR_MUTATION_SQL: &str =
-    "SELECT state_json, project_id FROM sessions WHERE session_id = ?1";
 
 impl AsyncDaemonDb {
     /// Upsert a discovered project through the canonical async daemon DB.
@@ -72,51 +68,6 @@ impl AsyncDaemonDb {
         state: &SessionState,
     ) -> Result<(), CliError> {
         self.sync_session(project_id, state).await
-    }
-
-    /// Load, mutate, and save session state under an immediate transaction.
-    ///
-    /// This serializes async mutation writers before they read state, avoiding
-    /// lost updates when independent HTTP/WebSocket requests mutate the same
-    /// session concurrently.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL, parse, or mutation failures.
-    pub(crate) async fn update_session_state_immediate<F, T>(
-        &self,
-        session_id: &str,
-        update: F,
-    ) -> Result<T, CliError>
-    where
-        F: FnOnce(&mut SessionState) -> Result<T, CliError>,
-    {
-        let mut transaction = self
-            .begin_immediate_transaction("async immediate session mutation")
-            .await?;
-        let row = query_as::<_, AsyncSessionMutationRow>(LOAD_SESSION_FOR_MUTATION_SQL)
-            .bind(session_id)
-            .fetch_optional(transaction.as_mut())
-            .await
-            .map_err(|error| {
-                db_error(format!(
-                    "load async session for mutation {session_id}: {error}"
-                ))
-            })?
-            .ok_or_else(|| {
-                CliError::from(CliErrorKind::session_not_active(format!(
-                    "harness session '{session_id}' not found"
-                )))
-            })?;
-        let mut state: SessionState = serde_json::from_str(&row.state_json)
-            .map_err(|error| db_error(format!("parse session state: {error}")))?;
-        let result = update(&mut state)?;
-        sync_session_in_transaction(&mut transaction, &row.project_id, &state).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit async immediate session mutation transaction: {error}"
-            ))
-        })?;
-        Ok(result)
     }
 
     /// Insert a new session record and mark it active.
@@ -284,12 +235,6 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("begin {context} transaction: {error}")))
     }
-}
-
-#[derive(sqlx::FromRow)]
-struct AsyncSessionMutationRow {
-    state_json: String,
-    project_id: String,
 }
 
 pub(in crate::daemon::db) async fn sync_session_in_transaction(

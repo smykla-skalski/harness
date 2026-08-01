@@ -151,10 +151,10 @@ pub async fn delete_session_async<A: AsyncSignalStorage>(
     session_id: &str,
     storage: &A,
 ) -> Result<bool, CliError> {
-    let Some(resolved) = storage.resolve_session(session_id).await? else {
+    let Some(state) = storage.load_session_state(session_id).await? else {
         return Ok(false);
     };
-    destroy_session_artifacts(&resolved.state);
+    destroy_session_artifacts(&state);
     storage.delete_session_row(session_id).await?;
     storage.bump_change(session_id).await?;
     storage.bump_change("global").await?;

@@ -118,6 +118,11 @@ pub trait SignalStorage {
 
 /// Asynchronous persistence needed by signal delivery.
 pub trait AsyncSignalStorage: Send + Sync {
+    fn load_session_state(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<Option<SessionState>, CliError>> + Send;
+
     fn resolve_session(
         &self,
         session_id: &str,
