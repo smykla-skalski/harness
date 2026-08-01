@@ -23,14 +23,6 @@ pub(crate) async fn sync_resolved_liveness_async(
         .await
 }
 
-pub(crate) async fn reconcile_expired_pending_signals_for_async_db(
-    session_id: &str,
-    async_db: &super::db::AsyncDaemonDb,
-) -> Result<(), CliError> {
-    harness_daemon_session_service::reconcile_expired_pending_signals_async(session_id, async_db)
-        .await
-}
-
 pub(crate) fn refresh_resolved_session_from_files_if_newer(
     db: &super::db::DaemonDb,
     resolved: &mut ResolvedSession,

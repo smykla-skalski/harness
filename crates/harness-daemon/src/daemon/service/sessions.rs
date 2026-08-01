@@ -1,9 +1,9 @@
 use super::{
-    CliError, CliErrorKind, ProjectSummary, SessionDetail, SessionExtensionsPayload,
-    SessionSummary, TimelineEntry, index, reconcile_expired_pending_signals_for_async_db,
-    reconcile_expired_pending_signals_for_db, session_not_found, snapshot, timeline,
+    CliError, ProjectSummary, SessionDetail, SessionExtensionsPayload, SessionSummary,
+    TimelineEntry, index, reconcile_expired_pending_signals_for_db, snapshot, timeline,
 };
-use crate::daemon::index::ResolvedSession;
+#[cfg(test)]
+use super::{CliErrorKind, session_not_found};
 use crate::session::service::ResolvedRuntimeSessionAgent;
 use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 #[cfg(test)]
@@ -27,21 +27,14 @@ pub(crate) use liveness::{
     reconcile_active_session_liveness_background,
     reconcile_active_session_liveness_background_async,
 };
-use liveness::{
-    reconcile_active_session_liveness_for_reads, reconcile_active_session_liveness_for_reads_async,
-    reconcile_session_liveness_for_read, reconcile_session_liveness_for_read_async,
-    session_liveness_refresh_due_now,
-};
+use liveness::{reconcile_active_session_liveness_for_reads, reconcile_session_liveness_for_read};
 
 /// List discovered projects known to the daemon.
 ///
 /// # Errors
 /// Returns [`CliError`] on project discovery failures.
 pub fn list_projects(db: Option<&super::db::DaemonDb>) -> Result<Vec<ProjectSummary>, CliError> {
-    if let Some(db) = db {
-        return db.list_project_summaries();
-    }
-    snapshot::project_summaries()
+    harness_daemon_session_service::list_projects(db)
 }
 
 /// List discovered projects from the canonical async daemon DB.
@@ -51,12 +44,7 @@ pub fn list_projects(db: Option<&super::db::DaemonDb>) -> Result<Vec<ProjectSumm
 pub(crate) async fn list_projects_async(
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<Vec<ProjectSummary>, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async project reads",
-        ))
-    })?;
-    async_db.list_project_summaries().await
+    harness_daemon_session_service::list_projects_async(async_db).await
 }
 
 /// List discovered sessions across all indexed projects.
@@ -82,21 +70,11 @@ pub(crate) async fn list_sessions_async(
     include_all: bool,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<Vec<SessionSummary>, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async session reads",
-        ))
-    })?;
-    reconcile_active_session_liveness_for_reads_async(include_all, Some(async_db)).await?;
-    async_db.list_session_summaries().await
+    harness_daemon_session_service::list_sessions_async(include_all, async_db).await
 }
 
 /// Resolve a runtime-session ID to the orchestration session and agent
 /// that own it, using a single indexed query against the canonical async DB.
-///
-/// The indexed lookup replaces the previous fan-out over
-/// `list_sessions` + `session_detail` that every hook invocation performed
-/// to translate a runtime session ID into a signal delivery target.
 ///
 /// # Errors
 /// Returns [`CliError::session_ambiguous`] when more than one live agent
@@ -107,29 +85,12 @@ pub(crate) async fn resolve_runtime_session_agent_async(
     runtime_session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for runtime session resolution",
-        ))
-    })?;
-    let mut matches = async_db
-        .resolve_runtime_session_agents(runtime_name, runtime_session_id)
-        .await?;
-    match matches.len() {
-        0 => Ok(None),
-        1 => {
-            let (orchestration_session_id, agent_id) = matches.remove(0);
-            Ok(Some(ResolvedRuntimeSessionAgent {
-                orchestration_session_id,
-                session_agent_id: agent_id,
-            }))
-        }
-        _ => Err(CliErrorKind::session_ambiguous(format!(
-            "runtime session '{runtime_session_id}' for runtime '{runtime_name}' \
-             maps to multiple orchestration sessions"
-        ))
-        .into()),
-    }
+    harness_daemon_session_service::resolve_runtime_session_agent_async(
+        runtime_name,
+        runtime_session_id,
+        async_db,
+    )
+    .await
 }
 
 /// Load a single session detail snapshot.
@@ -143,7 +104,7 @@ pub fn session_detail(
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
-    if session_liveness_refresh_due_now(session_id) {
+    if harness_daemon_session_service::session_liveness_refresh_due_now(session_id) {
         reconcile_session_liveness_for_read(session_id, db)?;
     }
     if let Some(db) = db
@@ -166,38 +127,7 @@ pub(crate) fn session_detail_from_daemon_db(
     session_id: &str,
     db: &super::db::DaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let resolved = db
-        .resolve_session(session_id)?
-        .ok_or_else(|| session_not_found(session_id))?;
-    snapshot::session_detail_from_resolved_with_db(&resolved, db)
-}
-
-/// Resolve a session from the async daemon DB after read-time reconciliation:
-/// expire stale pending signals and refresh liveness when due. Shared by the
-/// full and core detail readers so the reconcile-then-resolve preamble lives
-/// in one place.
-///
-/// # Errors
-/// Returns [`CliError`] when the pool is absent or the session cannot be
-/// resolved.
-async fn resolve_session_with_read_reconcile<'a>(
-    session_id: &str,
-    async_db: Option<&'a super::db::AsyncDaemonDb>,
-) -> Result<(&'a super::db::AsyncDaemonDb, ResolvedSession), CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async session reads",
-        ))
-    })?;
-    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    if session_liveness_refresh_due_now(session_id) {
-        reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
-    }
-    let resolved = async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
-    Ok((async_db, resolved))
+    harness_daemon_session_service::session_detail_from_storage(session_id, db)
 }
 
 /// Load a full session detail snapshot from the canonical async daemon DB.
@@ -208,11 +138,7 @@ pub(crate) async fn session_detail_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let (async_db, resolved) = resolve_session_with_read_reconcile(session_id, async_db).await?;
-    let signals = async_db.load_signals(session_id).await?;
-    let agent_activity = async_db.load_agent_activity(session_id).await?;
-    snapshot::build_session_detail_from_cached_runtime_async(resolved, signals, agent_activity)
-        .await
+    harness_daemon_session_service::session_detail_async(session_id, async_db).await
 }
 
 /// Load a daemon-owned async session detail snapshot without read-time reconciliation.
@@ -227,14 +153,7 @@ pub(crate) async fn session_detail_from_async_daemon_db(
     session_id: &str,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionDetail, CliError> {
-    let resolved = async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
-    let signals = async_db.load_signals(session_id).await?;
-    let agent_activity = async_db.load_agent_activity(session_id).await?;
-    snapshot::build_session_detail_from_cached_runtime_async(resolved, signals, agent_activity)
-        .await
+    harness_daemon_session_service::session_detail_from_storage_async(session_id, async_db).await
 }
 
 /// Load a lightweight session detail with only in-memory fields from the
@@ -246,8 +165,7 @@ pub(crate) async fn session_detail_core_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let (_, resolved) = resolve_session_with_read_reconcile(session_id, async_db).await?;
-    Ok(snapshot::build_session_detail_core(&resolved))
+    harness_daemon_session_service::session_detail_core_async(session_id, async_db).await
 }
 
 /// Load a session timeline window from the canonical async daemon DB.
@@ -260,20 +178,8 @@ pub(crate) async fn session_timeline_window_async(
     request: &TimelineWindowRequest,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<TimelineWindowResponse, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async session timeline reads",
-        ))
-    })?;
-    async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
-    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    async_db
-        .load_session_timeline_window(session_id, request)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))
+    harness_daemon_session_service::session_timeline_window_async(session_id, request, async_db)
+        .await
 }
 
 /// Load ACP transcript history for a session from the canonical async daemon DB.
@@ -285,21 +191,7 @@ pub(crate) async fn session_acp_transcript_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<AcpTranscriptResponse, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async ACP transcript reads",
-        ))
-    })?;
-    async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
-    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    Ok(AcpTranscriptResponse {
-        entries: async_db
-            .load_session_acp_transcript_entries(session_id)
-            .await?,
-    })
+    harness_daemon_session_service::session_acp_transcript_async(session_id, async_db).await
 }
 
 /// Load a merged session timeline.
@@ -459,7 +351,7 @@ pub fn session_detail_core(
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
-    if session_liveness_refresh_due_now(session_id) {
+    if harness_daemon_session_service::session_liveness_refresh_due_now(session_id) {
         reconcile_session_liveness_for_read(session_id, db)?;
     }
     if let Some(db) = db
@@ -502,18 +394,5 @@ pub(crate) async fn session_extensions_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<SessionExtensionsPayload, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async session extension reads",
-        ))
-    })?;
-    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    let resolved = async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
-    let signals = async_db.load_signals(session_id).await?;
-    let agent_activity = async_db.load_agent_activity(session_id).await?;
-    snapshot::build_session_extensions_from_cached_runtime_async(resolved, signals, agent_activity)
-        .await
+    harness_daemon_session_service::session_extensions_async(session_id, async_db).await
 }

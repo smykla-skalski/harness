@@ -75,6 +75,52 @@ impl AsyncSignalStorage for AsyncDaemonDb {
     {
         AsyncDaemonDb::load_expired_pending_signals(self, session_id).await
     }
+
+    async fn list_project_summaries(
+        &self,
+    ) -> Result<Vec<harness_session::wire::ProjectSummary>, CliError> {
+        AsyncDaemonDb::list_project_summaries(self).await
+    }
+
+    async fn list_session_summaries(
+        &self,
+    ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
+        AsyncDaemonDb::list_session_summaries(self).await
+    }
+
+    async fn resolve_runtime_session_agents(
+        &self,
+        runtime_name: &str,
+        runtime_session_id: &str,
+    ) -> Result<Vec<(String, String)>, CliError> {
+        AsyncDaemonDb::resolve_runtime_session_agents(self, runtime_name, runtime_session_id).await
+    }
+
+    async fn load_agent_activity(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<harness_session::wire::AgentToolActivitySummary>, CliError> {
+        AsyncDaemonDb::load_agent_activity(self, session_id).await
+    }
+
+    async fn load_session_timeline_window(
+        &self,
+        session_id: &str,
+        request: &harness_protocol::timeline::TimelineWindowRequest,
+    ) -> Result<Option<harness_protocol::timeline::TimelineWindowResponse>, CliError> {
+        AsyncDaemonDb::load_session_timeline_window(self, session_id, request).await
+    }
+
+    async fn load_session_acp_transcript_entries(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<harness_protocol::timeline::TimelineEntry>, CliError> {
+        AsyncDaemonDb::load_session_acp_transcript_entries(self, session_id).await
+    }
+
+    async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
+        AsyncDaemonDb::list_liveness_candidate_ids(self).await
+    }
 }
 
 pub(crate) async fn cancel_signal_async(

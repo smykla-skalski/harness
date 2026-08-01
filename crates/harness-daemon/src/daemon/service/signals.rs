@@ -99,6 +99,18 @@ impl SignalStorage for DaemonDb {
     {
         DaemonDb::load_expired_pending_signals(self, session_id)
     }
+
+    fn list_project_summaries(
+        &self,
+    ) -> Result<Vec<harness_session::wire::ProjectSummary>, CliError> {
+        DaemonDb::list_project_summaries(self)
+    }
+
+    fn list_session_summaries_full(
+        &self,
+    ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
+        DaemonDb::list_session_summaries_full(self)
+    }
 }
 
 impl SignalWake for AgentTuiManagerHandle {

@@ -5,7 +5,9 @@ use std::slice;
 use std::sync::{Arc, Mutex, OnceLock};
 #[cfg(test)]
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(test)]
+use std::time::Instant;
 
 use crate::agents::runtime as agents_runtime;
 use crate::agents::runtime::signal::AckResult;
@@ -92,7 +94,6 @@ pub(crate) enum ObserveLoopState {
 
 static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
 pub(crate) static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
-static SESSION_LIVENESS_REFRESH_CACHE: OnceLock<Mutex<BTreeMap<String, Instant>>> = OnceLock::new();
 
 #[must_use]
 pub(crate) fn observe_async_db() -> Option<Arc<super::db::AsyncDaemonDb>> {
@@ -130,7 +131,7 @@ pub(crate) fn install_observe_runtime(
     }
 }
 
-pub(crate) const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
+pub(crate) use harness_daemon_session_service::SESSION_LIVENESS_REFRESH_TTL;
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 

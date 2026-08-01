@@ -9,11 +9,13 @@ mod async_ops;
 mod async_send;
 mod direct;
 mod leave;
+mod liveness;
 mod mutations;
 mod observe;
 mod persistence;
 mod ports;
 mod reconcile;
+mod sessions;
 mod sync;
 mod timeout;
 mod tui_identity;
@@ -26,6 +28,14 @@ pub use direct::{
     update_session_title_async,
 };
 pub use leave::{leave_session, leave_session_async};
+pub use liveness::{
+    SESSION_LIVENESS_REFRESH_TTL, clear_session_liveness_refresh_cache_entry,
+    reconcile_active_session_liveness_background_async,
+    reconcile_active_session_liveness_for_reads_async, reconcile_session_liveness_for_read_async,
+    reconcile_session_liveness_for_read_returning_async, session_liveness_refresh_due_locked,
+    session_liveness_refresh_due_now, stale_session_ids_for_liveness_refresh,
+    stale_session_ids_for_liveness_refresh_now,
+};
 pub use mutations::{
     archive_session, archive_session_async, end_session, end_session_async, transfer_leader,
     transfer_leader_async,
@@ -41,6 +51,12 @@ pub use ports::{AsyncSignalStorage, ExpiredPendingSignalIndexRecord, SignalStora
 pub use reconcile::{
     liveness_project_dir_for_resolved, reconcile_expired_pending_signals,
     reconcile_expired_pending_signals_async, sync_resolved_liveness, sync_resolved_liveness_async,
+};
+pub use sessions::{
+    list_projects, list_projects_async, list_sessions_async, resolve_runtime_session_agent_async,
+    session_acp_transcript_async, session_detail_async, session_detail_core_async,
+    session_detail_from_storage, session_detail_from_storage_async, session_extensions_async,
+    session_timeline_window_async,
 };
 pub use sync::{attempt_active_signal_delivery, build_active_signal_prompt, send_signal};
 pub use sync::{cancel_signal, managed_tui_id_for_registration};

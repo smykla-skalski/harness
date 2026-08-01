@@ -3,9 +3,12 @@ use std::time::Duration;
 
 use harness_agents::runtime::signal::Signal;
 use harness_kernel::errors::CliError;
+use harness_protocol::timeline::{TimelineEntry, TimelineWindowRequest, TimelineWindowResponse};
 use harness_session::index::ResolvedSession;
 use harness_session::types::{SessionLogEntry, SessionSignalRecord, SessionState};
-use harness_session::wire::SessionDetail;
+use harness_session::wire::{
+    AgentToolActivitySummary, ProjectSummary, SessionDetail, SessionSummary,
+};
 
 /// A pending indexed signal whose effective status has expired.
 #[derive(Debug, Clone)]
@@ -90,6 +93,14 @@ pub trait SignalStorage {
         &self,
         session_id: &str,
     ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>;
+
+    /// # Errors
+    /// Returns an error on project discovery failures.
+    fn list_project_summaries(&self) -> Result<Vec<ProjectSummary>, CliError>;
+
+    /// # Errors
+    /// Returns an error on session discovery failures.
+    fn list_session_summaries_full(&self) -> Result<Vec<SessionSummary>, CliError>;
 }
 
 /// Asynchronous persistence needed by signal delivery.
@@ -152,6 +163,40 @@ pub trait AsyncSignalStorage: Send + Sync {
         &self,
         session_id: &str,
     ) -> impl Future<Output = Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>> + Send;
+
+    fn list_project_summaries(
+        &self,
+    ) -> impl Future<Output = Result<Vec<ProjectSummary>, CliError>> + Send;
+
+    fn list_session_summaries(
+        &self,
+    ) -> impl Future<Output = Result<Vec<SessionSummary>, CliError>> + Send;
+
+    fn resolve_runtime_session_agents(
+        &self,
+        runtime_name: &str,
+        runtime_session_id: &str,
+    ) -> impl Future<Output = Result<Vec<(String, String)>, CliError>> + Send;
+
+    fn load_agent_activity(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<Vec<AgentToolActivitySummary>, CliError>> + Send;
+
+    fn load_session_timeline_window(
+        &self,
+        session_id: &str,
+        request: &TimelineWindowRequest,
+    ) -> impl Future<Output = Result<Option<TimelineWindowResponse>, CliError>> + Send;
+
+    fn load_session_acp_transcript_entries(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<Vec<TimelineEntry>, CliError>> + Send;
+
+    fn list_liveness_candidate_ids(
+        &self,
+    ) -> impl Future<Output = Result<Vec<String>, CliError>> + Send;
 }
 
 /// Active wake transport used for best-effort signal delivery.
