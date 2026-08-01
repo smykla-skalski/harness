@@ -183,8 +183,8 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(keychainBundle.ssh.recorded.isEmpty)
   }
 
-  @Test("Settings saves and Step Mode serialize orchestrator settings writes")
-  func settingsSavesAndStepModeSerializeOrchestratorSettingsWrites() async {
+  @Test("Settings saves and Step Mode queue orchestrator settings writes")
+  func settingsSavesAndStepModeQueueOrchestratorSettingsWrites() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
     let snapshot = makeSettingsSnapshot()
@@ -200,30 +200,34 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
 
     #expect(store.isTaskBoardBusy)
     #expect(await waitForTaskBoardBusy(true, store: store))
-    #expect(await store.setTaskBoardStepMode(enabled: true) == false)
+    let queuedStepModeToggle = Task { @MainActor in
+      await store.setTaskBoardStepMode(enabled: true)
+    }
 
     await client.releaseNextTaskBoardOrchestratorSettingsMutation()
     #expect(await settingsSave.value)
+    #expect(await queuedStepModeToggle.value)
     #expect(!store.isTaskBoardBusy)
     #expect(await waitForTaskBoardBusy(false, store: store))
 
     await client.blockNextTaskBoardOrchestratorSettingsMutations()
     let stepModeToggle = Task { @MainActor in
-      await store.setTaskBoardStepMode(enabled: true)
+      await store.setTaskBoardStepMode(enabled: false)
     }
     await client.waitForBlockedTaskBoardOrchestratorSettingsMutations()
 
     #expect(store.isTaskBoardBusy)
     #expect(await waitForTaskBoardBusy(true, store: store))
-    #expect(
+    let queuedSettingsSave = Task { @MainActor in
       await store.updateTaskBoardGitSettings(
         snapshot: snapshot,
         origin: .settingsSecretsSaveButton
-      ) == false
-    )
+      )
+    }
 
     await client.releaseNextTaskBoardOrchestratorSettingsMutation()
     #expect(await stepModeToggle.value)
+    #expect(await queuedSettingsSave.value)
     #expect(!store.isTaskBoardBusy)
     #expect(await waitForTaskBoardBusy(false, store: store))
 
@@ -231,7 +235,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       if case .updateTaskBoardOrchestratorSettings = call { return true }
       return false
     }
-    #expect(settingsWrites.count == 2)
+    #expect(settingsWrites.count == 4)
   }
 
   @Test("Repeated stored credential sync is skipped after bootstrap")

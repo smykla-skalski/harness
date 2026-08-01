@@ -106,12 +106,13 @@ extension HarnessMonitorStore {
     snapshot: TaskBoardGitSettingsSnapshot,
     origin: TaskBoardSettingsSaveOrigin
   ) async -> Bool {
-    guard !isTaskBoardBusy else { return false }
+    await acquireTaskBoardOrchestratorSettingsMutationLock()
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
       endDaemonAction()
       endTaskBoardAction()
+      releaseTaskBoardOrchestratorSettingsMutationLock()
     }
 
     do {

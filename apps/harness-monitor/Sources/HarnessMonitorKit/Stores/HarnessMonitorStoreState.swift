@@ -26,10 +26,16 @@ struct CacheWriteSyncState {
 
 struct TaskBoardRuntimeState {
   var connection = TaskBoardConnectionState()
+  var orchestratorSettingsMutation = TaskBoardOrchestratorSettingsMutationState()
   var stepModeMutation = TaskBoardStepModeMutationState()
   var positionMutation = TaskBoardPositionMutationState()
   var syncPhase = TaskBoardSyncPhase.idle
   var actionCount = 0
+}
+
+struct TaskBoardOrchestratorSettingsMutationState {
+  var isLocked = false
+  var waiters: [CheckedContinuation<Void, Never>] = []
 }
 
 struct TaskBoardPositionMutationState {
@@ -43,8 +49,6 @@ struct TaskBoardStepModeMutationState {
   var lastAuthoritativeSettings: TaskBoardOrchestratorSettings?
   var confirmationRevision: UInt64 = 0
   var confirmedSettings: TaskBoardOrchestratorSettings?
-  var isRequestLocked = false
-  var requestWaiters: [CheckedContinuation<Void, Never>] = []
 }
 
 struct SelectedTimelineLoadState {

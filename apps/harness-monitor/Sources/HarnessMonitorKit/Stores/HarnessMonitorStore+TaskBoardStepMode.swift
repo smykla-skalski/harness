@@ -11,6 +11,7 @@ extension HarnessMonitorStore {
     }
     guard
       !isTaskBoardBusy || taskBoardRuntimeState.stepModeMutation.desiredValue != nil
+        || taskBoardRuntimeState.orchestratorSettingsMutation.isLocked
     else {
       return false
     }
@@ -19,8 +20,8 @@ extension HarnessMonitorStore {
       enabled: enabled,
       currentSettings: currentStatus.settings
     )
-    await acquireTaskBoardStepModeRequestLock()
-    defer { releaseTaskBoardStepModeRequestLock() }
+    await acquireTaskBoardOrchestratorSettingsMutationLock()
+    defer { releaseTaskBoardOrchestratorSettingsMutationLock() }
 
     guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
       return true
@@ -70,22 +71,22 @@ extension HarnessMonitorStore {
     return taskBoardRuntimeState.stepModeMutation.latestGeneration
   }
 
-  private func acquireTaskBoardStepModeRequestLock() async {
-    guard taskBoardRuntimeState.stepModeMutation.isRequestLocked else {
-      taskBoardRuntimeState.stepModeMutation.isRequestLocked = true
+  func acquireTaskBoardOrchestratorSettingsMutationLock() async {
+    guard taskBoardRuntimeState.orchestratorSettingsMutation.isLocked else {
+      taskBoardRuntimeState.orchestratorSettingsMutation.isLocked = true
       return
     }
     await withCheckedContinuation { continuation in
-      taskBoardRuntimeState.stepModeMutation.requestWaiters.append(continuation)
+      taskBoardRuntimeState.orchestratorSettingsMutation.waiters.append(continuation)
     }
   }
 
-  private func releaseTaskBoardStepModeRequestLock() {
-    guard !taskBoardRuntimeState.stepModeMutation.requestWaiters.isEmpty else {
-      taskBoardRuntimeState.stepModeMutation.isRequestLocked = false
+  func releaseTaskBoardOrchestratorSettingsMutationLock() {
+    guard !taskBoardRuntimeState.orchestratorSettingsMutation.waiters.isEmpty else {
+      taskBoardRuntimeState.orchestratorSettingsMutation.isLocked = false
       return
     }
-    taskBoardRuntimeState.stepModeMutation.requestWaiters.removeFirst().resume()
+    taskBoardRuntimeState.orchestratorSettingsMutation.waiters.removeFirst().resume()
   }
 
   /// No success toast: the toggle itself, the paused orchestrator status, and
