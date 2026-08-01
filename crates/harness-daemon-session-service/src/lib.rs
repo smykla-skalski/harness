@@ -6,6 +6,7 @@
 //! managed-agent runtimes.
 
 mod adopt;
+mod archive;
 mod async_ops;
 mod async_send;
 mod direct;
@@ -24,6 +25,7 @@ mod timeout;
 mod tui_identity;
 
 pub use adopt::{adopt_session_record, adopt_session_record_async};
+pub use archive::{archive_session, archive_session_async};
 pub use async_ops::{cancel_signal_async, record_signal_ack_direct_async};
 pub use async_send::send_signal_async;
 pub use direct::{
@@ -42,8 +44,7 @@ pub use liveness::{
     stale_session_ids_for_liveness_refresh_now,
 };
 pub use mutations::{
-    archive_session, archive_session_async, end_session, end_session_async, transfer_leader,
-    transfer_leader_async,
+    end_session, end_session_async, transfer_leader, transfer_leader_async,
 };
 pub use observe::{
     apply_heuristic_gap_tasks_async, apply_issue_tasks, apply_issue_tasks_async, observe_actor_id,
