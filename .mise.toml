@@ -582,7 +582,7 @@ run = "apps/harness-monitor/Scripts/render-preview-snapshots.sh"
 
 [tasks."monitor:build"]
 description = "Build the Harness Monitor macOS app (Debug) via the shared build lane"
-run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
+run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
 
 [tasks."monitor"]
 description = "Build and launch the Harness Monitor macOS app (Debug)"

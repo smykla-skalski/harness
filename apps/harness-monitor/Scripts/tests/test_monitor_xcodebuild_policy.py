@@ -48,6 +48,17 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
             mise_toml,
         )
 
+    def test_mise_monitor_build_keeps_signing_enabled(self) -> None:
+        mise_toml = MISE_TOML.read_text(encoding="utf-8")
+        task_match = re.search(
+            r'^\[tasks\."monitor:build"\]\n(?P<body>.*?)(?=^\[tasks\.|\Z)',
+            mise_toml,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(task_match)
+        assert task_match is not None
+        self.assertNotIn("CODE_SIGNING_ALLOWED=NO", task_match.group("body"))
+
     def test_mise_monitor_policy_lab_task_uses_the_fixed_user_lane(self) -> None:
         mise_toml = MISE_TOML.read_text(encoding="utf-8")
         task_match = re.search(
