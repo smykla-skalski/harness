@@ -218,7 +218,8 @@ struct AppOpenAnythingSourceContractTests {
     // A changed override has to rebuild the corpus, or the palette keeps
     // offering the window that was loaded before.
     #expect(sceneSource.contains(".onChange(of: appOpenAnythingLoadedSessionOverride"))
-    #expect(sceneSource.contains("restartOpenAnythingCorpusDriver(loadedSessionOverride: newValue)"))
+    #expect(
+      sceneSource.contains("restartOpenAnythingCorpusDriver(loadedSessionOverride: newValue)"))
     #expect(hostSource.contains("if let loadedSessionOverride"))
   }
 

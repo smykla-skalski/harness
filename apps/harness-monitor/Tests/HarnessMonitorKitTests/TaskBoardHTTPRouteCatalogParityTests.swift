@@ -84,7 +84,8 @@ private func daemonHTTPRoutes(prefix: String) throws -> [TaskBoardHTTPRoute] {
   }
 
   guard routes.isEmpty == false else {
-    throw TaskBoardHTTPRouteCatalogError.noRoutes(relativePath: "\(daemonContractDirectory) \(prefix)")
+    throw TaskBoardHTTPRouteCatalogError.noRoutes(
+      relativePath: "\(daemonContractDirectory) \(prefix)")
   }
   return Array(Set(routes)).sorted()
 }

@@ -20,7 +20,9 @@ actor RecordingTaskBoardItemsReadGate {
     didBlockRead = true
     let arrivals = arrivalContinuations
     arrivalContinuations.removeAll()
-    arrivals.forEach { $0.resume() }
+    for arrival in arrivals {
+      arrival.resume()
+    }
     await withCheckedContinuation { continuation in
       blockedReadContinuation = continuation
     }

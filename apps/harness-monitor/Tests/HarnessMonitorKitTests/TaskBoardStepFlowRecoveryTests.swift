@@ -186,7 +186,8 @@ struct TaskBoardStepFlowRecoveryTests {
       targetItem: topTodo,
       taskBoardItems: [topTodo, blocked, staleFailed],
       evaluation: EvaluationContext(
-        lastRun: lastRun(evaluation: TaskBoardOrchestratorEvaluationOutcome(records: [completedRecord]))
+        lastRun: lastRun(
+          evaluation: TaskBoardOrchestratorEvaluationOutcome(records: [completedRecord]))
       )
     )
 

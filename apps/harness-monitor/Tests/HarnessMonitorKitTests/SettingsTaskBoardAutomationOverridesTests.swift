@@ -66,7 +66,8 @@ struct SettingsTaskBoardAutomationOverridesTests {
   func revertingKeepsOtherRepositoryConfiguration() {
     var draft = Self.draft(
       repositories: [
-        TaskBoardRepositoryAutomationConfig(repository: "kumahq/kuma", preferredHostId: "mac-studio")
+        TaskBoardRepositoryAutomationConfig(
+          repository: "kumahq/kuma", preferredHostId: "mac-studio")
       ]
     )
     draft.beginOverriding(.labels, for: "kumahq/kuma")
