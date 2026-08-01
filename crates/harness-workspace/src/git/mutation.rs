@@ -42,8 +42,8 @@ pub fn pin_github_pull_request_worktree(
 ) -> GitResult<()> {
     let _origin_grant = hold_worktree_origin_grant(worktree);
     require_pin_target(worktree, repository, pull_request, expected_head)?;
-    let remote = matching_remote(worktree, repository)?;
-    fetch_pull_request_head(worktree, &remote, pull_request, expected_head)?;
+    matching_remote(worktree, repository)?;
+    fetch_pull_request_head(worktree, repository, pull_request, expected_head)?;
     require_clean_session_worktree(worktree)?;
     GitCommandRunner::new(worktree).mutation(["reset", "--hard", expected_head])?;
     let repository = GitRepository::discover(worktree)?;
@@ -126,10 +126,11 @@ fn matching_remote(worktree: &Path, repository: &str) -> GitResult<String> {
 
 fn fetch_pull_request_head(
     worktree: &Path,
-    remote: &str,
+    repository: &str,
     pull_request: u64,
     expected_head: &str,
 ) -> GitResult<()> {
+    let remote = format!("https://github.com/{repository}.git");
     let source = format!("refs/pull/{pull_request}/head");
     let target = format!("refs/harness/task-board/pull/{pull_request}/{expected_head}");
     let refspec = format!("+{source}:{target}");
@@ -138,7 +139,7 @@ fn fetch_pull_request_head(
             "fetch",
             "--no-tags",
             "--no-recurse-submodules",
-            remote,
+            &remote,
             &refspec,
         ],
         b"",
@@ -378,7 +379,11 @@ mod tests {
         let rewrite = format!("url.file://{}/.insteadOf", remote.display());
         git(
             &origin,
-            &["config", &rewrite, "git@github.com:acme/widgets.git"],
+            &[
+                "config",
+                &rewrite,
+                "https://github.com/acme/widgets.git",
+            ],
         );
         create_linked_worktree(&origin, "session-1", &session, "harness/session-1", &base)
             .expect("session worktree");
@@ -393,6 +398,10 @@ mod tests {
             "harness/session-1"
         );
         assert!(git_stdout(&session, &["status", "--porcelain"]).is_empty());
+        assert_eq!(
+            git_stdout(&session, &["config", "--get", "remote.upstream.url"]),
+            "git@github.com:acme/widgets.git"
+        );
     }
 
     fn git(repository: &Path, args: &[&str]) {
