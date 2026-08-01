@@ -85,9 +85,12 @@ extension WebSocketTransport {
             // after this loop ends can run the regular cleanup path.
             await self.setReconnectingStreams(false)
             if !Task.isCancelled {
+              let failureDescription = error.localizedDescription
               HarnessMonitorLogger.websocket.warning(
-                "WSock reconnect failure for \(logID, privacy: .public): "
-                  + "\(error.localizedDescription, privacy: .public)"
+                """
+                WSock reconnect failure for \(logID, privacy: .public): \
+                \(failureDescription, privacy: .public)
+                """
               )
             }
             break
@@ -98,7 +101,10 @@ extension WebSocketTransport {
   }
 
   private func shouldStopReconnect() -> Bool {
-    Task.isCancelled || isShutDown
+    if Task.isCancelled {
+      return true
+    }
+    return isShutDown
   }
 
   func reconnectInternal() async throws {

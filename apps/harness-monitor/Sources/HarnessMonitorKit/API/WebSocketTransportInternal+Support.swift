@@ -285,9 +285,12 @@ extension WebSocketTransport {
       // event name when they do not, so a regression report can locate
       // where in the pipeline the push was dropped.
       if let sessionId = pushEvent.sessionId {
+        let eventLabel = pushEvent.kind.debugLabel
         HarnessMonitorLogger.websocket.debug(
-          "dropping push \(pushEvent.kind.debugLabel, privacy: .public) for session "
-            + "\(sessionId, privacy: .public): no continuation attached"
+          """
+          dropping push \(eventLabel, privacy: .public) for session \
+          \(sessionId, privacy: .public): no continuation attached
+          """
         )
       } else {
         HarnessMonitorLogger.websocket.debug(
