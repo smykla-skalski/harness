@@ -5,7 +5,9 @@ use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
 };
 use crate::task_board::external::{ExternalSyncBatch, ExternalSyncScopeOutcome};
-use crate::task_board::{ExternalProvider, TaskBoardSyncSummary};
+use crate::task_board::{
+    ExternalProvider, ExternalSyncAction, ExternalSyncOperation, TaskBoardSyncSummary,
+};
 use harness_kernel::errors::CliErrorKind;
 
 #[tokio::test]
@@ -83,6 +85,58 @@ async fn correlated_stable_noop_uses_background_audit_planning() {
     }
 
     assert!(sync_events(&db).await.is_empty());
+}
+
+#[tokio::test]
+async fn correlated_preview_keeps_observed_operation_evidence() {
+    let (_dir, db) = open_db().await;
+    let request = TaskBoardSyncRequest::default();
+    let preview = ExternalSyncOperation {
+        provider: ExternalProvider::GitHub,
+        action: ExternalSyncAction::Pull,
+        board_item_id: Some("github-acme-widgets-41".into()),
+        external_id: Some("acme/widgets#41".into()),
+        url: Some("https://github.com/acme/widgets/pull/41".into()),
+        dry_run: true,
+        applied: false,
+        changed_fields: Vec::new(),
+        unsupported_fields: Vec::new(),
+    };
+    let batch = ExternalSyncBatch {
+        operations: vec![preview],
+        external_create_follow_ups: Vec::new(),
+        scope_outcomes: vec![ExternalSyncScopeOutcome::success(
+            ExternalProvider::GitHub,
+            "acme/widgets".into(),
+        )],
+        ambiguous_references: Vec::new(),
+        first_provider_failure: None,
+        terminal_error: None,
+    };
+    let mut metrics = SyncExecutionMetrics::default();
+    metrics.capture(&batch);
+    let result = Ok(sync_summary(batch.operations));
+
+    record_request_result_with_correlation(
+        &db,
+        &request,
+        TaskBoardSyncAuditTrigger::Orchestrator,
+        Some("run-preview"),
+        &result,
+        &metrics,
+    )
+    .await
+    .expect("record correlated preview evidence");
+
+    let events = sync_events(&db).await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].correlation_id.as_deref(), Some("run-preview"));
+    let payload = events[0].payload_json.as_ref().expect("preview payload");
+    assert_eq!(payload["observed_operation_count"].as_u64(), Some(1));
+    assert_eq!(
+        payload["operation_evidence"][0]["external_id"].as_str(),
+        Some("acme/widgets#41")
+    );
 }
 
 #[tokio::test]

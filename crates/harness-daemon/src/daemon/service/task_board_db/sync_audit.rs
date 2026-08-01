@@ -129,7 +129,7 @@ fn correlated_audit_is_required(
     result: &Result<TaskBoardSyncResponse, CliError>,
     metrics: &SyncExecutionMetrics,
 ) -> bool {
-    result.is_err() || metrics.has_applied_change() || metrics.failed_scope_count() > 0
+    result.is_err() || metrics.has_observed_operations() || metrics.failed_scope_count() > 0
 }
 
 pub(crate) async fn record_reviews_projection_result(
