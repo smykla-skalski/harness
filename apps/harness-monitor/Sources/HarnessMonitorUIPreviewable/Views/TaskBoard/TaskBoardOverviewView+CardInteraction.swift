@@ -245,7 +245,7 @@ private func taskBoardCardDragPhaseName(_ phase: DragSession.Phase) -> String {
   }
 }
 
-private func taskBoardDropSessionPhaseName(_ phase: DropSession.Phase) -> String {
+func taskBoardDropSessionPhaseName(_ phase: DropSession.Phase) -> String {
   switch phase {
   case .entering:
     "entering"

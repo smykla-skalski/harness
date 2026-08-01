@@ -58,7 +58,7 @@ struct TaskBoardLaneUnifiedColumn: View {
     get { hoveredCardID }
     nonmutating set { hoveredCardID = newValue }
   }
-  private var cardHoverCoordinateSpace: String {
+  var cardHoverCoordinateSpace: String {
     "task-board-lane-card-hover-\(lane.rawValue)"
   }
 
