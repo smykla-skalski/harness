@@ -73,7 +73,7 @@ pub async fn serve_remote_https(
     let daemon_epoch = manifest.started_at.clone();
     let async_db_slot_for_audit = async_db.clone();
 
-    initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await?;
+    initialize_startup_state(&db, &async_db, sender.clone(), &config).await?;
     super::task_board_automation_startup::initialize_control_before_serving(&async_db).await?;
     super::audit::record_remote_daemon_bound(async_db.get(), &endpoint, config.sandboxed).await;
     install_acp_probe_bridge_refresh();

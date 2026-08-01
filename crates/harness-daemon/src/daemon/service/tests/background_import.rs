@@ -7,6 +7,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
     use std::time::Duration;
 
     use crate::daemon::codex_transport::CodexTransportKind;
+    use crate::daemon::serve::ProviderCredentialStartupMode;
 
     with_temp_project(|project| {
         let state = start_active_file_session(
@@ -31,6 +32,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
             observe_interval: Duration::from_secs(5),
             sandboxed: false,
             codex_transport: CodexTransportKind::Stdio,
+            provider_credential_startup: ProviderCredentialStartupMode::Keychain,
         })
         .expect("validate serve config");
 

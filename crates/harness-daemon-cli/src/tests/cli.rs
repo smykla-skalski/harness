@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+use harness_daemon::daemon::serve::ProviderCredentialStartupMode;
+
 use super::super::{DaemonDevArgs, DaemonServeArgs, HARNESS_MONITOR_APP_GROUP_ID};
 
 #[derive(Debug, Parser)]
@@ -199,6 +201,10 @@ fn daemon_dev_execution_plan_is_always_unsandboxed() {
     temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
         let plan = dev.execution_plan();
         assert!(!plan.serve_config.sandboxed);
+        assert_eq!(
+            plan.serve_config.provider_credential_startup,
+            ProviderCredentialStartupMode::ClientHandoff
+        );
     });
 }
 
@@ -206,6 +212,10 @@ fn daemon_dev_execution_plan_is_always_unsandboxed() {
 fn daemon_serve_args_default_is_unsandboxed() {
     let parsed = DaemonServeArgsTestHarness::try_parse_from(["test"]).unwrap();
     assert!(!parsed.args.sandboxed);
+    assert_eq!(
+        parsed.args.serve_config().provider_credential_startup,
+        ProviderCredentialStartupMode::Keychain
+    );
     assert!(!parsed.args.enable_acp);
     assert!(!parsed.args.disable_acp);
 }
@@ -214,6 +224,10 @@ fn daemon_serve_args_default_is_unsandboxed() {
 fn daemon_serve_args_accepts_sandboxed_flag() {
     let parsed = DaemonServeArgsTestHarness::try_parse_from(["test", "--sandboxed"]).unwrap();
     assert!(parsed.args.sandboxed);
+    assert_eq!(
+        parsed.args.serve_config().provider_credential_startup,
+        ProviderCredentialStartupMode::ClientHandoff
+    );
 }
 
 #[test]

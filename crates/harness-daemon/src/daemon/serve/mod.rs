@@ -37,6 +37,7 @@ pub(crate) use reconciliation::{
 pub use remote::serve_remote_https;
 
 pub use config::DaemonServeConfig;
+pub use harness_daemon_provider_credentials::ProviderCredentialStartupMode;
 use std::path::Path;
 use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -103,7 +104,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let async_db_slot_for_audit = async_db.clone();
 
     if let Err(error) =
-        initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await
+        initialize_startup_state(&db, &async_db, sender.clone(), &config).await
     {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
@@ -220,7 +221,7 @@ pub(crate) async fn initialize_startup_state(
     db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
     async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
     sender: broadcast::Sender<super::protocol::StreamEvent>,
-    poll_interval: Duration,
+    config: &DaemonServeConfig,
 ) -> Result<(), CliError> {
     let span = startup_span();
     if let Some(trace_id) = span.in_scope(current_trace_id) {
@@ -235,13 +236,16 @@ pub(crate) async fn initialize_startup_state(
             reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
             let task_board_instance_id = async_db.task_board_instance_id().await?;
-            load_provider_credentials(&task_board_instance_id);
+            load_provider_credentials(
+                &task_board_instance_id,
+                config.provider_credential_startup,
+            );
         }
         spawn_startup_background_tasks(
             Arc::clone(&db),
             Arc::clone(async_db_slot),
             sender,
-            poll_interval,
+            config.poll_interval,
         );
         Ok(())
     }

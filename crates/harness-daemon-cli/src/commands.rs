@@ -10,7 +10,9 @@ use harness_daemon::daemon::cli_support::{
     adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
 };
 use harness_daemon::daemon::codex_transport::codex_transport_from_env;
-use harness_daemon::daemon::serve::{self, DaemonServeConfig};
+use harness_daemon::daemon::serve::{
+    self, DaemonServeConfig, ProviderCredentialStartupMode,
+};
 use harness_daemon::daemon::{launchd, service, state};
 use harness_daemon::feature_flags;
 use harness_daemon::workspace::{host_home_dir, normalized_env_value};
@@ -197,7 +199,7 @@ impl DaemonServeArgs {
         }
     }
 
-    fn serve_config(&self) -> DaemonServeConfig {
+    pub(crate) fn serve_config(&self) -> DaemonServeConfig {
         let sandboxed = self.sandboxed || service::sandboxed_from_env();
         let codex_transport = match self.codex_ws_url.as_ref() {
             Some(url) if !url.trim().is_empty() => {
@@ -218,6 +220,11 @@ impl DaemonServeArgs {
             observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
             sandboxed,
             codex_transport,
+            provider_credential_startup: if sandboxed {
+                ProviderCredentialStartupMode::ClientHandoff
+            } else {
+                ProviderCredentialStartupMode::Keychain
+            },
         }
     }
 }
@@ -317,6 +324,7 @@ impl DaemonDevArgs {
                 observe_interval: Duration::from_secs(5),
                 sandboxed: false,
                 codex_transport,
+                provider_credential_startup: ProviderCredentialStartupMode::ClientHandoff,
             },
             log_effective_app_group,
         }

@@ -4,6 +4,7 @@ use crate::daemon::codex_transport::CodexTransportKind;
 use crate::daemon::http::{CompanionRouteConfig, DaemonHttpAuthMode};
 use crate::daemon::server_state::RemoteRequestLimitConfig;
 use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
+use harness_daemon_provider_credentials::ProviderCredentialStartupMode;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone)]
@@ -29,6 +30,9 @@ pub struct DaemonServeConfig {
     /// unsandboxed default is stdio. See
     /// [`codex_transport::codex_transport_from_env`](crate::daemon::codex_transport::codex_transport_from_env).
     pub codex_transport: CodexTransportKind,
+    /// Whether startup restores provider tokens itself or waits for a trusted
+    /// client such as Harness Monitor to hand them off.
+    pub provider_credential_startup: ProviderCredentialStartupMode,
 }
 
 impl Default for DaemonServeConfig {
@@ -44,6 +48,7 @@ impl Default for DaemonServeConfig {
             observe_interval: Duration::from_secs(5),
             sandboxed: false,
             codex_transport: CodexTransportKind::Stdio,
+            provider_credential_startup: ProviderCredentialStartupMode::Keychain,
         }
     }
 }

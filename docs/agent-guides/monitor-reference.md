@@ -232,6 +232,8 @@ mise run monitor:daemon:dev
 
 The dev daemon runs unsandboxed, writes its manifest into the `Q498EB36N4.io.harnessmonitor` app group container, and spawns Codex as its own stdio child. No host bridge is required unless you explicitly test the WebSocket path. For an isolated runtime lane, prefix daemon and bridge commands with `HARNESS_MONITOR_RUNTIME_LANE=<name>`. For isolated CLI builds/tests, use `HARNESS_MONITOR_BUILD_LANE=<name>`.
 
+Both `harness-daemon dev` and sandboxed managed-daemon startup delegate GitHub and OpenRouter credential restoration to Harness Monitor. The daemon never queries the Monitor-owned provider Keychain items in either mode; the app reads them under its own identity and syncs the in-memory snapshots after connecting. Unsandboxed `harness-daemon serve` retains the headless Keychain restoration path.
+
 Debug the dev daemon with `lldb -- harness-daemon dev`. The scheme sets `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout. Starting the app before the daemon also works; the manifest watcher reconnects on first manifest write. Production builds can also switch future launches to external mode in **Settings > General > Startup daemon mode**, or by setting `HARNESS_MONITOR_EXTERNAL_DAEMON=1` before launch.
 
 If a `harness-bridge start` process is already running for the same runtime lane, stop it before using dev mode unless you are intentionally testing the WebSocket bridge path. In sandboxed production builds, keep external daemons in an app-group-accessible runtime root by using `HARNESS_MONITOR_RUNTIME_LANE`, `HARNESS_DAEMON_DATA_HOME`, or the `monitor:daemon:dev` wrapper so manifest discovery stays on the shared container roots.

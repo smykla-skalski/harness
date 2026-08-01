@@ -1,7 +1,8 @@
-//! Loads GitHub and `OpenRouter` provider credentials from the macOS Keychain
-//! at daemon startup and persists them through `harness-daemon-state`,
+//! Loads GitHub and `OpenRouter` provider credentials for headless daemons
+//! from the macOS Keychain and persists them through `harness-daemon-state`,
 //! converting into `harness-task-board`'s own credential-snapshot and
-//! sync-request types.
+//! sync-request types. Monitor-owned daemons use client handoff instead, so
+//! only the app process accesses its Keychain items.
 //!
 //! `db`'s `AsyncDaemonDb` type still lives inside `harness-daemon` itself, so
 //! depending on it here would recreate the daemon-crate dependency this
@@ -67,9 +68,22 @@ impl Default for ProviderCredentialLoadReport {
     }
 }
 
-/// Loads GitHub and `OpenRouter` provider credentials for `instance_id` from
-/// the macOS Keychain and persists them through `harness-daemon-state`.
-pub fn load_provider_credentials(instance_id: &str) {
+/// Selects which process owns provider credential persistence at startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderCredentialStartupMode {
+    /// The daemon is headless and restores credentials from the Keychain.
+    Keychain,
+    /// A trusted client reads its own Keychain items and syncs them after startup.
+    ClientHandoff,
+}
+
+/// Restores provider credentials for `instance_id` when the daemon owns the
+/// Keychain read. Client-handoff mode deliberately performs no Keychain query.
+pub fn load_provider_credentials(instance_id: &str, mode: ProviderCredentialStartupMode) {
+    if mode == ProviderCredentialStartupMode::ClientHandoff {
+        tracing::info!("provider credential loading delegated to client");
+        return;
+    }
     let report = load_for_instance(instance_id);
     log_load_issue("GitHub", &report.github);
     log_load_issue("OpenRouter", &report.openrouter);
@@ -143,7 +157,12 @@ fn load_for_instance(instance_id: &str) -> ProviderCredentialLoadReport {
     }
 }
 
-#[cfg(any(not(target_os = "macos"), test, feature = "test-support"))]
+#[cfg(test)]
+fn load_for_instance(_instance_id: &str) -> ProviderCredentialLoadReport {
+    panic!("client handoff must return before credential loading")
+}
+
+#[cfg(all(not(test), any(not(target_os = "macos"), feature = "test-support")))]
 fn load_for_instance(_instance_id: &str) -> ProviderCredentialLoadReport {
     ProviderCredentialLoadReport::default()
 }
@@ -280,6 +299,14 @@ mod tests {
         assert_eq!(
             report.openrouter.source,
             ProviderCredentialSource::Unavailable
+        );
+    }
+
+    #[test]
+    fn client_handoff_mode_never_loads_from_keychain() {
+        load_provider_credentials(
+            "instance-a",
+            ProviderCredentialStartupMode::ClientHandoff,
         );
     }
 }
