@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -5,6 +6,83 @@ import Testing
 @MainActor
 @Suite("Harness Monitor cross-daemon secret migration")
 struct HarnessMonitorStoreSecretMigrationTests {
+  @Test("A replacement daemon after app relaunch reviews and carries stored secrets")
+  func replacementDaemonAfterRelaunchMigratesSecrets() async throws {
+    let suiteName = "HarnessMonitorStoreSecretMigrationTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let connectionHistory = TaskBoardConnectionHistoryStore(defaults: defaults)
+    let credentials = InMemoryTaskBoardCredentialBundle()
+    let keyMaterial = InMemoryTaskBoardKeychainBundle()
+    try credentials.github.save(
+      TaskBoardGitHubCredentialSnapshot(
+        repositoryTokens: [
+          TaskBoardGitHubRepositoryToken(repository: "org/repo", token: "repo-token-A")
+        ]
+      ),
+      scope: .database("daemon-A")
+    )
+    let initialClient = RecordingHarnessClient()
+    initialClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 1,
+      instanceID: "daemon-A"
+    )
+    _ = await makeBootstrappedStore(
+      client: initialClient,
+      credentialPersistence: credentials,
+      keychainBundle: keyMaterial,
+      taskBoardConnectionHistoryStore: connectionHistory
+    )
+
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 2,
+      instanceID: "daemon-B"
+    )
+    let replacementWorker = TaskBoardSettingsWorker(
+      credentialPersistence: credentials.persistence,
+      keyMaterialPersistence: keyMaterial.persistence
+    )
+    let relaunchedStore = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: replacementClient),
+      voiceCapture: NativeVoiceCaptureService(),
+      taskBoardSettingsWorker: replacementWorker,
+      taskBoardConnectionHistoryStore: TaskBoardConnectionHistoryStore(defaults: defaults)
+    )
+
+    async let bootstrapped: Void = relaunchedStore.bootstrap()
+    #expect(await waitUntil { relaunchedStore.presentedSheet != nil })
+    relaunchedStore.resolveSecretMigrationConsent([.repositoryGitHubToken("org/repo"): true])
+    await bootstrapped
+
+    let migrated = try credentials.github.load(scope: .database("daemon-B"))
+    #expect(migrated.repositoryTokens.first?.repository == "org/repo")
+    #expect(migrated.repositoryTokens.first?.token == "repo-token-A")
+    #expect(relaunchedStore.presentedSheet == nil)
+  }
+
+  @Test("Repository override history survives app relaunch")
+  func repositoryOverrideHistorySurvivesRelaunch() throws {
+    let suiteName = "HarnessMonitorStoreSecretMigrationTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let connectionHistory = TaskBoardConnectionHistoryStore(defaults: defaults)
+    connectionHistory.recordRepositoryOverrideSlugs(["org/repo"], instanceID: "daemon-A")
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      voiceCapture: NativeVoiceCaptureService(),
+      taskBoardSettingsWorker: TaskBoardSettingsWorker(
+        credentialPersistence: InMemoryTaskBoardCredentialBundle().persistence,
+        keyMaterialPersistence: InMemoryTaskBoardKeychainBundle().persistence
+      ),
+      taskBoardConnectionHistoryStore: TaskBoardConnectionHistoryStore(defaults: defaults)
+    )
+
+    #expect(store.knownTaskBoardRepositorySlugs(for: "daemon-A") == ["org/repo"])
+  }
+
   @Test("Connecting to a replacement daemon reviews and carries stored secrets")
   func connectingToReplacementDaemonMigratesSecrets() async throws {
     let initialClient = RecordingHarnessClient()

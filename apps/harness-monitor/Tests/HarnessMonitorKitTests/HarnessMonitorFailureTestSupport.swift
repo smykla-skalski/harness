@@ -258,7 +258,9 @@ final class FailingHarnessClient: HarnessMonitorClientProtocol, @unchecked Senda
 func makeBootstrappedStore(
   client: any HarnessMonitorClientProtocol = RecordingHarnessClient(),
   credentialPersistence: InMemoryTaskBoardCredentialBundle? = nil,
-  keychainBundle: InMemoryTaskBoardKeychainBundle? = nil
+  keychainBundle: InMemoryTaskBoardKeychainBundle? = nil,
+  taskBoardConnectionHistoryStore: TaskBoardConnectionHistoryStore =
+    TaskBoardConnectionHistoryStore(defaults: nil)
 ) async -> HarnessMonitorStore {
   let daemon = RecordingDaemonController(client: client)
   let credentialPersistence = credentialPersistence ?? InMemoryTaskBoardCredentialBundle()
@@ -270,7 +272,8 @@ func makeBootstrappedStore(
   let store = HarnessMonitorStore(
     daemonController: daemon,
     voiceCapture: NativeVoiceCaptureService(),
-    taskBoardSettingsWorker: taskBoardSettingsWorker
+    taskBoardSettingsWorker: taskBoardSettingsWorker,
+    taskBoardConnectionHistoryStore: taskBoardConnectionHistoryStore
   )
   await store.bootstrap()
   clearRecordedCallsIfNeeded(for: client)

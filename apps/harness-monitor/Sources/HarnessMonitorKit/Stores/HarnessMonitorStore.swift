@@ -28,6 +28,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let timelineWindowWorker = TimelineWindowWorker()
   @ObservationIgnored let sessionWindowPresentationWorker = SessionWindowPresentationWorker()
   @ObservationIgnored let taskBoardSettingsWorker: TaskBoardSettingsWorker
+  @ObservationIgnored let taskBoardConnectionHistoryStore: TaskBoardConnectionHistoryStore
   @ObservationIgnored var taskBoardRuntimeState = TaskBoardRuntimeState()
   @ObservationIgnored var sessionIndexSnapshotApplyTask: Task<Void, Never>?
   @ObservationIgnored var sessionIndexSnapshotApplyGeneration: UInt64 = 0
@@ -361,6 +362,8 @@ public final class HarnessMonitorStore {
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil,
     taskBoardSettingsWorker: TaskBoardSettingsWorker,
+    taskBoardConnectionHistoryStore: TaskBoardConnectionHistoryStore =
+      TaskBoardConnectionHistoryStore(),
     reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFileStoreDefaults.preview(),
     reviewFilePatchStore: ReviewFilePatchStore = ReviewFileStoreDefaults.patch()
   ) {
@@ -376,6 +379,7 @@ public final class HarnessMonitorStore {
     (self.daemonController, self.daemonOwnership) = (daemonController, daemonOwnership)
     (self.fileViewer, self.voiceCapture) = (fileViewer, voiceCapture)
     self.taskBoardSettingsWorker = taskBoardSettingsWorker
+    self.taskBoardConnectionHistoryStore = taskBoardConnectionHistoryStore
     (self.reviewFilePreviewStore, self.reviewFilePatchStore) = (
       reviewFilePreviewStore,
       reviewFilePatchStore

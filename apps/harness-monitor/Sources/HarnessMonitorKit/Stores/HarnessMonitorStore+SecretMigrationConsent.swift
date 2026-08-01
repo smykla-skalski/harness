@@ -7,10 +7,14 @@ struct TaskBoardSecretMigrationConsentState: Sendable {
 
 extension HarnessMonitorStore {
   /// Records a freshly connected daemon identity. When it differs from the last
-  /// one connected this session, that prior id becomes the migration source so
-  /// stored secrets follow the user to the new daemon.
+  /// persisted identity, that prior id becomes the migration source so stored
+  /// secrets follow the user to the new daemon after an app relaunch.
   func noteConnectedDatabaseInstance(_ instanceID: String) {
-    let lastConnected = taskBoardRuntimeState.connection.lastConnectedDatabaseInstanceID
+    let persistedPrevious = taskBoardConnectionHistoryStore.noteConnectedDatabaseInstance(
+      instanceID
+    )
+    let lastConnected =
+      taskBoardRuntimeState.connection.lastConnectedDatabaseInstanceID ?? persistedPrevious
     if let lastConnected, lastConnected != instanceID {
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = lastConnected
     }
@@ -28,6 +32,7 @@ extension HarnessMonitorStore {
     guard !slugs.isEmpty else { return }
     taskBoardRuntimeState.connection.databaseRepositoryOverrideSlugs[instanceID, default: []]
       .formUnion(slugs)
+    taskBoardConnectionHistoryStore.recordRepositoryOverrideSlugs(slugs, instanceID: instanceID)
   }
 
   func knownTaskBoardRepositorySlugs(for instanceIDs: String?...) -> Set<String> {
@@ -35,6 +40,9 @@ extension HarnessMonitorStore {
     for instanceID in instanceIDs.compactMap({ $0 }) {
       slugs.formUnion(
         taskBoardRuntimeState.connection.databaseRepositoryOverrideSlugs[instanceID] ?? []
+      )
+      slugs.formUnion(
+        taskBoardConnectionHistoryStore.repositoryOverrideSlugs(instanceID: instanceID)
       )
     }
     return slugs
