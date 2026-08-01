@@ -78,7 +78,33 @@ extension PreviewHarnessClientState {
         ),
       ]
     )
-    let attempts = [
+    return TaskBoardWorkflowProgressResponse(
+      progress: TaskBoardWorkflowProgress(
+        executionId: executionID,
+        workflowKind: item.workflowKind ?? .prFixReview,
+        phase: .implementation,
+        state: .running,
+        exactHeadRevision: head,
+        currentRuntime: "codex",
+        currentModel: "gpt-5.3-codex-spark",
+        triage: TaskBoardDependencyRouteRecord(
+          routeId: "dependency-preview-route",
+          repository: triage.repository,
+          pullRequestNumber: triage.pullRequestNumber,
+          exactHeadRevision: head,
+          status: .fixRequested,
+          reason: "The failed Rust check requires a scoped repair.",
+          sourceResult: triage
+        ),
+        attempts: previewWorkflowAttempts(),
+        createdAt: "2026-07-30T08:10:00Z",
+        updatedAt: "2026-07-30T08:11:22Z"
+      )
+    )
+  }
+
+  private static func previewWorkflowAttempts() -> [TaskBoardWorkflowAttemptProgress] {
+    [
       TaskBoardWorkflowAttemptProgress(
         actionKey: "dependency_triage",
         attempt: 1,
@@ -101,28 +127,5 @@ extension PreviewHarnessClientState {
         updatedAt: "2026-07-30T08:11:22Z"
       ),
     ]
-    return TaskBoardWorkflowProgressResponse(
-      progress: TaskBoardWorkflowProgress(
-        executionId: executionID,
-        workflowKind: item.workflowKind ?? .prFixReview,
-        phase: .implementation,
-        state: .running,
-        exactHeadRevision: head,
-        currentRuntime: "codex",
-        currentModel: "gpt-5.3-codex-spark",
-        triage: TaskBoardDependencyRouteRecord(
-          routeId: "dependency-preview-route",
-          repository: triage.repository,
-          pullRequestNumber: triage.pullRequestNumber,
-          exactHeadRevision: head,
-          status: .fixRequested,
-          reason: "The failed Rust check requires a scoped repair.",
-          sourceResult: triage
-        ),
-        attempts: attempts,
-        createdAt: "2026-07-30T08:10:00Z",
-        updatedAt: "2026-07-30T08:11:22Z"
-      )
-    )
   }
 }

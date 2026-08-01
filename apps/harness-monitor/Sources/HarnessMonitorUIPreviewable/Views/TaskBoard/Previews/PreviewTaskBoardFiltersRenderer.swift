@@ -16,10 +16,28 @@ public enum TaskBoardFilterPreviewRenderer {
 
     let defaultIndex = HarnessMonitorTextSize.defaultIndex
     let largestIndex = HarnessMonitorTextSize.scales.count - 1
+    return renderFilterSurfaces(
+      textSizeIndex: defaultIndex,
+      largestTextSizeIndex: largestIndex,
+      directory: directory
+    )
+      && renderSearchSurfaces(
+        textSizeIndex: defaultIndex,
+        largestTextSizeIndex: largestIndex,
+        directory: directory
+      )
+  }
+
+  @MainActor
+  private static func renderFilterSurfaces(
+    textSizeIndex: Int,
+    largestTextSizeIndex: Int,
+    directory: String
+  ) -> Bool {
     return render(
       name: "filter-bar-idle",
       size: NSSize(width: 900, height: 120),
-      textSizeIndex: defaultIndex,
+      textSizeIndex: textSizeIndex,
       directory: directory
     ) {
       TaskBoardFilterBarPreview(filters: TaskBoardFilterState())
@@ -27,7 +45,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-bar-active",
         size: NSSize(width: 900, height: 160),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterBarPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
@@ -35,7 +53,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-bar-active-largest-text",
         size: NSSize(width: 900, height: 260),
-        textSizeIndex: largestIndex,
+        textSizeIndex: largestTextSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterBarPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
@@ -43,7 +61,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-project-dropdown",
         size: NSSize(width: 340, height: 160),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFacetFilterOptionsPreview(
@@ -54,7 +72,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-priority-dropdown",
         size: NSSize(width: 340, height: 184),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFacetFilterOptionsPreview(
@@ -65,7 +83,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-popover",
         size: NSSize(width: 420, height: 400),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterPopoverPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
@@ -73,7 +91,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-popover-largest-text",
         size: NSSize(width: 500, height: 520),
-        textSizeIndex: largestIndex,
+        textSizeIndex: largestTextSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterPopoverPreview(filters: TaskBoardFilterPreviewFixtures.narrowedFilters)
@@ -81,23 +99,31 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "filter-empty-state",
         size: NSSize(width: 640, height: 260),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterEmptyStatePreview()
       }
-      && render(
-        name: "search-field-idle",
-        size: NSSize(width: 420, height: 100),
-        textSizeIndex: defaultIndex,
-        directory: directory
-      ) {
-        TaskBoardSearchFieldPreview(searchText: "")
-      }
+  }
+
+  @MainActor
+  private static func renderSearchSurfaces(
+    textSizeIndex: Int,
+    largestTextSizeIndex: Int,
+    directory: String
+  ) -> Bool {
+    render(
+      name: "search-field-idle",
+      size: NSSize(width: 420, height: 100),
+      textSizeIndex: textSizeIndex,
+      directory: directory
+    ) {
+      TaskBoardSearchFieldPreview(searchText: "")
+    }
       && render(
         name: "search-suggestions",
         size: NSSize(width: 420, height: 260),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardSearchFieldPreview(searchText: "polcy", showsSuggestions: true)
@@ -105,7 +131,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "search-suggestions-largest-text",
         size: NSSize(width: 520, height: 340),
-        textSizeIndex: largestIndex,
+        textSizeIndex: largestTextSizeIndex,
         directory: directory
       ) {
         TaskBoardSearchFieldPreview(searchText: "polcy", showsSuggestions: true)
@@ -113,7 +139,7 @@ public enum TaskBoardFilterPreviewRenderer {
       && render(
         name: "search-with-filters",
         size: NSSize(width: 980, height: 170),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterBarPreview(
@@ -121,21 +147,26 @@ public enum TaskBoardFilterPreviewRenderer {
           searchText: "policy"
         )
       }
-      && render(
-        name: "search-empty-state",
-        size: NSSize(width: 640, height: 260),
-        textSizeIndex: defaultIndex,
-        directory: directory
-      ) {
-        TaskBoardFilterEmptyStatePreview(
-          filters: TaskBoardFilterState(),
-          searchText: "nothing here"
-        )
-      }
+      && renderEmptyStates(textSizeIndex: textSizeIndex, directory: directory)
+  }
+
+  @MainActor
+  private static func renderEmptyStates(textSizeIndex: Int, directory: String) -> Bool {
+    render(
+      name: "search-empty-state",
+      size: NSSize(width: 640, height: 260),
+      textSizeIndex: textSizeIndex,
+      directory: directory
+    ) {
+      TaskBoardFilterEmptyStatePreview(
+        filters: TaskBoardFilterState(),
+        searchText: "nothing here"
+      )
+    }
       && render(
         name: "search-and-filter-empty-state",
         size: NSSize(width: 680, height: 280),
-        textSizeIndex: defaultIndex,
+        textSizeIndex: textSizeIndex,
         directory: directory
       ) {
         TaskBoardFilterEmptyStatePreview(

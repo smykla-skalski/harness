@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 
 enum TaskBoardLaneListRow: Identifiable {
-  enum ID: Hashable {
+  enum RowID: Hashable {
     case decision(String)
     case api(String)
     case inbox(sessionID: String, taskID: String)
@@ -11,7 +11,7 @@ enum TaskBoardLaneListRow: Identifiable {
   case api(TaskBoardItem)
   case inbox(TaskBoardInboxItem)
 
-  var id: ID {
+  var id: RowID {
     switch self {
     case .decision(let decision):
       .decision(decision.id)

@@ -313,7 +313,7 @@ enum TaskBoardFilterPreviewFixtures {
     body: String = "",
     status: TaskBoardStatus,
     priority: TaskBoardPriority,
-    tags: [String],
+    tags: [String] = [],
     projectSlug: String,
     projectID: String? = nil,
     importedFromProvider: TaskBoardExternalRefProvider? = nil

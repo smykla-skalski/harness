@@ -73,7 +73,7 @@ struct TaskBoardFilterMatcher: Sendable {
   /// rather than pointing at an innocent one.
   static func responsibleCauses(
     in population: [TaskBoardFilterFields],
-    matcher: TaskBoardFilterMatcher
+    matcher: Self
   ) -> [TaskBoardNarrowingCause] {
     let activeCauses = matcher.activeCauses
     guard !activeCauses.isEmpty else {

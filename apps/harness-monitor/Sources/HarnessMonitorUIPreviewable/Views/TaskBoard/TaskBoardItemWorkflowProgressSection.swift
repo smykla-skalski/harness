@@ -142,7 +142,8 @@ struct TaskBoardItemWorkflowProgressSection: View {
     }
   }
 
-  @ViewBuilder private func checksSection(_ checks: [TaskBoardDependencyCheck]) -> some View {
+  @ViewBuilder
+  private func checksSection(_ checks: [TaskBoardDependencyCheck]) -> some View {
     if !checks.isEmpty {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         TaskBoardWorkflowSectionHeader(title: "Checks", systemImage: "checkmark.circle")

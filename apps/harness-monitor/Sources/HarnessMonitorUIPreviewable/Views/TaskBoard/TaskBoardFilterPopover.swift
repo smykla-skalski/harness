@@ -54,7 +54,8 @@ struct TaskBoardFilterPopover: View {
     }
   }
 
-  @ViewBuilder private func facetSection(_ facet: TaskBoardFilterFacet) -> some View {
+  @ViewBuilder
+  private func facetSection(_ facet: TaskBoardFilterFacet) -> some View {
     let options = inventory.options(for: facet)
     if !options.isEmpty {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {

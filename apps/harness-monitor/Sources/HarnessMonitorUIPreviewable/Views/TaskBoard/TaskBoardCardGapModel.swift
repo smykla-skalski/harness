@@ -4,108 +4,17 @@ import SwiftUI
 
 /// Where a lane's API rows sit inside its backing table. API rows follow the lane's
 /// decision rows and precede its inbox rows, so `firstRow` is the decision count.
-struct TaskBoardLaneAPIRowInfo: Equatable {
-  var firstRow: Int
-  var count: Int
-}
-
-func taskBoardCardGapSourceTargetIndex(sourceIndex: Int, sourceCount: Int) -> Int {
-  min(max(sourceIndex, 0), max(0, sourceCount - 1))
-}
-
-func taskBoardCardGapPointerYInSnapshotSpace(
-  pointerY: CGFloat,
-  snapshotReferenceY: CGFloat,
-  currentReferenceY: CGFloat
-) -> CGFloat {
-  pointerY - (currentReferenceY - snapshotReferenceY)
-}
-
-func taskBoardCardGapInsertionIndex(
-  midpoints: [CGFloat],
-  currentIndex: Int?,
-  pointerY: CGFloat,
-  gapHeight: CGFloat
-) -> Int {
-  let count = midpoints.count
-  guard let currentIndex else {
-    return midpoints.count { $0 > pointerY }
-  }
-  var index = min(max(currentIndex, 0), count)
-  while index > 0, pointerY > midpoints[index - 1] {
-    index -= 1
-  }
-  while index < count, pointerY < midpoints[index] - gapHeight {
-    index += 1
-  }
-  return index
-}
-
-@MainActor @Observable
-final class TaskBoardLaneCardGapState {
-  private(set) var draggedCardID: TaskBoardCardID?
-  private(set) var draggedItem: TaskBoardItem?
-  private(set) var displayIndex: Int?
-  private(set) var insertionOffset: Int?
-  private(set) var gapHeight: CGFloat = 48
-  private(set) var keepsListVisible = false
-  private(set) var showsMarker = false
-
-  var isActive: Bool { draggedCardID != nil }
-
-  func begin(
-    cardID: TaskBoardCardID,
-    item: TaskBoardItem,
-    displayIndex: Int?,
-    insertionOffset: Int?,
-    gapHeight: CGFloat,
-    keepsListVisible: Bool,
-    showsMarker: Bool
-  ) {
-    self.displayIndex = displayIndex
-    self.insertionOffset = insertionOffset
-    self.gapHeight = gapHeight
-    self.keepsListVisible = keepsListVisible
-    self.showsMarker = showsMarker
-    draggedItem = item
-    // The ID activates the lane's drag presentation, so publish it last.
-    draggedCardID = cardID
-  }
-
-  func updateDisplay(
-    index: Int?,
-    insertionOffset: Int?,
-    showsMarker: Bool
-  ) {
-    if displayIndex != index {
-      displayIndex = index
-    }
-    if self.insertionOffset != insertionOffset {
-      self.insertionOffset = insertionOffset
-    }
-    if self.showsMarker != showsMarker {
-      self.showsMarker = showsMarker
-    }
-  }
-
-  func end() {
-    draggedCardID = nil
-    draggedItem = nil
-    displayIndex = nil
-    insertionOffset = nil
-    keepsListVisible = false
-    showsMarker = false
-  }
-}
-
-/// Drives the custom insertion gap for a single-API-card drag. macOS 26 has no native
-/// cross-lane gap (`.gap` crashes the List bridge and the drop-session callbacks never
-/// fire inside a List — see the taskboard-dnd-macos26-recipe memory), so the dragged
-/// card is rendered as a placeholder and live-reordered to the drop point. This model
-/// owns the pointer targeting: a snapshot of resting API-row midpoints, translated by
 /// the List's live screen origin, plus a per-frame poll of the pointer.
-@MainActor @Observable
+@MainActor
+@Observable
 final class TaskBoardCardGapModel {
+  struct BeginContext {
+    var sourceLane: TaskBoardInboxLane
+    var sourceAPIIndex: Int
+    var candidateLanes: Set<TaskBoardInboxLane>
+    var rowInfo: [TaskBoardInboxLane: TaskBoardLaneAPIRowInfo]
+  }
+
   struct Target: Equatable {
     var lane: TaskBoardInboxLane
     /// Insertion index among the lane's API items, in post-removal (visible) space.
@@ -177,22 +86,19 @@ final class TaskBoardCardGapModel {
   func begin(
     cardID: TaskBoardCardID,
     item: TaskBoardItem,
-    sourceLane: TaskBoardInboxLane,
-    sourceAPIIndex: Int,
-    candidateLanes: Set<TaskBoardInboxLane>,
-    rowInfo: [TaskBoardInboxLane: TaskBoardLaneAPIRowInfo]
+    context: BeginContext
   ) {
-    self.candidateLanes = candidateLanes
-    self.sourceLane = sourceLane
-    self.sourceAPIIndex = sourceAPIIndex
-    self.sourceAPICount = rowInfo[sourceLane]?.count ?? 0
-    self.rowInfoByLane = rowInfo
+    candidateLanes = context.candidateLanes
+    sourceLane = context.sourceLane
+    sourceAPIIndex = context.sourceAPIIndex
+    sourceAPICount = context.rowInfo[context.sourceLane]?.count ?? 0
+    rowInfoByLane = context.rowInfo
     let tables = coordinator?.registeredTables ?? []
     snapshot(tables: tables)
     let sourceTarget = Target(
-      lane: sourceLane,
+      lane: context.sourceLane,
       index: taskBoardCardGapSourceTargetIndex(
-        sourceIndex: sourceAPIIndex,
+        sourceIndex: context.sourceAPIIndex,
         sourceCount: sourceAPICount
       )
     )
@@ -205,8 +111,8 @@ final class TaskBoardCardGapModel {
     beginLaneStates()
     buttonUpTicks = 0
     suppressNativeIndicators(in: tables)
-    pinScroll(in: tables, lanes: [sourceLane])
-    scheduleScrollPin(lanes: [sourceLane])
+    pinScroll(in: tables, lanes: [context.sourceLane])
+    scheduleScrollPin(lanes: [context.sourceLane])
     startTracking()
   }
 
@@ -426,11 +332,13 @@ final class TaskBoardCardGapModel {
         state(for: lane).begin(
           cardID: draggedCardID,
           item: draggedItem,
-          displayIndex: display?.index,
-          insertionOffset: showsMarker ? insertionOffset(for: lane) : nil,
-          gapHeight: gapHeight,
-          keepsListVisible: candidateLanes.contains(lane),
-          showsMarker: showsMarker
+          presentation: TaskBoardLaneCardGapState.Presentation(
+            displayIndex: display?.index,
+            insertionOffset: showsMarker ? insertionOffset(for: lane) : nil,
+            gapHeight: gapHeight,
+            keepsListVisible: candidateLanes.contains(lane),
+            showsMarker: showsMarker
+          )
         )
       }
     }

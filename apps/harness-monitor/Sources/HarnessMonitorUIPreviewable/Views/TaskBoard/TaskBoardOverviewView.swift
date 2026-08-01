@@ -88,6 +88,11 @@ public struct TaskBoardOverviewView: View {
 
   var currentPresentation: TaskBoardOverviewPresentation { cachedPresentation }
 
+  var evaluationSummaryFitsHorizontallyValue: Bool {
+    get { evaluationSummaryFitsHorizontally }
+    nonmutating set { evaluationSummaryFitsHorizontally = newValue }
+  }
+
   func applyImmediateTaskBoardPresentation(_ presentation: TaskBoardOverviewPresentation) {
     // Reject any older actor result already in flight. The next task keyed by
     // the updated input remains authoritative and will reconcile this value.
@@ -369,30 +374,6 @@ public struct TaskBoardOverviewView: View {
 }
 
 extension TaskBoardOverviewView {
-  func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
-    Group {
-      if evaluationSummaryFitsHorizontally {
-        HStack(spacing: HarnessMonitorTheme.spacingSM) {
-          evaluationSummaryContent(summary)
-        }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          evaluationSummaryContent(summary)
-        }
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .onGeometryChange(for: CGFloat.self) { proxy in
-      proxy.size.width
-    } action: { width in
-      let next = width >= 420
-      if evaluationSummaryFitsHorizontally != next {
-        evaluationSummaryFitsHorizontally = next
-      }
-    }
-    .accessibilityIdentifier("harness.task-board.evaluation-summary")
-  }
-
   /// Holds the board still until the typing stops. Clearing skips the wait: the
   /// board someone is asking for back is the one they already had.
   @MainActor
