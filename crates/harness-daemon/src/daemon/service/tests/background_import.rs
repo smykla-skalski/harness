@@ -192,6 +192,33 @@ fn background_reconciliation_ignores_agent_only_projects() {
     });
 }
 
+#[test]
+fn background_reconciliation_ignores_archived_session_projects() {
+    with_temp_project(|project| {
+        let state = start_active_file_session(
+            "archived background reconciliation",
+            "",
+            project,
+            Some("claude"),
+            Some("0faeea45-f70a-5c02-bb0d-49a35de97f57"),
+        )
+        .expect("start session");
+        let layout = crate::session::storage::layout_from_project_dir(project, &state.session_id)
+            .expect("session layout");
+        crate::session::storage::update_state(&layout, |state| {
+            state.archived_at = Some("2026-08-01T15:00:00Z".into());
+            Ok(())
+        })
+        .expect("archive session");
+
+        let (projects, sessions) = serve::discover_background_reconciliation_inputs()
+            .expect("discover reconciliation inputs");
+
+        assert!(projects.is_empty(), "archived projects need no DB import");
+        assert!(sessions.is_empty(), "archived sessions stay hidden");
+    });
+}
+
 /// A poisoned db lock used to return `Ok`, so reconciliation skipped its work
 /// and still logged the normal completion line - a silent no-op that looked
 /// exactly like a clean run.

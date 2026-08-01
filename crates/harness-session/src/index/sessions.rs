@@ -360,7 +360,7 @@ fn list_session_ids_new_layout() -> Vec<String> {
     ids
 }
 
-fn load_session_state_from_context_root(
+pub(super) fn load_session_state_from_context_root(
     context_root: &Path,
     session_id: &str,
 ) -> Result<Option<SessionState>, CliError> {

@@ -11,7 +11,7 @@ use harness_workspace::workspace::{
 };
 
 use super::contexts::{infer_checkout_identity, repair_context_root};
-use super::sessions::list_session_ids_legacy;
+use super::sessions::{list_session_ids_legacy, load_session_state_from_context_root};
 use super::{DiscoveredProject, project_context_dir_name};
 
 #[must_use]
@@ -109,7 +109,7 @@ pub fn discover_projects() -> Result<Vec<DiscoveredProject>, CliError> {
     discover_projects_internal(false)
 }
 
-/// Discover only projects that currently contain file-backed sessions.
+/// Discover only projects that currently contain visible file-backed sessions.
 ///
 /// This avoids resolving Git identity for agent-only project contexts when a
 /// caller only needs session import candidates.
@@ -161,10 +161,18 @@ fn discover_projects_internal(
 }
 
 fn context_has_file_backed_session(context_root: &Path) -> Result<bool, CliError> {
-    if !list_session_ids_legacy(context_root)?.is_empty() {
-        return Ok(true);
+    let mut session_ids = list_session_ids_legacy(context_root)?;
+    session_ids.extend(storage::list_known_session_ids_from_context_root(
+        context_root,
+    )?);
+    session_ids.sort_unstable();
+    session_ids.dedup();
+    for session_id in session_ids {
+        if load_session_state_from_context_root(context_root, &session_id)?.is_some() {
+            return Ok(true);
+        }
     }
-    Ok(!storage::list_known_session_ids_from_context_root(context_root)?.is_empty())
+    Ok(false)
 }
 
 /// Build a `DiscoveredProject` from an existing `context_root` directory.
