@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::iter::repeat_with;
 
-use futures_util::future::try_join_all;
 use tokio::sync::OnceCell;
+use tokio::task::JoinSet;
 
 use crate::external::ExternalTask;
 use harness_github_api::GitHubProtectedClient;
@@ -13,6 +14,8 @@ use super::super::{DEPENDENCY_BOT_AUTHORS, GitHubRepository, warn_github_message
 use super::mapping;
 
 const MAX_ALIASED_SEARCHES_PER_REQUEST: usize = 5;
+
+type BatchSearchResults = Vec<Result<GitHubBatchSearchResult, String>>;
 
 pub(super) struct InboxBatch {
     client: GitHubProtectedClient,
@@ -82,23 +85,7 @@ impl InboxBatch {
         } else {
             MAX_ALIASED_SEARCHES_PER_REQUEST - 1
         };
-        let batches = try_join_all(
-            slots
-                .chunks(batch_size)
-                .zip(queries.chunks(batch_size))
-                .zip(contexts.chunks(batch_size))
-                .map(|((slots, queries), contexts)| async move {
-                    let results = search_issue_pull_requests_batch(
-                        &self.client,
-                        queries,
-                        contexts,
-                        self.fresh,
-                    )
-                    .await?;
-                    Ok::<_, CliError>((slots, results))
-                }),
-        )
-        .await?;
+        let batches = self.fetch_batches(&queries, &contexts, batch_size).await?;
         let mut repositories = self
             .repositories
             .iter()
@@ -109,12 +96,49 @@ impl InboxBatch {
                 )
             })
             .collect::<HashMap<_, _>>();
-        for (slots, results) in batches {
+        for (slots, results) in slots.chunks(batch_size).zip(batches) {
             for (slot, result) in slots.iter().zip(results) {
                 record_result(&mut repositories, slot, result);
             }
         }
         Ok(self.finish_repositories(&repositories))
+    }
+
+    async fn fetch_batches(
+        &self,
+        queries: &[String],
+        contexts: &[String],
+        batch_size: usize,
+    ) -> Result<Vec<BatchSearchResults>, CliError> {
+        let mut pending = JoinSet::new();
+        for (index, (queries, contexts)) in queries
+            .chunks(batch_size)
+            .zip(contexts.chunks(batch_size))
+            .enumerate()
+        {
+            let client = self.client.clone();
+            let queries = queries.to_vec();
+            let contexts = contexts.to_vec();
+            let fresh = self.fresh;
+            pending.spawn(async move {
+                let results =
+                    search_issue_pull_requests_batch(&client, &queries, &contexts, fresh).await;
+                (index, results)
+            });
+        }
+        let mut batches = repeat_with(|| None).take(pending.len()).collect::<Vec<_>>();
+        while let Some(joined) = pending.join_next().await {
+            let (index, results) = joined.map_err(|error| {
+                CliErrorKind::workflow_io(format!("github inbox batch task failed: {error}"))
+            })?;
+            batches[index] = Some(results?);
+        }
+        batches
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                CliErrorKind::workflow_io("github inbox batch task omitted a result").into()
+            })
     }
 
     fn batch_inputs(&self) -> (Vec<QuerySlot>, Vec<String>, Vec<String>) {

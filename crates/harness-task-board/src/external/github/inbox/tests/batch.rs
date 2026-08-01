@@ -1,11 +1,23 @@
 use serde_json::json;
+use std::process::Command;
+use std::{env, thread};
+use tempfile::tempdir;
+use tokio::runtime::Builder as RuntimeBuilder;
 
 use super::super::*;
 use super::support::{
     MockResponse, assigned_only_background_batched_clients, assigned_only_batched_clients,
     batched_clients_with_reviews, empty_batch_search_response, spawn_sequence_mock,
 };
+use crate::external::{ExternalSyncDirection, ExternalSyncOptions, sync_external_tasks_scoped};
+use crate::store::TaskBoardStore;
 use harness_github_api::acquire_global_budget_test_lock;
+
+const DAEMON_STACK_CHILD_ENV: &str = "HARNESS_TEST_GITHUB_INBOX_DAEMON_STACK_CHILD";
+const DAEMON_STACK_TEST: &str =
+    "external::github::inbox::tests::batch::scoped_review_batch_survives_daemon_worker_stack";
+// WebSocket dispatch and tracing consume the rest of the production worker's 2 MiB stack.
+const INBOX_BATCH_STACK_HEADROOM: usize = 256 * 1024;
 
 #[tokio::test]
 async fn scoped_inbox_clients_share_batched_repository_reads() {
@@ -103,6 +115,67 @@ async fn scoped_review_batch_uses_one_gateway_safe_request_per_repository() {
             .iter()
             .any(|request| request.contains("repo:owner/seven"))
     );
+}
+
+#[test]
+fn scoped_review_batch_survives_daemon_worker_stack() {
+    if env::var_os(DAEMON_STACK_CHILD_ENV).is_none() {
+        let output = Command::new(env::current_exe().expect("current test executable"))
+            .args(["--exact", DAEMON_STACK_TEST, "--nocapture"])
+            .env(DAEMON_STACK_CHILD_ENV, "1")
+            .output()
+            .expect("run isolated daemon-stack inbox test");
+        assert!(
+            output.status.success(),
+            "isolated daemon-stack inbox test failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        return;
+    }
+
+    let worker = thread::Builder::new()
+        .name("daemon-stack-inbox".into())
+        .stack_size(INBOX_BATCH_STACK_HEADROOM)
+        .spawn(|| {
+            let runtime = RuntimeBuilder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("current-thread runtime");
+            runtime.block_on(async {
+                let _guard = acquire_global_budget_test_lock().await;
+                let repositories = (0..30)
+                    .map(|index| format!("owner/repo-{index}"))
+                    .collect::<Vec<_>>();
+                let repository_refs = repositories.iter().map(String::as_str).collect::<Vec<_>>();
+                let responses = (0..repositories.len())
+                    .map(|_| MockResponse::json(200, empty_batch_search_response(5)))
+                    .collect();
+                let (endpoint, requests, handle) = spawn_sequence_mock(responses);
+                let clients = batched_clients_with_reviews(&endpoint, &repository_refs)
+                    .into_iter()
+                    .map(|client| Box::new(client) as Box<dyn ExternalSyncClient>)
+                    .collect::<Vec<_>>();
+                let temp = tempdir().expect("tempdir");
+                let board = TaskBoardStore::new(temp.path().join("board"));
+
+                sync_external_tasks_scoped(
+                    &board,
+                    ExternalSyncOptions {
+                        direction: ExternalSyncDirection::Pull,
+                        ..ExternalSyncOptions::default()
+                    },
+                    &clients,
+                )
+                .await
+                .expect("full inbox sync");
+
+                handle.join().expect("mock server");
+                assert_eq!(requests.lock().expect("requests").len(), repositories.len());
+            });
+        })
+        .expect("spawn daemon-stack inbox test");
+    worker.join().expect("daemon-stack inbox test");
 }
 
 #[tokio::test]
