@@ -1,10 +1,14 @@
 use chrono::{TimeZone, Utc};
+use std::env;
+use std::process::{Command, Output};
+use std::thread;
 use tempfile::tempdir;
+use tokio::runtime::Builder as RuntimeBuilder;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::reviews::{
     ReviewAuthorAssociation, ReviewCheckStatus, ReviewItem, ReviewItemFlags, ReviewMergeableState,
-    ReviewPullRequestState, ReviewReviewStatus,
+    ReviewPullRequestState, ReviewReviewStatus, ReviewsQueryRequest,
 };
 use crate::task_board::external::{
     ExternalProviderScopeAttemptDecision, ExternalProviderScopeIdentity,
@@ -16,7 +20,72 @@ use crate::task_board::{
 use crate::task_board::{ExternalSyncClient, TaskBoardItem};
 use crate::workspace::utc_now;
 
-use super::{reconcile_shared_review_items_db, shared_review_request_clients_from_settings};
+use super::{
+    reconcile_shared_review_items_db, run_review_query_task,
+    shared_review_request_clients_from_settings,
+};
+
+const REVIEW_STACK_CHILD_ENV: &str = "HARNESS_TEST_SHARED_REVIEW_STACK_CHILD";
+const REVIEW_STACK_TEST: &str = "daemon::service::task_board_db::reviews_sync::tests::shared_review_query_validation_runs_on_fresh_task_stack";
+const CONSTRAINED_REVIEW_STACK: usize = 128 * 1024;
+
+#[test]
+fn shared_review_query_validation_runs_on_fresh_task_stack() {
+    if env::var_os(REVIEW_STACK_CHILD_ENV).is_none() {
+        let inline = run_review_stack_child("inline");
+        assert!(
+            !inline.status.success()
+                && String::from_utf8_lossy(&inline.stderr).contains("stack overflow"),
+            "inline validation did not reproduce the stack overflow: stdout={} stderr={}",
+            String::from_utf8_lossy(&inline.stdout),
+            String::from_utf8_lossy(&inline.stderr),
+        );
+        let isolated = run_review_stack_child("isolated");
+        assert!(
+            isolated.status.success(),
+            "isolated validation failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&isolated.stdout),
+            String::from_utf8_lossy(&isolated.stderr),
+        );
+        return;
+    }
+
+    let mode = env::var(REVIEW_STACK_CHILD_ENV).expect("review stack child mode");
+    let worker = thread::Builder::new()
+        .name("constrained-review-query".into())
+        .stack_size(CONSTRAINED_REVIEW_STACK)
+        .spawn(move || {
+            let request = ReviewsQueryRequest {
+                repositories: vec!["acme/widgets".into()],
+                ..ReviewsQueryRequest::default()
+            };
+            if mode == "inline" {
+                return request.validate();
+            }
+            let runtime = RuntimeBuilder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .expect("review query runtime");
+            runtime.block_on(run_review_query_task(async move {
+                request.validate()?;
+                Ok(())
+            }))
+        })
+        .expect("spawn constrained review query");
+    worker
+        .join()
+        .expect("constrained review query thread")
+        .expect("review query validation");
+}
+
+fn run_review_stack_child(mode: &str) -> Output {
+    Command::new(env::current_exe().expect("current test executable"))
+        .args(["--exact", REVIEW_STACK_TEST, "--nocapture"])
+        .env(REVIEW_STACK_CHILD_ENV, mode)
+        .output()
+        .expect("run isolated review stack test")
+}
 
 #[test]
 fn shared_review_clients_split_scope_and_ownership_by_repository() {

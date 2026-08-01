@@ -1,10 +1,12 @@
 use std::collections::HashSet;
+use std::future::Future;
 use std::slice;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::SecondsFormat;
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
+use tokio::task::spawn;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::TaskBoardSyncRequest;
@@ -72,8 +74,11 @@ impl ExternalSyncClient for SharedReviewRequestClient {
             .query
             .as_ref()
             .expect("shared Reviews client has tasks or a query");
-        let source =
-            super::super::reviews_source_port::query_repository_reviews(&query.request).await?;
+        let request = query.request.clone();
+        let source = run_review_query_task(async move {
+            super::super::reviews_source_port::query_repository_reviews(&request).await
+        })
+        .await?;
         self.hold_github_revision(source.github_data_revision)
             .await?;
         let tasks = review_external_tasks(
@@ -87,6 +92,17 @@ impl ExternalSyncClient for SharedReviewRequestClient {
     async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
         Err(CliErrorKind::workflow_io("shared Reviews source is pull-only").into())
     }
+}
+
+async fn run_review_query_task<T>(
+    task: impl Future<Output = Result<T, CliError>> + Send + 'static,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+{
+    spawn(task).await.map_err(|error| {
+        CliErrorKind::workflow_io(format!("shared reviews query task failed: {error}"))
+    })?
 }
 
 impl SharedReviewRequestClient {
