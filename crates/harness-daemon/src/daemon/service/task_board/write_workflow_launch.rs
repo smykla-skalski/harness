@@ -274,25 +274,37 @@ async fn pin_dependency_worktree(
     worktree: &str,
     pull_request: Option<&TaskBoardPullRequestIdentity>,
 ) -> Result<(), CliError> {
-    if !item.workflow_kind.has_dependency_update_intent() {
+    let Some(expected_head) = frozen_dependency_revision(item)? else {
         return Ok(());
-    }
+    };
     let identity = pull_request.ok_or_else(|| {
-        invalid_transition("dependency workflow launch has no frozen pull request head")
-    })?;
-    let head = identity.head.as_ref().ok_or_else(|| {
-        invalid_transition("dependency workflow launch has no frozen pull request head")
+        invalid_transition("dependency workflow launch has no pull request identity")
     })?;
     let worktree = std::path::PathBuf::from(worktree);
     let repository = identity.repository.clone();
     let pull_request = identity.number;
-    let expected_head = head.revision.clone();
+    let expected_head = expected_head.to_string();
     spawn_blocking(move || {
         pin_github_pull_request_worktree(&worktree, &repository, pull_request, &expected_head)
     })
     .await
     .map_err(|error| invalid_transition(format!("join pull request worktree pin: {error}")))?
     .map_err(|error| invalid_transition(error.to_string()))
+}
+
+fn frozen_dependency_revision(item: &TaskBoardItem) -> Result<Option<&str>, CliError> {
+    if !item.workflow_kind.has_dependency_update_intent() {
+        return Ok(None);
+    }
+    item.workflow
+        .pr_head_revision
+        .as_deref()
+        .map(str::trim)
+        .filter(|revision| !revision.is_empty())
+        .map(Some)
+        .ok_or_else(|| {
+            invalid_transition("dependency workflow launch has no recorded pull request head")
+        })
 }
 
 /// Stop a dependency launch whose live pull request no longer matches the frozen one, before any

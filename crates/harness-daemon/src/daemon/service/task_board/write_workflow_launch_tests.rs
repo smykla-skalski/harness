@@ -83,6 +83,7 @@ fn run_write_launch_stack_child(mode: &str) -> std::process::Output {
 fn dependency_item() -> TaskBoardItem {
     let mut item = approved_item("dep-item", Some("acme/widgets"));
     item.workflow_kind = TaskBoardWorkflowKind::PrFix;
+    item.workflow.pr_head_revision = Some("cafef00d".into());
     item
 }
 
@@ -163,6 +164,32 @@ fn dependency_identity_requires_a_frozen_head() {
             "unexpected error: {error}"
         );
     });
+}
+
+#[test]
+fn dependency_pin_uses_the_head_recorded_on_the_item() {
+    let item = dependency_item();
+
+    assert_eq!(
+        frozen_dependency_revision(&item).expect("recorded dependency head"),
+        Some("cafef00d")
+    );
+}
+
+#[test]
+fn dependency_pin_rejects_an_item_without_a_recorded_head() {
+    let mut item = dependency_item();
+    item.workflow.pr_head_revision = None;
+
+    let error = frozen_dependency_revision(&item)
+        .expect_err("dependency pinning must fail closed without the recorded head");
+
+    assert!(
+        error
+            .to_string()
+            .contains("no recorded pull request head"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
