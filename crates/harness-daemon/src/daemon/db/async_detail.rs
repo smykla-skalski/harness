@@ -1,8 +1,9 @@
+use harness_daemon_session_service::ExpiredPendingSignalIndexRecord;
 use sqlx::{query_as, query_scalar};
 
 use super::{
-    AsyncDaemonDb, CliError, ExpiredPendingSignalIndexRecord, SessionSignalRecord,
-    SessionSignalStatus, Signal, daemon_protocol, db_error,
+    AsyncDaemonDb, CliError, SessionSignalRecord, SessionSignalStatus, Signal, daemon_protocol,
+    db_error,
 };
 
 const LOAD_SIGNALS_SQL: &str = "

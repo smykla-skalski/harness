@@ -336,7 +336,10 @@ async fn sync_file_state_for_resolved_async(resolved: &ResolvedSession) -> Resul
     spawn_blocking(move || sync_file_state_for_resolved(&resolved))
         .await
         .unwrap_or_else(|error| {
-            Err(CliErrorKind::workflow_io(format!("session file mirror worker failed: {error}")).into())
+            Err(
+                CliErrorKind::workflow_io(format!("session file mirror worker failed: {error}"))
+                    .into(),
+            )
         })
 }
 
@@ -464,7 +467,10 @@ async fn refresh_signal_index_for_resolved_async<A: AsyncSignalStorage>(
     let signals = spawn_blocking(move || snapshot::load_signals_for(&project, &state))
         .await
         .unwrap_or_else(|error| {
-            Err(CliErrorKind::workflow_io(format!("signal index refresh worker failed: {error}")).into())
+            Err(
+                CliErrorKind::workflow_io(format!("signal index refresh worker failed: {error}"))
+                    .into(),
+            )
         })?;
     storage
         .sync_signal_index(&resolved.state.session_id, &signals)
@@ -496,7 +502,10 @@ async fn write_prepared_leave_signals_async(
     })
     .await
     .unwrap_or_else(|error| {
-        Err(CliErrorKind::workflow_io(format!("{operation} leave-signal worker failed: {error}")).into())
+        Err(
+            CliErrorKind::workflow_io(format!("{operation} leave-signal worker failed: {error}"))
+                .into(),
+        )
     })
 }
 
@@ -511,7 +520,9 @@ async fn save_archived_file_state_async(
     })
     .await
     .unwrap_or_else(|error| {
-        Err(CliErrorKind::workflow_io(format!("archive session file mirror worker failed: {error}")).into())
+        Err(CliErrorKind::workflow_io(format!(
+            "archive session file mirror worker failed: {error}"
+        ))
+        .into())
     })
 }
-

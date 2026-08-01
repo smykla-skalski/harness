@@ -8,9 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::agents::runtime as agents_runtime;
-use crate::agents::runtime::signal::{
-    AckResult, SignalAck, acknowledge_signal as write_signal_ack,
-};
+use crate::agents::runtime::signal::AckResult;
 use crate::agents::service as agents_service;
 use crate::session::types::{
     AgentRegistration, SessionLogEntry, SessionState, SessionTransition, TaskSource,

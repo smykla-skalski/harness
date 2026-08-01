@@ -189,7 +189,6 @@ pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
 #[cfg(test)]
 pub(crate) use schema::set_schema_init_hook;
-pub(crate) use signals::ExpiredPendingSignalIndexRecord;
 #[allow(unused_imports)]
 use signals::derive_effective_signal_status;
 pub(crate) use telemetry::{trace_async_db_operation, trace_sync_db_operation};

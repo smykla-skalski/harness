@@ -91,6 +91,14 @@ impl SignalStorage for DaemonDb {
     fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
         DaemonDb::mark_session_inactive(self, session_id)
     }
+
+    fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<harness_daemon_session_service::ExpiredPendingSignalIndexRecord>, CliError>
+    {
+        DaemonDb::load_expired_pending_signals(self, session_id)
+    }
 }
 
 impl SignalWake for AgentTuiManagerHandle {

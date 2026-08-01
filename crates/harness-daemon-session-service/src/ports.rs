@@ -1,10 +1,19 @@
 use std::future::Future;
 use std::time::Duration;
 
+use harness_agents::runtime::signal::Signal;
 use harness_kernel::errors::CliError;
 use harness_session::index::ResolvedSession;
 use harness_session::types::{SessionLogEntry, SessionSignalRecord, SessionState};
 use harness_session::wire::SessionDetail;
+
+/// A pending indexed signal whose effective status has expired.
+#[derive(Debug, Clone)]
+pub struct ExpiredPendingSignalIndexRecord {
+    pub runtime: String,
+    pub agent_id: String,
+    pub signal: Signal,
+}
 
 /// Synchronous persistence needed by signal delivery.
 pub trait SignalStorage {
@@ -74,6 +83,13 @@ pub trait SignalStorage {
     /// # Errors
     /// Returns an error when the active flag cannot be cleared.
     fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns an error when indexed signals cannot be loaded.
+    fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>;
 }
 
 /// Asynchronous persistence needed by signal delivery.
@@ -131,6 +147,11 @@ pub trait AsyncSignalStorage: Send + Sync {
         &self,
         session_id: &str,
     ) -> impl Future<Output = Result<(), CliError>> + Send;
+
+    fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>> + Send;
 }
 
 /// Active wake transport used for best-effort signal delivery.

@@ -13,6 +13,7 @@ mod mutations;
 mod observe;
 mod persistence;
 mod ports;
+mod reconcile;
 mod sync;
 mod timeout;
 mod tui_identity;
@@ -36,6 +37,10 @@ pub use observe::{
 pub use persistence::{
     acknowledged_signal_record, build_signal_ack, pending_signal_record, record_signal_ack,
 };
-pub use ports::{AsyncSignalStorage, SignalStorage, SignalWake};
+pub use ports::{AsyncSignalStorage, ExpiredPendingSignalIndexRecord, SignalStorage, SignalWake};
+pub use reconcile::{
+    liveness_project_dir_for_resolved, reconcile_expired_pending_signals,
+    reconcile_expired_pending_signals_async, sync_resolved_liveness, sync_resolved_liveness_async,
+};
 pub use sync::{attempt_active_signal_delivery, build_active_signal_prompt, send_signal};
 pub use sync::{cancel_signal, managed_tui_id_for_registration};

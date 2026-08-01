@@ -67,6 +67,14 @@ impl AsyncSignalStorage for AsyncDaemonDb {
     async fn sync_file_state(&self, session_id: &str) -> Result<(), CliError> {
         sync_file_state_from_async_db(self, session_id).await
     }
+
+    async fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<harness_daemon_session_service::ExpiredPendingSignalIndexRecord>, CliError>
+    {
+        AsyncDaemonDb::load_expired_pending_signals(self, session_id).await
+    }
 }
 
 pub(crate) async fn cancel_signal_async(

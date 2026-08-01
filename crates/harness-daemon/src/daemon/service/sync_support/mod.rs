@@ -1,10 +1,8 @@
 pub(super) use super::{
     AckResult, CliError, CliErrorKind, HookAgent, Path, PathBuf, ResolvedSession, SessionLogEntry,
-    SessionTransition, SignalAck, session_service, snapshot, utc_now, write_signal_ack,
+    SessionTransition, session_service, snapshot, utc_now,
 };
-pub(super) use crate::agents::runtime::{runtime_for_name, signal::pending_dir};
-pub(super) use crate::daemon::db::ExpiredPendingSignalIndexRecord;
-pub(super) use crate::session::types::{SessionSignalRecord, SessionState};
+pub(super) use crate::session::types::SessionSignalRecord;
 
 mod context;
 mod logs;
@@ -16,7 +14,9 @@ pub(crate) use context::{
     resolve_hook_agent, session_not_found, sync_file_state_for_resolved,
     sync_file_state_from_async_db,
 };
-pub(crate) use logs::{append_leave_signal_logs_to_db, append_task_drop_effect_logs, build_log_entry};
+pub(crate) use logs::{
+    append_leave_signal_logs_to_db, append_task_drop_effect_logs, build_log_entry,
+};
 pub(crate) use signals::{
     reconcile_expired_pending_signals_for_db, record_signal_ack, refresh_signal_index_for_db,
 };

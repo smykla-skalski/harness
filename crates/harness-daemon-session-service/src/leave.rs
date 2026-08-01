@@ -5,7 +5,9 @@ use harness_session::wire::{SessionDetail, SessionLeaveRequest};
 use harness_workspace::workspace::utc_now;
 
 use crate::mutations::sync_file_state_from_storage_async;
-use crate::persistence::{build_log_entry, effective_project_dir, session_detail, session_not_found};
+use crate::persistence::{
+    build_log_entry, effective_project_dir, session_detail, session_not_found,
+};
 use crate::ports::{AsyncSignalStorage, SignalStorage};
 
 /// # Errors

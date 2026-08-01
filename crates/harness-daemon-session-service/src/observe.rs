@@ -218,7 +218,9 @@ fn test_inject_issue(
     code: harness_protocol::observe::IssueCode,
     now: &str,
 ) -> Result<harness_session::types::WorkItem, CliError> {
-    use harness_protocol::observe::{Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole};
+    use harness_protocol::observe::{
+        Confidence, FixSafety, IssueCategory, IssueSeverity, MessageRole,
+    };
 
     let issue = Issue {
         id: format!("{code}/{agent_id}/1"),

@@ -1,14 +1,9 @@
+use harness_daemon_session_service::ExpiredPendingSignalIndexRecord;
+
 use super::{
     CliError, DaemonDb, SessionSignalRecord, SessionSignalStatus, SessionState, Signal, db_error,
     utc_now,
 };
-
-#[derive(Debug, Clone)]
-pub(crate) struct ExpiredPendingSignalIndexRecord {
-    pub(crate) runtime: String,
-    pub(crate) agent_id: String,
-    pub(crate) signal: Signal,
-}
 
 impl DaemonDb {
     /// Sync the signal index for a session from a list of signal records.
