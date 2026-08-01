@@ -1,3 +1,7 @@
+use std::future::Future;
+
+use tokio::task::JoinSet;
+
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
 use crate::github_api::refresh_read_generation;
@@ -24,6 +28,40 @@ use super::sync_audit::{SyncExecutionMetrics, TaskBoardSyncAuditTrigger};
 enum SyncAbort {
     Failed(CliError),
     Blocked(Box<ExternalSyncBatch>),
+}
+
+pub(super) async fn execute_isolated(
+    db: AsyncDaemonDb,
+    request: TaskBoardSyncRequest,
+    context: TaskBoardSyncRunContext,
+) -> (
+    Result<TaskBoardSyncResponse, CliError>,
+    SyncExecutionMetrics,
+) {
+    run_provider_sync_task(async move {
+        let mut metrics = SyncExecutionMetrics::default();
+        let result = execute(&db, &request, &context, &mut metrics).await;
+        (result, metrics)
+    })
+    .await
+    .unwrap_or_else(|error| (Err(error), SyncExecutionMetrics::default()))
+}
+
+pub(super) async fn run_provider_sync_task<T>(
+    task: impl Future<Output = T> + Send + 'static,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+{
+    let mut tasks = JoinSet::new();
+    tasks.spawn(task);
+    tasks
+        .join_next()
+        .await
+        .ok_or_else(|| CliErrorKind::workflow_io("provider sync task ended without a result"))?
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("provider sync task failed: {error}")).into()
+        })
 }
 
 impl SyncAbort {

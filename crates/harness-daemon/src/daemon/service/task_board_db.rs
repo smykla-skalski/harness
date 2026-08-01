@@ -35,6 +35,8 @@ mod positions;
 mod provider_sync_context_store;
 mod provider_sync_exclusion;
 mod provider_sync_execution;
+#[cfg(test)]
+mod provider_sync_execution_isolation_tests;
 mod provider_sync_store;
 mod request_validation;
 mod review_report;
@@ -55,7 +57,6 @@ use request_validation::{validate_create_title, validate_estimate, validate_upda
 pub(crate) use review_report::get_task_board_ai_review_report_db;
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
-use sync_audit::SyncExecutionMetrics;
 pub(crate) use sync_audit::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
     record_targeted_reviews_projection_result,
@@ -385,8 +386,9 @@ async fn sync_task_board_db_with_permit(
     mut permit: crate::daemon::db::TaskBoardSyncPermit,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let context = context.with_cancellation(permit.cancellation());
-    let mut metrics = SyncExecutionMetrics::default();
-    let result = provider_sync_execution::execute(db, request, &context, &mut metrics).await;
+    let (result, metrics) =
+        provider_sync_execution::execute_isolated(db.clone(), request.clone(), context.clone())
+            .await;
     context.observe_sync_metrics(&metrics);
     let audit = sync_audit::record_request_result_with_correlation(
         db,
