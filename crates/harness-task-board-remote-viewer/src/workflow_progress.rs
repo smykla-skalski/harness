@@ -67,10 +67,7 @@ mod tests {
 
         assert_eq!(progress.blocked_reason.as_deref(), Some("[redacted]"));
         assert_eq!(
-            progress
-                .terminal_outcome
-                .expect("terminal outcome")
-                .summary,
+            progress.terminal_outcome.expect("terminal outcome").summary,
             "[redacted]"
         );
         assert_eq!(triage.reason, "[redacted]");

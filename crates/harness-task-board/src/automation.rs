@@ -40,12 +40,12 @@ mod status;
 mod wake;
 mod workflow;
 mod workflow_execution;
-mod workflow_progress;
 mod workflow_execution_authority_validation;
 mod workflow_execution_remote_handoff_validation;
 mod workflow_execution_target_validation;
 mod workflow_execution_validation;
 mod workflow_execution_write_validation;
+mod workflow_progress;
 mod workflow_transitions;
 
 pub use admission::*;
@@ -81,10 +81,10 @@ pub use settings::*;
 pub use status::*;
 pub use workflow::*;
 pub use workflow_execution::*;
-pub use workflow_progress::*;
 pub use workflow_execution_remote_handoff_validation::*;
 pub use workflow_execution_target_validation::*;
 pub use workflow_execution_validation::*;
+pub use workflow_progress::*;
 pub use workflow_transitions::*;
 
 pub use wake::*;

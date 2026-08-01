@@ -4,6 +4,7 @@ use std::io::ErrorKind;
 use std::os::fd::RawFd;
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
 use std::process;
 
 use fs_err as fs;

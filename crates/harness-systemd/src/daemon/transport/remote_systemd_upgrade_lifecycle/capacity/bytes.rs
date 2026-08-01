@@ -2,7 +2,9 @@ use std::fs::{File, Metadata, OpenOptions};
 #[cfg(not(target_os = "linux"))]
 use std::io::Error;
 use std::io::ErrorKind;
-use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt as _;
+use std::os::unix::fs::OpenOptionsExt as _;
 use std::path::Path;
 
 use fs_err as fs;

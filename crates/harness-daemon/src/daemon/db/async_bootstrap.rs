@@ -249,8 +249,11 @@ async fn repair_modified_agent_turn_runs_checksum(pool: &SqlitePool) -> Result<(
     let Some((description, checksum)) = applied else {
         return Ok(());
     };
-    let modified_checksum = hex::decode(MODIFIED_AGENT_TURN_RUNS_CHECKSUM)
-        .map_err(|error| db_error(format!("decode agent turn runs migration checksum: {error}")))?;
+    let modified_checksum = hex::decode(MODIFIED_AGENT_TURN_RUNS_CHECKSUM).map_err(|error| {
+        db_error(format!(
+            "decode agent turn runs migration checksum: {error}"
+        ))
+    })?;
     if description != migration.description || checksum != modified_checksum {
         return Ok(());
     }

@@ -143,6 +143,12 @@ fn trusted_boundary(path: &Path) -> Result<PathBuf, CliError> {
 #[cfg(test)]
 fn trusted_boundary(path: &Path) -> Result<PathBuf, CliError> {
     let temporary_root = temp_dir();
+    let temporary_root = fs::canonicalize(&temporary_root).map_err(|error| {
+        io_error(format!(
+            "resolve test temporary directory {}: {error}",
+            temporary_root.display()
+        ))
+    })?;
     let relative = path.strip_prefix(&temporary_root).map_err(|_| {
         io_error(format!(
             "test private directory must be below the temporary directory {}: {}",

@@ -73,10 +73,7 @@ pub(in crate::daemon::task_board_managed_agents) async fn admission_state_counts
     .expect("load dispatch admission states")
 }
 
-pub(super) async fn current_intent_claim(
-    db: &AsyncDaemonDb,
-    intent_id: &str,
-) -> Option<String> {
+pub(super) async fn current_intent_claim(db: &AsyncDaemonDb, intent_id: &str) -> Option<String> {
     sqlx::query_scalar("SELECT claim_token FROM task_board_dispatch_intents WHERE intent_id = ?1")
         .bind(intent_id)
         .fetch_one(db.pool())

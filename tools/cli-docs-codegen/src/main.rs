@@ -109,7 +109,10 @@ fn render(command: &clap::Command) -> String {
     let mut current_hidden: &[String] = &[];
     let mut rendered = Vec::new();
     for line in markdown.lines() {
-        if let Some(rest) = line.strip_prefix("## `").and_then(|rest| rest.strip_suffix('`')) {
+        if let Some(rest) = line
+            .strip_prefix("## `")
+            .and_then(|rest| rest.strip_suffix('`'))
+        {
             current_hidden = hidden_by_path.get(rest).map_or(&[], Vec::as_slice);
         }
         let hidden_entry = line.strip_prefix("* `<").is_some_and(|rest| {
@@ -164,7 +167,10 @@ fn main() -> ExitCode {
                     continue;
                 }
                 Err(error) => {
-                    eprintln!("cli-docs-codegen: failed to read {}: {error}", path.display());
+                    eprintln!(
+                        "cli-docs-codegen: failed to read {}: {error}",
+                        path.display()
+                    );
                     return ExitCode::FAILURE;
                 }
             };

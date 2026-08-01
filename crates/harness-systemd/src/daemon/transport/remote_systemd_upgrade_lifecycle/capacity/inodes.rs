@@ -66,7 +66,7 @@ fn available_inodes(path: &Path) -> Result<Option<u64>, CliError> {
     if statistics.files() == 0 {
         Ok(None)
     } else {
-        Ok(Some(statistics.files_available()))
+        Ok(Some(statistics.files_available().into()))
     }
 }
 

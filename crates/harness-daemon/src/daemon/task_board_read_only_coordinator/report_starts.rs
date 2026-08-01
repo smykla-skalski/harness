@@ -57,11 +57,7 @@ where
     R: TaskBoardReadOnlyRuntime,
 {
     match request.mode {
-        CodexRunMode::Report => {
-            runtime
-                .start_report_run(session_id, request, run_id)
-                .await
-        }
+        CodexRunMode::Report => runtime.start_report_run(session_id, request, run_id).await,
         CodexRunMode::WorkspaceWrite => {
             runtime
                 .start_codex_workspace_run(session_id, request, run_id)

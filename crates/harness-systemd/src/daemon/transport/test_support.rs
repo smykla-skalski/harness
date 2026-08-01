@@ -1,3 +1,4 @@
+use std::env::temp_dir;
 use std::fs::{Permissions, set_permissions};
 use std::io;
 use std::os::unix::fs::PermissionsExt as _;
@@ -22,15 +23,15 @@ use tempfile::TempDir;
 const HARDENED_MODE: u32 = 0o755;
 
 pub(crate) fn hardened_tempdir() -> io::Result<TempDir> {
-    pin_umask();
-    let dir = tempfile::tempdir()?;
-    harden(dir.path())?;
-    Ok(dir)
+    hardened_tempdir_in(temp_dir())
 }
 
 pub(crate) fn hardened_tempdir_in(path: impl AsRef<Path>) -> io::Result<TempDir> {
     pin_umask();
-    let dir = tempfile::tempdir_in(path)?;
+    // macOS reports its temporary root through `/var`, a symlink to `/private/var`. Resolve the
+    // fixture parent so path-hardening tests only see aliases they created deliberately.
+    let parent = path.as_ref().canonicalize()?;
+    let dir = tempfile::tempdir_in(parent)?;
     harden(dir.path())?;
     Ok(dir)
 }

@@ -88,7 +88,10 @@ fn codex_evidence(run: &CodexRunSnapshot) -> TaskBoardWorkflowAttemptRuntimeEvid
     TaskBoardWorkflowAttemptRuntimeEvidence {
         runtime: "codex".into(),
         model: run.model.clone(),
-        report: run.final_message.clone().or_else(|| run.latest_summary.clone()),
+        report: run
+            .final_message
+            .clone()
+            .or_else(|| run.latest_summary.clone()),
         terminal_reason: run.error.clone(),
     }
 }

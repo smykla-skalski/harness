@@ -432,10 +432,7 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
         "0057_daemon_v58_ai_review_reports.sql",
         "15C283640623C5A38626FA96495572D77EAE9E4F0C092212C2AAE498833EAC2AED0EE8A624A2650A68AAB4D57B6F64ED",
     ),
-    (
-        "0058_daemon_v59_agent_turn_runs.sql",
-        ORIGINAL_V59_CHECKSUM,
-    ),
+    ("0058_daemon_v59_agent_turn_runs.sql", ORIGINAL_V59_CHECKSUM),
     (
         "0059_daemon_v60_agent_turn_runtime_id.sql",
         "5FE91EEC5D5F76FEC24F53970F71289534DC0F89607563215108F518475C3EA919FEFFE2D40781DB6CE0017A8DBD2224",
@@ -479,7 +476,10 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
         .iter()
         .map(|(filename, _)| (*filename).to_owned())
         .collect::<Vec<_>>();
-    assert_eq!(migration_files, expected_files, "checksum manifest is incomplete");
+    assert_eq!(
+        migration_files, expected_files,
+        "checksum manifest is incomplete"
+    );
 
     for &(filename, expected_checksum) in SHIPPED_MIGRATION_CHECKSUMS {
         let bytes = std::fs::read(migrations_dir.join(filename)).expect("read migration");
