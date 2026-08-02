@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -21,7 +22,7 @@ use super::core::{
     RuntimeSessionResolutionQuery, get_diagnostics, get_health, get_ready,
     get_runtime_session_resolution,
 };
-use super::response::{extract_request_id, request_activity_log_level, timed_response};
+use super::response::{request_activity_log_level, timed_response};
 use super::runtime_session::post_runtime_session;
 use super::sessions::{
     SessionScopeQuery, get_timeline, post_end_session, post_observe_session, post_session_join,
@@ -66,6 +67,7 @@ mod remote_viewer_task_board_paging;
 mod remote_viewer_task_board_review_report;
 mod remote_viewer_task_board_triage;
 mod report_only_delivery_acceptance;
+mod request_id;
 mod reviews_policy_writes;
 mod session_archive_tests;
 mod shutdown;
@@ -189,41 +191,6 @@ fn timed_response_observes_custom_error_responses() {
     assert!(output.contains("path=\"/v1/remote/pair/claim\""));
     assert!(output.contains("status=403"));
     assert!(output.contains("request_id=\"req-custom-response\""));
-}
-
-#[test]
-fn extract_request_id_preserves_supplied_header() {
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "x-request-id",
-        "req-123".parse().expect("request id header"),
-    );
-
-    assert_eq!(extract_request_id(&headers), "req-123");
-}
-
-#[test]
-fn extract_request_id_bounds_supplied_header() {
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "x-request-id",
-        "r".repeat(300).parse().expect("long request id header"),
-    );
-
-    let request_id = extract_request_id(&headers);
-
-    assert_eq!(request_id.len(), 256);
-    assert!(request_id.ends_with("..."));
-}
-
-#[test]
-fn extract_request_id_generates_fallback_when_header_missing() {
-    let first = extract_request_id(&HeaderMap::new());
-    let second = extract_request_id(&HeaderMap::new());
-
-    assert!(first.starts_with("daemon-"));
-    assert!(second.starts_with("daemon-"));
-    assert_ne!(first, second);
 }
 
 #[tokio::test]

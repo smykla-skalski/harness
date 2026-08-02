@@ -1,5 +1,7 @@
 use super::super::*;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
+use crate::daemon::db::activity_fold::DaemonDbActivityFold;
+use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::daemon::protocol::AgentToolActivitySummary;
 
 const FOLD_SESSION_ID: &str = "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4";

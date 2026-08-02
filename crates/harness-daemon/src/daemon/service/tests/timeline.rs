@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::conversation::DaemonDbConversation;
 
 #[test]
 fn session_timeline_window_known_revision_reloads_when_visible_rows_change_without_count_change() {

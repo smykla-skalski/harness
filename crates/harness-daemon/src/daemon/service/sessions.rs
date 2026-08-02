@@ -4,6 +4,8 @@ use super::{
 };
 #[cfg(test)]
 use super::{CliErrorKind, session_not_found};
+#[cfg(test)]
+use crate::daemon::db::timeline::DaemonDbTimeline;
 use crate::session::service::ResolvedRuntimeSessionAgent;
 use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 #[cfg(test)]

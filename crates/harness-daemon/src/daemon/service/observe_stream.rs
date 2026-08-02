@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::daemon::index as daemon_index;
 
 use super::resolved_events::{

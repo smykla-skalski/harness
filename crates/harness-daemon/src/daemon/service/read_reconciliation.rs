@@ -1,3 +1,4 @@
+use crate::daemon::db::imports::DaemonDbSessionResync;
 use std::path::PathBuf;
 
 use super::{CliError, Path, ResolvedSession, index, session_not_found};

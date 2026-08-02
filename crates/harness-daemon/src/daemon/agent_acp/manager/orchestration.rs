@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use async_trait::async_trait;

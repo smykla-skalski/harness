@@ -1,4 +1,7 @@
 use super::*;
+use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::imports::DaemonDbSessionResync;
+use crate::daemon::db::timeline::DaemonDbTimeline;
 
 #[test]
 fn prepare_runtime_transcript_resync_only_loads_matching_agent() {
@@ -219,12 +222,12 @@ fn apply_prepared_runtime_transcript_resync_preserves_other_agents() {
     assert_eq!(activities[1].agent_id, "codex-worker");
     assert_eq!(activities[1].tool_result_count, 1);
 
-    let leader_events = db
-        .load_conversation_events(&state.session_id, "claude-leader")
-        .expect("load leader events");
-    let worker_events = db
-        .load_conversation_events(&state.session_id, "codex-worker")
-        .expect("load worker events");
+    let leader_events =
+        DaemonDbConversation::load_conversation_events(&db, &state.session_id, "claude-leader")
+            .expect("load leader events");
+    let worker_events =
+        DaemonDbConversation::load_conversation_events(&db, &state.session_id, "codex-worker")
+            .expect("load worker events");
     assert_eq!(leader_events.len(), 1);
     assert_eq!(worker_events.len(), 2);
 }
@@ -277,9 +280,12 @@ fn append_conversation_events_merges_live_batches_without_replacing_history() {
     )
     .expect("append second live batch");
 
-    let loaded = db
-        .load_conversation_events("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader")
-        .expect("load appended events");
+    let loaded = DaemonDbConversation::load_conversation_events(
+        &db,
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+    )
+    .expect("load appended events");
     assert_eq!(loaded.len(), 2);
     assert_eq!(loaded[0].sequence, 1);
     assert_eq!(loaded[1].sequence, 2);
@@ -441,9 +447,9 @@ fn apply_prepared_runtime_transcript_resync_replaces_when_transcript_shrinks() {
     })
     .expect("apply worker transcript refresh");
 
-    let events = db
-        .load_conversation_events(&state.session_id, "codex-worker")
-        .expect("load worker events");
+    let events =
+        DaemonDbConversation::load_conversation_events(&db, &state.session_id, "codex-worker")
+            .expect("load worker events");
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].sequence, 1);
 }

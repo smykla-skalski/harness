@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::sync::{Arc, Mutex};
 
 use fs_err as fs;

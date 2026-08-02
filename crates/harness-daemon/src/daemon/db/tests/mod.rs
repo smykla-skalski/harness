@@ -7,6 +7,8 @@ pub(super) use std::time::{Duration, Instant};
 
 mod support;
 #[allow(unused_imports)]
+use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::timeline::DaemonDbTimeline;
 use support::*;
 
 mod agent_upserts;
@@ -200,9 +202,9 @@ fn assert_round_trip_smoke_reads(db: &DaemonDb, state: &SessionState) {
     let loaded_signals = db.load_signals(&state.session_id).expect("load signals");
     assert_eq!(loaded_signals.len(), 1);
     assert_eq!(loaded_signals[0].signal.signal_id, "sig-test-1");
-    let loaded_events = db
-        .load_conversation_events(&state.session_id, "claude-leader")
-        .expect("load conversation events");
+    let loaded_events =
+        DaemonDbConversation::load_conversation_events(db, &state.session_id, "claude-leader")
+            .expect("load conversation events");
     assert_eq!(loaded_events.len(), 1);
     match &loaded_events[0].kind {
         ConversationEventKind::Error { message, .. } => assert_eq!(message, "boom"),
