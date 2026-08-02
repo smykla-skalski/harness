@@ -42,9 +42,9 @@ A `replay` task ends only when clean local `main` and the session worktree point
 
 ## Visual changes
 
-Any change that alters what Harness Monitor renders, on macOS, iOS, or watchOS, requires user approval of an HTML snapshot gallery before the first commit of that change. This covers layout, typography, spacing, color, iconography, state presentation, animation endpoints, and any new or restyled view. It is not satisfied by a description, a code diff, a screenshot pasted into chat, or a build that compiles.
+Any change to what Harness Monitor renders on macOS, iOS, or watchOS needs user approval of an HTML snapshot gallery before its first commit. Layout, typography, spacing, color, iconography, state presentation, animation endpoints, and any new or restyled view all count. A description, a diff, a pasted screenshot, or a clean build does not substitute.
 
-Render the affected snapshots, inspect every emitted image yourself, then hand the user the gallery path and wait. Do not commit, and do not start delivery, until the user approves. When the user asks for changes, re-render and hand over the gallery again. `docs/agent-guides/monitor-previews.md` owns the mechanics, the suite registry, and how each platform produces its images.
+Render the affected suite, inspect every image, hand over the gallery path, and wait. Re-render and hand it over again after every requested change. `docs/agent-guides/monitor-previews.md` owns the mechanics and the per-platform details.
 
 ```bash
 HARNESS_MONITOR_BUILD_LANE=<session-lane> \
@@ -52,7 +52,7 @@ HARNESS_MONITOR_RUNTIME_LANE=<session-lane> \
 mise run monitor:preview -- <suite> tmp/preview-snapshots/<suite>/<task>
 ```
 
-That command assumes the assigned Monitor worktree and its session lanes, and it is safe to rerun; each run rebuilds the preview host and overwrites the output directory. `mise run monitor:preview -- --list` names the registered suites. A visual change with no suite that covers it needs one added before the change lands, since an unrendered surface cannot be approved.
+The command assumes the assigned Monitor worktree and its session lanes. Each run rebuilds the preview host and overwrites the output directory, so rerunning is safe. `mise run monitor:preview -- --list` names the registered suites. A surface no suite covers needs one added before it lands, because an unrendered surface cannot be approved.
 
 ## UI test failures
 

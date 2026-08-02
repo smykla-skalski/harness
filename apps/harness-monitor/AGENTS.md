@@ -158,7 +158,7 @@ Load detailed references only when the task touches the feature:
 
 Use the headless shell workflow in `../../docs/agent-guides/monitor-previews.md` for preview authoring and visual handoff. Keep `#Preview` placement aligned with `Sources/HarnessMonitorUIPreviewable/AGENTS.md`.
 
-Any change to what the macOS, iOS, or watch app renders needs user approval of the generated HTML snapshot gallery before its first commit. Render the affected suite, inspect every image, hand over the gallery path, and wait. The approval gate and the iOS and watch handling live in `../../docs/agent-guides/monitor-previews.md`.
+Any change to what the macOS, iOS, or watch app renders needs user approval of the HTML snapshot gallery before its first commit. Render the affected suite, inspect every image, hand over the gallery path, and wait. The gate and the iOS and watch handling live in `../../docs/agent-guides/monitor-previews.md`.
 
 ## Gotchas
 
