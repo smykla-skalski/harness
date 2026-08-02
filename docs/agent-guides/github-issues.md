@@ -2,9 +2,9 @@
 
 How to write and file issues in this repo. An issue is a contract between whoever understands the problem and whoever will change the code. It has to be complete enough that the implementer never needs to interrupt the author, and specific enough that "done" is verifiable by someone who was not in the room.
 
-The implementer is often an autonomous agent that cannot ask a follow-up question and may pick up a child issue with no memory of its siblings. Precision about outcomes and honesty about degrees of freedom matter more here than in a note between two people who can talk.
+The implementer is often an autonomous agent that cannot ask a follow-up question and may pick up a child issue with no memory of its siblings. Precision about outcomes and honesty about degrees of freedom matter more here than between two people who can talk.
 
-Research the codebase thoroughly before drafting, then keep almost all of that research out of the issue. Knowing the internals is what makes the scope and the slicing right; writing them down is what makes the issue rot.
+Research the codebase thoroughly before drafting, then keep almost all of that research out of the issue. Knowing the internals makes the scope and the slicing right. Writing it down makes the issue rot.
 
 PR titles and PR bodies follow `docs/agent-guides/delivery-workflows.md`, not this file.
 
@@ -36,13 +36,13 @@ PR titles and PR bodies follow `docs/agent-guides/delivery-workflows.md`, not th
 
 Use `type(scope): summary` with the same types as commits: `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`, or `perf`. Keep it imperative and present tense, lowercase after the colon, no trailing period, under 70 characters. PRs squash-merge, so an issue title routinely becomes the commit title on `main`.
 
-Name a user-visible capability or a concrete defect and its symptom, not a layer or a bare noun. "feat(monitor): reconnect after the daemon restarts" is a title. "feat(monitor): backend work" names no outcome and "fix(monitor): daemon bug" names no symptom, so neither is one. Lead with the verb and object so the title still reads when a list view truncates it, and prefer a verb for the observable result (add, remove, stop, prevent, allow) over a layer verb like update, improve, handle, or refactor.
+Name a user-visible capability or a concrete defect and its symptom, not a layer or a bare noun. "feat(monitor): reconnect after the daemon restarts" is a title. "feat(monitor): backend work" names no outcome and "fix(monitor): daemon bug" names no symptom, so neither is one. Lead with the verb and object so the title survives truncation in a list view. Prefer a verb for the observable result (add, remove, stop, prevent, allow) over a layer verb like update, improve, handle, or refactor.
 
-One deliverable per title. A summary that needs "and", "or", or a joining comma is two issues; resolve the split before writing either body.
+One deliverable per title. A summary that needs "and", "or", or a joining comma is two issues. Resolve the split before writing either body.
 
-Pick the type from the change class, not the diff size or the file extension. `feat` adds a capability a caller could not invoke before, `fix` corrects wrong or broken behavior, `refactor` changes structure with identical observable behavior, `perf` makes correct behavior faster against a metric you can name. Wrong output is `fix`, not `perf`; an unnamed metric means `refactor`, not `perf`. A file that ships as product behavior takes `feat` or `fix` whatever its extension, so a skill or a generated config the runtime consumes is not `docs`.
+Pick the type from the change class, not the diff size or the file extension. `feat` adds a capability a caller could not invoke before, `fix` corrects wrong or broken behavior, `refactor` changes structure with identical observable behavior, `perf` makes correct behavior faster against a metric you can name. Wrong output is `fix`, not `perf`. An unnamed metric means `refactor`, not `perf`. A file that ships as product behavior takes `feat` or `fix` whatever its extension, so a skill or a generated config the runtime consumes is not `docs`.
 
-Use a scope the repo already names, and prefer the narrowest true one. Coin a scope only when nothing fits and the area is durable enough that others will reuse it: one lowercase noun naming a real directory or subsystem, never the kind of change and never filler such as misc, core, logic, or general. If no real area fits, drop the parens and write `type: summary`. Flag any coined scope to the user before filing, since it hardens into a token across future issues and commits.
+Use a scope the repo already names, and prefer the narrowest true one. Coin a scope only when nothing fits and the area is durable enough to reuse: one lowercase noun naming a real directory or subsystem, never the kind of change and never filler such as misc, core, logic, or general. If no real area fits, drop the parens and write `type: summary`. Flag any coined scope to the user before filing, since it hardens into a token across future issues and commits.
 
 Umbrella issues prefix the title with `☂️ `, for example `☂️ feat(monitor): connect to multiple daemons at once`. Children carry no emoji, so the umbrella is the only entry that stands out in a list view.
 
@@ -57,17 +57,17 @@ Umbrella issues prefix the title with `☂️ `, for example `☂️ feat(monito
 
 ## Body
 
-Three sections at most for an ordinary issue. Bug reports swap the second section for three of their own, set out below. An umbrella keeps the ordinary body and adds no section of its own; it links its children as native sub-issues instead.
+Three sections at most for an ordinary issue. Bug reports swap the second section for three of their own, set out below. An umbrella keeps the ordinary body and adds no section of its own. It links its children as native sub-issues instead.
 
 `## Problem` comes first: two to four sentences of prose, active voice, present tense. State the user-visible impact and why it matters. No solution belongs in this section, because the moment a proposed fix lands there the implementer stops looking for a better one. If the reader cannot tell what goes wrong today, the issue is not ready.
 
-`## Expected outcome` comes second: three to six bullets, every one testable by someone who never read the issue, describing observable behavior only. "Tab moves focus in reading order in every view" passes. "Call `.focusSection()` in the sidebar" does not, because it names a mechanism rather than a result. Give each bullet one named observation that tells pass from fail: if you cannot say what you would look at to check it, the bullet is not testable yet and the argument has only been deferred to review. Quantify every quality word, since "fast", "simple", "reliable", and "secure" are not outcomes until they carry a threshold and a way to read it. Prefer outcomes that name the failure they prevent, since those survive a rewrite of the implementation.
+`## Expected outcome` comes second: three to six bullets, every one testable by someone who never read the issue, describing observable behavior only. "Tab moves focus in reading order in every view" passes. "Call `.focusSection()` in the sidebar" does not, because it names a mechanism rather than a result. Give each bullet one named observation that tells pass from fail. If you cannot say what you would look at to check it, the bullet is not testable yet. Quantify every quality word, since "fast", "simple", "reliable", and "secure" are not outcomes until they carry a threshold and a way to read it. Prefer outcomes that name the failure they prevent, since those survive a rewrite of the implementation.
 
-`## Out of scope` comes third, and only when scope drift is genuinely likely. Otherwise cut it. Use it to record adjacent work that a reader would reasonably assume is included, and to point at the issue that does cover it.
+`## Out of scope` comes third, and only when scope drift is genuinely likely. Otherwise cut it. Use it to record adjacent work a reader would reasonably assume is included, and to point at the issue that does cover it.
 
 ### Cover the states the change actually meets
 
-The most common way a feature issue underspecifies is by listing only the happy path. The implementer then builds only the happy path and reports done, and the empty view and the error toast get discovered later.
+A feature issue most often underspecifies by listing only the happy path. The implementer then builds only that, reports done, and the empty view and the error toast surface later.
 
 Before the outcome list is final, walk the states the change will really hit and add an outcome for each:
 
@@ -80,15 +80,15 @@ Leave out a state that genuinely cannot occur, never one that was inconvenient t
 
 ### Guard what already works
 
-Every outcome describes new behavior, so nothing in the default shape tells the implementer what must stay unchanged. When the change sits next to working behavior that a plausible implementation could break, add one outcome asserting the existing behavior still holds, phrased as a state to preserve: "existing X still does Y". An agent optimizing only the stated target otherwise trades away an invariant nobody wrote down.
+Every outcome describes new behavior, so nothing tells the implementer what must stay unchanged. When the change sits next to working behavior a plausible implementation could break, add one outcome asserting it still holds: "existing X still does Y". An agent optimizing only the stated target otherwise trades away an invariant nobody wrote down.
 
 ### Mark what is fixed and what is free
 
-A flat list reads as either all-mandatory or all-optional, and the implementer guesses wrong in both directions: gold-plating a nice-to-have, or dropping a blocker. When some outcomes are hard requirements and others are defaults a better idea may override, say which in a few words.
+A flat list reads as either all-mandatory or all-optional, so the implementer gold-plates a nice-to-have or drops a blocker. When some outcomes are hard requirements and others are defaults a better idea may override, say which in a few words.
 
 ### The one thing the repo cannot tell them
 
-Keep repo-derivable research out, because it rots. One class of context is the exception, because the implementer cannot re-derive it by reading the code: an approach already tried and rejected and why, an external constraint or quirk, a coupling that will bite. When such a fact would change how the work is done, put one or two sentences of it in `## Problem` or a short note, and cap it hard so it never becomes a research dump.
+Keep repo-derivable research out, because it rots. One class of context is the exception, since the implementer cannot re-derive it by reading the code: an approach already tried and rejected and why, an external constraint or quirk, a coupling that will bite. When such a fact would change how the work is done, put one or two sentences of it in `## Problem` or a short note, and cap it hard so it never becomes a research dump.
 
 Add one line when a decision inside the issue is a one-way door, such as a published version, a wire contract, or a public interface, and tell the implementer to stop and ask rather than guess.
 
@@ -96,9 +96,9 @@ Add one line when a decision inside the issue is a one-way door, such as a publi
 
 Bugs keep `## Problem` and replace `## Expected outcome` with three sections: `## Steps to reproduce` as a numbered list, `## Expected behavior`, and `## Actual behavior`.
 
-Start the steps from a clean, named state so they reproduce for someone whose machine is not already set up the way the reporter's was. Record the environment when it is relevant, and say whether this ever worked, since a regression and a never-worked bug send the implementer to different places. When the input does not supply a detail the report needs, ask rather than guess or quietly drop it; a fabricated repro step sends the implementer down the wrong path. A bug without a reproduction is a research task and should be titled and scoped as one.
+Start the steps from a clean, named state so they reproduce on a machine not already set up like the reporter's. Record the environment when it is relevant, and say whether this ever worked, since a regression and a never-worked bug send the implementer to different places. When the input does not supply a detail the report needs, ask rather than guess or quietly drop it, because a fabricated repro step sends the implementer down the wrong path. A bug without a reproduction is a research task and should be titled and scoped as one.
 
-`.github/ISSUE_TEMPLATE/bug_report.yml` is a GitHub issue form, so it is a hard contract for bugs filed through it: Description, Steps to Reproduce, Expected Behavior, Actual Behavior, and Environment are all required. Fill every required field to the quality bar above. When a required value is not in the input, do not invent it and do not leave it blank; put a visible placeholder there, list it as an open item, and hold filing until the user supplies it.
+`.github/ISSUE_TEMPLATE/bug_report.yml` is a GitHub issue form, so it is a hard contract for bugs filed through it: Description, Steps to Reproduce, Expected Behavior, Actual Behavior, and Environment are all required. Fill every required field to the quality bar above. When a required value is not in the input, do not invent it and do not leave it blank. Put a visible placeholder there, list it as an open item, and hold filing until the user supplies it.
 
 ## Repository templates
 
@@ -122,7 +122,7 @@ Length is a hint. A two-line issue can hide enormous work, and a long single iss
 
 Each child delivers one observable behavior through every layer that behavior touches. It does not deliver one layer serving many behaviors. A child named for a layer or a step, such as "add the daemon route", "write the tests", or "build the view", is the usual bad cut: each reads as reviewable in isolation, yet none ships on its own, and the value and integration risk pile onto whichever child lands last.
 
-One question catches it before filing: the moment this child merges, can a user or an operator do or see something they could not before? If the answer is no, re-slice it. This is a correctness rule here, not a nicety, because a later child is often picked up by a fresh agent and every child has to leave `main` releasable on its own.
+One question catches it before filing: the moment this child merges, can a user or an operator do or see something they could not before? If the answer is no, re-slice it. A later child is often picked up by a fresh agent, so every child has to leave `main` releasable on its own.
 
 ### Where to cut
 
@@ -134,7 +134,12 @@ Reach for these in order, and take the first that yields two genuinely valuable 
 - Data: handle one data type, format, or source first, then the next
 - Rules: ship the simple rule set, add the elaborate cases later
 
-When none of those fit: split create, read, update, and delete into separate issues; ship a thin end-to-end version of a multi-step flow and deepen individual steps later; do the simple variant now and the hard one later; make it correct first and fast in a following issue with its own metric.
+When none of those fit, try one of these:
+
+- Split create, read, update, and delete into separate issues
+- Ship a thin end-to-end version of a multi-step flow, then deepen individual steps
+- Do the simple variant now and the hard one later
+- Make it correct first and fast in a following issue, with its own metric
 
 A spike produces knowledge rather than shipped behavior. Timebox it, title and scope it as research, expect to throw its code away, and make its outcome a decision that renders the real issues estimable.
 
@@ -142,7 +147,7 @@ A spike produces knowledge rather than shipped behavior. Timebox it, title and s
 
 Sequence the thinnest end-to-end slice first, the one that exercises every layer shallowly, so integration risk is retired at the start. Order the rest so `main` stays releasable after each child merges, and where dependencies leave a choice, land the child that retires the most risk rather than the one that is easiest to write. Dependency is the hard constraint and risk is the tiebreaker within it.
 
-Challenge a dependency before recording it. Most "A before B" orderings are artifacts of a horizontal cut, and recording a false dependency freezes a bad cut into the issue graph. The walking skeleton is the legitimate case: its siblings genuinely extend the thin path it lays down. The test is whether the thing depended on ships user-visible value on its own.
+Challenge a dependency before recording it. Most "A before B" orderings are artifacts of a horizontal cut, and a false dependency freezes a bad cut into the issue graph. The walking skeleton is the legitimate case, because its siblings genuinely extend the thin path it lays down. The test is whether the thing depended on ships user-visible value on its own.
 
 ### The post-split check
 
@@ -152,11 +157,11 @@ Each child must also be self-contained. If a child needs a decision or a constra
 
 ## Umbrellas and children
 
-Use an umbrella when a goal needs three or more issues that each stand alone. Two is a dependency, not a group, and an umbrella over it is ceremony; record that pair as a native blocked-by relationship instead.
+Use an umbrella when a goal needs three or more issues that each stand alone. Two is a dependency, not a group, and an umbrella over it is ceremony. Record that pair as a native blocked-by relationship instead.
 
-The umbrella body follows the same three sections and adds no child-issue section. Its outcomes stay at the goal level, describing the capability as a whole and the shape of the finished result, and never enumerate the children one by one. Attach each child as a native GitHub sub-issue: GitHub then renders the child list, its progress, and a two-way link on both issues, so a hand-written checklist only duplicates state that goes stale. A child does not name its umbrella in prose, because the sub-issue link already shows that on both sides.
+The umbrella body follows the same three sections and adds no child-issue section. Its outcomes describe the capability as a whole and never enumerate the children one by one. Attach each child as a native GitHub sub-issue, so GitHub renders the child list, its progress, and a two-way link on both issues. A hand-written checklist only duplicates state that goes stale. A child does not name its umbrella in prose, because the sub-issue link already shows that on both sides.
 
-Set every relationship natively, and set it at creation rather than in a second pass. Create the umbrella first, read its number back from the output, then create each child already carrying its parent link and its real dependencies, in the order the children need to land, since GitHub preserves that order. This assumes `gh` 2.94 or newer (`gh --version`) and a clean checkout; each command is one create, so a rerun files a duplicate rather than updating anything.
+Set every relationship natively, and set it at creation rather than in a second pass. Create the umbrella first, read its number back from the output, then create each child already carrying its parent link and its real dependencies, in the order the children need to land, since GitHub preserves that order. This assumes `gh` 2.94 or newer (`gh --version`) and a clean checkout. Each command is one create, so a rerun files a duplicate rather than updating anything.
 
 ```bash
 gh issue create --repo smykla-skalski/harness --title "<umbrella title>" --body-file <tmp>              # note the number, e.g. 100
@@ -164,7 +169,7 @@ gh issue create --repo smykla-skalski/harness --title "<skeleton child>" --body-
 gh issue create --repo smykla-skalski/harness --title "<dependent child>" --body-file <tmp> --parent 100 --blocked-by 101
 ```
 
-`--parent` takes one issue number or URL; `--blocked-by` and `--blocking` take a comma-separated list. For issues that already exist, relate them with `gh issue edit --parent`, `--add-sub-issue`, `--add-blocked-by`, `--add-blocking`, and the matching `--remove-*` flags.
+`--parent` takes one issue number or URL. `--blocked-by` and `--blocking` take a comma-separated list. For issues that already exist, relate them with `gh issue edit --parent`, `--add-sub-issue`, `--add-blocked-by`, `--add-blocking`, and the matching `--remove-*` flags.
 
 On a `gh` older than 2.94, attach through the REST API and record dependencies as `Depends on #<issue>` prose, which the old CLI cannot set natively. The attach endpoint keys on the child's database id rather than its issue number:
 
@@ -179,7 +184,7 @@ GitHub's issue type field is separate from the `kind/*` label and sits alongside
 
 - Any issue labeled `kind/bug` gets type `Bug`, overriding the rules below even on an umbrella or one of its sub-issues.
 - Otherwise, a sub-issue attached to an umbrella gets type `Task`.
-- Otherwise, an umbrella whose children are new work gets type `Feature`. Type `Feature` is reserved for umbrellas; a standalone issue that is neither a bug nor a sub-issue gets no type.
+- Otherwise, an umbrella whose children are new work gets type `Feature`. Type `Feature` is reserved for umbrellas. A standalone issue that is neither a bug nor a sub-issue gets no type.
 
 Set it with `gh issue create --type <name>` or `gh issue edit <number> --type <name>`.
 
@@ -197,7 +202,7 @@ The bug variant is the exception. `## Steps to reproduce` must name the concrete
 
 ## Length and the readiness gate
 
-Target under 200 words. A draft that needs more is usually more than one issue, so treat overflow as a split signal rather than a formatting problem. Length is a proxy, not the rule: judge size by the change and cross-check against the split tells above.
+Target under 200 words. A draft that needs more is usually more than one issue, so treat overflow as a split signal rather than a formatting problem, and check it against the split tells above.
 
 Before filing, run one gate: could someone who never spoke to the author build this and know when they are done, from the issue alone? If not, the missing piece is an unstated outcome or an unstated constraint. Add that, not prose.
 
@@ -205,9 +210,9 @@ Before filing, run one gate: could someone who never spoke to the author build t
 
 Every issue body and comment goes through a writing pass before it is shown. Where the `writing-clearly-and-concisely` and `humanize` skills are installed, run them on the draft as the final pass, `humanize` last. Otherwise the rules below are the pass.
 
-Keep each paragraph and each bullet on one physical line. Never hard-wrap prose to a column width, no matter how long the line gets. Blank lines separate blocks; code blocks, tables, and numbered steps keep their own structure. A wrapped paragraph turns a one-word edit into a multi-line diff.
+Keep each paragraph and each bullet on one physical line, however long it gets, since a wrapped paragraph turns a one-word edit into a multi-line diff. Blank lines separate blocks, and code blocks, tables, and numbered steps keep their own structure.
 
-Write plainly. Active voice, positive form, concrete over abstract, and no needless words. One idea per bullet, so a bullet whose "and" joins two outcomes is two bullets. Put the strongest word at the end of a sentence and end a paragraph on its strongest point. Vary sentence length when three in a row share a shape. Bullets take no trailing period; prose sentences do. Prefer two sentences to a semicolon. Use straight quotes, sentence case headings, and regular hyphens rather than em dashes.
+Write plainly. Active voice, positive form, concrete over abstract, and no needless words. One idea per bullet, so a bullet whose "and" joins two outcomes is two bullets. Put the strongest word at the end of a sentence and end a paragraph on its strongest point. Vary sentence length when three in a row share a shape. Bullets take no trailing period. Prose sentences do. Use straight quotes, sentence case headings, and regular hyphens. No em dashes and no semicolons, since two sentences read clearer than either.
 
 Avoid the vocabulary that signals generated text: `additionally`, `crucial`, `delve`, `enhance`, `furthermore`, `key` as an adjective, `landscape` and `tapestry` used abstractly, `leverage`, `moreover`, `pivotal`, `robust`, `seamless`, `showcase`, `testament`, `underscore`, `valuable`. Cut `in order to` to `to` and `due to the fact that` to `because`.
 
@@ -225,13 +230,13 @@ Fetch the real text before editing it, rather than working from a guess:
 gh issue view <number-or-url> --json number,title,body,labels,state,url
 ```
 
-Diagnose in this order. If the issue is oversized by the tells above, propose the slice set first, because splitting changes everything downstream. Then diagnose the title with the rewrite procedure, and fix it even when the body is fine. Then diagnose the body: is the problem stated without a solution, are the outcomes observable and testable, are the edge and error states covered, is anything in there that should not be? Keep the issue's real intent and never invent scope the original did not have.
+Diagnose in three passes. Splitting first, because it changes everything downstream: when the issue is oversized by the tells above, propose the slice set before touching a line. The title second, fixed even when the body is fine. The body last: is the problem stated without a solution, are the outcomes observable and testable, are the edge and error states covered, is anything in there that should not be? Keep the issue's real intent and never invent scope the original did not have.
 
 ## Before and after filing
 
-Confirm scope forks with the user before filing when the answer would change which issues exist, how the work slices, or what the model is. Do not confirm choices that have an obvious default; take the default and say so.
+Confirm scope forks with the user before filing when the answer would change which issues exist, how the work slices, or what the model is. Do not confirm choices that have an obvious default. Take the default and say so.
 
-Show the full draft and get an explicit go-ahead before any create, edit, or comment. Pass `--repo smykla-skalski/harness` on every mutating call, since without it the call runs against whatever repo the shell sits in. Pass the body with `--body-file <tmp>` rather than inline, which preserves the markdown and the one-line-per-paragraph rule through shell escaping.
+Show the full draft and get an explicit go-ahead before any create, edit, or comment. Pass `--repo smykla-skalski/harness` on every mutating call, since without it the call runs against whatever repo the shell sits in. Pass the body with `--body-file <tmp>` rather than inline, so shell escaping cannot mangle the markdown or the one-line-per-paragraph rule.
 
 Apply `kind/enhancement` or `kind/bug` to every issue. Add `area/api` when the change alters a contract between the daemon and its clients, including the wire protocol, the command line, and the tool interfaces.
 
