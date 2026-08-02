@@ -134,6 +134,50 @@ struct TaskBoardReviewReportTests {
     )
   }
 
+  @Test("Complete terminal failures collapse generated sections into one message")
+  func completeTerminalFailuresCollapseGeneratedSections() {
+    let failed = TaskBoardReviewTerminalPresentation(
+      report: terminalReport(
+        status: .failed,
+        partialOutput: "The provider returned an incomplete structured response.",
+        terminalReason: "The response did not satisfy the report-only result contract."
+      ),
+      status: .failed
+    )
+    let cancelled = TaskBoardReviewTerminalPresentation(
+      report: terminalReport(
+        status: .cancelled,
+        terminalReason: "Cancelled by the operator."
+      ),
+      status: .cancelled
+    )
+
+    #expect(!failed.showsGeneratedSections)
+    #expect(failed.visiblePartialOutput == nil)
+    let expectedFailureDetail =
+      "The response did not satisfy the report-only result contract, "
+      + "so no summary or findings were generated"
+    #expect(
+      failed.terminalDetail == expectedFailureDetail
+    )
+    #expect(!cancelled.showsGeneratedSections)
+    #expect(
+      cancelled.terminalDetail
+        == "Cancelled by the operator, so no summary or findings were generated"
+    )
+  }
+
+  @Test("Completed empty reports retain the no-findings result")
+  func completedEmptyReportsRetainNoFindingsResult() {
+    let completed = TaskBoardReviewTerminalPresentation(
+      report: terminalReport(status: .completed),
+      status: .completed
+    )
+
+    #expect(completed.showsGeneratedSections)
+    #expect(completed.terminalDetail == nil)
+  }
+
   @Test("Report reload key advances within one item timestamp tick")
   func reloadKeyUsesTaskBoardRevision() {
     let initial = TaskBoardReviewReportLoadKey(
@@ -148,6 +192,30 @@ struct TaskBoardReviewReportTests {
     )
 
     #expect(initial != terminal)
+  }
+
+  private func terminalReport(
+    status: TaskBoardAiReviewReportStatus,
+    partialOutput: String? = nil,
+    terminalReason: String? = nil
+  ) -> TaskBoardAiReviewReportRecord {
+    TaskBoardAiReviewReportRecord(
+      reportId: "report-terminal",
+      itemId: "item-terminal",
+      correlationId: "correlation-terminal",
+      repository: "example/harness",
+      pullRequestNumber: 42,
+      headRevision: String(repeating: "a", count: 40),
+      runtime: "openrouter",
+      requestedRuntime: "openrouter",
+      actualRuntime: "openrouter",
+      requestedModel: "deepseek/deepseek-v4-flash",
+      status: status,
+      partialOutput: partialOutput,
+      terminalReason: terminalReason,
+      startedAt: "2026-07-29T19:40:00Z",
+      finishedAt: "2026-07-29T19:41:12Z"
+    )
   }
 }
 

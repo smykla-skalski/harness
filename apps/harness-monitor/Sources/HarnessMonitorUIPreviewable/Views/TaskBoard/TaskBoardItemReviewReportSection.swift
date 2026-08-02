@@ -176,7 +176,8 @@ struct TaskBoardItemReviewReportSection: View {
     status: TaskBoardAiReviewReportStatus,
     tint: Color
   ) -> some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    let presentation = TaskBoardReviewTerminalPresentation(report: report, status: status)
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       if report.isStale(comparedWith: item.workflow?.prHeadRevision) {
         TaskBoardReviewStaleHeadCard(
           repository: report.repository,
@@ -207,7 +208,7 @@ struct TaskBoardItemReviewReportSection: View {
           initiallyExpanded: initiallyShowsFullSummary
         )
       }
-      if let reason = report.terminalReason, !reason.isEmpty {
+      if let reason = presentation.terminalDetail {
         TaskBoardReviewMessageCard(
           icon: "exclamationmark.bubble.fill",
           title: "Terminal reason",
@@ -215,19 +216,21 @@ struct TaskBoardItemReviewReportSection: View {
           tint: tint
         )
       }
-      if let partialOutput = report.partialOutput, !partialOutput.isEmpty {
+      if let partialOutput = presentation.visiblePartialOutput {
         TaskBoardReviewTextSection(
           title: "Partial output",
           systemImage: "doc.text",
           content: partialOutput
         )
       }
-      TaskBoardReviewFindingsSection(
-        findings: report.findings,
-        repository: report.repository,
-        revision: report.headRevision,
-        status: status
-      )
+      if presentation.showsGeneratedSections {
+        TaskBoardReviewFindingsSection(
+          findings: report.findings,
+          repository: report.repository,
+          revision: report.headRevision,
+          status: status
+        )
+      }
     }
     .fixedSize(horizontal: false, vertical: true)
   }

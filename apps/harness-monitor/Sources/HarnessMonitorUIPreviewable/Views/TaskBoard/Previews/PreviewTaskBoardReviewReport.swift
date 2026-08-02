@@ -206,8 +206,8 @@ private enum TaskBoardReviewReportPreviewFixture {
     report.status = .failed
     report.summary = nil
     report.findings = []
-    report.partialOutput = "The provider returned an incomplete structured response."
-    report.terminalReason = "The response did not satisfy the report-only result contract."
+    report.partialOutput = "The provider returned an incomplete structured response"
+    report.terminalReason = "The response did not satisfy the report-only result contract"
     return report
   }
 
@@ -217,7 +217,7 @@ private enum TaskBoardReviewReportPreviewFixture {
     report.summary = nil
     report.findings = []
     report.partialOutput = nil
-    report.terminalReason = "Cancelled by the operator before findings were produced."
+    report.terminalReason = "Cancelled by the operator"
     return report
   }
 }
