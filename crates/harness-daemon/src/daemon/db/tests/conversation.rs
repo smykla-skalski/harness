@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::conversation::DaemonDbConversation;
 
 fn seed_conversation_session(db: &DaemonDb) {
     let project = sample_project();
@@ -47,9 +48,12 @@ fn sync_conversation_events_replaces_existing_rows() {
         .expect("count conversation events");
     assert_eq!(count, 2);
 
-    let loaded = db
-        .load_conversation_events("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4", "claude-leader")
-        .expect("load events");
+    let loaded = DaemonDbConversation::load_conversation_events(
+        &db,
+        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+        "claude-leader",
+    )
+    .expect("load events");
     assert_eq!(loaded.len(), 2);
     assert_eq!(loaded[0].sequence, 1);
     assert_eq!(loaded[1].sequence, 3);

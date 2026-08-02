@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::env::temp_dir;
 use std::sync::{Arc, Mutex, OnceLock};
 

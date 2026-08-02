@@ -2,6 +2,7 @@ use harness_daemon_watch::{AsyncWatchStorage, WatchStorage};
 use harness_kernel::errors::CliError;
 use harness_protocol::daemon::task_board::automation_snapshot::TaskBoardAutomationSnapshot;
 
+use crate::daemon::db::imports::DaemonDbSessionResync;
 use crate::daemon::db::{
     AsyncDaemonDb, DaemonDb, PreparedRuntimeTranscriptResync, PreparedSessionResync,
     prepare_runtime_transcript_resync, prepare_session_resync,
@@ -61,13 +62,13 @@ impl WatchStorage for DaemonDb {
         &self,
         prepared: &Self::PreparedSessionResync,
     ) -> Result<(), CliError> {
-        Self::apply_prepared_session_resync(self, &prepared.0)
+        DaemonDbSessionResync::apply_prepared_session_resync(self, &prepared.0)
     }
 
     fn apply_prepared_runtime_transcript_resync(
         &self,
         prepared: &Self::PreparedRuntimeTranscriptResync,
     ) -> Result<(), CliError> {
-        Self::apply_prepared_runtime_transcript_resync(self, &prepared.0)
+        DaemonDbSessionResync::apply_prepared_runtime_transcript_resync(self, &prepared.0)
     }
 }

@@ -2,6 +2,7 @@
 //! `task_reviews` mirror immediately, without a daemon restart or
 //! `rebuild_task_reviews` resync.
 
+use crate::daemon::db::imports::DaemonDbSessionResync;
 use std::path::{Path, PathBuf};
 
 use crate::daemon::protocol::{

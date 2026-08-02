@@ -42,7 +42,7 @@ pub(crate) use super::{
 // accumulator); this alias keeps every call site below unchanged.
 pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
-mod activity_fold;
+pub(crate) mod activity_fold;
 mod async_agent_turn_runs;
 pub(crate) use async_agent_turn_runs::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 mod async_agents;
@@ -63,10 +63,11 @@ pub(crate) use audit::AsyncAuditQueries;
 mod change_tracking;
 #[cfg(test)]
 pub(crate) use change_tracking::LOAD_CHANGE_TRACKING_SQL;
-mod conversation;
+pub(crate) mod conversation;
 mod diagnostics;
 pub use diagnostics::DaemonDbDiagnostics;
-mod imports;
+pub(crate) mod imports;
+pub use imports::DaemonDbImports;
 pub(crate) use imports::{
     prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
 };
@@ -167,8 +168,9 @@ mod signals;
 mod summaries;
 mod summary_rows;
 mod task_row;
+mod task_writes;
 mod telemetry;
-mod timeline;
+pub(crate) mod timeline;
 mod timeline_store;
 mod writes;
 
@@ -185,8 +187,8 @@ pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingClaimCodeErro
 pub use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]
 use conversation::{
-    clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
-    prepare_runtime_transcript_resync_for_agents,
+    DaemonDbConversation, clear_session_conversation_events,
+    prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
@@ -274,7 +276,7 @@ impl TimelineDbSource for DaemonDb {
         session_id: &str,
         agent_id: &str,
     ) -> Result<Vec<ConversationEvent>, CliError> {
-        DaemonDb::load_conversation_events(self, session_id, agent_id)
+        DaemonDbConversation::load_conversation_events(self, session_id, agent_id)
     }
 }
 

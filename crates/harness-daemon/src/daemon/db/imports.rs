@@ -1,3 +1,5 @@
+use super::conversation::DaemonDbConversation;
+use super::timeline::DaemonDbTimeline;
 use super::{
     CliError, DaemonDb, DiscoveredProject, ImportResult, PreparedRuntimeTranscriptResync,
     PreparedSessionResync, PreparedTaskCheckpointImport, ReconcileResult, SessionState,
@@ -6,22 +8,78 @@ use super::{
     prepare_runtime_transcript_resync_for_agents,
 };
 
-impl DaemonDb {
-    fn session_state_import_required(
-        &self,
-        session_id: &str,
-        file_state_version: u64,
-    ) -> Result<bool, CliError> {
-        let db_version = self.session_state_version(session_id)?;
-        let file_version = i64::try_from(file_state_version).unwrap_or(i64::MAX);
-        Ok(db_version.is_none_or(|version| version < file_version))
-    }
-
+pub trait DaemonDbImports {
     /// Import all file-backed sessions and projects into the database.
     ///
     /// # Errors
     /// Returns [`CliError`] on discovery or SQL failures.
-    pub fn import_from_files(&self) -> Result<ImportResult, CliError> {
+    fn import_from_files(&self) -> Result<ImportResult, CliError>;
+
+    /// Reconcile file-discovered sessions into the database, only
+    /// importing sessions that are new or have a higher `state_version`
+    /// than the DB copy. Daemon-first sessions (only in `SQLite`) are
+    /// never touched.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery or SQL failures.
+    fn reconcile_sessions(
+        &self,
+        projects: &[daemon_index::DiscoveredProject],
+        sessions: &[daemon_index::ResolvedSession],
+    ) -> Result<ReconcileResult, CliError>;
+
+    /// Discover projects and sessions from files, then reconcile into
+    /// the database. Only imports sessions that are new or have a higher
+    /// `state_version` than existing DB records. Safe to call while the
+    /// daemon is serving - daemon-first sessions are never overwritten.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery or SQL failures.
+    fn reconcile_from_files(&self) -> Result<ReconcileResult, CliError>;
+
+    /// Re-sync a session from its file-backed state into the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on discovery, I/O, or SQL failures.
+    fn resync_session(&self, session_id: &str) -> Result<(), CliError>;
+}
+
+/// Kept separate from [`DaemonDbImports`] (rather than one trait) because its
+/// prepared-resync argument types stay `pub(crate)`: a `pub` trait exposing a
+/// `pub(crate)` type in its signature is a real privacy mismatch, not just a
+/// lint to silence.
+pub(crate) trait DaemonDbSessionResync {
+    /// Apply a previously prepared session re-sync to the daemon database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn apply_prepared_session_resync(
+        &self,
+        prepared: &PreparedSessionResync,
+    ) -> Result<(), CliError>;
+
+    /// Apply a prepared transcript-only refresh for matching runtime agents.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn apply_prepared_runtime_transcript_resync(
+        &self,
+        prepared: &PreparedRuntimeTranscriptResync,
+    ) -> Result<(), CliError>;
+}
+
+fn session_state_import_required(
+    db: &DaemonDb,
+    session_id: &str,
+    file_state_version: u64,
+) -> Result<bool, CliError> {
+    let db_version = db.session_state_version(session_id)?;
+    let file_version = i64::try_from(file_state_version).unwrap_or(i64::MAX);
+    Ok(db_version.is_none_or(|version| version < file_version))
+}
+
+impl DaemonDbImports for DaemonDb {
+    fn import_from_files(&self) -> Result<ImportResult, CliError> {
         let projects = daemon_index::discover_projects()?;
         let sessions = daemon_index::discover_sessions_for(&projects, true)?;
 
@@ -48,14 +106,7 @@ impl DaemonDb {
         Ok(result)
     }
 
-    /// Reconcile file-discovered sessions into the database, only
-    /// importing sessions that are new or have a higher `state_version`
-    /// than the DB copy. Daemon-first sessions (only in `SQLite`) are
-    /// never touched.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery or SQL failures.
-    pub fn reconcile_sessions(
+    fn reconcile_sessions(
         &self,
         projects: &[daemon_index::DiscoveredProject],
         sessions: &[daemon_index::ResolvedSession],
@@ -68,7 +119,8 @@ impl DaemonDb {
         }
 
         for resolved in sessions {
-            if !self.session_state_import_required(
+            if !session_state_import_required(
+                self,
                 &resolved.state.session_id,
                 resolved.state.state_version,
             )? {
@@ -91,36 +143,25 @@ impl DaemonDb {
         Ok(result)
     }
 
-    /// Discover projects and sessions from files, then reconcile into
-    /// the database. Only imports sessions that are new or have a higher
-    /// `state_version` than existing DB records. Safe to call while the
-    /// daemon is serving - daemon-first sessions are never overwritten.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery or SQL failures.
-    pub fn reconcile_from_files(&self) -> Result<ReconcileResult, CliError> {
+    fn reconcile_from_files(&self) -> Result<ReconcileResult, CliError> {
         let projects = daemon_index::discover_projects()?;
         let sessions = daemon_index::discover_sessions_for(&projects, true)?;
         self.reconcile_sessions(&projects, &sessions)
     }
-    /// Re-sync a session from its file-backed state into the database.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery, I/O, or SQL failures.
-    pub fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
-        let prepared = prepare_session_resync(session_id)?;
-        self.apply_prepared_session_resync(&prepared)
-    }
 
-    /// Apply a previously prepared session re-sync to the daemon database.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) fn apply_prepared_session_resync(
+    fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
+        let prepared = prepare_session_resync(session_id)?;
+        DaemonDbSessionResync::apply_prepared_session_resync(self, &prepared)
+    }
+}
+
+impl DaemonDbSessionResync for DaemonDb {
+    fn apply_prepared_session_resync(
         &self,
         prepared: &PreparedSessionResync,
     ) -> Result<(), CliError> {
-        if !self.session_state_import_required(
+        if !session_state_import_required(
+            self,
             &prepared.resolved.state.session_id,
             prepared.resolved.state.state_version,
         )? {
@@ -169,11 +210,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Apply a prepared transcript-only refresh for matching runtime agents.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) fn apply_prepared_runtime_transcript_resync(
+    fn apply_prepared_runtime_transcript_resync(
         &self,
         prepared: &PreparedRuntimeTranscriptResync,
     ) -> Result<(), CliError> {
