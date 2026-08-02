@@ -3,6 +3,8 @@ import Foundation
 /// Stop after this many pages. A daemon that kept handing back a cursor
 /// without ever draining would otherwise spin the walk below forever.
 private let taskBoardItemPageLimit = 200
+private let taskBoardStaleCursorRestartLimit = 15
+private let taskBoardStaleCursorBackoffMilliseconds = [100, 200, 400, 800, 1_000]
 
 /// One transport's bounded task-board page read.
 ///
@@ -34,6 +36,25 @@ extension TaskBoardItemPageSource {
   func mergedTaskBoardItemPages(
     status: TaskBoardStatus?
   ) async throws -> TaskBoardListItemsResponseWire {
+    var restartCount = 0
+    while true {
+      do {
+        return try await mergedTaskBoardItemPagesOnce(status: status)
+      } catch where isStaleTaskBoardCursorError(error) {
+        guard restartCount < taskBoardStaleCursorRestartLimit else {
+          throw error
+        }
+        let delayIndex = min(restartCount, taskBoardStaleCursorBackoffMilliseconds.count - 1)
+        let delay = taskBoardStaleCursorBackoffMilliseconds[delayIndex]
+        restartCount += 1
+        try await Task.sleep(for: .milliseconds(delay))
+      }
+    }
+  }
+
+  private func mergedTaskBoardItemPagesOnce(
+    status: TaskBoardStatus?
+  ) async throws -> TaskBoardListItemsResponseWire {
     var merged = try await taskBoardItemPage(status: status, cursor: nil)
     var seen = Set<String>()
     merged.items = merged.items.filter { seen.insert($0.id).inserted }
@@ -61,5 +82,15 @@ extension TaskBoardItemPageSource {
     }
     merged.nextCursor = nil
     return merged
+  }
+
+  private func isStaleTaskBoardCursorError(_ error: any Error) -> Bool {
+    guard
+      case .server(let code, let message) = error as? HarnessMonitorAPIError,
+      code == 400
+    else {
+      return false
+    }
+    return message.contains("task-board list cursor is stale because the board changed")
   }
 }
