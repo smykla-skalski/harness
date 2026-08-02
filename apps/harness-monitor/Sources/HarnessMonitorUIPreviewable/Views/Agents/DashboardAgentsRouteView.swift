@@ -8,10 +8,12 @@ struct DashboardAgentsRouteView: View {
   let isRouteVisible: Bool
   let refreshesAutomatically: Bool
   let initialAcpDetail: DashboardAcpAgentDetail?
+  let initialCodexDetail: DashboardCodexAgentDetail?
   @AppStorage(DashboardAgentSelectionDefaults.storageKey)
   private var persistedSelectionRaw = ""
   @State private var state: DashboardAgentsRouteState
   @State private var isPresentingAcpCreate = false
+  @State private var isPresentingCodexCreate = false
 
   init(
     store: HarnessMonitorStore,
@@ -21,6 +23,7 @@ struct DashboardAgentsRouteView: View {
     refreshesAutomatically: Bool = true,
     initialState: DashboardAgentBrowserViewState = DashboardAgentBrowserViewState(),
     initialAcpDetail: DashboardAcpAgentDetail? = nil,
+    initialCodexDetail: DashboardCodexAgentDetail? = nil,
     selectionDefaults: UserDefaults = .standard
   ) {
     self.store = store
@@ -29,6 +32,7 @@ struct DashboardAgentsRouteView: View {
     self.isRouteVisible = isRouteVisible
     self.refreshesAutomatically = refreshesAutomatically
     self.initialAcpDetail = initialAcpDetail
+    self.initialCodexDetail = initialCodexDetail
     _persistedSelectionRaw = AppStorage(
       wrappedValue: "",
       DashboardAgentSelectionDefaults.storageKey,
@@ -91,7 +95,9 @@ struct DashboardAgentsRouteView: View {
             store: store,
             agent: selectedAgent,
             loadsAcpDetailAutomatically: refreshesAutomatically,
-            initialAcpDetail: initialAcpDetail
+            loadsCodexDetailAutomatically: refreshesAutomatically,
+            initialAcpDetail: initialAcpDetail,
+            initialCodexDetail: initialCodexDetail
           )
           .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -128,6 +134,13 @@ struct DashboardAgentsRouteView: View {
         onCreated: selectCreatedAcpAgent
       )
     }
+    .sheet(isPresented: $isPresentingCodexCreate) {
+      DashboardCodexAgentCreateSheet(
+        store: store,
+        sessions: sessions,
+        onCreated: selectCreatedCodexAgent
+      )
+    }
   }
 
   private var header: some View {
@@ -140,6 +153,13 @@ struct DashboardAgentsRouteView: View {
           .foregroundStyle(.secondary)
       }
       Spacer()
+      Button {
+        isPresentingCodexCreate = true
+      } label: {
+        Label("New Codex agent", systemImage: "plus")
+      }
+      .disabled(sessions.isEmpty)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardCodexCreateButton)
       Button {
         isPresentingAcpCreate = true
       } label: {
@@ -206,6 +226,23 @@ struct DashboardAgentsRouteView: View {
         checkoutID: session.checkoutId
       ),
       runtimeKind: .acp,
+      managedAgentID: snapshot.managedAgentID
+    )
+    persistedSelectionRaw = identity.selectionRawValue
+    history.recordDashboardAgentSelection(identity)
+    requestRefresh(force: true)
+  }
+
+  private func selectCreatedCodexAgent(
+    _ snapshot: CodexRunSnapshot,
+    _ session: SessionSummary
+  ) {
+    let identity = DashboardAgentIdentity(
+      workspace: DashboardAgentWorkspaceIdentity(
+        projectID: session.projectId,
+        checkoutID: session.checkoutId
+      ),
+      runtimeKind: .codex,
       managedAgentID: snapshot.managedAgentID
     )
     persistedSelectionRaw = identity.selectionRawValue

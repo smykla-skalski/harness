@@ -5,18 +5,24 @@ struct DashboardAgentDetailPane: View {
   let store: HarnessMonitorStore
   let agent: DashboardAgentSummary?
   let loadsAcpDetailAutomatically: Bool
+  let loadsCodexDetailAutomatically: Bool
   @State private var acpState: DashboardAcpAgentDetailState
+  @State private var codexState: DashboardCodexAgentDetailState
 
   init(
     store: HarnessMonitorStore,
     agent: DashboardAgentSummary?,
     loadsAcpDetailAutomatically: Bool = true,
-    initialAcpDetail: DashboardAcpAgentDetail? = nil
+    loadsCodexDetailAutomatically: Bool = true,
+    initialAcpDetail: DashboardAcpAgentDetail? = nil,
+    initialCodexDetail: DashboardCodexAgentDetail? = nil
   ) {
     self.store = store
     self.agent = agent
     self.loadsAcpDetailAutomatically = loadsAcpDetailAutomatically
+    self.loadsCodexDetailAutomatically = loadsCodexDetailAutomatically
     _acpState = State(initialValue: DashboardAcpAgentDetailState(detail: initialAcpDetail))
+    _codexState = State(initialValue: DashboardCodexAgentDetailState(detail: initialCodexDetail))
   }
 
   var body: some View {
@@ -28,6 +34,13 @@ struct DashboardAgentDetailPane: View {
             agent: agent,
             state: acpState,
             loadsAutomatically: loadsAcpDetailAutomatically
+          )
+        } else if agent.runtimeKind == .codex {
+          DashboardCodexAgentDetailView(
+            store: store,
+            agent: agent,
+            state: codexState,
+            loadsAutomatically: loadsCodexDetailAutomatically
           )
         } else {
           standardDetail(agent)

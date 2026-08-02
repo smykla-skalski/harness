@@ -106,6 +106,17 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardAgentDetail = "harness.dashboard.agents.detail"
   public static let dashboardAgentsRefreshButton = "harness.dashboard.agents.refresh"
   public static let dashboardAgentsLoadState = "harness.dashboard.agents.load-state"
+  public static let dashboardCodexCreateButton = "harness.dashboard.agents.codex.create"
+  public static let dashboardCodexCreateSheet = "harness.dashboard.agents.codex.create.sheet"
+  public static let dashboardCodexWorkspacePicker =
+    "harness.dashboard.agents.codex.create.workspace"
+  public static let dashboardCodexNameField = "harness.dashboard.agents.codex.create.name"
+  public static let dashboardCodexPromptField = "harness.dashboard.agents.codex.create.prompt"
+  public static let dashboardCodexStartButton = "harness.dashboard.agents.codex.create.start"
+  public static let dashboardCodexSteerField = "harness.dashboard.agents.codex.steer.field"
+  public static let dashboardCodexSteerButton = "harness.dashboard.agents.codex.steer.send"
+  public static let dashboardCodexInterruptButton = "harness.dashboard.agents.codex.interrupt"
+  public static let dashboardCodexStopButton = "harness.dashboard.agents.codex.stop"
   public static func dashboardAgentRow(_ identity: String) -> String {
     "harness.dashboard.agents.row.\(slug(identity))"
   }

@@ -37,6 +37,7 @@ public struct HarnessClient {
     var env = ProcessInfo.processInfo.environment
     env["XDG_DATA_HOME"] = dataHome.path
     env["HARNESS_DAEMON_DATA_HOME"] = dataHome.path
+    env["HARNESS_DAEMON_OWNERSHIP"] = "external"
     for (key, value) in extra { env[key] = value }
     return env
   }
