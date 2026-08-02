@@ -59,18 +59,22 @@ mod async_session_state;
 mod async_signal_writes;
 mod async_writes;
 mod audit;
+pub(crate) use audit::AsyncAuditQueries;
 mod change_tracking;
 #[cfg(test)]
 pub(crate) use change_tracking::LOAD_CHANGE_TRACKING_SQL;
 mod conversation;
 mod diagnostics;
+pub use diagnostics::DaemonDbDiagnostics;
 mod imports;
 pub(crate) use imports::{
     prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
 };
 mod policy_graph_connection;
 mod pull_request_actions;
+pub(crate) use pull_request_actions::AsyncPullRequestActionQueries;
 mod rebuild;
+pub(crate) use rebuild::TaskReviewRebuild;
 mod remote_acme;
 mod remote_acme_cas;
 mod remote_identity;
@@ -81,6 +85,7 @@ pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingRevokeOutcome
 mod remote_pairing;
 mod remote_pairing_expiry;
 mod review_writes;
+pub(crate) use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites};
 mod runtime;
 mod schema;
 mod schema_migrations;

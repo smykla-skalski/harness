@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 use tempfile::tempdir;
 
 use crate::daemon::audit_events::{AuditEventRecordDraft, record_audit_event};
+use crate::daemon::db::DaemonDbDiagnostics;
 use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::protocol::{http_paths, ws_methods};

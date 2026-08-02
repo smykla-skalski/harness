@@ -8,7 +8,7 @@ use tokio::sync::{broadcast, watch};
 
 use harness::daemon::agent_acp::AcpAgentManagerHandle;
 use harness::daemon::codex_controller::CodexControllerHandle;
-use harness::daemon::db::DaemonDb;
+use harness::daemon::db::{DaemonDb, DaemonDbDiagnostics};
 use harness::daemon::http::{
     DaemonHttpState, default_remote_pairing_limiter, default_remote_pairing_status_limiter,
     serve_tcp,

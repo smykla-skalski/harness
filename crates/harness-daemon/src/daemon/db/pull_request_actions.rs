@@ -38,11 +38,22 @@ type ActionRow = (
     Option<String>,
 );
 
-impl AsyncDaemonDb {
-    pub(crate) async fn load_pull_request_action(
-        &self,
-        id: &str,
-    ) -> Result<Option<RecordedAction>, CliError> {
+/// Backing persistence for `harness-task-board`'s `PullRequestActionStore`
+/// port, kept as its own local trait so the eventual move of `AsyncDaemonDb`
+/// out of this crate only has to touch the (foreign) `PullRequestActionStore`
+/// impl in `daemon/pull_request_action_store.rs`, not this file.
+pub(crate) trait AsyncPullRequestActionQueries {
+    /// # Errors
+    /// Returns [`CliError`] on SQL or decoding failure.
+    async fn load_pull_request_action(&self, id: &str) -> Result<Option<RecordedAction>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    async fn upsert_pull_request_action(&self, record: RecordedAction) -> Result<(), CliError>;
+}
+
+impl AsyncPullRequestActionQueries for AsyncDaemonDb {
+    async fn load_pull_request_action(&self, id: &str) -> Result<Option<RecordedAction>, CliError> {
         let row = query_as::<_, ActionRow>(SELECT_ACTION)
             .bind(id)
             .fetch_optional(self.pool())
@@ -51,10 +62,7 @@ impl AsyncDaemonDb {
         row.map(record_from_row).transpose()
     }
 
-    pub(crate) async fn upsert_pull_request_action(
-        &self,
-        record: RecordedAction,
-    ) -> Result<(), CliError> {
+    async fn upsert_pull_request_action(&self, record: RecordedAction) -> Result<(), CliError> {
         let (state, failure_class) = state_to_text(record.state);
         let number = i64::try_from(record.action.identity.number).map_err(|error| {
             db_error(format!("pull request action number out of range: {error}"))

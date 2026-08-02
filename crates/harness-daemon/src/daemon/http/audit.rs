@@ -3,6 +3,7 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use std::time::Instant;
 
+use crate::daemon::db::AsyncAuditQueries;
 use crate::daemon::protocol::{
     HarnessMonitorAuditDateRange, HarnessMonitorAuditEventsRequest, http_paths,
 };

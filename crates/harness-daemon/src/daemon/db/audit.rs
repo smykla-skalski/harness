@@ -38,67 +38,72 @@ INSERT INTO audit_events (
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
 ON CONFLICT(id) DO NOTHING";
 
-impl AsyncDaemonDb {
-    /// Persist one typed application audit event.
-    ///
+/// Read-side audit query surface, kept as its own trait (instead of folding
+/// into `AuditEventStore`) since that one is deliberately scoped to only the
+/// two write operations the recorder calls.
+pub(crate) trait AsyncAuditQueries: Send + Sync {
     /// # Errors
-    /// Returns [`CliError`] on SQL or payload serialization failure.
-    #[allow(dead_code)]
-    pub(crate) async fn upsert_audit_event(
+    /// Returns [`CliError`] on SQL or payload decoding failure.
+    async fn load_audit_events(
         &self,
-        event: &HarnessMonitorAuditEvent,
-    ) -> Result<(), CliError> {
-        self.write_audit_event(UPSERT_AUDIT_EVENT_SQL, event, "upsert")
+        request: &HarnessMonitorAuditEventsRequest,
+    ) -> Result<HarnessMonitorAuditEventsResponse, CliError>;
+}
+
+async fn write_audit_event(
+    db: &AsyncDaemonDb,
+    statement: &'static str,
+    event: &HarnessMonitorAuditEvent,
+    operation: &'static str,
+) -> Result<u64, CliError> {
+    let payload_json = event.payload_json.as_ref().map(Value::to_string);
+    let related_urls_json = serde_json::to_string(&event.related_urls)
+        .map_err(|error| db_error(format!("serialize audit related urls: {error}")))?;
+    query(statement)
+        .bind(&event.id)
+        .bind(&event.recorded_at)
+        .bind(&event.source)
+        .bind(&event.category)
+        .bind(&event.kind)
+        .bind(&event.severity)
+        .bind(&event.outcome)
+        .bind(&event.title)
+        .bind(&event.summary)
+        .bind(event.subject.as_deref())
+        .bind(event.actor.as_deref())
+        .bind(event.correlation_id.as_deref())
+        .bind(event.action_key.as_deref())
+        .bind(payload_json.as_deref())
+        .bind(event.legacy_message.as_deref())
+        .bind(&related_urls_json)
+        .execute(db.pool())
+        .await
+        .map(|result| result.rows_affected())
+        .map_err(|error| db_error(format!("{operation} audit event {}: {error}", event.id)))
+}
+
+// The only place `AsyncDaemonDb` is named as the recorder's storage
+// contract - keeping it here, next to the concrete type, means the
+// recorder itself never has to import `db`.
+impl AuditEventStore for AsyncDaemonDb {
+    async fn upsert_audit_event(&self, event: &HarnessMonitorAuditEvent) -> Result<(), CliError> {
+        write_audit_event(self, UPSERT_AUDIT_EVENT_SQL, event, "upsert")
             .await
             .map(|_| ())
     }
 
-    pub(crate) async fn insert_audit_event_if_absent(
+    async fn insert_audit_event_if_absent(
         &self,
         event: &HarnessMonitorAuditEvent,
     ) -> Result<bool, CliError> {
-        self.write_audit_event(INSERT_AUDIT_EVENT_IF_ABSENT_SQL, event, "insert")
+        write_audit_event(self, INSERT_AUDIT_EVENT_IF_ABSENT_SQL, event, "insert")
             .await
             .map(|rows| rows == 1)
     }
+}
 
-    async fn write_audit_event(
-        &self,
-        statement: &'static str,
-        event: &HarnessMonitorAuditEvent,
-        operation: &'static str,
-    ) -> Result<u64, CliError> {
-        let payload_json = event.payload_json.as_ref().map(Value::to_string);
-        let related_urls_json = serde_json::to_string(&event.related_urls)
-            .map_err(|error| db_error(format!("serialize audit related urls: {error}")))?;
-        query(statement)
-            .bind(&event.id)
-            .bind(&event.recorded_at)
-            .bind(&event.source)
-            .bind(&event.category)
-            .bind(&event.kind)
-            .bind(&event.severity)
-            .bind(&event.outcome)
-            .bind(&event.title)
-            .bind(&event.summary)
-            .bind(event.subject.as_deref())
-            .bind(event.actor.as_deref())
-            .bind(event.correlation_id.as_deref())
-            .bind(event.action_key.as_deref())
-            .bind(payload_json.as_deref())
-            .bind(event.legacy_message.as_deref())
-            .bind(&related_urls_json)
-            .execute(self.pool())
-            .await
-            .map(|result| result.rows_affected())
-            .map_err(|error| db_error(format!("{operation} audit event {}: {error}", event.id)))
-    }
-
-    /// Query typed application audit events by time and indexed facets.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or payload decoding failure.
-    pub(crate) async fn load_audit_events(
+impl AsyncAuditQueries for AsyncDaemonDb {
+    async fn load_audit_events(
         &self,
         request: &HarnessMonitorAuditEventsRequest,
     ) -> Result<HarnessMonitorAuditEventsResponse, CliError> {
@@ -112,22 +117,6 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("query audit events: {error}")))?;
         audit_response(rows, limit)
-    }
-}
-
-// The only place `AsyncDaemonDb` is named as the recorder's storage
-// contract - keeping it here, next to the concrete type, means the
-// recorder itself never has to import `db`.
-impl AuditEventStore for AsyncDaemonDb {
-    async fn upsert_audit_event(&self, event: &HarnessMonitorAuditEvent) -> Result<(), CliError> {
-        Self::upsert_audit_event(self, event).await
-    }
-
-    async fn insert_audit_event_if_absent(
-        &self,
-        event: &HarnessMonitorAuditEvent,
-    ) -> Result<bool, CliError> {
-        Self::insert_audit_event_if_absent(self, event).await
     }
 }
 

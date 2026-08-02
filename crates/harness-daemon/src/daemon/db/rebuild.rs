@@ -12,7 +12,32 @@ use rusqlite::params;
 use super::{CliError, DaemonDb, db_error};
 use crate::session::types::Review;
 
-impl DaemonDb {
+pub(crate) trait TaskReviewRebuild {
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn rebuild_task_reviews(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        reviews: &[Review],
+    ) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    #[cfg(test)]
+    fn count_task_reviews(&self, session_id: &str, task_id: &str) -> Result<i64, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    #[cfg(test)]
+    fn list_task_review_summaries(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> Result<Vec<(String, i64, String)>, CliError>;
+}
+
+impl TaskReviewRebuild for DaemonDb {
     /// Replace every row in `task_reviews` for `(session_id, task_id)` with
     /// the supplied `reviews`. Safe to call on daemon start to rebuild the
     /// `SQLite` mirror from `reviews.jsonl`.
@@ -21,10 +46,7 @@ impl DaemonDb {
     /// previous schema or a partial import are dropped before the fresh
     /// inserts. Each insert uses `INSERT OR REPLACE` so repeated calls with
     /// the same review ids remain idempotent.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) fn rebuild_task_reviews(
+    fn rebuild_task_reviews(
         &self,
         session_id: &str,
         task_id: &str,
@@ -79,16 +101,8 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("commit rebuild task_reviews transaction: {error}")))
     }
 
-    /// Number of `task_reviews` rows currently stored for a task.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
     #[cfg(test)]
-    pub(crate) fn count_task_reviews(
-        &self,
-        session_id: &str,
-        task_id: &str,
-    ) -> Result<i64, CliError> {
+    fn count_task_reviews(&self, session_id: &str, task_id: &str) -> Result<i64, CliError> {
         self.conn
             .query_row(
                 "SELECT COUNT(*) FROM task_reviews WHERE session_id = ?1 AND task_id = ?2",
@@ -98,13 +112,8 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("count task_reviews: {error}")))
     }
 
-    /// Fetch a single review row's round + verdict + review id, ordered by
-    /// `recorded_at`. Used by tests to assert rebuild fidelity.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
     #[cfg(test)]
-    pub(crate) fn list_task_review_summaries(
+    fn list_task_review_summaries(
         &self,
         session_id: &str,
         task_id: &str,

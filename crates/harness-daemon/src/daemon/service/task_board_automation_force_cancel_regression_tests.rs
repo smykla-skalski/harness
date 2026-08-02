@@ -2,8 +2,8 @@ use super::task_board_automation_force_cancel::{
     AuditOutcome, apply_cancel, audit_event, force_cancel_task_board_automation_db,
 };
 use crate::daemon::db::{
-    accept_remote_controller, claim_remote_controller, remote_controller_fixture,
-    remote_controller_running_status, remote_controller_status_request,
+    AsyncAuditQueries, accept_remote_controller, claim_remote_controller,
+    remote_controller_fixture, remote_controller_running_status, remote_controller_status_request,
 };
 use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, TaskBoardAutomationForceCancelRequest,

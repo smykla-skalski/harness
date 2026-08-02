@@ -48,6 +48,7 @@ use tempfile::tempdir;
 
 use super::super::test_support::test_http_state_with_db;
 use super::*;
+use crate::daemon::db::AsyncAuditQueries;
 
 #[tokio::test]
 async fn ws_task_board_method_parity_against_constants() {

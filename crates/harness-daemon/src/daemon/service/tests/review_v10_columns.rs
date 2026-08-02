@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, AsyncTaskReviewWrites};
 use crate::daemon::protocol::{
     TaskArbitrateRequest, TaskAssignRequest, TaskClaimReviewRequest, TaskCreateRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,

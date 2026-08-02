@@ -1,11 +1,46 @@
 use super::{CliError, DaemonDb, daemon_launchd, daemon_state, db_error};
 
-impl DaemonDb {
-    /// Set a diagnostics cache entry by key.
-    ///
+/// Diagnostics-cache persistence contract.
+///
+/// `pub`, not `pub(crate)`: `tests/integration/daemon_perf.rs` links `harness`
+/// as an ordinary dependency and calls `cache_startup_diagnostics` directly
+/// on a seeded `DaemonDb`, the same reason several sync `db` methods stay
+/// `pub` elsewhere.
+pub trait DaemonDbDiagnostics {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError> {
+    fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn get_diagnostics_cache(&self, key: &str) -> Result<Option<String>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn cache_startup_diagnostics(&self) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn load_cached_launch_agent_status(
+        &self,
+    ) -> Result<Option<daemon_launchd::LaunchAgentStatus>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn load_cached_workspace_diagnostics(
+        &self,
+    ) -> Result<Option<daemon_state::DaemonDiagnostics>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn load_recent_daemon_events(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<daemon_state::DaemonAuditEvent>, CliError>;
+}
+
+impl DaemonDbDiagnostics for DaemonDb {
+    fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError> {
         self.conn
             .execute(
                 "INSERT OR REPLACE INTO diagnostics_cache (key, value) VALUES (?1, ?2)",
@@ -15,11 +50,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Load a diagnostics cache entry.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn get_diagnostics_cache(&self, key: &str) -> Result<Option<String>, CliError> {
+    fn get_diagnostics_cache(&self, key: &str) -> Result<Option<String>, CliError> {
         match self.conn.query_row(
             "SELECT value FROM diagnostics_cache WHERE key = ?1",
             [key],
@@ -31,11 +62,7 @@ impl DaemonDb {
         }
     }
 
-    /// Cache the launch agent status and workspace diagnostics at daemon startup.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn cache_startup_diagnostics(&self) -> Result<(), CliError> {
+    fn cache_startup_diagnostics(&self) -> Result<(), CliError> {
         let launch_agent = daemon_launchd::launch_agent_status();
         let launch_agent_json = serde_json::to_string(&launch_agent).unwrap_or_default();
         self.set_diagnostics_cache("launch_agent", &launch_agent_json)?;
@@ -47,33 +74,21 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Load cached launch agent status.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn load_cached_launch_agent_status(
+    fn load_cached_launch_agent_status(
         &self,
     ) -> Result<Option<daemon_launchd::LaunchAgentStatus>, CliError> {
         let json = self.get_diagnostics_cache("launch_agent")?;
         Ok(json.and_then(|json| serde_json::from_str(&json).ok()))
     }
 
-    /// Load cached workspace diagnostics.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn load_cached_workspace_diagnostics(
+    fn load_cached_workspace_diagnostics(
         &self,
     ) -> Result<Option<daemon_state::DaemonDiagnostics>, CliError> {
         let json = self.get_diagnostics_cache("workspace")?;
         Ok(json.and_then(|json| serde_json::from_str(&json).ok()))
     }
 
-    /// Load recent daemon events, ordered by most recent first.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn load_recent_daemon_events(
+    fn load_recent_daemon_events(
         &self,
         limit: u32,
     ) -> Result<Vec<daemon_state::DaemonAuditEvent>, CliError> {

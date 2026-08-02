@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
+use crate::daemon::db::AsyncAuditQueries;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, acp_inspect_response, acp_transcript_response,
     ensure_acp_agent, ensure_acp_enabled, managed_agent_list_response_async,

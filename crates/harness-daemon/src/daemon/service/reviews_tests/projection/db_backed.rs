@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::AsyncAuditQueries;
 
 // Held across every await in this test deliberately: the shared GitHub API budget state guards a
 // process-global test resource, and the exclusivity has to span the whole

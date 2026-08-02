@@ -2,6 +2,8 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::audit_events::AuditEventStore;
+use crate::daemon::db::AsyncAuditQueries;
 
 #[tokio::test]
 async fn audit_events_round_trip_order_cursor_and_payload() {

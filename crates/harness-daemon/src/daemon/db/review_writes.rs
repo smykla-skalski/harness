@@ -32,12 +32,20 @@ fn serialize_verdict(review: &Review) -> Result<String, CliError> {
         .ok_or_else(|| db_error("serialize review verdict"))
 }
 
-impl DaemonDb {
-    /// Insert a single `task_reviews` row (sync path). Idempotent on `review_id`.
-    ///
+pub(crate) trait SyncTaskReviewWrites {
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failure.
-    pub(crate) fn insert_task_review(
+    fn insert_task_review(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        review: &Review,
+    ) -> Result<(), CliError>;
+}
+
+impl SyncTaskReviewWrites for DaemonDb {
+    /// Insert a single `task_reviews` row (sync path). Idempotent on `review_id`.
+    fn insert_task_review(
         &self,
         session_id: &str,
         task_id: &str,
@@ -66,12 +74,35 @@ impl DaemonDb {
     }
 }
 
-impl AsyncDaemonDb {
-    /// Insert a single `task_reviews` row (async path). Idempotent on `review_id`.
-    ///
+pub(crate) trait AsyncTaskReviewWrites {
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failure.
-    pub(crate) async fn insert_task_review(
+    async fn insert_task_review(
+        &self,
+        session_id: &str,
+        task_id: &str,
+        review: &Review,
+    ) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    #[cfg(test)]
+    async fn count_task_reviews(&self, session_id: &str, task_id: &str) -> Result<i64, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures. Returns [`Ok(None)`] when the
+    /// task row is missing.
+    #[cfg(test)]
+    async fn fetch_task_v10_columns(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> Result<Option<TaskV10Columns>, CliError>;
+}
+
+impl AsyncTaskReviewWrites for AsyncDaemonDb {
+    /// Insert a single `task_reviews` row (async path). Idempotent on `review_id`.
+    async fn insert_task_review(
         &self,
         session_id: &str,
         task_id: &str,
@@ -101,18 +132,8 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Number of `task_reviews` rows for `(session_id, task_id)`. Used by tests
-    /// to assert that a live `submit_review_async` mutation mirrored into `SQLite`
-    /// without requiring a rebuild or resync.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
     #[cfg(test)]
-    pub(crate) async fn count_task_reviews(
-        &self,
-        session_id: &str,
-        task_id: &str,
-    ) -> Result<i64, CliError> {
+    async fn count_task_reviews(&self, session_id: &str, task_id: &str) -> Result<i64, CliError> {
         query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM task_reviews WHERE session_id = ?1 AND task_id = ?2",
         )
@@ -123,15 +144,8 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("count async task_reviews: {error}")))
     }
 
-    /// Read the v10 denormalized task columns directly from `SQLite`.
-    /// Tests use this to prove each review mutation updates the columns
-    /// in place rather than relying only on the serialized state blob.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures. Returns [`Ok(None)`] when the
-    /// task row is missing.
     #[cfg(test)]
-    pub(crate) async fn fetch_task_v10_columns(
+    async fn fetch_task_v10_columns(
         &self,
         session_id: &str,
         task_id: &str,

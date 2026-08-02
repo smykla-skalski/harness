@@ -3,7 +3,7 @@ use super::{
     DaemonManifest, DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL,
     SetLogLevelRequest, StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{DaemonDb, DaemonDbDiagnostics};
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::protocol::GitHubApiDiagnostics;
 use crate::github_api::GitHubProtectedClient;

@@ -12,6 +12,7 @@ use crate::session::types::{ReviewVerdict, SessionRole, TaskStatus};
 use crate::session::{storage as session_storage, types::SessionState};
 
 use super::*;
+use crate::daemon::db::AsyncTaskReviewWrites;
 
 struct ReviewPersistenceFixture {
     db_path: PathBuf,

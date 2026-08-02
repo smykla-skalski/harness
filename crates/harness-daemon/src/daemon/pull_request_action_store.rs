@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use harness_kernel::errors::CliError;
 use harness_task_board::github::{PullRequestActionStore, RecordedAction};
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, AsyncPullRequestActionQueries};
 
 #[async_trait]
 impl PullRequestActionStore for AsyncDaemonDb {

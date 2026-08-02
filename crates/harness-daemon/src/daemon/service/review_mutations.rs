@@ -18,6 +18,8 @@ use crate::session::service::{
 };
 use harness_kernel::errors::CliError;
 
+use crate::daemon::db::SyncTaskReviewWrites;
+
 use super::{effective_project_dir, index, project_dir_for_db_session, session_detail};
 
 fn project_dir_from_db_or_index(

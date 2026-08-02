@@ -5,7 +5,9 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::daemon::audit_events::{broadcast_audit_event, persist_audit_event_once_strict};
+use crate::daemon::audit_events::{
+    AuditEventStore, broadcast_audit_event, persist_audit_event_once_strict,
+};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, TaskBoardAutomationForceCancelDisposition,

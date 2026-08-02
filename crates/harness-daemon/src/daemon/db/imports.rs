@@ -1,8 +1,9 @@
 use super::{
     CliError, DaemonDb, DiscoveredProject, ImportResult, PreparedRuntimeTranscriptResync,
     PreparedSessionResync, PreparedTaskCheckpointImport, ReconcileResult, SessionState,
-    clear_session_conversation_events, daemon_index, daemon_snapshot, import_daemon_events,
-    prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
+    TaskReviewRebuild, clear_session_conversation_events, daemon_index, daemon_snapshot,
+    import_daemon_events, prepare_agent_conversation_imports_and_activity,
+    prepare_runtime_transcript_resync_for_agents,
 };
 
 impl DaemonDb {

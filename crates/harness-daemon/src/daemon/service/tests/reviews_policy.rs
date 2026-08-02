@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncAuditQueries, AsyncDaemonDb};
 use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
     ReviewsPolicyRunStatus, ReviewsPolicyStepType, ReviewsPolicyTrigger,

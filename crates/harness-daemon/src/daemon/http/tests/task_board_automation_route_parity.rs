@@ -10,7 +10,8 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 use crate::daemon::db::{
-    AsyncDaemonDb, accept_remote_controller, claim_remote_controller, remote_controller_fixture,
+    AsyncAuditQueries, AsyncDaemonDb, accept_remote_controller, claim_remote_controller,
+    remote_controller_fixture,
 };
 use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, TaskBoardAutomationForceCancelRequest, http_paths, ws_methods,

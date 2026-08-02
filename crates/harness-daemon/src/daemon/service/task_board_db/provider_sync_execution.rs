@@ -247,6 +247,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::daemon::db::AsyncAuditQueries;
     use crate::daemon::protocol::HarnessMonitorAuditEventsRequest;
     use crate::task_board::{
         ExternalCreateOutcome, ExternalProvider, ExternalRefSyncState, ExternalSyncConfig,

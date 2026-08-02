@@ -1,6 +1,7 @@
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
+use crate::daemon::audit_events::AuditEventStore;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
 use crate::daemon::service::observe_sender;

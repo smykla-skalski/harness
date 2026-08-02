@@ -200,6 +200,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::daemon::db::AsyncAuditQueries;
     use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
     use crate::task_board::policy_runtime::models::{
         PolicyActionDescriptor, PolicyRunSubject, PolicyRunTrigger,

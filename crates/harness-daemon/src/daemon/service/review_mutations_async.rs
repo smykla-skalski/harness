@@ -5,6 +5,7 @@
 //! in `review_mutations`.
 
 use crate::agents::runtime::runtime_for_name;
+use crate::daemon::db::AsyncTaskReviewWrites;
 use crate::daemon::index as daemon_index;
 use crate::daemon::protocol::{
     SessionDetail, TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
