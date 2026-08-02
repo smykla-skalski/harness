@@ -2,6 +2,25 @@
 
 Choose one delivery mode before creating the editing worktree, then keep that mode until delivery or an explicitly approved reconciliation.
 
+## Contents
+
+- Select the mode
+- Shared contract
+- Signing backends
+- `replay`
+- `pr`
+- Large features and PR series
+- Prepare and publish
+- Ready and merge
+- Close out
+- Realign
+- Cleanup
+- `pr with review`
+- The loop
+- Reviewer variants
+- Adding a reviewer variant
+- Working alongside other sessions
+
 ## Select the mode
 
 - `pr` is the default: base the work on `upstream/main`, publish a dedicated branch, open the PR ready for review, wait for the user to merge, and align local state after the merge. No reviewer loop runs, and the PR is never a draft.
@@ -19,14 +38,14 @@ Choose one delivery mode before creating the editing worktree, then keep that mo
 2. Inspect current state and real call sites before editing. Work in small test, implement, and verify chunks.
 3. Run focused tests and the smallest owning `mise` check task for every component or crate the change touched. Do not require `mise run check:full` or validate untouched surfaces. Docs, helper scripts, and files outside an app or codebase need no unrelated app build.
 4. Allow unrelated dirty files temporarily only when they remain outside the task's explicit paths. Require a clean worktree before rebase or delivery, and deliver committed state only.
-5. Commit explicit paths with `git commit -sS -- <paths>`. For new files, first use `git add -N -- <new-paths>`; never use broad staging, `git commit -a`, or interactive commit selection.
+5. Commit explicit paths with `git commit -sS -- <paths>`. For new files, first use `git add -N -- <new-paths>`. Never use broad staging, `git commit -a`, or interactive commit selection.
 6. Verify every commit with `git log --show-signature -1` and require the exact `Signed-off-by: Bart Smykla <bartek@smykla.com>` trailer.
-7. Evaluate semver for every change, but change a version only with explicit user approval. Keep an approved required bump in the same delivery; treat a standalone bump as its own confirmed `replay` task.
+7. Evaluate semver for every change, but change a version only with explicit user approval. Keep an approved required bump in the same delivery, and treat a standalone bump as its own confirmed `replay` task.
 
 ### Signing backends
 
 - macOS agent sessions use the configured 1Password SSH signer. Stop for the user if it is unavailable or locked.
-- Linux sessions provisioned by Smycracker use only its host-wide Git signing service, agent socket at `/run/smycracker-git-signing/agent.sock`, managed public key at `/etc/smycracker/git-signing/key.pub`, signing wrapper at `/usr/local/bin/smycracker-git-signing-ssh-keygen`, and doctor at `/usr/local/bin/smycracker-git-signing-doctor`. The wrapper selects the socket without inherited Orca or shell environment; run the doctor before the first commit on a host.
+- Linux sessions provisioned by Smycracker use only its host-wide Git signing service, agent socket at `/run/smycracker-git-signing/agent.sock`, managed public key at `/etc/smycracker/git-signing/key.pub`, signing wrapper at `/usr/local/bin/smycracker-git-signing-ssh-keygen`, and doctor at `/usr/local/bin/smycracker-git-signing-doctor`. The wrapper selects the socket without inherited Orca or shell environment. Run the doctor before the first commit on a host.
 - Before any provider change, Smycracker's controller preflight must verify GitHub login `bartsmykla` and the exact public key's SSH signing registration. Stop for the user if that preflight or the host doctor fails.
 - Smycracker owns key creation, GitHub registration, private-key custody, loading, rotation, and revocation. Agents must never copy, export, replace, register, or revoke signing material.
 - The Smycracker signing key is dedicated to signing and remains registered on GitHub account `bartsmykla` across ordinary teardown and host replacement. Before planned rotation, push and verify every outstanding commit signed by the old key. Git authentication and SSH host identities are separate trust purposes.
@@ -38,7 +57,7 @@ Choose one delivery mode before creating the editing worktree, then keep that mo
 1. Use current local `main` as the worktree's base and integration target.
 2. Finish and commit the task in the session worktree. Immediately before delivery, rebase the unpublished task range once onto current local `main`, resolve conflicts in the worktree, and rerun affected validation when the rebase materially changes the result.
 3. Verify a clean worktree, the exact task range, every signature, and every sign-off.
-4. From a clean local-`main` checkout, fast-forward local `main` to the verified worktree tip with `git merge --ff-only <session-branch>`. If it cannot fast-forward, reconcile in the worktree; never cherry-pick replacement commits or resolve conflicts on `main`.
+4. From a clean local-`main` checkout, fast-forward local `main` to the verified worktree tip with `git merge --ff-only <session-branch>`. If it cannot fast-forward, reconcile in the worktree. Never cherry-pick replacement commits or resolve conflicts on `main`.
 5. Do not push the session branch or local `main` unless the user separately requests it, and do not rerun validation on `main` merely because the fast-forward succeeded.
 6. Finish only when local `main` and the session worktree branch point to the same commit and both checkouts are clean. Keep the worktree and lane available, and report any intentional difference from `upstream/main`.
 
@@ -48,26 +67,26 @@ Choose one delivery mode before creating the editing worktree, then keep that mo
 
 When a feature is expected to exceed about 5,000 reviewable changed lines, record an ordered PR-series plan before implementation. Treat 5,000 lines as a soft per-PR ceiling, never a quota, hard product limit, or reason to pad a smaller coherent slice. The budget applies in both PR modes, since it exists to keep a diff reviewable rather than to feed one particular reviewer.
 
-1. Find the merge base of the intended PR base and proposed branch head, then compute the proposed PR diff from that merge base to the branch head. Count additions plus deletions in text files eligible for GitHub Copilot code review under its [documented excluded-file rules](https://docs.github.com/en/copilot/reference/review-excluded-files), then subtract any generated, vendored, lockfile, snapshot, or other explicitly mechanical lines that remain in that eligible set. Use the resulting authored, Copilot-eligible text volume for the approximately 5,000-line budget. Report the complete diff, budget count, subtracted mechanical volume, and binary changes separately; never classify authored work as mechanical to hide an oversized diff or separate required derived output from its source.
+1. Find the merge base of the intended PR base and proposed branch head, then compute the proposed PR diff from that merge base to the branch head. Count additions plus deletions in text files eligible for GitHub Copilot code review under its [documented excluded-file rules](https://docs.github.com/en/copilot/reference/review-excluded-files), which serve as the yardstick whether or not a reviewer runs, then subtract any generated, vendored, lockfile, snapshot, or other explicitly mechanical lines that remain in that eligible set. Use the resulting authored, eligible text volume for the approximately 5,000-line budget. Report the complete diff, budget count, subtracted mechanical volume, and binary changes separately. Never classify authored work as mechanical to hide an oversized diff, and never separate required derived output from its source.
 2. Record each planned PR's outcome, predecessor, owned behavior and surfaces, estimated reviewable lines, planned overlap, validation, non-goals, and status.
-3. Give each slice one durable outcome and leave the repository buildable, tested, and operationally safe when it merges. Include the tests, documentation, migrations, compatibility behavior, cleanup, and approved version change required by that outcome; no test or runtime path may depend on an unmerged future PR.
+3. Give each slice one durable outcome and leave the repository buildable, tested, and operationally safe when it merges. Include the tests, documentation, migrations, compatibility behavior, cleanup, and approved version change required by that outcome. No test or runtime path may depend on an unmerged future PR.
 4. Use a foundation slice only when it establishes a stable, tested, independently useful boundary. Forbid dormant scaffolding, placeholders, half-exposed behavior, temporary review-only adapters, deferred known fixes, and other work planned for replacement.
 5. Let later slices consume or extend a stable earlier contract, but never knowingly repair, replace, rename, remove, or substantially redesign it. Combine, reorder, or redesign the boundary before publication when the plan predicts such rework. Judge overlap by behavior rather than filenames: small additive integration in the same file is valid, but each behavior, migration, and schema transition needs one owning PR.
-6. Obtain explicit user approval for an operationally necessary staged transition such as expand, migrate, and contract. Record every production-safe intermediate state and planned removal before implementation; staged rollout needs do not justify ordinary implementation churn.
+6. Obtain explicit user approval for an operationally necessary staged transition such as expand, migrate, and contract. Record every production-safe intermediate state and planned removal before implementation. Staged rollout needs do not justify ordinary implementation churn.
 7. Deliver dependent or semantically overlapping slices serially. Complete the mode's review gate, user merge, and normal closeout before implementing the next slice from current `upstream/main`. Read-only planning may continue while waiting.
 8. Run slices in parallel only as separate agent sessions, each with its own worktree and lane, and only when they share no code contract, migration, runtime dependency, or semantic ownership and remain correct and mergeable in either order.
 9. Give every slice its own dedicated branch, its own run through the mode's gate, and its own terminal state. Within one session, reuse that session's worktree and build, test, and runtime lane across serial slices.
 10. Recalculate the review budget before publication, and again before the first review request when the mode has a reviewer. Reslice when a sound boundary exists. When the smallest self-contained slice still exceeds the budget, stop for explicit user approval and record why an artificial split would be worse. Do not add an automated size gate.
 11. After each merge, record the exact merged contract and commit, then reassess the remaining boundaries, estimates, overlap, and validation before implementation continues.
-12. Use the final slice to prove the complete acceptance path and finish only whole-feature documentation, versioning, and integration not required by an earlier outcome; never use it to repair an earlier slice or defer that slice's obligations. A closed-unmerged prerequisite blocks dependent work, and the feature is complete only after every planned slice merges, required validation and cleanup finish, and local `main`, `upstream/main`, and the reusable worktree align.
+12. Use the final slice to prove the complete acceptance path and finish only whole-feature documentation, versioning, and integration not required by an earlier outcome. Never use it to repair an earlier slice or defer that slice's obligations. A closed-unmerged prerequisite blocks dependent work, and the feature is complete only after every planned slice merges, required validation and cleanup finish, and local `main`, `upstream/main`, and the reusable worktree align.
 
 ### Prepare and publish
 
-1. Fetch and prune `upstream`, then require a clean `local main == upstream/main`. Fast-forward clean local `main` if it is behind `upstream/main`; stop for direction if local `main` is ahead or diverged.
+1. Fetch and prune `upstream`, then require a clean `local main == upstream/main`. Fast-forward clean local `main` if it is behind `upstream/main`. Stop for direction if local `main` is ahead or diverged.
 2. Create the session worktree and dedicated branch from `upstream/main`, and leave local `main` untouched until post-merge closeout.
 3. Rebase the completed branch onto current `upstream/main` before its first push, resolve conflicts in the worktree, run affected validation, and verify the signed task range.
 4. Push the dedicated branch and open the PR: ready for review in `pr`, a draft in `pr with review`. The merge squashes the branch into one commit, so add signed fix commits instead of rewriting history. Use `--force-with-lease` only for an unavoidable rebase onto `upstream/main`, after verifying the expected remote tip. Never plain-force or rewrite a shared branch.
-5. Include every approved required version bump in the reviewed branch.
+5. Include every approved required version bump in the delivered branch.
 
 The PR title becomes the commit title on `main`, so write it as a commit message: `{type}({scope}): {message}`, 50 characters or fewer. GitHub appends ` (#<number>)`.
 
@@ -96,9 +115,9 @@ The closing line is optional. Add it only when the task actually worked on a rea
 
 ### Close out
 
-This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything, unless the worktree and branch existed only to deliver one standalone, non-umbrella issue or task, in which case closeout removes them and their build caches instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path; when it is unclear whether more work is coming, default to realign and ask before removing anything.
+This repository allows squash merges only. The session branch collapses into one new commit on `upstream/main`, so its own commits never reach `main` and the branch can never fast-forward onto it. Closeout realigns local state instead of integrating anything. The exception is a worktree and branch that existed only to deliver one standalone, non-umbrella issue or task, where closeout removes them and their build caches instead. A worktree kept alive for an umbrella's remaining slices or another follow-up in the same PR series always takes the realign path. When it is unclear whether more work is coming, default to realign and ask before removing anything.
 
-Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits (reconcile those first, as described below).
+Confirm the PR merged before either path, then check that `<main-checkout>` is on `main`, `<worktree>` is on `<session-branch>`, both are clean, and local `main` carries no unpublished `replay` commits. Reconcile those first, as described below.
 
 #### Realign
 
@@ -147,7 +166,7 @@ git -C <main-checkout> worktree remove <worktree>
 git -C <main-checkout> branch -D <session-branch>
 ```
 
-Use `-D`, not `-d`: the squash commit means the local branch's commits are never an ancestor of `main`, so the safe delete refuses. Skip a separate remote delete; GitHub already removed the remote branch on merge, and `fetch --prune` already dropped the local tracking ref. Confirm with `git ls-remote --heads upstream <session-branch>` if in doubt.
+Use `-D`, not `-d`: the squash commit means the local branch's commits are never an ancestor of `main`, so the safe delete refuses. Skip a separate remote delete. GitHub already removed the remote branch on merge, and `fetch --prune` already dropped the local tracking ref. Confirm with `git ls-remote --heads upstream <session-branch>` if in doubt.
 
 When unpublished local `replay` commits sit on `main`, rebase and re-sign only that range onto merged `upstream/main`, preserve its sign-offs, and wait for the user to push. Never cherry-pick the squash commit on top of that range or reset those commits away. Stop for the user if any unpublished commit falls outside a stable, signed, signed-off replay range.
 
@@ -157,7 +176,7 @@ If the PR closes without merging, verify that state through GitHub, leave `main`
 
 Everything in `pr` applies, with two differences. The PR opens as a draft, and it becomes ready only after the configured reviewer reports a clean pass on the current tree.
 
-One reviewer per delivery. `copilot` is the only variant today. When the user asks for a review without naming a reviewer, use `copilot` and say so.
+One reviewer per delivery. When the user asks for a review without naming a reviewer, use `copilot` and say so.
 
 ### The loop
 
@@ -169,11 +188,15 @@ These rules hold for every reviewer. The variant supplies the commands, the read
 4. Answer an incorrect finding before resuming other work, then resolve the thread. Give the evidence, not the verdict: the command that proves it and the mechanism behind it. Write one or two plain sentences, and drop the polite filler, bullets, and trailing period. Never silently resolve a wrong finding, because a silent resolve reads as a real defect quietly ignored and leaves the next reader no record of why nothing changed.
 5. Re-request and repeat without a fixed round limit until the variant's clean pass holds.
 6. If the tree or the feedback changes, invalidate the prior result and resume the loop. Editing the PR title or body never invalidates a review, because the review covers the code change and not the metadata around it.
-7. Escalate only a genuine impasse, a recurring already-addressed finding, or persistent reviewer or API failure. Keep the PR a draft while blocked.
+7. Escalate on the variant's own terms, and keep the PR a draft while blocked.
+
+### Reviewer variants
+
+- [`copilot`](pr-reviewers/copilot.md) - the only variant today.
 
 ### Adding a reviewer variant
 
-A variant defines these five things and changes nothing else about the mode:
+Add one file under `pr-reviewers/`, link it in the list above, and answer these five questions there. Change nothing else about the mode.
 
 1. The request command, and the re-request command when it differs.
 2. Where the findings appear and how to read them, including any surface the obvious API call misses.
@@ -181,48 +204,7 @@ A variant defines these five things and changes nothing else about the mode:
 4. What a clean pass means for it.
 5. What counts as reviewer failure worth escalating rather than retrying.
 
-Reviewers that are agents rather than GitHub bots still land here, under their own heading, and still answer the same five questions.
-
-### `copilot`
-
-#### Request
-
-Request Copilot immediately, and use the same command for every re-request:
-
-```bash
-gh api --method POST repos/smykla-skalski/harness/pulls/<PR_NUMBER>/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
-```
-
-#### Read the findings
-
-A Copilot review arrives in two halves and the loop needs both. These are read-only and safe to rerun at any point:
-
-```bash
-gh api --paginate repos/smykla-skalski/harness/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.id == 175728472) | {commit: .commit_id, state: .state, body: .body}'
-gh api --paginate repos/smykla-skalski/harness/pulls/<PR_NUMBER>/comments --jq '.[] | {user: .user.login, path, line, original_line, body}'
-```
-
-Keep `--paginate` on both. `gh api` returns only the first page otherwise, so a PR that accumulates more than thirty reviews or inline comments over a long loop starts hiding its older ones behind a result that still looks complete.
-
-Keep the author and both line fields on the comments query. That endpoint returns human, Copilot, and other bot comments in one list, so dropping `.user.login` leaves each finding unattributable, and a comment the branch has moved past reports `line: null` while its position survives only in `original_line`.
-
-Select the reviewer by numeric id rather than by name, because this bot's login is not stable across endpoints. `reviews[].user.login` calls it `copilot-pull-request-reviewer[bot]`, while `requested_reviewers`, `comments[].user.login`, and the users API all call it `Copilot`. A filter written from the name one endpoint showed then matches nothing on another and reads as a review that never arrived, which is the same silence as a review that has not run yet. The id is identical everywhere and also keeps other bot reviewers, such as `smyklot[bot]`, out of the result. Treat `175728472` as current rather than permanent, and re-derive it whenever a filter that should match comes back empty:
-
-```bash
-gh api 'users/copilot-pull-request-reviewer%5Bbot%5D' --jq '.id'
-```
-
-#### Triage
-
-Read the review body as well as the inline comments, because the two carry different findings. Copilot withholds anything it is unsure of from the inline threads and collects it in a collapsed `Comments suppressed due to low confidence (N)` block in the body instead, where each entry is a `**<path>:<line>**` heading followed by the finding. Those entries never appear in the review-comments API, so a run that only counts inline threads reads a review that raised real defects as a clean one.
-
-Triage every suppressed finding exactly as you would a posted one, and never treat the block as advisory. Low confidence describes how sure Copilot is that the remark belongs in review, not how small the defect is, and genuine correctness bugs land there. Confirm or refute each entry against the code, fix what is real, and answer what is wrong.
-
-A suppressed finding has no thread to resolve, so answer a wrong one in a single PR comment that names its file and line and gives the same evidence. Fixing a real one needs no reply, because the pushed commit is the record.
-
-#### Clean pass
-
-Copilot reviewed the current tree, posted no new comments, and either raised no suppressed findings or raised only ones this loop already fixed or answered.
+Reviewers that are agents rather than GitHub bots use the same file shape and answer the same five questions.
 
 ## Working alongside other sessions
 
