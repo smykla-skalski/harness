@@ -17,7 +17,7 @@ struct DashboardAgentsListPane: View {
       case .loading:
         VStack(spacing: 12) {
           ProgressView()
-          Text("Loading agents…")
+          Text("Loading agents")
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

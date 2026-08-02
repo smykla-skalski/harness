@@ -228,6 +228,8 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
   public let permissionQueueDepth: Int
   public let terminalCount: Int
   public let promptDeadlineRemainingMs: UInt64
+  public let handshake: AcpAgentHandshake?
+  public let sessionState: AcpAgentSessionState?
 
   public var id: String { acpId }
   public var managedAgentID: String { acpId }
@@ -249,7 +251,9 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
     pendingPermissions: Int,
     permissionQueueDepth: Int = 0,
     terminalCount: Int,
-    promptDeadlineRemainingMs: UInt64
+    promptDeadlineRemainingMs: UInt64,
+    handshake: AcpAgentHandshake? = nil,
+    sessionState: AcpAgentSessionState? = nil
   ) {
     self.acpId = acpId
     self.sessionId = sessionId
@@ -267,6 +271,8 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
     self.permissionQueueDepth = permissionQueueDepth
     self.terminalCount = terminalCount
     self.promptDeadlineRemainingMs = promptDeadlineRemainingMs
+    self.handshake = handshake
+    self.sessionState = sessionState
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -287,6 +293,8 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
     case permissionQueueDepth
     case terminalCount
     case promptDeadlineRemainingMs
+    case handshake
+    case sessionState
   }
 
   public init(from decoder: any Decoder) throws {
@@ -315,6 +323,8 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
       UInt64.self,
       forKey: .promptDeadlineRemainingMs
     )
+    handshake = try container.decodeIfPresent(AcpAgentHandshake.self, forKey: .handshake)
+    sessionState = try container.decodeIfPresent(AcpAgentSessionState.self, forKey: .sessionState)
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -336,6 +346,8 @@ public struct AcpAgentInspectSnapshot: Codable, Equatable, Identifiable, Sendabl
     try container.encode(permissionQueueDepth, forKey: .permissionQueueDepth)
     try container.encode(terminalCount, forKey: .terminalCount)
     try container.encode(promptDeadlineRemainingMs, forKey: .promptDeadlineRemainingMs)
+    try container.encodeIfPresent(handshake, forKey: .handshake)
+    try container.encodeIfPresent(sessionState, forKey: .sessionState)
   }
 }
 

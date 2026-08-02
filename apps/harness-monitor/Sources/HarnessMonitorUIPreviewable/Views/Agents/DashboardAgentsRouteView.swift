@@ -7,9 +7,11 @@ struct DashboardAgentsRouteView: View {
   let history: GlobalWindowNavigationHistory
   let isRouteVisible: Bool
   let refreshesAutomatically: Bool
+  let initialAcpDetail: DashboardAcpAgentDetail?
   @AppStorage(DashboardAgentSelectionDefaults.storageKey)
   private var persistedSelectionRaw = ""
   @State private var state: DashboardAgentsRouteState
+  @State private var isPresentingAcpCreate = false
 
   init(
     store: HarnessMonitorStore,
@@ -18,6 +20,7 @@ struct DashboardAgentsRouteView: View {
     isRouteVisible: Bool,
     refreshesAutomatically: Bool = true,
     initialState: DashboardAgentBrowserViewState = DashboardAgentBrowserViewState(),
+    initialAcpDetail: DashboardAcpAgentDetail? = nil,
     selectionDefaults: UserDefaults = .standard
   ) {
     self.store = store
@@ -25,6 +28,7 @@ struct DashboardAgentsRouteView: View {
     self.history = history
     self.isRouteVisible = isRouteVisible
     self.refreshesAutomatically = refreshesAutomatically
+    self.initialAcpDetail = initialAcpDetail
     _persistedSelectionRaw = AppStorage(
       wrappedValue: "",
       DashboardAgentSelectionDefaults.storageKey,
@@ -83,8 +87,13 @@ struct DashboardAgentsRouteView: View {
           )
           .frame(minWidth: 250, idealWidth: 310, maxWidth: 390)
 
-          DashboardAgentDetailPane(agent: selectedAgent)
-            .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+          DashboardAgentDetailPane(
+            store: store,
+            agent: selectedAgent,
+            loadsAcpDetailAutomatically: refreshesAutomatically,
+            initialAcpDetail: initialAcpDetail
+          )
+          .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
       }
     }
@@ -112,6 +121,13 @@ struct DashboardAgentsRouteView: View {
     .task(id: history.pendingDashboardAgentsRestoreRequest?.requestID) {
       applyPendingHistoryRestoreIfNeeded()
     }
+    .sheet(isPresented: $isPresentingAcpCreate) {
+      DashboardAcpAgentCreateSheet(
+        store: store,
+        sessions: sessions,
+        onCreated: selectCreatedAcpAgent
+      )
+    }
   }
 
   private var header: some View {
@@ -124,6 +140,12 @@ struct DashboardAgentsRouteView: View {
           .foregroundStyle(.secondary)
       }
       Spacer()
+      Button {
+        isPresentingAcpCreate = true
+      } label: {
+        Label("New ACP agent", systemImage: "plus")
+      }
+      .disabled(sessions.isEmpty)
       if let sourceLabel {
         Text(sourceLabel)
           .scaledFont(.caption.weight(.medium))
@@ -171,6 +193,23 @@ struct DashboardAgentsRouteView: View {
   }
 
   private func requestManualRefresh() {
+    requestRefresh(force: true)
+  }
+
+  private func selectCreatedAcpAgent(
+    _ snapshot: AcpAgentSnapshot,
+    _ session: SessionSummary
+  ) {
+    let identity = DashboardAgentIdentity(
+      workspace: DashboardAgentWorkspaceIdentity(
+        projectID: session.projectId,
+        checkoutID: session.checkoutId
+      ),
+      runtimeKind: .acp,
+      managedAgentID: snapshot.managedAgentID
+    )
+    persistedSelectionRaw = identity.selectionRawValue
+    history.recordDashboardAgentSelection(identity)
     requestRefresh(force: true)
   }
 

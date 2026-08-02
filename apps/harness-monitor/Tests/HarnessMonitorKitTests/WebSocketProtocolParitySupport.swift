@@ -97,6 +97,36 @@ extension WebSocketProtocolParityTests {
     )
   }
 
+  func makeAcpManagementRPCTransport(probe: RPCProbe) -> WebSocketTransport {
+    WebSocketTransport(
+      connection: HarnessMonitorConnection(endpoint: Self.testEndpoint, token: "test-token"),
+      session: session,
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        switch method {
+        case .managedAgentAcpSessions:
+          return try Self.jsonValue(
+            AcpProviderSessionPage(
+              sessions: [
+                AcpProviderSession(
+                  sessionID: "provider-session",
+                  cwd: "/tmp/project",
+                  title: "Dashboard migration"
+                )
+              ]
+            )
+          )
+        case .managedAgentCloseAcpSession, .managedAgentDeleteAcpSession,
+          .managedAgentLogoutAcp:
+          return .object(["ok": .bool(true)])
+        default:
+          Issue.record("Unexpected RPC method \(method.rawValue)")
+          throw HarnessMonitorAPIError.server(code: 500, message: "unexpected method")
+        }
+      }
+    )
+  }
+
   func exerciseParityMutations(
     transport: WebSocketTransport,
     terminalSnapshot: AgentTuiSnapshot,

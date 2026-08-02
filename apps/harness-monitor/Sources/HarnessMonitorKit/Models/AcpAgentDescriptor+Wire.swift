@@ -92,7 +92,9 @@ extension AcpAgentInspectSnapshot {
       pendingPermissions: Int(wire.pendingPermissions),
       permissionQueueDepth: Int(wire.permissionQueueDepth),
       terminalCount: Int(wire.terminalCount),
-      promptDeadlineRemainingMs: wire.promptDeadlineRemainingMs
+      promptDeadlineRemainingMs: wire.promptDeadlineRemainingMs,
+      handshake: wire.handshake,
+      sessionState: wire.sessionState
     )
   }
 }

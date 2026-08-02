@@ -2,22 +2,36 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct DashboardAgentDetailPane: View {
+  let store: HarnessMonitorStore
   let agent: DashboardAgentSummary?
+  let loadsAcpDetailAutomatically: Bool
+  @State private var acpState: DashboardAcpAgentDetailState
+
+  init(
+    store: HarnessMonitorStore,
+    agent: DashboardAgentSummary?,
+    loadsAcpDetailAutomatically: Bool = true,
+    initialAcpDetail: DashboardAcpAgentDetail? = nil
+  ) {
+    self.store = store
+    self.agent = agent
+    self.loadsAcpDetailAutomatically = loadsAcpDetailAutomatically
+    _acpState = State(initialValue: DashboardAcpAgentDetailState(detail: initialAcpDetail))
+  }
 
   var body: some View {
     Group {
       if let agent {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 20) {
-            DashboardAgentDetailHeader(agent: agent)
-            DashboardAgentCurrentSummary(agent: agent)
-            DashboardAgentIdentityCard(agent: agent)
-          }
-          .frame(maxWidth: 760, alignment: .leading)
-          .padding(24)
-          .frame(maxWidth: .infinity, alignment: .topLeading)
+        if agent.runtimeKind == .acp {
+          DashboardAcpAgentDetailView(
+            store: store,
+            agent: agent,
+            state: acpState,
+            loadsAutomatically: loadsAcpDetailAutomatically
+          )
+        } else {
+          standardDetail(agent)
         }
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentDetail)
       } else {
         ContentUnavailableView(
           "Select an agent",
@@ -27,9 +41,23 @@ struct DashboardAgentDetailPane: View {
       }
     }
   }
+
+  private func standardDetail(_ agent: DashboardAgentSummary) -> some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 20) {
+        DashboardAgentDetailHeader(agent: agent)
+        DashboardAgentCurrentSummary(agent: agent)
+        DashboardAgentIdentityCard(agent: agent)
+      }
+      .frame(maxWidth: 760, alignment: .leading)
+      .padding(24)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentDetail)
+  }
 }
 
-private struct DashboardAgentDetailHeader: View {
+struct DashboardAgentDetailHeader: View {
   let agent: DashboardAgentSummary
 
   var body: some View {
@@ -103,7 +131,7 @@ private struct DashboardAgentCurrentSummary: View {
   }
 }
 
-private struct DashboardAgentIdentityCard: View {
+struct DashboardAgentIdentityCard: View {
   let agent: DashboardAgentSummary
 
   var body: some View {
