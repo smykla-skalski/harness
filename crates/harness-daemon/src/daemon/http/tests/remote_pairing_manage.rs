@@ -4,6 +4,7 @@
 //! rule are both in the path. A unit test can say the query filters; only this
 //! can say a broker holding `pair_manage` never sees another broker's links.
 
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use axum::http::StatusCode;
 use serde_json::Value;
 

@@ -1,10 +1,10 @@
 //! `db`'s interface onto [`DaemonDb`] and [`AsyncDaemonDb`] for remote pairing
 //! codes, the inventory built from them, and their lifecycle.
 //!
-//! `db/remote_pairing.rs`, `db/remote_pairing/{inventory,status}.rs`,
-//! `db/remote_pairing_expiry.rs`, and `db/remote_pairing_revoke.rs` persist
-//! this area's state, but the traits live here, next to the domain code that
-//! calls them (`daemon::http::remote_pairing`, `harness-daemon-remote-cli`) rather
+//! `db/remote_pairing.rs`, `db/remote_pairing/inventory.rs`, and
+//! `db/remote_pairing_revoke.rs` keep this area's SQL and row parsing, but
+//! the traits and their impls live here, next to the domain code that calls
+//! them (`daemon::http::remote_pairing`, `harness-daemon-remote-cli`) rather
 //! than inside `db`. `db` doesn't own either type's callers, and an inherent
 //! `impl` block for this area could never move into a crate `db` doesn't
 //! share with them; a trait this module declares has no such problem, since
@@ -16,20 +16,23 @@
 //!
 //! Two traits, not one, because `DaemonDb` and `AsyncDaemonDb` are different
 //! concrete types with disjoint method sets here: revoking a pairing and
-//! sweeping expirations are async-only, everything else is sync-only.
+//! sweeping expirations are async-only, everything else is sync-only. Each
+//! impl lives in its own submodule so this file stays the trait/type
+//! declarations only.
 
 use std::error::Error;
 use std::fmt;
 
 use harness_kernel::errors::CliError;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-
 use super::remote_identity::RemoteAuditEvent;
 use super::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingClaimedClient, RemotePairingError,
     RemotePairingInventoryEntry, RemotePairingRecord, RemotePairingStatus, RemoteStoredPairing,
 };
+
+mod async_impl;
+mod sync_impl;
 
 /// Who a pairing belongs to.
 ///
@@ -49,6 +52,16 @@ pub(crate) enum RemotePairingOwner {
 pub(crate) enum RemotePairingClaimCodeError {
     Pairing(RemotePairingError),
     Store(CliError),
+}
+
+impl RemotePairingClaimCodeError {
+    fn pairing(error: RemotePairingError) -> Self {
+        Self::Pairing(error)
+    }
+
+    fn store(error: CliError) -> Self {
+        Self::Store(error)
+    }
 }
 
 impl fmt::Display for RemotePairingClaimCodeError {
@@ -93,15 +106,17 @@ pub(crate) enum RemotePairingRevokeOutcome {
     NotFound,
 }
 
-/// The sync half, backed by [`DaemonDb`].
-#[allow(
-    dead_code,
-    reason = "the crate-boundary seam this module exists for; every caller \
-              still goes through the inherent method each one forwards to"
-)]
+/// The sync half, backed by [`DaemonDb`](crate::daemon::db::DaemonDb).
 pub(crate) trait RemotePairingQueries {
     /// # Errors
     /// Returns [`CliError`] on SQL or scope serialization failures.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "convenience wrapper exercised only by tests today"
+        )
+    )]
     fn create_remote_pairing_code(
         &self,
         record: &RemotePairingRecord,
@@ -168,12 +183,7 @@ pub(crate) trait RemotePairingQueries {
     ) -> Result<bool, CliError>;
 }
 
-/// The async half, backed by [`AsyncDaemonDb`].
-#[allow(
-    dead_code,
-    reason = "the crate-boundary seam this module exists for; every caller \
-              still goes through the inherent method each one forwards to"
-)]
+/// The async half, backed by [`AsyncDaemonDb`](crate::daemon::db::AsyncDaemonDb).
 pub(crate) trait RemotePairingAsyncQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] when the expiration sweep cannot be persisted.
@@ -187,97 +197,4 @@ pub(crate) trait RemotePairingAsyncQueries: Send + Sync {
         revoked_at: &str,
         audit: &RemoteAuditEvent,
     ) -> Result<RemotePairingRevoked, CliError>;
-}
-
-/// The sync trait's one and only impl for [`DaemonDb`]. Every method is a
-/// thin forward into the matching inherent method (`db/remote_pairing.rs`,
-/// `db/remote_pairing/{inventory,status}.rs`, `db/remote_pairing_expiry.rs`),
-/// kept on `Self` so nothing outside `db` has to change to keep calling them
-/// by the same name.
-impl RemotePairingQueries for DaemonDb {
-    fn create_remote_pairing_code(
-        &self,
-        record: &RemotePairingRecord,
-        audit_event_id: &str,
-    ) -> Result<RemoteStoredPairing, CliError> {
-        Self::create_remote_pairing_code(self, record, audit_event_id)
-    }
-
-    fn create_remote_pairing_code_with_audit(
-        &self,
-        record: &RemotePairingRecord,
-        audit_event_id: &str,
-        extra_audit: Option<&RemoteAuditEvent>,
-    ) -> Result<RemoteStoredPairing, CliError> {
-        Self::create_remote_pairing_code_with_audit(self, record, audit_event_id, extra_audit)
-    }
-
-    fn claim_remote_pairing_code(
-        &self,
-        code: &str,
-        claim: &RemotePairingClaimRequest,
-        now: &str,
-    ) -> Result<RemotePairingClaimedClient, RemotePairingClaimCodeError> {
-        Self::claim_remote_pairing_code(self, code, claim, now)
-    }
-
-    fn remote_pairing_minted_by(&self, pairing_id: &str) -> Result<RemotePairingOwner, CliError> {
-        Self::remote_pairing_minted_by(self, pairing_id)
-    }
-
-    fn list_remote_pairing_inventory(
-        &self,
-        now: &str,
-        minted_by: Option<&str>,
-    ) -> Result<Vec<RemotePairingInventoryEntry>, CliError> {
-        Self::list_remote_pairing_inventory(self, now, minted_by)
-    }
-
-    fn remote_pairing_claimed_by(&self, client_id: &str) -> Result<Option<String>, CliError> {
-        Self::remote_pairing_claimed_by(self, client_id)
-    }
-
-    fn remote_pairing_inventory_entry(
-        &self,
-        pairing_id: &str,
-        now: &str,
-    ) -> Result<Option<RemotePairingInventoryEntry>, CliError> {
-        Self::remote_pairing_inventory_entry(self, pairing_id, now)
-    }
-
-    fn load_remote_pairing_status(
-        &self,
-        pairing_id: &str,
-        now: &str,
-    ) -> Result<RemotePairingStatus, CliError> {
-        Self::load_remote_pairing_status(self, pairing_id, now)
-    }
-
-    fn record_remote_pairing_expiration(
-        &self,
-        pairing_id: &str,
-        now: &str,
-    ) -> Result<bool, CliError> {
-        Self::record_remote_pairing_expiration(self, pairing_id, now)
-    }
-}
-
-/// The async trait's one and only impl for [`AsyncDaemonDb`]. Every method is
-/// a thin forward into the matching inherent method
-/// (`db/remote_pairing_expiry.rs`, `db/remote_pairing_revoke.rs`), kept on
-/// `Self` so nothing outside `db` has to change to keep calling them by the
-/// same name.
-impl RemotePairingAsyncQueries for AsyncDaemonDb {
-    async fn record_expired_remote_pairings(&self, now: &str) -> Result<u64, CliError> {
-        Self::record_expired_remote_pairings(self, now).await
-    }
-
-    async fn revoke_remote_pairing_with_audit(
-        &self,
-        pairing_id: &str,
-        revoked_at: &str,
-        audit: &RemoteAuditEvent,
-    ) -> Result<RemotePairingRevoked, CliError> {
-        Self::revoke_remote_pairing_with_audit(self, pairing_id, revoked_at, audit).await
-    }
 }

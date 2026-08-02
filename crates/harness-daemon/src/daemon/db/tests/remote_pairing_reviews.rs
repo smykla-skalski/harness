@@ -3,6 +3,7 @@ use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingRecord,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 use crate::reviews::ReviewsQueryRequest;
 
 #[test]

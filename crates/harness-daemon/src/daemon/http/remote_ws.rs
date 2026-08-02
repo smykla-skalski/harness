@@ -10,6 +10,7 @@
 //! it is open, and a client that needs the current state reads the inventory
 //! over HTTP, which is the request that answers that question.
 
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket};

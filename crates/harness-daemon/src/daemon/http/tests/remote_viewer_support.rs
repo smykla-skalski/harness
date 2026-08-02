@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use axum::http::{HeaderValue, header::AUTHORIZATION};
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;

@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentityQueries;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -364,6 +365,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::super::db::DaemonDb;
+    use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 
     #[test]
     fn unauthenticated_audit_limiter_caps_global_writes_and_records_one_aggregate_signal() {

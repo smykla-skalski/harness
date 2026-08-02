@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};

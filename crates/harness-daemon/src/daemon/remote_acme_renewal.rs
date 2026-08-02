@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
@@ -15,6 +16,7 @@ use super::remote_acme::{
 };
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_live::LiveRemoteAcmeIssuer;
+use super::remote_acme_queries::RemoteAcmeQueries;
 use super::remote_certificate_identity::{RemoteCertificateIdentityError, certificate_not_after};
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
 use super::remote_tls::{

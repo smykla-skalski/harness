@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::thread;
 
 use axum::extract::State;

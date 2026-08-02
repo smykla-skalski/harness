@@ -4,14 +4,11 @@ use std::sync::LazyLock;
 
 use rusqlite::Row;
 
-use super::{
-    DaemonDb, OptionalExtension, db_error, decode_remote_pairing_metadata, pairing_is_expired,
-};
+use super::{db_error, decode_remote_pairing_metadata, pairing_is_expired};
 use crate::daemon::remote_pairing::{
     RemotePairingDevice, RemotePairingInventoryEntry, RemotePairingObservation,
     derive_remote_pairing_state,
 };
-use crate::daemon::remote_pairing_queries::RemotePairingOwner;
 use harness_kernel::errors::CliError;
 
 /// The columns and joins both reads share. One spelling, because
@@ -37,7 +34,7 @@ FROM remote_pairing_codes p
 LEFT JOIN remote_clients c ON c.client_id = p.claimed_client_id
 ";
 
-static SELECT_REMOTE_PAIRING_INVENTORY_SQL: LazyLock<String> = LazyLock::new(|| {
+pub(crate) static SELECT_REMOTE_PAIRING_INVENTORY_SQL: LazyLock<String> = LazyLock::new(|| {
     format!(
         "{INVENTORY_SELECT_SQL}WHERE ?1 IS NULL OR json_extract(p.metadata_json, '$.minted_by') = ?1
 ORDER BY p.created_at DESC, p.pairing_id DESC"
@@ -46,120 +43,10 @@ ORDER BY p.created_at DESC, p.pairing_id DESC"
 
 /// One pairing, for an event that has just changed it. Reading the whole
 /// inventory to answer about a single row is what this exists to avoid.
-static SELECT_REMOTE_PAIRING_ENTRY_SQL: LazyLock<String> =
+pub(crate) static SELECT_REMOTE_PAIRING_ENTRY_SQL: LazyLock<String> =
     LazyLock::new(|| format!("{INVENTORY_SELECT_SQL}WHERE p.pairing_id = ?1"));
 
-impl DaemonDb {
-    /// Who minted one pairing.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the row or its metadata cannot be read.
-    pub(crate) fn remote_pairing_minted_by(
-        &self,
-        pairing_id: &str,
-    ) -> Result<RemotePairingOwner, CliError> {
-        let metadata_json: Option<String> = self
-            .conn
-            .query_row(
-                "SELECT metadata_json FROM remote_pairing_codes WHERE pairing_id = ?1",
-                [pairing_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(|error| db_error(format!("load pairing {pairing_id} owner: {error}")))?;
-        let Some(metadata_json) = metadata_json else {
-            return Ok(RemotePairingOwner::Unknown);
-        };
-        let metadata = decode_remote_pairing_metadata(&metadata_json)
-            .map_err(|error| db_error(format!("read pairing {pairing_id} owner: {error}")))?;
-        Ok(metadata
-            .minted_by
-            .map_or(RemotePairingOwner::Host, RemotePairingOwner::Client))
-    }
-
-    /// Pairings, newest first, with the device each one became.
-    ///
-    /// `minted_by` narrows the answer to one client's links. Filtering in the
-    /// query rather than afterwards keeps a broker's listing proportional to
-    /// what it minted instead of to everything the daemon has ever issued.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when a row or its metadata cannot be read.
-    pub(crate) fn list_remote_pairing_inventory(
-        &self,
-        now: &str,
-        minted_by: Option<&str>,
-    ) -> Result<Vec<RemotePairingInventoryEntry>, CliError> {
-        let mut statement = self
-            .conn
-            .prepare(&SELECT_REMOTE_PAIRING_INVENTORY_SQL)
-            .map_err(|error| db_error(format!("prepare remote pairing inventory: {error}")))?;
-        let rows = statement
-            .query_map([minted_by], |row| Ok(read_inventory_columns(row)))
-            .map_err(|error| db_error(format!("query remote pairing inventory: {error}")))?;
-
-        let mut entries = Vec::new();
-        for row in rows {
-            let columns =
-                row.map_err(|error| db_error(format!("read remote pairing inventory: {error}")))??;
-            entries.push(entry_from_columns(columns, now)?);
-        }
-        Ok(entries)
-    }
-
-    /// Which pairing a device claimed.
-    ///
-    /// A claim is spent by code and the caller never learns which row it was,
-    /// so this is how the change gets a pairing id to announce. A client is the
-    /// claimant of at most one pairing, because claiming mints the client.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the query fails.
-    pub(crate) fn remote_pairing_claimed_by(
-        &self,
-        client_id: &str,
-    ) -> Result<Option<String>, CliError> {
-        self.conn
-            .query_row(
-                "SELECT pairing_id FROM remote_pairing_codes WHERE claimed_client_id = ?1",
-                [client_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(|error| db_error(format!("query pairing claimed by client: {error}")))
-    }
-
-    /// One pairing as the inventory would show it, or `None` when no such row
-    /// exists.
-    ///
-    /// Deliberately unnarrowed by owner: the caller is the daemon reporting a
-    /// change it just made, not a client asking what it may see, and the entry
-    /// carries who minted it so the narrowing happens where the audience is
-    /// known.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the row or its metadata cannot be read.
-    pub(crate) fn remote_pairing_inventory_entry(
-        &self,
-        pairing_id: &str,
-        now: &str,
-    ) -> Result<Option<RemotePairingInventoryEntry>, CliError> {
-        let columns = self
-            .conn
-            .query_row(&SELECT_REMOTE_PAIRING_ENTRY_SQL, [pairing_id], |row| {
-                Ok(read_inventory_columns(row))
-            })
-            .optional()
-            .map_err(|error| db_error(format!("query remote pairing entry: {error}")))?;
-
-        columns
-            .transpose()?
-            .map(|columns| entry_from_columns(columns, now))
-            .transpose()
-    }
-}
-
-struct InventoryColumns {
+pub(crate) struct InventoryColumns {
     pairing_id: String,
     role: String,
     created_at: String,
@@ -173,7 +60,7 @@ struct InventoryColumns {
     revoked_at: Option<String>,
 }
 
-fn read_inventory_columns(row: &Row<'_>) -> Result<InventoryColumns, CliError> {
+pub(crate) fn read_inventory_columns(row: &Row<'_>) -> Result<InventoryColumns, CliError> {
     let column = |index: usize| -> Result<String, CliError> {
         row.get::<_, String>(index)
             .map_err(|error| db_error(format!("read remote pairing inventory column: {error}")))
@@ -197,7 +84,7 @@ fn read_inventory_columns(row: &Row<'_>) -> Result<InventoryColumns, CliError> {
     })
 }
 
-fn entry_from_columns(
+pub(crate) fn entry_from_columns(
     columns: InventoryColumns,
     now: &str,
 ) -> Result<RemotePairingInventoryEntry, CliError> {

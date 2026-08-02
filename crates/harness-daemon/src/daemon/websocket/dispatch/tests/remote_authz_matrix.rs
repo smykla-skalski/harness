@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::sync::{Arc, Mutex};
 
 use crate::daemon::http::{DaemonHttpAuthMode, DaemonHttpState};

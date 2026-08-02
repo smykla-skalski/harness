@@ -1,3 +1,4 @@
+use crate::daemon::remote_pairing_queries::RemotePairingAsyncQueries;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -64,7 +65,9 @@ mod tests {
     use super::*;
     use crate::daemon::db::DaemonDb;
     use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+    use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
     use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
+    use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 
     /// A backstop against a loop that never sweeps, not a claim about how fast
     /// this machine is. The waits below finish on their condition in

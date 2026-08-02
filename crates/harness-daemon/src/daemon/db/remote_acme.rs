@@ -1,16 +1,15 @@
-use rusqlite::{OptionalExtension, params, types::Type};
+use rusqlite::types::Type;
 
-use super::{CliError, DaemonDb, db_error};
 use crate::daemon::remote::{
     RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
 };
 use crate::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeIssuanceState, RemoteAcmeRuntimeState,
-    RemoteCertificateBundle, RemoteRenewalOutcome,
+    RemoteCertificateBundle,
 };
 use crate::daemon::remote_acme_queries::{RemoteAcmeRenewalStatus, RemoteAcmeStoredState};
 
-const SELECT_REMOTE_ACME_STATE_SQL: &str = "
+pub(crate) const SELECT_REMOTE_ACME_STATE_SQL: &str = "
 SELECT
     NULLIF(TRIM(account_id), ''),
     CASE
@@ -38,7 +37,7 @@ SELECT
 FROM remote_acme_state
 WHERE singleton = 1";
 
-const SELECT_REMOTE_ACME_ISSUANCE_STATE_SQL: &str = "
+pub(crate) const SELECT_REMOTE_ACME_ISSUANCE_STATE_SQL: &str = "
 SELECT
     NULLIF(TRIM(account_id), ''),
     NULLIF(TRIM(account_credentials_json), ''),
@@ -46,7 +45,7 @@ SELECT
 FROM remote_acme_state
 WHERE singleton = 1";
 
-const SELECT_REMOTE_ACME_RUNTIME_STATE_SQL: &str = "
+pub(crate) const SELECT_REMOTE_ACME_RUNTIME_STATE_SQL: &str = "
 SELECT
     NULLIF(TRIM(account_id), ''),
     NULLIF(TRIM(account_credentials_json), ''),
@@ -55,188 +54,9 @@ SELECT
 FROM remote_acme_state
 WHERE singleton = 1";
 
-impl DaemonDb {
-    /// Load token-safe remote ACME status from the singleton state row.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or status parsing failures.
-    pub(crate) fn load_remote_acme_state(&self) -> Result<RemoteAcmeStoredState, CliError> {
-        self.conn
-            .query_row(SELECT_REMOTE_ACME_STATE_SQL, [], remote_acme_state_from_row)
-            .optional()
-            .map_err(|error| db_error(format!("load remote acme state: {error}")))?
-            .ok_or_else(|| db_error("remote acme singleton state row is missing"))
-    }
-
-    /// Load secret ACME account material for certificate issuance.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the singleton row is missing, SQL loading
-    /// fails, or persisted account credentials are incomplete or invalid.
-    pub(crate) fn load_remote_acme_issuance_state(
-        &self,
-    ) -> Result<RemoteAcmeIssuanceState, CliError> {
-        self.conn
-            .query_row(
-                SELECT_REMOTE_ACME_ISSUANCE_STATE_SQL,
-                [],
-                remote_acme_issuance_state_from_row,
-            )
-            .optional()
-            .map_err(|error| db_error(format!("load remote acme issuance state: {error}")))?
-            .ok_or_else(|| db_error("remote acme singleton state row is missing"))
-    }
-
-    /// Persist an ACME account id and its opaque serialized credentials.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failure or if the singleton row is missing.
-    pub(crate) fn record_remote_acme_account(
-        &self,
-        account: &RemoteAcmeAccountCredentials,
-        updated_at: &str,
-    ) -> Result<(), CliError> {
-        let changed = self
-            .conn
-            .execute(
-                "UPDATE remote_acme_state
-                 SET account_id = ?1,
-                     account_credentials_json = ?2,
-                     updated_at = ?3
-                 WHERE singleton = 1",
-                params![account.account_id(), account.serialized(), updated_at],
-            )
-            .map_err(|error| db_error(format!("record remote acme account: {error}")))?;
-        if changed == 0 {
-            return Err(db_error("remote acme singleton state row is missing"));
-        }
-        Ok(())
-    }
-
-    /// Persist the remote serve config needed for later ACME issuance.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the config is invalid, the singleton state row
-    /// is missing, or the write fails.
-    pub(crate) fn record_remote_acme_serve_config(
-        &self,
-        config: &RemoteDaemonServeConfig,
-        updated_at: &str,
-    ) -> Result<(), CliError> {
-        validate_remote_serve_config(config)
-            .map_err(|error| db_error(format!("validate remote acme serve config: {error}")))?;
-        let changed = self
-            .conn
-            .execute(
-                "UPDATE remote_acme_state
-                 SET domain = ?1,
-                     host = ?2,
-                     https_port = ?3,
-                     http_port = ?4,
-                     acme_email = ?5,
-                     acme_challenge = ?6,
-                     acme_dns_provider = ?7,
-                     updated_at = ?8
-                 WHERE singleton = 1",
-                params![
-                    config.domain.trim(),
-                    config.host.trim(),
-                    i64::from(config.https_port),
-                    i64::from(config.http_port),
-                    config.acme_email.trim(),
-                    config.acme_challenge.as_str(),
-                    config.acme_dns_provider.map(RemoteDnsProvider::as_str),
-                    updated_at,
-                ],
-            )
-            .map_err(|error| db_error(format!("record remote acme serve config: {error}")))?;
-        if changed == 0 {
-            return Err(db_error("remote acme singleton state row is missing"));
-        }
-        Ok(())
-    }
-
-    /// Load remote ACME account and certificate material for the TLS runtime.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the singleton state row is missing or SQL
-    /// loading fails.
-    pub(crate) fn load_remote_acme_runtime_state(
-        &self,
-    ) -> Result<RemoteAcmeRuntimeState, CliError> {
-        self.conn
-            .query_row(
-                SELECT_REMOTE_ACME_RUNTIME_STATE_SQL,
-                [],
-                remote_acme_runtime_state_from_row,
-            )
-            .optional()
-            .map_err(|error| db_error(format!("load remote acme runtime state: {error}")))?
-            .ok_or_else(|| db_error("remote acme singleton state row is missing"))
-    }
-
-    /// Persist a redacted ACME renewal failure report.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failure.
-    pub(crate) fn record_remote_acme_renewal_failure(
-        &self,
-        detail: &str,
-        updated_at: &str,
-    ) -> Result<(), CliError> {
-        let report = RemoteRenewalOutcome::failure(detail).report().to_string();
-        self.conn
-            .execute(
-                "INSERT INTO remote_acme_state (
-                     singleton, renewal_status, renewal_error, updated_at
-                 ) VALUES (1, 'failed', ?1, ?2)
-                 ON CONFLICT(singleton) DO UPDATE SET
-                     renewal_status = excluded.renewal_status,
-                     renewal_error = excluded.renewal_error,
-                     updated_at = excluded.updated_at",
-                params![report, updated_at],
-            )
-            .map_err(|error| db_error(format!("record remote acme renewal failure: {error}")))?;
-        Ok(())
-    }
-
-    /// Persist a successful ACME renewal certificate bundle.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failure or if the singleton state row is
-    /// unexpectedly missing.
-    pub(crate) fn record_remote_acme_renewal_success(
-        &self,
-        bundle: &RemoteCertificateBundle,
-        updated_at: &str,
-    ) -> Result<(), CliError> {
-        let changed = self
-            .conn
-            .execute(
-                "UPDATE remote_acme_state
-                 SET certificate_pem = ?1,
-                     private_key_pem = ?2,
-                     certificate_fingerprint = ?3,
-                     renewal_status = 'succeeded',
-                     renewal_error = NULL,
-                     updated_at = ?4
-                 WHERE singleton = 1",
-                params![
-                    bundle.certificate_pem(),
-                    bundle.private_key_pem(),
-                    bundle.fingerprint(),
-                    updated_at,
-                ],
-            )
-            .map_err(|error| db_error(format!("record remote acme renewal success: {error}")))?;
-        if changed == 0 {
-            return Err(db_error("remote acme singleton state row is missing"));
-        }
-        Ok(())
-    }
-}
-
-fn remote_acme_state_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteAcmeStoredState> {
+pub(crate) fn remote_acme_state_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<RemoteAcmeStoredState> {
     let status_label = row.get::<_, String>(4)?;
     Ok(RemoteAcmeStoredState {
         account_id: row.get(0)?,
@@ -250,7 +70,7 @@ fn remote_acme_state_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Remot
     })
 }
 
-fn remote_acme_issuance_state_from_row(
+pub(crate) fn remote_acme_issuance_state_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<RemoteAcmeIssuanceState> {
     let account_id = row.get::<_, Option<String>>(0)?;
@@ -409,7 +229,7 @@ fn parse_dns_provider_at_column(label: &str, column: usize) -> rusqlite::Result<
     }
 }
 
-fn remote_acme_runtime_state_from_row(
+pub(crate) fn remote_acme_runtime_state_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<RemoteAcmeRuntimeState> {
     let account = remote_acme_account_from_columns(
