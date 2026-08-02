@@ -367,7 +367,9 @@ extension RecordingHarnessClient {
       )
     )
     if let snapshot = lock.withLock({ resolvedAcpSnapshotsByAgentID[agentID] }) {
-      return .acp(snapshot)
+      let resolved = replacingAcpSnapshot(snapshot, pendingBatches: [])
+      lock.withLock { resolvedAcpSnapshotsByAgentID[agentID] = resolved }
+      return .acp(resolved)
     }
     throw HarnessMonitorAPIError.server(code: 404, message: "ACP permission unavailable.")
   }

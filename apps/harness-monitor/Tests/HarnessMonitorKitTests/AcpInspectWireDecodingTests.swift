@@ -40,6 +40,9 @@ struct AcpInspectWireDecodingTests {
     #expect(agent.displayName == "Copilot")
     #expect(agent.terminalCount == 1)
     #expect(agent.promptDeadlineRemainingMs == 60000)
+    #expect(agent.handshake?.supportsSessionResume == true)
+    #expect(agent.handshake?.supportsLogout == true)
+    #expect(agent.sessionState?.title == "Dashboard migration")
   }
 }
 
@@ -64,7 +67,17 @@ private let inspectFixture = """
         "pending_permissions": 0,
         "permission_queue_depth": 0,
         "terminal_count": 1,
-        "prompt_deadline_remaining_ms": 60000
+        "prompt_deadline_remaining_ms": 60000,
+        "handshake": {
+          "protocol_version": 1,
+          "auth_method_ids": ["oauth"],
+          "supports_session_resume": true,
+          "supports_logout": true
+        },
+        "session_state": {
+          "title": "Dashboard migration",
+          "available_commands": ["review"]
+        }
       }
     ],
     "daemon_perceived_now": "2026-06-18T00:00:01Z",

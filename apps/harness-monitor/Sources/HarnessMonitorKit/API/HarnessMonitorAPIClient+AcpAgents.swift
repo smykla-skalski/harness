@@ -46,6 +46,44 @@ extension HarnessMonitorAPIClient {
     return try ManagedAgentSnapshot(wire: wire)
   }
 
+  public func managedAcpSessions(
+    agentID: String,
+    cwd: String?,
+    cursor: String?
+  ) async throws -> AcpProviderSessionPage {
+    var queryItems: [URLQueryItem] = []
+    if let cwd { queryItems.append(URLQueryItem(name: "cwd", value: cwd)) }
+    if let cursor { queryItems.append(URLQueryItem(name: "cursor", value: cursor)) }
+    return try await get(
+      "/v1/managed-agents/\(agentID)/sessions",
+      queryItems: queryItems,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func closeManagedAcpSession(agentID: String, sessionID: String) async throws {
+    let _: AcpMutationAcknowledgement = try await post(
+      "/v1/managed-agents/\(agentID)/sessions/\(sessionID)/close",
+      body: EmptyBody(),
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func deleteManagedAcpSession(agentID: String, sessionID: String) async throws {
+    let _: AcpMutationAcknowledgement = try await delete(
+      "/v1/managed-agents/\(agentID)/sessions/\(sessionID)",
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func logoutManagedAcpAgent(agentID: String) async throws {
+    let _: AcpMutationAcknowledgement = try await post(
+      "/v1/managed-agents/\(agentID)/logout",
+      body: EmptyBody(),
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
   public func openRouterModelCatalog() async throws -> OpenRouterModelCatalogResponse {
     try await get("/v1/openrouter/models", decoder: PolicyWireCoding.decoder)
   }

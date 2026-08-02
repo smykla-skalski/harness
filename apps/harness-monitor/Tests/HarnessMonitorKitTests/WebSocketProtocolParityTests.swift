@@ -72,6 +72,45 @@ struct WebSocketProtocolParityTests {
     assertExpectedSessionAgentMutationParameters(calls)
   }
 
+  @Test("WebSocket ACP provider-session controls carry managed identity")
+  func acpProviderSessionControlsUseManagedIdentity() async throws {
+    let probe = RPCProbe()
+    let transport = makeAcpManagementRPCTransport(probe: probe)
+
+    let page = try await transport.managedAcpSessions(
+      agentID: "acp-dashboard",
+      cwd: "/tmp/project",
+      cursor: "next-page"
+    )
+    try await transport.closeManagedAcpSession(
+      agentID: "acp-dashboard",
+      sessionID: "provider-session"
+    )
+    try await transport.deleteManagedAcpSession(
+      agentID: "acp-dashboard",
+      sessionID: "provider-session"
+    )
+    try await transport.logoutManagedAcpAgent(agentID: "acp-dashboard")
+
+    #expect(page.sessions.map(\.sessionID) == ["provider-session"])
+    let calls = await probe.snapshot()
+    #expect(
+      calls.map(\.method) == [
+        .managedAgentAcpSessions,
+        .managedAgentCloseAcpSession,
+        .managedAgentDeleteAcpSession,
+        .managedAgentLogoutAcp,
+      ]
+    )
+    for call in calls {
+      #expect(objectValue(call.params, key: "managed_agent_id") == .string("acp-dashboard"))
+    }
+    #expect(objectValue(calls[0].params, key: "cwd") == .string("/tmp/project"))
+    #expect(objectValue(calls[0].params, key: "cursor") == .string("next-page"))
+    #expect(objectValue(calls[1].params, key: "agent_session_id") == .string("provider-session"))
+    #expect(objectValue(calls[2].params, key: "agent_session_id") == .string("provider-session"))
+  }
+
   @Test("Swift RPC method catalog matches daemon websocket constants")
   func swiftRPCMethodCatalogMatchesDaemonConstants() throws {
     let daemonMethods = try daemonRPCMethodValues()

@@ -105,6 +105,26 @@ extension HarnessMonitorClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable")
   }
 
+  public func managedAcpSessions(
+    agentID _: String,
+    cwd _: String?,
+    cursor _: String?
+  ) async throws -> AcpProviderSessionPage {
+    throw HarnessMonitorAPIError.server(code: 501, message: "ACP session list unavailable")
+  }
+
+  public func closeManagedAcpSession(agentID _: String, sessionID _: String) async throws {
+    throw HarnessMonitorAPIError.server(code: 501, message: "ACP session close unavailable")
+  }
+
+  public func deleteManagedAcpSession(agentID _: String, sessionID _: String) async throws {
+    throw HarnessMonitorAPIError.server(code: 501, message: "ACP session delete unavailable")
+  }
+
+  public func logoutManagedAcpAgent(agentID _: String) async throws {
+    throw HarnessMonitorAPIError.server(code: 501, message: "ACP logout unavailable")
+  }
+
   public func codexRuns(sessionID: String) async throws -> CodexRunListResponse {
     let agents = try await managedAgents(sessionID: sessionID)
     return CodexRunListResponse(

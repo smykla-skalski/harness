@@ -11,6 +11,26 @@ public struct TimelineEntry: Codable, Equatable, Identifiable, Sendable {
   public let payload: JSONValue
 
   public var id: String { entryId }
+
+  public init(
+    entryId: String,
+    recordedAt: String,
+    kind: String,
+    sessionId: String,
+    agentId: String?,
+    taskId: String?,
+    summary: String,
+    payload: JSONValue
+  ) {
+    self.entryId = entryId
+    self.recordedAt = recordedAt
+    self.kind = kind
+    self.sessionId = sessionId
+    self.agentId = agentId
+    self.taskId = taskId
+    self.summary = summary
+    self.payload = payload
+  }
 }
 
 public struct TimelineCursor: Codable, Equatable, Sendable {

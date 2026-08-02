@@ -133,6 +133,25 @@ extension RecordingHarnessClient {
     return .acp(snapshot)
   }
 
+  func promptManagedAcpAgent(
+    agentID: String,
+    prompt _: String
+  ) async throws -> ManagedAgentSnapshot {
+    guard let snapshot = lock.withLock({ resolvedAcpSnapshotsByAgentID[agentID] }) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "ACP agent unavailable")
+    }
+    return .acp(snapshot)
+  }
+
+  func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot {
+    guard let snapshot = lock.withLock({ resolvedAcpSnapshotsByAgentID[agentID] }) else {
+      throw HarnessMonitorAPIError.server(code: 404, message: "ACP agent unavailable")
+    }
+    let stopped = replacingAcpSnapshot(snapshot, status: .removed, pendingBatches: [])
+    lock.withLock { resolvedAcpSnapshotsByAgentID[agentID] = stopped }
+    return .acp(stopped)
+  }
+
   private func recordStartedAcpAgent(
     sessionID: String,
     request: AcpAgentStartRequest,
@@ -242,6 +261,31 @@ extension RecordingHarnessClient {
     managedAgentID: String
   ) -> String {
     "recording-session-agent-\(descriptorID)-\(managedAgentID)"
+  }
+
+  func replacingAcpSnapshot(
+    _ snapshot: AcpAgentSnapshot,
+    status: AgentStatus? = nil,
+    pendingBatches: [AcpPermissionBatch]? = nil
+  ) -> AcpAgentSnapshot {
+    AcpAgentSnapshot(
+      acpId: snapshot.acpId,
+      sessionId: snapshot.sessionId,
+      agentId: snapshot.agentId,
+      displayName: snapshot.displayName,
+      status: status ?? snapshot.status,
+      pid: snapshot.pid,
+      pgid: snapshot.pgid,
+      projectDir: snapshot.projectDir,
+      pendingPermissions: pendingBatches?.flatMap(\.requests).count ?? snapshot.pendingPermissions,
+      permissionQueueDepth: pendingBatches?.count ?? snapshot.permissionQueueDepth,
+      pendingPermissionBatches: pendingBatches ?? snapshot.pendingPermissionBatches,
+      terminalCount: snapshot.terminalCount,
+      createdAt: snapshot.createdAt,
+      updatedAt: snapshot.updatedAt,
+      disconnectReason: snapshot.disconnectReason,
+      stderrTail: snapshot.stderrTail
+    )
   }
 
   private func updatedSummaryForStartedAgent(

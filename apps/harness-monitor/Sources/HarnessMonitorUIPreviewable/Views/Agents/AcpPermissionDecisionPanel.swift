@@ -27,7 +27,7 @@ struct AcpPermissionDecisionPanel: View {
             label: selectionSummary
           )
         if isResolving {
-          Text("Submitting permission decision...")
+          Text("Submitting permission decision")
             .scaledFont(.caption)
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .accessibilityLabel("Submitting permission decision")

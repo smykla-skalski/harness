@@ -24,6 +24,18 @@ public struct AcpPermissionItem: Codable, Equatable, Sendable {
   public let sessionId: String
   public let toolCall: JSONValue
   public let options: [JSONValue]
+
+  public init(
+    requestId: String,
+    sessionId: String,
+    toolCall: JSONValue,
+    options: [JSONValue]
+  ) {
+    self.requestId = requestId
+    self.sessionId = sessionId
+    self.toolCall = toolCall
+    self.options = options
+  }
 }
 
 /// First-class ACP permission queue element.

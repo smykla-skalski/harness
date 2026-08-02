@@ -1,7 +1,7 @@
 import Foundation
 
 public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProtocol,
-  HarnessMonitorReviewsClientProtocol, Sendable
+  HarnessMonitorReviewsClientProtocol, HarnessMonitorAcpSessionClientProtocol, Sendable
 {
   func health() async throws -> HealthResponse
   func transportLatencyMs() async throws -> Int?
