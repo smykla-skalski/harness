@@ -152,24 +152,38 @@ gallery_path="$output_directory/index.html"
     '  <style>' \
     '    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }' \
     '    body { margin: 0; padding: 32px; background: #151515; color: #f5f5f5; }' \
-    '    header { margin: 0 0 24px; }' \
+    '    header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 0 0 24px; }' \
     '    h1 { margin: 0 0 8px; font-size: 24px; text-transform: capitalize; }' \
     '    p { margin: 0; color: #aaa; }' \
-    '    main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 20px; }' \
+    '    .layout-controls { display: flex; gap: 4px; padding: 4px; background: #202020; border: 1px solid #353535; border-radius: 10px; }' \
+    '    button { padding: 7px 12px; color: #bbb; background: transparent; border: 0; border-radius: 7px; font: inherit; cursor: pointer; }' \
+    '    button:hover { color: #fff; background: #2b2b2b; }' \
+    '    button[aria-pressed="true"] { color: #fff; background: #3b6fc4; }' \
+    '    main { display: grid; gap: 20px; }' \
+    '    main[data-columns="two"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }' \
+    '    main[data-columns="one"] { grid-template-columns: minmax(0, 1fr); }' \
     '    figure { margin: 0; padding: 16px; overflow: auto; background: #202020; border: 1px solid #353535; border-radius: 12px; }' \
     '    figcaption { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 12px; font-size: 14px; font-weight: 600; }' \
     '    .name { text-transform: capitalize; }' \
     '    .dimensions { color: #888; font-weight: 400; white-space: nowrap; }' \
-    '    img { display: block; max-width: none; height: auto; margin-inline: auto; border-radius: 8px; background: #1d1d1d; }' \
+    '    img { display: block; max-width: 100%; height: auto; margin-inline: auto; border-radius: 8px; background: #1d1d1d; }' \
     '    a { color: inherit; }' \
+    '    @media (max-width: 1120px) { main[data-columns="two"] { grid-template-columns: minmax(0, 1fr); } }' \
+    '    @media (max-width: 700px) { body { padding: 20px; } header { align-items: stretch; flex-direction: column; } .layout-controls { align-self: start; } }' \
     '  </style>' \
     '</head>' \
     '<body>' \
     '  <header>' \
-    "    <h1>$suite_label</h1>" \
-    "    <p>$rendered_count snapshots · Click any preview to open the original PNG</p>" \
+    '    <div>' \
+    "      <h1>$suite_label</h1>" \
+    "      <p>$rendered_count snapshots · Click any preview to open the original PNG</p>" \
+    '    </div>' \
+    '    <div class="layout-controls" role="group" aria-label="Preview columns">' \
+    '      <button type="button" data-column-choice="two" aria-pressed="true">Two columns</button>' \
+    '      <button type="button" data-column-choice="one" aria-pressed="false">One column</button>' \
+    '    </div>' \
     '  </header>' \
-    '  <main>'
+    '  <main data-columns="two">'
   for index in "${!rendered_names[@]}"; do
     snapshot_name="${rendered_names[$index]}"
     point_width="${rendered_widths[$index]}"
@@ -185,6 +199,18 @@ gallery_path="$output_directory/index.html"
   done
   printf '%s\n' \
     '  </main>' \
+    '  <script>' \
+    '    const grid = document.querySelector("main");' \
+    '    const columnButtons = document.querySelectorAll("[data-column-choice]");' \
+    '    for (const button of columnButtons) {' \
+    '      button.addEventListener("click", () => {' \
+    '        grid.dataset.columns = button.dataset.columnChoice;' \
+    '        for (const candidate of columnButtons) {' \
+    '          candidate.setAttribute("aria-pressed", String(candidate === button));' \
+    '        }' \
+    '      });' \
+    '    }' \
+    '  </script>' \
     '</body>' \
     '</html>'
 } > "$gallery_path"
