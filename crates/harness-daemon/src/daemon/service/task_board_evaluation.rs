@@ -166,9 +166,11 @@ async fn selected_items_async(
     request: &TaskBoardEvaluateRequest,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     if let Some(item_id) = request.item_id.as_deref() {
-        return db.task_board_item(item_id).await.map(|item| vec![item]);
+        return super::task_board_repository_scope::scoped_task_board_item_db(db, item_id)
+            .await
+            .map(|item| vec![item]);
     }
-    db.list_task_board_items(request.status).await
+    super::task_board_repository_scope::scoped_task_board_items_db(db, request.status).await
 }
 
 #[cfg(test)]
